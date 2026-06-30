@@ -30,6 +30,7 @@ import co.xenastudios.neoskript.lang.type.VectorType;
 import co.xenastudios.neoskript.lang.type.WorldType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -602,6 +603,44 @@ public final class BuiltinModule {
         registry.registerEffect("make %world% (rainy|stormy)", arguments ->
                 worldEffect(arguments.get(0), world -> world.setStorm(true)));
 
+        registry.registerEffect("set (max health|maximum health) of %player% to %number%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> value = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof LivingEntity entity) {
+                    entity.setMaxHealth(Math.max(1, orZero(toNumber(value.getSingle(ctx)))));
+                }
+            };
+        });
+        registry.registerEffect("ignite %entity% [for %number% seconds]", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> seconds = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Entity entity) {
+                    int ticks = seconds == null ? 100 : (int) (orZero(toNumber(seconds.getSingle(ctx))) * 20);
+                    entity.setFireTicks(ticks);
+                }
+            };
+        });
+        registry.registerEffect("extinguish %entity%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Entity entity) {
+                    entity.setFireTicks(0);
+                }
+            };
+        });
+        registry.registerEffect("set [the] block at %location% to %item%", arguments -> {
+            Expression<?> location = arguments.get(0);
+            Expression<?> item = arguments.get(1);
+            return ctx -> {
+                Location loc = toLocation(location.getSingle(ctx));
+                if (loc != null && item.getSingle(ctx) instanceof ItemStack stack) {
+                    loc.getBlock().setType(stack.getType());
+                }
+            };
+        });
+
         registry.registerEffect("give %object% to %player%", arguments -> {
             Expression<?> item = arguments.get(0);
             Expression<?> target = arguments.get(1);
@@ -683,6 +722,16 @@ public final class BuiltinModule {
                 CommandSender receiver = resolveReceiver(target, ctx);
                 if (receiver != null) {
                     receiver.sendActionBar(colored(Renderer.toDisplay(message.getSingle(ctx))));
+                }
+            };
+        });
+
+        registry.registerEffect("send title %string% [to %player%]", arguments -> {
+            Expression<?> message = arguments.get(0);
+            Expression<?> target = arguments.get(1);
+            return ctx -> {
+                if (resolveReceiver(target, ctx) instanceof Player player) {
+                    player.showTitle(Title.title(colored(Renderer.toDisplay(message.getSingle(ctx))), Component.empty()));
                 }
             };
         });

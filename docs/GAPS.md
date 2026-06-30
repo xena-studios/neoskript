@@ -34,6 +34,7 @@ load/save, chunk load — plus **event-values** (`event-block`/`event-world`/`ev
 remove, delete/clear, replace-in-text, return, stop, exit loop, continue, cancel/uncancel event,
 set health/food/gamemode, kill, heal, feed, op/deop, kick, teleport to player, set walk speed, give/take items,
 allow/disallow flight, set display name, clear inventory, set time of world, make world sunny/stormy,
+set max health, ignite/extinguish, set block, send title,
 execute command (`make … execute`, `execute console command`).
 
 **Expressions:** player, console, event-values, loop-value/number/index, name of, size/amount of,
@@ -54,9 +55,8 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`.
 
 - **Types:** entity (beyond generic Entity), block (beyond event-value), inventory,
   slot, biome, colour, enchantment, material, chunk, offline player, date, direction, …
-- **Effects:** set block, play sound/particles, apply/clear potion effects,
-  open/modify inventories, send title, set weather amount/duration, scoreboard, push/launch, ignite,
-  ban/unban, set max health, …
+- **Effects:** play sound/particles, apply/clear potion effects, open/modify inventories,
+  set weather amount/duration, scoreboard, push/launch, ban/unban, …
 - **Expressions:** direction/vector math, item properties (amount/name/lore/enchants), world
   time/weather, target/looked-at block, nearby entities, date/now and time differences, more
   string/number formatting, …
