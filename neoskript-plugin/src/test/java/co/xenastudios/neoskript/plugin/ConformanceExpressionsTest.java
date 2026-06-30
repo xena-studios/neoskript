@@ -65,6 +65,7 @@ class ConformanceExpressionsTest {
                         set {_x} to x of location of player
                         set {_x} to y of location of player
                         set {_x} to z of location of player
+                        set {_x} to distance between location of player and location of player
                         set {_x} to time of world of player
                         set {_x} to gamemode of player
                         set {_x} to health of player

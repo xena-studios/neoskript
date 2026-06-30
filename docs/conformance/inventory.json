@@ -8165,7 +8165,7 @@
       "[the] distance between %location% and %location%"
     ],
     "source": "ch/njol/skript/expressions/ExprDistance.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "distance between %location% and %location%"
   },
