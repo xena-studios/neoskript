@@ -25,11 +25,11 @@ and **`cancel event`**/`uncancel event`.
 
 **Conditions:** equality and numeric comparisons, `is set`, `contains`, `starts/ends with`,
 `matches` (regex), `is between`, `chance of`, `is op`, `is online/offline`, `is alive/dead`,
-`is sneaking/sprinting/flying`, `has permission`.
+`is sneaking/sprinting/flying`, `has permission`, `has <item>`.
 
 **Effects:** broadcast, send/message, send actionbar (with legacy `&` colour codes), set, add,
 remove, delete/clear, replace-in-text, return, stop, exit loop, continue, cancel/uncancel event,
-set health/food/gamemode, kill, heal, feed, op/deop, kick, teleport to player, set walk speed,
+set health/food/gamemode, kill, heal, feed, op/deop, kick, teleport to player, set walk speed, give/take items,
 allow/disallow flight, set display name, clear inventory, set time of world, make world sunny/stormy,
 execute command (`make … execute`, `execute console command`).
 
@@ -45,13 +45,13 @@ players; gamemode literals; command `sender`, `arg-N`, `args`; comma/`and`-separ
 (registry-backed display/parse).
 
 **Built-in functions:** abs, round, floor, ceil, sqrt, exp, ln, log, sin/cos/tan (+inverse), mod,
-atan2, min, max, sum, product, `vector()`, `location()`.
+atan2, min, max, sum, product, `vector()`, `location()`, `item()`.
 
 ## ❌ Remaining — content long tail
 
-- **Types:** item/itemstack, entity (beyond generic Entity), block (beyond event-value), inventory,
+- **Types:** entity (beyond generic Entity), block (beyond event-value), inventory,
   slot, biome, colour, enchantment, material, chunk, offline player, date, direction, …
-- **Effects:** set block, give/remove items, play sound/particles, apply/clear potion effects,
+- **Effects:** set block, play sound/particles, apply/clear potion effects,
   open/modify inventories, send title, set weather amount/duration, scoreboard, push/launch, ignite,
   ban/unban, set max health, …
 - **Expressions:** direction/vector math, item properties (amount/name/lore/enchants), world
@@ -60,7 +60,7 @@ atan2, min, max, sum, product, `vector()`, `location()`.
 - **Events:** the remaining ~80 (craft, smelt, enchant, projectile, vehicle, portal, bucket, leash,
   tame, breed, world save/init, chunk load, server ping, tab complete, …).
 - **Conditions:** the remaining ~100 (is wearing, can build/fly, is banned/whitelisted, world is,
-  is burning/in water, has item, is holding, …).
+  is burning/in water, is holding, …).
 - **Functions:** `date()`, `rgb()`/colour, `world()`, `player()`, …
 
 ## ❌ Remaining — deeper engine features
@@ -74,7 +74,7 @@ atan2, min, max, sum, product, `vector()`, `location()`.
 5. **Persistence:** SQL backends; serialization of non-simple variable values.
 6. **Text:** MiniMessage (`<red>`) in addition to legacy `&` codes.
 7. **Pattern engine niceties:** `the`/`a`/`an` articles, plural handling, parse marks/tags from
-   alternations, comma-separated expression lists (`a, b and c`).
+   alternations.
 
 ## Notes
 

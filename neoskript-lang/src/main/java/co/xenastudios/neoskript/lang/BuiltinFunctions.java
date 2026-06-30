@@ -3,7 +3,9 @@ package co.xenastudios.neoskript.lang;
 import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 import co.xenastudios.neoskript.core.runtime.ScriptFunction;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
 import java.util.List;
@@ -53,6 +55,17 @@ public final class BuiltinFunctions {
         registry.register("location", (args, ctx) -> {
             World world = args.size() > 3 && args.get(3) instanceof World w ? w : null;
             return new Location(world, coord(args, 0), coord(args, 1), coord(args, 2));
+        });
+        registry.register("item", (args, ctx) -> {
+            if (args.isEmpty()) {
+                return null;
+            }
+            Material material = Material.matchMaterial(String.valueOf(args.get(0)));
+            if (material == null) {
+                return null;
+            }
+            int amount = args.size() > 1 && args.get(1) instanceof Number n ? n.intValue() : 1;
+            return new ItemStack(material, Math.max(1, amount));
         });
     }
 

@@ -21,6 +21,7 @@ import co.xenastudios.neoskript.lang.expression.EventPlayerExpression;
 import co.xenastudios.neoskript.lang.expression.EventValueExpression;
 import co.xenastudios.neoskript.lang.type.BooleanType;
 import co.xenastudios.neoskript.lang.type.GameModeType;
+import co.xenastudios.neoskript.lang.type.ItemType;
 import co.xenastudios.neoskript.lang.type.LocationType;
 import co.xenastudios.neoskript.lang.type.NumberType;
 import co.xenastudios.neoskript.lang.type.PlayerType;
@@ -40,6 +41,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.player.PlayerEvent;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -83,6 +85,7 @@ public final class BuiltinModule {
         types.register(new GameModeType());
         types.register(new LocationType());
         types.register(new VectorType());
+        types.register(new ItemType());
         Renderer.setTypeRegistry(types);
     }
 
@@ -443,6 +446,20 @@ public final class BuiltinModule {
         registry.registerCondition("%player% has permission %string%", a -> hasPermission(a, true));
         registry.registerCondition("%player% (doesn't have|does not have|lacks) permission %string%",
                 a -> hasPermission(a, false));
+        registry.registerCondition("%player% (has|have) %object%", a -> hasItem(a, true));
+        registry.registerCondition("%player% (doesn't have|does not have|hasn't|haven't) %object%",
+                a -> hasItem(a, false));
+    }
+
+    private static Condition hasItem(Arguments arguments, boolean expected) {
+        Expression<?> target = arguments.get(0);
+        Expression<?> item = arguments.get(1);
+        return ctx -> {
+            boolean has = target.getSingle(ctx) instanceof Player player
+                    && item.getSingle(ctx) instanceof ItemStack stack
+                    && player.getInventory().containsAtLeast(stack, stack.getAmount());
+            return has == expected;
+        };
     }
 
     private static Condition playerIs(Expression<?> target, Predicate<Player> test, boolean expected) {
@@ -568,6 +585,25 @@ public final class BuiltinModule {
                 worldEffect(arguments.get(0), world -> world.setStorm(false)));
         registry.registerEffect("make %world% (rainy|stormy)", arguments ->
                 worldEffect(arguments.get(0), world -> world.setStorm(true)));
+
+        registry.registerEffect("give %object% to %player%", arguments -> {
+            Expression<?> item = arguments.get(0);
+            Expression<?> target = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Player player && item.getSingle(ctx) instanceof ItemStack stack) {
+                    player.getInventory().addItem(stack);
+                }
+            };
+        });
+        registry.registerEffect("take %object% from %player%", arguments -> {
+            Expression<?> item = arguments.get(0);
+            Expression<?> target = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Player player && item.getSingle(ctx) instanceof ItemStack stack) {
+                    player.getInventory().removeItem(stack);
+                }
+            };
+        });
     }
 
     private static co.xenastudios.neoskript.api.syntax.Effect worldEffect(Expression<?> target,
