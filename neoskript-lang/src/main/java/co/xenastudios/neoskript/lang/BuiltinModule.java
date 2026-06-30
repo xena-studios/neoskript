@@ -117,7 +117,14 @@ public final class BuiltinModule {
 
         registry.registerExpression("(size|amount|number) of %objects%", Object.class, arguments -> {
             Expression<?> source = arguments.get(0);
-            return new ComputedExpression(ctx -> (double) source.getAll(ctx).length);
+            return new ComputedExpression(ctx -> {
+                Object[] all = source.getAll(ctx);
+                // For a single item stack, "amount of" means its stack size, not the element count.
+                if (all.length == 1 && all[0] instanceof ItemStack item) {
+                    return (double) item.getAmount();
+                }
+                return (double) all.length;
+            });
         });
 
         registry.registerExpression("random number (from|between) %number% (to|and) %number%", Object.class,
@@ -146,11 +153,11 @@ public final class BuiltinModule {
                 arguments -> new ComputedListExpression(ctx -> Bukkit.getOnlinePlayers().toArray()));
 
         registry.registerExpression("x[-coordinate] of %location%", Object.class,
-                arguments -> coordinate(arguments.get(0), Location::getX));
+                arguments -> coordinate(arguments.get(0), Location::getX, Vector::getX));
         registry.registerExpression("y[-coordinate] of %location%", Object.class,
-                arguments -> coordinate(arguments.get(0), Location::getY));
+                arguments -> coordinate(arguments.get(0), Location::getY, Vector::getY));
         registry.registerExpression("z[-coordinate] of %location%", Object.class,
-                arguments -> coordinate(arguments.get(0), Location::getZ));
+                arguments -> coordinate(arguments.get(0), Location::getZ, Vector::getZ));
         registry.registerExpression("time of %world%", Object.class, arguments -> {
             Expression<?> world = arguments.get(0);
             return new ComputedExpression(ctx ->
@@ -209,10 +216,16 @@ public final class BuiltinModule {
                 target.getSingle(ctx) instanceof LivingEntity entity ? accessor.apply(entity) : null);
     }
 
-    private static ComputedExpression coordinate(Expression<?> target, java.util.function.ToDoubleFunction<Location> fn) {
+    private static ComputedExpression coordinate(Expression<?> target,
+                                                 java.util.function.ToDoubleFunction<Location> locationFn,
+                                                 java.util.function.ToDoubleFunction<Vector> vectorFn) {
         return new ComputedExpression(ctx -> {
-            Location location = toLocation(target.getSingle(ctx));
-            return location == null ? null : fn.applyAsDouble(location);
+            Object value = target.getSingle(ctx);
+            if (value instanceof Vector vector) {
+                return vectorFn.applyAsDouble(vector);
+            }
+            Location location = toLocation(value);
+            return location == null ? null : locationFn.applyAsDouble(location);
         });
     }
 
@@ -262,7 +275,14 @@ public final class BuiltinModule {
                 arguments -> mapString(arguments.get(0), s -> s.toLowerCase(Locale.ROOT)));
         registry.registerExpression("length of %string%", Object.class, arguments -> {
             Expression<?> s = arguments.get(0);
-            return new ComputedExpression(ctx -> (double) Renderer.toDisplay(s.getSingle(ctx)).length());
+            return new ComputedExpression(ctx -> {
+                Object value = s.getSingle(ctx);
+                // A vector's "length" is its magnitude; otherwise it's the string length.
+                if (value instanceof Vector vector) {
+                    return vector.length();
+                }
+                return (double) Renderer.toDisplay(value).length();
+            });
         });
         registry.registerExpression("%string% split at %string%", Object.class, arguments -> {
             Expression<?> source = arguments.get(0);

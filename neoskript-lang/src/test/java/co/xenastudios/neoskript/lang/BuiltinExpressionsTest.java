@@ -60,6 +60,15 @@ class BuiltinExpressionsTest {
     }
 
     @Test
+    void vectorCoordinatesAndLength() {
+        Map<String, Object> g = new HashMap<>();
+        assertEquals(3.0, eval("x of vector(3, 4, 0)", g));
+        assertEquals(4.0, eval("y of vector(3, 4, 0)", g));
+        assertEquals(5.0, eval("length of vector(3, 4, 0)", g)); // 3-4-5 triangle
+        assertEquals(3.0, eval("length of \"abc\"", g));          // strings still measured by length
+    }
+
+    @Test
     void localFunctionWithTypedParameterCoercesArgument() {
         // The string "5" is coerced to a number by the declared parameter type, so *2 yields 10.
         scripts.parse("local function double(n: number) :: number:\n    return {_n} * 2\n");
