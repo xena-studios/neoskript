@@ -1,0 +1,4 @@
+# NeoSkript conformance fixture — a minimal Skript-syntax script.
+on join:
+    broadcast "Welcome, %player%!"
+    send "Hello there" to player

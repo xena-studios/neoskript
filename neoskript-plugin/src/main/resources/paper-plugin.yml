@@ -1,0 +1,8 @@
+name: NeoSkript
+version: '${version}'
+main: co.xenastudios.neoskript.plugin.NeoSkriptPlugin
+api-version: '1.21'
+authors: [XenaStudios]
+description: A fast, modern, drop-in replacement for Skript.
+website: https://github.com/XenaStudios/NeoSkript
+folia-supported: true
