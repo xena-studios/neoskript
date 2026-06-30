@@ -7214,8 +7214,7 @@
       "[the] breeder"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/expressions/ExprBreedingFamily.java",
-    "status": "parse-verified",
-    "implemented": true
+    "status": "todo"
   },
   {
     "id": "expression:brewing-results",
@@ -8258,8 +8257,7 @@
       "[the] [displayed] ([e]xp[erience]|enchanting) cost"
     ],
     "source": "ch/njol/skript/expressions/ExprEnchantingExpCost.java",
-    "status": "parse-verified",
-    "implemented": true
+    "status": "todo"
   },
   {
     "id": "expression:enchantment-bonus",
@@ -9132,8 +9130,7 @@
       "[the] hatching entity [type]"
     ],
     "source": "ch/njol/skript/expressions/ExprHatchingType.java",
-    "status": "parse-verified",
-    "implemented": true
+    "status": "todo"
   },
   {
     "id": "expression:hatching-number",

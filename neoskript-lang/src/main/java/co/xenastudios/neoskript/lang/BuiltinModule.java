@@ -354,7 +354,7 @@ public final class BuiltinModule {
                 event(ctx) instanceof org.bukkit.event.player.PlayerLevelChangeEvent e ? (double) e.getNewLevel() : null);
         eventValue(registry, "[the] (new|future) food level", ctx ->
                 event(ctx) instanceof org.bukkit.event.entity.FoodLevelChangeEvent e ? (double) e.getFoodLevel() : null);
-        eventValue(registry, "[the] (bred|breeding) (mother|breeder)", ctx ->
+        eventValue(registry, "[the] (breeder|breeding mother|bred mother)", ctx ->
                 event(ctx) instanceof org.bukkit.event.entity.EntityBreedEvent e ? e.getBreeder() : null);
         eventValue(registry, "[the] (sign|written) line[s]", ctx ->
                 event(ctx) instanceof org.bukkit.event.block.SignChangeEvent e ? e.getLines() : null);
