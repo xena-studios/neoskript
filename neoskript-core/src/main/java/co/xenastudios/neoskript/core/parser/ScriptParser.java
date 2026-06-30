@@ -1,6 +1,7 @@
 package co.xenastudios.neoskript.core.parser;
 
 import co.xenastudios.neoskript.api.syntax.Condition;
+import co.xenastudios.neoskript.core.alias.AliasRegistry;
 import co.xenastudios.neoskript.api.syntax.Expression;
 import co.xenastudios.neoskript.core.expression.FunctionCallExpression;
 import co.xenastudios.neoskript.core.expression.VariableExpression;
@@ -106,6 +107,12 @@ public final class ScriptParser {
                 parseCommand(node);
             } else if (lower.equals("variables:")) {
                 parseVariables(node).ifPresent(triggers::add);
+            } else if (lower.equals("aliases:")) {
+                parseAliases(node);
+            } else if (lower.startsWith("import ") || lower.startsWith("using ")) {
+                // `import`/`using` pull in Java types for effect-command use; NeoSkript has no such
+                // reflective bridge, so they are recognised and skipped rather than failing the parse.
+                continue;
             } else {
                 throw new ParseException("Expected an event, function, or command, got: " + node.content(), node.line());
             }
@@ -184,6 +191,22 @@ public final class ScriptParser {
             defaults.add(new DefaultVariableStatement(target, value));
         }
         return defaults.isEmpty() ? Optional.empty() : Optional.of(Trigger.onLoad(defaults));
+    }
+
+    /** Parses an {@code aliases:} block of {@code name = material} entries into the alias registry. */
+    private void parseAliases(Node node) {
+        for (Node entry : node.children()) {
+            int equals = entry.content().indexOf('=');
+            if (equals < 0) {
+                throw new ParseException("Expected 'alias = material' in aliases block: " + entry.content(),
+                        entry.line());
+            }
+            String alias = entry.content().substring(0, equals).trim();
+            String material = entry.content().substring(equals + 1).trim();
+            if (!alias.isEmpty() && !material.isEmpty()) {
+                AliasRegistry.register(alias, material);
+            }
+        }
     }
 
     private void parseCommand(Node node) {

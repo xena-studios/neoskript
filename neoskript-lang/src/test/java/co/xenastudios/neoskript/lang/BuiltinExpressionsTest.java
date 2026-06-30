@@ -60,6 +60,14 @@ class BuiltinExpressionsTest {
     }
 
     @Test
+    void leadingArticleIsTolerated() {
+        Map<String, Object> g = new HashMap<>();
+        // "the"/"a"/"an" are stripped as a fallback so article-laden phrasing still parses.
+        assertEquals(5.0, eval("the length of \"hello\"", g));
+        assertEquals("HELLO", eval("uppercase \"hello\"", g));
+    }
+
+    @Test
     void listExpressions() {
         Map<String, Object> g = new HashMap<>();
         g.put("fruits::1", "banana");

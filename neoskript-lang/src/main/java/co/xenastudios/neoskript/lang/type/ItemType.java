@@ -1,6 +1,7 @@
 package co.xenastudios.neoskript.lang.type;
 
 import co.xenastudios.neoskript.api.type.Type;
+import co.xenastudios.neoskript.core.alias.AliasRegistry;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
@@ -25,7 +26,8 @@ public final class ItemType implements Type<ItemStack> {
 
     @Override
     public Optional<ItemStack> parse(String input) {
-        Material material = Material.matchMaterial(input.trim());
+        String mapped = AliasRegistry.resolve(input);
+        Material material = Material.matchMaterial(mapped != null ? mapped : input.trim());
         return material == null ? Optional.empty() : Optional.of(new ItemStack(material));
     }
 

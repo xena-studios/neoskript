@@ -61,7 +61,9 @@ public final class BuiltinFunctions {
             if (args.isEmpty()) {
                 return null;
             }
-            Material material = Material.matchMaterial(String.valueOf(args.get(0)));
+            String itemName = String.valueOf(args.get(0));
+            String mapped = co.xenastudios.neoskript.core.alias.AliasRegistry.resolve(itemName);
+            Material material = Material.matchMaterial(mapped != null ? mapped : itemName);
             if (material == null) {
                 return null;
             }

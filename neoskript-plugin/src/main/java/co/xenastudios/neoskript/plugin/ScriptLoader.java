@@ -119,6 +119,7 @@ public final class ScriptLoader {
         registeredCommands.clear();
         functions.clear();
         commands.clear();
+        co.xenastudios.neoskript.core.alias.AliasRegistry.clear();
         hotPaths.reset();
         return loadAll(scriptsDir);
     }

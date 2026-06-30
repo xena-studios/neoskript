@@ -173,7 +173,25 @@ public final class ExpressionParser {
             }
         }
 
+        // Pattern nicety: tolerate a leading article ("the player", "a diamond", "an apple") by
+        // stripping it and retrying. Only reached as a fallback once nothing else matched, so it
+        // never shadows an expression that legitimately begins with one of these words.
+        String withoutArticle = stripLeadingArticle(s);
+        if (withoutArticle != null) {
+            return parsePrimary(withoutArticle);
+        }
+
         throw new ParseException("Don't understand the expression '" + input + "'");
+    }
+
+    /** Returns {@code s} without a leading {@code the}/{@code a}/{@code an} word, or null if none. */
+    private static String stripLeadingArticle(String s) {
+        for (String article : new String[] {"the ", "an ", "a "}) {
+            if (s.length() > article.length() && s.regionMatches(true, 0, article, 0, article.length())) {
+                return s.substring(article.length()).trim();
+            }
+        }
+        return null;
     }
 
     /**
