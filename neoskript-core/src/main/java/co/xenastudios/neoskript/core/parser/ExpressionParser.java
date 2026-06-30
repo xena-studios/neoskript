@@ -96,15 +96,21 @@ public final class ExpressionParser {
             return parseAdditive(s.substring(1, s.length() - 1).trim());
         }
 
-        if (s.charAt(0) == '"' && s.charAt(s.length() - 1) == '"') {
-            return VariableString.parse(s.substring(1, s.length() - 1), this);
+        // Only treat as a string literal if the whole input is one quoted string (the first quote's
+        // partner is the last character) — otherwise e.g. `"a" split at ","` is two strings.
+        if (s.charAt(0) == '"') {
+            int close = s.indexOf('"', 1);
+            if (close == s.length() - 1) {
+                return VariableString.parse(s.substring(1, close), this);
+            }
         }
 
         if (NUMBER.matcher(s).matches()) {
             return new NumberLiteral(Double.parseDouble(s));
         }
 
-        if (s.charAt(0) == '{' && s.charAt(s.length() - 1) == '}') {
+        // Likewise, only a variable if the first '{' is closed exactly at the end.
+        if (s.charAt(0) == '{' && matchingBraceAtEnd(s)) {
             return VariableExpression.parse(s.substring(1, s.length() - 1), this);
         }
 
@@ -185,6 +191,26 @@ public final class ExpressionParser {
             return "+-*/(".indexOf(c) >= 0;
         }
         return true;
+    }
+
+    /** True if the first {@code &#123;} is matched by a {@code &#125;} at the very end of the string. */
+    private static boolean matchingBraceAtEnd(String s) {
+        if (s.charAt(s.length() - 1) != '}') {
+            return false;
+        }
+        int depth = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return i == s.length() - 1;
+                }
+            }
+        }
+        return false;
     }
 
     /** True if the whole string is one parenthesised group, e.g. {@code (a + b)}. */

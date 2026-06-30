@@ -5,16 +5,17 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Holds user-defined functions by name. Populated as scripts are parsed and queried at runtime by
- * function-call expressions, so calls may appear before the definition in source. Backed by a
+ * Holds callable functions by name — user-defined {@link FunctionDefinition}s and native built-ins
+ * ({@link ScriptFunction}s). Populated as scripts are parsed and at startup, and queried at runtime
+ * by function-call expressions, so calls may appear before the definition in source. Backed by a
  * concurrent map so scripts can be parsed in parallel.
  */
 public final class FunctionRegistry {
 
-    private final Map<String, FunctionDefinition> functions = new ConcurrentHashMap<>();
+    private final Map<String, ScriptFunction> functions = new ConcurrentHashMap<>();
 
     /**
-     * Registers (or replaces) a function.
+     * Registers (or replaces) a user-defined function.
      *
      * @param function the function definition
      */
@@ -23,12 +24,22 @@ public final class FunctionRegistry {
     }
 
     /**
+     * Registers (or replaces) a function by name — used for native built-ins.
+     *
+     * @param name     the function name (case-insensitive)
+     * @param function the implementation
+     */
+    public void register(String name, ScriptFunction function) {
+        functions.put(name.toLowerCase(Locale.ROOT), function);
+    }
+
+    /**
      * Looks up a function by name.
      *
      * @param name the function name (case-insensitive)
-     * @return the definition, or {@code null} if none is registered
+     * @return the function, or {@code null} if none is registered
      */
-    public FunctionDefinition get(String name) {
+    public ScriptFunction get(String name) {
         return functions.get(name.toLowerCase(Locale.ROOT));
     }
 
@@ -37,8 +48,11 @@ public final class FunctionRegistry {
         return functions.size();
     }
 
-    /** Removes all registered functions (used when reloading scripts). */
+    /**
+     * Removes user-defined functions while keeping native built-ins (used when reloading scripts, so
+     * built-ins registered once at startup survive).
+     */
     public void clear() {
-        functions.clear();
+        functions.values().removeIf(FunctionDefinition.class::isInstance);
     }
 }

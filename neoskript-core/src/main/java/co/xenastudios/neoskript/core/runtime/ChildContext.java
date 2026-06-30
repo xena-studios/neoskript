@@ -4,7 +4,6 @@ import co.xenastudios.neoskript.api.runtime.TriggerContext;
 import org.bukkit.event.Event;
 
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -52,14 +51,7 @@ public final class ChildContext implements TriggerContext, VariableScope {
 
     @Override
     public Map<String, Object> listLocal(String prefix) {
-        Map<String, Object> children = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : locals.entrySet()) {
-            String key = entry.getKey();
-            if (key.startsWith(prefix) && key.indexOf("::", prefix.length()) < 0) {
-                children.put(key, entry.getValue());
-            }
-        }
-        return children;
+        return ListVariables.directChildren(locals, prefix);
     }
 
     @Override

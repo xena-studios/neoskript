@@ -9,7 +9,7 @@ import java.util.List;
  * functions are dynamically typed; parameter type annotations in the source are accepted but not yet
  * enforced (Phase 2 polish / Phase 3).
  */
-public final class FunctionDefinition {
+public final class FunctionDefinition implements ScriptFunction {
 
     /** Maximum nested function-call depth before aborting (guards against infinite recursion). */
     public static final int MAX_DEPTH = 800;
@@ -44,7 +44,8 @@ public final class FunctionDefinition {
      * @param caller    the calling context, whose globals the function shares
      * @return the value passed to {@code return}, or {@code null} if the function returned no value
      */
-    public Object invoke(List<Object> arguments, TriggerContext caller) {
+    @Override
+    public Object call(List<Object> arguments, TriggerContext caller) {
         int depth = DEPTH.get();
         if (depth >= MAX_DEPTH) {
             throw new IllegalStateException(

@@ -9,6 +9,7 @@ import co.xenastudios.neoskript.core.runtime.EventRegistry;
 import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 import co.xenastudios.neoskript.core.runtime.Profiler;
 import co.xenastudios.neoskript.core.variable.FlatFileVariableStore;
+import co.xenastudios.neoskript.lang.BuiltinFunctions;
 import co.xenastudios.neoskript.lang.BuiltinModule;
 import co.xenastudios.neoskript.lang.event.BuiltinEvents;
 import co.xenastudios.neoskript.platform.PlatformInfo;
@@ -63,6 +64,7 @@ public class NeoSkriptPlugin extends JavaPlugin {
         BuiltinEvents.registerAll(events);
 
         this.functions = new FunctionRegistry();
+        BuiltinFunctions.registerAll(functions);
 
         this.addonManager = new AddonManager(getLogger());
         addons.addAll(addonManager.enable(AddonManager.discover(getClassLoader()), registry));

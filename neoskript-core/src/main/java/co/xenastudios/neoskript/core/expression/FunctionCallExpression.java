@@ -2,8 +2,8 @@ package co.xenastudios.neoskript.core.expression;
 
 import co.xenastudios.neoskript.api.runtime.TriggerContext;
 import co.xenastudios.neoskript.api.syntax.Expression;
-import co.xenastudios.neoskript.core.runtime.FunctionDefinition;
 import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
+import co.xenastudios.neoskript.core.runtime.ScriptFunction;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +32,7 @@ public final class FunctionCallExpression implements Expression<Object> {
 
     @Override
     public Object getSingle(TriggerContext ctx) {
-        FunctionDefinition function = registry.get(name);
+        ScriptFunction function = registry.get(name);
         if (function == null) {
             return null;
         }
@@ -40,7 +40,7 @@ public final class FunctionCallExpression implements Expression<Object> {
         for (Expression<?> argument : arguments) {
             values.add(argument == null ? null : argument.getSingle(ctx));
         }
-        return function.invoke(values, ctx);
+        return function.call(values, ctx);
     }
 
     @Override

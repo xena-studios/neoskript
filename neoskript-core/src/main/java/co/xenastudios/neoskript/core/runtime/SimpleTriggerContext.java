@@ -4,7 +4,6 @@ import co.xenastudios.neoskript.api.runtime.TriggerContext;
 import org.bukkit.event.Event;
 
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -59,12 +58,12 @@ public final class SimpleTriggerContext implements TriggerContext, VariableScope
 
     @Override
     public Map<String, Object> listLocal(String prefix) {
-        return directChildren(locals, prefix);
+        return ListVariables.directChildren(locals, prefix);
     }
 
     @Override
     public Map<String, Object> listGlobal(String prefix) {
-        return directChildren(globals, prefix);
+        return ListVariables.directChildren(globals, prefix);
     }
 
     @Override
@@ -81,16 +80,5 @@ public final class SimpleTriggerContext implements TriggerContext, VariableScope
         } else {
             map.put(name, value);
         }
-    }
-
-    private static Map<String, Object> directChildren(Map<String, Object> map, String prefix) {
-        Map<String, Object> children = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            String key = entry.getKey();
-            if (key.startsWith(prefix) && key.indexOf("::", prefix.length()) < 0) {
-                children.put(key, entry.getValue());
-            }
-        }
-        return children;
     }
 }
