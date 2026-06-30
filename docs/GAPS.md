@@ -37,30 +37,31 @@ execute command (`make … execute`, `execute console command`).
 random number/integer, arithmetic (`+ - * /`, parentheses, constant-folded), variables (incl. lists
 and dynamic names), function calls; string ops (uppercase, lowercase, length, split, join); list ops
 (first/last/random element, reversed, sorted); player properties (health, max health, food, level,
-uuid, gamemode, world, location, name); all/online players; gamemode literals; command `sender`,
-`arg-N`, `args`; comma/`and`-separated list literals (`1, 2 and 3`).
+uuid, gamemode, world, location, name); location coordinates (x/y/z) and distance between; all/online
+players; gamemode literals; command `sender`, `arg-N`, `args`; comma/`and`-separated list literals
+(`1, 2 and 3`).
 
-**Types:** `number`, `text`, `boolean`, `player`, `world`, `gamemode` (registry-backed display/parse).
+**Types:** `number`, `text`, `boolean`, `player`, `world`, `gamemode`, `location`, `vector`
+(registry-backed display/parse).
 
 **Built-in functions:** abs, round, floor, ceil, sqrt, exp, ln, log, sin/cos/tan (+inverse), mod,
-atan2, min, max, sum, product.
+atan2, min, max, sum, product, `vector()`, `location()`.
 
 ## ❌ Remaining — content long tail
 
-- **Types:** location, vector, item/itemstack, entity (beyond generic Entity), block (beyond
-  event-value), inventory, slot, biome, colour, enchantment, material, chunk, offline player, date,
-  direction, …
+- **Types:** item/itemstack, entity (beyond generic Entity), block (beyond event-value), inventory,
+  slot, biome, colour, enchantment, material, chunk, offline player, date, direction, …
 - **Effects:** set block, give/remove items, play sound/particles, apply/clear potion effects,
   open/modify inventories, send title, set weather amount/duration, scoreboard, push/launch, ignite,
   ban/unban, set max health, …
-- **Expressions:** location components (x/y/z), distance/direction/vectors, item properties
-  (amount/name/lore/enchants), world time/weather, target/looked-at block, nearby entities, date/now
-  and time differences, more string/number formatting, …
+- **Expressions:** direction/vector math, item properties (amount/name/lore/enchants), world
+  time/weather, target/looked-at block, nearby entities, date/now and time differences, more
+  string/number formatting, …
 - **Events:** the remaining ~80 (craft, smelt, enchant, projectile, vehicle, portal, bucket, leash,
   tame, breed, world save/init, chunk load, server ping, tab complete, …).
 - **Conditions:** the remaining ~100 (is wearing, can build/fly, is banned/whitelisted, world is,
   is burning/in water, has item, is holding, …).
-- **Functions:** `vector()`, `location()`, `date()`, `rgb()`/colour, `world()`, `player()`, …
+- **Functions:** `date()`, `rgb()`/colour, `world()`, `player()`, …
 
 ## ❌ Remaining — deeper engine features
 

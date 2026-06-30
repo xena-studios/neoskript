@@ -2,6 +2,9 @@ package co.xenastudios.neoskript.lang;
 
 import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 import co.xenastudios.neoskript.core.runtime.ScriptFunction;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.util.Vector;
 
 import java.util.List;
 import java.util.function.DoubleBinaryOperator;
@@ -44,6 +47,18 @@ public final class BuiltinFunctions {
         registry.register("max", reduce(Math::max));
         registry.register("sum", reduce(Double::sum));
         registry.register("product", reduce((a, b) -> a * b));
+
+        registry.register("vector", (args, ctx) ->
+                new Vector(coord(args, 0), coord(args, 1), coord(args, 2)));
+        registry.register("location", (args, ctx) -> {
+            World world = args.size() > 3 && args.get(3) instanceof World w ? w : null;
+            return new Location(world, coord(args, 0), coord(args, 1), coord(args, 2));
+        });
+    }
+
+    private static double coord(List<Object> args, int index) {
+        Double value = number(args, index);
+        return value == null ? 0 : value;
     }
 
     private static ScriptFunction unary(DoubleUnaryOperator op) {

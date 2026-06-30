@@ -21,14 +21,17 @@ import co.xenastudios.neoskript.lang.expression.EventPlayerExpression;
 import co.xenastudios.neoskript.lang.expression.EventValueExpression;
 import co.xenastudios.neoskript.lang.type.BooleanType;
 import co.xenastudios.neoskript.lang.type.GameModeType;
+import co.xenastudios.neoskript.lang.type.LocationType;
 import co.xenastudios.neoskript.lang.type.NumberType;
 import co.xenastudios.neoskript.lang.type.PlayerType;
 import co.xenastudios.neoskript.lang.type.StringType;
+import co.xenastudios.neoskript.lang.type.VectorType;
 import co.xenastudios.neoskript.lang.type.WorldType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.CommandSender;
@@ -78,6 +81,8 @@ public final class BuiltinModule {
         types.register(new PlayerType());
         types.register(new WorldType());
         types.register(new GameModeType());
+        types.register(new LocationType());
+        types.register(new VectorType());
         Renderer.setTypeRegistry(types);
     }
 
@@ -131,6 +136,26 @@ public final class BuiltinModule {
         registry.registerExpression("(all players|online players|all online players)", Object.class,
                 arguments -> new ComputedListExpression(ctx -> Bukkit.getOnlinePlayers().toArray()));
 
+        registry.registerExpression("x[-coordinate] of %location%", Object.class,
+                arguments -> coordinate(arguments.get(0), Location::getX));
+        registry.registerExpression("y[-coordinate] of %location%", Object.class,
+                arguments -> coordinate(arguments.get(0), Location::getY));
+        registry.registerExpression("z[-coordinate] of %location%", Object.class,
+                arguments -> coordinate(arguments.get(0), Location::getZ));
+        registry.registerExpression("distance between %location% and %location%", Object.class, arguments -> {
+            Expression<?> a = arguments.get(0);
+            Expression<?> b = arguments.get(1);
+            return new ComputedExpression(ctx -> {
+                Location first = toLocation(a.getSingle(ctx));
+                Location second = toLocation(b.getSingle(ctx));
+                if (first == null || second == null || first.getWorld() == null
+                        || !first.getWorld().equals(second.getWorld())) {
+                    return null;
+                }
+                return first.distance(second);
+            });
+        });
+
         gameMode(registry, "survival", GameMode.SURVIVAL);
         gameMode(registry, "creative", GameMode.CREATIVE);
         gameMode(registry, "adventure", GameMode.ADVENTURE);
@@ -148,6 +173,24 @@ public final class BuiltinModule {
     private static ComputedExpression playerValue(Expression<?> target, Function<LivingEntity, Object> accessor) {
         return new ComputedExpression(ctx ->
                 target.getSingle(ctx) instanceof LivingEntity entity ? accessor.apply(entity) : null);
+    }
+
+    private static ComputedExpression coordinate(Expression<?> target, java.util.function.ToDoubleFunction<Location> fn) {
+        return new ComputedExpression(ctx -> {
+            Location location = toLocation(target.getSingle(ctx));
+            return location == null ? null : fn.applyAsDouble(location);
+        });
+    }
+
+    /** Coerces a value to a Location: a Location directly, or an entity's current location. */
+    private static Location toLocation(Object value) {
+        if (value instanceof Location location) {
+            return location;
+        }
+        if (value instanceof Entity entity) {
+            return entity.getLocation();
+        }
+        return null;
     }
 
     private static void gameMode(SyntaxRegistry registry, String name, GameMode mode) {
@@ -472,13 +515,15 @@ public final class BuiltinModule {
                 }
             };
         });
-        registry.registerEffect("teleport %player% to %player%", arguments -> {
+        registry.registerEffect("teleport %player% to %object%", arguments -> {
             Expression<?> target = arguments.get(0);
             Expression<?> destination = arguments.get(1);
             return ctx -> {
-                if (target.getSingle(ctx) instanceof Player player
-                        && destination.getSingle(ctx) instanceof Player to) {
-                    player.teleport(to.getLocation());
+                if (target.getSingle(ctx) instanceof Player player) {
+                    Location to = toLocation(destination.getSingle(ctx));
+                    if (to != null) {
+                        player.teleport(to);
+                    }
                 }
             };
         });
