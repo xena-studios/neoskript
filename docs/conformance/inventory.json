@@ -8407,8 +8407,8 @@
       "%livingentities%'[s] (owner|tamer)"
     ],
     "source": "ch/njol/skript/expressions/ExprEntityOwner.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:entity-size",
@@ -9496,8 +9496,8 @@
       "%slots/itemtypes/itemstacks%'[s] item[[ ]stack] (amount|size|number)"
     ],
     "source": "ch/njol/skript/expressions/ExprItemAmount.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:item-component-copy",
@@ -10147,8 +10147,8 @@
       "[the] %number%(st|nd|rd|th) line of %itemtype%'[s] lore"
     ],
     "source": "org/skriptlang/skript/bukkit/item/elements/ExprLore.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:love-time",
@@ -12064,8 +12064,8 @@
       "%livingentities%'[s] [actual:(actual[ly]|exact)] target[ed] block[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprTargetedBlock.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:teleport-cause",

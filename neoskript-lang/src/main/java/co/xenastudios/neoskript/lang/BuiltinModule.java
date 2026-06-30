@@ -318,6 +318,44 @@ public final class BuiltinModule {
                 arguments -> new ComputedExpression(ctx -> (double) Bukkit.getMaxPlayers()));
         registry.registerExpression("(online player[s] count|number of online players|online player amount)",
                 Object.class, arguments -> new ComputedExpression(ctx -> (double) Bukkit.getOnlinePlayers().size()));
+        registry.registerExpression("[the] item[[ ]stack] (amount|size) of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof ItemStack item ? (double) item.getAmount() : null);
+        });
+        registry.registerExpression("yaw of %location%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                Location l = toLocation(src.getSingle(ctx));
+                return l == null ? null : (double) l.getYaw();
+            });
+        });
+        registry.registerExpression("pitch of %location%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                Location l = toLocation(src.getSingle(ctx));
+                return l == null ? null : (double) l.getPitch();
+            });
+        });
+        registry.registerExpression("[the] lore of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedListExpression(ctx -> {
+                if (src.getSingle(ctx) instanceof ItemStack item && item.hasItemMeta()
+                        && item.getItemMeta().hasLore()) {
+                    return item.getItemMeta().getLore().toArray();
+                }
+                return new Object[0];
+            });
+        });
+        registry.registerExpression("[the] (owner|tamer) of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof Tameable t ? t.getOwner() : null);
+        });
+        registry.registerExpression("[the] target[ed] block of %player%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof Player p ? p.getTargetBlockExact(100) : null);
+        });
         registry.registerExpression("max[imum] durability of %object%", Object.class, arguments -> {
             Expression<?> src = arguments.get(0);
             return new ComputedExpression(ctx -> {
