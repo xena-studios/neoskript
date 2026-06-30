@@ -214,6 +214,17 @@ public final class ExpressionParser {
             }
         }
 
+        // Type literal: "hard" -> a difficulty, "survival" -> a gamemode, "creeper" -> an entity type.
+        // Only reached once no registered expression matched, so it never shadows real syntax.
+        co.xenastudios.neoskript.core.type.TypeRegistry typeRegistry =
+                co.xenastudios.neoskript.core.runtime.Renderer.typeRegistry();
+        if (typeRegistry != null) {
+            Object literal = typeRegistry.parseLiteral(s);
+            if (literal != null) {
+                return new co.xenastudios.neoskript.core.expression.ComputedExpression(ctx -> literal);
+            }
+        }
+
         // Pattern nicety: tolerate a leading article ("the player", "a diamond", "an apple") by
         // stripping it and retrying. Only reached as a fallback once nothing else matched, so it
         // never shadows an expression that legitimately begins with one of these words.

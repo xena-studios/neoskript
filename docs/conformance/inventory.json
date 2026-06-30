@@ -3246,8 +3246,8 @@
       "(create|strike) lightning(1¦[ ]effect|) %directions% %locations%"
     ],
     "source": "ch/njol/skript/effects/EffLightning.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:load-server-icon",

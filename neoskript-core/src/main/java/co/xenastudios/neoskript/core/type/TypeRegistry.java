@@ -73,4 +73,31 @@ public final class TypeRegistry {
     public int size() {
         return types.size();
     }
+
+    /**
+     * Attempts to parse {@code input} as a literal of some registered type (e.g. {@code "hard"} →
+     * a difficulty, {@code "survival"} → a gamemode). The primitive {@code number}/{@code text}/
+     * {@code boolean} types are skipped — those literals are handled directly by the parser, and the
+     * text type would otherwise greedily match anything.
+     *
+     * @param input the raw text
+     * @return the first matching typed value, or {@code null} if none match
+     */
+    public Object parseLiteral(String input) {
+        for (Type<?> type : types) {
+            Class<?> c = type.typeClass();
+            if (c == String.class || Number.class.isAssignableFrom(c) || c == Boolean.class) {
+                continue;
+            }
+            try {
+                var parsed = type.parse(input);
+                if (parsed.isPresent()) {
+                    return parsed.get();
+                }
+            } catch (Throwable serverDependent) {
+                // A type whose parse needs a running server (e.g. player) — skip it as a literal source.
+            }
+        }
+        return null;
+    }
 }

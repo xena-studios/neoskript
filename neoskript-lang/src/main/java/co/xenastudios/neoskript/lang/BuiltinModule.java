@@ -1137,6 +1137,35 @@ public final class BuiltinModule {
                 worldEffect(arguments.get(0), world -> world.setStorm(false)));
         registry.registerEffect("make %world% (rainy|stormy)", arguments ->
                 worldEffect(arguments.get(0), world -> world.setStorm(true)));
+        registry.registerEffect("(strike|create) [a] lightning [bolt] at %location%", arguments -> {
+            Expression<?> loc = arguments.get(0);
+            return ctx -> {
+                Location l = toLocation(loc.getSingle(ctx));
+                if (l != null && l.getWorld() != null) {
+                    l.getWorld().strikeLightning(l);
+                }
+            };
+        });
+        registry.registerEffect("set [world] spawn [(point|location)] of %world% to %location%", arguments -> {
+            Expression<?> world = arguments.get(0);
+            Expression<?> loc = arguments.get(1);
+            return ctx -> {
+                Location l = toLocation(loc.getSingle(ctx));
+                if (world.getSingle(ctx) instanceof World w && l != null) {
+                    w.setSpawnLocation(l);
+                }
+            };
+        });
+        registry.registerEffect("set difficulty of %world% to %object%", arguments -> {
+            Expression<?> world = arguments.get(0);
+            Expression<?> diff = arguments.get(1);
+            return ctx -> {
+                if (world.getSingle(ctx) instanceof World w
+                        && diff.getSingle(ctx) instanceof org.bukkit.Difficulty d) {
+                    w.setDifficulty(d);
+                }
+            };
+        });
         registry.registerEffect("make %world% thunder[ing]", arguments ->
                 worldEffect(arguments.get(0), world -> world.setThundering(true)));
         registry.registerEffect("set (weather|storm) duration of %world% to %number% seconds", arguments -> {
