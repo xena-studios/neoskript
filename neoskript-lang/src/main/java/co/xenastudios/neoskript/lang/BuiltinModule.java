@@ -327,6 +327,32 @@ public final class BuiltinModule {
             Expression<?> src = arguments.get(0);
             return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof World w ? (double) w.getSeed() : null);
         });
+        // --- event values: read the current Bukkit event, null outside the matching event ---
+        eventValue(registry, "[the] damage", ctx ->
+                event(ctx) instanceof org.bukkit.event.entity.EntityDamageEvent e ? e.getDamage() : null);
+        eventValue(registry, "[the] final damage", ctx ->
+                event(ctx) instanceof org.bukkit.event.entity.EntityDamageEvent e ? e.getFinalDamage() : null);
+        eventValue(registry, "[the] damage cause", ctx ->
+                event(ctx) instanceof org.bukkit.event.entity.EntityDamageEvent e ? e.getCause() : null);
+        eventValue(registry, "[the] (attacker|damager)", ctx ->
+                event(ctx) instanceof org.bukkit.event.entity.EntityDamageByEntityEvent e ? e.getDamager() : null);
+        eventValue(registry, "[the] (victim|damaged entity)", ctx ->
+                event(ctx) instanceof org.bukkit.event.entity.EntityDamageEvent e ? e.getEntity() : null);
+        eventValue(registry, "[the] death message", ctx ->
+                event(ctx) instanceof org.bukkit.event.entity.PlayerDeathEvent e ? e.getDeathMessage() : null);
+        eventValue(registry, "[the] join message", ctx ->
+                event(ctx) instanceof org.bukkit.event.player.PlayerJoinEvent e ? e.getJoinMessage() : null);
+        eventValue(registry, "[the] (quit|leave) message", ctx ->
+                event(ctx) instanceof org.bukkit.event.player.PlayerQuitEvent e ? e.getQuitMessage() : null);
+        eventValue(registry, "[the] spawn[ing] reason", ctx ->
+                event(ctx) instanceof org.bukkit.event.entity.CreatureSpawnEvent e ? e.getSpawnReason() : null);
+        eventValue(registry, "[the] (clicked|interacted) block", ctx ->
+                event(ctx) instanceof org.bukkit.event.player.PlayerInteractEvent e ? e.getClickedBlock() : null);
+        eventValue(registry, "[the] dropped (exp|experience|xp)", ctx ->
+                event(ctx) instanceof org.bukkit.event.entity.EntityDeathEvent e ? (double) e.getDroppedExp() : null);
+        eventValue(registry, "[the] (level|new level)", ctx ->
+                event(ctx) instanceof org.bukkit.event.player.PlayerLevelChangeEvent e ? (double) e.getNewLevel() : null);
+
         registry.registerExpression("[a] random uuid", Object.class,
                 arguments -> new ComputedExpression(ctx -> java.util.UUID.randomUUID()));
         registry.registerExpression("normalize[d] %vector%", Object.class, arguments -> {
@@ -1322,6 +1348,17 @@ public final class BuiltinModule {
         registry.registerExpression("%object%'s " + name, Object.class, a ->
                 new co.xenastudios.neoskript.lang.expression.NumericPropertyExpression<>(
                         a.get(0), holder, getter, setter, reset));
+    }
+
+    /** The current Bukkit event, or null outside an event context. */
+    private static org.bukkit.event.Event event(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+        return ctx.event().orElse(null);
+    }
+
+    /** Registers a read-only event-value expression backed by a function of the context. */
+    private static void eventValue(SyntaxRegistry registry, String pattern,
+                                   Function<co.xenastudios.neoskript.api.runtime.TriggerContext, Object> getter) {
+        registry.registerExpression(pattern, Object.class, a -> new ComputedExpression(getter::apply));
     }
 
     private static co.xenastudios.neoskript.api.syntax.Effect entityEffect(Expression<?> target,

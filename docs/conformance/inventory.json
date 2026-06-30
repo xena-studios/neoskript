@@ -7447,8 +7447,8 @@
       "[the] (clicked [enchant[ment]] (button|option)|clicked (block|%-*itemtype/entitydata%)|clicked slot|clicked inventory|click (type|action)|inventory action)"
     ],
     "source": "ch/njol/skript/expressions/ExprClicked.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:color-from-hex-code",
@@ -7790,8 +7790,8 @@
       "[the] damage cause"
     ],
     "source": "ch/njol/skript/expressions/ExprDamageCause.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage-source",
@@ -7944,8 +7944,8 @@
       "[the] death( |-)message"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/elements/expressions/ExprDeathMessage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:debug-info",
@@ -8779,8 +8779,8 @@
       "[the] final damage"
     ],
     "source": "ch/njol/skript/expressions/ExprFinalDamage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:firework-effect",
@@ -11517,8 +11517,8 @@
       "%players%'[s] respawn[ing] reason"
     ],
     "source": "ch/njol/skript/expressions/ExprRespawnReason.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:result",
