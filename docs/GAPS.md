@@ -51,15 +51,15 @@ atan2, min, max, sum, product.
   event-value), inventory, slot, biome, colour, enchantment, material, chunk, offline player, date,
   direction, …
 - **Effects:** set block, give/remove items, play sound/particles, apply/clear potion effects,
-  open/close/modify inventories, send title, set time/weather, scoreboard, set fly/walk speed,
-  push/launch, ignite, set name/display name, replace-in-string, …
-- **Expressions:** location components (x/y/z, world), distance/direction/vectors, item properties
-  (amount/name/lore/enchants), world/time/weather, target/looked-at block, nearby entities, date/now
+  open/modify inventories, send title, set weather amount/duration, scoreboard, push/launch, ignite,
+  ban/unban, set max health, …
+- **Expressions:** location components (x/y/z), distance/direction/vectors, item properties
+  (amount/name/lore/enchants), world time/weather, target/looked-at block, nearby entities, date/now
   and time differences, more string/number formatting, …
 - **Events:** the remaining ~80 (craft, smelt, enchant, projectile, vehicle, portal, bucket, leash,
   tame, breed, world save/init, chunk load, server ping, tab complete, …).
 - **Conditions:** the remaining ~100 (is wearing, can build/fly, is banned/whitelisted, world is,
-  is alive/dead, is burning/in water, chance of %, …).
+  is burning/in water, has item, is holding, …).
 - **Functions:** `vector()`, `location()`, `date()`, `rgb()`/colour, `world()`, `player()`, …
 
 ## ❌ Remaining — deeper engine features
