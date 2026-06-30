@@ -6,14 +6,14 @@ Tiers: **`done`** = implemented and covered by a behaviour test (strongest). **`
 
 | Category | Documented | External | In-scope | Done | Parse-verified | Verified | % |
 |---|---|---|---|---|---|---|---|
-| effect | 148 | 0 | 148 | 23 | 0 | 23 | 15.5% |
-| condition | 168 | 3 | 165 | 36 | 15 | 51 | 30.9% |
-| expression | 515 | 8 | 507 | 43 | 38 | 81 | 16.0% |
+| effect | 148 | 0 | 148 | 23 | 10 | 33 | 22.3% |
+| condition | 168 | 3 | 165 | 36 | 26 | 62 | 37.6% |
+| expression | 515 | 8 | 507 | 43 | 68 | 111 | 21.9% |
 | event | 167 | 1 | 166 | 108 | 0 | 108 | 65.1% |
 | type | 135 | 2 | 133 | 55 | 0 | 55 | 41.4% |
 | function | 48 | 0 | 48 | 40 | 0 | 40 | 83.3% |
 | section | 9 | 0 | 9 | 3 | 0 | 3 | 33.3% |
 | structure | 10 | 0 | 10 | 6 | 0 | 6 | 60.0% |
-| **Total** | **1200** | **14** | **1186** | **314** | **53** | **367** | **30.9%** |
+| **Total** | **1200** | **14** | **1186** | **314** | **104** | **418** | **35.2%** |
 
-_Verified 367/1186 (30.9%) — of which behaviour-tested (done) 314 (26.5%). Goal: 100% of the 1186 in-scope entries._
+_Verified 418/1186 (35.2%) — of which behaviour-tested (done) 314 (26.5%). Goal: 100% of the 1186 in-scope entries._

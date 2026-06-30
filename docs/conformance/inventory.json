@@ -344,8 +344,8 @@
       "%damagesources%'[s] damage (do not|don't|does not|doesn't) scale with difficulty"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/elements/conditions/CondScalesWithDifficulty.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:damage-source-was-indirectly-caused",
@@ -369,8 +369,8 @@
       "respawn anchors [do[1:(n't| not)]] work in %worlds%"
     ],
     "source": "ch/njol/skript/conditions/CondAnchorWorks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:egg-will-hatch",
@@ -582,8 +582,8 @@
       "%livingentities% (do[es]n't|do[es] not) have [a[n]] (ai|artificial intelligence)"
     ],
     "source": "ch/njol/skript/conditions/CondAI.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-chat-filtering",
@@ -771,8 +771,8 @@
       "%players% (doesn't|does not|do not|don't) have [a] resource pack [(loaded|installed)]"
     ],
     "source": "ch/njol/skript/conditions/CondHasResourcePack.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-scoreboard-tag",
@@ -1710,8 +1710,8 @@
       "%chunk% (is|are)(n't| not) ([a] slime chunk|slime chunks|slimey)"
     ],
     "source": "ch/njol/skript/conditions/CondIsSlimeChunk.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-sneaking",
@@ -2053,8 +2053,8 @@
       "%livingentities% (isn't|is not|aren't|are not) on (its|their) back[s]"
     ],
     "source": "ch/njol/skript/conditions/CondPandaIsOnBack.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:panda-is-rolling",
@@ -2066,8 +2066,8 @@
       "%livingentities% (isn't|is not|aren't|are not) rolling"
     ],
     "source": "ch/njol/skript/conditions/CondPandaIsRolling.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:panda-is-scared",
@@ -2079,8 +2079,8 @@
       "%livingentities% (isn't|is not|aren't|are not) scared"
     ],
     "source": "ch/njol/skript/conditions/CondPandaIsScared.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:panda-is-sneezing",
@@ -2092,8 +2092,8 @@
       "%livingentities% (isn't|is not|aren't|are not) sneezing"
     ],
     "source": "ch/njol/skript/conditions/CondPandaIsSneezing.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:potion-effect-has-icon",
@@ -2140,8 +2140,8 @@
       "%potioneffecttypes% (is|are) [not] instant"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/conditions/CondIsPotionInstant.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:pvp",
@@ -2290,8 +2290,8 @@
       "%itementities% (can't|cannot) (despawn naturally|naturally despawn)"
     ],
     "source": "ch/njol/skript/conditions/CondItemDespawn.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:action-bar",
@@ -2316,8 +2316,8 @@
       "prevent %livingentities% from (duplicating|cloning)"
     ],
     "source": "ch/njol/skript/effects/EffAllayCanDuplicate.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:allow-prevent-leash-drop",
@@ -2346,8 +2346,8 @@
       "allow %livingentities% to age"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/effects/EffAllowAging.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:apply-bone-meal",
@@ -2452,8 +2452,8 @@
       "(cancel|interrupt) [the] us[ag]e of %livingentities%'[s] [active|current] item"
     ],
     "source": "ch/njol/skript/effects/EffCancelItemUse.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:cancel-command-cooldown",
@@ -3144,8 +3144,8 @@
       "allow %itementities% to (naturally despawn|despawn naturally)"
     ],
     "source": "ch/njol/skript/effects/EffItemDespawn.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:item-tooltips",
@@ -3234,8 +3234,8 @@
       "un(leash|lead) [holder of] %livingentities%"
     ],
     "source": "ch/njol/skript/effects/EffLeash.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:lightning",
@@ -3283,8 +3283,8 @@
       "[local[ly]] suppress [the] (conflict|variable save|missing conjunction|deprecated syntax|\"starting with expression\") warning[s]"
     ],
     "source": "ch/njol/skript/effects/EffSuppressWarnings.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:log",
@@ -3334,8 +3334,8 @@
       "make %livingentities% (duplicate|clone)"
     ],
     "source": "ch/njol/skript/effects/EffAllayDuplicate.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-breedable",
@@ -3349,8 +3349,8 @@
       "sterilize %livingentities%"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/effects/EffBreedable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-disturbance",
@@ -3909,8 +3909,8 @@
       "save [[the] world[s]] %worlds%"
     ],
     "source": "ch/njol/skript/effects/EffWorldSave.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:send-block-change",
@@ -4069,8 +4069,8 @@
       "[:un](tame|domesticate) %entities%"
     ],
     "source": "ch/njol/skript/effects/EffTame.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:teleport",
@@ -7013,8 +7013,8 @@
       "%blocks%'[s] [max:max[imum]] honey level"
     ],
     "source": "ch/njol/skript/expressions/ExprBeehiveHoneyLevel.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:beehive-target-flower",
@@ -8433,8 +8433,8 @@
       "%entities/entitydatas%'[s] entity snapshot"
     ],
     "source": "ch/njol/skript/expressions/ExprEntitySnapshot.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:entity-sound",
@@ -8653,8 +8653,8 @@
       "%players%'[s] (experience|[e]xp) [pickup|collection] cooldown"
     ],
     "source": "ch/njol/skript/expressions/ExprExperienceCooldown.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:experimental-only",
@@ -8945,8 +8945,8 @@
       "%entities%'[s] freeze time"
     ],
     "source": "ch/njol/skript/expressions/ExprFreezeTicks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:function",
@@ -9535,8 +9535,8 @@
       "%displays%'[s] item [display] transform"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/item/elements/expressions/ExprItemDisplayTransform.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:item-enchantments",
@@ -9731,8 +9731,8 @@
       "%players%'[s] [([currently] selected|current)] [game] (language|locale) [setting]"
     ],
     "source": "ch/njol/skript/expressions/ExprLanguage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:last-attacker",
@@ -9795,8 +9795,8 @@
       "%offlineplayers%'[s] [last] death location[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprLastDeathLocation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:last-interaction-date",
@@ -9913,8 +9913,8 @@
       "%players%'[s] [xp|exp[erience]] level"
     ],
     "source": "ch/njol/skript/expressions/ExprLevel.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:level-progress",
@@ -10066,8 +10066,8 @@
       "%lootcontexts%'[s] loot[ing] [context] location"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/expressions/ExprLootContextLocation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:loot-of-loot-table",
@@ -10117,8 +10117,8 @@
       "%lootcontexts%'[s] looted entity"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/expressions/ExprLootContextEntity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:looter-of-loot-context",
@@ -10186,8 +10186,8 @@
       "%lootcontexts%'[s] loot[ing] [context] luck [value|factor]"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/expressions/ExprLootContextLuck.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:max-durability",
@@ -10225,8 +10225,8 @@
       "%itemstacks%'[s] max[imum] [item] us(e|age) (time|duration)"
     ],
     "source": "ch/njol/skript/expressions/ExprMaxItemUseTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:max-minecart-speed",
@@ -10238,8 +10238,8 @@
       "%entities%'[s] max[imum] minecart (speed|velocity)"
     ],
     "source": "ch/njol/skript/expressions/ExprMaxMinecartSpeed.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:max-players",
@@ -10288,8 +10288,8 @@
       "%entities%'[s] max[imum] freeze time"
     ],
     "source": "ch/njol/skript/expressions/ExprMaxFreezeTicks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:maximum-integer-value",
@@ -10636,8 +10636,8 @@
       "%livingentities%'[s] (invulnerability|invincibility|no damage) time[[ ]span]"
     ],
     "source": "ch/njol/skript/expressions/ExprNoDamageTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:node",
@@ -10968,8 +10968,8 @@
       "%entities%'[s] pick[ ]up delay"
     ],
     "source": "ch/njol/skript/expressions/ExprPickupDelay.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:ping",
@@ -11045,8 +11045,8 @@
       "%players%'[s] (player|tab)[ ]list name[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/expressions/ExprPlayerListName.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:player-protocol-version",
@@ -11058,8 +11058,8 @@
       "%players%'[s] protocol version"
     ],
     "source": "ch/njol/skript/expressions/ExprPlayerProtocolVersion.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:player-skull",
@@ -11097,8 +11097,8 @@
       "%entities%'[s] portal cooldown"
     ],
     "source": "ch/njol/skript/expressions/ExprPortalCooldown.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:potion-effect-amplifier",
@@ -11149,8 +11149,8 @@
       "%potioneffecttypes%'[s] potion [effect [type]] category"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/expressions/ExprPotionEffectTypeCategory.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:potion-effects-of-entity-item",
@@ -11380,8 +11380,8 @@
       "[the] redstone power of %blocks%"
     ],
     "source": "ch/njol/skript/expressions/ExprRedstoneBlockPower.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:reduce",
@@ -11666,8 +11666,8 @@
       "%worlds%'[s] sea level"
     ],
     "source": "ch/njol/skript/expressions/ExprSeaLevel.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:sea-pickles",
@@ -11868,8 +11868,8 @@
       "%worlds%'[s] spawn[s] [(point|location)[s]]"
     ],
     "source": "ch/njol/skript/expressions/ExprSpawn.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:spawn-egg-entity",
@@ -11920,8 +11920,8 @@
       "%players%'[s] spectator target"
     ],
     "source": "ch/njol/skript/expressions/ExprSpectatorTarget.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:speed",
@@ -12000,8 +12000,8 @@
       "%minecrafttags%'[s] [namespace[d]] key[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/tags/elements/expressions/ExprTagKey.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:tags-contents",
@@ -12161,8 +12161,8 @@
       "[text alignment[s]] of %displays%"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/text/elements/expressions/ExprTextDisplayAlignment.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:text-display-line-width",
@@ -12173,8 +12173,8 @@
       "[line width] of %displays%"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/text/elements/expressions/ExprTextDisplayLineWidth.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:text-display-opacity",
@@ -12198,8 +12198,8 @@
       "%displays%'[s] text[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/misc/elements/expressions/ExprTextOf.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:the-egg",
@@ -12777,8 +12777,8 @@
       "%players%'[s] client view distance[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprClientViewDistance.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:villager-level-experience",
@@ -12854,8 +12854,8 @@
       "world[ ]border warning distance of %worldborders%"
     ],
     "source": "ch/njol/skript/expressions/ExprWorldBorderWarningDistance.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:warning-time-of-world-border",
