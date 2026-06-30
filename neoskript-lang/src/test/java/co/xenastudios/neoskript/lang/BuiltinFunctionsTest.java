@@ -50,6 +50,25 @@ class BuiltinFunctionsTest {
     }
 
     @Test
+    void uuidAndCalcExperience() {
+        assertEquals(java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                eval("uuid(\"00000000-0000-0000-0000-000000000001\")"));
+        assertEquals(null, eval("uuid(\"not-a-uuid\")"));
+        assertEquals(7.0, eval("calcExperience(1)"));   // 1 + 6
+        assertEquals(160.0, eval("calcExperience(10)")); // 100 + 60
+    }
+
+    @Test
+    void locationAndVectorFunctions() {
+        org.bukkit.Location loc = (org.bukkit.Location) eval("location(1, 2, 3)");
+        assertEquals(1.0, loc.getX());
+        assertEquals(2.0, loc.getY());
+        assertEquals(3.0, loc.getZ());
+        org.bukkit.util.Vector v = (org.bukkit.util.Vector) eval("vector(4, 5, 6)");
+        assertEquals(4.0, v.getX());
+    }
+
+    @Test
     void dateBuildsCalendarDate() {
         java.util.Date date = (java.util.Date) eval("date(2026, 6, 30)");
         java.util.Calendar calendar = java.util.Calendar.getInstance();

@@ -13129,7 +13129,8 @@
       "calcExperience(level: integer)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "function:case-equals",
@@ -13344,7 +13345,8 @@
       "location(x: number, y: number, z: number, world: world = (default world), yaw: number = 0, pitch: number = 0)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "function:log",
@@ -13427,7 +13429,8 @@
       "offlineplayer(nameOrUUID: text, allowLookups: boolean = true)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "function:permutations",
@@ -13450,7 +13453,8 @@
       "player(nameOrUUID: text, getExactPlayer: boolean = false)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "function:product",
@@ -13580,7 +13584,8 @@
       "uuid(uuid: text)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "function:vector",
@@ -13615,7 +13620,8 @@
       "world(name: text)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "section:catch-runtime-errors",

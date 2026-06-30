@@ -74,6 +74,42 @@ public final class BuiltinFunctions {
         registry.register("world", (args, ctx) -> args.isEmpty() ? null : Bukkit.getWorld(String.valueOf(args.get(0))));
         registry.register("player", (args, ctx) ->
                 args.isEmpty() ? null : Bukkit.getPlayerExact(String.valueOf(args.get(0))));
+        registry.register("offlineplayer", (args, ctx) -> {
+            if (args.isEmpty()) {
+                return null;
+            }
+            String name = String.valueOf(args.get(0)).trim();
+            try {
+                return Bukkit.getOfflinePlayer(java.util.UUID.fromString(name));
+            } catch (IllegalArgumentException notUuid) {
+                return Bukkit.getOfflinePlayer(name);
+            }
+        });
+        registry.register("uuid", (args, ctx) -> {
+            if (args.isEmpty()) {
+                return null;
+            }
+            try {
+                return java.util.UUID.fromString(String.valueOf(args.get(0)).trim());
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        });
+        registry.register("calcExperience", (args, ctx) -> {
+            Double level = number(args, 0);
+            if (level == null) {
+                return null;
+            }
+            int l = (int) (double) level;
+            // Total experience to reach a level from 0 (vanilla Minecraft formula).
+            if (l <= 16) {
+                return (double) (l * l + 6 * l);
+            }
+            if (l <= 31) {
+                return 2.5 * l * l - 40.5 * l + 360;
+            }
+            return 4.5 * l * l - 162.5 * l + 2220;
+        });
         registry.register("date", (args, ctx) -> {
             Double year = number(args, 0);
             Double month = number(args, 1);
