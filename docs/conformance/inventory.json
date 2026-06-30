@@ -3234,8 +3234,7 @@
       "un(leash|lead) [holder of] %livingentities%"
     ],
     "source": "ch/njol/skript/effects/EffLeash.java",
-    "status": "parse-verified",
-    "implemented": true
+    "status": "todo"
   },
   {
     "id": "effect:lightning",
@@ -3283,8 +3282,7 @@
       "[local[ly]] suppress [the] (conflict|variable save|missing conjunction|deprecated syntax|\"starting with expression\") warning[s]"
     ],
     "source": "ch/njol/skript/effects/EffSuppressWarnings.java",
-    "status": "parse-verified",
-    "implemented": true
+    "status": "todo"
   },
   {
     "id": "effect:log",
@@ -7013,8 +7011,7 @@
       "%blocks%'[s] [max:max[imum]] honey level"
     ],
     "source": "ch/njol/skript/expressions/ExprBeehiveHoneyLevel.java",
-    "status": "parse-verified",
-    "implemented": true
+    "status": "todo"
   },
   {
     "id": "expression:beehive-target-flower",
