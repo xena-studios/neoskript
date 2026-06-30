@@ -722,7 +722,7 @@ public final class BuiltinModule {
     private static void registerConditions(SyntaxRegistry registry) {
         // Order matters: more specific patterns are registered (and matched) first.
         registry.registerCondition("%object% (is not|isn't|is not) set", arguments -> isSet(arguments.get(0), false));
-        registry.registerCondition("%object% (is|are) set", arguments -> isSet(arguments.get(0), true));
+        registry.registerCondition("%object% ((is|are) set|exist[s])", arguments -> isSet(arguments.get(0), true));
 
         // Player-state conditions — registered before the generic equality they would otherwise shadow.
         registerEntityConditions(registry);
@@ -740,10 +740,10 @@ public final class BuiltinModule {
         });
         registry.registerCondition("%object% (doesn't contain|does not contain|don't contain) %object%",
                 arguments -> contains(arguments, false));
-        registry.registerCondition("%object% contains %object%", arguments -> contains(arguments, true));
-        registry.registerCondition("%string% starts with %string%", arguments -> affix(arguments, true));
-        registry.registerCondition("%string% ends with %string%", arguments -> affix(arguments, false));
-        registry.registerCondition("%string% matches %string%", arguments -> {
+        registry.registerCondition("%object% contain[s] %object%", arguments -> contains(arguments, true));
+        registry.registerCondition("%string% start[s] with %string%", arguments -> affix(arguments, true));
+        registry.registerCondition("%string% end[s] with %string%", arguments -> affix(arguments, false));
+        registry.registerCondition("%string% match[es] %string%", arguments -> {
             Expression<?> text = arguments.get(0);
             Expression<?> regex = arguments.get(1);
             return ctx -> {
@@ -834,7 +834,7 @@ public final class BuiltinModule {
                 a -> playerIs(a.get(0), player -> player.getFireTicks() > 0, true));
         registry.registerCondition("%player% is whitelisted", a -> playerIs(a.get(0), Player::isWhitelisted, true));
         registry.registerCondition("%player% is banned", a -> playerIs(a.get(0), Player::isBanned, true));
-        registry.registerCondition("%player% is (in a vehicle|inside a vehicle)",
+        registry.registerCondition("%player% is (in a vehicle|inside a vehicle|riding)",
                 a -> playerIs(a.get(0), Player::isInsideVehicle, true));
         registry.registerCondition("%player% has permission %string%", a -> hasPermission(a, true));
         registry.registerCondition("%player% (doesn't have|does not have|lacks) permission %string%",
@@ -842,13 +842,15 @@ public final class BuiltinModule {
         registry.registerCondition("%player% (has|have) %object%", a -> hasItem(a, true));
         registry.registerCondition("%player% (doesn't have|does not have|hasn't|haven't) %object%",
                 a -> hasItem(a, false));
-        registry.registerCondition("%player% is holding %object%", a -> {
+        co.xenastudios.neoskript.api.syntax.ConditionFactory holding = a -> {
             Expression<?> target = a.get(0);
             Expression<?> item = a.get(1);
             return ctx -> target.getSingle(ctx) instanceof Player player
                     && item.getSingle(ctx) instanceof ItemStack stack
                     && player.getInventory().getItemInMainHand().getType() == stack.getType();
-        });
+        };
+        registry.registerCondition("%player% is holding %object%", holding);
+        registry.registerCondition("%player% (has|have) %object% in [main] hand", holding);
         registry.registerCondition("%world% is raining", a -> worldIs(a.get(0), true));
         registry.registerCondition("%world% (is not raining|isn't raining|is clear)", a -> worldIs(a.get(0), false));
         registry.registerCondition("%world% is thundering", a -> {
@@ -901,11 +903,11 @@ public final class BuiltinModule {
         registry.registerCondition("%entity% is frozen", a -> entityIs(a.get(0), e -> e.getFreezeTicks() > 0, true));
         registry.registerCondition("%entity% (is a baby|is a child)",
                 a -> entityIs(a.get(0), e -> e instanceof org.bukkit.entity.Ageable age && !age.isAdult(), true));
-        registry.registerCondition("%entity% is an adult",
+        registry.registerCondition("%entity% is [an] adult",
                 a -> entityIs(a.get(0), e -> e instanceof org.bukkit.entity.Ageable age && age.isAdult(), true));
-        registry.registerCondition("%entity% (has ai|has AI)",
+        registry.registerCondition("%entity% (has|have) [an] (ai|AI)",
                 a -> entityIs(a.get(0), e -> e instanceof LivingEntity le && le.hasAI(), true));
-        registry.registerCondition("%entity% can pick up items",
+        registry.registerCondition("%entity% can pick[ ]up items",
                 a -> entityIs(a.get(0), e -> e instanceof LivingEntity le && le.getCanPickupItems(), true));
         registry.registerCondition("%entity% has scoreboard tag %string%", a -> {
             Expression<?> target = a.get(0);
@@ -1062,6 +1064,22 @@ public final class BuiltinModule {
                         }
                     };
                 });
+        registry.registerEffect("play sound %string% at %location% [with volume %-number%] [with pitch %-number%]",
+                arguments -> {
+                    Expression<?> sound = arguments.get(0);
+                    Expression<?> loc = arguments.get(1);
+                    Expression<?> volume = arguments.get(2);
+                    Expression<?> pitch = arguments.get(3);
+                    return ctx -> {
+                        Location at = toLocation(loc.getSingle(ctx));
+                        if (at != null && at.getWorld() != null) {
+                            String name = Renderer.toDisplay(sound.getSingle(ctx)).toLowerCase(Locale.ROOT);
+                            float vol = volume == null ? 1f : (float) orZero(toNumber(volume.getSingle(ctx)));
+                            float pit = pitch == null ? 1f : (float) orZero(toNumber(pitch.getSingle(ctx)));
+                            at.getWorld().playSound(at, name, vol, pit);
+                        }
+                    };
+                });
 
         registry.registerEffect(
                 "apply %string% to %player% [for %-number% seconds] [(at|of) (tier|level|amplifier) %-number%]",
@@ -1134,10 +1152,10 @@ public final class BuiltinModule {
                 }
             };
         });
-        registry.registerEffect("stop [all] sound[s] (for|to) %player%", arguments ->
-                playerEffect(arguments.get(0), Player::stopAllSounds));
-        registry.registerEffect("(clear|reset) [the] title[s] (of|for|from) %player%", arguments ->
-                playerEffect(arguments.get(0), Player::resetTitle));
+        registry.registerEffect("stop [all] sound[s] [(for|to) %player%]", arguments ->
+                playerOrEventEffect(arguments.get(0), Player::stopAllSounds));
+        registry.registerEffect("(clear|reset) [the] title[s] [(of|for|from) %player%]", arguments ->
+                playerOrEventEffect(arguments.get(0), Player::resetTitle));
         registry.registerEffect("(force %player% to (say|chat)|make %player% (say|chat)) %string%", arguments -> {
             Expression<?> a = arguments.get(0);
             Expression<?> b = arguments.get(1);
@@ -1180,16 +1198,16 @@ public final class BuiltinModule {
                 }
             };
         });
-        registry.registerEffect("make %player% (fly|start flying)", arguments ->
+        registry.registerEffect("(make|force) %player% [to] (fly|start flying)", arguments ->
                 playerEffect(arguments.get(0), player -> {
                     player.setAllowFlight(true);
                     player.setFlying(true);
                 }));
         registry.registerEffect("make %player% stop flying", arguments ->
                 playerEffect(arguments.get(0), player -> player.setFlying(false)));
-        registry.registerEffect("(allow|enable) (flight|flying) for %player%", arguments ->
+        registry.registerEffect("(allow|enable) (flight|flying|fly) for %player%", arguments ->
                 playerEffect(arguments.get(0), player -> player.setAllowFlight(true)));
-        registry.registerEffect("(disallow|disable) (flight|flying) for %player%", arguments ->
+        registry.registerEffect("(disallow|disable) (flight|flying|fly) for %player%", arguments ->
                 playerEffect(arguments.get(0), player -> player.setAllowFlight(false)));
         registry.registerEffect("set (display name|displayname) of %player% to %string%", arguments -> {
             Expression<?> target = arguments.get(0);
@@ -1375,6 +1393,22 @@ public final class BuiltinModule {
         registry.registerExpression(pattern, Object.class, a -> new ComputedExpression(getter::apply));
     }
 
+    /** Applies an action to the target player, or the event's player when the target is omitted. */
+    private static co.xenastudios.neoskript.api.syntax.Effect playerOrEventEffect(Expression<?> target,
+                                                                                  Consumer<Player> action) {
+        return ctx -> {
+            Player player = null;
+            if (target != null && target.getSingle(ctx) instanceof Player p) {
+                player = p;
+            } else if (event(ctx) instanceof org.bukkit.event.player.PlayerEvent pe) {
+                player = pe.getPlayer();
+            }
+            if (player != null) {
+                action.accept(player);
+            }
+        };
+    }
+
     private static co.xenastudios.neoskript.api.syntax.Effect entityEffect(Expression<?> target,
                                                                            Consumer<Entity> action) {
         return ctx -> {
@@ -1470,6 +1504,17 @@ public final class BuiltinModule {
             Expression<?> from = arguments.get(0);
             Expression<?> to = arguments.get(1);
             VariableExpression variable = requireVariable(arguments.get(2));
+            return ctx -> {
+                String text = Renderer.toDisplay(variable.getSingle(ctx));
+                variable.set(ctx, text.replace(Renderer.toDisplay(from.getSingle(ctx)),
+                        Renderer.toDisplay(to.getSingle(ctx))));
+            };
+        });
+        // Canonical Skript word order: replace X in Y with Z.
+        registry.registerEffect("replace [all] %string% in %object% with %string%", arguments -> {
+            Expression<?> from = arguments.get(0);
+            VariableExpression variable = requireVariable(arguments.get(1));
+            Expression<?> to = arguments.get(2);
             return ctx -> {
                 String text = Renderer.toDisplay(variable.getSingle(ctx));
                 variable.set(ctx, text.replace(Renderer.toDisplay(from.getSingle(ctx)),
