@@ -57,6 +57,7 @@ class BuiltinExpressionsTest {
         assertEquals("hello", eval("lowercase \"HELLO\"", g));
         assertEquals(5.0, eval("length of \"hello\"", g));
         assertArrayEquals(new Object[]{"a", "b", "c"}, evalAll("\"a,b,c\" split at \",\"", g));
+        assertEquals("Hello World", eval("capitalized \"hello world\"", g));
     }
 
     @Test

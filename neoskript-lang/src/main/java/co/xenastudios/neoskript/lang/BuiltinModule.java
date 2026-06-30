@@ -285,6 +285,8 @@ public final class BuiltinModule {
                 arguments -> mapString(arguments.get(0), s -> s.toUpperCase(Locale.ROOT)));
         registry.registerExpression("(lowercase|lower case) [of] %string%", Object.class,
                 arguments -> mapString(arguments.get(0), s -> s.toLowerCase(Locale.ROOT)));
+        registry.registerExpression("capitalized %string%", Object.class,
+                arguments -> mapString(arguments.get(0), BuiltinModule::capitalize));
         registry.registerExpression("length of %string%", Object.class, arguments -> {
             Expression<?> s = arguments.get(0);
             return new ComputedExpression(ctx -> {
@@ -371,6 +373,18 @@ public final class BuiltinModule {
 
     private static ComputedExpression mapString(Expression<?> source, java.util.function.UnaryOperator<String> op) {
         return new ComputedExpression(ctx -> op.apply(Renderer.toDisplay(source.getSingle(ctx))));
+    }
+
+    /** Capitalises the first letter of each whitespace-separated word. */
+    private static String capitalize(String text) {
+        StringBuilder result = new StringBuilder(text.length());
+        boolean startOfWord = true;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            result.append(startOfWord ? Character.toTitleCase(c) : c);
+            startOfWord = Character.isWhitespace(c);
+        }
+        return result.toString();
     }
 
     private static int compareForSort(Object a, Object b) {

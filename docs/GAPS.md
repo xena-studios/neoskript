@@ -62,7 +62,7 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
 - **Effects:** particles, open/modify inventories, set weather amount/duration, scoreboard,
   ban/unban, … (`play sound`, apply/clear potion effects, and thunder/weather duration are implemented)
 - **Expressions:** direction math, more item properties (name/lore/enchants), weather
-  state, target/looked-at block, nearby entities, time differences, more string/number formatting, … (x/y/z and length now work on vectors; amount of an item gives its stack size)
+  state, target/looked-at block, nearby entities, time differences, more number formatting, … (capitalized text is implemented) (x/y/z and length now work on vectors; amount of an item gives its stack size)
 - **Events:** the remaining (leash, tame variants, server ping, tab complete, advancement, and the long tail).
 - **Conditions:** the remaining long tail (`can build`, `is in water/lava`, and `is thundering` are now implemented).
 
