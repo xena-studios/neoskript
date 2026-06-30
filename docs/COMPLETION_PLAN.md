@@ -13,9 +13,10 @@ Driven by `docs/conformance/` — `inventory.json` (every documented Skript 2.15
 
 - **Denominator:** 1,186 in-scope entries (1,200 documented − 14 external-plugin, see
   `EXTERNAL_PLUGIN_SYNTAX.md`).
-- **Current:** **202/1186 done (17%)** — every entry NeoSkript already implements has been verified
-  with a conformance test (types 24, functions 40, effects 18, conditions 30, expressions 34,
-  events 49, sections 3, structures 6).
+- **Current:** **218/1186 done (18.4%)** — every entry NeoSkript already implemented is verified with
+  a conformance test, plus newly-added types and entity effects. Engine adapters now in place:
+  `EnumType` (lazy) and `RegistryType` (lazy, Bukkit-registry-backed) make the type tail mechanical;
+  ~33 types, 49 events, 23 effects, 30 conditions, 36 expressions, 40 functions done.
 - **Engine bugs found & fixed during verification** (see `KNOWN_ISSUES.md`): candidate fall-through,
   null optional args (`SimpleArguments`), leading-optional space in `PatternCompiler`, and
   `distance between A and B` mis-splitting. All fixed with regression tests.
