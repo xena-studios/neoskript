@@ -18,18 +18,26 @@ import co.xenastudios.neoskript.core.type.TypeRegistry;
 import co.xenastudios.neoskript.lang.expression.EventPlayerExpression;
 import co.xenastudios.neoskript.lang.expression.EventValueExpression;
 import co.xenastudios.neoskript.lang.type.BooleanType;
+import co.xenastudios.neoskript.lang.type.GameModeType;
 import co.xenastudios.neoskript.lang.type.NumberType;
 import co.xenastudios.neoskript.lang.type.PlayerType;
 import co.xenastudios.neoskript.lang.type.StringType;
+import co.xenastudios.neoskript.lang.type.WorldType;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.player.PlayerEvent;
+
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
@@ -65,6 +73,8 @@ public final class BuiltinModule {
         types.register(new StringType());
         types.register(new BooleanType());
         types.register(new PlayerType());
+        types.register(new WorldType());
+        types.register(new GameModeType());
         Renderer.setTypeRegistry(types);
     }
 
@@ -100,6 +110,45 @@ public final class BuiltinModule {
 
         registerStringAndListExpressions(registry);
         registerCommandExpressions(registry);
+        registerEntityExpressions(registry);
+    }
+
+    private static void registerEntityExpressions(SyntaxRegistry registry) {
+        playerProperty(registry, "health", LivingEntity::getHealth);
+        playerProperty(registry, "(max health|maximum health)", LivingEntity::getMaxHealth);
+        playerProperty(registry, "(food level|hunger|food)", player -> (double) ((Player) player).getFoodLevel());
+        playerProperty(registry, "level", player -> (double) ((Player) player).getLevel());
+        playerProperty(registry, "(uuid|unique id)", player -> player.getUniqueId().toString());
+        playerProperty(registry, "(gamemode|game mode)", player -> ((Player) player).getGameMode());
+        playerProperty(registry, "world", LivingEntity::getWorld);
+        playerProperty(registry, "location", LivingEntity::getLocation);
+        playerProperty(registry, "name", player -> player.getName());
+        playerProperty(registry, "(display name|displayname)", player -> ((Player) player).getName());
+
+        registry.registerExpression("(all players|online players|all online players)", Object.class,
+                arguments -> new ComputedListExpression(ctx -> Bukkit.getOnlinePlayers().toArray()));
+
+        gameMode(registry, "survival", GameMode.SURVIVAL);
+        gameMode(registry, "creative", GameMode.CREATIVE);
+        gameMode(registry, "adventure", GameMode.ADVENTURE);
+        gameMode(registry, "spectator", GameMode.SPECTATOR);
+    }
+
+    /** Registers {@code <prop> of %player%} and {@code %player%'s <prop>} for a player accessor. */
+    private static void playerProperty(SyntaxRegistry registry, String name, Function<LivingEntity, Object> accessor) {
+        registry.registerExpression(name + " of %player%", Object.class,
+                arguments -> playerValue(arguments.get(0), accessor));
+        registry.registerExpression("%player%'s " + name, Object.class,
+                arguments -> playerValue(arguments.get(0), accessor));
+    }
+
+    private static ComputedExpression playerValue(Expression<?> target, Function<LivingEntity, Object> accessor) {
+        return new ComputedExpression(ctx ->
+                target.getSingle(ctx) instanceof LivingEntity entity ? accessor.apply(entity) : null);
+    }
+
+    private static void gameMode(SyntaxRegistry registry, String name, GameMode mode) {
+        registry.registerExpression(name + " [mode]", Object.class, arguments -> new ComputedExpression(ctx -> mode));
     }
 
     private static void registerCommandExpressions(SyntaxRegistry registry) {
@@ -249,6 +298,9 @@ public final class BuiltinModule {
         registry.registerCondition("%object% (is not|isn't|is not) set", arguments -> isSet(arguments.get(0), false));
         registry.registerCondition("%object% (is|are) set", arguments -> isSet(arguments.get(0), true));
 
+        // Player-state conditions — registered before the generic equality they would otherwise shadow.
+        registerEntityConditions(registry);
+
         // String/collection conditions — registered before the generic comparisons they could shadow.
         registry.registerCondition("%object% (is between|between) %object% and %object%", arguments -> {
             Expression<?> value = arguments.get(0);
@@ -328,6 +380,110 @@ public final class BuiltinModule {
         };
     }
 
+    private static void registerEntityConditions(SyntaxRegistry registry) {
+        registry.registerCondition("%player% (is op|is an op|is operator)", a -> playerIs(a.get(0), Player::isOp, true));
+        registry.registerCondition("%player% (is not|isn't) op", a -> playerIs(a.get(0), Player::isOp, false));
+        registry.registerCondition("%player% is online", a -> playerIs(a.get(0), Player::isOnline, true));
+        registry.registerCondition("%player% is offline", a -> playerIs(a.get(0), Player::isOnline, false));
+        registry.registerCondition("%player% is sneaking", a -> playerIs(a.get(0), Player::isSneaking, true));
+        registry.registerCondition("%player% is sprinting", a -> playerIs(a.get(0), Player::isSprinting, true));
+        registry.registerCondition("%player% is flying", a -> playerIs(a.get(0), Player::isFlying, true));
+        registry.registerCondition("%player% has permission %string%", a -> hasPermission(a, true));
+        registry.registerCondition("%player% (doesn't have|does not have|lacks) permission %string%",
+                a -> hasPermission(a, false));
+    }
+
+    private static Condition playerIs(Expression<?> target, Predicate<Player> test, boolean expected) {
+        return ctx -> target.getSingle(ctx) instanceof Player player && test.test(player) == expected;
+    }
+
+    private static Condition hasPermission(Arguments arguments, boolean expected) {
+        Expression<?> target = arguments.get(0);
+        Expression<?> permission = arguments.get(1);
+        return ctx -> target.getSingle(ctx) instanceof Player player
+                && player.hasPermission(Renderer.toDisplay(permission.getSingle(ctx))) == expected;
+    }
+
+    private static void registerEntityEffects(SyntaxRegistry registry) {
+        registry.registerEffect("set health of %player% to %number%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> value = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof LivingEntity entity) {
+                    double health = Math.max(0, Math.min(orZero(toNumber(value.getSingle(ctx))), entity.getMaxHealth()));
+                    entity.setHealth(health);
+                }
+            };
+        });
+        registry.registerEffect("set (food level|hunger) of %player% to %number%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> value = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Player player) {
+                    player.setFoodLevel((int) orZero(toNumber(value.getSingle(ctx))));
+                }
+            };
+        });
+        registry.registerEffect("set (gamemode|game mode) of %player% to %gamemode%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> value = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Player player && value.getSingle(ctx) instanceof GameMode mode) {
+                    player.setGameMode(mode);
+                }
+            };
+        });
+
+        registry.registerEffect("kill %entity%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            return ctx -> {
+                Object value = target.getSingle(ctx);
+                if (value instanceof LivingEntity entity) {
+                    entity.setHealth(0);
+                } else if (value instanceof Entity entity) {
+                    entity.remove();
+                }
+            };
+        });
+        registry.registerEffect("heal %player%", arguments ->
+                playerEffect(arguments.get(0), player -> player.setHealth(player.getMaxHealth())));
+        registry.registerEffect("feed %player%", arguments ->
+                playerEffect(arguments.get(0), player -> player.setFoodLevel(20)));
+        registry.registerEffect("op %player%", arguments ->
+                playerEffect(arguments.get(0), player -> player.setOp(true)));
+        registry.registerEffect("deop %player%", arguments ->
+                playerEffect(arguments.get(0), player -> player.setOp(false)));
+        registry.registerEffect("kick %player% [(due to|because of) %string%]", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> reason = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Player player) {
+                    String text = reason == null ? "Kicked from the server" : Renderer.toDisplay(reason.getSingle(ctx));
+                    player.kick(Component.text(text));
+                }
+            };
+        });
+        registry.registerEffect("teleport %player% to %player%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> destination = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Player player
+                        && destination.getSingle(ctx) instanceof Player to) {
+                    player.teleport(to.getLocation());
+                }
+            };
+        });
+    }
+
+    private static co.xenastudios.neoskript.api.syntax.Effect playerEffect(Expression<?> target,
+                                                                           Consumer<Player> action) {
+        return ctx -> {
+            if (target.getSingle(ctx) instanceof Player player) {
+                action.accept(player);
+            }
+        };
+    }
+
     private static Condition equality(co.xenastudios.neoskript.api.syntax.Arguments arguments, boolean expected) {
         Expression<?> left = arguments.get(0);
         Expression<?> right = arguments.get(1);
@@ -345,6 +501,9 @@ public final class BuiltinModule {
     }
 
     private static void registerEffects(SyntaxRegistry registry) {
+        // Registered first so specific "set <property> of ..." effects win over the generic set.
+        registerEntityEffects(registry);
+
         registry.registerEffect("broadcast %string%", arguments -> {
             Expression<?> message = arguments.get(0);
             return ctx -> Bukkit.broadcast(Component.text(Renderer.toDisplay(message.getSingle(ctx))));
