@@ -3,6 +3,7 @@ package co.xenastudios.neoskript.core.parser;
 import co.xenastudios.neoskript.api.syntax.Expression;
 import co.xenastudios.neoskript.core.expression.ArithmeticExpression;
 import co.xenastudios.neoskript.core.expression.FunctionCallExpression;
+import co.xenastudios.neoskript.core.expression.ListExpression;
 import co.xenastudios.neoskript.core.expression.NumberLiteral;
 import co.xenastudios.neoskript.core.expression.VariableExpression;
 import co.xenastudios.neoskript.core.expression.VariableString;
@@ -48,7 +49,51 @@ public final class ExpressionParser {
         if (s.isEmpty()) {
             throw new ParseException("Empty expression");
         }
-        return parseAdditive(s);
+        List<String> items = splitList(s);
+        if (items.size() == 1) {
+            return parseAdditive(s);
+        }
+        List<Expression<?>> elements = new ArrayList<>(items.size());
+        for (String item : items) {
+            elements.add(parseAdditive(item.trim()));
+        }
+        return new ListExpression(elements);
+    }
+
+    /** Splits an expression into list elements on top-level commas and {@code and}/{@code or}. */
+    private static List<String> splitList(String s) {
+        List<String> parts = new ArrayList<>();
+        int depth = 0;
+        boolean inQuotes = false;
+        int start = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (inQuotes) {
+                // skip
+            } else if (c == '(' || c == '{') {
+                depth++;
+            } else if (c == ')' || c == '}') {
+                depth--;
+            } else if (depth == 0) {
+                if (c == ',') {
+                    parts.add(s.substring(start, i));
+                    start = i + 1;
+                } else if (s.regionMatches(true, i, " and ", 0, 5)) {
+                    parts.add(s.substring(start, i));
+                    start = i + 5;
+                    i += 4;
+                } else if (s.regionMatches(true, i, " or ", 0, 4)) {
+                    parts.add(s.substring(start, i));
+                    start = i + 4;
+                    i += 3;
+                }
+            }
+        }
+        parts.add(s.substring(start));
+        parts.removeIf(part -> part.isBlank());
+        return parts;
     }
 
     private Expression<?> parseAdditive(String s) {

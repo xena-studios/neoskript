@@ -88,4 +88,24 @@ class BuiltinExpressionsTest {
         assertTrue(condition("5 is between 1 and 10"));
         assertFalse(condition("15 is between 1 and 10"));
     }
+
+    @Test
+    void commaAndSeparatedListLiterals() {
+        Map<String, Object> g = new HashMap<>();
+        assertArrayEquals(new Object[]{1.0, 2.0, 3.0}, evalAll("1, 2 and 3", g));
+        assertArrayEquals(new Object[]{"a", "b"}, evalAll("\"a\" and \"b\"", g));
+    }
+
+    @Test
+    void loopsOverListLiterals() {
+        List<Trigger> triggers = scripts.parse("""
+                on join:
+                    set {_count} to 0
+                    loop 1, 2 and 3:
+                        add 1 to {_count}
+                """);
+        SimpleTriggerContext ctx = new SimpleTriggerContext(null, new HashMap<>());
+        triggers.get(0).execute(ctx);
+        assertEquals(3.0, ctx.getLocal("count"));
+    }
 }
