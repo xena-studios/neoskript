@@ -51,6 +51,10 @@ class PlayerEffects2Test {
                         close inventory of player
                         make player wake up
                         despawn player
+                        make player charged
+                        leash player to player
+                        break event-block
+                        detonate player
                 """, StandardCharsets.UTF_8);
         server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
 

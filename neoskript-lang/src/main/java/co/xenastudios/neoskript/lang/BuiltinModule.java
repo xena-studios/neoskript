@@ -1193,6 +1193,47 @@ public final class BuiltinModule {
         });
         registry.registerEffect("(despawn|remove) %entity%", arguments ->
                 entityEffect(arguments.get(0), Entity::remove));
+        registry.registerEffect("make %entity% (charged|powered)", arguments ->
+                entityEffect(arguments.get(0), e -> {
+                    if (e instanceof org.bukkit.entity.Creeper c) {
+                        c.setPowered(true);
+                    }
+                }));
+        registry.registerEffect("make %entity% (uncharged|unpowered|not charged|not powered)", arguments ->
+                entityEffect(arguments.get(0), e -> {
+                    if (e instanceof org.bukkit.entity.Creeper c) {
+                        c.setPowered(false);
+                    }
+                }));
+        registry.registerEffect("(leash|lead) %object% to %object%", arguments -> {
+            Expression<?> ent = arguments.get(0);
+            Expression<?> holder = arguments.get(1);
+            return ctx -> {
+                if (ent.getSingle(ctx) instanceof LivingEntity le && holder.getSingle(ctx) instanceof Entity h) {
+                    try {
+                        le.setLeashHolder(h);
+                    } catch (IllegalArgumentException ignored) {
+                        // not leashable
+                    }
+                }
+            };
+        });
+        registry.registerEffect("break %object% [naturally]", arguments -> {
+            Expression<?> src = arguments.get(0);
+            return ctx -> {
+                if (src.getSingle(ctx) instanceof org.bukkit.block.Block b) {
+                    b.breakNaturally();
+                }
+            };
+        });
+        registry.registerEffect("(detonate|instantly explode) %entity%", arguments ->
+                entityEffect(arguments.get(0), e -> {
+                    if (e instanceof org.bukkit.entity.Creeper c) {
+                        c.explode();
+                    } else if (e instanceof org.bukkit.entity.Explosive ex) {
+                        ex.getWorld().createExplosion(ex.getLocation(), ex.getYield());
+                    }
+                }));
         registry.registerEffect("close [the] inventory [(of|for)] %player%", arguments ->
                 playerEffect(arguments.get(0), Player::closeInventory));
         registry.registerEffect("close %player%'s inventory", arguments ->

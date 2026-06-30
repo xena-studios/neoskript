@@ -2427,8 +2427,8 @@
       "break %blocks% [naturally] [using %-itemtype%]"
     ],
     "source": "ch/njol/skript/effects/EffBreakNaturally.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:broadcast",
@@ -2526,8 +2526,8 @@
       "[:un](charge|power) %entities%"
     ],
     "source": "ch/njol/skript/effects/EffCharge.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:clear-entity-storage",
@@ -2712,8 +2712,8 @@
       "detonate %entities%"
     ],
     "source": "ch/njol/skript/effects/EffDetonate.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:do-if",
@@ -3234,7 +3234,8 @@
       "un(leash|lead) [holder of] %livingentities%"
     ],
     "source": "ch/njol/skript/effects/EffLeash.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:lightning",
