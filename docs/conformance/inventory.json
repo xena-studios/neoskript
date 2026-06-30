@@ -7994,7 +7994,7 @@
       "%worlds%'[s] difficult(y|ies)"
     ],
     "source": "ch/njol/skript/expressions/ExprDifficulty.java",
-    "status": "parse-verified",
+    "status": "done",
     "implemented": true
   },
   {
@@ -11692,8 +11692,8 @@
       "%entities/blocks%'[s] loot[[ ]table] seed[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/expressions/ExprLootTableSeed.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:sent-command-list",

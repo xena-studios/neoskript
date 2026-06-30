@@ -314,6 +314,19 @@ public final class BuiltinModule {
                                 : second.toVector().subtract(first.toVector());
                     });
                 });
+        registry.registerExpression("difficulty of %world%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof World w ? w.getDifficulty() : null);
+        });
+        registry.registerExpression("[world] spawn [(point|location)] of %world%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof World w ? w.getSpawnLocation() : null);
+        });
+        registry.registerExpression("[world] seed of %world%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof World w ? (double) w.getSeed() : null);
+        });
         registry.registerExpression("[a] random uuid", Object.class,
                 arguments -> new ComputedExpression(ctx -> java.util.UUID.randomUUID()));
         registry.registerExpression("normalize[d] %vector%", Object.class, arguments -> {

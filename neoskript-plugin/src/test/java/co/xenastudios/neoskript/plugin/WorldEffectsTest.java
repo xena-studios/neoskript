@@ -46,6 +46,11 @@ class WorldEffectsTest {
                 command /we:
                     trigger:
                         set difficulty of world of player to hard
+                        set {_dif} to difficulty of world of player
+                        set {_spawn} to spawn of world of player
+                        set {_seed} to seed of world of player
+                        if {_dif} is hard:
+                            send "GETDIF" to player
                         send "DONE" to player
 
                 command /we2:
@@ -66,6 +71,7 @@ class WorldEffectsTest {
         }
         assertTrue(seen.contains("JOINED"), "lightning/spawn commands parsed (file loaded)");
         assertTrue(seen.contains("DONE"), "set difficulty ran");
+        assertTrue(seen.contains("GETDIF"), "difficulty/spawn/seed getters resolve");
         assertEquals(Difficulty.HARD, player.getWorld().getDifficulty(), "difficulty set to hard (via 'hard' type literal)");
     }
 }
