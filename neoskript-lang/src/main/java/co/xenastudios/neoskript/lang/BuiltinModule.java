@@ -3,6 +3,7 @@ package co.xenastudios.neoskript.lang;
 import co.xenastudios.neoskript.api.registry.SyntaxRegistry;
 import co.xenastudios.neoskript.api.runtime.TriggerContext;
 import co.xenastudios.neoskript.api.syntax.Arguments;
+import co.xenastudios.neoskript.api.syntax.ChangeMode;
 import co.xenastudios.neoskript.api.syntax.Condition;
 import co.xenastudios.neoskript.api.syntax.Expression;
 import co.xenastudios.neoskript.core.expression.ComputedExpression;
@@ -207,6 +208,26 @@ public final class BuiltinModule {
         playerProperty(registry, "location", LivingEntity::getLocation);
         playerProperty(registry, "name", player -> player.getName());
         playerProperty(registry, "(display name|displayname)", player -> ((Player) player).getName());
+
+        // Changeable numeric properties (gettable + set/add/remove/reset via the generic changer).
+        numericProperty(registry, "saturation", Player.class,
+                Player::getSaturation, (p, v) -> p.setSaturation((float) v), 5);
+        numericProperty(registry, "exhaustion", Player.class,
+                Player::getExhaustion, (p, v) -> p.setExhaustion((float) v), 0);
+        numericProperty(registry, "(fly speed|flight speed)", Player.class,
+                Player::getFlySpeed, (p, v) -> p.setFlySpeed((float) Math.max(-1, Math.min(1, v))), 0.1);
+        numericProperty(registry, "absorption", LivingEntity.class,
+                LivingEntity::getAbsorptionAmount, (e, v) -> e.setAbsorptionAmount(Math.max(0, v)), 0);
+        numericProperty(registry, "(no damage ticks|invulnerability ticks)", LivingEntity.class,
+                e -> (double) e.getNoDamageTicks(), (e, v) -> e.setNoDamageTicks((int) v), 0);
+        numericProperty(registry, "fall distance", org.bukkit.entity.Entity.class,
+                e -> (double) e.getFallDistance(), (e, v) -> e.setFallDistance((float) v), 0);
+        numericProperty(registry, "fire ticks", org.bukkit.entity.Entity.class,
+                e -> (double) e.getFireTicks(), (e, v) -> e.setFireTicks((int) v), 0);
+        numericProperty(registry, "(remaining air|air level)", LivingEntity.class,
+                e -> (double) e.getRemainingAir(), (e, v) -> e.setRemainingAir((int) v), 300);
+        numericProperty(registry, "(maximum air|max air)", LivingEntity.class,
+                e -> (double) e.getMaximumAir(), (e, v) -> e.setMaximumAir((int) v), 300);
 
         registry.registerExpression("(all players|online players|all online players)", Object.class,
                 arguments -> new ComputedListExpression(ctx -> Bukkit.getOnlinePlayers().toArray()));
@@ -972,6 +993,17 @@ public final class BuiltinModule {
         };
     }
 
+    private static <H> void numericProperty(SyntaxRegistry registry, String name, Class<H> holder,
+                                            java.util.function.ToDoubleFunction<H> getter,
+                                            java.util.function.ObjDoubleConsumer<H> setter, double reset) {
+        registry.registerExpression(name + " of %object%", Object.class, a ->
+                new co.xenastudios.neoskript.lang.expression.NumericPropertyExpression<>(
+                        a.get(0), holder, getter, setter, reset));
+        registry.registerExpression("%object%'s " + name, Object.class, a ->
+                new co.xenastudios.neoskript.lang.expression.NumericPropertyExpression<>(
+                        a.get(0), holder, getter, setter, reset));
+    }
+
     private static co.xenastudios.neoskript.api.syntax.Effect entityEffect(Expression<?> target,
                                                                            Consumer<Entity> action) {
         return ctx -> {
@@ -1054,9 +1086,13 @@ public final class BuiltinModule {
         });
 
         registry.registerEffect("set %object% to %object%", arguments -> {
-            VariableExpression variable = requireVariable(arguments.get(0));
+            Expression<?> lhs = arguments.get(0);
             Expression<?> value = arguments.get(1);
-            return ctx -> variable.set(ctx, value.getSingle(ctx));
+            if (lhs instanceof VariableExpression variable) {
+                return ctx -> variable.set(ctx, value.getSingle(ctx));
+            }
+            requireChangeable(lhs, ChangeMode.SET);
+            return ctx -> lhs.change(ctx, new Object[]{value.getSingle(ctx)}, ChangeMode.SET);
         });
 
         registry.registerEffect("replace [all] %string% with %string% in %object%", arguments -> {
@@ -1072,39 +1108,51 @@ public final class BuiltinModule {
 
         registry.registerEffect("add %object% to %object%", arguments -> {
             Expression<?> value = arguments.get(0);
-            VariableExpression variable = requireVariable(arguments.get(1));
-            return ctx -> mutate(ctx, variable, () -> {
-                Object item = value.getSingle(ctx);
-                if (variable.isList()) {
-                    variable.addToList(ctx, item);
-                } else {
-                    Double sum = add(variable.getSingle(ctx), item);
-                    if (sum != null) {
-                        variable.set(ctx, sum);
+            Expression<?> lhs = arguments.get(1);
+            if (lhs instanceof VariableExpression variable) {
+                return ctx -> mutate(ctx, variable, () -> {
+                    Object item = value.getSingle(ctx);
+                    if (variable.isList()) {
+                        variable.addToList(ctx, item);
+                    } else {
+                        Double sum = add(variable.getSingle(ctx), item);
+                        if (sum != null) {
+                            variable.set(ctx, sum);
+                        }
                     }
-                }
-            });
+                });
+            }
+            requireChangeable(lhs, ChangeMode.ADD);
+            return ctx -> lhs.change(ctx, new Object[]{value.getSingle(ctx)}, ChangeMode.ADD);
         });
 
         registry.registerEffect("remove %object% from %object%", arguments -> {
             Expression<?> value = arguments.get(0);
-            VariableExpression variable = requireVariable(arguments.get(1));
-            return ctx -> mutate(ctx, variable, () -> {
-                Object item = value.getSingle(ctx);
-                if (variable.isList()) {
-                    variable.removeFromList(ctx, item);
-                } else {
-                    Double difference = subtract(variable.getSingle(ctx), item);
-                    if (difference != null) {
-                        variable.set(ctx, difference);
+            Expression<?> lhs = arguments.get(1);
+            if (lhs instanceof VariableExpression variable) {
+                return ctx -> mutate(ctx, variable, () -> {
+                    Object item = value.getSingle(ctx);
+                    if (variable.isList()) {
+                        variable.removeFromList(ctx, item);
+                    } else {
+                        Double difference = subtract(variable.getSingle(ctx), item);
+                        if (difference != null) {
+                            variable.set(ctx, difference);
+                        }
                     }
-                }
-            });
+                });
+            }
+            requireChangeable(lhs, ChangeMode.REMOVE);
+            return ctx -> lhs.change(ctx, new Object[]{value.getSingle(ctx)}, ChangeMode.REMOVE);
         });
 
         registry.registerEffect("(delete|clear|reset) %object%", arguments -> {
-            VariableExpression variable = requireVariable(arguments.get(0));
-            return ctx -> mutate(ctx, variable, () -> variable.delete(ctx));
+            Expression<?> lhs = arguments.get(0);
+            if (lhs instanceof VariableExpression variable) {
+                return ctx -> mutate(ctx, variable, () -> variable.delete(ctx));
+            }
+            requireChangeable(lhs, ChangeMode.RESET);
+            return ctx -> lhs.change(ctx, null, ChangeMode.RESET);
         });
 
         registry.registerEffect("return %object%", arguments -> {
@@ -1144,6 +1192,13 @@ public final class BuiltinModule {
             return variable;
         }
         throw new ParseException("Expected a variable, got: " + expression);
+    }
+
+    /** Ensures an expression accepts the given change mode (else this candidate fails, allowing fall-through). */
+    private static void requireChangeable(Expression<?> expression, ChangeMode mode) {
+        if (expression == null || expression.acceptChange(mode) == null) {
+            throw new ParseException("Cannot " + mode.name().toLowerCase(Locale.ROOT) + ": " + expression);
+        }
     }
 
     /**

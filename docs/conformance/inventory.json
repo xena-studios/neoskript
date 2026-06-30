@@ -8616,8 +8616,8 @@
       "%players%'[s] exhaustion"
     ],
     "source": "ch/njol/skript/expressions/ExprExhaustion.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:experience",
@@ -8742,8 +8742,8 @@
       "%entities%'[s] fall[en] (distance|height)"
     ],
     "source": "ch/njol/skript/expressions/ExprFallDistance.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:fertilized-blocks",
@@ -10623,8 +10623,8 @@
       "%livingentities%'[s] (invulnerability|invincibility|no damage) tick[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprNoDamageTicks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:no-damage-time",
@@ -11454,8 +11454,8 @@
       "%livingentities%'[s] remaining air"
     ],
     "source": "ch/njol/skript/expressions/ExprRemainingAir.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:repeat-string",
@@ -11613,8 +11613,8 @@
       "%players%'[s] saturation"
     ],
     "source": "ch/njol/skript/expressions/ExprSaturation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:scale",
