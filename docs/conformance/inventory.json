@@ -434,8 +434,8 @@
       "%entities% (is not|are not|isn't|aren't) wet"
     ],
     "source": "ch/njol/skript/conditions/CondEntityIsWet.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:entity-storage-is-full",
@@ -987,8 +987,8 @@
       "%livingentities% (is|are)(n't| not) climbing"
     ],
     "source": "ch/njol/skript/conditions/CondIsClimbing.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-conditional",
@@ -1015,8 +1015,8 @@
       "custom name of %entities% (isn't|is not|are not|aren't) visible"
     ],
     "source": "ch/njol/skript/conditions/CondIsCustomNameVisible.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-dancing",
@@ -1347,8 +1347,8 @@
       "%livingentities% (isn't|is not|aren't|are not) jumping"
     ],
     "source": "ch/njol/skript/conditions/CondIsJumping.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-leashed",
@@ -1415,8 +1415,8 @@
       "%vectors% (isn't|aren't|is not|are not) normalized"
     ],
     "source": "ch/njol/skript/conditions/CondIsVectorNormalized.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-occluding",
@@ -1496,8 +1496,8 @@
       "%blocks% (is|are)(n't| not) passable"
     ],
     "source": "ch/njol/skript/conditions/CondIsPassable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-pathfinding",
@@ -1631,8 +1631,8 @@
       "%livingentities% (is|are)(n't| not) riptiding"
     ],
     "source": "ch/njol/skript/conditions/CondIsRiptiding.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-saddled",
@@ -1846,8 +1846,8 @@
       "%entities% (isn't|aren't|is not|are not) ticking"
     ],
     "source": "ch/njol/skript/conditions/CondIsTicking.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-transparent",
@@ -2247,8 +2247,8 @@
       "%displays% (isn't|aren't|is not|are not) visible through (blocks|walls)"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/text/elements/conditions/CondTextDisplaySeeThroughBlocks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:time",

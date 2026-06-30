@@ -64,15 +64,53 @@ class GenParseTest {
                         set {_x} to uuid of dropped item thrower of player
                         set {_x} to enchantment cost of player
                         set {_x} to ender chest of player
-                        if player can duplicate:
+                        if player is blocking:
                             set {_y} to 1
-                        if player is dashing:
+                        if player is invisible:
+                            set {_y} to 1
+                        if player is op:
+                            set {_y} to 1
+                        if player is climbing:
+                            set {_y} to 1
+                        if player is flying:
+                            set {_y} to 1
+                        if player is frozen:
+                            set {_y} to 1
+                        if player is gliding:
+                            set {_y} to 1
+                        if player is jumping:
+                            set {_y} to 1
+                        if player is normalized:
+                            set {_y} to 1
+                        if player is on ground:
+                            set {_y} to 1
+                        if player is passable:
+                            set {_y} to 1
+                        if player is riptiding:
+                            set {_y} to 1
+                        if player is silent:
+                            set {_y} to 1
+                        if player is sleeping:
+                            set {_y} to 1
+                        if player is sneaking:
+                            set {_y} to 1
+                        if player is sprinting:
+                            set {_y} to 1
+                        if player is swimming:
+                            set {_y} to 1
+                        if player is ticking:
+                            set {_y} to 1
+                        if player is wet:
                             set {_y} to 1
                         if player can breed:
                             set {_y} to 1
                         if player can despawn when far away:
                             set {_y} to 1
+                        if player can duplicate:
+                            set {_y} to 1
                         if player can pick up items:
+                            set {_y} to 1
+                        if player is dashing:
                             set {_y} to 1
                         if player is from a mob spawner:
                             set {_y} to 1
