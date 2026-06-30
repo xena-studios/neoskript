@@ -51,21 +51,20 @@ players; gamemode literals; command `sender`, `arg-N`, `args`; comma/`and`-separ
 (registry-backed display/parse).
 
 **Built-in functions:** abs, round, floor, ceil, sqrt, exp, ln, log, sin/cos/tan (+inverse), mod,
-atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `player()`.
+atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `player()`, `rgb()`, `date()`.
 
 **Persistence:** flatfile and JDBC (SQLite) backends with rich-type serialization (location, item, vector, …).
 
 ## ❌ Remaining — content long tail
 
 - **Types:** entity (beyond generic Entity), block (beyond event-value), inventory,
-  slot, biome, enchantment, material, chunk, offline player, date, direction, … (colour is implemented)
+  slot, biome, enchantment, material, chunk, offline player, direction, … (colour and date are implemented)
 - **Effects:** particles, open/modify inventories, set weather amount/duration, scoreboard,
   ban/unban, … (`play sound` and apply/clear potion effects are implemented)
 - **Expressions:** direction math, more item properties (name/lore/enchants), weather
   state, target/looked-at block, nearby entities, time differences, more string/number formatting, … (x/y/z and length now work on vectors; amount of an item gives its stack size)
 - **Events:** the remaining (leash, tame variants, server ping, tab complete, advancement, and the long tail).
 - **Conditions:** the remaining long tail (`can build`, `is in water/lava`, and `is thundering` are now implemented).
-- **Functions:** `date()`, … (`rgb()` is implemented).
 
 ## ❌ Remaining — deeper engine features
 

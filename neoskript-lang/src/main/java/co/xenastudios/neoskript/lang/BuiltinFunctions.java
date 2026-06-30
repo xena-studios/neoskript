@@ -74,6 +74,19 @@ public final class BuiltinFunctions {
         registry.register("world", (args, ctx) -> args.isEmpty() ? null : Bukkit.getWorld(String.valueOf(args.get(0))));
         registry.register("player", (args, ctx) ->
                 args.isEmpty() ? null : Bukkit.getPlayerExact(String.valueOf(args.get(0))));
+        registry.register("date", (args, ctx) -> {
+            Double year = number(args, 0);
+            Double month = number(args, 1);
+            Double day = number(args, 2);
+            if (year == null || month == null || day == null) {
+                return null;
+            }
+            java.util.Calendar calendar = java.util.Calendar.getInstance();
+            calendar.clear();
+            calendar.set((int) (double) year, (int) (double) month - 1, (int) (double) day,
+                    intArg(args, 3), intArg(args, 4), intArg(args, 5));
+            return calendar.getTime();
+        });
         registry.register("rgb", (args, ctx) -> {
             Double r = number(args, 0);
             Double g = number(args, 1);
@@ -125,6 +138,12 @@ public final class BuiltinFunctions {
 
     private static Double number(List<Object> args, int index) {
         return index < args.size() ? toNumber(args.get(index)) : null;
+    }
+
+    /** A positional numeric argument as an int, defaulting to 0 when absent. */
+    private static int intArg(List<Object> args, int index) {
+        Double value = number(args, index);
+        return value == null ? 0 : (int) (double) value;
     }
 
     private static Double toNumber(Object value) {

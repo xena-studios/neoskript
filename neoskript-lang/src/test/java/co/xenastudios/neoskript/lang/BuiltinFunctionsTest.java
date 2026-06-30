@@ -50,6 +50,16 @@ class BuiltinFunctionsTest {
     }
 
     @Test
+    void dateBuildsCalendarDate() {
+        java.util.Date date = (java.util.Date) eval("date(2026, 6, 30)");
+        java.util.Calendar calendar = java.util.Calendar.getInstance();
+        calendar.setTime(date);
+        assertEquals(2026, calendar.get(java.util.Calendar.YEAR));
+        assertEquals(6, calendar.get(java.util.Calendar.MONTH) + 1); // month is 0-based
+        assertEquals(30, calendar.get(java.util.Calendar.DAY_OF_MONTH));
+    }
+
+    @Test
     void rgbBuildsColour() {
         org.bukkit.Color colour = (org.bukkit.Color) eval("rgb(10, 20, 30)");
         assertEquals(10, colour.getRed());

@@ -93,6 +93,7 @@ public final class BuiltinModule {
         types.register(new VectorType());
         types.register(new ItemType());
         types.register(new co.xenastudios.neoskript.lang.type.ColourType());
+        types.register(new co.xenastudios.neoskript.lang.type.DateType());
         Renderer.setTypeRegistry(types);
         BuiltinSerializers.registerAll();
     }
