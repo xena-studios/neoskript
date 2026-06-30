@@ -77,6 +77,21 @@ class BuiltinExpressionsTest {
     }
 
     @Test
+    void stringAndListUtilityExpressions() {
+        Map<String, Object> g = new HashMap<>();
+        g.put("l::1", "banana");
+        g.put("l::2", "apple");
+        g.put("l::3", "cherry");
+        assertEquals("\n", eval("new line", g));
+        assertEquals("ababab", eval("\"ab\" repeated 3 times", g));
+        assertEquals("ell", eval("substring of \"hello\" from 2 to 4", g));
+        assertEquals(7.0, eval("difference between 10 and 3", g));
+        assertArrayEquals(new Object[]{"apple", "banana", "cherry"},
+                evalAll("alphabetically sorted {l::*}", g));
+        assertEquals(3, evalAll("shuffled {l::*}", g).length); // a permutation: same size
+    }
+
+    @Test
     void eventValueExpressionsResolveWithoutThe() {
         // A leading optional [the] must not force a separating space (regression: `block` failed).
         for (String s : new String[]{"block", "event-block", "entity", "event-entity", "world", "the event-block"}) {

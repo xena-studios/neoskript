@@ -6594,8 +6594,8 @@
       "alphabetically sorted %strings%"
     ],
     "source": "ch/njol/skript/expressions/ExprAlphabetList.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:altitude",
@@ -7981,8 +7981,8 @@
       "difference (between|of) %object% and %object%"
     ],
     "source": "ch/njol/skript/expressions/ExprDifference.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:difficulty",
@@ -10594,8 +10594,8 @@
       "line[ ]break"
     ],
     "source": "ch/njol/skript/literals/LitNewLine.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:new-potion-effect",
@@ -11466,8 +11466,8 @@
       "%strings% repeated %integer% time[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprRepeat.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:resonating-time",
@@ -11752,8 +11752,8 @@
       "shuffled %objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprShuffledList.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:sign-text",
@@ -11962,8 +11962,8 @@
       "[the] character[s] at [(index|position|indexes|indices|positions)] %numbers% (in|of) %strings%"
     ],
     "source": "ch/njol/skript/expressions/ExprSubstring.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:tablisted-players",

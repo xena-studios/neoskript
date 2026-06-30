@@ -5,7 +5,11 @@ inventory until fixed, so coverage stays honest.
 
 ## Open
 
-_None currently._
+- **First-word optional suffix in patterns** (`PatternCompiler`/indexed dispatch): a pattern whose
+  first literal carries an optional suffix (e.g. `alphabetical[ly] sorted ...`) is bucketed under the
+  truncated word (`alphabetical`), so input `alphabetically ...` misses the bucket. Workaround: spell
+  the first word out or start the pattern with an alternation. Low impact; fix is to index all
+  first-word variants.
 
 ## Fixed during the conformance effort
 

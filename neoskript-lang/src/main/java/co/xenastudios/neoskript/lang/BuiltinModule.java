@@ -428,6 +428,54 @@ public final class BuiltinModule {
                 return values;
             });
         });
+        registry.registerExpression("alphabetically sorted %objects%", Object.class, arguments -> {
+            Expression<?> source = arguments.get(0);
+            return new ComputedListExpression(ctx -> {
+                Object[] values = source.getAll(ctx).clone();
+                java.util.Arrays.sort(values, (a, b) ->
+                        Renderer.toDisplay(a).compareToIgnoreCase(Renderer.toDisplay(b)));
+                return values;
+            });
+        });
+        registry.registerExpression("shuffled %objects%", Object.class, arguments -> {
+            Expression<?> source = arguments.get(0);
+            return new ComputedListExpression(ctx -> {
+                java.util.List<Object> values = new java.util.ArrayList<>(java.util.Arrays.asList(source.getAll(ctx)));
+                java.util.Collections.shuffle(values);
+                return values.toArray();
+            });
+        });
+        registry.registerExpression("(nl|newline|new line)", Object.class,
+                arguments -> new ComputedExpression(ctx -> "\n"));
+        registry.registerExpression("%string% repeated %number% [time[s]]", Object.class, arguments -> {
+            Expression<?> text = arguments.get(0);
+            Expression<?> count = arguments.get(1);
+            return new ComputedExpression(ctx -> {
+                int times = (int) orZero(toNumber(count.getSingle(ctx)));
+                return times <= 0 ? "" : Renderer.toDisplay(text.getSingle(ctx)).repeat(times);
+            });
+        });
+        registry.registerExpression("substring of %string% (from|between) %number% (to|and) %number%", Object.class,
+                arguments -> {
+                    Expression<?> text = arguments.get(0);
+                    Expression<?> from = arguments.get(1);
+                    Expression<?> to = arguments.get(2);
+                    return new ComputedExpression(ctx -> {
+                        String s = Renderer.toDisplay(text.getSingle(ctx));
+                        int a = Math.max(1, (int) orZero(toNumber(from.getSingle(ctx))));
+                        int b = Math.min(s.length(), (int) orZero(toNumber(to.getSingle(ctx))));
+                        return a > b ? "" : s.substring(a - 1, b); // Skript is 1-indexed, inclusive
+                    });
+                });
+        registry.registerExpression("difference between %number% and %number%", Object.class, arguments -> {
+            Expression<?> a = arguments.get(0);
+            Expression<?> b = arguments.get(1);
+            return new ComputedExpression(ctx -> {
+                Double x = toNumber(a.getSingle(ctx));
+                Double y = toNumber(b.getSingle(ctx));
+                return (x == null || y == null) ? null : Math.abs(x - y);
+            });
+        });
     }
 
     private enum Element {
