@@ -6,7 +6,7 @@ Reference: **Skript 2.15.3** — generated from `inventory.json` by `coverage.py
 
 | Category | Documented | External | In-scope | Implemented | Done (tested) | Done % |
 |---|---|---|---|---|---|---|
-| effect | 148 | 0 | 148 | 20 | 0 | 0.0% |
+| effect | 148 | 0 | 148 | 20 | 18 | 12.2% |
 | condition | 168 | 3 | 165 | 30 | 0 | 0.0% |
 | expression | 515 | 8 | 507 | 32 | 0 | 0.0% |
 | event | 167 | 1 | 166 | 13 | 0 | 0.0% |
@@ -14,6 +14,6 @@ Reference: **Skript 2.15.3** — generated from `inventory.json` by `coverage.py
 | function | 48 | 0 | 48 | 40 | 40 | 83.3% |
 | section | 9 | 0 | 9 | 3 | 3 | 33.3% |
 | structure | 10 | 0 | 10 | 6 | 6 | 60.0% |
-| **Total** | **1200** | **14** | **1186** | **168** | **73** | **6.2%** |
+| **Total** | **1200** | **14** | **1186** | **168** | **91** | **7.7%** |
 
 _Implemented (incl. tested): 168/1186 (14.2%). Goal: 100% of the 1186 in-scope entries, each implemented and tested._

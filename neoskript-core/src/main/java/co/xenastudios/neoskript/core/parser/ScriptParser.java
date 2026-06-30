@@ -362,6 +362,10 @@ public final class ScriptParser {
     }
 
     private Statement parseLeaf(Node node) {
+        // Overlapping patterns share a leading word (e.g. `send %string%` vs `send actionbar %string%`).
+        // If a matching candidate's arguments fail to parse, fall through to the next candidate rather
+        // than aborting the line, so the more specific pattern still gets a chance.
+        ParseException lastError = null;
         for (EffectEntry entry : registry.effectCandidates(node.content())) {
             Optional<List<String>> match = entry.pattern().match(node.content());
             if (match.isPresent()) {
@@ -369,7 +373,7 @@ public final class ScriptParser {
                     return new EffectStatement(
                             entry.factory().create(new SimpleArguments(expressions.parseArguments(match.get()))));
                 } catch (ParseException e) {
-                    throw new ParseException(e.getMessage(), node.line());
+                    lastError = e;
                 }
             }
         }
@@ -382,19 +386,26 @@ public final class ScriptParser {
         } catch (ParseException ignored) {
             // not an expression either
         }
+        if (lastError != null) {
+            throw new ParseException(lastError.getMessage(), node.line());
+        }
         throw new ParseException("Don't understand the statement '" + node.content() + "'", node.line());
     }
 
     private Condition parseCondition(String content, int line) {
+        ParseException lastError = null;
         for (ConditionEntry entry : registry.conditionCandidates(content)) {
             Optional<List<String>> match = entry.pattern().match(content);
             if (match.isPresent()) {
                 try {
                     return entry.factory().create(new SimpleArguments(expressions.parseArguments(match.get())));
                 } catch (ParseException e) {
-                    throw new ParseException(e.getMessage(), line);
+                    lastError = e; // try the next overlapping candidate
                 }
             }
+        }
+        if (lastError != null) {
+            throw new ParseException(lastError.getMessage(), line);
         }
         throw new ParseException("Don't understand the condition '" + content + "'", line);
     }

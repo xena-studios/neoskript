@@ -169,7 +169,11 @@ public final class ExpressionParser {
         for (ExpressionEntry entry : registry.expressionCandidates(s)) {
             Optional<List<String>> match = entry.pattern().match(s);
             if (match.isPresent()) {
-                return entry.factory().create(new SimpleArguments(parseArguments(match.get())));
+                try {
+                    return entry.factory().create(new SimpleArguments(parseArguments(match.get())));
+                } catch (ParseException ignored) {
+                    // Overlapping pattern whose arguments don't parse — try the next candidate.
+                }
             }
         }
 

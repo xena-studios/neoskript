@@ -3,6 +3,8 @@ package co.xenastudios.neoskript.core.parser;
 import co.xenastudios.neoskript.api.syntax.Arguments;
 import co.xenastudios.neoskript.api.syntax.Expression;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -14,7 +16,9 @@ public final class SimpleArguments implements Arguments {
     private final List<Expression<?>> arguments;
 
     public SimpleArguments(List<Expression<?>> arguments) {
-        this.arguments = List.copyOf(arguments == null ? List.of() : arguments);
+        // A defensive, unmodifiable copy that PERMITS null elements (absent optional %-slots%).
+        // List.copyOf would reject nulls, so use ArrayList + unmodifiableList.
+        this.arguments = Collections.unmodifiableList(new ArrayList<>(arguments == null ? List.of() : arguments));
     }
 
     @Override

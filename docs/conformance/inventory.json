@@ -2302,7 +2302,7 @@
       "send [the] action[ ]bar [with text] %object% [to %audiences%]"
     ],
     "source": "org/skriptlang/skript/bukkit/text/elements/effects/EffActionBar.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "send (actionbar|action bar) %string% [to %player%]"
   },
@@ -2439,7 +2439,7 @@
       "broadcast %objects% [(to|in) %-worlds%]"
     ],
     "source": "org/skriptlang/skript/bukkit/text/elements/effects/EffBroadcast.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "broadcast %string%"
   },
@@ -2512,7 +2512,7 @@
       "reset %~objects%"
     ],
     "source": "ch/njol/skript/effects/EffChange.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "set %object% to %object% / add %object% to %object% / remove %object% from %object% / (delete|clear|reset) %object%"
   },
@@ -2565,7 +2565,7 @@
       "(let|make) %commandsenders% execute [[the] [bungee:bungee[cord]] command[s]] %strings%"
     ],
     "source": "ch/njol/skript/effects/EffCommand.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "(make|let|force) %object% [to] (execute|run|perform) [command] %string% / execute console command %string%"
   },
@@ -2631,7 +2631,7 @@
       "continue [the] <integer>(st|nd|rd|th) loop"
     ],
     "source": "ch/njol/skript/effects/EffContinue.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "(continue|next loop iteration)"
   },
@@ -2660,7 +2660,7 @@
       "repair %itemtypes/slots% [by %-number%]"
     ],
     "source": "ch/njol/skript/effects/EffHealth.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "heal %player%"
   },
@@ -2923,7 +2923,7 @@
       "(exit|stop) all (section|1:loop|2:conditional)s"
     ],
     "source": "ch/njol/skript/effects/EffExit.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "(stop|exit) [trigger] / (exit|stop) [the] [current] loop"
   },
@@ -2982,7 +2982,7 @@
       "feed [the] %players% [by %-number% [beef[s]]]"
     ],
     "source": "ch/njol/skript/effects/EffFeed.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "feed %player%"
   },
@@ -3117,7 +3117,7 @@
       "extinguish %entities%"
     ],
     "source": "ch/njol/skript/effects/EffIgnite.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "ignite %entity% [for %number% seconds] / extinguish %entity%"
   },
@@ -3195,7 +3195,7 @@
       "kill %entities%"
     ],
     "source": "ch/njol/skript/effects/EffKill.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "kill %entity%"
   },
@@ -3544,7 +3544,7 @@
       "(message|send [message[s]]) %objects% [to %audiences%]"
     ],
     "source": "org/skriptlang/skript/bukkit/text/elements/effects/EffMessage.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "(message|send) %string% [to %player%]"
   },
@@ -3570,7 +3570,7 @@
       "[de[-]]op %offlineplayers%"
     ],
     "source": "ch/njol/skript/effects/EffOp.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "op %player% / deop %player%"
   },
@@ -3686,7 +3686,7 @@
       "play sound[s] %strings% [[with] seed %-number%] [(in|from) %-soundcategory%] [(at|with) volume %-number%] [(and|at|with) pitch %-number%] [(to|for) %players%] [(at|on|from) %-locations/entities%]"
     ],
     "source": "ch/njol/skript/effects/EffPlaySound.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "play sound %string% (to|for) %player% [with volume %-number%] [with pitch %-number%]"
   },
@@ -3842,7 +3842,7 @@
       "replace [all|every] %itemtypes% with %itemtype% in %inventories%"
     ],
     "source": "ch/njol/skript/effects/EffReplace.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "replace [all] %string% with %string% in %object%"
   },
@@ -3855,7 +3855,7 @@
       "return %objects%"
     ],
     "source": "ch/njol/skript/effects/EffReturn.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "return %object%"
   },
@@ -4081,7 +4081,7 @@
       "[:force] teleport %entities% (to|%direction%) %location% [[while] retaining %-teleportflags%]"
     ],
     "source": "ch/njol/skript/effects/EffTeleport.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "teleport %player% to %object%"
   },
@@ -4156,7 +4156,7 @@
       "send subtitle %object% [to %audiences%] [for %-timespan%] [with fade[(-| )]in %-timespan%] [[and] [with] fade[(-| )]out %-timespan%]"
     ],
     "source": "org/skriptlang/skript/bukkit/text/elements/effects/EffSendTitle.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "send title %string% [to %player%]"
   },
@@ -4197,7 +4197,7 @@
       "(disallow|disable) (fly|flight) (for|to) %players%"
     ],
     "source": "ch/njol/skript/effects/EffToggleFlight.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "(allow|enable) (flight|flying) for %player% / (disallow|disable) (flight|flying) for %player%"
   },
