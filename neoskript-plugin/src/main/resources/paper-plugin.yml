@@ -6,3 +6,12 @@ authors: [XenaStudios]
 description: A fast, modern, drop-in replacement for Skript.
 website: https://github.com/XenaStudios/NeoSkript
 folia-supported: true
+commands:
+  neoskript:
+    description: Manage NeoSkript (status and reload).
+    usage: /neoskript [reload]
+    aliases: [nsk, ns]
+permissions:
+  neoskript.admin:
+    description: Allows reloading NeoSkript scripts.
+    default: op

@@ -22,8 +22,9 @@ public final class BukkitEventBridge {
      * @param plugin     the owning plugin
      * @param eventClass the Bukkit event class to listen for
      * @param handler    invoked with each fired event instance
+     * @return the registered listener, so callers can unregister it on reload
      */
-    public static void register(Plugin plugin, Class<? extends Event> eventClass, Consumer<Event> handler) {
+    public static Listener register(Plugin plugin, Class<? extends Event> eventClass, Consumer<Event> handler) {
         Listener listener = new Listener() {
         };
         plugin.getServer().getPluginManager().registerEvent(
@@ -36,5 +37,6 @@ public final class BukkitEventBridge {
                     }
                 },
                 plugin);
+        return listener;
     }
 }

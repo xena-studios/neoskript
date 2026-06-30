@@ -1,16 +1,17 @@
 package co.xenastudios.neoskript.core.runtime;
 
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Holds user-defined functions by name. Populated as scripts are parsed and queried at runtime by
- * function-call expressions, so calls may appear before the definition in source.
+ * function-call expressions, so calls may appear before the definition in source. Backed by a
+ * concurrent map so scripts can be parsed in parallel.
  */
 public final class FunctionRegistry {
 
-    private final Map<String, FunctionDefinition> functions = new HashMap<>();
+    private final Map<String, FunctionDefinition> functions = new ConcurrentHashMap<>();
 
     /**
      * Registers (or replaces) a function.
@@ -34,5 +35,10 @@ public final class FunctionRegistry {
     /** @return the number of registered functions */
     public int size() {
         return functions.size();
+    }
+
+    /** Removes all registered functions (used when reloading scripts). */
+    public void clear() {
+        functions.clear();
     }
 }

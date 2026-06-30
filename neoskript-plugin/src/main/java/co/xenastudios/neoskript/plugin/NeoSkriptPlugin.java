@@ -53,8 +53,13 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         getLogger().info("Running on " + platform.describe());
 
         ScriptParser parser = new ScriptParser(registry, events, functions);
-        ScriptLoader loader = new ScriptLoader(this, parser, globalVariables);
+        ScriptLoader loader = new ScriptLoader(this, parser, functions, globalVariables);
         ScriptLoader.Result result = loader.loadAll(getDataFolder().toPath().resolve("scripts"));
+
+        var command = getCommand("neoskript");
+        if (command != null) {
+            command.setExecutor(new NeoSkriptCommand(this, loader));
+        }
 
         double elapsedMs = (System.nanoTime() - startNanos) / 1_000_000.0;
         getLogger().info(String.format(

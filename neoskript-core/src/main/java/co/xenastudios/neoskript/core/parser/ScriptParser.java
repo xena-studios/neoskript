@@ -189,7 +189,7 @@ public final class ScriptParser {
     }
 
     private Statement parseLeaf(Node node) {
-        for (EffectEntry entry : registry.effects()) {
+        for (EffectEntry entry : registry.effectCandidates(node.content())) {
             Optional<List<String>> match = entry.pattern().match(node.content());
             if (match.isPresent()) {
                 try {
@@ -213,7 +213,7 @@ public final class ScriptParser {
     }
 
     private Condition parseCondition(String content, int line) {
-        for (ConditionEntry entry : registry.conditions()) {
+        for (ConditionEntry entry : registry.conditionCandidates(content)) {
             Optional<List<String>> match = entry.pattern().match(content);
             if (match.isPresent()) {
                 try {

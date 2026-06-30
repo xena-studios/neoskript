@@ -20,11 +20,13 @@ public final class SyntaxPattern {
     private final String raw;
     private final Pattern regex;
     private final int argCount;
+    private final String firstLiteral;
 
-    SyntaxPattern(String raw, Pattern regex, int argCount) {
+    SyntaxPattern(String raw, Pattern regex, int argCount, String firstLiteral) {
         this.raw = raw;
         this.regex = regex;
         this.argCount = argCount;
+        this.firstLiteral = firstLiteral;
     }
 
     /**
@@ -50,6 +52,14 @@ public final class SyntaxPattern {
     /** @return the number of {@code %type%} argument slots */
     public int argCount() {
         return argCount;
+    }
+
+    /**
+     * @return the lowercased leading literal word of this pattern (used to index candidates for fast
+     *         dispatch), or {@code null} if the pattern begins with an argument or alternation
+     */
+    public String firstLiteral() {
+        return firstLiteral;
     }
 
     /** @return the original pattern string */

@@ -56,7 +56,7 @@ public final class ExpressionParser {
         if (op >= 0) {
             Expression<?> left = parseAdditive(s.substring(0, op).trim());
             Expression<?> right = parseMultiplicative(s.substring(op + 1).trim());
-            return new ArithmeticExpression(left, s.charAt(op), right);
+            return arithmetic(left, s.charAt(op), right);
         }
         return parseMultiplicative(s);
     }
@@ -66,9 +66,24 @@ public final class ExpressionParser {
         if (op >= 0) {
             Expression<?> left = parseMultiplicative(s.substring(0, op).trim());
             Expression<?> right = parsePrimary(s.substring(op + 1).trim());
-            return new ArithmeticExpression(left, s.charAt(op), right);
+            return arithmetic(left, s.charAt(op), right);
         }
         return parsePrimary(s);
+    }
+
+    /**
+     * Builds an arithmetic node, folding it to a constant when both operands are number literals
+     * (the optimizer's constant-folding pass, applied during parsing).
+     */
+    private static Expression<?> arithmetic(Expression<?> left, char operator, Expression<?> right) {
+        ArithmeticExpression node = new ArithmeticExpression(left, operator, right);
+        if (left instanceof NumberLiteral && right instanceof NumberLiteral) {
+            Double folded = node.getSingle(null); // literals ignore the context
+            if (folded != null) {
+                return new NumberLiteral(folded);
+            }
+        }
+        return node;
     }
 
     private Expression<?> parsePrimary(String input) {
@@ -100,7 +115,7 @@ public final class ExpressionParser {
             return new FunctionCallExpression(name, args, functions);
         }
 
-        for (ExpressionEntry entry : registry.expressions()) {
+        for (ExpressionEntry entry : registry.expressionCandidates(s)) {
             Optional<List<String>> match = entry.pattern().match(s);
             if (match.isPresent()) {
                 return entry.factory().create(new SimpleArguments(parseArguments(match.get())));

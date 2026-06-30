@@ -93,7 +93,25 @@ public final class PatternCompiler {
         }
 
         regex.append('$');
-        return new SyntaxPattern(pattern, Pattern.compile(regex.toString(), Pattern.CASE_INSENSITIVE), argCount);
+        return new SyntaxPattern(pattern, Pattern.compile(regex.toString(), Pattern.CASE_INSENSITIVE),
+                argCount, leadingLiteral(pattern));
+    }
+
+    /**
+     * Extracts the lowercased leading literal word of a pattern, or {@code null} if it starts with an
+     * argument ({@code %}), an optional group ({@code [}), or an alternation ({@code (}).
+     */
+    static String leadingLiteral(String pattern) {
+        int i = 0;
+        while (i < pattern.length() && Character.isWhitespace(pattern.charAt(i))) {
+            i++;
+        }
+        int start = i;
+        while (i < pattern.length()
+                && (Character.isLetterOrDigit(pattern.charAt(i)) || pattern.charAt(i) == '_')) {
+            i++;
+        }
+        return i > start ? pattern.substring(start, i).toLowerCase(java.util.Locale.ROOT) : null;
     }
 
     private static boolean endsWith(StringBuilder sb, String suffix) {
