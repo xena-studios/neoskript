@@ -680,6 +680,26 @@ public final class BuiltinModule {
             Expression<?> target = a.get(0);
             return ctx -> target.getSingle(ctx) instanceof World w && w.isThundering();
         });
+        registry.registerCondition("%entity% is invisible", a -> entityIs(a.get(0), Entity::isInvisible, true));
+        registry.registerCondition("%entity% is (visible|not invisible)",
+                a -> entityIs(a.get(0), Entity::isInvisible, false));
+        registry.registerCondition("%entity% is invulnerable", a -> entityIs(a.get(0), Entity::isInvulnerable, true));
+        registry.registerCondition("%entity% is silent", a -> entityIs(a.get(0), Entity::isSilent, true));
+        registry.registerCondition("%entity% is frozen", a -> entityIs(a.get(0), e -> e.getFreezeTicks() > 0, true));
+        registry.registerCondition("%entity% (is a baby|is a child)",
+                a -> entityIs(a.get(0), e -> e instanceof org.bukkit.entity.Ageable age && !age.isAdult(), true));
+        registry.registerCondition("%entity% is an adult",
+                a -> entityIs(a.get(0), e -> e instanceof org.bukkit.entity.Ageable age && age.isAdult(), true));
+        registry.registerCondition("%entity% (has ai|has AI)",
+                a -> entityIs(a.get(0), e -> e instanceof LivingEntity le && le.hasAI(), true));
+        registry.registerCondition("%entity% can pick up items",
+                a -> entityIs(a.get(0), e -> e instanceof LivingEntity le && le.getCanPickupItems(), true));
+        registry.registerCondition("%entity% has scoreboard tag %string%", a -> {
+            Expression<?> target = a.get(0);
+            Expression<?> tag = a.get(1);
+            return ctx -> target.getSingle(ctx) instanceof Entity entity
+                    && entity.getScoreboardTags().contains(Renderer.toDisplay(tag.getSingle(ctx)));
+        });
         registry.registerCondition("%player% is in water", a -> playerIs(a.get(0), Player::isInWater, true));
         registry.registerCondition("%player% is in lava", a -> playerIs(a.get(0), Player::isInLava, true));
         registry.registerCondition("%player% (can build|is allowed to build)",
@@ -729,6 +749,10 @@ public final class BuiltinModule {
 
     private static Condition playerIs(Expression<?> target, Predicate<Player> test, boolean expected) {
         return ctx -> target.getSingle(ctx) instanceof Player player && test.test(player) == expected;
+    }
+
+    private static Condition entityIs(Expression<?> target, Predicate<Entity> test, boolean expected) {
+        return ctx -> target.getSingle(ctx) instanceof Entity entity && test.test(entity) == expected;
     }
 
     private static Condition hasPermission(Arguments arguments, boolean expected) {

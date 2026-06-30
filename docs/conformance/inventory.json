@@ -837,8 +837,8 @@
       "%livingentities% (isn't|aren't|is not|are not) [an] adult"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/conditions/CondIsAdult.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-alive",
@@ -864,8 +864,8 @@
       "%livingentities% (isn't|aren't|is not|are not) a (child|baby)"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/conditions/CondIsBaby.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-banned",
@@ -1189,8 +1189,8 @@
       "%entities% (isn't|is not|aren't|are not) frozen"
     ],
     "source": "ch/njol/skript/conditions/CondIsFrozen.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-fuel",
@@ -1321,8 +1321,8 @@
       "%livingentities% (isn't|is not|aren't|are not) (invisible|:visible)"
     ],
     "source": "ch/njol/skript/conditions/CondIsInvisible.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-invulnerable",
@@ -1334,8 +1334,8 @@
       "%entities/gamemodes% (isn't|is not|aren't|are not) (invulnerable|invincible)"
     ],
     "source": "ch/njol/skript/conditions/CondIsInvulnerable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-jumping",
@@ -1683,8 +1683,8 @@
       "%entities% (is|are)(n't| not) silent"
     ],
     "source": "ch/njol/skript/conditions/CondIsSilent.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-sleeping",
