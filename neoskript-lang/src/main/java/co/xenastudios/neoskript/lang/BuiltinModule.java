@@ -90,6 +90,7 @@ public final class BuiltinModule {
         types.register(new LocationType());
         types.register(new VectorType());
         types.register(new ItemType());
+        types.register(new co.xenastudios.neoskript.lang.type.ColourType());
         Renderer.setTypeRegistry(types);
         BuiltinSerializers.registerAll();
     }

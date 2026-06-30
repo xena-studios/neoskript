@@ -58,14 +58,14 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
 ## ❌ Remaining — content long tail
 
 - **Types:** entity (beyond generic Entity), block (beyond event-value), inventory,
-  slot, biome, colour, enchantment, material, chunk, offline player, date, direction, …
+  slot, biome, enchantment, material, chunk, offline player, date, direction, … (colour is implemented)
 - **Effects:** play sound/particles, apply/clear potion effects, open/modify inventories,
   set weather amount/duration, scoreboard, ban/unban, …
 - **Expressions:** direction/vector math, item properties (amount/name/lore/enchants), weather
   state, target/looked-at block, nearby entities, time differences, more string/number formatting, …
 - **Events:** the remaining (leash, tame variants, server ping, tab complete, advancement, and the long tail).
 - **Conditions:** the remaining (can build, generic "world is", is in water/lava, and the long tail).
-- **Functions:** `date()`, `rgb()`/colour, …
+- **Functions:** `date()`, … (`rgb()` is implemented).
 
 ## ❌ Remaining — deeper engine features
 

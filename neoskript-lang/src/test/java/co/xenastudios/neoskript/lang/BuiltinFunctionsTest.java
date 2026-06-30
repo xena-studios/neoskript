@@ -48,4 +48,16 @@ class BuiltinFunctionsTest {
         assertEquals(1.0, eval("mod(10, 3)"));
         assertEquals(7.0, eval("abs(0 - max(3, 7))"));
     }
+
+    @Test
+    void rgbBuildsColour() {
+        org.bukkit.Color colour = (org.bukkit.Color) eval("rgb(10, 20, 30)");
+        assertEquals(10, colour.getRed());
+        assertEquals(20, colour.getGreen());
+        assertEquals(30, colour.getBlue());
+        // out-of-range channels are clamped
+        org.bukkit.Color clamped = (org.bukkit.Color) eval("rgb(300, 0 - 5, 128)");
+        assertEquals(255, clamped.getRed());
+        assertEquals(0, clamped.getGreen());
+    }
 }
