@@ -163,6 +163,7 @@ public final class BuiltinModule {
         types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
                 "frogvariant", org.bukkit.entity.Frog.Variant.class, () -> org.bukkit.Registry.FROG_VARIANT));
         co.xenastudios.neoskript.lang.type.GenTypes.register(types);
+        co.xenastudios.neoskript.lang.type.GenTypes2.register(types);
 
         Renderer.setTypeRegistry(types);
         BuiltinSerializers.registerAll();

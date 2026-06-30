@@ -14391,7 +14391,8 @@
       "experiencecooldownchangereason"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:fireworkeffect",
@@ -15304,7 +15305,8 @@
       "villagercareerchangereason"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:villagerprofession",
