@@ -78,6 +78,7 @@ public final class BuiltinEvents {
      */
     public static void registerAll(EventRegistry events) {
         GenEvents.register(events); // bulk simple Bukkit-event mappings
+        GenEvents2.register(events); // all registerEvent Bukkit classes
         events.register(PlayerJoinEvent.class, "join", "player join", "player joins");
         events.register(PlayerQuitEvent.class, "quit", "disconnect", "player quit", "player quits");
         events.register(AsyncChatEvent.class, "chat", "player chat", "player chats");
