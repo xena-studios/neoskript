@@ -6,7 +6,7 @@ dependencies {
     api(project(":neoskript-api"))
     compileOnly(libs.paper.api)
 
-    testImplementation(libs.paper.api)
+    testImplementation(libs.paper.api.test)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

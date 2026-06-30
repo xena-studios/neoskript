@@ -8,6 +8,12 @@ dependencies {
     implementation(project(":neoskript-lang"))
     implementation(project(":neoskript-platform"))
     compileOnly(libs.paper.api)
+
+    testImplementation(libs.paper.api.test)
+    testImplementation(libs.mockbukkit)
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 tasks.named<ProcessResources>("processResources") {

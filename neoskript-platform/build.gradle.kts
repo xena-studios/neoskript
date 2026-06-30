@@ -3,6 +3,8 @@ dependencies {
     implementation(project(":neoskript-core"))
     compileOnly(libs.paper.api)
 
+    testImplementation(libs.paper.api.test)
+    testImplementation(libs.mockbukkit)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

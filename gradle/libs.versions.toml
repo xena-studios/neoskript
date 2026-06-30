@@ -1,13 +1,20 @@
 [versions]
 paper = "26.1.2.build.72-stable"
+# Paper API used only on the test classpath: the latest 1.21.x line, which MockBukkit supports.
+# (MockBukkit has not yet caught up to the 26.x API scheme.) compileOnly's paper does not leak to
+# tests, so the shipped jar still targets `paper` above.
+paper-test = "1.21.11-R0.1-SNAPSHOT"
 junit = "6.0.0"
 shadow = "9.4.3"
+mockbukkit = "4.110.0"
 
 [libraries]
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper" }
+paper-api-test = { module = "io.papermc.paper:paper-api", version.ref = "paper-test" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+mockbukkit = { module = "org.mockbukkit.mockbukkit:mockbukkit-v1.21", version.ref = "mockbukkit" }
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

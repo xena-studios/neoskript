@@ -33,7 +33,7 @@ import java.util.logging.Level;
  * then discovers and loads {@code .sk} scripts (registering their triggers and functions). Persisted
  * variables are saved on disable.
  */
-public final class NeoSkriptPlugin extends JavaPlugin {
+public class NeoSkriptPlugin extends JavaPlugin {
 
     /** Auto-save interval for global variables, in ticks (5 minutes). */
     private static final long AUTOSAVE_TICKS = 20L * 60L * 5L;
