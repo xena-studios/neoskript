@@ -77,6 +77,15 @@ class BuiltinExpressionsTest {
     }
 
     @Test
+    void randomUuidAndNormalizedVector() {
+        java.util.Map<String,Object> g = new java.util.HashMap<>();
+        Object u = eval("random uuid", g);
+        org.junit.jupiter.api.Assertions.assertTrue(u instanceof java.util.UUID);
+        org.bukkit.util.Vector v = (org.bukkit.util.Vector) eval("normalized vector(3, 4, 0)", g);
+        org.junit.jupiter.api.Assertions.assertEquals(1.0, v.length(), 0.0001);
+    }
+
+    @Test
     void stringAndListUtilityExpressions() {
         Map<String, Object> g = new HashMap<>();
         g.put("l::1", "banana");

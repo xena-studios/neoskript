@@ -314,6 +314,18 @@ public final class BuiltinModule {
                                 : second.toVector().subtract(first.toVector());
                     });
                 });
+        registry.registerExpression("[a] random uuid", Object.class,
+                arguments -> new ComputedExpression(ctx -> java.util.UUID.randomUUID()));
+        registry.registerExpression("normalize[d] %vector%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof Vector v ? v.clone().normalize() : null);
+        });
+        registry.registerExpression("world[ ]border (size|diameter) of %world%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof World w ? w.getWorldBorder().getSize() : null);
+        });
         registry.registerExpression("(max[imum] players|maximum player count)", Object.class,
                 arguments -> new ComputedExpression(ctx -> (double) Bukkit.getMaxPlayers()));
         registry.registerExpression("(online player[s] count|number of online players|online player amount)",

@@ -10212,8 +10212,8 @@
       "%livingentities%'[s] max[imum] health"
     ],
     "source": "ch/njol/skript/expressions/ExprMaxHealth.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:max-item-use-time",
@@ -11308,8 +11308,8 @@
       "[a] random uuid"
     ],
     "source": "ch/njol/skript/expressions/ExprRandomUUID.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:raw-name",
@@ -11804,8 +11804,8 @@
       "world[ ]border (size|diameter|:radius) of %worldborders%"
     ],
     "source": "ch/njol/skript/expressions/ExprWorldBorderSize.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:skull-owner",
@@ -12613,8 +12613,8 @@
       "%vector% normalized"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorNormalize.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:vectors-random-vector",
