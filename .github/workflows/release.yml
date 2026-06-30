@@ -31,7 +31,10 @@ jobs:
         id: release
         with:
           release-type: simple
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Prefer a PAT (RELEASE_PLEASE_TOKEN) so release PRs work even when the org disables
+          # "Allow GitHub Actions to create and approve pull requests"; falls back to GITHUB_TOKEN
+          # (which needs that org/repo setting enabled).
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
   publish:
     needs: release-please

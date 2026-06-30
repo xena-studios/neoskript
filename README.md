@@ -74,6 +74,9 @@ Conventional Commits.
   (`paperApiVersion` for `paper-plugin.yml`, `minecraftVersions` for Modrinth) — adjust both there.
 - **Modrinth** requires repository settings: variable `MODRINTH_PROJECT_ID` and secret
   `MODRINTH_TOKEN`. The Modrinth step is skipped until `MODRINTH_PROJECT_ID` is set.
+- **release-please PRs:** the workflow uses `GITHUB_TOKEN`, which requires Settings → Actions →
+  "Allow GitHub Actions to create and approve pull requests". If that's locked by org policy, add a
+  PAT secret `RELEASE_PLEASE_TOKEN` (Contents + Pull requests write) — the workflow prefers it.
 
 ### Consuming the API
 
