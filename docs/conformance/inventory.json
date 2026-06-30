@@ -11517,8 +11517,7 @@
       "%players%'[s] respawn[ing] reason"
     ],
     "source": "ch/njol/skript/expressions/ExprRespawnReason.java",
-    "status": "parse-verified",
-    "implemented": true
+    "status": "todo"
   },
   {
     "id": "expression:result",
@@ -11893,8 +11892,8 @@
       "%livingentities%'[s] spawn[ing] reason"
     ],
     "source": "ch/njol/skript/expressions/ExprSpawnReason.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:spawner-type",
