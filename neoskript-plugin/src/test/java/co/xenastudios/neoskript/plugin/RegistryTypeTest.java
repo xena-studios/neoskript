@@ -69,6 +69,8 @@ class RegistryTypeTest {
         checkRegistry("potiontype", org.bukkit.Registry.POTION);
         checkRegistry("structuretype", org.bukkit.Registry.STRUCTURE_TYPE);
         checkRegistry("musicinstrument", org.bukkit.Registry.INSTRUMENT);
+        checkRegistry("cattype", org.bukkit.Registry.CAT_VARIANT);
+        checkRegistry("frogvariant", org.bukkit.Registry.FROG_VARIANT);
 
         // an unknown key parses to empty rather than throwing
         assertTrue(biome.parse("not_a_real_biome").isEmpty());

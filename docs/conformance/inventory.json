@@ -14002,7 +14002,8 @@
       "cattype"
     ],
     "source": "ch/njol/skript/entity/CatData.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:chickenvariant",
@@ -14432,7 +14433,8 @@
       "frogvariant"
     ],
     "source": "ch/njol/skript/entity/FrogData.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:function",

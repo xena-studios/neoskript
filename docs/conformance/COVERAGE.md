@@ -10,10 +10,10 @@ Reference: **Skript 2.15.3** — generated from `inventory.json` by `coverage.py
 | condition | 168 | 3 | 165 | 36 | 36 | 21.8% |
 | expression | 515 | 8 | 507 | 43 | 43 | 8.5% |
 | event | 167 | 1 | 166 | 49 | 49 | 29.5% |
-| type | 135 | 2 | 133 | 35 | 35 | 26.3% |
+| type | 135 | 2 | 133 | 37 | 37 | 27.8% |
 | function | 48 | 0 | 48 | 40 | 40 | 83.3% |
 | section | 9 | 0 | 9 | 3 | 3 | 33.3% |
 | structure | 10 | 0 | 10 | 6 | 6 | 60.0% |
-| **Total** | **1200** | **14** | **1186** | **237** | **235** | **19.8%** |
+| **Total** | **1200** | **14** | **1186** | **239** | **237** | **20.0%** |
 
-_Implemented (incl. tested): 237/1186 (20.0%). Goal: 100% of the 1186 in-scope entries, each implemented and tested._
+_Implemented (incl. tested): 239/1186 (20.2%). Goal: 100% of the 1186 in-scope entries, each implemented and tested._

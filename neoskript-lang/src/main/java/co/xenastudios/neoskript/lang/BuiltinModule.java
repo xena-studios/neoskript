@@ -151,6 +151,10 @@ public final class BuiltinModule {
                 () -> org.bukkit.Registry.STRUCTURE_TYPE));
         types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
                 "musicinstrument", org.bukkit.MusicInstrument.class, () -> org.bukkit.Registry.INSTRUMENT));
+        types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
+                "cattype", org.bukkit.entity.Cat.Type.class, () -> org.bukkit.Registry.CAT_VARIANT));
+        types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
+                "frogvariant", org.bukkit.entity.Frog.Variant.class, () -> org.bukkit.Registry.FROG_VARIANT));
         Renderer.setTypeRegistry(types);
         BuiltinSerializers.registerAll();
     }
