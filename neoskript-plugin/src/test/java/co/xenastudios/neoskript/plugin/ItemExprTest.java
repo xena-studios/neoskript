@@ -49,6 +49,13 @@ class ItemExprTest {
                         set {_age} to age of player
                         set {_dur} to durability of item("diamond")
                         set {_col} to color of player
+                        if block hardness of item("stone") is greater than 0:
+                            send "HARD" to player
+                        if hex code of rgb(255, 0, 0) is "#ff0000":
+                            send "HEX" to player
+                        set {_face} to facing of player
+                        set {_yield} to explosive yield of player
+                        set {_cmd} to custom model data of item("stone")
                         send "DONE" to player
 
                 command /ie2:
@@ -68,6 +75,8 @@ class ItemExprTest {
         }
         assertTrue(seen.contains("JOINED"), "owner/targeted-block commands parsed (file loaded)");
         assertTrue(seen.contains("AMT"), "item amount = 5");
+        assertTrue(seen.contains("HARD"), "stone has hardness > 0");
+        assertTrue(seen.contains("HEX"), "hex code of red = #ff0000");
         assertTrue(seen.contains("DONE"), "yaw/pitch/lore getters ran without error");
     }
 }

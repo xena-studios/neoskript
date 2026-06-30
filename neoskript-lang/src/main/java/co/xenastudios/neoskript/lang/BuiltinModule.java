@@ -383,6 +383,42 @@ public final class BuiltinModule {
                 arguments -> new ComputedExpression(ctx -> (double) Bukkit.getMaxPlayers()));
         registry.registerExpression("(online player[s] count|number of online players|online player amount)",
                 Object.class, arguments -> new ComputedExpression(ctx -> (double) Bukkit.getOnlinePlayers().size()));
+        registry.registerExpression("[the] [block] hardness of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    material(src.getSingle(ctx)) instanceof org.bukkit.Material m ? (double) m.getHardness() : null);
+        });
+        registry.registerExpression("explosive (yield|radius|size|power) of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof org.bukkit.entity.Explosive e ? (double) e.getYield() : null);
+        });
+        registry.registerExpression("[custom] model data of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                if (src.getSingle(ctx) instanceof ItemStack item && item.hasItemMeta()
+                        && item.getItemMeta().hasCustomModelData()) {
+                    return (double) item.getItemMeta().getCustomModelData();
+                }
+                return null;
+            });
+        });
+        registry.registerExpression("[the] facing of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof Entity e ? e.getFacing() : null);
+        });
+        registry.registerExpression("hex[adecimal] code of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof org.bukkit.Color c
+                            ? String.format("#%06x", c.asRGB()) : null);
+        });
+        registry.registerExpression("first empty slot[s] of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof org.bukkit.inventory.Inventory inv ? (double) inv.firstEmpty() : null);
+        });
         registry.registerExpression("age of %object%", Object.class, arguments -> {
             Expression<?> src = arguments.get(0);
             return new ComputedExpression(ctx ->

@@ -7102,8 +7102,8 @@
       "%itemtypes%'[s] [block] hardness"
     ],
     "source": "ch/njol/skript/expressions/ExprBlockHardness.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:block-sound",
@@ -7739,8 +7739,8 @@
       "%itemtype%'[s] (5:(complete|full)) [custom] model data"
     ],
     "source": "ch/njol/skript/expressions/ExprCustomModelData.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage",
@@ -8712,8 +8712,8 @@
       "%entities%'[s] explosive (yield|radius|size|power)"
     ],
     "source": "ch/njol/skript/expressions/ExprExplosiveYield.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:facing",
@@ -8725,8 +8725,8 @@
       "%livingentities/blocks%'[s] (1¦horizontal|) facing"
     ],
     "source": "ch/njol/skript/expressions/ExprFacing.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:fall-distance",
@@ -9204,8 +9204,8 @@
       "%colors%'[s] hex[adecimal] code"
     ],
     "source": "org/skriptlang/skript/common/elements/expressions/ExprHexCode.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:hidden-players",
