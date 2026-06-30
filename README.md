@@ -33,4 +33,4 @@ The distributable plugin jar is produced at
 
 ## License
 
-TBD.
+NeoSkript is licensed under the [GNU General Public License v3.0](LICENSE).
