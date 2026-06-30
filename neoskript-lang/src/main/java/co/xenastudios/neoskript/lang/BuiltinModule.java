@@ -26,6 +26,7 @@ import co.xenastudios.neoskript.lang.type.PlayerType;
 import co.xenastudios.neoskript.lang.type.StringType;
 import co.xenastudios.neoskript.lang.type.WorldType;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.World;
@@ -461,7 +462,7 @@ public final class BuiltinModule {
             return ctx -> {
                 if (target.getSingle(ctx) instanceof Player player) {
                     String text = reason == null ? "Kicked from the server" : Renderer.toDisplay(reason.getSingle(ctx));
-                    player.kick(Component.text(text));
+                    player.kick(colored(text));
                 }
             };
         });
@@ -508,7 +509,7 @@ public final class BuiltinModule {
 
         registry.registerEffect("broadcast %string%", arguments -> {
             Expression<?> message = arguments.get(0);
-            return ctx -> Bukkit.broadcast(Component.text(Renderer.toDisplay(message.getSingle(ctx))));
+            return ctx -> Bukkit.broadcast(colored(Renderer.toDisplay(message.getSingle(ctx))));
         });
 
         registry.registerEffect("(message|send) %string% [to %player%]", arguments -> {
@@ -517,9 +518,35 @@ public final class BuiltinModule {
             return ctx -> {
                 CommandSender receiver = resolveReceiver(target, ctx);
                 if (receiver != null) {
-                    receiver.sendMessage(Component.text(Renderer.toDisplay(message.getSingle(ctx))));
+                    receiver.sendMessage(colored(Renderer.toDisplay(message.getSingle(ctx))));
                 }
             };
+        });
+
+        registry.registerEffect("send (actionbar|action bar) %string% [to %player%]", arguments -> {
+            Expression<?> message = arguments.get(0);
+            Expression<?> target = arguments.get(1);
+            return ctx -> {
+                CommandSender receiver = resolveReceiver(target, ctx);
+                if (receiver != null) {
+                    receiver.sendActionBar(colored(Renderer.toDisplay(message.getSingle(ctx))));
+                }
+            };
+        });
+
+        registry.registerEffect("(make|let|force) %object% [to] (execute|run|perform) [command] %string%", arguments -> {
+            Expression<?> who = arguments.get(0);
+            Expression<?> command = arguments.get(1);
+            return ctx -> {
+                if (who.getSingle(ctx) instanceof CommandSender sender) {
+                    Bukkit.dispatchCommand(sender, stripSlash(Renderer.toDisplay(command.getSingle(ctx))));
+                }
+            };
+        });
+        registry.registerEffect("execute console command %string%", arguments -> {
+            Expression<?> command = arguments.get(0);
+            return ctx -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
+                    stripSlash(Renderer.toDisplay(command.getSingle(ctx))));
         });
 
         registry.registerEffect("set %object% to %object%", arguments -> {
@@ -614,6 +641,15 @@ public final class BuiltinModule {
         } else {
             op.run();
         }
+    }
+
+    /** Translates legacy {@code &} colour codes (and hex) into a coloured component. */
+    private static Component colored(String text) {
+        return LegacyComponentSerializer.legacyAmpersand().deserialize(text);
+    }
+
+    private static String stripSlash(String command) {
+        return command.startsWith("/") ? command.substring(1) : command;
     }
 
     private static CommandSender resolveReceiver(Expression<?> target, TriggerContext ctx) {
