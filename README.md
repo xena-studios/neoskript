@@ -6,11 +6,12 @@ Paper + Folia on Java 25, with a clean, extensible API.
 NeoSkript runs existing `.sk` scripts unchanged while being dramatically faster to load and execute,
 Folia-safe by construction, and designed so addon authors are first-class users.
 
-> **Status:** Phases 0–5 of the roadmap are implemented. Scripts parse and run end-to-end with
-> control flow, variables (including lists + persistence), functions, scheduled and load triggers, a
-> profiler, an indexed/optimizing parser, a `/neoskript` command, addon discovery, and generated
-> docs. See [`docs/PLAN.md`](docs/PLAN.md) for the roadmap and [`docs/SYNTAX.md`](docs/SYNTAX.md) for
-> the syntax guide.
+> **Status:** Phases 0–5 of the roadmap are implemented, plus a broad language expansion — custom
+> commands, options, event-values + `cancel event`, loop control, top-level `wait` delays, built-in
+> math functions, string/list operations, player/world syntax, and colour codes — on top of control
+> flow, variables (lists + persistence), functions, a profiler, and the indexed parser. See
+> [`docs/GAPS.md`](docs/GAPS.md) for exactly what's implemented vs. the remaining long tail,
+> [`docs/PLAN.md`](docs/PLAN.md) for the roadmap, and [`docs/SYNTAX.md`](docs/SYNTAX.md) for the guide.
 
 ## Quick example
 
