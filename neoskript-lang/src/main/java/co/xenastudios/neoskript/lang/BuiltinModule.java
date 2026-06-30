@@ -1089,6 +1089,14 @@ public final class BuiltinModule {
                 }
             };
         });
+        registry.registerEffect("(despawn|remove) %entity%", arguments ->
+                entityEffect(arguments.get(0), Entity::remove));
+        registry.registerEffect("close [the] inventory [(of|for)] %player%", arguments ->
+                playerEffect(arguments.get(0), Player::closeInventory));
+        registry.registerEffect("close %player%'s inventory", arguments ->
+                playerEffect(arguments.get(0), Player::closeInventory));
+        registry.registerEffect("make %player% wake up", arguments ->
+                playerEffect(arguments.get(0), p -> p.wakeup(true)));
         registry.registerEffect("make %entity% swing [its] [main] hand", arguments ->
                 entityEffect(arguments.get(0), e -> {
                     if (e instanceof LivingEntity le) {

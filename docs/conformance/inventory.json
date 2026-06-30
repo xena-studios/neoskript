@@ -2805,8 +2805,8 @@
       "prevent %livingentities% from despawning [on chunk unload|when far away]"
     ],
     "source": "ch/njol/skript/effects/EffEntityUnload.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:entity-visibility",
@@ -3603,8 +3603,8 @@
       "open [a] dispenser (to|for) %players%"
     ],
     "source": "ch/njol/skript/effects/EffOpenInventory.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:open-close-lid",
@@ -4016,7 +4016,7 @@
       "stop playing sound[s] %strings% [(in [the]|from) %-soundcategory%] [(to|for) %players%]"
     ],
     "source": "ch/njol/skript/effects/EffStopSound.java",
-    "status": "todo",
+    "status": "parse-verified",
     "implemented": true
   },
   {
@@ -4143,7 +4143,7 @@
       "(clear|delete|:reset) [the] %audiences%'[s] title[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/text/elements/effects/EffResetTitle.java",
-    "status": "todo",
+    "status": "parse-verified",
     "implemented": true
   },
   {
@@ -4281,8 +4281,8 @@
       "force %players% to (stop sleeping|wake up) (spawn:without spawn [location] update)"
     ],
     "source": "ch/njol/skript/effects/EffWakeupSleep.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:zombify-villager",

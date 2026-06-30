@@ -48,6 +48,9 @@ class PlayerEffects2Test {
                         stop all sounds for player
                         reset the title of player
                         make player say "hi there"
+                        close inventory of player
+                        make player wake up
+                        despawn player
                 """, StandardCharsets.UTF_8);
         server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
 
