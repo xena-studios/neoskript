@@ -2998,8 +2998,8 @@
       "force %livingentities% to damage %entities% by %number% [heart[s]]"
     ],
     "source": "ch/njol/skript/effects/EffForceAttack.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:force-eating",
@@ -3051,8 +3051,8 @@
       "force %players% to respawn"
     ],
     "source": "ch/njol/skript/effects/EffRespawn.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:generate-loot",
@@ -3090,8 +3090,8 @@
       "make %livingentities% (:left|right)( |-)handed"
     ],
     "source": "ch/njol/skript/effects/EffHandedness.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:hide-player-from-server-list",

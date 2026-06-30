@@ -1205,6 +1205,34 @@ public final class BuiltinModule {
                         c.setPowered(false);
                     }
                 }));
+        registry.registerEffect("force %player% to respawn", arguments ->
+                playerEffect(arguments.get(0), p -> p.spigot().respawn()));
+        registry.registerEffect("make %object% left[(-| )]handed", arguments -> {
+            Expression<?> src = arguments.get(0);
+            return ctx -> {
+                if (src.getSingle(ctx) instanceof org.bukkit.entity.Mob mob) {
+                    mob.setLeftHanded(true);
+                }
+            };
+        });
+        registry.registerEffect("make %object% right[(-| )]handed", arguments -> {
+            Expression<?> src = arguments.get(0);
+            return ctx -> {
+                if (src.getSingle(ctx) instanceof org.bukkit.entity.Mob mob) {
+                    mob.setLeftHanded(false);
+                }
+            };
+        });
+        registry.registerEffect("make %object% attack %object%", arguments -> {
+            Expression<?> attacker = arguments.get(0);
+            Expression<?> victim = arguments.get(1);
+            return ctx -> {
+                if (attacker.getSingle(ctx) instanceof org.bukkit.entity.Mob mob
+                        && victim.getSingle(ctx) instanceof Entity target) {
+                    mob.attack(target);
+                }
+            };
+        });
         registry.registerEffect("(leash|lead) %object% to %object%", arguments -> {
             Expression<?> ent = arguments.get(0);
             Expression<?> holder = arguments.get(1);

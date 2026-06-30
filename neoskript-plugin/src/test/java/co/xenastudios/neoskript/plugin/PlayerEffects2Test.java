@@ -55,6 +55,10 @@ class PlayerEffects2Test {
                         leash player to player
                         break event-block
                         detonate player
+                        force player to respawn
+                        make player left handed
+                        make player right-handed
+                        make player attack player
                 """, StandardCharsets.UTF_8);
         server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
 
