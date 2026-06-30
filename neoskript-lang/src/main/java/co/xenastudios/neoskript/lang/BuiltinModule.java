@@ -536,6 +536,15 @@ public final class BuiltinModule {
         });
         registry.registerCondition("%world% is raining", a -> worldIs(a.get(0), true));
         registry.registerCondition("%world% (is not raining|isn't raining|is clear)", a -> worldIs(a.get(0), false));
+        registry.registerCondition("%world% is thundering", a -> {
+            Expression<?> target = a.get(0);
+            return ctx -> target.getSingle(ctx) instanceof World w && w.isThundering();
+        });
+        registry.registerCondition("%player% is in water", a -> playerIs(a.get(0), Player::isInWater, true));
+        registry.registerCondition("%player% is in lava", a -> playerIs(a.get(0), Player::isInLava, true));
+        registry.registerCondition("%player% (can build|is allowed to build)",
+                a -> playerIs(a.get(0), player -> player.getGameMode() != org.bukkit.GameMode.ADVENTURE
+                        && player.getGameMode() != org.bukkit.GameMode.SPECTATOR, true));
         registry.registerCondition("%player% has played before", a -> playerIs(a.get(0), Player::hasPlayedBefore, true));
         registry.registerCondition("%object% is tamed", a -> {
             Expression<?> target = a.get(0);

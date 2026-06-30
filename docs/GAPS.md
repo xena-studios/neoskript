@@ -30,7 +30,7 @@ order, and a string matches a typed value by its display form (e.g. `gamemode is
 **Conditions:** equality and numeric comparisons, `is set`, `contains`, `starts/ends with`,
 `matches` (regex), `is between`, `chance of`, `is op`, `is online/offline`, `is alive/dead`,
 `is sneaking/sprinting/flying`, `can fly`, `is blocking/gliding/glowing/sleeping/swimming`,
-`is on ground`, `is burning`, `is whitelisted/banned`, `is in a vehicle`, `has permission`, `has <item>`, `is holding <item>`, `is wearing <item>`, `is tamed/leashed`, `has played before`, `world is raining`.
+`is on ground`, `is burning`, `is whitelisted/banned`, `is in a vehicle`, `has permission`, `has <item>`, `is holding <item>`, `is wearing <item>`, `is tamed/leashed`, `has played before`, `world is raining/thundering`, `is in water/lava`, `can build`.
 
 **Effects:** broadcast, send/message, send actionbar (legacy `&` and MiniMessage colours), set, add,
 remove, delete/clear, replace-in-text, return, stop, exit loop, continue, cancel/uncancel event,
@@ -64,7 +64,7 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
 - **Expressions:** direction math, more item properties (name/lore/enchants), weather
   state, target/looked-at block, nearby entities, time differences, more string/number formatting, … (x/y/z and length now work on vectors; amount of an item gives its stack size)
 - **Events:** the remaining (leash, tame variants, server ping, tab complete, advancement, and the long tail).
-- **Conditions:** the remaining (can build, generic "world is", is in water/lava, and the long tail).
+- **Conditions:** the remaining long tail (`can build`, `is in water/lava`, and `is thundering` are now implemented).
 - **Functions:** `date()`, … (`rgb()` is implemented).
 
 ## ❌ Remaining — deeper engine features
