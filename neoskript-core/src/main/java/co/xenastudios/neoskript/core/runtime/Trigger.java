@@ -88,4 +88,31 @@ public final class Trigger {
             // `stop` aborts the remainder of the trigger.
         }
     }
+
+    /**
+     * Runs the trigger, honouring top-level {@code wait}s by scheduling the remainder via
+     * {@code scheduler} (which may run it on a later tick).
+     *
+     * @param ctx       the execution context
+     * @param scheduler schedules delayed continuations
+     */
+    public void execute(TriggerContext ctx, DelayScheduler scheduler) {
+        runFrom(0, ctx, scheduler);
+    }
+
+    private void runFrom(int index, TriggerContext ctx, DelayScheduler scheduler) {
+        try {
+            for (int i = index; i < statements.size(); i++) {
+                Statement statement = statements.get(i);
+                if (scheduler != null && statement instanceof DelayStatement delay) {
+                    int next = i + 1;
+                    scheduler.runLater(() -> runFrom(next, ctx, scheduler), delay.ticks());
+                    return; // suspend until the scheduled continuation runs
+                }
+                statement.run(ctx);
+            }
+        } catch (StopSignal ignored) {
+            // `stop` aborts the remainder of the trigger.
+        }
+    }
 }

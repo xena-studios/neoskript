@@ -5,10 +5,9 @@ import co.xenastudios.neoskript.core.parser.ParseException;
 import co.xenastudios.neoskript.core.parser.ScriptParser;
 import co.xenastudios.neoskript.core.runtime.CommandDefinition;
 import co.xenastudios.neoskript.core.runtime.CommandRegistry;
-import co.xenastudios.neoskript.core.runtime.ExecutionEngine;
+import co.xenastudios.neoskript.core.runtime.DelayScheduler;
 import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 import co.xenastudios.neoskript.core.runtime.HotPathTracker;
-import co.xenastudios.neoskript.core.runtime.InterpretedEngine;
 import co.xenastudios.neoskript.core.runtime.Profiler;
 import co.xenastudios.neoskript.core.runtime.SimpleTriggerContext;
 import co.xenastudios.neoskript.core.runtime.Trigger;
@@ -56,7 +55,7 @@ public final class ScriptLoader {
     private final Map<String, Object> globals;
     private final NeoScheduler scheduler;
     private final Profiler profiler;
-    private final ExecutionEngine engine = new InterpretedEngine();
+    private final DelayScheduler delays;
     private final HotPathTracker hotPaths = new HotPathTracker(HOT_THRESHOLD);
 
     private final List<Listener> listeners = new ArrayList<>();
@@ -74,6 +73,7 @@ public final class ScriptLoader {
         this.globals = globals;
         this.scheduler = scheduler;
         this.profiler = profiler;
+        this.delays = scheduler::runGlobalLater;
     }
 
     /** The outcome of a load. */
@@ -192,10 +192,10 @@ public final class ScriptLoader {
         try {
             if (profiler.isEnabled()) {
                 long start = System.nanoTime();
-                engine.run(trigger, ctx);
+                trigger.execute(ctx, delays);
                 profiler.record(trigger.eventName(), System.nanoTime() - start);
             } else {
-                engine.run(trigger, ctx);
+                trigger.execute(ctx, delays);
             }
         } catch (RuntimeException e) {
             // One misbehaving trigger shouldn't break the event for other triggers or plugins.

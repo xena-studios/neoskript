@@ -6,6 +6,7 @@ import co.xenastudios.neoskript.core.expression.FunctionCallExpression;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry;
 import co.xenastudios.neoskript.core.runtime.CommandDefinition;
 import co.xenastudios.neoskript.core.runtime.CommandRegistry;
+import co.xenastudios.neoskript.core.runtime.DelayStatement;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry.ConditionEntry;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry.EffectEntry;
 import co.xenastudios.neoskript.core.runtime.EffectStatement;
@@ -131,7 +132,7 @@ public final class ScriptParser {
     }
 
     private List<Statement> parseBody(Node node, String label) {
-        List<Statement> body = parseStatements(node.children());
+        List<Statement> body = parseStatements(node.children(), true);
         if (body.isEmpty()) {
             throw new ParseException("'" + label + "' has an empty body", node.line());
         }
@@ -154,7 +155,7 @@ public final class ScriptParser {
             int colon = trimmed.indexOf(':');
             parameters.add((colon >= 0 ? trimmed.substring(0, colon) : trimmed).trim());
         }
-        functions.register(new FunctionDefinition(name, parameters, parseStatements(node.children())));
+        functions.register(new FunctionDefinition(name, parameters, parseStatements(node.children(), false)));
     }
 
     private void parseCommand(Node node) {
@@ -174,7 +175,7 @@ public final class ScriptParser {
             String content = child.content();
             String lower = content.toLowerCase(Locale.ROOT);
             if (lower.equals("trigger:")) {
-                body = parseStatements(child.children());
+                body = parseStatements(child.children(), false);
             } else if (lower.startsWith("permission:")) {
                 permission = entryValue(content);
             } else if (lower.startsWith("description:")) {
@@ -203,7 +204,7 @@ public final class ScriptParser {
         return colon < 0 ? "" : line.substring(colon + 1).trim();
     }
 
-    private List<Statement> parseStatements(List<Node> nodes) {
+    private List<Statement> parseStatements(List<Node> nodes, boolean allowDelays) {
         List<Statement> result = new ArrayList<>();
         int i = 0;
         while (i < nodes.size()) {
@@ -211,7 +212,10 @@ public final class ScriptParser {
             String content = node.content();
             String lower = content.toLowerCase(Locale.ROOT);
 
-            if (lower.startsWith("if ") && content.endsWith(":")) {
+            if ((lower.startsWith("wait ") || lower.startsWith("delay ")) && !content.endsWith(":")) {
+                result.add(parseDelay(node, allowDelays));
+                i++;
+            } else if (lower.startsWith("if ") && content.endsWith(":")) {
                 IfResult parsed = parseIf(nodes, i);
                 result.add(parsed.section());
                 i = parsed.next();
@@ -219,7 +223,7 @@ public final class ScriptParser {
                 throw new ParseException("'" + content + "' without a matching 'if'", node.line());
             } else if (lower.startsWith("while ") && content.endsWith(":")) {
                 Condition condition = parseCondition(content.substring(6, content.length() - 1).trim(), node.line());
-                result.add(new WhileSection(condition, parseStatements(node.children())));
+                result.add(new WhileSection(condition, parseStatements(node.children(), false)));
                 i++;
             } else if (lower.startsWith("loop ") && content.endsWith(":")) {
                 result.add(parseLoop(node));
@@ -234,13 +238,27 @@ public final class ScriptParser {
         return result;
     }
 
+    private Statement parseDelay(Node node, boolean allowDelays) {
+        if (!allowDelays) {
+            throw new ParseException(
+                    "'wait' is only supported at the top level of a trigger (not inside sections or functions yet)",
+                    node.line());
+        }
+        String spec = node.content().substring(node.content().indexOf(' ') + 1).trim();
+        OptionalLong ticks = Timespan.parseTicks(spec);
+        if (ticks.isEmpty()) {
+            throw new ParseException("Unknown timespan '" + spec + "'", node.line());
+        }
+        return new DelayStatement(ticks.getAsLong());
+    }
+
     private IfResult parseIf(List<Node> nodes, int index) {
         Node node = nodes.get(index);
         String content = node.content();
         boolean elseIf = content.toLowerCase(Locale.ROOT).startsWith("else if ");
         int prefix = elseIf ? "else if ".length() : "if ".length();
         Condition condition = parseCondition(content.substring(prefix, content.length() - 1).trim(), node.line());
-        List<Statement> thenBranch = parseStatements(node.children());
+        List<Statement> thenBranch = parseStatements(node.children(), false);
 
         List<Statement> elseBranch = null;
         int next = index + 1;
@@ -248,7 +266,7 @@ public final class ScriptParser {
             Node following = nodes.get(next);
             String followingLower = following.content().toLowerCase(Locale.ROOT);
             if (followingLower.equals("else:")) {
-                elseBranch = parseStatements(following.children());
+                elseBranch = parseStatements(following.children(), false);
                 next++;
             } else if (followingLower.startsWith("else if ") && following.content().endsWith(":")) {
                 IfResult chained = parseIf(nodes, next);
@@ -261,7 +279,7 @@ public final class ScriptParser {
 
     private Statement parseLoop(Node node) {
         String content = node.content().substring(0, node.content().length() - 1).trim();
-        List<Statement> body = parseStatements(node.children());
+        List<Statement> body = parseStatements(node.children(), false);
 
         Matcher times = LOOP_TIMES.matcher(content);
         if (times.matches()) {
