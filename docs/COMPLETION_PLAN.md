@@ -6,6 +6,26 @@ and supersedes nothing — it's the execution plan for "100% of GAPS.md".
 
 _Authored: 2026-06-30. Baseline: 93 tests green; all engine-tractable features and broad content done._
 
+## Conformance campaign (toward 100%)
+
+Driven by `docs/conformance/` — `inventory.json` (every documented Skript 2.15.3 entry) and
+`coverage.py` → `COVERAGE.md`. `done` = implemented **and** covered by a test.
+
+- **Denominator:** 1,186 in-scope entries (1,200 documented − 14 external-plugin, see
+  `EXTERNAL_PLUGIN_SYNTAX.md`).
+- **Current:** **202/1186 done (17%)** — every entry NeoSkript already implements has been verified
+  with a conformance test (types 24, functions 40, effects 18, conditions 30, expressions 34,
+  events 49, sections 3, structures 6).
+- **Engine bugs found & fixed during verification** (see `KNOWN_ISSUES.md`): candidate fall-through,
+  null optional args (`SimpleArguments`), leading-optional space in `PatternCompiler`, and
+  `distance between A and B` mis-splitting. All fixed with regression tests.
+- **Remaining:** ~984 entries need implementing from scratch (≈475 expressions, ≈130 effects,
+  ≈135 conditions, ≈117 events, ≈109 types). This is the bulk of the work to reach 100%.
+- **Method:** per category, implement in `neoskript-lang` registries, verify with a conformance
+  test, flip the entry to `done`, commit. Highest leverage next: the changer system (makes
+  expressions settable/addable, matching Skript's model) and a generic registry-backed type adapter
+  (biome/enchantment/sound/particle/attribute, …). Keep the build green every batch.
+
 ## Status (2026-06-30)
 
 - **Phase A — Type system depth:** ✅ done. Converter graph, value serializers, and **type-aware
