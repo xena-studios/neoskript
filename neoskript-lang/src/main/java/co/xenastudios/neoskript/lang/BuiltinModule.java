@@ -154,6 +154,19 @@ public final class BuiltinModule {
         });
         registry.registerExpression("now", Object.class,
                 arguments -> new ComputedExpression(ctx -> (double) System.currentTimeMillis()));
+        registry.registerExpression("type of %object%", Object.class, arguments -> {
+            Expression<?> source = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                Object value = source.getSingle(ctx);
+                if (value instanceof ItemStack item) {
+                    return item.getType().name().toLowerCase(Locale.ROOT);
+                }
+                if (value instanceof Entity entity) {
+                    return entity.getType().name().toLowerCase(Locale.ROOT);
+                }
+                return null;
+            });
+        });
 
         registry.registerExpression("distance between %location% and %location%", Object.class, arguments -> {
             Expression<?> a = arguments.get(0);
@@ -484,6 +497,22 @@ public final class BuiltinModule {
         });
         registry.registerCondition("%world% is raining", a -> worldIs(a.get(0), true));
         registry.registerCondition("%world% (is not raining|isn't raining|is clear)", a -> worldIs(a.get(0), false));
+        registry.registerCondition("%player% is wearing %object%", a -> {
+            Expression<?> target = a.get(0);
+            Expression<?> item = a.get(1);
+            return ctx -> {
+                if (!(target.getSingle(ctx) instanceof Player player)
+                        || !(item.getSingle(ctx) instanceof ItemStack stack)) {
+                    return false;
+                }
+                for (ItemStack armor : player.getInventory().getArmorContents()) {
+                    if (armor != null && armor.getType() == stack.getType()) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+        });
     }
 
     private static Condition worldIs(Expression<?> target, boolean raining) {

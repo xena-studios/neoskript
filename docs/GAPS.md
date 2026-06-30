@@ -27,7 +27,7 @@ load/save, chunk load — plus **event-values** (`event-block`/`event-world`/`ev
 **Conditions:** equality and numeric comparisons, `is set`, `contains`, `starts/ends with`,
 `matches` (regex), `is between`, `chance of`, `is op`, `is online/offline`, `is alive/dead`,
 `is sneaking/sprinting/flying`, `can fly`, `is blocking/gliding/glowing/sleeping/swimming`,
-`is on ground`, `is burning`, `is whitelisted/banned`, `is in a vehicle`, `has permission`, `has <item>`, `is holding <item>`, `world is raining`.
+`is on ground`, `is burning`, `is whitelisted/banned`, `is in a vehicle`, `has permission`, `has <item>`, `is holding <item>`, `is wearing <item>`, `world is raining`.
 
 **Effects:** broadcast, send/message, send actionbar (legacy `&` and MiniMessage colours), set, add,
 remove, delete/clear, replace-in-text, return, stop, exit loop, continue, cancel/uncancel event,
@@ -42,7 +42,7 @@ and dynamic names), function calls; string ops (uppercase, lowercase, length, sp
 (first/last/random element, reversed, sorted); player properties (health, max health, food, level,
 uuid, gamemode, world, location, name); location coordinates (x/y/z) and distance between; all/online
 players; gamemode literals; command `sender`, `arg-N`, `args`; comma/`and`-separated list literals
-(`1, 2 and 3`); world time (`time of`) and current timestamp (`now`).
+(`1, 2 and 3`); world time (`time of`), current timestamp (`now`), and type of <item>/<entity>.
 
 **Types:** `number`, `text`, `boolean`, `player`, `world`, `gamemode`, `location`, `vector`
 (registry-backed display/parse).
@@ -60,7 +60,7 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
   state, target/looked-at block, nearby entities, time differences, more string/number formatting, …
 - **Events:** the remaining (enchant, portal, bucket fill/empty, leash, breed, world init, chunk
   unload, redstone, block burn/ignite/grow, server ping, tab complete, …).
-- **Conditions:** the remaining (is wearing, can build, world is, is in water/lava, is tamed/leashed,
+- **Conditions:** the remaining (can build, world is, is in water/lava, is tamed/leashed,
   has played before, …).
 - **Functions:** `date()`, `rgb()`/colour, …
 
