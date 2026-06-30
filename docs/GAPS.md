@@ -74,6 +74,12 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
 6. **Pattern engine niceties:** `the`/`a`/`an` articles, plural handling, parse marks/tags from
    alternations.
 
+## Completing the gaps
+
+See [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) for the phased engineering plan to close everything
+listed above — type-system graph, async runtime, persistence backends, structures, pattern niceties,
+and the content long tail — with designs, tests, risks, and sequencing.
+
 ## Notes
 
 - New content slots into the existing registries with the same builder API — adding events,
