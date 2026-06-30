@@ -50,4 +50,36 @@ class FlatFileVariableStoreTest {
     void loadingMissingFileYieldsEmpty(@TempDir Path dir) throws IOException {
         assertTrue(FlatFileVariableStore.load(dir.resolve("absent.csv")).isEmpty());
     }
+
+    @Test
+    void roundTripsCustomSerializedValues(@TempDir Path dir) throws IOException {
+        ValueSerializers.register(new ValueSerializer() {
+            @Override
+            public String id() {
+                return "char";
+            }
+
+            @Override
+            public boolean handles(Object value) {
+                return value instanceof Character;
+            }
+
+            @Override
+            public String serialize(Object value) {
+                return value.toString();
+            }
+
+            @Override
+            public Object deserialize(String data) {
+                return data.isEmpty() ? null : data.charAt(0);
+            }
+        });
+
+        Path file = dir.resolve("variables.csv");
+        Map<String, Object> in = new LinkedHashMap<>();
+        in.put("letter", 'A');
+        FlatFileVariableStore.save(file, in);
+
+        assertEquals('A', FlatFileVariableStore.load(file).get("letter"));
+    }
 }

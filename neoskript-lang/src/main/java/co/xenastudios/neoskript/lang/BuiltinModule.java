@@ -91,6 +91,7 @@ public final class BuiltinModule {
         types.register(new VectorType());
         types.register(new ItemType());
         Renderer.setTypeRegistry(types);
+        BuiltinSerializers.registerAll();
     }
 
     private static void registerExpressions(SyntaxRegistry registry) {

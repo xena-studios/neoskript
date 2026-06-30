@@ -64,13 +64,12 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
 
 ## ❌ Remaining — deeper engine features
 
-1. **Type system depth:** the comparator graph and the converter/serializer graph (cross-type
-   comparison/conversion, and persistence of rich types beyond strings/numbers/booleans).
+1. **Type system depth:** a comparator graph wired into conditions (the converter graph and rich-type serializers are done; conditions still use the simpler Comparisons facade).
 2. **Async/delays beyond the top level:** `wait` inside `if`/`loop`/`while`/functions, and explicit
    `async:`/`run … async` sections (needs a full continuation-based runtime).
 3. **Functions:** typed parameters with enforced return types, and local functions (default/optional params are done).
 4. **Structures:** `aliases:` (custom item aliases), `import`/`using`.
-5. **Persistence:** SQL backends; serialization of non-simple variable values.
+5. **Persistence:** SQL backends (the flatfile store now persists rich types via value serializers).
 6. **Pattern engine niceties:** `the`/`a`/`an` articles, plural handling, parse marks/tags from
    alternations.
 

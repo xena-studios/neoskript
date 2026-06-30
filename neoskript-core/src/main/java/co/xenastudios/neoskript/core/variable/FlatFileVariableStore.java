@@ -49,7 +49,7 @@ public final class FlatFileVariableStore {
                 case "number" -> parseNumber(parts[2]);
                 case "boolean" -> Boolean.valueOf(parts[2]);
                 case "string" -> unescape(parts[2]);
-                default -> null;
+                default -> deserializeCustom(parts[1], unescape(parts[2]));
             };
             if (value != null) {
                 variables.put(name, value);
@@ -84,7 +84,12 @@ public final class FlatFileVariableStore {
                 type = "string";
                 serialized = escape(text);
             } else {
-                continue; // not persistable yet
+                ValueSerializer serializer = ValueSerializers.forValue(value);
+                if (serializer == null) {
+                    continue; // no serializer registered for this type
+                }
+                type = serializer.id();
+                serialized = escape(serializer.serialize(value));
             }
             lines.add(escape(entry.getKey()) + "\t" + type + "\t" + serialized);
         }
@@ -96,6 +101,11 @@ public final class FlatFileVariableStore {
         } catch (AtomicMoveNotSupportedException e) {
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
         }
+    }
+
+    private static Object deserializeCustom(String typeId, String data) {
+        ValueSerializer serializer = ValueSerializers.byId(typeId);
+        return serializer == null ? null : serializer.deserialize(data);
     }
 
     private static Double parseNumber(String text) {
