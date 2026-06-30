@@ -151,7 +151,7 @@
       "%players% (can't|cannot|can not) fly"
     ],
     "source": "ch/njol/skript/conditions/CondCanFly.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% can fly / %player% (can't fly|cannot fly|can not fly)"
   },
@@ -234,7 +234,7 @@
       "chance of %number%(1:\\%|) [fail:(fails|failed)]"
     ],
     "source": "ch/njol/skript/conditions/CondChance.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "chance of %number%[ percent]"
   },
@@ -282,7 +282,7 @@
       "(1¦neither|) %objects@1% (2¦)(will not be|won't be) between %objects% and %objects%"
     ],
     "source": "ch/njol/skript/conditions/CondCompare.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%object% (is greater than|is more than|>) %object% / %object% (is less than|<) %object% / %object% (is|are|is equal to|=) %object% / etc."
   },
@@ -298,7 +298,7 @@
       "%inventories/strings/objects% (doesn't|does not|do not|don't) contain %itemtypes/strings/objects%"
     ],
     "source": "ch/njol/skript/conditions/CondContains.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%object% contains %object% / %object% (doesn't contain|does not contain|don't contain) %object%"
   },
@@ -316,7 +316,7 @@
       "%inventories% (doesn't|does not|do not|don't) have %itemtypes% [in [(the[ir]|his|her|its)] inventory]"
     ],
     "source": "org/skriptlang/skript/common/properties/elements/conditions/PropCondContains.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%object% contains %object% / %object% (doesn't contain|does not contain|don't contain) %object%"
   },
@@ -407,7 +407,7 @@
       "%entities% (is not|are not|isn't|aren't) in (1¦water|2¦lava|3¦[a] bubble[ ]column|4¦rain)"
     ],
     "source": "ch/njol/skript/conditions/CondEntityIsInLiquid.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is in water / %player% is in lava"
   },
@@ -542,7 +542,7 @@
       "%~objects% (do[es](n't| not) exist|(is|are)(n't| not) set)"
     ],
     "source": "ch/njol/skript/conditions/CondIsSet.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%object% (is|are) set / %object% (is not|isn't|is not) set"
   },
@@ -717,7 +717,7 @@
       "%commandsenders% (doesn't|does not|do not|don't) have [the] permission[s] %strings%"
     ],
     "source": "ch/njol/skript/conditions/CondPermission.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% has permission %string% / %player% (doesn't have|does not have|lacks) permission %string%"
   },
@@ -744,7 +744,7 @@
       "%offlineplayers% (has not|hasn't|have not|haven't|did not|didn't) [(already|yet)] play[ed] [on (this|the) server] (before|already|yet)"
     ],
     "source": "ch/njol/skript/conditions/CondPlayedBefore.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% has played before"
   },
@@ -850,7 +850,7 @@
       "%entities% (isn't|is not|aren't|are not) (alive|dead)"
     ],
     "source": "ch/njol/skript/conditions/CondIsAlive.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is alive / %player% is dead"
   },
@@ -879,7 +879,7 @@
       "%players/strings% (isn't|is not|aren't|are not) IP(-| |)banned"
     ],
     "source": "ch/njol/skript/conditions/CondIsBanned.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is banned"
   },
@@ -933,7 +933,7 @@
       "%players% (is|are)(n't| not) (blocking|defending) [with [a] shield]"
     ],
     "source": "ch/njol/skript/conditions/CondIsBlocking.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is blocking"
   },
@@ -947,7 +947,7 @@
       "%entities% (is|are)(n't| not) (burning|ignited|on fire)"
     ],
     "source": "ch/njol/skript/conditions/CondIsBurning.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% (is burning|is on fire)"
   },
@@ -1160,7 +1160,7 @@
       "%players% (isn't|is not|aren't|are not) flying"
     ],
     "source": "ch/njol/skript/conditions/CondIsFlying.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is flying"
   },
@@ -1215,7 +1215,7 @@
       "%livingentities% (isn't|is not|aren't|are not) gliding"
     ],
     "source": "ch/njol/skript/conditions/CondIsGliding.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is gliding"
   },
@@ -1254,7 +1254,7 @@
       "[%livingentities%] (is not|isn't) holding %itemtypes% in off[(-| )]hand"
     ],
     "source": "ch/njol/skript/conditions/CondItemInHand.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is holding %object%"
   },
@@ -1360,7 +1360,7 @@
       "%livingentities% (isn't|is not|aren't|are not) leashed"
     ],
     "source": "ch/njol/skript/conditions/CondLeashed.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%object% is leashed"
   },
@@ -1454,7 +1454,7 @@
       "%entities% (is|are)(n't| not) on [the] ground"
     ],
     "source": "ch/njol/skript/conditions/CondIsOnGround.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is (on the ground|on ground)"
   },
@@ -1468,7 +1468,7 @@
       "%offlineplayers% (is|are)(n't| not) (online|:offline|:connected)"
     ],
     "source": "ch/njol/skript/conditions/CondIsOnline.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is online"
   },
@@ -1482,7 +1482,7 @@
       "%offlineplayers% (is|are)(n't| not) [[a] server|an] op[erator][s]"
     ],
     "source": "ch/njol/skript/conditions/CondIsOp.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% (is op|is an op|is operator)"
   },
@@ -1617,7 +1617,7 @@
       "%entities% (is|are)(n't| not) riding [%-entitydatas/entities%]"
     ],
     "source": "ch/njol/skript/conditions/CondIsRiding.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is (in a vehicle|inside a vehicle)"
   },
@@ -1696,7 +1696,7 @@
       "%livingentities% (is|are)(n't| not) sleeping"
     ],
     "source": "ch/njol/skript/conditions/CondIsSleeping.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is sleeping"
   },
@@ -1723,7 +1723,7 @@
       "%players% (is|are)(n't| not) sneaking"
     ],
     "source": "ch/njol/skript/conditions/CondIsSneaking.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is sneaking"
   },
@@ -1765,7 +1765,7 @@
       "%players% (isn't|aren't|is not|are not) sprinting"
     ],
     "source": "ch/njol/skript/conditions/CondIsSprinting.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is sprinting"
   },
@@ -1792,7 +1792,7 @@
       "%livingentities% (isn't|aren't|is not|are not) swimming"
     ],
     "source": "ch/njol/skript/conditions/CondIsSwimming.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is swimming"
   },
@@ -1832,7 +1832,7 @@
       "%entities% (isn't|aren't|is not|are not) (tamed|domesticated)"
     ],
     "source": "ch/njol/skript/conditions/CondIsTamed.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%object% is tamed"
   },
@@ -1913,7 +1913,7 @@
       "%livingentities% (isn't|aren't|is not|are not) wearing %itemtypes%"
     ],
     "source": "ch/njol/skript/conditions/CondIsWearing.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is wearing %object%"
   },
@@ -1928,7 +1928,7 @@
       "[the] server white[ ]list (is|not:(isn't|is not)) enforced"
     ],
     "source": "ch/njol/skript/conditions/CondIsWhitelisted.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%player% is whitelisted"
   },
@@ -2027,7 +2027,7 @@
       "%strings% (1¦partially match[es]|2¦do[es](n't| not) partially match) %strings%"
     ],
     "source": "ch/njol/skript/conditions/CondMatches.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%string% matches %string%"
   },
@@ -2205,7 +2205,7 @@
       "%strings% (doesn't|does not|do not|don't) (start|1¦end) with %strings%"
     ],
     "source": "ch/njol/skript/conditions/CondStartsEndsWith.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "%string% starts with %string% / %string% ends with %string%"
   },
