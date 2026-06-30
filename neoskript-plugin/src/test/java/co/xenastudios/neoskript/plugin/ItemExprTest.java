@@ -53,6 +53,8 @@ class ItemExprTest {
                             send "HARD" to player
                         if hex code of rgb(255, 0, 0) is "#ff0000":
                             send "HEX" to player
+                        if inventory of player is set:
+                            send "INV" to player
                         send "DONE" to player
 
                 command /ie2:
@@ -62,6 +64,11 @@ class ItemExprTest {
                         set {_face} to facing of player
                         set {_yield} to explosive yield of player
                         set {_cmd} to custom model data of item("stone")
+                        set {_ip} to ip of player
+                        set {_ench} to enchantments of item("diamond sword")
+                        set {_fl} to item flags of item("diamond")
+                        set {_io} to item of player
+                        set {_ab} to attached block of player
                 """, StandardCharsets.UTF_8);
         server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
 
@@ -75,6 +82,7 @@ class ItemExprTest {
         }
         assertTrue(seen.contains("JOINED"), "owner/targeted-block commands parsed (file loaded)");
         assertTrue(seen.contains("AMT"), "item amount = 5");
+        assertTrue(seen.contains("INV"), "inventory of player resolves");
         assertTrue(seen.contains("HARD"), "stone has hardness > 0");
         assertTrue(seen.contains("HEX"), "hex code of red = #ff0000");
         assertTrue(seen.contains("DONE"), "yaw/pitch/lore getters ran without error");

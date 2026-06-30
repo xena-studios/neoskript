@@ -6809,8 +6809,8 @@
       "%projectiles%'[s] (attached|hit) block[multiple:s]"
     ],
     "source": "ch/njol/skript/expressions/ExprAttachedBlock.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:arrow-knockback-strength",
@@ -9388,8 +9388,8 @@
       "%inventoryholders/itemtypes%'[s] inventor(y|ies)"
     ],
     "source": "ch/njol/skript/expressions/ExprInventory.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:inventory-action",
@@ -9465,8 +9465,8 @@
       "IP[( |-)address]"
     ],
     "source": "ch/njol/skript/expressions/ExprIP.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:item",
@@ -9543,8 +9543,8 @@
       "%itemtypes%'[s] enchantments"
     ],
     "source": "ch/njol/skript/expressions/ExprEnchantments.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:item-flags",
@@ -9556,8 +9556,8 @@
       "%itemtypes%'[s] item flags"
     ],
     "source": "ch/njol/skript/expressions/ExprItemFlags.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:item-of-an-entity",
@@ -9569,8 +9569,8 @@
       "%entities%'[s] item [inside]"
     ],
     "source": "org/skriptlang/skript/bukkit/misc/elements/expressions/ExprItemOfEntity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:item-with-custom-model-data",

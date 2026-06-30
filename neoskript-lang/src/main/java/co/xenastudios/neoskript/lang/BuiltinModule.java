@@ -383,6 +383,49 @@ public final class BuiltinModule {
                 arguments -> new ComputedExpression(ctx -> (double) Bukkit.getMaxPlayers()));
         registry.registerExpression("(online player[s] count|number of online players|online player amount)",
                 Object.class, arguments -> new ComputedExpression(ctx -> (double) Bukkit.getOnlinePlayers().size()));
+        registry.registerExpression("inventor(y|ies) of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof org.bukkit.inventory.InventoryHolder h ? h.getInventory() : null);
+        });
+        registry.registerExpression("[the] (ip|IP)[(-| )address[es]] of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                if (src.getSingle(ctx) instanceof Player p && p.getAddress() != null) {
+                    return p.getAddress().getAddress().getHostAddress();
+                }
+                return null;
+            });
+        });
+        registry.registerExpression("[the] enchantments of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedListExpression(ctx ->
+                    src.getSingle(ctx) instanceof ItemStack item ? item.getEnchantments().keySet().toArray() : new Object[0]);
+        });
+        registry.registerExpression("[the] item flags of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedListExpression(ctx -> {
+                if (src.getSingle(ctx) instanceof ItemStack item && item.hasItemMeta()) {
+                    return item.getItemMeta().getItemFlags().toArray();
+                }
+                return new Object[0];
+            });
+        });
+        registry.registerExpression("[the] (inverse|opposite) of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof Boolean b ? !b : null);
+        });
+        registry.registerExpression("[the] item [inside] of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof org.bukkit.entity.Item item ? item.getItemStack() : null);
+        });
+        registry.registerExpression("(attached|hit) block of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof org.bukkit.entity.AbstractArrow ar ? ar.getAttachedBlock() : null);
+        });
         registry.registerExpression("[the] [block] hardness of %object%", Object.class, arguments -> {
             Expression<?> src = arguments.get(0);
             return new ComputedExpression(ctx ->
