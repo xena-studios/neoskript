@@ -732,6 +732,44 @@ public final class BuiltinModule {
             Expression<?> target = a.get(0);
             return ctx -> target.getSingle(ctx) instanceof World w && w.isThundering();
         });
+        registry.registerCondition("%object% (is|are) alphanumeric", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> {
+                Object o = src.getSingle(ctx);
+                return o != null && Renderer.toDisplay(o).matches("[A-Za-z0-9]+");
+            };
+        });
+        registry.registerCondition("%object% (is|are) [a] block", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> {
+                Object o = src.getSingle(ctx);
+                if (o instanceof ItemStack item) {
+                    return item.getType().isBlock();
+                }
+                return o instanceof org.bukkit.Material mat && mat.isBlock();
+            };
+        });
+        registry.registerCondition("%object% (has|have) [a[n]] [active] potion effect %string%", a -> {
+            Expression<?> target = a.get(0);
+            Expression<?> type = a.get(1);
+            return ctx -> {
+                if (!(target.getSingle(ctx) instanceof LivingEntity le)) {
+                    return false;
+                }
+                org.bukkit.potion.PotionEffectType pet = potionEffect(Renderer.toDisplay(type.getSingle(ctx)));
+                return pet != null && le.hasPotionEffect(pet);
+            };
+        });
+        registry.registerCondition("%object% (has|have) [a] [direct] line of sight to %object%", a -> {
+            Expression<?> target = a.get(0);
+            Expression<?> other = a.get(1);
+            return ctx -> target.getSingle(ctx) instanceof LivingEntity le
+                    && other.getSingle(ctx) instanceof Entity e && le.hasLineOfSight(e);
+        });
+        registry.registerCondition("%object% (is|are) (sheared|shorn)", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> src.getSingle(ctx) instanceof org.bukkit.entity.Shearable sh && sh.isSheared();
+        });
         registry.registerCondition("%entity% is invisible", a -> entityIs(a.get(0), Entity::isInvisible, true));
         registry.registerCondition("%entity% is (visible|not invisible)",
                 a -> entityIs(a.get(0), Entity::isInvisible, false));

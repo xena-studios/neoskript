@@ -22,8 +22,8 @@
       "%strings% (isn't|is not|aren't|are not) alphanumeric"
     ],
     "source": "ch/njol/skript/conditions/CondAlphanumeric.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:beehive-is-sedated",
@@ -421,8 +421,8 @@
       "%livingentities% (is|are)(n't| not) (sheared|shorn)"
     ],
     "source": "ch/njol/skript/conditions/CondIsSheared.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:entity-is-wet",
@@ -678,8 +678,8 @@
       "%livingentities% (has|have) no [direct] line of sight to %entities/locations%"
     ],
     "source": "ch/njol/skript/conditions/CondHasLineOfSight.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-loot-table",
@@ -758,8 +758,8 @@
       "%livingentities% (has|have) [not] %skriptpotioneffects% [active]"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/conditions/CondHasPotion.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:has-resource-pack",
@@ -784,8 +784,8 @@
       "%entities% (doesn't|does not|do not|don't) have [the] score[ ]board tag[s] %strings%"
     ],
     "source": "ch/njol/skript/conditions/CondHasScoreboardTag.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:ignition-process",
@@ -905,8 +905,8 @@
       "%itemtypes% (is|are)(n't| not) [a] block[s]"
     ],
     "source": "ch/njol/skript/conditions/CondIsBlock.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-block-redstone-powered",
