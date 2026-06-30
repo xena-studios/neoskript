@@ -857,6 +857,30 @@ public final class BuiltinModule {
             Expression<?> target = a.get(0);
             return ctx -> target.getSingle(ctx) instanceof World w && w.isThundering();
         });
+        registry.registerCondition("%object% (is|are) edible", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> material(src.getSingle(ctx)) instanceof org.bukkit.Material m && m.isEdible();
+        });
+        registry.registerCondition("%object% (is|are) flammable", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> material(src.getSingle(ctx)) instanceof org.bukkit.Material m && m.isFlammable();
+        });
+        registry.registerCondition("%object% (is|are) fuel", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> material(src.getSingle(ctx)) instanceof org.bukkit.Material m && m.isFuel();
+        });
+        registry.registerCondition("%object% (is|are) (charged|powered)", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> src.getSingle(ctx) instanceof org.bukkit.entity.Creeper c && c.isPowered();
+        });
+        registry.registerCondition("%object% (is|are) redstone powered", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> src.getSingle(ctx) instanceof org.bukkit.block.Block b && b.isBlockPowered();
+        });
+        registry.registerCondition("%object% can (age|grow (up|old[er]))", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> src.getSingle(ctx) instanceof org.bukkit.entity.Breedable br && !br.getAgeLock();
+        });
         registry.registerCondition("%object% (is|are) alphanumeric", a -> {
             Expression<?> src = a.get(0);
             return ctx -> {
@@ -1380,6 +1404,14 @@ public final class BuiltinModule {
         registry.registerExpression("%object%'s " + name, Object.class, a ->
                 new co.xenastudios.neoskript.lang.expression.NumericPropertyExpression<>(
                         a.get(0), holder, getter, setter, reset));
+    }
+
+    /** Coerces a value to a Material: a Material directly, or an item stack's type. */
+    private static org.bukkit.Material material(Object value) {
+        if (value instanceof org.bukkit.Material m) {
+            return m;
+        }
+        return value instanceof ItemStack item ? item.getType() : null;
     }
 
     /** The current Bukkit event, or null outside an event context. */

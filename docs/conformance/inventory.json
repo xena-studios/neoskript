@@ -100,8 +100,8 @@
       "%livingentities% (can't|cannot) (age|grow (up|old[er]))"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/conditions/CondCanAge.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:can-breed",
@@ -920,8 +920,8 @@
       "%blocks% (is|are)(n't| not) indirectly redstone powered"
     ],
     "source": "ch/njol/skript/conditions/CondIsBlockRedstonePowered.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-blocking",
@@ -961,8 +961,8 @@
       "%entities% (is|are)(n't| not) (charged|powered)"
     ],
     "source": "ch/njol/skript/conditions/CondIsCharged.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-charging-fireball",
@@ -1054,8 +1054,8 @@
       "%itemtypes% (is|are)(n't| not) edible"
     ],
     "source": "ch/njol/skript/conditions/CondIsEdible.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-empty",
@@ -1147,8 +1147,8 @@
       "%itemtypes% (isn't|is not|aren't|are not) flammable"
     ],
     "source": "ch/njol/skript/conditions/CondIsFlammable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-flying",
@@ -1202,8 +1202,8 @@
       "%itemtypes% (isn't|is not|aren't|are not) [furnace] fuel"
     ],
     "source": "ch/njol/skript/conditions/CondIsFuel.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-gliding",

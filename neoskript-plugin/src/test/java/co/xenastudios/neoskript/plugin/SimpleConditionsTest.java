@@ -47,6 +47,18 @@ class SimpleConditionsTest {
                             send "BLOCK" to player
                         if player has potion effect "speed":
                             send "POT" to player
+                        if item("bread") is edible:
+                            send "EDIBLE" to player
+                        if item("oak planks") is flammable:
+                            send "FLAM" to player
+                        if item("coal") is fuel:
+                            send "FUEL" to player
+                        if player is charged:
+                            send "no" to player
+                        if event-block is redstone powered:
+                            send "no" to player
+                        if player can age:
+                            send "no" to player
                 """, StandardCharsets.UTF_8);
         server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
 
@@ -62,5 +74,8 @@ class SimpleConditionsTest {
         assertTrue(!seen.contains("BAD"), "alphanumeric false for 'a b!'");
         assertTrue(seen.contains("BLOCK"), "stone is a block");
         assertTrue(seen.contains("POT"), "has potion effect speed");
+        assertTrue(seen.contains("EDIBLE"), "bread is edible");
+        assertTrue(seen.contains("FLAM"), "oak planks is flammable");
+        assertTrue(seen.contains("FUEL"), "coal is fuel");
     }
 }
