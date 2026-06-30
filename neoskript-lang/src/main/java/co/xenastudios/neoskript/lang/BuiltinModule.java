@@ -988,6 +988,29 @@ public final class BuiltinModule {
                 }
             };
         });
+        registry.registerEffect("make %entity% swing [its] [main] hand", arguments ->
+                entityEffect(arguments.get(0), e -> {
+                    if (e instanceof LivingEntity le) {
+                        le.swingMainHand();
+                    }
+                }));
+        registry.registerEffect("make %entity% swing [its] off[ ]hand", arguments ->
+                entityEffect(arguments.get(0), e -> {
+                    if (e instanceof LivingEntity le) {
+                        le.swingOffHand();
+                    }
+                }));
+        registry.registerEffect("drop %object% at %location%", arguments -> {
+            Expression<?> item = arguments.get(0);
+            Expression<?> loc = arguments.get(1);
+            return ctx -> {
+                Location where = toLocation(loc.getSingle(ctx));
+                Object what = item.getSingle(ctx);
+                if (where != null && where.getWorld() != null && what instanceof ItemStack stack) {
+                    where.getWorld().dropItem(where, stack);
+                }
+            };
+        });
         registry.registerEffect("make %player% (fly|start flying)", arguments ->
                 playerEffect(arguments.get(0), player -> {
                     player.setAllowFlight(true);

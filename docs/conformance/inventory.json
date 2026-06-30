@@ -2736,8 +2736,8 @@
       "drop %itemtypes/experiences% [%directions% %locations%] [(1¦without velocity)]"
     ],
     "source": "ch/njol/skript/effects/EffDrop.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:enable-disable-unload-reload-script",
@@ -3182,7 +3182,7 @@
       "kick %players% [(by reason of|because [of]|on account of|due to) %-textcomponent%]"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/effects/EffKick.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "kick %player% [(due to|because of) %string%]"
   },
@@ -4057,8 +4057,8 @@
       "make %livingentities% swing [their] off[ ]hand"
     ],
     "source": "ch/njol/skript/effects/EffSwingHand.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:tame-untame",
