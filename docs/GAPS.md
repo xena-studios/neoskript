@@ -15,7 +15,7 @@ _Last reviewed: 2026-06-30._
 (`command /name:` with permission/description/usage/aliases/trigger and `arg-N`/`args`), **`options:`** with `{@key}` substitution, and **`variables:`** defaults.
 
 **Sections:** `if`/`else if`/`else`, `while`, `loop … times`, `loop <values>`, **loop control**
-(`exit loop`, `continue`), and **top-level `wait <timespan>`** (scheduler-backed delays).
+(`exit loop`, `continue`), and **`wait <timespan>` anywhere in a trigger** incl. inside if/while/loop (scheduler-backed continuation interpreter).
 
 **Events (~61):** join, quit, chat, death, block break/place, interact, inventory click/open/close,
 command, respawn, teleport, move, drop, pickup, sneak/sprint/flight toggle, gamemode change, level/exp
@@ -65,8 +65,7 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
 ## ❌ Remaining — deeper engine features
 
 1. **Type system depth:** a comparator graph wired into conditions (the converter graph and rich-type serializers are done; conditions still use the simpler Comparisons facade).
-2. **Async/delays beyond the top level:** `wait` inside `if`/`loop`/`while`/functions, and explicit
-   `async:`/`run … async` sections (needs a full continuation-based runtime).
+2. **Async sections:** explicit `async:` / `run … async` blocks. (`wait` anywhere in a trigger now works via the continuation interpreter; delays inside functions remain disallowed, as in Skript.)
 3. **Functions:** typed parameters with enforced return types, and local functions (default/optional params are done).
 4. **Structures:** `aliases:` (custom item aliases), `import`/`using`.
 5. **Persistence:** SQL backends (the flatfile store now persists rich types via value serializers).
@@ -83,5 +82,4 @@ and the content long tail — with designs, tests, risks, and sequencing.
 
 - New content slots into the existing registries with the same builder API — adding events,
   conditions, effects, and expressions is now mostly mechanical and individually testable.
-- The hardest remaining item is **(2)** — full continuation-based async; top-level `wait` is supported
-  today and the rest is deliberately deferred to keep execution correct.
+- A continuation-based interpreter now supports `wait` anywhere in a trigger; explicit `async:` sections are the small remaining piece of that area.

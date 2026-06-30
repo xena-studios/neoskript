@@ -41,6 +41,21 @@ public final class LoopSection implements Statement {
     /** Wall-clock safety budget for a single loop run (nanoseconds). */
     public static final long MAX_NANOS = 10_000_000_000L; // 10 seconds
 
+    /** @return {@code true} for {@code loop N times}, {@code false} for {@code loop <values>} */
+    public boolean isTimes() {
+        return times;
+    }
+
+    /** @return the count expression (times mode) or values expression (over mode) */
+    public Expression<?> source() {
+        return source;
+    }
+
+    /** @return the loop body */
+    public List<Statement> body() {
+        return body;
+    }
+
     @Override
     public void run(TriggerContext ctx) {
         Object previousValue = ctx.getLocal("loop-value");

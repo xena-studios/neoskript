@@ -22,6 +22,21 @@ public final class IfSection implements Statement {
         this.elseBranch = elseBranch == null ? null : List.copyOf(elseBranch);
     }
 
+    /** @return the condition */
+    public Condition condition() {
+        return condition;
+    }
+
+    /** @return the then-branch statements */
+    public List<Statement> thenBranch() {
+        return thenBranch;
+    }
+
+    /** @return the else-branch statements, or {@code null} if there is no else */
+    public List<Statement> elseBranch() {
+        return elseBranch;
+    }
+
     @Override
     public void run(TriggerContext ctx) {
         if (condition.check(ctx)) {

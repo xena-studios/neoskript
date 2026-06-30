@@ -244,17 +244,17 @@ public final class ScriptParser {
                 result.add(parseDelay(node, allowDelays));
                 i++;
             } else if (lower.startsWith("if ") && content.endsWith(":")) {
-                IfResult parsed = parseIf(nodes, i);
+                IfResult parsed = parseIf(nodes, i, allowDelays);
                 result.add(parsed.section());
                 i = parsed.next();
             } else if ((lower.startsWith("else if ") || lower.equals("else:")) && content.endsWith(":")) {
                 throw new ParseException("'" + content + "' without a matching 'if'", node.line());
             } else if (lower.startsWith("while ") && content.endsWith(":")) {
                 Condition condition = parseCondition(content.substring(6, content.length() - 1).trim(), node.line());
-                result.add(new WhileSection(condition, parseStatements(node.children(), false)));
+                result.add(new WhileSection(condition, parseStatements(node.children(), allowDelays)));
                 i++;
             } else if (lower.startsWith("loop ") && content.endsWith(":")) {
-                result.add(parseLoop(node));
+                result.add(parseLoop(node, allowDelays));
                 i++;
             } else if (content.endsWith(":")) {
                 throw new ParseException("Unknown section: " + content, node.line());
@@ -280,13 +280,13 @@ public final class ScriptParser {
         return new DelayStatement(ticks.getAsLong());
     }
 
-    private IfResult parseIf(List<Node> nodes, int index) {
+    private IfResult parseIf(List<Node> nodes, int index, boolean allowDelays) {
         Node node = nodes.get(index);
         String content = node.content();
         boolean elseIf = content.toLowerCase(Locale.ROOT).startsWith("else if ");
         int prefix = elseIf ? "else if ".length() : "if ".length();
         Condition condition = parseCondition(content.substring(prefix, content.length() - 1).trim(), node.line());
-        List<Statement> thenBranch = parseStatements(node.children(), false);
+        List<Statement> thenBranch = parseStatements(node.children(), allowDelays);
 
         List<Statement> elseBranch = null;
         int next = index + 1;
@@ -294,10 +294,10 @@ public final class ScriptParser {
             Node following = nodes.get(next);
             String followingLower = following.content().toLowerCase(Locale.ROOT);
             if (followingLower.equals("else:")) {
-                elseBranch = parseStatements(following.children(), false);
+                elseBranch = parseStatements(following.children(), allowDelays);
                 next++;
             } else if (followingLower.startsWith("else if ") && following.content().endsWith(":")) {
-                IfResult chained = parseIf(nodes, next);
+                IfResult chained = parseIf(nodes, next, allowDelays);
                 elseBranch = List.of(chained.section());
                 next = chained.next();
             }
@@ -305,9 +305,9 @@ public final class ScriptParser {
         return new IfResult(new IfSection(condition, thenBranch, elseBranch), next);
     }
 
-    private Statement parseLoop(Node node) {
+    private Statement parseLoop(Node node, boolean allowDelays) {
         String content = node.content().substring(0, node.content().length() - 1).trim();
-        List<Statement> body = parseStatements(node.children(), false);
+        List<Statement> body = parseStatements(node.children(), allowDelays);
 
         Matcher times = LOOP_TIMES.matcher(content);
         if (times.matches()) {

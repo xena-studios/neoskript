@@ -25,6 +25,16 @@ public final class WhileSection implements Statement {
         this.body = List.copyOf(body);
     }
 
+    /** @return the loop condition */
+    public Condition condition() {
+        return condition;
+    }
+
+    /** @return the loop body */
+    public List<Statement> body() {
+        return body;
+    }
+
     @Override
     public void run(TriggerContext ctx) {
         long iterations = 0;
