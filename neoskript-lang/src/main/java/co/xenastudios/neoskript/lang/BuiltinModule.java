@@ -795,6 +795,46 @@ public final class BuiltinModule {
                 }
             };
         });
+        registry.registerEffect("make %entity% invisible", arguments ->
+                entityEffect(arguments.get(0), e -> e.setInvisible(true)));
+        registry.registerEffect("make %entity% visible", arguments ->
+                entityEffect(arguments.get(0), e -> e.setInvisible(false)));
+        registry.registerEffect("make %entity% invulnerable", arguments ->
+                entityEffect(arguments.get(0), e -> e.setInvulnerable(true)));
+        registry.registerEffect("make %entity% vulnerable", arguments ->
+                entityEffect(arguments.get(0), e -> e.setInvulnerable(false)));
+        registry.registerEffect("(silence %entity%|make %entity% silent)", arguments -> {
+            Expression<?> a = arguments.get(0);
+            Expression<?> b = arguments.get(1);
+            Expression<?> target = a != null ? a : b;
+            return entityEffect(target, e -> e.setSilent(true));
+        });
+        registry.registerEffect("(unsilence %entity%|make %entity% not silent)", arguments -> {
+            Expression<?> a = arguments.get(0);
+            Expression<?> b = arguments.get(1);
+            Expression<?> target = a != null ? a : b;
+            return entityEffect(target, e -> e.setSilent(false));
+        });
+        registry.registerEffect("(disable|remove) gravity for %entity%", arguments ->
+                entityEffect(arguments.get(0), e -> e.setGravity(false)));
+        registry.registerEffect("(enable|restore) gravity for %entity%", arguments ->
+                entityEffect(arguments.get(0), e -> e.setGravity(true)));
+        registry.registerEffect("push %entity% [(with|at|by)] [(force|velocity)] %vector%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> velocity = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Entity entity && velocity.getSingle(ctx) instanceof Vector v) {
+                    entity.setVelocity(entity.getVelocity().add(v));
+                }
+            };
+        });
+        registry.registerEffect("make %player% (fly|start flying)", arguments ->
+                playerEffect(arguments.get(0), player -> {
+                    player.setAllowFlight(true);
+                    player.setFlying(true);
+                }));
+        registry.registerEffect("make %player% stop flying", arguments ->
+                playerEffect(arguments.get(0), player -> player.setFlying(false)));
         registry.registerEffect("(allow|enable) (flight|flying) for %player%", arguments ->
                 playerEffect(arguments.get(0), player -> player.setAllowFlight(true)));
         registry.registerEffect("(disallow|disable) (flight|flying) for %player%", arguments ->
@@ -928,6 +968,15 @@ public final class BuiltinModule {
         return ctx -> {
             if (target.getSingle(ctx) instanceof Player player) {
                 action.accept(player);
+            }
+        };
+    }
+
+    private static co.xenastudios.neoskript.api.syntax.Effect entityEffect(Expression<?> target,
+                                                                           Consumer<Entity> action) {
+        return ctx -> {
+            if (target.getSingle(ctx) instanceof Entity entity) {
+                action.accept(entity);
             }
         };
     }

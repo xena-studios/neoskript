@@ -3414,8 +3414,8 @@
       "make %players% fly"
     ],
     "source": "ch/njol/skript/effects/EffMakeFly.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:make-goat-ram",
@@ -3467,8 +3467,8 @@
       "make %livingentities% (visible|not invisible)"
     ],
     "source": "ch/njol/skript/effects/EffInvisible.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:make-invulnerable",
@@ -3480,8 +3480,8 @@
       "make %entities% (not (invulnerable|invincible)|vulnerable|vincible)"
     ],
     "source": "ch/njol/skript/effects/EffInvulnerability.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:make-panda-roll",
@@ -3788,8 +3788,8 @@
       "(push|thrust|pull) %entities% (towards|away:away from) %location% [(at|with) [a] (speed|velocity|force) [of] %-number%]"
     ],
     "source": "ch/njol/skript/effects/EffPush.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:pvp",
@@ -3963,8 +3963,8 @@
       "make %entities% not silent"
     ],
     "source": "ch/njol/skript/effects/EffSilence.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:sort",
