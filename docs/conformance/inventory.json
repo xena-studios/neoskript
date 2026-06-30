@@ -13867,7 +13867,8 @@
       "attributetype"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:audience",
@@ -13922,7 +13923,8 @@
       "biome"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:block",
@@ -14225,7 +14227,8 @@
       "enchantment"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:enchantmentoffer",

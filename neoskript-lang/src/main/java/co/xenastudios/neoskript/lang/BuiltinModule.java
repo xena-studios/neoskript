@@ -121,6 +121,13 @@ public final class BuiltinModule {
                 "healreason", org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason.class));
         types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
                 "teleportcause", org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.class));
+        // Registry-backed types (lazy: the Registry is only touched at parse time, never at registration).
+        types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
+                "biome", org.bukkit.block.Biome.class, () -> org.bukkit.Registry.BIOME));
+        types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
+                "enchantment", org.bukkit.enchantments.Enchantment.class, () -> org.bukkit.Registry.ENCHANTMENT));
+        types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
+                "attributetype", org.bukkit.attribute.Attribute.class, () -> org.bukkit.Registry.ATTRIBUTE));
         Renderer.setTypeRegistry(types);
         BuiltinSerializers.registerAll();
     }
