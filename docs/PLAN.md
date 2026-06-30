@@ -106,7 +106,7 @@ neoskript/
 
 - **Phase 0 — Foundations** *(done)*: multi-module Gradle build, Paper plugin bootstrap, Folia-aware scheduler, CI, testkit scaffolding, API interface drafts. *Deliverable: empty plugin loads on Paper + Folia.*
 - **Phase 1 — Pipeline core** *(done)*: lexer → pattern-based parser → linker → tree-walking interpreter; argument-aware syntax API; scalar variables (local + global); string interpolation; `on join`/`on quit` events; `broadcast`, `send`, `set` effects; the `player` expression; script discovery + Bukkit event wiring. *Deliverable: real `.sk` scripts run end-to-end.*
-- **Phase 2 — Language breadth**: bulk of built-in syntaxes; variables with persistence; functions; conformance suite green on a growing corpus.
+- **Phase 2 — Language breadth** *(done)*: control-flow sections (`if`/`else if`/`else`, `while`, `loop … times`, `loop <values>`); conditions (equality, numeric comparisons, `is set`); arithmetic with precedence + parentheses; list variables with dynamic names; user functions with `return`; more effects (`add`/`remove`/`delete`, `message`, `stop`); more events (chat/death/break/place); flatfile variable persistence. *Deliverable: substantial scripts run; representative syntax coverage, growing against the corpus.*
 - **Phase 3 — Performance pass**: optimizer, method-handle resolution, parallel/incremental reload, benchmarks vs Skript.
 - **Phase 4 — New features + JIT**: prioritized features, optional ASM bytecode backend, profiler.
 - **Phase 5 — Polish**: docs site, addon API stabilization, public beta.

@@ -111,8 +111,14 @@ public final class ScriptLoader {
             Files.writeString(scriptsDir.resolve("example.sk"), """
                     # NeoSkript example script
                     on join:
+                        add 1 to {joins}
                         broadcast "%player% joined the server!"
                         send "Welcome to the server!" to player
+                        if {joins} is greater than 100:
+                            broadcast "That's over 100 joins!"
+
+                    on quit:
+                        broadcast "%player% left the server."
                     """, StandardCharsets.UTF_8);
             plugin.getLogger().info("Created scripts directory with an example script.");
         } catch (IOException e) {

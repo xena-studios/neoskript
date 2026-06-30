@@ -4,6 +4,7 @@ import co.xenastudios.neoskript.api.runtime.TriggerContext;
 import org.bukkit.event.Event;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -11,9 +12,10 @@ import java.util.Optional;
  * A basic single-threaded {@link TriggerContext}. Local variables live in a per-execution map;
  * global variables are read from and written to a shared map owned by the runtime.
  *
- * <p>Phase 3 will replace local-variable storage with parse-time-resolved indexed slots and globals
- * with the persistence-backed variable store; this implementation establishes the contract for the
- * Phase 1 interpreter.
+ * <p>List variables ({@code {name::index}}) are stored flat, keyed by their full resolved name; the
+ * {@code listLocal}/{@code listGlobal} accessors return the direct children of a prefix. Phase 3 will
+ * replace local-variable storage with parse-time-resolved indexed slots and globals with the
+ * persistence-backed variable store.
  */
 public final class SimpleTriggerContext implements TriggerContext {
 
@@ -42,11 +44,7 @@ public final class SimpleTriggerContext implements TriggerContext {
 
     @Override
     public void setLocal(String name, Object value) {
-        if (value == null) {
-            locals.remove(name);
-        } else {
-            locals.put(name, value);
-        }
+        put(locals, name, value);
     }
 
     @Override
@@ -56,10 +54,35 @@ public final class SimpleTriggerContext implements TriggerContext {
 
     @Override
     public void setGlobal(String name, Object value) {
+        put(globals, name, value);
+    }
+
+    @Override
+    public Map<String, Object> listLocal(String prefix) {
+        return directChildren(locals, prefix);
+    }
+
+    @Override
+    public Map<String, Object> listGlobal(String prefix) {
+        return directChildren(globals, prefix);
+    }
+
+    private static void put(Map<String, Object> map, String name, Object value) {
         if (value == null) {
-            globals.remove(name);
+            map.remove(name);
         } else {
-            globals.put(name, value);
+            map.put(name, value);
         }
+    }
+
+    private static Map<String, Object> directChildren(Map<String, Object> map, String prefix) {
+        Map<String, Object> children = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            String key = entry.getKey();
+            if (key.startsWith(prefix) && key.indexOf("::", prefix.length()) < 0) {
+                children.put(key, entry.getValue());
+            }
+        }
+        return children;
     }
 }

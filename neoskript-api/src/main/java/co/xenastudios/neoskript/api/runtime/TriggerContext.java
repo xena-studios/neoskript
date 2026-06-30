@@ -2,6 +2,7 @@ package co.xenastudios.neoskript.api.runtime;
 
 import org.bukkit.event.Event;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -53,4 +54,20 @@ public interface TriggerContext {
      * @param value the value to store; {@code null} clears the variable
      */
     void setGlobal(String name, Object value);
+
+    /**
+     * Returns the direct children of a local list variable ({@code {_name::*}}).
+     *
+     * @param prefix the list prefix, including the trailing {@code ::} (e.g. {@code "scores::"})
+     * @return a map of full child name to value (e.g. {@code "scores::1" -> 10}); empty if none
+     */
+    Map<String, Object> listLocal(String prefix);
+
+    /**
+     * Returns the direct children of a global list variable ({@code {name::*}}).
+     *
+     * @param prefix the list prefix, including the trailing {@code ::}
+     * @return a map of full child name to value; empty if none
+     */
+    Map<String, Object> listGlobal(String prefix);
 }

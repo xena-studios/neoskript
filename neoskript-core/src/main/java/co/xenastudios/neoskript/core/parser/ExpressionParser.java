@@ -1,11 +1,14 @@
 package co.xenastudios.neoskript.core.parser;
 
 import co.xenastudios.neoskript.api.syntax.Expression;
+import co.xenastudios.neoskript.core.expression.ArithmeticExpression;
+import co.xenastudios.neoskript.core.expression.FunctionCallExpression;
 import co.xenastudios.neoskript.core.expression.NumberLiteral;
 import co.xenastudios.neoskript.core.expression.VariableExpression;
 import co.xenastudios.neoskript.core.expression.VariableString;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry.ExpressionEntry;
+import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,17 +18,22 @@ import java.util.regex.Pattern;
 /**
  * Parses an expression substring into an {@link Expression}.
  *
- * <p>Resolution order: quoted strings, numeric literals, variables ({@code {...}}), then registered
- * expression patterns. Arguments captured from a registered pattern are parsed recursively.
+ * <p>Grammar (highest to lowest binding): primaries (literals, variables, function calls,
+ * parenthesised groups, registered patterns) → {@code * /} → {@code + -}. Arithmetic operators are
+ * left-associative. Quoted strings, {@code {...}} variables, and {@code (...)} groups are treated as
+ * atomic when locating top-level operators.
  */
 public final class ExpressionParser {
 
     private static final Pattern NUMBER = Pattern.compile("-?\\d+(\\.\\d+)?");
+    private static final Pattern FUNCTION_CALL = Pattern.compile("([A-Za-z_][A-Za-z0-9_]*)\\s*\\((.*)\\)");
 
     private final DefaultSyntaxRegistry registry;
+    private final FunctionRegistry functions;
 
-    public ExpressionParser(DefaultSyntaxRegistry registry) {
+    public ExpressionParser(DefaultSyntaxRegistry registry, FunctionRegistry functions) {
         this.registry = registry;
+        this.functions = functions;
     }
 
     /**
@@ -40,8 +48,40 @@ public final class ExpressionParser {
         if (s.isEmpty()) {
             throw new ParseException("Empty expression");
         }
+        return parseAdditive(s);
+    }
 
-        if (s.length() >= 2 && s.charAt(0) == '"' && s.charAt(s.length() - 1) == '"') {
+    private Expression<?> parseAdditive(String s) {
+        int op = findTopLevelOperator(s, "+-");
+        if (op >= 0) {
+            Expression<?> left = parseAdditive(s.substring(0, op).trim());
+            Expression<?> right = parseMultiplicative(s.substring(op + 1).trim());
+            return new ArithmeticExpression(left, s.charAt(op), right);
+        }
+        return parseMultiplicative(s);
+    }
+
+    private Expression<?> parseMultiplicative(String s) {
+        int op = findTopLevelOperator(s, "*/");
+        if (op >= 0) {
+            Expression<?> left = parseMultiplicative(s.substring(0, op).trim());
+            Expression<?> right = parsePrimary(s.substring(op + 1).trim());
+            return new ArithmeticExpression(left, s.charAt(op), right);
+        }
+        return parsePrimary(s);
+    }
+
+    private Expression<?> parsePrimary(String input) {
+        String s = input.trim();
+        if (s.isEmpty()) {
+            throw new ParseException("Empty expression");
+        }
+
+        if (s.charAt(0) == '(' && isWrapped(s)) {
+            return parseAdditive(s.substring(1, s.length() - 1).trim());
+        }
+
+        if (s.charAt(0) == '"' && s.charAt(s.length() - 1) == '"') {
             return VariableString.parse(s.substring(1, s.length() - 1), this);
         }
 
@@ -49,8 +89,15 @@ public final class ExpressionParser {
             return new NumberLiteral(Double.parseDouble(s));
         }
 
-        if (s.length() >= 2 && s.charAt(0) == '{' && s.charAt(s.length() - 1) == '}') {
-            return VariableExpression.of(s.substring(1, s.length() - 1));
+        if (s.charAt(0) == '{' && s.charAt(s.length() - 1) == '}') {
+            return VariableExpression.parse(s.substring(1, s.length() - 1), this);
+        }
+
+        var functionMatch = FUNCTION_CALL.matcher(s);
+        if (functionMatch.matches()) {
+            String name = functionMatch.group(1);
+            List<Expression<?>> args = parseArgumentList(functionMatch.group(2));
+            return new FunctionCallExpression(name, args, functions);
         }
 
         for (ExpressionEntry entry : registry.expressions()) {
@@ -76,5 +123,96 @@ public final class ExpressionParser {
             args.add(capture == null ? null : parse(capture));
         }
         return args;
+    }
+
+    private List<Expression<?>> parseArgumentList(String argsText) {
+        List<Expression<?>> args = new ArrayList<>();
+        for (String part : splitTopLevel(argsText, ',')) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                args.add(parse(trimmed));
+            }
+        }
+        return args;
+    }
+
+    /** Finds the rightmost top-level (depth-0, outside quotes) operator from {@code ops}, or -1. */
+    private static int findTopLevelOperator(String s, String ops) {
+        int depth = 0;
+        boolean inQuotes = false;
+        int result = -1;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (inQuotes) {
+                // skip
+            } else if (c == '(' || c == '{') {
+                depth++;
+            } else if (c == ')' || c == '}') {
+                depth--;
+            } else if (depth == 0 && ops.indexOf(c) >= 0) {
+                if ((c == '-' || c == '+') && isUnaryPosition(s, i)) {
+                    continue;
+                }
+                result = i;
+            }
+        }
+        return result;
+    }
+
+    private static boolean isUnaryPosition(String s, int index) {
+        for (int i = index - 1; i >= 0; i--) {
+            char c = s.charAt(i);
+            if (Character.isWhitespace(c)) {
+                continue;
+            }
+            return "+-*/(".indexOf(c) >= 0;
+        }
+        return true;
+    }
+
+    /** True if the whole string is one parenthesised group, e.g. {@code (a + b)}. */
+    private static boolean isWrapped(String s) {
+        if (s.length() < 2 || s.charAt(0) != '(' || s.charAt(s.length() - 1) != ')') {
+            return false;
+        }
+        int depth = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+                if (depth == 0 && i != s.length() - 1) {
+                    return false;
+                }
+            }
+        }
+        return depth == 0;
+    }
+
+    private static List<String> splitTopLevel(String s, char separator) {
+        List<String> parts = new ArrayList<>();
+        int depth = 0;
+        boolean inQuotes = false;
+        int start = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (inQuotes) {
+                // skip
+            } else if (c == '(' || c == '{') {
+                depth++;
+            } else if (c == ')' || c == '}') {
+                depth--;
+            } else if (c == separator && depth == 0) {
+                parts.add(s.substring(start, i));
+                start = i + 1;
+            }
+        }
+        parts.add(s.substring(start));
+        return parts;
     }
 }

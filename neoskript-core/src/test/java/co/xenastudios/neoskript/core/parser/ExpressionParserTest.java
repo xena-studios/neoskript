@@ -4,6 +4,7 @@ import co.xenastudios.neoskript.api.syntax.Expression;
 import co.xenastudios.neoskript.core.expression.NumberLiteral;
 import co.xenastudios.neoskript.core.expression.VariableExpression;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry;
+import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 import co.xenastudios.neoskript.core.runtime.SimpleTriggerContext;
 import org.junit.jupiter.api.Test;
 
@@ -17,7 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ExpressionParserTest {
 
-    private final ExpressionParser parser = new ExpressionParser(new DefaultSyntaxRegistry());
+    private final ExpressionParser parser =
+            new ExpressionParser(new DefaultSyntaxRegistry(), new FunctionRegistry());
 
     @Test
     void parsesNumberLiterals() {
@@ -28,8 +30,7 @@ class ExpressionParserTest {
 
     @Test
     void parsesStringLiterals() {
-        Expression<?> expr = parser.parse("\"hello world\"");
-        assertEquals("hello world", expr.getSingle(context()));
+        assertEquals("hello world", parser.parse("\"hello world\"").getSingle(context()));
     }
 
     @Test
@@ -47,8 +48,22 @@ class ExpressionParserTest {
     void interpolatesExpressionsInStrings() {
         SimpleTriggerContext ctx = context();
         ctx.setLocal("x", 5.0);
-        Expression<?> expr = parser.parse("\"x is %{_x}%!\"");
-        assertEquals("x is 5!", expr.getSingle(ctx));
+        assertEquals("x is 5!", parser.parse("\"x is %{_x}%!\"").getSingle(ctx));
+    }
+
+    @Test
+    void evaluatesArithmeticWithPrecedence() {
+        assertEquals(14.0, parser.parse("2 + 3 * 4").getSingle(context()));
+        assertEquals(20.0, parser.parse("(2 + 3) * 4").getSingle(context()));
+        assertEquals(5.0, parser.parse("10 - 2 - 3").getSingle(context()));
+        assertEquals(-5.0, parser.parse("-5").getSingle(context()));
+    }
+
+    @Test
+    void arithmeticReadsVariables() {
+        SimpleTriggerContext ctx = context();
+        ctx.setLocal("x", 4.0);
+        assertEquals(9.0, parser.parse("{_x} + 5").getSingle(ctx));
     }
 
     @Test

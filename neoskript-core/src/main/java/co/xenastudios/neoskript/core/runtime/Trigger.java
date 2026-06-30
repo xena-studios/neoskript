@@ -1,13 +1,12 @@
 package co.xenastudios.neoskript.core.runtime;
 
 import co.xenastudios.neoskript.api.runtime.TriggerContext;
-import co.xenastudios.neoskript.api.syntax.Effect;
 
 import java.util.List;
 
 /**
  * A parsed, executable event handler: the linker's output for one {@code on <event>:} block. Holds
- * the Bukkit event class it listens for and the flat list of effects to run when it fires.
+ * the Bukkit event class it listens for and the tree of statements to run when it fires.
  *
  * <p>The event class is kept as a raw {@link Class} so core stays free of hard Bukkit imports; the
  * platform layer casts it when registering the listener.
@@ -16,12 +15,12 @@ public final class Trigger {
 
     private final String eventName;
     private final Class<?> eventClass;
-    private final List<Effect> effects;
+    private final List<Statement> statements;
 
-    public Trigger(String eventName, Class<?> eventClass, List<Effect> effects) {
+    public Trigger(String eventName, Class<?> eventClass, List<Statement> statements) {
         this.eventName = eventName;
         this.eventClass = eventClass;
-        this.effects = List.copyOf(effects);
+        this.statements = List.copyOf(statements);
     }
 
     /** @return the event name as written in the script (e.g. {@code "join"}) */
@@ -34,19 +33,21 @@ public final class Trigger {
         return eventClass;
     }
 
-    /** @return the effects to run, in order */
-    public List<Effect> effects() {
-        return effects;
+    /** @return the top-level statements, in order */
+    public List<Statement> statements() {
+        return statements;
     }
 
     /**
-     * Runs this trigger's effects against the given context.
+     * Runs this trigger's statements against the given context, honouring {@code stop}.
      *
      * @param ctx the execution context
      */
     public void execute(TriggerContext ctx) {
-        for (Effect effect : effects) {
-            effect.execute(ctx);
+        try {
+            IfSection.runAll(statements, ctx);
+        } catch (StopSignal ignored) {
+            // `stop` aborts the remainder of the trigger.
         }
     }
 }
