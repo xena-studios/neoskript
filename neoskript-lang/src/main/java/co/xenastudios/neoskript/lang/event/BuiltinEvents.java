@@ -20,7 +20,22 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
+import org.bukkit.event.block.BlockBurnEvent;
+import org.bukkit.event.block.BlockGrowEvent;
+import org.bukkit.event.block.BlockIgniteEvent;
+import org.bukkit.event.block.BlockRedstoneEvent;
+import org.bukkit.event.enchantment.EnchantItemEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityBreedEvent;
+import org.bukkit.event.entity.EntityShootBowEvent;
+import org.bukkit.event.entity.EntityTargetEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerBucketEmptyEvent;
+import org.bukkit.event.player.PlayerBucketFillEvent;
+import org.bukkit.event.player.PlayerPortalEvent;
+import org.bukkit.event.server.ServerLoadEvent;
+import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.event.world.WorldInitEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
@@ -109,5 +124,21 @@ public final class BuiltinEvents {
         events.register(ChunkLoadEvent.class, "chunk load");
         events.register(WorldSaveEvent.class, "world save");
         events.register(LightningStrikeEvent.class, "lightning", "lightning strike");
+
+        events.register(EnchantItemEvent.class, "enchant", "item enchant");
+        events.register(PlayerPortalEvent.class, "portal");
+        events.register(PlayerBucketEmptyEvent.class, "bucket empty", "empty bucket");
+        events.register(PlayerBucketFillEvent.class, "bucket fill", "fill bucket");
+        events.register(BlockRedstoneEvent.class, "redstone", "redstone change");
+        events.register(BlockIgniteEvent.class, "block ignite");
+        events.register(BlockBurnEvent.class, "block burn");
+        events.register(BlockGrowEvent.class, "block grow", "grow");
+        events.register(ChunkUnloadEvent.class, "chunk unload");
+        events.register(WorldInitEvent.class, "world init");
+        events.register(EntityShootBowEvent.class, "shoot bow", "bow shoot");
+        events.register(EntityBreedEvent.class, "breed", "breeding");
+        events.register(EntityTargetEvent.class, "target", "entity target");
+        events.register(ServerLoadEvent.class, "server load", "server start");
+        events.register(InventoryDragEvent.class, "inventory drag");
     }
 }

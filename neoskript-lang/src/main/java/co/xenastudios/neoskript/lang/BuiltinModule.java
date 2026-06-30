@@ -41,6 +41,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Tameable;
+import org.bukkit.util.Vector;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.inventory.ItemStack;
@@ -154,6 +156,10 @@ public final class BuiltinModule {
         });
         registry.registerExpression("now", Object.class,
                 arguments -> new ComputedExpression(ctx -> (double) System.currentTimeMillis()));
+        registry.registerExpression("velocity of %entity%", Object.class, arguments -> {
+            Expression<?> source = arguments.get(0);
+            return new ComputedExpression(ctx -> source.getSingle(ctx) instanceof Entity e ? e.getVelocity() : null);
+        });
         registry.registerExpression("type of %object%", Object.class, arguments -> {
             Expression<?> source = arguments.get(0);
             return new ComputedExpression(ctx -> {
@@ -497,6 +503,15 @@ public final class BuiltinModule {
         });
         registry.registerCondition("%world% is raining", a -> worldIs(a.get(0), true));
         registry.registerCondition("%world% (is not raining|isn't raining|is clear)", a -> worldIs(a.get(0), false));
+        registry.registerCondition("%player% has played before", a -> playerIs(a.get(0), Player::hasPlayedBefore, true));
+        registry.registerCondition("%object% is tamed", a -> {
+            Expression<?> target = a.get(0);
+            return ctx -> target.getSingle(ctx) instanceof Tameable tameable && tameable.isTamed();
+        });
+        registry.registerCondition("%object% is leashed", a -> {
+            Expression<?> target = a.get(0);
+            return ctx -> target.getSingle(ctx) instanceof LivingEntity entity && entity.isLeashed();
+        });
         registry.registerCondition("%player% is wearing %object%", a -> {
             Expression<?> target = a.get(0);
             Expression<?> item = a.get(1);
@@ -678,6 +693,15 @@ public final class BuiltinModule {
             return ctx -> {
                 if (target.getSingle(ctx) instanceof Entity entity) {
                     entity.setFireTicks(0);
+                }
+            };
+        });
+        registry.registerEffect("set velocity of %entity% to %vector%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> velocity = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Entity entity && velocity.getSingle(ctx) instanceof Vector vec) {
+                    entity.setVelocity(vec);
                 }
             };
         });
