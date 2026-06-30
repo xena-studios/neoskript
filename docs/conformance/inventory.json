@@ -13901,7 +13901,8 @@
       "bannerpatterntype"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:billboard",
@@ -13912,7 +13913,8 @@
       "billboard"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/DisplayModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:biome",
@@ -13969,7 +13971,8 @@
       "bukkitparticle"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/ParticleModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:byte",
@@ -14569,7 +14572,8 @@
       "inventoryclosereason"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:inventoryholder",
@@ -14614,7 +14618,8 @@
       "itemdisplaytransform"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/DisplayModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:itementity",
@@ -14636,7 +14641,8 @@
       "itemflag"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:itemstack",
@@ -14773,7 +14779,8 @@
       "moonphase"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:nameable",
@@ -14907,7 +14914,8 @@
       "potionaction"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/PotionModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:potion-effect-event-cause",
@@ -14918,7 +14926,8 @@
       "potioncause"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/PotionModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:potion-effect-type",
@@ -14929,7 +14938,8 @@
       "potioneffecttype"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/PotionModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:potion-effect-type-category",
@@ -14940,7 +14950,8 @@
       "potioneffecttypecategory"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/PotionModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:projectile",
@@ -14984,7 +14995,8 @@
       "quitreason"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:region",
@@ -15006,7 +15018,8 @@
       "resourcepackstate"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:respawnreason",
@@ -15017,7 +15030,8 @@
       "respawnreason"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:scalableparticle",
@@ -15165,7 +15179,8 @@
       "textalignment"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/DisplayModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:textcomponent",
@@ -15220,7 +15235,8 @@
       "transformreason"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:unleashreason",
@@ -15231,7 +15247,8 @@
       "unleashreason"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:uuid",
@@ -15334,7 +15351,8 @@
       "wolfvariant"
     ],
     "source": "ch/njol/skript/entity/WolfData.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:world",
