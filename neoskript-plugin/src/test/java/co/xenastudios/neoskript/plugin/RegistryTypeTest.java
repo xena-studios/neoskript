@@ -63,7 +63,22 @@ class RegistryTypeTest {
         assertNotNull(inventoryType, "inventorytype registered");
         assertTrue(inventoryType.parse("chest").isPresent(), "inventory type 'chest' should parse");
 
+        // Newer registry types: verify by round-tripping a real key pulled from the live registry,
+        // so the test does not depend on guessing version-specific key names.
+        checkRegistry("damagetype", org.bukkit.Registry.DAMAGE_TYPE);
+        checkRegistry("potiontype", org.bukkit.Registry.POTION);
+        checkRegistry("structuretype", org.bukkit.Registry.STRUCTURE_TYPE);
+        checkRegistry("musicinstrument", org.bukkit.Registry.INSTRUMENT);
+
         // an unknown key parses to empty rather than throwing
         assertTrue(biome.parse("not_a_real_biome").isEmpty());
+    }
+
+    private void checkRegistry(String codeName, org.bukkit.Registry<? extends org.bukkit.Keyed> registry) {
+        Type<?> type = Renderer.typeRegistry().byCodeName(codeName);
+        assertNotNull(type, codeName + " type registered");
+        org.bukkit.Keyed first = registry.iterator().next();
+        String keyPath = first.getKey().getKey();
+        assertTrue(type.parse(keyPath).isPresent(), codeName + " should parse its own key '" + keyPath + "'");
     }
 }

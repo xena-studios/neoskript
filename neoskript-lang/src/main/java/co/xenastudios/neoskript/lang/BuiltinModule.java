@@ -141,6 +141,15 @@ public final class BuiltinModule {
                 () -> org.bukkit.Registry.VILLAGER_PROFESSION));
         types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
                 "villagertype", org.bukkit.entity.Villager.Type.class, () -> org.bukkit.Registry.VILLAGER_TYPE));
+        types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
+                "damagetype", org.bukkit.damage.DamageType.class, () -> org.bukkit.Registry.DAMAGE_TYPE));
+        types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
+                "potiontype", org.bukkit.potion.PotionType.class, () -> org.bukkit.Registry.POTION));
+        types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
+                "structuretype", org.bukkit.generator.structure.StructureType.class,
+                () -> org.bukkit.Registry.STRUCTURE_TYPE));
+        types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
+                "musicinstrument", org.bukkit.MusicInstrument.class, () -> org.bukkit.Registry.INSTRUMENT));
         Renderer.setTypeRegistry(types);
         BuiltinSerializers.registerAll();
     }

@@ -14148,7 +14148,8 @@
       "damagetype"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/DamageSourceModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:date",
@@ -15116,7 +15117,8 @@
       "structuretype"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:teleportcause",
