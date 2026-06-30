@@ -3,9 +3,11 @@ package co.xenastudios.neoskript.core.parser;
 import co.xenastudios.neoskript.api.syntax.Condition;
 import co.xenastudios.neoskript.api.syntax.Expression;
 import co.xenastudios.neoskript.core.expression.FunctionCallExpression;
+import co.xenastudios.neoskript.core.expression.VariableExpression;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry;
 import co.xenastudios.neoskript.core.runtime.CommandDefinition;
 import co.xenastudios.neoskript.core.runtime.CommandRegistry;
+import co.xenastudios.neoskript.core.runtime.DefaultVariableStatement;
 import co.xenastudios.neoskript.core.runtime.DelayStatement;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry.ConditionEntry;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry.EffectEntry;
@@ -102,6 +104,8 @@ public final class ScriptParser {
                 parseFunction(node);
             } else if (lower.startsWith("command ") && node.content().endsWith(":")) {
                 parseCommand(node);
+            } else if (lower.equals("variables:")) {
+                parseVariables(node).ifPresent(triggers::add);
             } else {
                 throw new ParseException("Expected an event, function, or command, got: " + node.content(), node.line());
             }
@@ -162,6 +166,24 @@ public final class ScriptParser {
         }
         functions.register(
                 new FunctionDefinition(name, parameters, defaults, parseStatements(node.children(), false)));
+    }
+
+    private Optional<Trigger> parseVariables(Node node) {
+        List<Statement> defaults = new ArrayList<>();
+        for (Node entry : node.children()) {
+            int equals = entry.content().indexOf('=');
+            if (equals < 0) {
+                throw new ParseException("Expected '{var} = value' in variables block: " + entry.content(),
+                        entry.line());
+            }
+            Expression<?> variable = expressions.parse(entry.content().substring(0, equals).trim());
+            if (!(variable instanceof VariableExpression target)) {
+                throw new ParseException("Left side of a default must be a variable: " + entry.content(), entry.line());
+            }
+            Expression<?> value = expressions.parse(entry.content().substring(equals + 1).trim());
+            defaults.add(new DefaultVariableStatement(target, value));
+        }
+        return defaults.isEmpty() ? Optional.empty() : Optional.of(Trigger.onLoad(defaults));
     }
 
     private void parseCommand(Node node) {
