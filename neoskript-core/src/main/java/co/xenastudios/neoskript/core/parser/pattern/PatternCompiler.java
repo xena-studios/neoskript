@@ -129,6 +129,12 @@ public final class PatternCompiler {
                 && (Character.isLetterOrDigit(pattern.charAt(i)) || pattern.charAt(i) == '_')) {
             i++;
         }
+        // If the first word is immediately followed (no space) by an optional group or alternation,
+        // its spelling varies (e.g. `ender[ ]chest`, `fall[en]`, `x[-coordinate]`), so it can't be a
+        // reliable index key — treat it as a wildcard so it is always a parse candidate.
+        if (i < pattern.length() && (pattern.charAt(i) == '[' || pattern.charAt(i) == '(')) {
+            return null;
+        }
         return i > start ? pattern.substring(start, i).toLowerCase(java.util.Locale.ROOT) : null;
     }
 

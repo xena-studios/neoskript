@@ -5,13 +5,10 @@ inventory until fixed, so coverage stays honest.
 
 ## Open
 
-- **First-word optional suffix in patterns** (`PatternCompiler`/indexed dispatch): a pattern whose
-  first literal carries an optional suffix (e.g. `alphabetical[ly] sorted ...`) is bucketed under the
-  truncated word (`alphabetical`), so input `alphabetically ...` misses the bucket. Workaround: spell
-  the first word out or start the pattern with an alternation. Low impact; fix is to index all
-  first-word variants.
 
 ## Fixed during the conformance effort
+
+- **First-word optional suffix** (`PatternCompiler.leadingLiteral`): a pattern whose first word carried an optional suffix or alternation (`ender[ ]chest`, `fall[en]`, `x[-coordinate]`) was indexed under the truncated word, so inputs like `enderchest` missed the bucket. Fixed by treating such first words as wildcards.
 
 - **Distance / infix `and`** (`ExpressionParser`): `distance between A and B` was mis-split on its
   ` and ` by list-literal parsing. Fixed — when a split comes only from `and`/`or` (no top-level

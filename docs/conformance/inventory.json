@@ -8368,8 +8368,8 @@
       "%livingentities%'[s] (ai|artificial intelligence)"
     ],
     "source": "ch/njol/skript/expressions/ExprAI.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:entity-attribute",
@@ -8879,8 +8879,8 @@
       "%players%'[s] fl(y[ing]|ight) (mode|state)"
     ],
     "source": "ch/njol/skript/expressions/ExprFlightMode.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:food-level",
@@ -9058,8 +9058,8 @@
       "%livingentities%'[s] (gliding|glider) [state]"
     ],
     "source": "ch/njol/skript/expressions/ExprGlidingState.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:glowing",
@@ -9071,8 +9071,8 @@
       "%entities%'[s] glowing"
     ],
     "source": "ch/njol/skript/expressions/ExprGlowing.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:gravity",
@@ -9084,8 +9084,8 @@
       "%entities%'[s] gravity"
     ],
     "source": "ch/njol/skript/expressions/ExprGravity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:group",
@@ -9157,8 +9157,8 @@
       "%livingentities%'[s] (head|eye[s]) [location[s]]"
     ],
     "source": "ch/njol/skript/expressions/ExprEyeLocation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:heal-amount",
@@ -9298,8 +9298,8 @@
       "%blocks%'[s] humidit(y|ies)"
     ],
     "source": "ch/njol/skript/expressions/ExprHumidity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:indices-of-list",
@@ -9845,8 +9845,8 @@
       "%players%'[s] [last] resource pack response[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprLastResourcePackResponse.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:last-spawned-entity",
@@ -9926,8 +9926,8 @@
       "%players%'[s] level progress"
     ],
     "source": "ch/njol/skript/expressions/ExprLevelProgress.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:light-level",
@@ -10487,8 +10487,8 @@
       "%worlds%'[s] (lunar|moon) phase[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprMoonPhase.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:moved-blocks",
@@ -12089,8 +12089,8 @@
       "%blocks%'[s] temperature[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprTemperature.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:ternary",
@@ -12587,8 +12587,8 @@
       "%vectors%'[s] (vector|standard|normal) length[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorLength.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-location-vector-offset",
@@ -12650,8 +12650,8 @@
       "%vectors%'[s] squared length[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorSquaredLength.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-vector-between-locations",
@@ -12956,8 +12956,8 @@
       "[world] environment of %worlds%"
     ],
     "source": "ch/njol/skript/expressions/ExprWorldEnvironment.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:world-from-name",

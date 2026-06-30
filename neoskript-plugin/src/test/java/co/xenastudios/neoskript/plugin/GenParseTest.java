@@ -40,30 +40,50 @@ class GenParseTest {
 
                 command /genparse:
                     trigger:
+                        set {_x} to ai of player
+                        set {_x} to gliding of player
+                        set {_x} to head of player
+                        set {_x} to lunar phase of player
+                        set {_x} to vector length of player
+                        set {_x} to resource pack response of player
+                        set {_x} to environment of player
                         set {_x} to active item of player
+                        set {_x} to altitude of player
                         set {_x} to anvil text input of player
                         set {_x} to arrow knockback strength of player
                         set {_x} to arrow pierce level of player
                         set {_x} to attack cooldown of player
                         set {_x} to bed location of player
-                        set {_x} to world border center of player
-                        set {_x} to compass target of player
-                        set {_x} to world border damage amount of player
-                        set {_x} to world border damage buffer of player
+                        set {_x} to billboard of player
                         set {_x} to causing entity of player
+                        set {_x} to compass target of player
                         set {_x} to damage location of player
                         set {_x} to damage type of player
-                        set {_x} to direct entity of player
-                        set {_x} to food exhaustion of player
-                        set {_x} to source location of player
                         set {_x} to difficulty of player
-                        set {_x} to billboard of player
-                        set {_x} to teleport duration of player
-                        set {_x} to view range of player
-                        set {_x} to uuid of dropped item owner of player
-                        set {_x} to uuid of dropped item thrower of player
+                        set {_x} to difficulty of player
+                        set {_x} to direct entity of player
                         set {_x} to enchantment cost of player
                         set {_x} to ender chest of player
+                        set {_x} to enderchest of player
+                        set {_x} to exhaustion of player
+                        set {_x} to fall distance of player
+                        set {_x} to fly mode of player
+                        set {_x} to food exhaustion of player
+                        set {_x} to glowing of player
+                        set {_x} to gravity of player
+                        set {_x} to humidity of player
+                        set {_x} to level progress of player
+                        set {_x} to saturation of player
+                        set {_x} to source location of player
+                        set {_x} to squared length of player
+                        set {_x} to teleport duration of player
+                        set {_x} to temperature of player
+                        set {_x} to uuid of dropped item owner of player
+                        set {_x} to uuid of dropped item thrower of player
+                        set {_x} to view range of player
+                        set {_x} to world border center of player
+                        set {_x} to world border damage amount of player
+                        set {_x} to world border damage buffer of player
                         if player is blocking:
                             set {_y} to 1
                         if player is invisible:
