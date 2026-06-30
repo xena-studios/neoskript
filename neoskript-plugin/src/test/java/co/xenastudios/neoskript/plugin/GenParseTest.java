@@ -193,9 +193,13 @@ class GenParseTest {
                             set {_y} to 1
                         if player can pick up items:
                             set {_y} to 1
+                        if player can see chat colors:
+                            set {_y} to 1
                         if player has AI:
                             set {_y} to 1
                         if player has a resource pack loaded:
+                            set {_y} to 1
+                        if player has been stared at:
                             set {_y} to 1
                         if player is a slime chunk:
                             set {_y} to 1
@@ -204,6 +208,10 @@ class GenParseTest {
                         if player is dashing:
                             set {_y} to 1
                         if player is from a mob spawner:
+                            set {_y} to 1
+                        if player is in love:
+                            set {_y} to 1
+                        if player is in open water:
                             set {_y} to 1
                         if player is instant:
                             set {_y} to 1

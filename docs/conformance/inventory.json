@@ -206,8 +206,8 @@
       "%players% can('t| not) see chat colo[u]r[s|ing]"
     ],
     "source": "ch/njol/skript/conditions/CondChatColors.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:can-see-messages",
@@ -394,8 +394,8 @@
       "%livingentities% (don't|doesn't|do not|does not) have been stared at"
     ],
     "source": "ch/njol/skript/conditions/CondEndermanStaredAt.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:entity-is-in-liquid",
@@ -1134,8 +1134,8 @@
       "%entities% (isn't|aren't|is not|are not) in open water[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/fishing/elements/conditions/CondIsInOpenWater.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-flammable",
@@ -1268,8 +1268,8 @@
       "%livingentities% (isn't|aren't|is not|are not) in lov(e|ing) [state|mode]"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/conditions/CondIsInLove.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-incendiary",
