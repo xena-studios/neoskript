@@ -36,4 +36,33 @@ public interface Expression<T> extends SyntaxElement {
      * @return {@code true} if this expression always yields at most one value
      */
     boolean isSingle();
+
+    /**
+     * Declares whether this expression can be changed in the given mode, and with what value type(s).
+     *
+     * <p>Returning {@code null} (the default) means the expression is read-only for that mode. A
+     * non-null array lists the accepted delta element types ({@code Object.class} for "anything");
+     * an empty array means the mode is accepted but takes no delta (e.g. {@link ChangeMode#DELETE}).
+     *
+     * @param mode the change mode
+     * @return the accepted delta types, or {@code null} if this mode is not supported
+     */
+    default Class<?>[] acceptChange(ChangeMode mode) {
+        return null;
+    }
+
+    /**
+     * Applies a change to this expression. Only called for modes that {@link #acceptChange(ChangeMode)}
+     * accepts.
+     *
+     * @param ctx   the current execution context
+     * @param delta the new/added/removed values, or {@code null} for {@link ChangeMode#DELETE}/
+     *              {@link ChangeMode#RESET}
+     * @param mode  the change mode
+     * @throws UnsupportedOperationException if this expression does not support being changed
+     */
+    default void change(TriggerContext ctx, Object[] delta, ChangeMode mode) {
+        throw new UnsupportedOperationException(
+                getClass().getSimpleName() + " cannot be changed (" + mode + ")");
+    }
 }
