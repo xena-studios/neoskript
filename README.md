@@ -6,9 +6,23 @@ Paper + Folia on Java 25, with a clean, extensible API.
 NeoSkript runs existing `.sk` scripts unchanged while being dramatically faster to load and execute,
 Folia-safe by construction, and designed so addon authors are first-class users.
 
-> **Status:** Phase 4 (New features). Built-in profiler, scheduled `every`/`on load` triggers, a
-> random expression, and an execution-engine seam with hot-path detection, on top of Phases 1–3. See
-> [`docs/PLAN.md`](docs/PLAN.md) for the full plan and roadmap.
+> **Status:** Phases 0–5 of the roadmap are implemented. Scripts parse and run end-to-end with
+> control flow, variables (including lists + persistence), functions, scheduled and load triggers, a
+> profiler, an indexed/optimizing parser, a `/neoskript` command, addon discovery, and generated
+> docs. See [`docs/PLAN.md`](docs/PLAN.md) for the roadmap and [`docs/SYNTAX.md`](docs/SYNTAX.md) for
+> the syntax guide.
+
+## Quick example
+
+```sk
+on join:
+    add 1 to {joins}
+    broadcast "%player% joined! (%{joins}% total)"
+    send "Welcome to the server!" to player
+
+every 5 minutes:
+    broadcast "Still going strong."
+```
 
 ## Modules
 
@@ -31,6 +45,19 @@ Requires JDK 25 (the build uses a Java 25 toolchain).
 
 The distributable plugin jar is produced at
 `neoskript-plugin/build/libs/neoskript-plugin-<version>.jar`.
+
+## Documentation
+
+- [`docs/SYNTAX.md`](docs/SYNTAX.md) — the language guide (events, effects, conditions, control flow,
+  variables, functions, commands).
+- [`docs/PLAN.md`](docs/PLAN.md) — architecture and roadmap.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — building, project layout, and writing addons.
+
+## Addons
+
+NeoSkript exposes a typed SPI (`neoskript-api`). Implement `NeoSkriptAddon` and either ship it via
+`ServiceLoader` or register it from a dependent plugin's `onEnable`. See
+[`CONTRIBUTING.md`](CONTRIBUTING.md#writing-an-addon).
 
 ## License
 

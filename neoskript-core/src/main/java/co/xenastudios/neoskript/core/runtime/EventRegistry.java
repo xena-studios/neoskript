@@ -39,6 +39,11 @@ public final class EventRegistry {
         return Optional.ofNullable(byName.get(normalize(name)));
     }
 
+    /** @return all registered aliases mapped to their event class (a copy) */
+    public Map<String, Class<?>> aliases() {
+        return Map.copyOf(byName);
+    }
+
     private static String normalize(String name) {
         return name.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
     }

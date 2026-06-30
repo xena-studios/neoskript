@@ -36,8 +36,19 @@ public final class NeoSkriptCommand implements CommandExecutor {
         return switch (args[0].toLowerCase(java.util.Locale.ROOT)) {
             case "reload" -> reload(sender);
             case "profile" -> profile(sender, args);
+            case "docs" -> docs(sender);
             default -> status(sender);
         };
+    }
+
+    private boolean docs(CommandSender sender) {
+        try {
+            var file = plugin.writeSyntaxDocs();
+            sender.sendMessage(Component.text("Wrote syntax reference to " + file + ".", NamedTextColor.GREEN));
+        } catch (java.io.IOException e) {
+            sender.sendMessage(Component.text("Failed to write docs: " + e.getMessage(), NamedTextColor.RED));
+        }
+        return true;
     }
 
     private boolean reload(CommandSender sender) {

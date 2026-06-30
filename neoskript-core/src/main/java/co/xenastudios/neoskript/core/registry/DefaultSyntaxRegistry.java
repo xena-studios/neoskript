@@ -76,6 +76,25 @@ public final class DefaultSyntaxRegistry implements SyntaxRegistry {
         return expressions.candidates(firstWord(input));
     }
 
+    /** @return all registered effects, in registration order (for documentation/inspection) */
+    public List<EffectEntry> allEffects() {
+        return expressionsView(effects.all);
+    }
+
+    /** @return all registered conditions, in registration order */
+    public List<ConditionEntry> allConditions() {
+        return expressionsView(conditions.all);
+    }
+
+    /** @return all registered expressions, in registration order */
+    public List<ExpressionEntry> allExpressions() {
+        return expressionsView(expressions.all);
+    }
+
+    private static <E> List<E> expressionsView(List<E> entries) {
+        return List.copyOf(entries);
+    }
+
     @Override
     public int size() {
         return counter;
@@ -100,6 +119,7 @@ public final class DefaultSyntaxRegistry implements SyntaxRegistry {
     private static final class Index<E> {
         private final Map<String, List<E>> byWord = new HashMap<>();
         private final List<E> wildcard = new ArrayList<>();
+        private final List<E> all = new ArrayList<>();
         private final Comparator<E> byOrder;
         private boolean hasWildcard;
 
@@ -108,6 +128,7 @@ public final class DefaultSyntaxRegistry implements SyntaxRegistry {
         }
 
         void add(E entry, String firstLiteral) {
+            all.add(entry);
             if (firstLiteral == null) {
                 wildcard.add(entry);
                 hasWildcard = true;
