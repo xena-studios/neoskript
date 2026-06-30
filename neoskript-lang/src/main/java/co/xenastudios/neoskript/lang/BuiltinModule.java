@@ -94,6 +94,25 @@ public final class BuiltinModule {
         types.register(new ItemType());
         types.register(new co.xenastudios.neoskript.lang.type.ColourType());
         types.register(new co.xenastudios.neoskript.lang.type.DateType());
+        // Generic enum-backed types (reflective, version-robust). Code names follow Skript's.
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "entitytype", org.bukkit.entity.EntityType.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "damagecause", org.bukkit.event.entity.EntityDamageEvent.DamageCause.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "clicktype", org.bukkit.event.inventory.ClickType.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "inventoryaction", org.bukkit.event.inventory.InventoryAction.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "weathertype", org.bukkit.WeatherType.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "difficulty", org.bukkit.Difficulty.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "blockface", org.bukkit.block.BlockFace.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "equipmentslot", org.bukkit.inventory.EquipmentSlot.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "spawnreason", org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.class));
         Renderer.setTypeRegistry(types);
         BuiltinSerializers.registerAll();
     }
