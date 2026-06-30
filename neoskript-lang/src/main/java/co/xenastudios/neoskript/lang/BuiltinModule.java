@@ -925,6 +925,21 @@ public final class BuiltinModule {
                 }
             };
         });
+        registry.registerEffect("stop [all] sound[s] (for|to) %player%", arguments ->
+                playerEffect(arguments.get(0), Player::stopAllSounds));
+        registry.registerEffect("(clear|reset) [the] title[s] (of|for|from) %player%", arguments ->
+                playerEffect(arguments.get(0), Player::resetTitle));
+        registry.registerEffect("(force %player% to (say|chat)|make %player% (say|chat)) %string%", arguments -> {
+            Expression<?> a = arguments.get(0);
+            Expression<?> b = arguments.get(1);
+            Expression<?> message = arguments.get(2);
+            return ctx -> {
+                Object target = a != null ? a.getSingle(ctx) : (b != null ? b.getSingle(ctx) : null);
+                if (target instanceof Player player) {
+                    player.chat(Renderer.toDisplay(message.getSingle(ctx)));
+                }
+            };
+        });
         registry.registerEffect("make %player% (fly|start flying)", arguments ->
                 playerEffect(arguments.get(0), player -> {
                     player.setAllowFlight(true);

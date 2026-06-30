@@ -3520,7 +3520,7 @@
     ],
     "source": "ch/njol/skript/effects/EffMakeSay.java",
     "status": "todo",
-    "implemented": false
+    "implemented": true
   },
   {
     "id": "effect:make-sign-glow",
@@ -4017,7 +4017,7 @@
     ],
     "source": "ch/njol/skript/effects/EffStopSound.java",
     "status": "todo",
-    "implemented": false
+    "implemented": true
   },
   {
     "id": "effect:strider-shivering",
@@ -4144,7 +4144,7 @@
     ],
     "source": "org/skriptlang/skript/bukkit/text/elements/effects/EffResetTitle.java",
     "status": "todo",
-    "implemented": false
+    "implemented": true
   },
   {
     "id": "effect:title-send",
