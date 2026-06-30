@@ -32,6 +32,20 @@ class ComparisonsTest {
     }
 
     @Test
+    void stringMatchesTypedValueByDisplayForm() {
+        // A string equals an enum/typed value when it matches that value's display form.
+        assertTrue(Comparisons.equal(org.bukkit.GameMode.SURVIVAL, "survival"));
+        assertTrue(Comparisons.equal("CREATIVE", org.bukkit.GameMode.CREATIVE));
+        assertFalse(Comparisons.equal(org.bukkit.GameMode.SURVIVAL, "creative"));
+    }
+
+    @Test
+    void comparableValuesOfTheSameTypeOrder() {
+        assertTrue(Comparisons.compare("apple", "banana") < 0);
+        assertTrue(Comparisons.compare("banana", "apple") > 0);
+    }
+
+    @Test
     void nonNumericComparisonIsNull() {
         assertNull(Comparisons.compare("abc", 5));
         assertNull(Comparisons.compare(new Object(), new Object()));

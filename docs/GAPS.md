@@ -24,6 +24,9 @@ consume, fish, bed enter, sign change, craft, smelt, vehicle enter/exit, weather
 load/save/init, chunk load/unload, enchant, portal, bucket, redstone, breed, target, shoot bow, server load — plus **event-values** (`event-block`/`event-world`/`event-entity`/…) and
 **`cancel event`**/`uncancel event`.
 
+**Comparisons:** type-aware equality/ordering — numeric by value, same-type `Comparable` by natural
+order, and a string matches a typed value by its display form (e.g. `gamemode is "survival"`).
+
 **Conditions:** equality and numeric comparisons, `is set`, `contains`, `starts/ends with`,
 `matches` (regex), `is between`, `chance of`, `is op`, `is online/offline`, `is alive/dead`,
 `is sneaking/sprinting/flying`, `can fly`, `is blocking/gliding/glowing/sleeping/swimming`,
@@ -66,9 +69,8 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
 
 ## ❌ Remaining — deeper engine features
 
-1. **Type system depth:** a comparator graph wired into conditions (the converter graph and rich-type serializers are done; conditions still use the simpler Comparisons facade).
-2. **Async sections:** explicit `async:` / `run … async` blocks. (`wait` anywhere in a trigger now works via the continuation interpreter; delays inside functions remain disallowed, as in Skript.)
-3. **Pattern engine niceties:** plural handling and parse marks/tags from alternations (leading `the`/`a`/`an` articles are now tolerated).
+1. **Pattern engine niceties:** plural handling and parse marks/tags from alternations (leading
+   `the`/`a`/`an` articles are now tolerated, and plural type names are normalised in function signatures).
 
 ## Completing the gaps
 
@@ -80,4 +82,5 @@ and the content long tail — with designs, tests, risks, and sequencing.
 
 - New content slots into the existing registries with the same builder API — adding events,
   conditions, effects, and expressions is now mostly mechanical and individually testable.
-- A continuation-based interpreter now supports `wait` anywhere in a trigger; explicit `async:` sections are the small remaining piece of that area.
+- A continuation-based interpreter supports `wait` anywhere in a trigger. Like Skript, NeoSkript has
+  no separate `async:` section type — off-thread work is the domain of add-ons.
