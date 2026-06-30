@@ -45,12 +45,7 @@ public final class FlatFileVariableStore {
                 continue;
             }
             String name = unescape(parts[0]);
-            Object value = switch (parts[1]) {
-                case "number" -> parseNumber(parts[2]);
-                case "boolean" -> Boolean.valueOf(parts[2]);
-                case "string" -> unescape(parts[2]);
-                default -> deserializeCustom(parts[1], unescape(parts[2]));
-            };
+            Object value = VariableCodec.decode(parts[1], unescape(parts[2]));
             if (value != null) {
                 variables.put(name, value);
             }
@@ -71,27 +66,11 @@ public final class FlatFileVariableStore {
         }
         List<String> lines = new java.util.ArrayList<>(variables.size());
         for (Map.Entry<String, Object> entry : variables.entrySet()) {
-            Object value = entry.getValue();
-            String type;
-            String serialized;
-            if (value instanceof Number number) {
-                type = "number";
-                serialized = Double.toString(number.doubleValue());
-            } else if (value instanceof Boolean bool) {
-                type = "boolean";
-                serialized = bool.toString();
-            } else if (value instanceof String text) {
-                type = "string";
-                serialized = escape(text);
-            } else {
-                ValueSerializer serializer = ValueSerializers.forValue(value);
-                if (serializer == null) {
-                    continue; // no serializer registered for this type
-                }
-                type = serializer.id();
-                serialized = escape(serializer.serialize(value));
+            VariableCodec.Encoded encoded = VariableCodec.encode(entry.getValue());
+            if (encoded == null) {
+                continue; // not persistable
             }
-            lines.add(escape(entry.getKey()) + "\t" + type + "\t" + serialized);
+            lines.add(escape(entry.getKey()) + "\t" + encoded.type() + "\t" + escape(encoded.value()));
         }
         // Write to a temp file then move into place so a crash mid-write can't corrupt the store.
         Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
@@ -100,19 +79,6 @@ public final class FlatFileVariableStore {
             Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (AtomicMoveNotSupportedException e) {
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
-        }
-    }
-
-    private static Object deserializeCustom(String typeId, String data) {
-        ValueSerializer serializer = ValueSerializers.byId(typeId);
-        return serializer == null ? null : serializer.deserialize(data);
-    }
-
-    private static Double parseNumber(String text) {
-        try {
-            return Double.valueOf(text);
-        } catch (NumberFormatException e) {
-            return null;
         }
     }
 

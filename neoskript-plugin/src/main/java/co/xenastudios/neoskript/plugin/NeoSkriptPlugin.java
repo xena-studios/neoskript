@@ -51,6 +51,7 @@ public class NeoSkriptPlugin extends JavaPlugin {
     private AddonManager addonManager;
     private final List<NeoSkriptAddon> addons = new ArrayList<>();
     private TaskHandle autoSaveTask;
+    private SqlVariableStore sqlStore;
 
     @Override
     public void onEnable() {
@@ -72,6 +73,7 @@ public class NeoSkriptPlugin extends JavaPlugin {
         this.addonManager = new AddonManager(getLogger());
         addons.addAll(addonManager.enable(AddonManager.discover(getClassLoader()), registry));
 
+        setupStorage();
         loadVariables();
         getLogger().info("Running on " + platform.describe());
 
@@ -140,17 +142,34 @@ public class NeoSkriptPlugin extends JavaPlugin {
 
     private void loadVariables() {
         try {
-            globalVariables.putAll(FlatFileVariableStore.load(variablesFile()));
-        } catch (IOException e) {
+            if (sqlStore != null) {
+                globalVariables.putAll(sqlStore.load());
+            } else {
+                globalVariables.putAll(FlatFileVariableStore.load(variablesFile()));
+            }
+        } catch (Exception e) {
             getLogger().log(Level.WARNING, "Failed to load persisted variables", e);
         }
     }
 
     private void saveVariables() {
         try {
-            FlatFileVariableStore.save(variablesFile(), globalVariables);
-        } catch (IOException e) {
+            if (sqlStore != null) {
+                sqlStore.save(globalVariables);
+            } else {
+                FlatFileVariableStore.save(variablesFile(), globalVariables);
+            }
+        } catch (Exception e) {
             getLogger().log(Level.WARNING, "Failed to save persisted variables", e);
+        }
+    }
+
+    /** Selects the persistence backend from config (default: flatfile; "sqlite" uses a JDBC store). */
+    private void setupStorage() {
+        String backend = getConfig().getString("storage", "flatfile");
+        if (backend.equalsIgnoreCase("sqlite")) {
+            String path = getDataFolder().toPath().resolve("variables.db").toString();
+            this.sqlStore = new SqlVariableStore("jdbc:sqlite:" + path);
         }
     }
 

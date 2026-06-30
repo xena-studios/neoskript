@@ -7,6 +7,8 @@ paper-test = "1.21.11-R0.1-SNAPSHOT"
 junit = "6.0.0"
 shadow = "9.4.3"
 mockbukkit = "4.110.0"
+sqlite = "3.47.1.0"
+h2 = "2.3.232"
 
 [libraries]
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper" }
@@ -15,6 +17,8 @@ junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 mockbukkit = { module = "org.mockbukkit.mockbukkit:mockbukkit-v1.21", version.ref = "mockbukkit" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

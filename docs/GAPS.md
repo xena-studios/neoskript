@@ -50,6 +50,8 @@ players; gamemode literals; command `sender`, `arg-N`, `args`; comma/`and`-separ
 **Built-in functions:** abs, round, floor, ceil, sqrt, exp, ln, log, sin/cos/tan (+inverse), mod,
 atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `player()`.
 
+**Persistence:** flatfile and JDBC (SQLite) backends with rich-type serialization (location, item, vector, …).
+
 ## ❌ Remaining — content long tail
 
 - **Types:** entity (beyond generic Entity), block (beyond event-value), inventory,
@@ -68,8 +70,7 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
 2. **Async sections:** explicit `async:` / `run … async` blocks. (`wait` anywhere in a trigger now works via the continuation interpreter; delays inside functions remain disallowed, as in Skript.)
 3. **Functions:** typed parameters with enforced return types, and local functions (default/optional params are done).
 4. **Structures:** `aliases:` (custom item aliases), `import`/`using`.
-5. **Persistence:** SQL backends (the flatfile store now persists rich types via value serializers).
-6. **Pattern engine niceties:** `the`/`a`/`an` articles, plural handling, parse marks/tags from
+5. **Pattern engine niceties:** `the`/`a`/`an` articles, plural handling, parse marks/tags from
    alternations.
 
 ## Completing the gaps
