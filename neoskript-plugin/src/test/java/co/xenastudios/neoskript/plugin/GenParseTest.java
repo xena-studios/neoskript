@@ -53,17 +53,22 @@ class GenParseTest {
                         set {_x} to anvil text input of player
                         set {_x} to arrow knockback strength of player
                         set {_x} to arrow pierce level of player
+                        set {_x} to arrows stuck in player
                         set {_x} to attack cooldown of player
                         set {_x} to bed location of player
                         set {_x} to billboard of player
+                        set {_x} to brewing time of player
+                        set {_x} to buried item of player
                         set {_x} to causing entity of player
                         set {_x} to client view distance of player
+                        set {_x} to codepoint of player
                         set {_x} to compass target of player
                         set {_x} to damage location of player
                         set {_x} to damage type of player
                         set {_x} to difficulty of player
                         set {_x} to difficulty of player
                         set {_x} to direct entity of player
+                        set {_x} to duplication cooldown of player
                         set {_x} to enchantment cost of player
                         set {_x} to ender chest of player
                         set {_x} to enderchest of player
@@ -76,28 +81,38 @@ class GenParseTest {
                         set {_x} to fly mode of player
                         set {_x} to flight mode of player
                         set {_x} to food exhaustion of player
+                        set {_x} to food level of player
                         set {_x} to freeze time of player
+                        set {_x} to fuel level of player
                         set {_x} to gliding state of player
+                        set {_x} to glow color override of player
                         set {_x} to glowing of player
                         set {_x} to gravity of player
+                        set {_x} to hidden players of player
                         set {_x} to humidity of player
                         set {_x} to humidity of player
                         set {_x} to item display transform of player
                         set {_x} to language of player
                         set {_x} to last death location of player
+                        set {_x} to leash holder of player
                         set {_x} to level of player
                         set {_x} to level progress of player
                         set {_x} to line width of player
                         set {_x} to loot location of player
                         set {_x} to loot luck value of player
                         set {_x} to looted entity of player
+                        set {_x} to looter of player
                         set {_x} to max freeze time of player
+                        set {_x} to max fuse ticks of player
                         set {_x} to max item use time of player
                         set {_x} to max minecart speed of player
                         set {_x} to moon phase of player
+                        set {_x} to most angered entity of player
                         set {_x} to namespaced key of player
                         set {_x} to no damage time of player
+                        set {_x} to passengers of player
                         set {_x} to pickup delay of player
+                        set {_x} to ping of player
                         set {_x} to player list name of player
                         set {_x} to portal cooldown of player
                         set {_x} to potion effect type category of player
@@ -105,25 +120,33 @@ class GenParseTest {
                         set {_x} to redstone power of player
                         set {_x} to resource pack response of player
                         set {_x} to saturation of player
+                        set {_x} to scoreboard tags of player
                         set {_x} to sea level of player
+                        set {_x} to seed of player
                         set {_x} to source location of player
                         set {_x} to spawn of player
                         set {_x} to spectator target of player
                         set {_x} to squared length of player
                         set {_x} to squared length of player
+                        set {_x} to tag contents of player
                         set {_x} to teleport duration of player
                         set {_x} to temperature of player
                         set {_x} to temperature of player
                         set {_x} to text alignment of player
                         set {_x} to text of player
+                        set {_x} to text opacity of player
+                        set {_x} to time lived of player
                         set {_x} to uuid of dropped item owner of player
                         set {_x} to uuid of dropped item thrower of player
                         set {_x} to vector length of player
+                        set {_x} to vector of player
+                        set {_x} to vehicle of player
                         set {_x} to view range of player
                         set {_x} to world border center of player
                         set {_x} to world border damage amount of player
                         set {_x} to world border damage buffer of player
                         set {_x} to world border warning distance of player
+                        set {_x} to world border warning time of player
                         if player is blocking:
                             set {_y} to 1
                         if player is invisible:

@@ -6556,8 +6556,8 @@
       "%livingentities%'[s] (duplicat(e|ing|ion)|clon(e|ing)) cool[ ]down [time]"
     ],
     "source": "ch/njol/skript/expressions/ExprDuplicateCooldown.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:allay-target-jukebox",
@@ -6848,8 +6848,8 @@
       "[number of] arrow[s] stuck in %livingentities%"
     ],
     "source": "ch/njol/skript/expressions/ExprArrowsStuck.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:attack-cooldown",
@@ -7239,8 +7239,8 @@
       "%blocks%'[s] brewing [stand] fuel (level|amount)"
     ],
     "source": "org/skriptlang/skript/bukkit/brewing/elements/expressions/ExprBrewingFuelLevel.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:brewing-stand-slot",
@@ -7273,8 +7273,8 @@
       "%blocks%'[s] [current|remaining] brewing time"
     ],
     "source": "org/skriptlang/skript/bukkit/brewing/elements/expressions/ExprBrewingTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:broadcast-message",
@@ -7311,8 +7311,8 @@
       "%blocks%'[s] (brushable|buried) item"
     ],
     "source": "ch/njol/skript/expressions/ExprBrushableItem.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:case-text",
@@ -7361,8 +7361,8 @@
       "%strings%'[s] [unicode|character] code([ ]point| position)"
     ],
     "source": "ch/njol/skript/expressions/ExprCodepoint.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:character-from-codepoint",
@@ -7699,8 +7699,8 @@
       "%livingentities%'[s] [creeper] max[imum] fuse tick[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprCreeperMaxFuseTicks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:cursor-slot",
@@ -8049,8 +8049,8 @@
       "%displays%'[s] glow[ing] colo[u]r[s] override[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/elements/expressions/ExprDisplayGlowOverride.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:display-height-width",
@@ -8892,8 +8892,8 @@
       "%players%'[s] (food|hunger)[[ ](level|met(er|re)|bar)]"
     ],
     "source": "ch/njol/skript/expressions/ExprFoodLevel.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:formatted-date",
@@ -9222,8 +9222,8 @@
       "[(all [[of] the]|the)] players hidden (from|for|by) %players%"
     ],
     "source": "ch/njol/skript/expressions/ExprHiddenPlayers.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:horse-domestication",
@@ -9235,8 +9235,8 @@
       "%livingentities%'[s] [:max[imum]] domestication level"
     ],
     "source": "ch/njol/skript/expressions/ExprDomestication.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:hostname",
@@ -9886,8 +9886,8 @@
       "%livingentities%'[s] leash holder[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprLeashHolder.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:length",
@@ -10130,8 +10130,8 @@
       "%lootcontexts%'[s] (looter|looting player)"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/expressions/ExprLootContextLooter.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:lore",
@@ -10906,8 +10906,8 @@
       "%entities%'[s] passenger[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprPassenger.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:percent-of",
@@ -10981,8 +10981,8 @@
       "%players%'[s] ping"
     ],
     "source": "ch/njol/skript/expressions/ExprPing.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:plain-item",
@@ -11639,8 +11639,8 @@
       "%entities%'[s] scoreboard tags"
     ],
     "source": "ch/njol/skript/expressions/ExprScoreboardTags.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:script",
@@ -12013,8 +12013,8 @@
       "%minecrafttag%'[s] tag (contents|values)"
     ],
     "source": "org/skriptlang/skript/bukkit/tags/elements/expressions/ExprTagContents.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:tags-of-x",
@@ -12185,8 +12185,8 @@
       "[[display] [text] opacity] of %displays%"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/text/elements/expressions/ExprTextDisplayOpacity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:text-of",
@@ -12238,8 +12238,8 @@
       "%entities%'[s] time (alive|lived)"
     ],
     "source": "ch/njol/skript/expressions/ExprTimeLived.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:time-played",
@@ -12675,8 +12675,8 @@
       "%location%'s vector"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorOfLocation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-vector-from-yaw-and-pitch",
@@ -12713,8 +12713,8 @@
       "%entities%'[s] vehicle[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprVehicle.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:velocity",
@@ -12842,8 +12842,8 @@
       "%livingentities%'[s] most angered entity"
     ],
     "source": "ch/njol/skript/expressions/ExprWardenAngryAt.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:warning-distance-of-world-border",
@@ -12866,8 +12866,8 @@
       "world[ ]border warning time of %worldborders%"
     ],
     "source": "ch/njol/skript/expressions/ExprWorldBorderWarningTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:weather",
@@ -12981,8 +12981,8 @@
       "%worlds%'[s] seed[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprSeed.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:worlds",
