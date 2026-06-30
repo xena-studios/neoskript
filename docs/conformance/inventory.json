@@ -10199,8 +10199,8 @@
       "%itemtypes/itemstacks/slots%'[s] max[imum] (durabilit(y|ies)|damage)"
     ],
     "source": "ch/njol/skript/expressions/ExprMaxDurability.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:max-health",
@@ -10251,8 +10251,8 @@
       "[the] [1:(real|default)|2:(fake|shown|displayed)] max[imum] (count|amount|number|size) of players"
     ],
     "source": "ch/njol/skript/expressions/ExprMaxPlayers.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:maximum-double-value",
@@ -10401,8 +10401,8 @@
       "[the] mid[-]point (of|between) %object% and %object%"
     ],
     "source": "ch/njol/skript/expressions/ExprMidpoint.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:minecart-derailed-flying-velocity",
@@ -10741,8 +10741,8 @@
       "[the] [(1:(real|default)|2:(fake|shown|displayed))] (count|amount|number|size) of online players"
     ],
     "source": "ch/njol/skript/expressions/ExprOnlinePlayersCount.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:opened-inventory",
@@ -12305,8 +12305,8 @@
       "%entities%'[s] [total] experience"
     ],
     "source": "ch/njol/skript/expressions/ExprTotalExperience.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:tps-ticks-per-second",
@@ -12662,8 +12662,8 @@
       "[the] vector (from|between) %location% (to|and) %location%"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorBetweenLocations.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:vectors-vector-from-location",

@@ -242,6 +242,8 @@ public final class BuiltinModule {
                 e -> (double) e.getRemainingAir(), (e, v) -> e.setRemainingAir((int) v), 300);
         numericProperty(registry, "(maximum air|max air)", LivingEntity.class,
                 e -> (double) e.getMaximumAir(), (e, v) -> e.setMaximumAir((int) v), 300);
+        numericProperty(registry, "total (experience|exp|xp)", Player.class,
+                p -> (double) p.getTotalExperience(), (p, v) -> p.setTotalExperience((int) Math.max(0, v)), 0);
 
         registry.registerExpression("(all players|online players|all online players)", Object.class,
                 arguments -> new ComputedListExpression(ctx -> Bukkit.getOnlinePlayers().toArray()));
@@ -288,6 +290,42 @@ public final class BuiltinModule {
                     return null;
                 }
                 return first.distance(second);
+            });
+        });
+        registry.registerExpression("(midpoint (of|between)|middle of) %location% and %location%", Object.class,
+                arguments -> {
+                    Expression<?> a = arguments.get(0);
+                    Expression<?> b = arguments.get(1);
+                    return new ComputedExpression(ctx -> {
+                        Location first = toLocation(a.getSingle(ctx));
+                        Location second = toLocation(b.getSingle(ctx));
+                        return (first == null || second == null) ? null
+                                : first.clone().add(second).multiply(0.5);
+                    });
+                });
+        registry.registerExpression("vector (from|between) %location% (to|and) %location%", Object.class,
+                arguments -> {
+                    Expression<?> a = arguments.get(0);
+                    Expression<?> b = arguments.get(1);
+                    return new ComputedExpression(ctx -> {
+                        Location first = toLocation(a.getSingle(ctx));
+                        Location second = toLocation(b.getSingle(ctx));
+                        return (first == null || second == null) ? null
+                                : second.toVector().subtract(first.toVector());
+                    });
+                });
+        registry.registerExpression("(max[imum] players|maximum player count)", Object.class,
+                arguments -> new ComputedExpression(ctx -> (double) Bukkit.getMaxPlayers()));
+        registry.registerExpression("(online player[s] count|number of online players|online player amount)",
+                Object.class, arguments -> new ComputedExpression(ctx -> (double) Bukkit.getOnlinePlayers().size()));
+        registry.registerExpression("max[imum] durability of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                Object o = src.getSingle(ctx);
+                if (o instanceof ItemStack item) {
+                    return (double) item.getType().getMaxDurability();
+                }
+                return o instanceof org.bukkit.Material mat ? (double) mat.getMaxDurability() : null;
             });
         });
 
