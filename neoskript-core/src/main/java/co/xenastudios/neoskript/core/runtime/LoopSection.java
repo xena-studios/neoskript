@@ -38,10 +38,14 @@ public final class LoopSection implements Statement {
         return new LoopSection(values, false, body);
     }
 
+    /** Wall-clock safety budget for a single loop run (nanoseconds). */
+    public static final long MAX_NANOS = 10_000_000_000L; // 10 seconds
+
     @Override
     public void run(TriggerContext ctx) {
         Object previousValue = ctx.getLocal("loop-value");
         Object previousIndex = ctx.getLocal("loop-index");
+        long deadline = System.nanoTime() + MAX_NANOS;
         try {
             if (times) {
                 long count = toLong(source.getSingle(ctx));
@@ -49,6 +53,9 @@ public final class LoopSection implements Statement {
                     ctx.setLocal("loop-value", (double) i);
                     ctx.setLocal("loop-index", (double) i);
                     IfSection.runAll(body, ctx);
+                    if (System.nanoTime() >= deadline) {
+                        break;
+                    }
                 }
             } else {
                 Object[] values = source.getAll(ctx);
@@ -56,6 +63,9 @@ public final class LoopSection implements Statement {
                     ctx.setLocal("loop-value", values[i]);
                     ctx.setLocal("loop-index", (double) (i + 1));
                     IfSection.runAll(body, ctx);
+                    if (System.nanoTime() >= deadline) {
+                        break;
+                    }
                 }
             }
         } finally {

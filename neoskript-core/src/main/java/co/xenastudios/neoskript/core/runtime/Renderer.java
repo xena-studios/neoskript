@@ -1,30 +1,28 @@
 package co.xenastudios.neoskript.core.runtime;
 
-import java.util.function.Function;
+import co.xenastudios.neoskript.core.type.TypeRegistry;
 
 /**
  * Renders runtime values to their display text, used by string interpolation and message effects.
  *
- * <p>Core handles the type-agnostic cases (null, numbers, strings) without depending on Bukkit. The
- * platform layer installs a {@linkplain #setPlatformRenderer(Function) fallback} that knows how to
- * render server types (players, etc.) by their friendly name. Phase 2 replaces this with per-type
- * {@code toDisplayString} lookups via the type registry.
+ * <p>Display is delegated to the registered {@link TypeRegistry} (so each {@code Type} controls how
+ * its values render — e.g. players render as their name); core keeps type-agnostic fallbacks for
+ * numbers and strings so rendering still works before/without a registry (e.g. in unit tests).
  */
 public final class Renderer {
 
-    private static volatile Function<Object, String> platformRenderer;
+    private static volatile TypeRegistry typeRegistry;
 
     private Renderer() {
     }
 
     /**
-     * Installs a renderer for platform-specific types. Returns {@code null} to fall back to
-     * {@link String#valueOf(Object)}.
+     * Installs the type registry used for display. Set once at startup.
      *
-     * @param renderer the platform renderer, or {@code null} to clear it
+     * @param registry the registry, or {@code null} to clear it
      */
-    public static void setPlatformRenderer(Function<Object, String> renderer) {
-        platformRenderer = renderer;
+    public static void setTypeRegistry(TypeRegistry registry) {
+        typeRegistry = registry;
     }
 
     /**
@@ -37,18 +35,18 @@ public final class Renderer {
         if (value == null) {
             return "<none>";
         }
+        TypeRegistry registry = typeRegistry;
+        if (registry != null) {
+            String rendered = registry.display(value);
+            if (rendered != null) {
+                return rendered;
+            }
+        }
         if (value instanceof Number number) {
             return formatNumber(number);
         }
         if (value instanceof CharSequence text) {
             return text.toString();
-        }
-        Function<Object, String> renderer = platformRenderer;
-        if (renderer != null) {
-            String rendered = renderer.apply(value);
-            if (rendered != null) {
-                return rendered;
-            }
         }
         return String.valueOf(value);
     }

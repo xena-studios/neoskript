@@ -1,0 +1,4 @@
+# A Bukkit-free fixture the harness can actually execute.
+on join:
+    set {_x} to 5
+    set {result} to {_x}

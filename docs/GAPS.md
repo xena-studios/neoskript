@@ -16,7 +16,8 @@ _Last reviewed: 2026-06-29._
 - **Conditions (8):** `is`/`is not`/`=`/`!=`, `>`/`<`/`>=`/`<=` (+aliases), `is set`/`is not set`
 - **Expressions (10):** player, console, loop-value, loop-number/index, name of player, size/amount of,
   random number, random integer, arithmetic, variables/literals/function calls
-- **Types (1 real):** `number`; `string`/`player`/`object` handled loosely
+- **Types:** a `TypeRegistry` wired for display/parsing with `number`, `text`, `boolean`, and
+  `player` (the converter/comparator/serializer graph is still pending — see the engine gaps)
 - **Structures:** event triggers, user functions, periodic, load
 - **Control flow:** if / else if / else, while, loop N times, loop list
 

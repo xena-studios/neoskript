@@ -11,6 +11,11 @@ import java.util.List;
  */
 public final class FunctionDefinition {
 
+    /** Maximum nested function-call depth before aborting (guards against infinite recursion). */
+    public static final int MAX_DEPTH = 800;
+
+    private static final ThreadLocal<Integer> DEPTH = ThreadLocal.withInitial(() -> 0);
+
     private final String name;
     private final List<String> parameters;
     private final List<Statement> body;
@@ -40,15 +45,28 @@ public final class FunctionDefinition {
      * @return the value passed to {@code return}, or {@code null} if the function returned no value
      */
     public Object invoke(List<Object> arguments, TriggerContext caller) {
-        TriggerContext scope = new ChildContext(caller);
-        for (int i = 0; i < parameters.size(); i++) {
-            scope.setLocal(parameters.get(i), i < arguments.size() ? arguments.get(i) : null);
+        int depth = DEPTH.get();
+        if (depth >= MAX_DEPTH) {
+            throw new IllegalStateException(
+                    "Maximum function call depth (" + MAX_DEPTH + ") exceeded in '" + name
+                            + "' — possible infinite recursion");
         }
+        DEPTH.set(depth + 1);
         try {
-            IfSection.runAll(body, scope);
-        } catch (ReturnSignal signal) {
-            return signal.value();
+            TriggerContext scope = new ChildContext(caller);
+            for (int i = 0; i < parameters.size(); i++) {
+                scope.setLocal(parameters.get(i), i < arguments.size() ? arguments.get(i) : null);
+            }
+            try {
+                IfSection.runAll(body, scope);
+            } catch (ReturnSignal signal) {
+                return signal.value();
+            } catch (StopSignal ignored) {
+                // `stop` inside a function ends the function, not the caller's trigger.
+            }
+            return null;
+        } finally {
+            DEPTH.set(depth);
         }
-        return null;
     }
 }

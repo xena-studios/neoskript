@@ -11,7 +11,13 @@ import co.xenastudios.neoskript.core.parser.ParseException;
 import co.xenastudios.neoskript.core.runtime.Renderer;
 import co.xenastudios.neoskript.core.runtime.ReturnSignal;
 import co.xenastudios.neoskript.core.runtime.StopSignal;
+import co.xenastudios.neoskript.core.runtime.VariableScope;
+import co.xenastudios.neoskript.core.type.TypeRegistry;
 import co.xenastudios.neoskript.lang.expression.EventPlayerExpression;
+import co.xenastudios.neoskript.lang.type.BooleanType;
+import co.xenastudios.neoskript.lang.type.NumberType;
+import co.xenastudios.neoskript.lang.type.PlayerType;
+import co.xenastudios.neoskript.lang.type.StringType;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -38,10 +44,19 @@ public final class BuiltinModule {
      * @param registry the target registry
      */
     public static void registerAll(SyntaxRegistry registry) {
-        Renderer.setPlatformRenderer(value -> value instanceof CommandSender sender ? sender.getName() : null);
+        registerTypes();
         registerExpressions(registry);
         registerConditions(registry);
         registerEffects(registry);
+    }
+
+    private static void registerTypes() {
+        TypeRegistry types = new TypeRegistry();
+        types.register(new NumberType());
+        types.register(new StringType());
+        types.register(new BooleanType());
+        types.register(new PlayerType());
+        Renderer.setTypeRegistry(types);
     }
 
     private static void registerExpressions(SyntaxRegistry registry) {
@@ -160,7 +175,7 @@ public final class BuiltinModule {
         registry.registerEffect("add %object% to %object%", arguments -> {
             Expression<?> value = arguments.get(0);
             VariableExpression variable = requireVariable(arguments.get(1));
-            return ctx -> {
+            return ctx -> mutate(ctx, variable, () -> {
                 Object item = value.getSingle(ctx);
                 if (variable.isList()) {
                     variable.addToList(ctx, item);
@@ -170,13 +185,13 @@ public final class BuiltinModule {
                         variable.set(ctx, sum);
                     }
                 }
-            };
+            });
         });
 
         registry.registerEffect("remove %object% from %object%", arguments -> {
             Expression<?> value = arguments.get(0);
             VariableExpression variable = requireVariable(arguments.get(1));
-            return ctx -> {
+            return ctx -> mutate(ctx, variable, () -> {
                 Object item = value.getSingle(ctx);
                 if (variable.isList()) {
                     variable.removeFromList(ctx, item);
@@ -186,12 +201,12 @@ public final class BuiltinModule {
                         variable.set(ctx, difference);
                     }
                 }
-            };
+            });
         });
 
         registry.registerEffect("(delete|clear|reset) %object%", arguments -> {
             VariableExpression variable = requireVariable(arguments.get(0));
-            return variable::delete;
+            return ctx -> mutate(ctx, variable, () -> variable.delete(ctx));
         });
 
         registry.registerEffect("return %object%", arguments -> {
@@ -199,6 +214,10 @@ public final class BuiltinModule {
             return ctx -> {
                 throw new ReturnSignal(value.getSingle(ctx));
             };
+        });
+
+        registry.registerEffect("return", arguments -> ctx -> {
+            throw new ReturnSignal(null);
         });
 
         registry.registerEffect("(stop|exit) [trigger]", arguments -> ctx -> {
@@ -211,6 +230,18 @@ public final class BuiltinModule {
             return variable;
         }
         throw new ParseException("Expected a variable, got: " + expression);
+    }
+
+    /**
+     * Runs a read-modify-write on a variable, serializing it across concurrent (Folia) handlers when
+     * the target is a shared global. Local variables are per-execution, so they need no locking.
+     */
+    private static void mutate(TriggerContext ctx, VariableExpression variable, Runnable op) {
+        if (!variable.isLocal() && ctx instanceof VariableScope scope) {
+            scope.runAtomic(op);
+        } else {
+            op.run();
+        }
     }
 
     private static CommandSender resolveReceiver(Expression<?> target, TriggerContext ctx) {

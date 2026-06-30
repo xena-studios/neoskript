@@ -2,8 +2,10 @@ package co.xenastudios.neoskript.core.variable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,7 +88,14 @@ public final class FlatFileVariableStore {
             }
             lines.add(escape(entry.getKey()) + "\t" + type + "\t" + serialized);
         }
-        Files.write(file, lines, StandardCharsets.UTF_8);
+        // Write to a temp file then move into place so a crash mid-write can't corrupt the store.
+        Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+        Files.write(tmp, lines, StandardCharsets.UTF_8);
+        try {
+            Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     private static Double parseNumber(String text) {

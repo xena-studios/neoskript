@@ -12,7 +12,7 @@ import java.util.Optional;
  * A nested execution scope with its own local variables that delegates global-variable access to a
  * parent context. Used for function bodies, which get a fresh local scope but share globals.
  */
-public final class ChildContext implements TriggerContext {
+public final class ChildContext implements TriggerContext, VariableScope {
 
     private final TriggerContext parent;
     private final Map<String, Object> locals = new HashMap<>();
@@ -65,5 +65,15 @@ public final class ChildContext implements TriggerContext {
     @Override
     public Map<String, Object> listGlobal(String prefix) {
         return parent.listGlobal(prefix);
+    }
+
+    @Override
+    public void runAtomic(Runnable action) {
+        // Delegate to the owning scope so global mutations share one lock.
+        if (parent instanceof VariableScope scope) {
+            scope.runAtomic(action);
+        } else {
+            action.run();
+        }
     }
 }

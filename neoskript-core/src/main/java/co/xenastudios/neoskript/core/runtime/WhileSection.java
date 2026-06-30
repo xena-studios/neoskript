@@ -14,6 +14,9 @@ public final class WhileSection implements Statement {
     /** Safety cap on iterations for a single {@code while} run. */
     public static final long MAX_ITERATIONS = 10_000_000L;
 
+    /** Wall-clock safety budget for a single {@code while} run (nanoseconds). */
+    public static final long MAX_NANOS = 10_000_000_000L; // 10 seconds
+
     private final Condition condition;
     private final List<Statement> body;
 
@@ -25,9 +28,11 @@ public final class WhileSection implements Statement {
     @Override
     public void run(TriggerContext ctx) {
         long iterations = 0;
+        long deadline = System.nanoTime() + MAX_NANOS;
         while (condition.check(ctx)) {
             IfSection.runAll(body, ctx);
-            if (++iterations >= MAX_ITERATIONS) {
+            // Stop on either bound so a runaway loop can't hang the server thread indefinitely.
+            if (++iterations >= MAX_ITERATIONS || System.nanoTime() >= deadline) {
                 break;
             }
         }

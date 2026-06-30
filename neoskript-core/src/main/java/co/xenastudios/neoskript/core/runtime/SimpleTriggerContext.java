@@ -17,7 +17,7 @@ import java.util.Optional;
  * replace local-variable storage with parse-time-resolved indexed slots and globals with the
  * persistence-backed variable store.
  */
-public final class SimpleTriggerContext implements TriggerContext {
+public final class SimpleTriggerContext implements TriggerContext, VariableScope {
 
     private final Event event;
     private final Map<String, Object> globals;
@@ -65,6 +65,14 @@ public final class SimpleTriggerContext implements TriggerContext {
     @Override
     public Map<String, Object> listGlobal(String prefix) {
         return directChildren(globals, prefix);
+    }
+
+    @Override
+    public void runAtomic(Runnable action) {
+        // Serialize compound global mutations across concurrently-firing (Folia) handlers.
+        synchronized (globals) {
+            action.run();
+        }
     }
 
     private static void put(Map<String, Object> map, String name, Object value) {

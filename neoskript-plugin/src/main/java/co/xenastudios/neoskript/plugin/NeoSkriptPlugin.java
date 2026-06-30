@@ -13,6 +13,7 @@ import co.xenastudios.neoskript.lang.BuiltinModule;
 import co.xenastudios.neoskript.lang.event.BuiltinEvents;
 import co.xenastudios.neoskript.platform.PlatformInfo;
 import co.xenastudios.neoskript.platform.scheduler.NeoScheduler;
+import co.xenastudios.neoskript.platform.scheduler.TaskHandle;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
@@ -34,6 +35,9 @@ import java.util.logging.Level;
  */
 public final class NeoSkriptPlugin extends JavaPlugin {
 
+    /** Auto-save interval for global variables, in ticks (5 minutes). */
+    private static final long AUTOSAVE_TICKS = 20L * 60L * 5L;
+
     private PlatformInfo platform;
     private NeoScheduler scheduler;
     private DefaultSyntaxRegistry registry;
@@ -43,6 +47,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     private final Map<String, Object> globalVariables = new ConcurrentHashMap<>();
     private AddonManager addonManager;
     private final List<NeoSkriptAddon> addons = new ArrayList<>();
+    private TaskHandle autoSaveTask;
 
     @Override
     public void onEnable() {
@@ -75,6 +80,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             command.setExecutor(new NeoSkriptCommand(this, loader, profiler));
         }
 
+        // Periodically persist globals off-thread so a crash loses at most one interval of data.
+        this.autoSaveTask = scheduler.runRepeating(
+                () -> scheduler.runAsync(this::saveVariables), AUTOSAVE_TICKS, AUTOSAVE_TICKS);
+
         double elapsedMs = (System.nanoTime() - startNanos) / 1_000_000.0;
         getLogger().info(String.format(
                 "NeoSkript enabled in %.2f ms — %d syntaxes, %d triggers, %d functions from %d script(s)%s (Folia: %s)",
@@ -85,6 +94,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (autoSaveTask != null) {
+            autoSaveTask.cancel();
+        }
         if (addonManager != null) {
             addonManager.disable(addons);
         }

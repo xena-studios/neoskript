@@ -10,6 +10,7 @@ import co.xenastudios.neoskript.core.runtime.InterpretedEngine;
 import co.xenastudios.neoskript.core.runtime.Profiler;
 import co.xenastudios.neoskript.core.runtime.SimpleTriggerContext;
 import co.xenastudios.neoskript.core.runtime.Trigger;
+import co.xenastudios.neoskript.core.runtime.Triggers;
 import co.xenastudios.neoskript.platform.event.BukkitEventBridge;
 import co.xenastudios.neoskript.platform.scheduler.NeoScheduler;
 import co.xenastudios.neoskript.platform.scheduler.TaskHandle;
@@ -24,7 +25,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -109,15 +109,14 @@ public final class ScriptLoader {
     }
 
     private void registerTriggers(List<Trigger> triggers) {
-        Map<Class<?>, List<Trigger>> eventTriggers = new LinkedHashMap<>();
         for (Trigger trigger : triggers) {
             switch (trigger.kind()) {
-                case EVENT -> eventTriggers.computeIfAbsent(trigger.eventClass(), k -> new ArrayList<>()).add(trigger);
                 case PERIODIC -> schedulePeriodic(trigger);
                 case LOAD -> run(trigger, null);
+                case EVENT -> { /* registered together below */ }
             }
         }
-        registerEventListeners(eventTriggers);
+        registerEventListeners(Triggers.groupEventTriggers(triggers));
     }
 
     @SuppressWarnings("unchecked")
@@ -141,12 +140,17 @@ public final class ScriptLoader {
     /** Runs a trigger with a fresh local scope, applying profiling and hot-path tracking. */
     private void run(Trigger trigger, Event event) {
         TriggerContext ctx = new SimpleTriggerContext(event, globals);
-        if (profiler.isEnabled()) {
-            long start = System.nanoTime();
-            engine.run(trigger, ctx);
-            profiler.record(trigger.eventName(), System.nanoTime() - start);
-        } else {
-            engine.run(trigger, ctx);
+        try {
+            if (profiler.isEnabled()) {
+                long start = System.nanoTime();
+                engine.run(trigger, ctx);
+                profiler.record(trigger.eventName(), System.nanoTime() - start);
+            } else {
+                engine.run(trigger, ctx);
+            }
+        } catch (RuntimeException e) {
+            // One misbehaving trigger shouldn't break the event for other triggers or plugins.
+            plugin.getLogger().log(Level.WARNING, "Error while running '" + trigger.eventName() + "'", e);
         }
         if (hotPaths.recordAndCheckHot(trigger)) {
             plugin.getLogger().fine("Trigger '" + trigger.eventName() + "' is hot (eligible for compilation).");

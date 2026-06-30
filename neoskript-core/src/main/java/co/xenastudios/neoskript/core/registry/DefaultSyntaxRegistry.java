@@ -78,21 +78,17 @@ public final class DefaultSyntaxRegistry implements SyntaxRegistry {
 
     /** @return all registered effects, in registration order (for documentation/inspection) */
     public List<EffectEntry> allEffects() {
-        return expressionsView(effects.all);
+        return List.copyOf(effects.all);
     }
 
     /** @return all registered conditions, in registration order */
     public List<ConditionEntry> allConditions() {
-        return expressionsView(conditions.all);
+        return List.copyOf(conditions.all);
     }
 
     /** @return all registered expressions, in registration order */
     public List<ExpressionEntry> allExpressions() {
-        return expressionsView(expressions.all);
-    }
-
-    private static <E> List<E> expressionsView(List<E> entries) {
-        return List.copyOf(entries);
+        return List.copyOf(expressions.all);
     }
 
     @Override
