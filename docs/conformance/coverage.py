@@ -25,42 +25,51 @@ def main():
     documented = defaultdict(int)
     external = defaultdict(int)
     done = defaultdict(int)
+    implemented = defaultdict(int)
     for e in entries:
         c = e["category"]
         documented[c] += 1
         if e["status"] == "external":
             external[c] += 1
-        elif e["status"] == "done":
+            continue
+        if e["status"] == "done":
             done[c] += 1
+        if e.get("implemented"):
+            implemented[c] += 1
 
     lines = [
         "# NeoSkript Conformance Coverage",
         "",
         "Reference: **Skript 2.15.3** — generated from `inventory.json` by `coverage.py`.",
         "",
-        "`done` = implemented **and** covered by a test. `external` = third-party-plugin syntax "
-        "(see [`EXTERNAL_PLUGIN_SYNTAX.md`](../EXTERNAL_PLUGIN_SYNTAX.md)), excluded from the denominator. "
-        "`todo` = not yet verified.",
+        "`done` = implemented **and** covered by a test (the conformance metric). `implemented` = "
+        "present in NeoSkript per the coverage audit, test pending. `external` = third-party-plugin "
+        "syntax (see [`EXTERNAL_PLUGIN_SYNTAX.md`](../EXTERNAL_PLUGIN_SYNTAX.md)), excluded from the "
+        "denominator. `todo` = not yet implemented.",
         "",
-        "| Category | Documented | External | In-scope | Done (tested) | % |",
-        "|---|---|---|---|---|---|",
+        "| Category | Documented | External | In-scope | Implemented | Done (tested) | Done % |",
+        "|---|---|---|---|---|---|---|",
     ]
-    t_doc = t_ext = t_done = 0
+    t_doc = t_ext = t_done = t_impl = 0
     for c in CATEGORIES:
         doc = documented.get(c, 0)
         ext = external.get(c, 0)
         dn = done.get(c, 0)
+        impl = implemented.get(c, 0)
         scope = doc - ext
         pct = (100.0 * dn / scope) if scope else 0.0
         t_doc += doc
         t_ext += ext
         t_done += dn
-        lines.append(f"| {c} | {doc} | {ext} | {scope} | {dn} | {pct:.1f}% |")
+        t_impl += impl
+        lines.append(f"| {c} | {doc} | {ext} | {scope} | {impl} | {dn} | {pct:.1f}% |")
     t_scope = t_doc - t_ext
     t_pct = (100.0 * t_done / t_scope) if t_scope else 0.0
-    lines.append(f"| **Total** | **{t_doc}** | **{t_ext}** | **{t_scope}** | **{t_done}** | **{t_pct:.1f}%** |")
+    t_ipct = (100.0 * t_impl / t_scope) if t_scope else 0.0
+    lines.append(f"| **Total** | **{t_doc}** | **{t_ext}** | **{t_scope}** | **{t_impl}** | **{t_done}** | **{t_pct:.1f}%** |")
     lines.append("")
-    lines.append(f"_Goal: 100% of the {t_scope} in-scope entries, each implemented and tested._")
+    lines.append(f"_Implemented (incl. tested): {t_impl}/{t_scope} ({t_ipct:.1f}%). "
+                 f"Goal: 100% of the {t_scope} in-scope entries, each implemented and tested._")
     lines.append("")
 
     with open(COVERAGE, "w") as f:
