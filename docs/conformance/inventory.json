@@ -5455,7 +5455,7 @@
       "[player] level (change|1¦up|-1¦down)"
     ],
     "source": "ch/njol/skript/events/EvtLevel.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "level change (PlayerLevelChangeEvent)"
   },
@@ -5468,7 +5468,7 @@
       "lightning [strike]"
     ],
     "source": "ch/njol/skript/events/SimpleEvents.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "lightning / lightning strike (LightningStrikeEvent)"
   },
@@ -5495,7 +5495,7 @@
       "%entitydata% (turn[ing] around|rotate) or (move|walk|step)"
     ],
     "source": "ch/njol/skript/events/EvtMove.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "move / player move / walk (PlayerMoveEvent)"
   },
@@ -5532,7 +5532,7 @@
       "[(player|1¦entity)] (pick[ ]up|picking up) [[of] %-itemtypes%]"
     ],
     "source": "ch/njol/skript/events/EvtItem.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "pickup / item pickup (EntityPickupItemEvent)"
   },
@@ -5593,7 +5593,7 @@
       "[block] (plac(e|ing)|build[ing]) [[of] %-itemtypes/blockdatas%]"
     ],
     "source": "ch/njol/skript/events/EvtBlock.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "place / block place / block placing (BlockPlaceEvent)"
   },
@@ -5654,7 +5654,7 @@
       "[player] world chang(ing|e[d])"
     ],
     "source": "ch/njol/skript/events/SimpleEvents.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "world change / world switch (PlayerChangedWorldEvent)"
   },
@@ -5952,7 +5952,7 @@
       "[player] sneak toggl(e|ing)"
     ],
     "source": "ch/njol/skript/events/SimpleEvents.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "sneak toggle / toggle sneak (PlayerToggleSneakEvent)"
   },
@@ -5965,7 +5965,7 @@
       "spawn[ing] [of %-entitydatas%]"
     ],
     "source": "ch/njol/skript/events/EvtEntity.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "spawn / mob spawn / creature spawn (CreatureSpawnEvent)"
   },
@@ -6029,7 +6029,7 @@
       "[player] sprint toggl(e|ing)"
     ],
     "source": "ch/njol/skript/events/SimpleEvents.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "sprint toggle / toggle sprint (PlayerToggleSprintEvent)"
   },
@@ -6091,7 +6091,7 @@
       "[entity] tam(e|ing)"
     ],
     "source": "ch/njol/skript/events/SimpleEvents.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "tame / taming (EntityTameEvent)"
   },
@@ -6105,7 +6105,7 @@
       "[entity] un[-]target"
     ],
     "source": "ch/njol/skript/events/EvtEntityTarget.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "target / entity target (EntityTargetEvent)"
   },
@@ -6118,7 +6118,7 @@
       "[%entitytypes%] teleport[ing]"
     ],
     "source": "ch/njol/skript/events/EvtTeleport.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "teleport / player teleport (PlayerTeleportEvent)"
   },
@@ -6221,7 +6221,7 @@
       "enter[ing] [a] vehicle"
     ],
     "source": "ch/njol/skript/events/SimpleEvents.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "vehicle enter (VehicleEnterEvent)"
   },
