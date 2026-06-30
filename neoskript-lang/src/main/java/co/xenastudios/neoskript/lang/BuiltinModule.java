@@ -893,6 +893,31 @@ public final class BuiltinModule {
             Expression<?> target = a.get(0);
             return ctx -> target.getSingle(ctx) instanceof World w && w.isThundering();
         });
+        registry.registerCondition("%object% (is|are) interactable", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> material(src.getSingle(ctx)) instanceof org.bukkit.Material m && m.isInteractable();
+        });
+        registry.registerCondition("%object% (is|are) occluding", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> material(src.getSingle(ctx)) instanceof org.bukkit.Material m && m.isOccluding();
+        });
+        registry.registerCondition("%object% (is|are) persistent", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> src.getSingle(ctx) instanceof Entity e && e.isPersistent();
+        });
+        registry.registerCondition("%object% (is|are) [not] poisoned", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> src.getSingle(ctx) instanceof LivingEntity le
+                    && le.hasPotionEffect(org.bukkit.potion.PotionEffectType.POISON);
+        });
+        registry.registerCondition("%object% (is|are) [properly] saddled", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> src.getSingle(ctx) instanceof org.bukkit.entity.Steerable s && s.hasSaddle();
+        });
+        registry.registerCondition("plugin[s] %string% (is|are) enabled", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> Bukkit.getPluginManager().isPluginEnabled(Renderer.toDisplay(src.getSingle(ctx)));
+        });
         registry.registerCondition("%object% (is|are) edible", a -> {
             Expression<?> src = a.get(0);
             return ctx -> material(src.getSingle(ctx)) instanceof org.bukkit.Material m && m.isEdible();

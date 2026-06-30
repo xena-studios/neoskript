@@ -59,6 +59,21 @@ class SimpleConditionsTest {
                             send "no" to player
                         if player can age:
                             send "no" to player
+                        if item("chest") is interactable:
+                            send "INT" to player
+                        if item("stone") is occluding:
+                            send "OCC" to player
+                        if plugin "NeoSkript" is enabled:
+                            send "PLUG" to player
+
+                command /sc2:
+                    trigger:
+                        if player is poisoned:
+                            send "no" to player
+                        if player is persistent:
+                            send "no" to player
+                        if player is saddled:
+                            send "no" to player
                 """, StandardCharsets.UTF_8);
         server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
 
@@ -77,5 +92,8 @@ class SimpleConditionsTest {
         assertTrue(seen.contains("EDIBLE"), "bread is edible");
         assertTrue(seen.contains("FLAM"), "oak planks is flammable");
         assertTrue(seen.contains("FUEL"), "coal is fuel");
+        assertTrue(seen.contains("INT"), "chest is interactable");
+        assertTrue(seen.contains("OCC"), "stone is occluding");
+        assertTrue(seen.contains("PLUG"), "NeoSkript plugin is enabled");
     }
 }

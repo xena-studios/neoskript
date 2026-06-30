@@ -1308,8 +1308,8 @@
       "%itemtypes% (isn't|is not|aren't|are not) interactable"
     ],
     "source": "ch/njol/skript/conditions/CondIsInteractable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-invisible",
@@ -1428,8 +1428,8 @@
       "%itemtypes% (is|are)(n't| not) occluding"
     ],
     "source": "ch/njol/skript/conditions/CondIsOccluding.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-of-type",
@@ -1522,8 +1522,8 @@
       "%entities/blocks% (is|are)(n't| not) persistent"
     ],
     "source": "ch/njol/skript/conditions/CondIsPersistent.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-playing-dead",
@@ -1549,8 +1549,8 @@
       "plugin[s] %strings% (is|are) disabled"
     ],
     "source": "ch/njol/skript/conditions/CondIsPluginEnabled.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-poisoned",
@@ -1561,8 +1561,8 @@
       "%livingentities% (is|are) [not] poisoned"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/conditions/CondIsPoisoned.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-preferred-tool",
@@ -1644,8 +1644,8 @@
       "%livingentities% (is|are)(n't| not) [:properly] saddled"
     ],
     "source": "ch/njol/skript/conditions/CondIsSaddled.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-screaming",
