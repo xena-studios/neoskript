@@ -121,6 +121,14 @@ public final class BuiltinModule {
                 "healreason", org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason.class));
         types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
                 "teleportcause", org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "inventorytype", org.bukkit.event.inventory.InventoryType.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "soundcategory", org.bukkit.SoundCategory.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "fireworktype", org.bukkit.FireworkEffect.Type.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "material", org.bukkit.Material.class));
         // Registry-backed types (lazy: the Registry is only touched at parse time, never at registration).
         types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
                 "biome", org.bukkit.block.Biome.class, () -> org.bukkit.Registry.BIOME));
@@ -128,6 +136,11 @@ public final class BuiltinModule {
                 "enchantment", org.bukkit.enchantments.Enchantment.class, () -> org.bukkit.Registry.ENCHANTMENT));
         types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
                 "attributetype", org.bukkit.attribute.Attribute.class, () -> org.bukkit.Registry.ATTRIBUTE));
+        types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
+                "villagerprofession", org.bukkit.entity.Villager.Profession.class,
+                () -> org.bukkit.Registry.VILLAGER_PROFESSION));
+        types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
+                "villagertype", org.bukkit.entity.Villager.Type.class, () -> org.bukkit.Registry.VILLAGER_TYPE));
         Renderer.setTypeRegistry(types);
         BuiltinSerializers.registerAll();
     }

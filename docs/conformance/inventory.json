@@ -14408,7 +14408,8 @@
       "fireworktype"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:float",
@@ -14587,7 +14588,8 @@
       "inventorytype"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:itemcomponent",
@@ -14723,7 +14725,8 @@
       "material"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:metadataholder",
@@ -15077,7 +15080,8 @@
       "soundcategory"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:spawnreason",
@@ -15290,7 +15294,8 @@
       "villagerprofession"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:villagertype",
@@ -15301,7 +15306,8 @@
       "villagertype"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:weathertype",

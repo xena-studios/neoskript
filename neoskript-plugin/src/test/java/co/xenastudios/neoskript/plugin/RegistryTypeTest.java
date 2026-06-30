@@ -45,6 +45,24 @@ class RegistryTypeTest {
         assertNotNull(enchantment, "enchantment type registered");
         assertTrue(enchantment.parse("sharpness").isPresent(), "enchantment 'sharpness' should parse");
 
+        Type<?> profession = types.byCodeName("villagerprofession");
+        assertNotNull(profession, "villagerprofession type registered");
+        assertTrue(profession.parse("farmer").isPresent(), "villager profession 'farmer' should parse");
+
+        Type<?> villagerType = types.byCodeName("villagertype");
+        assertNotNull(villagerType, "villagertype type registered");
+        assertTrue(villagerType.parse("plains").isPresent(), "villager type 'plains' should parse");
+
+        // Material is a registry-backed enum (needs a server), so it is verified here, not in lang.
+        Type<?> material = types.byCodeName("material");
+        assertNotNull(material, "material type registered");
+        assertTrue(material.parse("diamond").isPresent(), "material 'diamond' should parse");
+
+        // InventoryType is registry-backed too (server-only).
+        Type<?> inventoryType = types.byCodeName("inventorytype");
+        assertNotNull(inventoryType, "inventorytype registered");
+        assertTrue(inventoryType.parse("chest").isPresent(), "inventory type 'chest' should parse");
+
         // an unknown key parses to empty rather than throwing
         assertTrue(biome.parse("not_a_real_biome").isEmpty());
     }

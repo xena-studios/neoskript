@@ -21,12 +21,28 @@ public final class EnumType<T> implements Type<T> {
 
     private final String codeName;
     private final Class<T> typeClass;
-    private final T[] constants;
+    private T[] constants;
+    private boolean resolved;
 
     public EnumType(String codeName, Class<T> typeClass) {
         this.codeName = codeName;
         this.typeClass = typeClass;
-        this.constants = typeClass.getEnumConstants();
+    }
+
+    /**
+     * Resolves the enum constants on first use. Deferred so that constructing the type does not load
+     * a registry-backed enum's static initializer (which needs a running server).
+     */
+    private T[] constants() {
+        if (!resolved) {
+            try {
+                constants = typeClass.getEnumConstants();
+            } catch (Throwable noServer) {
+                constants = null;
+            }
+            resolved = true;
+        }
+        return constants;
     }
 
     @Override
@@ -41,11 +57,12 @@ public final class EnumType<T> implements Type<T> {
 
     @Override
     public Optional<T> parse(String input) {
-        if (constants == null) {
+        T[] values = constants();
+        if (values == null) {
             return Optional.empty();
         }
         String normalized = input.trim().toUpperCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
-        for (T constant : constants) {
+        for (T constant : values) {
             if (((Enum<?>) constant).name().equals(normalized)) {
                 return Optional.of(constant);
             }
