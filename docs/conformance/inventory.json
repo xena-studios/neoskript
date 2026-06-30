@@ -9,8 +9,8 @@
       "%livingentities% (can't|cannot|can not) (duplicate|clone)"
     ],
     "source": "ch/njol/skript/conditions/CondAllayCanDuplicate.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:alphanumeric",
@@ -87,8 +87,8 @@
       "%livingentities% (is|are)(n't| not) dashing"
     ],
     "source": "ch/njol/skript/conditions/CondIsDashing.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:can-age",
@@ -113,8 +113,8 @@
       "%livingentities% (can't|cannot) (breed|be bred)"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/conditions/CondCanBreed.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:can-build",
@@ -138,8 +138,8 @@
       "%livingentities% can('t| not) despawn (on chunk unload|when far away)"
     ],
     "source": "ch/njol/skript/conditions/CondEntityUnload.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:can-fly",
@@ -178,8 +178,8 @@
       "%livingentities% (can't|cannot|can not) pick([ ]up items| items up)"
     ],
     "source": "ch/njol/skript/conditions/CondCanPickUpItems.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:can-see",
@@ -1176,8 +1176,8 @@
       "%entities% (wasn't|weren't|was not|were not) spawned (from|by) a [mob] spawner"
     ],
     "source": "ch/njol/skript/conditions/CondFromMobSpawner.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-frozen",
@@ -6392,8 +6392,8 @@
       "%livingentities%'[s] (raised|active) (tool|item|weapon)"
     ],
     "source": "ch/njol/skript/expressions/ExprActiveItem.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:active-item-use-time",
@@ -6703,8 +6703,8 @@
       "%inventories%'[s] anvil [inventory] (rename|text) input"
     ],
     "source": "ch/njol/skript/expressions/ExprAnvilText.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:any-of",
@@ -6823,8 +6823,8 @@
       "%projectiles%'[s] arrow knockback strength"
     ],
     "source": "ch/njol/skript/expressions/ExprArrowKnockbackStrength.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:arrow-pierce-level",
@@ -6836,8 +6836,8 @@
       "%projectiles%'[s] arrow pierce level"
     ],
     "source": "ch/njol/skript/expressions/ExprArrowPierceLevel.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:arrows-stuck",
@@ -6861,8 +6861,8 @@
       "%players%'[s] attack cooldown"
     ],
     "source": "ch/njol/skript/expressions/ExprAttackCooldown.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:attacked",
@@ -7000,8 +7000,8 @@
       "%offlineplayers%'[s] [(safe:(safe|valid)|(unsafe|invalid))] bed[s] [location[s]]"
     ],
     "source": "ch/njol/skript/expressions/ExprBed.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:beehive-honey-level",
@@ -7348,8 +7348,8 @@
       "world[ ]border (center|middle) of %worldborders%"
     ],
     "source": "ch/njol/skript/expressions/ExprWorldBorderCenter.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:character-codepoint",
@@ -7558,8 +7558,8 @@
       "%players%'[s] compass target"
     ],
     "source": "ch/njol/skript/expressions/ExprCompassTarget.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:config",
@@ -7766,8 +7766,8 @@
       "world[ ]border damage amount of %worldborders%"
     ],
     "source": "ch/njol/skript/expressions/ExprWorldBorderDamageAmount.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage-buffer-of-world-border",
@@ -7778,8 +7778,8 @@
       "world[ ]border damage buffer of %worldborders%"
     ],
     "source": "ch/njol/skript/expressions/ExprWorldBorderDamageBuffer.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage-cause",
@@ -7815,8 +7815,8 @@
       "%damagesources%'[s] (causing|responsible) entity"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/elements/expressions/ExprCausingEntity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage-source-damage-location",
@@ -7828,8 +7828,8 @@
       "%damagesources%'[s] damage location"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/elements/expressions/ExprDamageLocation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage-source-damage-type",
@@ -7841,8 +7841,8 @@
       "%damagesources%'[s] damage type"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/elements/expressions/ExprDamageType.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage-source-direct-entity",
@@ -7854,8 +7854,8 @@
       "%damagesources%'[s] direct entity"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/elements/expressions/ExprDirectEntity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage-source-food-exhaustion",
@@ -7867,8 +7867,8 @@
       "%damagesources%'[s] food exhaustion"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/elements/expressions/ExprFoodExhaustion.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage-source-source-location",
@@ -7880,8 +7880,8 @@
       "%damagesources%'[s] source location"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/elements/expressions/ExprSourceLocation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage-value-durability",
@@ -7994,8 +7994,8 @@
       "%worlds%'[s] difficult(y|ies)"
     ],
     "source": "ch/njol/skript/expressions/ExprDifficulty.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:direction",
@@ -8023,8 +8023,8 @@
       "%displays%'[s] bill[ |-]board[ing] [setting]"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/elements/expressions/ExprDisplayBillboard.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:display-brightness",
@@ -8114,8 +8114,8 @@
       "%displays%'[s] teleport[ation] duration[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/elements/expressions/ExprDisplayTeleportDuration.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:display-transformation-rotation",
@@ -8153,8 +8153,8 @@
       "%displays%'[s] [display] view (range|radius)"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/elements/expressions/ExprDisplayViewRange.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:distance",
@@ -8179,8 +8179,8 @@
       "[the] [dropped] item owner's uuid [of %itementities%]"
     ],
     "source": "ch/njol/skript/expressions/ExprItemOwner.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:dropped-item-thrower",
@@ -8192,8 +8192,8 @@
       "[the] [dropped] item thrower's uuid [of %itementities%]"
     ],
     "source": "ch/njol/skript/expressions/ExprItemThrower.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:drops",
@@ -8312,8 +8312,8 @@
       "%enchantmentoffers%'[s] [enchant[ment]] cost"
     ],
     "source": "ch/njol/skript/expressions/ExprEnchantmentOfferCost.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:ender-chest",
@@ -8325,8 +8325,8 @@
       "%players%'[s] ender[ ]chest[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprEnderChest.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:enderman-carrying-blockdata",

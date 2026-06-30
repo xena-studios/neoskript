@@ -80,6 +80,8 @@ public final class BuiltinModule {
         registerExpressions(registry);
         registerConditions(registry);
         registerEffects(registry);
+        GenExpressions.register(registry); // bulk property getters (generated)
+        GenConditions.register(registry); // bulk boolean conditions (generated)
     }
 
     private static void registerTypes() {
