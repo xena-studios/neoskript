@@ -51,6 +51,7 @@ class WorldEffectsTest {
                         set {_seed} to seed of world of player
                         if {_dif} is hard:
                             send "GETDIF" to player
+                        enforce the whitelist
                         send "DONE" to player
 
                 command /we2:
@@ -73,5 +74,6 @@ class WorldEffectsTest {
         assertTrue(seen.contains("DONE"), "set difficulty ran");
         assertTrue(seen.contains("GETDIF"), "difficulty/spawn/seed getters resolve");
         assertEquals(Difficulty.HARD, player.getWorld().getDifficulty(), "difficulty set to hard (via 'hard' type literal)");
+        assertTrue(server.isWhitelistEnforced(), "enforce whitelist effect");
     }
 }

@@ -59,6 +59,11 @@ class PlayerEffects2Test {
                         make player left handed
                         make player right-handed
                         make player attack player
+                        make player adult
+                        make player a baby
+                        make player incendiary
+                        make player persistent
+                        make player not persistent
                 """, StandardCharsets.UTF_8);
         server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
 

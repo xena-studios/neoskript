@@ -2791,8 +2791,8 @@
       "[:un]enforce [the] [server] white[ ]list"
     ],
     "source": "ch/njol/skript/effects/EffEnforceWhitelist.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:entity-despawn",
@@ -2955,8 +2955,8 @@
       "stop (ignition|explosion) [process] of [creeper[s]] %livingentities%"
     ],
     "source": "ch/njol/skript/effects/EffExplodeCreeper.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:explosion",
@@ -3321,8 +3321,8 @@
       "force %livingentities% to be[come] a[n] (:adult|baby|child)"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/effects/EffMakeAdultOrBaby.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-allay-duplicate",
@@ -3440,8 +3440,8 @@
       "make [the] [event(-| )]explosion [(1¦not)] (incendiary|fiery)"
     ],
     "source": "ch/njol/skript/effects/EffIncendiary.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-interaction-responsive",
@@ -3642,8 +3642,8 @@
       "prevent %entities/blocks% from persisting"
     ],
     "source": "ch/njol/skript/effects/EffPersistent.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:play-dead",

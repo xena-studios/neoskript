@@ -1254,6 +1254,38 @@ public final class BuiltinModule {
         });
         registry.registerEffect("(despawn|remove) %entity%", arguments ->
                 entityEffect(arguments.get(0), Entity::remove));
+        registry.registerEffect("make %entity% [a[n]] adult", arguments ->
+                entityEffect(arguments.get(0), e -> {
+                    if (e instanceof org.bukkit.entity.Ageable a) {
+                        a.setAdult();
+                    }
+                }));
+        registry.registerEffect("make %entity% [a] (baby|child)", arguments ->
+                entityEffect(arguments.get(0), e -> {
+                    if (e instanceof org.bukkit.entity.Ageable a) {
+                        a.setBaby();
+                    }
+                }));
+        registry.registerEffect("make %entity% incendiary", arguments ->
+                entityEffect(arguments.get(0), e -> {
+                    if (e instanceof org.bukkit.entity.Explosive ex) {
+                        ex.setIsIncendiary(true);
+                    }
+                }));
+        registry.registerEffect("make %entity% not incendiary", arguments ->
+                entityEffect(arguments.get(0), e -> {
+                    if (e instanceof org.bukkit.entity.Explosive ex) {
+                        ex.setIsIncendiary(false);
+                    }
+                }));
+        registry.registerEffect("make %entity% persistent", arguments ->
+                entityEffect(arguments.get(0), e -> e.setPersistent(true)));
+        registry.registerEffect("make %entity% not persist[ent]", arguments ->
+                entityEffect(arguments.get(0), e -> e.setPersistent(false)));
+        registry.registerEffect("enforce [the] [server] white[ ]list", arguments ->
+                ctx -> Bukkit.setWhitelistEnforced(true));
+        registry.registerEffect("unenforce [the] [server] white[ ]list", arguments ->
+                ctx -> Bukkit.setWhitelistEnforced(false));
         registry.registerEffect("make %entity% (charged|powered)", arguments ->
                 entityEffect(arguments.get(0), e -> {
                     if (e instanceof org.bukkit.entity.Creeper c) {
