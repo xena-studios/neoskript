@@ -343,6 +343,26 @@ public final class BuiltinModule {
                 arguments -> new ComputedExpression(ctx -> (double) Bukkit.getMaxPlayers()));
         registry.registerExpression("(online player[s] count|number of online players|online player amount)",
                 Object.class, arguments -> new ComputedExpression(ctx -> (double) Bukkit.getOnlinePlayers().size()));
+        registry.registerExpression("age of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof org.bukkit.entity.Ageable a ? (double) a.getAge() : null);
+        });
+        registry.registerExpression("(damage value|durability) of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                if (src.getSingle(ctx) instanceof ItemStack item && item.hasItemMeta()
+                        && item.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable dmg) {
+                    return (double) dmg.getDamage();
+                }
+                return null;
+            });
+        });
+        registry.registerExpression("colo[u]r of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    src.getSingle(ctx) instanceof org.bukkit.material.Colorable c ? c.getColor() : null);
+        });
         registry.registerExpression("[the] item[[ ]stack] (amount|size) of %object%", Object.class, arguments -> {
             Expression<?> src = arguments.get(0);
             return new ComputedExpression(ctx ->

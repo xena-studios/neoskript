@@ -46,6 +46,9 @@ class ItemExprTest {
                         set {_y} to yaw of location of player
                         set {_p} to pitch of location of player
                         set {_l} to lore of item("diamond")
+                        set {_age} to age of player
+                        set {_dur} to durability of item("diamond")
+                        set {_col} to color of player
                         send "DONE" to player
 
                 command /ie2:

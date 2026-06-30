@@ -6430,8 +6430,8 @@
       "%blocks/entities%'[s] [:max[imum]] age"
     ],
     "source": "ch/njol/skript/expressions/ExprAge.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:all-banned-players-ips",
@@ -7472,8 +7472,8 @@
       "%blocks/itemtypes/entities/fireworkeffects/potioneffecttypes/displays%'[s] colo[u]r[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprColorOf.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:colored-formatted-uncolored",
@@ -7893,8 +7893,8 @@
       "%itemtypes/itemstacks/slots%'[s] (damage[s] [value[s]]|1:durabilit(y|ies))"
     ],
     "source": "ch/njol/skript/expressions/ExprDurability.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damaged-item",
