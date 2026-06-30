@@ -11,7 +11,10 @@ dependencies {
 }
 
 tasks.named<ProcessResources>("processResources") {
-    val props = mapOf("version" to project.version.toString())
+    val props = mapOf(
+        "version" to project.version.toString(),
+        "apiVersion" to (project.findProperty("paperApiVersion") as String? ?: "1.21"),
+    )
     inputs.properties(props)
     filesMatching("paper-plugin.yml") {
         expand(props)

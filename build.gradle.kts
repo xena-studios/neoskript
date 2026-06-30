@@ -4,8 +4,11 @@ plugins {
 
 allprojects {
     group = "co.xenastudios"
-    // Overridable for releases/nightlies via -PneoskriptVersion=...; defaults to a local snapshot.
-    version = (findProperty("neoskriptVersion") as String?) ?: "1.0.0-SNAPSHOT"
+    // Overridable for releases/nightlies via -PneoskriptVersion=...; otherwise the version tracked in
+    // version.txt (maintained by release-please), falling back to a local snapshot.
+    version = (findProperty("neoskriptVersion") as String?)
+        ?: runCatching { rootDir.resolve("version.txt").readText().trim() }.getOrNull()?.takeIf { it.isNotEmpty() }
+        ?: "1.0.0-SNAPSHOT"
 }
 
 subprojects {

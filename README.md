@@ -61,14 +61,28 @@ NeoSkript exposes a typed SPI (`neoskript-api`). Implement `NeoSkriptAddon` and 
 
 ## Releases
 
-- **Nightly builds:** every push to `main` refreshes a rolling prerelease. Grab the latest jar at
-  `…/releases/download/nightly/NeoSkript-nightly.jar`.
-- **Stable / beta releases:** push a tag. `v1.2.3` cuts a release; a tag with a `-` suffix
-  (`v1.2.3-beta.1`) is marked a prerelease. The version flows into the jar via
-  `-PneoskriptVersion=…`.
-- **Modrinth:** tag releases also publish to Modrinth when these repository settings are present —
-  variable `MODRINTH_PROJECT_ID`, secret `MODRINTH_TOKEN` (optional variable `MINECRAFT_VERSIONS`,
-  default `1.21`). Prerelease tags upload as Modrinth `beta` channel versions.
+Releases are automated with [release-please](https://github.com/googleapis/release-please) and your
+Conventional Commits.
+
+- **Cutting a release:** every push to `main` updates a release PR that bumps `version.txt` and
+  `CHANGELOG.md` based on the commits. Merging that PR creates the tag + GitHub Release, then the
+  publish job builds the plugin jar, attaches it, publishes `neoskript-api`/`neoskript-core` to
+  **GitHub Packages**, and (if configured) uploads to **Modrinth**.
+- **Nightly builds:** every push to `main` also refreshes a rolling prerelease (updated in place).
+  Grab the latest jar at `…/releases/download/nightly/NeoSkript-nightly.jar`.
+- **Minecraft version** is single-sourced in [`gradle.properties`](gradle.properties)
+  (`paperApiVersion` for `paper-plugin.yml`, `minecraftVersions` for Modrinth) — adjust both there.
+- **Modrinth** requires repository settings: variable `MODRINTH_PROJECT_ID` and secret
+  `MODRINTH_TOKEN`. The Modrinth step is skipped until `MODRINTH_PROJECT_ID` is set.
+
+### Consuming the API
+
+Once published, addons can depend on `neoskript-api` from GitHub Packages:
+
+```kotlin
+repositories { maven("https://maven.pkg.github.com/xena-studios/neoskript") }
+dependencies { compileOnly("co.xenastudios:neoskript-api:<version>") }
+```
 
 ## License
 

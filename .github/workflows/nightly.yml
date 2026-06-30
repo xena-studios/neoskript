@@ -44,10 +44,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Replace the previous nightly release and move its tag to this commit.
-          gh release delete nightly --cleanup-tag --yes || true
-          gh release create nightly dist/NeoSkript-nightly.jar \
-            --title "Nightly (latest main)" \
-            --notes "Automated build of \`${{ github.sha }}\` ($(git rev-parse --short HEAD))." \
-            --prerelease \
-            --target "${{ github.sha }}"
+          SHA="${{ github.sha }}"
+          NOTES="Automated build of \`$SHA\` ($(git rev-parse --short HEAD))."
+          # Update the existing nightly release in place (replace the asset, refresh notes) rather
+          # than deleting and recreating it — so watchers aren't re-notified on every push and the
+          # tag isn't churned. Create it once if it doesn't exist yet.
+          if ! gh release view nightly >/dev/null 2>&1; then
+            gh release create nightly --prerelease --target "$SHA" \
+              --title "Nightly (latest main)" --notes "$NOTES"
+          fi
+          gh release upload nightly dist/NeoSkript-nightly.jar --clobber
+          gh release edit nightly --notes "$NOTES"
