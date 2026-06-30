@@ -46,6 +46,8 @@ import org.bukkit.util.Vector;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -227,6 +229,15 @@ public final class BuiltinModule {
             Location location = toLocation(value);
             return location == null ? null : locationFn.applyAsDouble(location);
         });
+    }
+
+    /** Resolves a potion effect type by name (e.g. {@code speed}, {@code instant_health}), or null. */
+    @SuppressWarnings("deprecation")
+    private static PotionEffectType potionEffect(String name) {
+        if (name == null) {
+            return null;
+        }
+        return PotionEffectType.getByName(name.trim().toUpperCase(Locale.ROOT).replace(' ', '_'));
     }
 
     /** Coerces a value to a Location: a Location directly, or an entity's current location. */
@@ -665,6 +676,35 @@ public final class BuiltinModule {
                         }
                     };
                 });
+
+        registry.registerEffect(
+                "apply %string% to %player% [for %-number% seconds] [(at|of) (tier|level|amplifier) %-number%]",
+                arguments -> {
+                    Expression<?> effect = arguments.get(0);
+                    Expression<?> target = arguments.get(1);
+                    Expression<?> seconds = arguments.get(2);
+                    Expression<?> amplifier = arguments.get(3);
+                    return ctx -> {
+                        if (!(target.getSingle(ctx) instanceof Player player)) {
+                            return;
+                        }
+                        PotionEffectType type = potionEffect(Renderer.toDisplay(effect.getSingle(ctx)));
+                        if (type == null) {
+                            return;
+                        }
+                        int ticks = seconds == null ? 30 * 20 : (int) (orZero(toNumber(seconds.getSingle(ctx))) * 20);
+                        int level = amplifier == null ? 0 : Math.max(0, (int) orZero(toNumber(amplifier.getSingle(ctx))) - 1);
+                        player.addPotionEffect(new PotionEffect(type, ticks, level));
+                    };
+                });
+        registry.registerEffect("(clear|remove all) [active] potion effects (from|of) %player%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Player player) {
+                    player.getActivePotionEffects().forEach(e -> player.removePotionEffect(e.getType()));
+                }
+            };
+        });
 
         registry.registerEffect("set (walk speed|walkspeed) of %player% to %number%", arguments -> {
             Expression<?> target = arguments.get(0);
