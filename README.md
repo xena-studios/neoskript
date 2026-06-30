@@ -59,6 +59,17 @@ NeoSkript exposes a typed SPI (`neoskript-api`). Implement `NeoSkriptAddon` and 
 `ServiceLoader` or register it from a dependent plugin's `onEnable`. See
 [`CONTRIBUTING.md`](CONTRIBUTING.md#writing-an-addon).
 
+## Releases
+
+- **Nightly builds:** every push to `main` refreshes a rolling prerelease. Grab the latest jar at
+  `…/releases/download/nightly/NeoSkript-nightly.jar`.
+- **Stable / beta releases:** push a tag. `v1.2.3` cuts a release; a tag with a `-` suffix
+  (`v1.2.3-beta.1`) is marked a prerelease. The version flows into the jar via
+  `-PneoskriptVersion=…`.
+- **Modrinth:** tag releases also publish to Modrinth when these repository settings are present —
+  variable `MODRINTH_PROJECT_ID`, secret `MODRINTH_TOKEN` (optional variable `MINECRAFT_VERSIONS`,
+  default `1.21`). Prerelease tags upload as Modrinth `beta` channel versions.
+
 ## License
 
 NeoSkript is licensed under the [GNU General Public License v3.0](LICENSE).

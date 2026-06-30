@@ -1,0 +1,74 @@
+name: Release
+
+# Tag a commit to release it, e.g.:
+#   git tag v1.0.0      && git push origin v1.0.0   -> stable release
+#   git tag v1.0.0-beta.1 && git push origin v1.0.0-beta.1 -> prerelease (tags with a '-' suffix)
+#
+# Publishes the plugin jar to a GitHub Release and (if configured) to Modrinth.
+# Modrinth requires repo settings:
+#   - Variable  MODRINTH_PROJECT_ID  (the Modrinth project id or slug)
+#   - Secret    MODRINTH_TOKEN       (a Modrinth API token with write access)
+#   - Optional variable MINECRAFT_VERSIONS (defaults to "1.21"); space/comma separated or ranges
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve version
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: ./gradlew build -PneoskriptVersion=${{ steps.ver.outputs.version }} --no-daemon --stacktrace
+
+      - name: Stage jar
+        run: |
+          mkdir -p dist
+          cp neoskript-plugin/build/libs/neoskript-plugin-*.jar "dist/NeoSkript-${{ steps.ver.outputs.version }}.jar"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRERELEASE=""
+          [[ "${GITHUB_REF_NAME}" == *-* ]] && PRERELEASE="--prerelease"
+          gh release create "${GITHUB_REF_NAME}" dist/*.jar \
+            --title "NeoSkript ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            $PRERELEASE
+
+      - name: Publish to Modrinth
+        if: ${{ vars.MODRINTH_PROJECT_ID != '' }}
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: dist/*.jar
+          name: NeoSkript ${{ steps.ver.outputs.version }}
+          version: ${{ steps.ver.outputs.version }}
+          version-type: ${{ contains(github.ref_name, '-') && 'beta' || 'release' }}
+          loaders: |
+            paper
+            folia
+            purpur
+          game-versions: ${{ vars.MINECRAFT_VERSIONS || '1.21' }}
+          java: 25
+          changelog: Released from ${{ github.ref_name }}. See the GitHub release for details.

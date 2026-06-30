@@ -4,7 +4,8 @@ plugins {
 
 allprojects {
     group = "co.xenastudios"
-    version = "1.0.0-SNAPSHOT"
+    // Overridable for releases/nightlies via -PneoskriptVersion=...; defaults to a local snapshot.
+    version = (findProperty("neoskriptVersion") as String?) ?: "1.0.0-SNAPSHOT"
 }
 
 subprojects {
