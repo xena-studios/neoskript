@@ -650,6 +650,22 @@ public final class BuiltinModule {
             };
         });
 
+        registry.registerEffect("play sound %string% (to|for) %player% [with volume %-number%] [with pitch %-number%]",
+                arguments -> {
+                    Expression<?> sound = arguments.get(0);
+                    Expression<?> target = arguments.get(1);
+                    Expression<?> volume = arguments.get(2);
+                    Expression<?> pitch = arguments.get(3);
+                    return ctx -> {
+                        if (target.getSingle(ctx) instanceof Player player) {
+                            String name = Renderer.toDisplay(sound.getSingle(ctx)).toLowerCase(Locale.ROOT);
+                            float vol = volume == null ? 1f : (float) orZero(toNumber(volume.getSingle(ctx)));
+                            float pit = pitch == null ? 1f : (float) orZero(toNumber(pitch.getSingle(ctx)));
+                            player.playSound(player.getLocation(), name, vol, pit);
+                        }
+                    };
+                });
+
         registry.registerEffect("set (walk speed|walkspeed) of %player% to %number%", arguments -> {
             Expression<?> target = arguments.get(0);
             Expression<?> value = arguments.get(1);
