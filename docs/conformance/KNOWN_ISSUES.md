@@ -6,9 +6,10 @@ Bugs found by the conformance effort that are implemented but not yet correct. E
 | Entry | Issue | Notes |
 |---|---|---|
 | `expression:distance` | `distance between A and B` fails to parse — the ` and ` is consumed by list-literal parsing before the distance pattern is tried. | Parser-precedence: registered patterns containing ` and ` need to be matched before top-level `and`/`,` list splitting. Affects any expression whose pattern contains ` and `. |
-| `expression:block`, `expression:creature-entity-…` (event-values) | A bare `event-block`/`block`/`event-entity` does not resolve standalone — the indexed pattern dispatch doesn't bucket a pattern that begins with an optional group + alternation (`[the] (event-block\|block)`) under the right leading word. | Event-value expressions are effectively unreachable; fix the first-literal computation to index all alternation branches (and the post-optional word). |
 
 ## Fixed during the conformance effort
+
+- **Leading optional space** (`PatternCompiler`): a pattern starting with an optional group (`[the] (event-block|block)`) compiled the following space as mandatory, so the event-value expressions were unreachable without `the`. Fixed to pull a leading optional's trailing space inside the group.
 
 - **Candidate fall-through** (`parseLeaf`/`parseCondition`/`parsePrimary`): a matching candidate whose
   arguments failed to parse aborted the line instead of trying the next overlapping pattern. Fixed —

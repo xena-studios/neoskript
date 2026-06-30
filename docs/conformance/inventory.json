@@ -7064,7 +7064,7 @@
       "[the] block %direction% [%location%]"
     ],
     "source": "ch/njol/skript/expressions/ExprBlock.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "[the] (event-block|block)"
   },
@@ -7685,7 +7685,7 @@
       "[the] [event-]<.+>"
     ],
     "source": "ch/njol/skript/expressions/ExprEntity.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "[the] (event-entity|entity) / [the] (event-player|player)"
   },

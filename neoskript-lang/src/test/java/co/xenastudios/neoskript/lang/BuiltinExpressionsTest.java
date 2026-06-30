@@ -77,6 +77,14 @@ class BuiltinExpressionsTest {
     }
 
     @Test
+    void eventValueExpressionsResolveWithoutThe() {
+        // A leading optional [the] must not force a separating space (regression: `block` failed).
+        for (String s : new String[]{"block", "event-block", "entity", "event-entity", "world", "the event-block"}) {
+            expressions.parse(s); // must not throw
+        }
+    }
+
+    @Test
     void leadingArticleIsTolerated() {
         Map<String, Object> g = new HashMap<>();
         // "the"/"a"/"an" are stripped as a fallback so article-laden phrasing still parses.

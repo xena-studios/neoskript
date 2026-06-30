@@ -35,6 +35,11 @@ public final class PatternCompiler {
         int argCount = 0;
         int i = 0;
         int length = pattern.length();
+        // Per optional group `[...]`: was it at the very start of the pattern? A leading optional's
+        // trailing space is pulled inside so it isn't required when omitted (`[the] block` ->
+        // `(?:the\s+)?block`, matching "block" and "the block"). A non-leading optional like the
+        // `[-coordinate]` in `x[-coordinate] of` keeps its trailing space as a real separator.
+        java.util.Deque<Boolean> leadingOptional = new java.util.ArrayDeque<>();
 
         while (i < length) {
             char c = pattern.charAt(i);
@@ -49,6 +54,7 @@ public final class PatternCompiler {
                     i = end + 1;
                 }
                 case '[' -> {
+                    boolean atStart = regex.length() == 1; // only "^" so far
                     // Pull a preceding whitespace matcher inside the optional group so that the
                     // surrounding space is also optional when the group is absent.
                     if (endsWith(regex, "\\s+")) {
@@ -57,11 +63,23 @@ public final class PatternCompiler {
                     } else {
                         regex.append("(?:");
                     }
+                    leadingOptional.push(atStart);
                     i++;
                 }
                 case ']' -> {
-                    regex.append(")?");
-                    i++;
+                    boolean atStart = !leadingOptional.isEmpty() && leadingOptional.pop();
+                    // A leading optional pulls its trailing space inside so the space isn't required
+                    // when the group is omitted (e.g. `[the] block` matches "block").
+                    if (atStart && i + 1 < length && Character.isWhitespace(pattern.charAt(i + 1))) {
+                        regex.append("\\s+)?");
+                        i++;
+                        while (i < length && Character.isWhitespace(pattern.charAt(i))) {
+                            i++;
+                        }
+                    } else {
+                        regex.append(")?");
+                        i++;
+                    }
                 }
                 case '(' -> {
                     regex.append("(?:");
