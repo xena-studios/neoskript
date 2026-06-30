@@ -392,6 +392,8 @@ public final class BuiltinModule {
         registry.registerCondition("%player% (is not|isn't) op", a -> playerIs(a.get(0), Player::isOp, false));
         registry.registerCondition("%player% is online", a -> playerIs(a.get(0), Player::isOnline, true));
         registry.registerCondition("%player% is offline", a -> playerIs(a.get(0), Player::isOnline, false));
+        registry.registerCondition("%player% is alive", a -> playerIs(a.get(0), player -> player.getHealth() > 0, true));
+        registry.registerCondition("%player% is dead", a -> playerIs(a.get(0), player -> player.getHealth() <= 0, true));
         registry.registerCondition("%player% is sneaking", a -> playerIs(a.get(0), Player::isSneaking, true));
         registry.registerCondition("%player% is sprinting", a -> playerIs(a.get(0), Player::isSprinting, true));
         registry.registerCondition("%player% is flying", a -> playerIs(a.get(0), Player::isFlying, true));
@@ -480,6 +482,56 @@ public final class BuiltinModule {
                 }
             };
         });
+
+        registry.registerEffect("set (walk speed|walkspeed) of %player% to %number%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> value = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Player player) {
+                    player.setWalkSpeed((float) Math.max(-1, Math.min(1, orZero(toNumber(value.getSingle(ctx))))));
+                }
+            };
+        });
+        registry.registerEffect("(allow|enable) (flight|flying) for %player%", arguments ->
+                playerEffect(arguments.get(0), player -> player.setAllowFlight(true)));
+        registry.registerEffect("(disallow|disable) (flight|flying) for %player%", arguments ->
+                playerEffect(arguments.get(0), player -> player.setAllowFlight(false)));
+        registry.registerEffect("set (display name|displayname) of %player% to %string%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> name = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Player player) {
+                    player.displayName(colored(Renderer.toDisplay(name.getSingle(ctx))));
+                }
+            };
+        });
+        registry.registerEffect("clear [the] inventory of %player%", arguments ->
+                playerEffect(arguments.get(0), player -> player.getInventory().clear()));
+        registry.registerEffect("clear %player%'s inventory", arguments ->
+                playerEffect(arguments.get(0), player -> player.getInventory().clear()));
+
+        registry.registerEffect("set time of %world% to %number%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> value = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof World world) {
+                    world.setTime((long) orZero(toNumber(value.getSingle(ctx))));
+                }
+            };
+        });
+        registry.registerEffect("make %world% (sunny|clear)", arguments ->
+                worldEffect(arguments.get(0), world -> world.setStorm(false)));
+        registry.registerEffect("make %world% (rainy|stormy)", arguments ->
+                worldEffect(arguments.get(0), world -> world.setStorm(true)));
+    }
+
+    private static co.xenastudios.neoskript.api.syntax.Effect worldEffect(Expression<?> target,
+                                                                          Consumer<World> action) {
+        return ctx -> {
+            if (target.getSingle(ctx) instanceof World world) {
+                action.accept(world);
+            }
+        };
     }
 
     private static co.xenastudios.neoskript.api.syntax.Effect playerEffect(Expression<?> target,

@@ -24,20 +24,21 @@ change, weather, world load — plus **event-values** (`event-block`/`event-worl
 and **`cancel event`**/`uncancel event`.
 
 **Conditions:** equality and numeric comparisons, `is set`, `contains`, `starts/ends with`,
-`matches` (regex), `is between`, `is op`, `is online/offline`, `is sneaking/sprinting/flying`,
-`has permission`.
+`matches` (regex), `is between`, `chance of`, `is op`, `is online/offline`, `is alive/dead`,
+`is sneaking/sprinting/flying`, `has permission`.
 
 **Effects:** broadcast, send/message, send actionbar (with legacy `&` colour codes), set, add,
-remove, delete/clear, return, stop, exit loop, continue, cancel/uncancel event, set health/food/
-gamemode, kill, heal, feed, op/deop, kick, teleport to player, execute command (`make … execute`,
-`execute console command`).
+remove, delete/clear, replace-in-text, return, stop, exit loop, continue, cancel/uncancel event,
+set health/food/gamemode, kill, heal, feed, op/deop, kick, teleport to player, set walk speed,
+allow/disallow flight, set display name, clear inventory, set time of world, make world sunny/stormy,
+execute command (`make … execute`, `execute console command`).
 
 **Expressions:** player, console, event-values, loop-value/number/index, name of, size/amount of,
 random number/integer, arithmetic (`+ - * /`, parentheses, constant-folded), variables (incl. lists
 and dynamic names), function calls; string ops (uppercase, lowercase, length, split, join); list ops
 (first/last/random element, reversed, sorted); player properties (health, max health, food, level,
 uuid, gamemode, world, location, name); all/online players; gamemode literals; command `sender`,
-`arg-N`, `args`.
+`arg-N`, `args`; comma/`and`-separated list literals (`1, 2 and 3`).
 
 **Types:** `number`, `text`, `boolean`, `player`, `world`, `gamemode` (registry-backed display/parse).
 
