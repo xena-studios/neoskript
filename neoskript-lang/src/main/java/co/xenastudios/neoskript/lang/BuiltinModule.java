@@ -16,14 +16,19 @@ import co.xenastudios.neoskript.core.runtime.StopSignal;
 import co.xenastudios.neoskript.core.runtime.VariableScope;
 import co.xenastudios.neoskript.core.type.TypeRegistry;
 import co.xenastudios.neoskript.lang.expression.EventPlayerExpression;
+import co.xenastudios.neoskript.lang.expression.EventValueExpression;
 import co.xenastudios.neoskript.lang.type.BooleanType;
 import co.xenastudios.neoskript.lang.type.NumberType;
 import co.xenastudios.neoskript.lang.type.PlayerType;
 import co.xenastudios.neoskript.lang.type.StringType;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Cancellable;
 import org.bukkit.event.player.PlayerEvent;
 
 import java.util.Locale;
@@ -65,6 +70,14 @@ public final class BuiltinModule {
 
     private static void registerExpressions(SyntaxRegistry registry) {
         registry.registerExpression("player", Player.class, arguments -> new EventPlayerExpression());
+        registry.registerExpression("[the] event-player", Player.class,
+                arguments -> new EventValueExpression<>(Player.class));
+        registry.registerExpression("[the] (event-block|block)", Block.class,
+                arguments -> new EventValueExpression<>(Block.class));
+        registry.registerExpression("[the] (event-world|world)", World.class,
+                arguments -> new EventValueExpression<>(World.class));
+        registry.registerExpression("[the] (event-entity|entity)", Entity.class,
+                arguments -> new EventValueExpression<>(Entity.class));
         registry.registerExpression("console", Object.class,
                 arguments -> new ComputedExpression(ctx -> Bukkit.getConsoleSender()));
 
@@ -380,6 +393,15 @@ public final class BuiltinModule {
         registry.registerEffect("(stop|exit) [trigger]", arguments -> ctx -> {
             throw StopSignal.INSTANCE;
         });
+
+        registry.registerEffect("cancel [the] event", arguments -> ctx -> setCancelled(ctx, true));
+        registry.registerEffect("uncancel [the] event", arguments -> ctx -> setCancelled(ctx, false));
+    }
+
+    private static void setCancelled(TriggerContext ctx, boolean cancelled) {
+        ctx.event()
+                .filter(Cancellable.class::isInstance)
+                .ifPresent(event -> ((Cancellable) event).setCancelled(cancelled));
     }
 
     private static VariableExpression requireVariable(Expression<?> expression) {
