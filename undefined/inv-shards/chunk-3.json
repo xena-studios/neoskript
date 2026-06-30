@@ -1,0 +1,148 @@
+[
+  {
+    "category": "condition",
+    "name": "Is Block",
+    "since": "2.4",
+    "patterns": [
+      "%itemtypes% (is|are) ([a] block|blocks)",
+      "%itemtypes% (isn't|is not|aren't|are not) ([a] block|blocks)"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsBlock.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Blocking",
+    "since": "unknown (before 2.1)",
+    "patterns": [
+      "%players% (is|are) (blocking|defending) [with [a] shield]",
+      "%players% (isn't|is not|aren't|are not) (blocking|defending) [with [a] shield]"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsBlocking.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Block Redstone Powered",
+    "since": "2.5",
+    "patterns": [
+      "%blocks% (is|are) redstone powered",
+      "%blocks% (is|are) indirectly redstone powered",
+      "%blocks% (is|are)(n't| not) redstone powered",
+      "%blocks% (is|are)(n't| not) indirectly redstone powered"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsBlockRedstonePowered.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Burning",
+    "since": "1.4.4",
+    "patterns": [
+      "%entities% (is|are) (burning|ignited|on fire)",
+      "%entities% (isn't|is not|aren't|are not) (burning|ignited|on fire)"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsBurning.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Charged",
+    "since": "2.5, 2.10 (withers, wither skulls)",
+    "patterns": [
+      "%entities% (is|are) (charged|powered)",
+      "%entities% (isn't|is not|aren't|are not) (charged|powered)"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsCharged.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Charging Fireball",
+    "since": "2.11",
+    "patterns": [
+      "%livingentities% (is|are) charging [a] fireball",
+      "%livingentities% (isn't|is not|aren't|are not) charging [a] fireball"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsChargingFireball.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Climbing",
+    "since": "2.8.0",
+    "patterns": [
+      "%livingentities% (is|are) climbing",
+      "%livingentities% (isn't|is not|aren't|are not) climbing"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsClimbing.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Conditional",
+    "since": "2.10",
+    "patterns": [
+      "%blocks% (is|are) [:un]conditional",
+      "%blocks% (isn't|is not|aren't|are not) [:un]conditional"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsCommandBlockConditional.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Custom Name Visible",
+    "since": "2.10",
+    "patterns": [
+      "%entities%'[s] custom name[s] (is|are) visible",
+      "%entities%'[s] custom name[s] (isn't|is not|are not|aren't) visible",
+      "custom name of %entities% (is|are) visible",
+      "custom name of %entities% (isn't|is not|are not|aren't) visible"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsCustomNameVisible.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Dancing",
+    "since": "2.11",
+    "patterns": [
+      "%livingentities% (is|are) dancing",
+      "%livingentities% (isn't|is not|aren't|are not) dancing"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsDancing.java"
+  },
+  {
+    "category": "condition",
+    "name": "Camel Is Dashing",
+    "since": "2.11",
+    "patterns": [
+      "%livingentities% (is|are) dashing",
+      "%livingentities% (isn't|is not|aren't|are not) dashing"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsDashing.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Evenly Divisible By",
+    "since": "2.10, 2.12 (tolerance)",
+    "patterns": [
+      "%numbers% (is|are) evenly divisible by %number% [with [a] tolerance [of] %-number%]",
+      "%numbers% (isn't|is not|aren't|are not) evenly divisible by %number% [with [a] tolerance [of] %-number%]",
+      "%numbers% can be evenly divided by %number% [with [a] tolerance [of] %-number%]",
+      "%numbers% (can't|can[ ]not) be evenly divided by %number% [with [a] tolerance [of] %-number%]"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsDivisibleBy.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Eating",
+    "since": "2.11",
+    "patterns": [
+      "%livingentities% (is|are) eating",
+      "%livingentities% (isn't|is not|aren't|are not) eating"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsEating.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Edible",
+    "since": "2.2-dev36",
+    "patterns": [
+      "%itemtypes% (is|are) edible",
+      "%itemtypes% (isn't|is not|aren't|are not) edible"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsEdible.java"
+  }
+]

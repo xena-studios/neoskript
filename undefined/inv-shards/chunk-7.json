@@ -1,0 +1,147 @@
+[
+  {
+    "category": "condition",
+    "name": "Is Spawnable",
+    "since": "2.13",
+    "patterns": [
+      "%entitydatas% is spawnable [in [the [world]] %world%]",
+      "%entitydatas% can be spawned [in [the [world]] %world%]",
+      "%entitydatas% (isn't|is not) spawnable [in [the [world]] %world%]",
+      "%entitydatas% (can't|can not) be spawned [in [the [world]] %world%]"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsSpawnable.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Sprinting",
+    "since": "1.4.4",
+    "patterns": [
+      "%players% (is|are) sprinting",
+      "%players% (isn't|is not|aren't|are not) sprinting"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsSprinting.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Stackable",
+    "since": "2.7",
+    "patterns": [
+      "%itemstacks% (is|are) stackable",
+      "%itemstacks% (isn't|is not|aren't|are not) stackable"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsStackable.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Swimming",
+    "since": "2.3",
+    "patterns": [
+      "%livingentities% (is|are) swimming",
+      "%livingentities% (isn't|is not|aren't|are not) swimming"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsSwimming.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Tameable",
+    "since": "2.5",
+    "patterns": [
+      "%livingentities% (is|are) tameable",
+      "%livingentities% (isn't|is not|aren't|are not) tameable"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsTameable.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Tamed",
+    "since": "2.10",
+    "patterns": [
+      "%entities% (is|are) (tamed|domesticated)",
+      "%entities% (isn't|is not|aren't|are not) (tamed|domesticated)"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsTamed.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Ticking",
+    "since": "2.10",
+    "patterns": [
+      "%entities% (is|are) ticking",
+      "%entities% (isn't|is not|aren't|are not) ticking"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsTicking.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Transparent",
+    "since": "2.2-dev36",
+    "patterns": [
+      "%itemtypes% (is|are) transparent",
+      "%itemtypes% (isn't|is not|aren't|are not) transparent"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsTransparent.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Unbreakable",
+    "since": "2.5.1, 2.9.0 (breakable)",
+    "patterns": [
+      "%itemtypes% (is|are) [:un]breakable",
+      "%itemtypes% (isn't|is not|aren't|are not) [:un]breakable"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsUnbreakable.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Using Experimental Feature",
+    "since": "2.9.0",
+    "patterns": [
+      "%script% is using %strings%",
+      "%scripts% are using %strings%",
+      "%script% is(n't| not) using %strings%",
+      "%scripts% are(n't| not) using %strings%"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsUsingFeature.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Valid",
+    "since": "2.7, 2.10 (Scripts & Configs)",
+    "patterns": [
+      "%entities/scripts% (is|are) valid",
+      "%entities/scripts% (isn't|is not|aren't|are not) valid"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsValid.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Normalized",
+    "since": "2.5.1",
+    "patterns": [
+      "%vectors% (is|are) normalized",
+      "%vectors% (isn't|is not|aren't|are not) normalized"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsVectorNormalized.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Wearing",
+    "since": "1.0",
+    "patterns": [
+      "%livingentities% (is|are) wearing %itemtypes%",
+      "%livingentities% (isn't|is not|aren't|are not) wearing %itemtypes%"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsWearing.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Whitelisted",
+    "since": "2.5.2, 2.9.0 (enforce, offline players)",
+    "patterns": [
+      "[the] server (is|not:(isn't|is not)) (in white[ ]list mode|white[ ]listed)",
+      "%offlineplayers% (is|are|not:(isn't|is not|aren't|are not)) white[ ]listed",
+      "[the] server white[ ]list (is|not:(isn't|is not)) enforced"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsWhitelisted.java"
+  }
+]

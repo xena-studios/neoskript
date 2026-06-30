@@ -1,0 +1,154 @@
+[
+  {
+    "category": "condition",
+    "name": "Is Within",
+    "since": "2.7, 2.11 (world borders)",
+    "patterns": [
+      "%locations% (is|are) within %location% and %location%",
+      "%locations% (isn't|is not|aren't|are not) within %location% and %location%",
+      "%locations% (is|are) (within|in[side [of]]) %entities/chunks/worlds/worldborders/blocks%",
+      "%locations% (isn't|is not|aren't|are not) (within|in[side [of]]) %entities/chunks/worlds/worldborders/blocks%"
+    ],
+    "source": "ch/njol/skript/conditions/CondIsWithin.java"
+  },
+  {
+    "category": "condition",
+    "name": "Will Despawn",
+    "since": "2.11",
+    "patterns": [
+      "%itementities% will (despawn naturally|naturally despawn)",
+      "%itementities% (won't|will not) (despawn naturally|naturally despawn)",
+      "%itementities% can (despawn naturally|naturally despawn)",
+      "%itementities% can('t| not) (despawn naturally|naturally despawn)"
+    ],
+    "source": "ch/njol/skript/conditions/CondItemDespawn.java"
+  },
+  {
+    "category": "condition",
+    "name": "Item Has Enchantment Glint Override",
+    "since": "2.10",
+    "patterns": [
+      "%itemtypes% (has|have) enchantment glint overrid(den|e)",
+      "%itemtypes% (doesn't|don't|does not|do not) have enchantment glint overrid(den|e)",
+      "%itemtypes% (is|are) forced to [:not] glint",
+      "%itemtypes% (isn't|is not|aren't|are not) forced to [:not] glint"
+    ],
+    "source": "ch/njol/skript/conditions/CondItemEnchantmentGlint.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Holding",
+    "since": "1.0",
+    "patterns": [
+      "[%livingentities%] ha(s|ve) %itemtypes% in [main] hand",
+      "[%livingentities%] (is|are) holding %itemtypes% [in main hand]",
+      "[%livingentities%] ha(s|ve) %itemtypes% in off[(-| )]hand",
+      "[%livingentities%] (is|are) holding %itemtypes% in off[(-| )]hand",
+      "[%livingentities%] (ha(s|ve) not|do[es]n't have) %itemtypes% in [main] hand",
+      "[%livingentities%] (is not|isn't) holding %itemtypes% [in main hand]",
+      "[%livingentities%] (ha(s|ve) not|do[es]n't have) %itemtypes% in off[(-| )]hand",
+      "[%livingentities%] (is not|isn't) holding %itemtypes% in off[(-| )]hand"
+    ],
+    "source": "ch/njol/skript/conditions/CondItemInHand.java"
+  },
+  {
+    "category": "condition",
+    "name": "Is Leashed",
+    "since": "2.5",
+    "patterns": [
+      "%livingentities% (is|are) leashed",
+      "%livingentities% (isn't|is not|aren't|are not) leashed"
+    ],
+    "source": "ch/njol/skript/conditions/CondLeashed.java"
+  },
+  {
+    "category": "condition",
+    "name": "Leash Will Drop",
+    "since": "2.10",
+    "patterns": [
+      "[the] (lead|leash) [item] (will|not:(won't|will not)) (drop|be dropped)"
+    ],
+    "source": "ch/njol/skript/conditions/CondLeashWillDrop.java"
+  },
+  {
+    "category": "condition",
+    "name": "Lid Is Open/Closed",
+    "since": "2.10",
+    "patterns": [
+      "[the] lid[s] of %blocks% (is|are) (open[ed]|:close[d])",
+      "[the] lid[s] of %blocks% (isn't|is not|aren't|are not) (open[ed]|:close[d])",
+      "%blocks%'[s] lid[s] (is|are) (open[ed]|:close[d])",
+      "%blocks%'[s] lid[s] (isn't|is not|aren't|are not) (open[ed]|:close[d])"
+    ],
+    "source": "ch/njol/skript/conditions/CondLidState.java"
+  },
+  {
+    "category": "condition",
+    "name": "Matches",
+    "since": "2.5.2",
+    "patterns": [
+      "%strings% (1¦match[es]|2¦do[es](n't| not) match) %strings%",
+      "%strings% (1¦partially match[es]|2¦do[es](n't| not) partially match) %strings%"
+    ],
+    "source": "ch/njol/skript/conditions/CondMatches.java"
+  },
+  {
+    "category": "condition",
+    "name": "Running Minecraft",
+    "since": "2.5",
+    "patterns": [
+      "running [(1¦below)] minecraft %string%"
+    ],
+    "source": "ch/njol/skript/conditions/CondMinecraftVersion.java"
+  },
+  {
+    "category": "condition",
+    "name": "Panda Is On Its Back",
+    "since": "2.11",
+    "patterns": [
+      "%livingentities% (is|are) on (its|their) back[s]",
+      "%livingentities% (isn't|is not|aren't|are not) on (its|their) back[s]"
+    ],
+    "source": "ch/njol/skript/conditions/CondPandaIsOnBack.java"
+  },
+  {
+    "category": "condition",
+    "name": "Panda Is Rolling",
+    "since": "2.11",
+    "patterns": [
+      "%livingentities% (is|are) rolling",
+      "%livingentities% (isn't|is not|aren't|are not) rolling"
+    ],
+    "source": "ch/njol/skript/conditions/CondPandaIsRolling.java"
+  },
+  {
+    "category": "condition",
+    "name": "Panda Is Scared",
+    "since": "2.11",
+    "patterns": [
+      "%livingentities% (is|are) scared",
+      "%livingentities% (isn't|is not|aren't|are not) scared"
+    ],
+    "source": "ch/njol/skript/conditions/CondPandaIsScared.java"
+  },
+  {
+    "category": "condition",
+    "name": "Panda Is Sneezing",
+    "since": "2.11",
+    "patterns": [
+      "%livingentities% (is|are) sneezing",
+      "%livingentities% (isn't|is not|aren't|are not) sneezing"
+    ],
+    "source": "ch/njol/skript/conditions/CondPandaIsSneezing.java"
+  },
+  {
+    "category": "condition",
+    "name": "In The Past/Future",
+    "since": "2.10",
+    "patterns": [
+      "%dates% (is|are)[negated:(n't| not)] in the (past|:future)",
+      "%dates% ha(s|ve)[negated:(n't| not)] passed"
+    ],
+    "source": "ch/njol/skript/conditions/CondPastFuture.java"
+  }
+]

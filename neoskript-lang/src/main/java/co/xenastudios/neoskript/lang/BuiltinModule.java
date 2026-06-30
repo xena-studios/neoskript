@@ -113,6 +113,14 @@ public final class BuiltinModule {
                 "equipmentslot", org.bukkit.inventory.EquipmentSlot.class));
         types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
                 "spawnreason", org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "environment", org.bukkit.World.Environment.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "entityeffect", org.bukkit.EntityEffect.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "healreason", org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason.class));
+        types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
+                "teleportcause", org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.class));
         Renderer.setTypeRegistry(types);
         BuiltinSerializers.registerAll();
     }

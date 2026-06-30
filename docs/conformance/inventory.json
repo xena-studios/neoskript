@@ -13356,6 +13356,17 @@
     "status": "todo"
   },
   {
+    "id": "type:audience",
+    "category": "type",
+    "name": "audience",
+    "since": "",
+    "patterns": [
+      "audience"
+    ],
+    "source": "org/skriptlang/skript/bukkit/text/types/AudienceClassInfo.java",
+    "status": "todo"
+  },
+  {
     "id": "type:bannerpattern",
     "category": "type",
     "name": "bannerpattern",
@@ -13400,6 +13411,17 @@
     "status": "todo"
   },
   {
+    "id": "type:block",
+    "category": "type",
+    "name": "block",
+    "since": "",
+    "patterns": [
+      "block"
+    ],
+    "source": "org/skriptlang/skript/bukkit/types/BlockClassInfo.java",
+    "status": "todo"
+  },
+  {
     "id": "type:blockdata",
     "category": "type",
     "name": "blockdata",
@@ -13419,8 +13441,19 @@
       "boolean"
     ],
     "source": "ch/njol/skript/classes/data/JavaClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
+  },
+  {
+    "id": "type:bukkitparticle",
+    "category": "type",
+    "name": "bukkitparticle",
+    "since": "",
+    "patterns": [
+      "bukkitparticle"
+    ],
+    "source": "org/skriptlang/skript/bukkit/particles/ParticleModule.java",
+    "status": "todo"
   },
   {
     "id": "type:byte",
@@ -13498,7 +13531,7 @@
       "clicktype"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13510,7 +13543,7 @@
       "color"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13577,7 +13610,7 @@
       "damagecause"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13611,7 +13644,7 @@
       "date"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13623,7 +13656,7 @@
       "difficulty"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13705,6 +13738,17 @@
     "status": "todo"
   },
   {
+    "id": "type:entity",
+    "category": "type",
+    "name": "entity",
+    "since": "",
+    "patterns": [
+      "entity"
+    ],
+    "source": "org/skriptlang/skript/bukkit/types/EntityClassInfo.java",
+    "status": "todo"
+  },
+  {
     "id": "type:entity-type",
     "category": "type",
     "name": "Entity Type",
@@ -13725,7 +13769,7 @@
       "entitytype"
     ],
     "source": "ch/njol/skript/entity/EntityType.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13737,7 +13781,7 @@
       "entityeffect"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/ParticleModule.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "type:entitysnapshot",
@@ -13759,7 +13803,7 @@
       "environment"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "type:equipmentslot",
@@ -13770,7 +13814,7 @@
       "equipmentslot"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13904,7 +13948,7 @@
       "gamemode"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13949,7 +13993,7 @@
       "healreason"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "type:hoof",
@@ -13975,6 +14019,17 @@
     "prior": true
   },
   {
+    "id": "type:inventory",
+    "category": "type",
+    "name": "inventory",
+    "since": "",
+    "patterns": [
+      "inventory"
+    ],
+    "source": "org/skriptlang/skript/bukkit/types/InventoryClassInfo.java",
+    "status": "todo"
+  },
+  {
     "id": "type:inventoryaction",
     "category": "type",
     "name": "inventoryaction",
@@ -13983,7 +14038,7 @@
       "inventoryaction"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -14064,6 +14119,28 @@
     "status": "todo"
   },
   {
+    "id": "type:itemstack",
+    "category": "type",
+    "name": "itemstack",
+    "since": "",
+    "patterns": [
+      "itemstack"
+    ],
+    "source": "org/skriptlang/skript/bukkit/types/ItemStackClassInfo.java",
+    "status": "done"
+  },
+  {
+    "id": "type:itemtype",
+    "category": "type",
+    "name": "itemtype",
+    "since": "",
+    "patterns": [
+      "itemtype"
+    ],
+    "source": "org/skriptlang/skript/bukkit/types/ItemTypeClassInfo.java",
+    "status": "done"
+  },
+  {
     "id": "type:livingentity",
     "category": "type",
     "name": "livingentity",
@@ -14074,6 +14151,17 @@
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
     "status": "todo"
+  },
+  {
+    "id": "type:location",
+    "category": "type",
+    "name": "location",
+    "since": "",
+    "patterns": [
+      "location"
+    ],
+    "source": "org/skriptlang/skript/bukkit/types/LocationClassInfo.java",
+    "status": "done"
   },
   {
     "id": "type:long",
@@ -14164,6 +14252,17 @@
     "status": "todo"
   },
   {
+    "id": "type:nameable",
+    "category": "type",
+    "name": "nameable",
+    "since": "",
+    "patterns": [
+      "nameable"
+    ],
+    "source": "org/skriptlang/skript/bukkit/types/NameableClassInfo.java",
+    "status": "todo"
+  },
+  {
     "id": "type:named",
     "category": "type",
     "name": "named",
@@ -14194,7 +14293,7 @@
       "number"
     ],
     "source": "ch/njol/skript/classes/data/JavaClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -14220,6 +14319,17 @@
     "status": "todo"
   },
   {
+    "id": "type:offlineplayer",
+    "category": "type",
+    "name": "offlineplayer",
+    "since": "",
+    "patterns": [
+      "offlineplayer"
+    ],
+    "source": "org/skriptlang/skript/bukkit/types/OfflinePlayerClassInfo.java",
+    "status": "todo"
+  },
+  {
     "id": "type:particle",
     "category": "type",
     "name": "particle",
@@ -14240,6 +14350,17 @@
     ],
     "source": "ch/njol/skript/entity/PigData.java",
     "status": "todo"
+  },
+  {
+    "id": "type:player",
+    "category": "type",
+    "name": "player",
+    "since": "",
+    "patterns": [
+      "player"
+    ],
+    "source": "org/skriptlang/skript/bukkit/types/PlayerClassInfo.java",
+    "status": "done"
   },
   {
     "id": "type:potion-effect",
@@ -14314,6 +14435,28 @@
     "prior": true
   },
   {
+    "id": "type:quaternion",
+    "category": "type",
+    "name": "quaternion",
+    "since": "",
+    "patterns": [
+      "quaternion"
+    ],
+    "source": "org/skriptlang/skript/common/types/QuaternionClassInfo.java",
+    "status": "todo"
+  },
+  {
+    "id": "type:queue",
+    "category": "type",
+    "name": "queue",
+    "since": "",
+    "patterns": [
+      "queue"
+    ],
+    "source": "org/skriptlang/skript/common/types/QueueClassInfo.java",
+    "status": "todo"
+  },
+  {
     "id": "type:quitreason",
     "category": "type",
     "name": "quitreason",
@@ -14369,6 +14512,17 @@
     "status": "todo"
   },
   {
+    "id": "type:script",
+    "category": "type",
+    "name": "script",
+    "since": "",
+    "patterns": [
+      "script"
+    ],
+    "source": "org/skriptlang/skript/common/types/ScriptClassInfo.java",
+    "status": "todo"
+  },
+  {
     "id": "type:short",
     "category": "type",
     "name": "short",
@@ -14391,6 +14545,17 @@
     "status": "todo"
   },
   {
+    "id": "type:slot",
+    "category": "type",
+    "name": "slot",
+    "since": "",
+    "patterns": [
+      "slot"
+    ],
+    "source": "org/skriptlang/skript/bukkit/types/SlotClassInfo.java",
+    "status": "todo"
+  },
+  {
     "id": "type:soundcategory",
     "category": "type",
     "name": "soundcategory",
@@ -14410,7 +14575,7 @@
       "spawnreason"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -14422,7 +14587,7 @@
       "string"
     ],
     "source": "ch/njol/skript/classes/data/JavaClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -14445,7 +14610,7 @@
       "teleportcause"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "type:teleportflag",
@@ -14478,6 +14643,17 @@
       "textalignment"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/DisplayModule.java",
+    "status": "todo"
+  },
+  {
+    "id": "type:textcomponent",
+    "category": "type",
+    "name": "textcomponent",
+    "since": "",
+    "patterns": [
+      "textcomponent"
+    ],
+    "source": "org/skriptlang/skript/bukkit/text/types/TextComponentClassInfo.java",
     "status": "todo"
   },
   {
@@ -14558,6 +14734,17 @@
     "status": "todo"
   },
   {
+    "id": "type:vector",
+    "category": "type",
+    "name": "vector",
+    "since": "",
+    "patterns": [
+      "vector"
+    ],
+    "source": "org/skriptlang/skript/bukkit/types/VectorClassInfo.java",
+    "status": "done"
+  },
+  {
     "id": "type:vehicle",
     "category": "type",
     "name": "vehicle",
@@ -14611,7 +14798,7 @@
       "weathertype"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -14634,7 +14821,7 @@
       "world"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {

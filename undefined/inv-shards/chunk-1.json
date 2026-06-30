@@ -1,0 +1,169 @@
+[
+  {
+    "category": "condition",
+    "name": "Chance",
+    "since": "1.0, 2.14 (chance fails)",
+    "patterns": [
+      "chance of %number%(1:\\%|) [fail:(fails|failed)]"
+    ],
+    "source": "ch/njol/skript/conditions/CondChance.java"
+  },
+  {
+    "category": "condition",
+    "name": "Can See Chat Colors",
+    "since": "2.10",
+    "patterns": [
+      "%players% can see chat colo[u]r[s|ing]",
+      "%players% can('t| not) see chat colo[u]r[s|ing]"
+    ],
+    "source": "ch/njol/skript/conditions/CondChatColors.java"
+  },
+  {
+    "category": "condition",
+    "name": "Has Chat Filtering",
+    "since": "2.10",
+    "patterns": [
+      "%players% (has|have) (chat|text) filtering (on|enabled)",
+      "%players% (doesn't|don't|does not|do not) have (chat|text) filtering (on|enabled)"
+    ],
+    "source": "ch/njol/skript/conditions/CondChatFiltering.java"
+  },
+  {
+    "category": "condition",
+    "name": "Can See Messages",
+    "since": "2.10",
+    "patterns": [
+      "%player% can see all messages [in chat]",
+      "%player% can only see (commands|system messages) [in chat]",
+      "%player% can('t|[ ]not) see any (command[s]|message[s]) [in chat]",
+      "%player% can('t|[ ]not) see all messages [in chat]",
+      "%player% can('t|[ ]not) only see (commands|system messages) [in chat]"
+    ],
+    "source": "ch/njol/skript/conditions/CondChatVisibility.java"
+  },
+  {
+    "category": "condition",
+    "name": "Comparison",
+    "since": "1.0",
+    "patterns": [
+      "(1¦neither|) %objects% ((is|are)(|2¦(n't| not|4¦ neither)) ((greater|more|higher|bigger|larger) than|above)|\\>) %objects%",
+      "(1¦neither|) %objects% ((is|are)(|2¦(n't| not|4¦ neither)) (greater|more|higher|bigger|larger|above) [than] or (equal to|the same as)|\\>=) %objects%",
+      "(1¦neither|) %objects% ((is|are)(|2¦(n't| not|4¦ neither)) ((less|smaller|lower) than|below)|\\<) %objects%",
+      "(1¦neither|) %objects% ((is|are)(|2¦(n't| not|4¦ neither)) (less|smaller|lower|below) [than] or (equal to|the same as)|\\<=) %objects%",
+      "(1¦neither|) %objects% (2¦)((is|are) (not|4¦neither)|isn't|aren't|!=) [equal to] %objects%",
+      "(1¦neither|) %objects% (is|are|=) [(equal to|the same as)] %objects%",
+      "(1¦neither|) %objects% (is|are) between %objects% and %objects%",
+      "(1¦neither|) %objects% (2¦)(is not|are not|isn't|aren't) between %objects% and %objects%",
+      "(1¦neither|) %objects@-1% (was|were)(|2¦(n't| not|4¦ neither)) ((greater|more|higher|bigger|larger) than|above) %objects%",
+      "(1¦neither|) %objects@-1% (was|were)(|2¦(n't| not|4¦ neither)) (greater|more|higher|bigger|larger|above) [than] or (equal to|the same as) %objects%",
+      "(1¦neither|) %objects@-1% (was|were)(|2¦(n't| not|4¦ neither)) ((less|smaller|lower) than|below) %objects%",
+      "(1¦neither|) %objects@-1% (was|were)(|2¦(n't| not|4¦ neither)) (less|smaller|lower|below) [than] or (equal to|the same as) %objects%",
+      "(1¦neither|) %objects@-1% (2¦)((was|were) (not|4¦neither)|wasn't|weren't) [equal to] %objects%",
+      "(1¦neither|) %objects@-1% (was|were) [(equal to|the same as)] %objects%",
+      "(1¦neither|) %objects@-1% (was|were) between %objects% and %objects%",
+      "(1¦neither|) %objects@-1% (2¦)(was not|were not|wasn't|weren't) between %objects% and %objects%",
+      "(1¦neither|) %objects@1% (will be|2¦(will (not|4¦neither) be|won't be)) ((greater|more|higher|bigger|larger) than|above) %objects%",
+      "(1¦neither|) %objects@1% (will be|2¦(will (not|4¦neither) be|won't be)) (greater|more|higher|bigger|larger|above) [than] or (equal to|the same as) %objects%",
+      "(1¦neither|) %objects@1% (will be|2¦(will (not|4¦neither) be|won't be)) ((less|smaller|lower) than|below) %objects%",
+      "(1¦neither|) %objects@1% (will be|2¦(will (not|4¦neither) be|won't be)) (less|smaller|lower|below) [than] or (equal to|the same as) %objects%",
+      "(1¦neither|) %objects@1% (2¦)((will (not|4¦neither) be|won't be)|(isn't|aren't|is not|are not) (turning|changing) [in]to) [equal to] %objects%",
+      "(1¦neither|) %objects@1% (will be [(equal to|the same as)]|(is|are) (turning|changing) [in]to) %objects%",
+      "(1¦neither|) %objects@1% will be between %objects% and %objects%",
+      "(1¦neither|) %objects@1% (2¦)(will not be|won't be) between %objects% and %objects%"
+    ],
+    "source": "ch/njol/skript/conditions/CondCompare.java"
+  },
+  {
+    "category": "condition",
+    "name": "Contains",
+    "since": "1.0",
+    "patterns": [
+      "%inventories% (has|have) %itemtypes% [in [(the[ir]|his|her|its)] inventory]",
+      "%inventories% (doesn't|does not|do not|don't) have %itemtypes% [in [(the[ir]|his|her|its)] inventory]",
+      "%inventories/strings/objects% contain[(1¦s)] %itemtypes/strings/objects%",
+      "%inventories/strings/objects% (doesn't|does not|do not|don't) contain %itemtypes/strings/objects%"
+    ],
+    "source": "ch/njol/skript/conditions/CondContains.java"
+  },
+  {
+    "category": "condition",
+    "name": "Damage Cause",
+    "since": "2.0",
+    "patterns": [
+      "[the] damage (was|is|has)(0¦|1¦n('|o)t) [been] (caused|done|made) by %damagecause%"
+    ],
+    "source": "ch/njol/skript/conditions/CondDamageCause.java"
+  },
+  {
+    "category": "condition",
+    "name": "Time",
+    "since": "2.0",
+    "patterns": [
+      "%date% (was|were)( more|(n't| not) less) than %timespan% [ago]",
+      "%date% (was|were)((n't| not) more| less) than %timespan% [ago]"
+    ],
+    "source": "ch/njol/skript/conditions/CondDate.java"
+  },
+  {
+    "category": "condition",
+    "name": "Will Consume Boosting Firework",
+    "since": "2.10",
+    "patterns": [
+      "[the] (boosting|used) firework will be consumed",
+      "[the] (boosting|used) firework (will not|won't) be consumed"
+    ],
+    "source": "ch/njol/skript/conditions/CondElytraBoostConsume.java"
+  },
+  {
+    "category": "condition",
+    "name": "Enderman Has Been Stared At",
+    "since": "2.11",
+    "patterns": [
+      "%livingentities% (has|have) been stared at",
+      "%livingentities% (doesn't|don't|does not|do not) have been stared at"
+    ],
+    "source": "ch/njol/skript/conditions/CondEndermanStaredAt.java"
+  },
+  {
+    "category": "condition",
+    "name": "Entity is in Liquid",
+    "since": "2.6.1",
+    "patterns": [
+      "%entities% (is|are) in (1¦water|2¦lava|3¦[a] bubble[ ]column|4¦rain)",
+      "%entities% (isn't|is not|aren't|are not) in (1¦water|2¦lava|3¦[a] bubble[ ]column|4¦rain)"
+    ],
+    "source": "ch/njol/skript/conditions/CondEntityIsInLiquid.java"
+  },
+  {
+    "category": "condition",
+    "name": "Entity is Wet",
+    "since": "2.6.1",
+    "patterns": [
+      "%entities% (is|are) wet",
+      "%entities% (isn't|is not|aren't|are not) wet"
+    ],
+    "source": "ch/njol/skript/conditions/CondEntityIsWet.java"
+  },
+  {
+    "category": "condition",
+    "name": "Entity Storage Is Full",
+    "since": "2.11",
+    "patterns": [
+      "[the] entity storage of %blocks% (is|are) full",
+      "%blocks%'[s] entity storage (is|are) full",
+      "[the] entity storage of %blocks% (isn't|is not|aren't|are not) full",
+      "%blocks%'[s] entity storage (isn't|is not|aren't|are not) full"
+    ],
+    "source": "ch/njol/skript/conditions/CondEntityStorageIsFull.java"
+  },
+  {
+    "category": "condition",
+    "name": "Can Despawn",
+    "since": "2.11",
+    "patterns": [
+      "%livingentities% can despawn (on chunk unload|when far away)",
+      "%livingentities% can('t| not) despawn (on chunk unload|when far away)"
+    ],
+    "source": "ch/njol/skript/conditions/CondEntityUnload.java"
+  }
+]
