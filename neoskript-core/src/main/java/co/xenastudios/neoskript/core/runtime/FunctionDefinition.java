@@ -1,6 +1,7 @@
 package co.xenastudios.neoskript.core.runtime;
 
 import co.xenastudios.neoskript.api.runtime.TriggerContext;
+import co.xenastudios.neoskript.api.syntax.Expression;
 
 import java.util.List;
 
@@ -18,11 +19,18 @@ public final class FunctionDefinition implements ScriptFunction {
 
     private final String name;
     private final List<String> parameters;
+    private final List<Expression<?>> defaults;
     private final List<Statement> body;
 
     public FunctionDefinition(String name, List<String> parameters, List<Statement> body) {
+        this(name, parameters, java.util.Collections.nCopies(parameters.size(), null), body);
+    }
+
+    public FunctionDefinition(String name, List<String> parameters, List<Expression<?>> defaults,
+                              List<Statement> body) {
         this.name = name;
         this.parameters = List.copyOf(parameters);
+        this.defaults = new java.util.ArrayList<>(defaults);
         this.body = List.copyOf(body);
     }
 
@@ -56,7 +64,11 @@ public final class FunctionDefinition implements ScriptFunction {
         try {
             TriggerContext scope = new ChildContext(caller);
             for (int i = 0; i < parameters.size(); i++) {
-                scope.setLocal(parameters.get(i), i < arguments.size() ? arguments.get(i) : null);
+                Object value = i < arguments.size() ? arguments.get(i) : null;
+                if (value == null && defaults.get(i) != null) {
+                    value = defaults.get(i).getSingle(scope); // default may reference earlier params
+                }
+                scope.setLocal(parameters.get(i), value);
             }
             try {
                 IfSection.runAll(body, scope);

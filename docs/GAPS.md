@@ -11,7 +11,7 @@ _Last reviewed: 2026-06-30._
 
 ## ✅ Implemented
 
-**Structures:** events, periodic (`every`), `on load`, user functions, **custom commands**
+**Structures:** events, periodic (`every`), `on load`, user functions (with default parameters), **custom commands**
 (`command /name:` with permission/description/usage/aliases/trigger and `arg-N`/`args`), **`options:`**
 with `{@key}` substitution.
 
@@ -30,7 +30,7 @@ load/save, chunk load — plus **event-values** (`event-block`/`event-world`/`ev
 `is sneaking/sprinting/flying`, `can fly`, `is blocking/gliding/glowing/sleeping/swimming`,
 `is on ground`, `is burning`, `is whitelisted/banned`, `is in a vehicle`, `has permission`, `has <item>`, `is holding <item>`, `world is raining`.
 
-**Effects:** broadcast, send/message, send actionbar (with legacy `&` colour codes), set, add,
+**Effects:** broadcast, send/message, send actionbar (legacy `&` and MiniMessage colours), set, add,
 remove, delete/clear, replace-in-text, return, stop, exit loop, continue, cancel/uncancel event,
 set health/food/gamemode, kill, heal, feed, op/deop, kick, teleport to player, set walk speed, give/take items,
 allow/disallow flight, set display name, clear inventory, set time of world, make world sunny/stormy,
@@ -71,11 +71,10 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
    comparison/conversion, and persistence of rich types beyond strings/numbers/booleans).
 2. **Async/delays beyond the top level:** `wait` inside `if`/`loop`/`while`/functions, and explicit
    `async:`/`run … async` sections (needs a full continuation-based runtime).
-3. **Functions:** typed/optional/default parameters and enforced return types; local functions.
+3. **Functions:** typed parameters with enforced return types, and local functions (default/optional params are done).
 4. **Structures:** `aliases:`, `variables:` defaults, `import`/`using`.
 5. **Persistence:** SQL backends; serialization of non-simple variable values.
-6. **Text:** MiniMessage (`<red>`) in addition to legacy `&` codes.
-7. **Pattern engine niceties:** `the`/`a`/`an` articles, plural handling, parse marks/tags from
+6. **Pattern engine niceties:** `the`/`a`/`an` articles, plural handling, parse marks/tags from
    alternations.
 
 ## Notes

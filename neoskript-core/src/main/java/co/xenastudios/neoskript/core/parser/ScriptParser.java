@@ -146,16 +146,22 @@ public final class ScriptParser {
         }
         String name = header.group(1);
         List<String> parameters = new ArrayList<>();
+        List<Expression<?>> defaults = new ArrayList<>();
         for (String param : header.group(2).split(",")) {
             String trimmed = param.trim();
             if (trimmed.isEmpty()) {
                 continue;
             }
-            // Accept "name: type" — keep the name, ignore the (not-yet-enforced) type.
-            int colon = trimmed.indexOf(':');
-            parameters.add((colon >= 0 ? trimmed.substring(0, colon) : trimmed).trim());
+            // Accept "name: type = default" — keep the name and default; the type is not yet enforced.
+            int equals = trimmed.indexOf('=');
+            String head = (equals >= 0 ? trimmed.substring(0, equals) : trimmed).trim();
+            String defaultExpr = equals >= 0 ? trimmed.substring(equals + 1).trim() : "";
+            int colon = head.indexOf(':');
+            parameters.add((colon >= 0 ? head.substring(0, colon) : head).trim());
+            defaults.add(defaultExpr.isEmpty() ? null : expressions.parse(defaultExpr));
         }
-        functions.register(new FunctionDefinition(name, parameters, parseStatements(node.children(), false)));
+        functions.register(
+                new FunctionDefinition(name, parameters, defaults, parseStatements(node.children(), false)));
     }
 
     private void parseCommand(Node node) {

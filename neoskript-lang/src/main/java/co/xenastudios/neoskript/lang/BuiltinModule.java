@@ -29,6 +29,7 @@ import co.xenastudios.neoskript.lang.type.StringType;
 import co.xenastudios.neoskript.lang.type.VectorType;
 import co.xenastudios.neoskript.lang.type.WorldType;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
@@ -877,8 +878,18 @@ public final class BuiltinModule {
         }
     }
 
-    /** Translates legacy {@code &} colour codes (and hex) into a coloured component. */
+    /**
+     * Builds a coloured component from text: MiniMessage ({@code <red>}…) when it contains tags,
+     * otherwise legacy {@code &} colour codes.
+     */
     private static Component colored(String text) {
+        if (text.indexOf('<') >= 0 && text.indexOf('>') >= 0) {
+            try {
+                return MiniMessage.miniMessage().deserialize(text);
+            } catch (RuntimeException ignored) {
+                // not valid MiniMessage — fall back to legacy
+            }
+        }
         return LegacyComponentSerializer.legacyAmpersand().deserialize(text);
     }
 
