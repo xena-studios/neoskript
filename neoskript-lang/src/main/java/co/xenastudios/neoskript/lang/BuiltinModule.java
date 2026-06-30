@@ -18,6 +18,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerEvent;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  * Registers NeoSkript's built-in syntax: expressions, conditions, and effects.
  *
@@ -58,6 +60,33 @@ public final class BuiltinModule {
             Expression<?> source = arguments.get(0);
             return new ComputedExpression(ctx -> (double) source.getAll(ctx).length);
         });
+
+        registry.registerExpression("random number (from|between) %number% (to|and) %number%", Object.class,
+                arguments -> random(arguments.get(0), arguments.get(1), false));
+        registry.registerExpression("random integer (from|between) %number% (to|and) %number%", Object.class,
+                arguments -> random(arguments.get(0), arguments.get(1), true));
+    }
+
+    private static ComputedExpression random(Expression<?> minExpr, Expression<?> maxExpr, boolean integer) {
+        return new ComputedExpression(ctx -> {
+            double lo = orZero(toNumber(minExpr.getSingle(ctx)));
+            double hi = orZero(toNumber(maxExpr.getSingle(ctx)));
+            if (lo > hi) {
+                double tmp = lo;
+                lo = hi;
+                hi = tmp;
+            }
+            if (integer) {
+                long low = Math.round(lo);
+                long high = Math.round(hi);
+                return (double) (high <= low ? low : ThreadLocalRandom.current().nextLong(low, high + 1));
+            }
+            return hi <= lo ? lo : ThreadLocalRandom.current().nextDouble(lo, hi);
+        });
+    }
+
+    private static double orZero(Double value) {
+        return value == null ? 0.0 : value;
     }
 
     private static ComputedExpression nameOf(Expression<?> target) {

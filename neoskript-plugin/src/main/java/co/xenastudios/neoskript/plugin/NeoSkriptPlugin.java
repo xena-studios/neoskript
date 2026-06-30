@@ -4,6 +4,7 @@ import co.xenastudios.neoskript.core.parser.ScriptParser;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry;
 import co.xenastudios.neoskript.core.runtime.EventRegistry;
 import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
+import co.xenastudios.neoskript.core.runtime.Profiler;
 import co.xenastudios.neoskript.core.variable.FlatFileVariableStore;
 import co.xenastudios.neoskript.lang.BuiltinModule;
 import co.xenastudios.neoskript.lang.event.BuiltinEvents;
@@ -31,6 +32,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     private DefaultSyntaxRegistry registry;
     private EventRegistry events;
     private FunctionRegistry functions;
+    private final Profiler profiler = new Profiler();
     private final Map<String, Object> globalVariables = new ConcurrentHashMap<>();
 
     @Override
@@ -53,12 +55,13 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         getLogger().info("Running on " + platform.describe());
 
         ScriptParser parser = new ScriptParser(registry, events, functions);
-        ScriptLoader loader = new ScriptLoader(this, parser, functions, globalVariables);
+        ScriptLoader loader =
+                new ScriptLoader(this, parser, functions, globalVariables, scheduler, profiler);
         ScriptLoader.Result result = loader.loadAll(getDataFolder().toPath().resolve("scripts"));
 
         var command = getCommand("neoskript");
         if (command != null) {
-            command.setExecutor(new NeoSkriptCommand(this, loader));
+            command.setExecutor(new NeoSkriptCommand(this, loader, profiler));
         }
 
         double elapsedMs = (System.nanoTime() - startNanos) / 1_000_000.0;

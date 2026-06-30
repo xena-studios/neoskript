@@ -8,8 +8,8 @@ website: https://github.com/XenaStudios/NeoSkript
 folia-supported: true
 commands:
   neoskript:
-    description: Manage NeoSkript (status and reload).
-    usage: /neoskript [reload]
+    description: Manage NeoSkript (status, reload, profile).
+    usage: /neoskript [reload|profile]
     aliases: [nsk, ns]
 permissions:
   neoskript.admin:

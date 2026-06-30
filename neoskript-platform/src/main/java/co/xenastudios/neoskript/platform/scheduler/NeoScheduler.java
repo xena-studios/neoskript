@@ -37,6 +37,16 @@ public interface NeoScheduler {
     void runAsync(Runnable task);
 
     /**
+     * Runs a task repeatedly on the global region thread.
+     *
+     * @param task             the task to run
+     * @param initialDelayTicks delay before the first run, in ticks (clamped to a minimum of 1)
+     * @param periodTicks       interval between runs, in ticks (clamped to a minimum of 1)
+     * @return a handle to cancel the repeating task
+     */
+    TaskHandle runRepeating(Runnable task, long initialDelayTicks, long periodTicks);
+
+    /**
      * Creates the default scheduler for the given plugin.
      *
      * @param plugin the owning plugin

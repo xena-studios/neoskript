@@ -109,6 +109,27 @@ class ScriptParserTest {
     }
 
     @Test
+    void parsesPeriodicTriggers() {
+        Trigger trigger = parseOne("""
+                every 5 seconds:
+                    set {_x} to 1
+                """);
+        assertEquals(Trigger.Kind.PERIODIC, trigger.kind());
+        assertEquals(100L, trigger.intervalTicks());
+    }
+
+    @Test
+    void parsesLoadTriggers() {
+        Trigger trigger = parseOne("""
+                on load:
+                    set {started} to 1
+                """);
+        assertEquals(Trigger.Kind.LOAD, trigger.kind());
+        run(trigger);
+        assertEquals(1.0, globals.get("started"));
+    }
+
+    @Test
     void reportsUnknownEvents() {
         ParseException error = assertThrows(ParseException.class,
                 () -> parser.parse("on explode:\n    set {_x} to 1\n"));

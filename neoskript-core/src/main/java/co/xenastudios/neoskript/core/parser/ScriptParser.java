@@ -13,8 +13,12 @@ import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 import co.xenastudios.neoskript.core.runtime.IfSection;
 import co.xenastudios.neoskript.core.runtime.LoopSection;
 import co.xenastudios.neoskript.core.runtime.Statement;
+import co.xenastudios.neoskript.core.runtime.Timespan;
 import co.xenastudios.neoskript.core.runtime.Trigger;
 import co.xenastudios.neoskript.core.runtime.WhileSection;
+
+import java.util.OptionalLong;
+import java.util.Set;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -76,7 +80,9 @@ public final class ScriptParser {
 
         for (Node node : roots) {
             String lower = node.content().toLowerCase(Locale.ROOT);
-            if (lower.startsWith("on ") && node.content().endsWith(":")) {
+            if (lower.startsWith("every ") && node.content().endsWith(":")) {
+                triggers.add(parsePeriodic(node));
+            } else if (lower.startsWith("on ") && node.content().endsWith(":")) {
                 triggers.add(parseEvent(node));
             } else if (lower.startsWith("function ") && node.content().endsWith(":")) {
                 parseFunction(node);
@@ -87,15 +93,34 @@ public final class ScriptParser {
         return triggers;
     }
 
+    private static final Set<String> LOAD_ALIASES = Set.of("load", "enable", "server load", "server start");
+
     private Trigger parseEvent(Node node) {
         String eventName = node.content().substring(3, node.content().length() - 1).trim();
+        List<Statement> body = parseBody(node, eventName);
+        if (LOAD_ALIASES.contains(eventName.toLowerCase(Locale.ROOT))) {
+            return Trigger.onLoad(body);
+        }
         Class<?> eventClass = events.resolve(eventName)
                 .orElseThrow(() -> new ParseException("Unknown event '" + eventName + "'", node.line()));
+        return new Trigger(eventName, eventClass, body);
+    }
+
+    private Trigger parsePeriodic(Node node) {
+        String spec = node.content().substring("every ".length(), node.content().length() - 1).trim();
+        OptionalLong ticks = Timespan.parseTicks(spec);
+        if (ticks.isEmpty()) {
+            throw new ParseException("Unknown timespan '" + spec + "'", node.line());
+        }
+        return Trigger.periodic(ticks.getAsLong(), parseBody(node, "every " + spec));
+    }
+
+    private List<Statement> parseBody(Node node, String label) {
         List<Statement> body = parseStatements(node.children());
         if (body.isEmpty()) {
-            throw new ParseException("Event '" + eventName + "' has an empty body", node.line());
+            throw new ParseException("'" + label + "' has an empty body", node.line());
         }
-        return new Trigger(eventName, eventClass, body);
+        return body;
     }
 
     private void parseFunction(Node node) {

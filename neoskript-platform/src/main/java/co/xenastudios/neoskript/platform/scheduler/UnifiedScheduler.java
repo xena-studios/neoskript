@@ -29,4 +29,11 @@ final class UnifiedScheduler implements NeoScheduler {
     public void runAsync(Runnable task) {
         Bukkit.getAsyncScheduler().runNow(plugin, scheduled -> task.run());
     }
+
+    @Override
+    public TaskHandle runRepeating(Runnable task, long initialDelayTicks, long periodTicks) {
+        var scheduledTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(
+                plugin, scheduled -> task.run(), Math.max(1L, initialDelayTicks), Math.max(1L, periodTicks));
+        return scheduledTask::cancel;
+    }
 }

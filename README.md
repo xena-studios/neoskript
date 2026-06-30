@@ -6,8 +6,8 @@ Paper + Folia on Java 25, with a clean, extensible API.
 NeoSkript runs existing `.sk` scripts unchanged while being dramatically faster to load and execute,
 Folia-safe by construction, and designed so addon authors are first-class users.
 
-> **Status:** Phase 3 (Performance pass). Constant folding, indexed pattern dispatch, parallel script
-> loading, and a `/neoskript reload` command, on top of the Phase 2 language. See
+> **Status:** Phase 4 (New features). Built-in profiler, scheduled `every`/`on load` triggers, a
+> random expression, and an execution-engine seam with hot-path detection, on top of Phases 1–3. See
 > [`docs/PLAN.md`](docs/PLAN.md) for the full plan and roadmap.
 
 ## Modules
