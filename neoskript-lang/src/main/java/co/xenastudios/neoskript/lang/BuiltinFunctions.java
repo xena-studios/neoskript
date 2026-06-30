@@ -96,6 +96,132 @@ public final class BuiltinFunctions {
             }
             return Color.fromRGB(clampColor(r), clampColor(g), clampColor(b));
         });
+
+        // --- additional Skript-parity math/utility functions ---
+        registry.register("ceiling", unary(Math::ceil)); // alias of ceil
+        registry.register("clamp", (args, ctx) -> {
+            Double v = number(args, 0);
+            Double lo = number(args, 1);
+            Double hi = number(args, 2);
+            return (v == null || lo == null || hi == null) ? null : Math.max(lo, Math.min(hi, v));
+        });
+        registry.register("root", (args, ctx) -> {
+            Double n = number(args, 0);
+            Double degree = number(args, 1);
+            return (n == null || degree == null || degree == 0) ? null : Math.pow(n, 1.0 / degree);
+        });
+        registry.register("factorial", (args, ctx) -> {
+            Double n = number(args, 0);
+            if (n == null || n < 0) {
+                return null;
+            }
+            double result = 1;
+            for (int i = 2; i <= (int) (double) n; i++) {
+                result *= i;
+            }
+            return result;
+        });
+        registry.register("combinations", (args, ctx) -> binomial(number(args, 0), number(args, 1), false));
+        registry.register("permutations", (args, ctx) -> binomial(number(args, 0), number(args, 1), true));
+        registry.register("isNaN", (args, ctx) -> {
+            Double n = number(args, 0);
+            return n == null || n.isNaN();
+        });
+        registry.register("mean", (args, ctx) -> {
+            double sum = 0;
+            int count = 0;
+            for (Object arg : args) {
+                Double v = toNumber(arg);
+                if (v != null) {
+                    sum += v;
+                    count++;
+                }
+            }
+            return count == 0 ? null : sum / count;
+        });
+        registry.register("median", (args, ctx) -> {
+            java.util.List<Double> nums = new java.util.ArrayList<>();
+            for (Object arg : args) {
+                Double v = toNumber(arg);
+                if (v != null) {
+                    nums.add(v);
+                }
+            }
+            if (nums.isEmpty()) {
+                return null;
+            }
+            java.util.Collections.sort(nums);
+            int mid = nums.size() / 2;
+            return nums.size() % 2 == 1 ? nums.get(mid) : (nums.get(mid - 1) + nums.get(mid)) / 2.0;
+        });
+        registry.register("fromBase", (args, ctx) -> {
+            Double base = number(args, 1);
+            if (args.isEmpty() || base == null) {
+                return null;
+            }
+            try {
+                return (double) Long.parseLong(String.valueOf(args.get(0)).trim(), (int) (double) base);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        });
+        registry.register("toBase", (args, ctx) -> {
+            Double n = number(args, 0);
+            Double base = number(args, 1);
+            return (n == null || base == null) ? null : Long.toString((long) (double) n, (int) (double) base);
+        });
+        registry.register("concat", (args, ctx) -> {
+            StringBuilder sb = new StringBuilder();
+            for (Object arg : args) {
+                sb.append(arg == null ? "" : String.valueOf(arg));
+            }
+            return sb.toString();
+        });
+        registry.register("case_equals", (args, ctx) -> {
+            if (args.size() < 2) {
+                return true;
+            }
+            String first = String.valueOf(args.get(0));
+            for (int i = 1; i < args.size(); i++) {
+                if (!first.equals(String.valueOf(args.get(i)))) {
+                    return false;
+                }
+            }
+            return true;
+        });
+        registry.register("formatNumber", (args, ctx) -> {
+            Double n = number(args, 0);
+            if (n == null) {
+                return null;
+            }
+            String pattern = args.size() > 1 ? String.valueOf(args.get(1)) : "#,##0.##";
+            java.text.DecimalFormat format = new java.text.DecimalFormat(
+                    pattern, new java.text.DecimalFormatSymbols(java.util.Locale.US));
+            return format.format(n);
+        });
+        registry.register("file_separator", (args, ctx) -> java.io.File.separator);
+        registry.register("line_separator", (args, ctx) -> System.lineSeparator());
+    }
+
+    /** Binomial helper: permutations (ordered) or combinations of n things taken k at a time. */
+    private static Double binomial(Double n, Double k, boolean ordered) {
+        if (n == null || k == null || n < 0 || k < 0 || k > n) {
+            return null;
+        }
+        long nn = (long) (double) n;
+        long kk = (long) (double) k;
+        double numerator = 1;
+        for (long i = nn; i > nn - kk; i--) {
+            numerator *= i;
+        }
+        if (ordered) {
+            return numerator;
+        }
+        double denominator = 1;
+        for (long i = 2; i <= kk; i++) {
+            denominator *= i;
+        }
+        return numerator / denominator;
     }
 
     /** Clamps a colour channel to the 0–255 range. */

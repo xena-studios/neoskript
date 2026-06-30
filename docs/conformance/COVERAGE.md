@@ -11,9 +11,9 @@ Reference: **Skript 2.15.3** — generated from `inventory.json` by `coverage.py
 | expression | 515 | 8 | 507 | 0 | 0.0% |
 | event | 167 | 1 | 166 | 0 | 0.0% |
 | type | 135 | 2 | 133 | 24 | 18.0% |
-| function | 48 | 0 | 48 | 0 | 0.0% |
+| function | 48 | 0 | 48 | 40 | 83.3% |
 | section | 9 | 0 | 9 | 0 | 0.0% |
 | structure | 10 | 0 | 10 | 0 | 0.0% |
-| **Total** | **1200** | **14** | **1186** | **24** | **2.0%** |
+| **Total** | **1200** | **14** | **1186** | **64** | **5.4%** |
 
 _Goal: 100% of the 1186 in-scope entries, each implemented and tested._

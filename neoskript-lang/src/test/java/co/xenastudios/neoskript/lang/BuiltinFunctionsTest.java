@@ -60,6 +60,47 @@ class BuiltinFunctionsTest {
     }
 
     @Test
+    void parityMathFunctions() {
+        assertEquals(5.0, eval("ceiling(4.1)"));
+        assertEquals(3.0, eval("clamp(5, 0, 3)"));
+        assertEquals(0.0, eval("clamp(0 - 1, 0, 3)"));
+        assertEquals(3.0, eval("root(27, 3)"));
+        assertEquals(120.0, eval("factorial(5)"));
+        assertEquals(10.0, eval("combinations(5, 2)"));
+        assertEquals(20.0, eval("permutations(5, 2)"));
+        assertEquals(4.0, eval("mean(2, 4, 6)"));
+        assertEquals(2.5, eval("median(1, 2, 3, 4)"));
+        assertEquals(2.0, eval("median(1, 2, 3)"));
+    }
+
+    @Test
+    void parityUtilityFunctions() {
+        assertEquals(true, eval("isNaN(sqrt(0 - 1))"));
+        assertEquals(false, eval("isNaN(5)"));
+        assertEquals(255.0, eval("fromBase(\"ff\", 16)"));
+        assertEquals("ff", eval("toBase(255, 16)"));
+        assertEquals("abc", eval("concat(\"a\", \"b\", \"c\")"));
+        assertEquals(true, eval("case_equals(\"a\", \"a\")"));
+        assertEquals(false, eval("case_equals(\"a\", \"A\")"));
+        assertEquals("1,234,567", eval("formatNumber(1234567)"));
+        assertEquals(java.io.File.separator, eval("file_separator()"));
+        assertEquals(System.lineSeparator(), eval("line_separator()"));
+    }
+
+    @Test
+    void trigonometricAndLogFunctions() {
+        assertEquals(0.0, eval("sin(0)"));
+        assertEquals(1.0, eval("cos(0)"));
+        assertEquals(0.0, eval("tan(0)"));
+        assertEquals(0.0, eval("asin(0)"));
+        assertEquals(0.0, eval("atan(0)"));
+        assertEquals(0.0, eval("atan2(0, 1)"));
+        assertEquals(0.0, eval("ln(1)"));
+        assertEquals(1.0, eval("exp(0)"));
+        assertEquals(0.0, eval("log(1)"));
+    }
+
+    @Test
     void rgbBuildsColour() {
         org.bukkit.Color colour = (org.bukkit.Color) eval("rgb(10, 20, 30)");
         assertEquals(10, colour.getRed());

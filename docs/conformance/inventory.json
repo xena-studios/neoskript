@@ -12554,7 +12554,7 @@
       "abs(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12566,7 +12566,7 @@
       "acos(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12578,7 +12578,7 @@
       "asin(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12590,7 +12590,7 @@
       "atan(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12602,7 +12602,7 @@
       "atan2(x: number, y: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12638,7 +12638,7 @@
       "case_equals(strs: strings): boolean"
     ],
     "source": "ch/njol/skript/test/runner/TestFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12650,7 +12650,7 @@
       "ceil(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12662,7 +12662,7 @@
       "ceiling(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:clamp",
@@ -12673,7 +12673,7 @@
       "clamp(values: numbers, min: number, max: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:combinations",
@@ -12684,7 +12684,7 @@
       "combinations(options: number, selected: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:concat",
@@ -12695,7 +12695,7 @@
       "concat(texts: objects)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:cos",
@@ -12706,7 +12706,7 @@
       "cos(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12718,7 +12718,7 @@
       "date(year: number, month: number, day: number, hour: number = 0, minute: number = 0, second: number = 0, millisecond: number = 0, zone_offset: number = NaN, dst_offset: number = NaN)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12730,7 +12730,7 @@
       "exp(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12742,7 +12742,7 @@
       "factorial(number: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:file-separator",
@@ -12753,7 +12753,7 @@
       "file_separator(): string"
     ],
     "source": "ch/njol/skript/test/runner/TestFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:floor",
@@ -12764,7 +12764,7 @@
       "floor(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12776,7 +12776,7 @@
       "formatNumber(number: number, format: text = \"\")"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:frombase",
@@ -12787,7 +12787,7 @@
       "fromBase(string value: texts, base: integer)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12799,7 +12799,7 @@
       "isNaN(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:line-separator",
@@ -12810,7 +12810,7 @@
       "line_separator(): string"
     ],
     "source": "ch/njol/skript/test/runner/TestFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:ln",
@@ -12821,7 +12821,7 @@
       "ln(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12845,7 +12845,7 @@
       "log(n: number, base: number = 10)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12857,7 +12857,7 @@
       "max(ns: numbers)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12869,7 +12869,7 @@
       "mean(numbers: numbers)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:median",
@@ -12880,7 +12880,7 @@
       "median(numbers: numbers)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:min",
@@ -12891,7 +12891,7 @@
       "min(ns: numbers)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12903,7 +12903,7 @@
       "mod(d: number, m: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12927,7 +12927,7 @@
       "permutations(options: number, selected: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:player",
@@ -12950,7 +12950,7 @@
       "product(ns: numbers)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12973,7 +12973,7 @@
       "rgb(red: integer, green: integer, blue: integer, alpha: integer = 255)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -12985,7 +12985,7 @@
       "root(n: number, number: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done"
   },
   {
     "id": "function:round",
@@ -12996,7 +12996,7 @@
       "round(n: number, d: number = 0)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13008,7 +13008,7 @@
       "sin(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13020,7 +13020,7 @@
       "sqrt(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13032,7 +13032,7 @@
       "sum(ns: numbers)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13044,7 +13044,7 @@
       "tan(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13056,7 +13056,7 @@
       "toBase(n: integers, base: integer)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13079,7 +13079,7 @@
       "vector(n: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
@@ -13091,7 +13091,7 @@
       "vector(x: number, y: number, z: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo",
+    "status": "done",
     "prior": true
   },
   {
