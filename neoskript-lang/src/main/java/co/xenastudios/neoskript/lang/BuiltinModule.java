@@ -146,6 +146,14 @@ public final class BuiltinModule {
                 arguments -> coordinate(arguments.get(0), Location::getY));
         registry.registerExpression("z[-coordinate] of %location%", Object.class,
                 arguments -> coordinate(arguments.get(0), Location::getZ));
+        registry.registerExpression("time of %world%", Object.class, arguments -> {
+            Expression<?> world = arguments.get(0);
+            return new ComputedExpression(ctx ->
+                    world.getSingle(ctx) instanceof World w ? (double) w.getTime() : null);
+        });
+        registry.registerExpression("now", Object.class,
+                arguments -> new ComputedExpression(ctx -> (double) System.currentTimeMillis()));
+
         registry.registerExpression("distance between %location% and %location%", Object.class, arguments -> {
             Expression<?> a = arguments.get(0);
             Expression<?> b = arguments.get(1);
@@ -466,6 +474,19 @@ public final class BuiltinModule {
         registry.registerCondition("%player% (has|have) %object%", a -> hasItem(a, true));
         registry.registerCondition("%player% (doesn't have|does not have|hasn't|haven't) %object%",
                 a -> hasItem(a, false));
+        registry.registerCondition("%player% is holding %object%", a -> {
+            Expression<?> target = a.get(0);
+            Expression<?> item = a.get(1);
+            return ctx -> target.getSingle(ctx) instanceof Player player
+                    && item.getSingle(ctx) instanceof ItemStack stack
+                    && player.getInventory().getItemInMainHand().getType() == stack.getType();
+        });
+        registry.registerCondition("%world% is raining", a -> worldIs(a.get(0), true));
+        registry.registerCondition("%world% (is not raining|isn't raining|is clear)", a -> worldIs(a.get(0), false));
+    }
+
+    private static Condition worldIs(Expression<?> target, boolean raining) {
+        return ctx -> target.getSingle(ctx) instanceof World world && world.hasStorm() == raining;
     }
 
     private static Condition hasItem(Arguments arguments, boolean expected) {

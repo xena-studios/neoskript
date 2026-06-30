@@ -2,6 +2,7 @@ package co.xenastudios.neoskript.lang;
 
 import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 import co.xenastudios.neoskript.core.runtime.ScriptFunction;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -67,6 +68,9 @@ public final class BuiltinFunctions {
             int amount = args.size() > 1 && args.get(1) instanceof Number n ? n.intValue() : 1;
             return new ItemStack(material, Math.max(1, amount));
         });
+        registry.register("world", (args, ctx) -> args.isEmpty() ? null : Bukkit.getWorld(String.valueOf(args.get(0))));
+        registry.register("player", (args, ctx) ->
+                args.isEmpty() ? null : Bukkit.getPlayerExact(String.valueOf(args.get(0))));
     }
 
     private static double coord(List<Object> args, int index) {

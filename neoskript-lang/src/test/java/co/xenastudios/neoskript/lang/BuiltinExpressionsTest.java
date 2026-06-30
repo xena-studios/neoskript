@@ -97,6 +97,12 @@ class BuiltinExpressionsTest {
     }
 
     @Test
+    void nowReturnsACurrentTimestamp() {
+        Object now = eval("now", new HashMap<>());
+        assertTrue(now instanceof Double && (Double) now > 0, "now should be a positive timestamp");
+    }
+
+    @Test
     void chanceConditionBounds() {
         assertTrue(condition("chance of 100"));
         assertFalse(condition("chance of 0"));
