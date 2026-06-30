@@ -352,6 +352,20 @@ public final class BuiltinModule {
                 event(ctx) instanceof org.bukkit.event.entity.EntityDeathEvent e ? (double) e.getDroppedExp() : null);
         eventValue(registry, "[the] (level|new level)", ctx ->
                 event(ctx) instanceof org.bukkit.event.player.PlayerLevelChangeEvent e ? (double) e.getNewLevel() : null);
+        eventValue(registry, "[the] (new|future) food level", ctx ->
+                event(ctx) instanceof org.bukkit.event.entity.FoodLevelChangeEvent e ? (double) e.getFoodLevel() : null);
+        eventValue(registry, "[the] (bred|breeding) (mother|breeder)", ctx ->
+                event(ctx) instanceof org.bukkit.event.entity.EntityBreedEvent e ? e.getBreeder() : null);
+        eventValue(registry, "[the] (sign|written) line[s]", ctx ->
+                event(ctx) instanceof org.bukkit.event.block.SignChangeEvent e ? e.getLines() : null);
+        eventValue(registry, "[the] hatching (number|amount)", ctx ->
+                event(ctx) instanceof org.bukkit.event.player.PlayerEggThrowEvent e ? (double) e.getNumHatches() : null);
+        eventValue(registry, "[the] respawn[ing] reason", ctx ->
+                event(ctx) instanceof org.bukkit.event.player.PlayerRespawnEvent e ? e.getRespawnReason() : null);
+        eventValue(registry, "[the] regrow[n] [health] amount", ctx ->
+                event(ctx) instanceof org.bukkit.event.entity.EntityRegainHealthEvent e ? e.getAmount() : null);
+        eventValue(registry, "[the] (xp|experience) [orb] amount", ctx ->
+                event(ctx) instanceof org.bukkit.event.player.PlayerExpChangeEvent e ? (double) e.getAmount() : null);
 
         registry.registerExpression("[a] random uuid", Object.class,
                 arguments -> new ComputedExpression(ctx -> java.util.UUID.randomUUID()));

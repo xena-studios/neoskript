@@ -54,6 +54,11 @@ class EventValuesTest {
                         set {_h} to spawn reason
                         set {_i} to clicked block
                         set {_j} to dropped exp
+                        set {_k} to new food level
+                        set {_l2} to breeder
+                        set {_m2} to sign lines
+                        set {_n2} to respawn reason
+                        set {_o2} to xp amount
                         send "DONE" to player
                 """, StandardCharsets.UTF_8);
         server.dispatchCommand(server.getConsoleSender(), "neoskript reload");

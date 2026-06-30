@@ -7214,8 +7214,8 @@
       "[the] breeder"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/expressions/ExprBreedingFamily.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:brewing-results",
@@ -8258,8 +8258,8 @@
       "[the] [displayed] ([e]xp[erience]|enchanting) cost"
     ],
     "source": "ch/njol/skript/expressions/ExprEnchantingExpCost.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:enchantment-bonus",
@@ -9132,8 +9132,8 @@
       "[the] hatching entity [type]"
     ],
     "source": "ch/njol/skript/expressions/ExprHatchingType.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:hatching-number",
@@ -11517,7 +11517,8 @@
       "%players%'[s] respawn[ing] reason"
     ],
     "source": "ch/njol/skript/expressions/ExprRespawnReason.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:result",
@@ -11763,8 +11764,8 @@
       "[the] (1st|first|2nd|second|3rd|third|4th|fourth) line [of %block%]"
     ],
     "source": "org/skriptlang/skript/bukkit/block/sign/elements/expressions/ExprSignText.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:simulation-distance",
