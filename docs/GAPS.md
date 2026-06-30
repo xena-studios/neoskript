@@ -18,14 +18,17 @@ with `{@key}` substitution.
 **Sections:** `if`/`else if`/`else`, `while`, `loop … times`, `loop <values>`, **loop control**
 (`exit loop`, `continue`), and **top-level `wait <timespan>`** (scheduler-backed delays).
 
-**Events (~21):** join, quit, chat, death, block break/place, interact, inventory click, command,
-respawn, teleport, move, drop, sneak toggle, gamemode change, damage, explode, food level, sign
-change, weather, world load — plus **event-values** (`event-block`/`event-world`/`event-entity`/…)
-and **`cancel event`**/`uncancel event`.
+**Events (~46):** join, quit, chat, death, block break/place, interact, inventory click/open/close,
+command, respawn, teleport, move, drop, pickup, sneak/sprint/flight toggle, gamemode change, level/exp
+change, world change, damage, explode, regen, tame, creature spawn, projectile hit/launch, food level,
+consume, fish, bed enter, sign change, craft, smelt, vehicle enter/exit, weather, lightning, world
+load/save, chunk load — plus **event-values** (`event-block`/`event-world`/`event-entity`/…) and
+**`cancel event`**/`uncancel event`.
 
 **Conditions:** equality and numeric comparisons, `is set`, `contains`, `starts/ends with`,
 `matches` (regex), `is between`, `chance of`, `is op`, `is online/offline`, `is alive/dead`,
-`is sneaking/sprinting/flying`, `has permission`, `has <item>`.
+`is sneaking/sprinting/flying`, `can fly`, `is blocking/gliding/glowing/sleeping/swimming`,
+`is on ground`, `is burning`, `is whitelisted/banned`, `is in a vehicle`, `has permission`, `has <item>`.
 
 **Effects:** broadcast, send/message, send actionbar (with legacy `&` colour codes), set, add,
 remove, delete/clear, replace-in-text, return, stop, exit loop, continue, cancel/uncancel event,
@@ -57,10 +60,10 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`.
 - **Expressions:** direction/vector math, item properties (amount/name/lore/enchants), world
   time/weather, target/looked-at block, nearby entities, date/now and time differences, more
   string/number formatting, …
-- **Events:** the remaining ~80 (craft, smelt, enchant, projectile, vehicle, portal, bucket, leash,
-  tame, breed, world save/init, chunk load, server ping, tab complete, …).
-- **Conditions:** the remaining ~100 (is wearing, can build/fly, is banned/whitelisted, world is,
-  is burning/in water, is holding, …).
+- **Events:** the remaining (enchant, portal, bucket fill/empty, leash, breed, world init, chunk
+  unload, redstone, block burn/ignite/grow, server ping, tab complete, …).
+- **Conditions:** the remaining (is wearing, can build, world is, is in water/lava, is holding
+  <item>, is tamed/leashed, has played before, …).
 - **Functions:** `date()`, `rgb()`/colour, `world()`, `player()`, …
 
 ## ❌ Remaining — deeper engine features

@@ -443,6 +443,22 @@ public final class BuiltinModule {
         registry.registerCondition("%player% is sneaking", a -> playerIs(a.get(0), Player::isSneaking, true));
         registry.registerCondition("%player% is sprinting", a -> playerIs(a.get(0), Player::isSprinting, true));
         registry.registerCondition("%player% is flying", a -> playerIs(a.get(0), Player::isFlying, true));
+        registry.registerCondition("%player% can fly", a -> playerIs(a.get(0), Player::getAllowFlight, true));
+        registry.registerCondition("%player% (can't fly|cannot fly|can not fly)",
+                a -> playerIs(a.get(0), Player::getAllowFlight, false));
+        registry.registerCondition("%player% is blocking", a -> playerIs(a.get(0), Player::isBlocking, true));
+        registry.registerCondition("%player% is gliding", a -> playerIs(a.get(0), Player::isGliding, true));
+        registry.registerCondition("%player% is glowing", a -> playerIs(a.get(0), Player::isGlowing, true));
+        registry.registerCondition("%player% is sleeping", a -> playerIs(a.get(0), Player::isSleeping, true));
+        registry.registerCondition("%player% is swimming", a -> playerIs(a.get(0), Player::isSwimming, true));
+        registry.registerCondition("%player% is (on the ground|on ground)",
+                a -> playerIs(a.get(0), Player::isOnGround, true));
+        registry.registerCondition("%player% (is burning|is on fire)",
+                a -> playerIs(a.get(0), player -> player.getFireTicks() > 0, true));
+        registry.registerCondition("%player% is whitelisted", a -> playerIs(a.get(0), Player::isWhitelisted, true));
+        registry.registerCondition("%player% is banned", a -> playerIs(a.get(0), Player::isBanned, true));
+        registry.registerCondition("%player% is (in a vehicle|inside a vehicle)",
+                a -> playerIs(a.get(0), Player::isInsideVehicle, true));
         registry.registerCondition("%player% has permission %string%", a -> hasPermission(a, true));
         registry.registerCondition("%player% (doesn't have|does not have|lacks) permission %string%",
                 a -> hasPermission(a, false));

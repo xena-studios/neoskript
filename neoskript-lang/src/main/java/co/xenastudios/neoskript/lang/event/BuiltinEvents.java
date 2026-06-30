@@ -20,8 +20,32 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
+import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.EntityRegainHealthEvent;
+import org.bukkit.event.entity.EntityTameEvent;
+import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.inventory.CraftItemEvent;
+import org.bukkit.event.inventory.FurnaceSmeltEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.player.PlayerBedEnterEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerExpChangeEvent;
+import org.bukkit.event.player.PlayerFishEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.player.PlayerLevelChangeEvent;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
+import org.bukkit.event.player.PlayerToggleSprintEvent;
+import org.bukkit.event.vehicle.VehicleEnterEvent;
+import org.bukkit.event.vehicle.VehicleExitEvent;
+import org.bukkit.event.weather.LightningStrikeEvent;
 import org.bukkit.event.weather.WeatherChangeEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.WorldLoadEvent;
+import org.bukkit.event.world.WorldSaveEvent;
 
 /**
  * Registers NeoSkript's built-in event names. Phase 2 covers the common player/block events; the
@@ -60,5 +84,30 @@ public final class BuiltinEvents {
         events.register(SignChangeEvent.class, "sign change", "sign edit");
         events.register(WeatherChangeEvent.class, "weather change");
         events.register(WorldLoadEvent.class, "world load");
+
+        events.register(EntityDeathEvent.class, "entity death", "mob death");
+        events.register(EntityPickupItemEvent.class, "pickup", "item pickup");
+        events.register(EntityRegainHealthEvent.class, "regen", "heal", "health regen");
+        events.register(EntityTameEvent.class, "tame", "taming");
+        events.register(CreatureSpawnEvent.class, "spawn", "mob spawn", "creature spawn");
+        events.register(ProjectileHitEvent.class, "projectile hit");
+        events.register(ProjectileLaunchEvent.class, "projectile launch", "shoot");
+        events.register(PlayerLevelChangeEvent.class, "level change");
+        events.register(PlayerExpChangeEvent.class, "exp change", "experience change");
+        events.register(PlayerBedEnterEvent.class, "bed enter");
+        events.register(PlayerFishEvent.class, "fish", "fishing");
+        events.register(PlayerItemConsumeEvent.class, "consume", "eat", "drink");
+        events.register(PlayerChangedWorldEvent.class, "world change", "world switch");
+        events.register(PlayerToggleSprintEvent.class, "sprint toggle", "toggle sprint");
+        events.register(PlayerToggleFlightEvent.class, "flight toggle", "toggle flight");
+        events.register(InventoryOpenEvent.class, "inventory open");
+        events.register(InventoryCloseEvent.class, "inventory close");
+        events.register(CraftItemEvent.class, "craft", "crafting");
+        events.register(FurnaceSmeltEvent.class, "smelt", "smelting");
+        events.register(VehicleEnterEvent.class, "vehicle enter");
+        events.register(VehicleExitEvent.class, "vehicle exit");
+        events.register(ChunkLoadEvent.class, "chunk load");
+        events.register(WorldSaveEvent.class, "world save");
+        events.register(LightningStrikeEvent.class, "lightning", "lightning strike");
     }
 }
