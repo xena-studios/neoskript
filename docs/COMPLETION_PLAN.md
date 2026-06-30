@@ -6,6 +6,23 @@ and supersedes nothing — it's the execution plan for "100% of GAPS.md".
 
 _Authored: 2026-06-30. Baseline: 93 tests green; all engine-tractable features and broad content done._
 
+## Status (2026-06-30)
+
+- **Phase A — Type system depth:** ✅ done. Converter graph, value serializers, and **type-aware
+  comparisons** (numeric / `Comparable` / string-vs-display) wired into conditions.
+- **Phase B — Async runtime:** ✅ done. Continuation interpreter gives `wait` anywhere in a trigger.
+  Like Skript, there is no separate `async:` section type (off-thread work is an add-on concern).
+- **Phase C — Persistence:** ✅ done. Flatfile + JDBC/SQLite backends sharing a `VariableCodec`,
+  selected by config; rich-type serialization round-trips.
+- **Phase D — Structures:** ✅ done. `aliases:` custom items; `import`/`using` recognised and skipped.
+- **Phase E — Pattern niceties:** ✅ mostly done. Leading `the`/`a`/`an` articles tolerated; plural
+  type names normalised in signatures. Remaining: matcher-level parse marks/tags from alternations.
+- **Phase F — Content tail:** 🔄 continuous. Every named gap closed (`rgb()`, `date()`, colour & date
+  types, `play sound`, apply/clear potion effects, thunder/weather-duration effects, `is in
+  water/lava`, `can build`, `is thundering`, vector coordinates/length, item amount, capitalized
+  text, local/typed functions). The remaining work is the long tail of additional same-shape content
+  (more types, events, effects, expressions), each individually testable. **117 tests green.**
+
 ## Working principles
 
 - **Never break green.** Every change keeps `./gradlew build` green; CI/Nightly must stay passing.
