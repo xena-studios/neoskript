@@ -130,6 +130,17 @@ class ScriptParserTest {
     }
 
     @Test
+    void appliesOptionsSubstitution() {
+        SimpleTriggerContext ctx = run(parseOne("""
+                options:
+                    greeting: hello there
+                on join:
+                    set {_g} to "{@greeting}"
+                """));
+        assertEquals("hello there", ctx.getLocal("g"));
+    }
+
+    @Test
     void reportsUnknownEvents() {
         ParseException error = assertThrows(ParseException.class,
                 () -> parser.parse("on explode:\n    set {_x} to 1\n"));

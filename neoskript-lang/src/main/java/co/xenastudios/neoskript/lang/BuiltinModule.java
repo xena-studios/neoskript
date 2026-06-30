@@ -10,6 +10,8 @@ import co.xenastudios.neoskript.core.expression.ComputedListExpression;
 import co.xenastudios.neoskript.core.expression.NamedLocalExpression;
 import co.xenastudios.neoskript.core.expression.VariableExpression;
 import co.xenastudios.neoskript.core.parser.ParseException;
+import co.xenastudios.neoskript.core.runtime.BreakSignal;
+import co.xenastudios.neoskript.core.runtime.ContinueSignal;
 import co.xenastudios.neoskript.core.runtime.Renderer;
 import co.xenastudios.neoskript.core.runtime.ReturnSignal;
 import co.xenastudios.neoskript.core.runtime.StopSignal;
@@ -576,6 +578,13 @@ public final class BuiltinModule {
 
         registry.registerEffect("(stop|exit) [trigger]", arguments -> ctx -> {
             throw StopSignal.INSTANCE;
+        });
+
+        registry.registerEffect("(exit|stop) [the] [current] loop", arguments -> ctx -> {
+            throw BreakSignal.INSTANCE;
+        });
+        registry.registerEffect("(continue|next loop iteration)", arguments -> ctx -> {
+            throw ContinueSignal.INSTANCE;
         });
 
         registry.registerEffect("cancel [the] event", arguments -> ctx -> setCancelled(ctx, true));

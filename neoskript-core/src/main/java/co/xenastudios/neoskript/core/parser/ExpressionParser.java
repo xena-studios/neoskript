@@ -176,6 +176,11 @@ public final class ExpressionParser {
                 if ((c == '-' || c == '+') && isUnaryPosition(s, i)) {
                     continue;
                 }
+                // A '-' glued directly after a letter/underscore is part of an identifier
+                // (loop-number, event-block, arg-1), not subtraction.
+                if (c == '-' && i > 0 && (Character.isLetter(s.charAt(i - 1)) || s.charAt(i - 1) == '_')) {
+                    continue;
+                }
                 result = i;
             }
         }

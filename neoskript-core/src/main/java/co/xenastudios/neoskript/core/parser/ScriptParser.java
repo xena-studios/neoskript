@@ -25,8 +25,10 @@ import java.util.Set;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -86,7 +88,7 @@ public final class ScriptParser {
      * @throws ParseException on malformed input
      */
     public List<Trigger> parse(String source) {
-        List<Node> roots = buildTree(readLines(source));
+        List<Node> roots = applyOptions(buildTree(readLines(source)));
         List<Trigger> triggers = new ArrayList<>();
 
         for (Node node : roots) {
@@ -308,6 +310,48 @@ public final class ScriptParser {
             }
         }
         throw new ParseException("Don't understand the condition '" + content + "'", line);
+    }
+
+    /**
+     * Applies an {@code options:} block: collects its {@code key: value} children and substitutes
+     * {@code {@key}} occurrences throughout the remaining nodes, then drops the options block.
+     */
+    private static List<Node> applyOptions(List<Node> roots) {
+        Map<String, String> options = new HashMap<>();
+        List<Node> remaining = new ArrayList<>();
+        for (Node node : roots) {
+            if (node.content().equalsIgnoreCase("options:")) {
+                for (Node entry : node.children()) {
+                    int colon = entry.content().indexOf(':');
+                    if (colon > 0) {
+                        options.put(entry.content().substring(0, colon).trim(),
+                                entry.content().substring(colon + 1).trim());
+                    }
+                }
+            } else {
+                remaining.add(node);
+            }
+        }
+        if (options.isEmpty()) {
+            return remaining;
+        }
+        List<Node> substituted = new ArrayList<>(remaining.size());
+        for (Node node : remaining) {
+            substituted.add(substituteOptions(node, options));
+        }
+        return substituted;
+    }
+
+    private static Node substituteOptions(Node node, Map<String, String> options) {
+        String content = node.content();
+        for (Map.Entry<String, String> option : options.entrySet()) {
+            content = content.replace("{@" + option.getKey() + "}", option.getValue());
+        }
+        List<Node> children = new ArrayList<>(node.children().size());
+        for (Node child : node.children()) {
+            children.add(substituteOptions(child, options));
+        }
+        return new Node(content, node.line(), children);
     }
 
     private static List<Node> buildTree(List<Line> lines) {

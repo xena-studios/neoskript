@@ -30,7 +30,13 @@ public final class WhileSection implements Statement {
         long iterations = 0;
         long deadline = System.nanoTime() + MAX_NANOS;
         while (condition.check(ctx)) {
-            IfSection.runAll(body, ctx);
+            try {
+                IfSection.runAll(body, ctx);
+            } catch (ContinueSignal ignored) {
+                // proceed to the next iteration
+            } catch (BreakSignal ignored) {
+                break;
+            }
             // Stop on either bound so a runaway loop can't hang the server thread indefinitely.
             if (++iterations >= MAX_ITERATIONS || System.nanoTime() >= deadline) {
                 break;

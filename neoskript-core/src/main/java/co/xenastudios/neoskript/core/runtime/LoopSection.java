@@ -52,8 +52,7 @@ public final class LoopSection implements Statement {
                 for (long i = 1; i <= count; i++) {
                     ctx.setLocal("loop-value", (double) i);
                     ctx.setLocal("loop-index", (double) i);
-                    IfSection.runAll(body, ctx);
-                    if (System.nanoTime() >= deadline) {
+                    if (runIteration(ctx) || System.nanoTime() >= deadline) {
                         break;
                     }
                 }
@@ -62,8 +61,7 @@ public final class LoopSection implements Statement {
                 for (int i = 0; i < values.length; i++) {
                     ctx.setLocal("loop-value", values[i]);
                     ctx.setLocal("loop-index", (double) (i + 1));
-                    IfSection.runAll(body, ctx);
-                    if (System.nanoTime() >= deadline) {
+                    if (runIteration(ctx) || System.nanoTime() >= deadline) {
                         break;
                     }
                 }
@@ -72,6 +70,18 @@ public final class LoopSection implements Statement {
             ctx.setLocal("loop-value", previousValue);
             ctx.setLocal("loop-index", previousIndex);
         }
+    }
+
+    /** Runs the body for one iteration; returns {@code true} if the loop should break. */
+    private boolean runIteration(TriggerContext ctx) {
+        try {
+            IfSection.runAll(body, ctx);
+        } catch (ContinueSignal ignored) {
+            // proceed to the next iteration
+        } catch (BreakSignal ignored) {
+            return true;
+        }
+        return false;
     }
 
     private static long toLong(Object value) {
