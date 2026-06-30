@@ -25,6 +25,11 @@ public final class Renderer {
         typeRegistry = registry;
     }
 
+    /** @return the installed type registry, or {@code null} if none is set */
+    public static TypeRegistry typeRegistry() {
+        return typeRegistry;
+    }
+
     /**
      * Renders a value for display.
      *

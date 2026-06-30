@@ -101,7 +101,8 @@ public final class ScriptParser {
                 triggers.add(parsePeriodic(node));
             } else if (lower.startsWith("on ") && node.content().endsWith(":")) {
                 triggers.add(parseEvent(node));
-            } else if (lower.startsWith("function ") && node.content().endsWith(":")) {
+            } else if ((lower.startsWith("function ") || lower.startsWith("local function "))
+                    && node.content().endsWith(":")) {
                 parseFunction(node);
             } else if (lower.startsWith("command ") && node.content().endsWith(":")) {
                 parseCommand(node);
@@ -158,21 +159,38 @@ public final class ScriptParser {
         String name = header.group(1);
         List<String> parameters = new ArrayList<>();
         List<Expression<?>> defaults = new ArrayList<>();
+        List<String> parameterTypes = new ArrayList<>();
         for (String param : header.group(2).split(",")) {
             String trimmed = param.trim();
             if (trimmed.isEmpty()) {
                 continue;
             }
-            // Accept "name: type = default" — keep the name and default; the type is not yet enforced.
+            // "name: type = default": keep the name and default; the type is best-effort coerced.
             int equals = trimmed.indexOf('=');
             String head = (equals >= 0 ? trimmed.substring(0, equals) : trimmed).trim();
             String defaultExpr = equals >= 0 ? trimmed.substring(equals + 1).trim() : "";
             int colon = head.indexOf(':');
             parameters.add((colon >= 0 ? head.substring(0, colon) : head).trim());
+            parameterTypes.add(colon >= 0 ? singular(head.substring(colon + 1).trim()) : null);
             defaults.add(defaultExpr.isEmpty() ? null : expressions.parse(defaultExpr));
         }
-        functions.register(
-                new FunctionDefinition(name, parameters, defaults, parseStatements(node.children(), false)));
+        // Optional return type after "::" in the header line (e.g. `function f(...) :: number:`).
+        String returnType = null;
+        int closeParen = node.content().lastIndexOf(')');
+        int marker = closeParen >= 0 ? node.content().indexOf("::", closeParen) : -1;
+        if (marker >= 0) {
+            returnType = singular(node.content().substring(marker + 2, node.content().length() - 1).trim());
+        }
+        functions.register(new FunctionDefinition(
+                name, parameters, defaults, parameterTypes, returnType, parseStatements(node.children(), false)));
+    }
+
+    /** Strips a trailing plural {@code s} from a type name so {@code numbers} reads as {@code number}. */
+    private static String singular(String typeName) {
+        if (typeName.length() > 1 && typeName.toLowerCase(Locale.ROOT).endsWith("s")) {
+            return typeName.substring(0, typeName.length() - 1);
+        }
+        return typeName.isEmpty() ? null : typeName;
     }
 
     private Optional<Trigger> parseVariables(Node node) {

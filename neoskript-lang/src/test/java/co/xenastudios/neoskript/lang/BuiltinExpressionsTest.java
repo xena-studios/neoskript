@@ -60,6 +60,13 @@ class BuiltinExpressionsTest {
     }
 
     @Test
+    void localFunctionWithTypedParameterCoercesArgument() {
+        // The string "5" is coerced to a number by the declared parameter type, so *2 yields 10.
+        scripts.parse("local function double(n: number) :: number:\n    return {_n} * 2\n");
+        assertEquals(10.0, eval("double(\"5\")", new HashMap<>()));
+    }
+
+    @Test
     void leadingArticleIsTolerated() {
         Map<String, Object> g = new HashMap<>();
         // "the"/"a"/"an" are stripped as a fallback so article-laden phrasing still parses.

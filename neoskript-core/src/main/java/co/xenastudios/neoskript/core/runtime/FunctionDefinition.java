@@ -2,13 +2,16 @@ package co.xenastudios.neoskript.core.runtime;
 
 import co.xenastudios.neoskript.api.runtime.TriggerContext;
 import co.xenastudios.neoskript.api.syntax.Expression;
+import co.xenastudios.neoskript.api.type.Type;
+import co.xenastudios.neoskript.core.type.TypeRegistry;
 
 import java.util.List;
 
 /**
- * A user-defined function: a name, ordered parameter names, and a body of statements. Phase 2
- * functions are dynamically typed; parameter type annotations in the source are accepted but not yet
- * enforced (Phase 2 polish / Phase 3).
+ * A user-defined function: a name, ordered parameter names, and a body of statements. Functions are
+ * dynamically typed; declared parameter and return types (e.g. {@code function f(n: number) :: text})
+ * are best-effort coerced — a string argument to a typed parameter is parsed into that type, and the
+ * returned value is coerced to the declared return type.
  */
 public final class FunctionDefinition implements ScriptFunction {
 
@@ -20,6 +23,8 @@ public final class FunctionDefinition implements ScriptFunction {
     private final String name;
     private final List<String> parameters;
     private final List<Expression<?>> defaults;
+    private final List<String> parameterTypes;
+    private final String returnType;
     private final List<Statement> body;
 
     public FunctionDefinition(String name, List<String> parameters, List<Statement> body) {
@@ -28,10 +33,40 @@ public final class FunctionDefinition implements ScriptFunction {
 
     public FunctionDefinition(String name, List<String> parameters, List<Expression<?>> defaults,
                               List<Statement> body) {
+        this(name, parameters, defaults, java.util.Collections.nCopies(parameters.size(), null), null, body);
+    }
+
+    public FunctionDefinition(String name, List<String> parameters, List<Expression<?>> defaults,
+                              List<String> parameterTypes, String returnType, List<Statement> body) {
         this.name = name;
         this.parameters = List.copyOf(parameters);
         this.defaults = new java.util.ArrayList<>(defaults);
+        this.parameterTypes = new java.util.ArrayList<>(parameterTypes);
+        this.returnType = returnType;
         this.body = List.copyOf(body);
+    }
+
+    /**
+     * Coerces a value toward a declared type's code name: values already of the type pass through;
+     * strings are parsed via the type. Returns the original value when no coercion applies.
+     */
+    private static Object coerce(Object value, String typeName) {
+        if (typeName == null || value == null) {
+            return value;
+        }
+        TypeRegistry registry = Renderer.typeRegistry();
+        if (registry == null) {
+            return value;
+        }
+        Type<?> type = registry.byCodeName(typeName);
+        if (type == null || type.typeClass().isInstance(value)) {
+            return value;
+        }
+        if (value instanceof String s) {
+            Object parsed = type.parse(s).orElse(null);
+            return parsed != null ? parsed : value;
+        }
+        return value;
     }
 
     /** @return the function name */
@@ -68,12 +103,12 @@ public final class FunctionDefinition implements ScriptFunction {
                 if (value == null && defaults.get(i) != null) {
                     value = defaults.get(i).getSingle(scope); // default may reference earlier params
                 }
-                scope.setLocal(parameters.get(i), value);
+                scope.setLocal(parameters.get(i), coerce(value, parameterTypes.get(i)));
             }
             try {
                 IfSection.runAll(body, scope);
             } catch (ReturnSignal signal) {
-                return signal.value();
+                return coerce(signal.value(), returnType);
             } catch (StopSignal ignored) {
                 // `stop` inside a function ends the function, not the caller's trigger.
             }

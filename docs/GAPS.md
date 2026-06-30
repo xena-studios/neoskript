@@ -11,7 +11,7 @@ _Last reviewed: 2026-06-30._
 
 ## ✅ Implemented
 
-**Structures:** events, periodic (`every`), `on load`, user functions (with default parameters), **custom commands**
+**Structures:** events, periodic (`every`), `on load`, user functions (with default parameters, `local function`, and best-effort typed parameters/return types), **custom commands**
 (`command /name:` with permission/description/usage/aliases/trigger and `arg-N`/`args`), **`options:`** with `{@key}` substitution, **`variables:`** defaults, and **`aliases:`** (custom item aliases). `import`/`using` are recognised and skipped (no reflective Java bridge).
 
 **Sections:** `if`/`else if`/`else`, `while`, `loop … times`, `loop <values>`, **loop control**
@@ -68,8 +68,7 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
 
 1. **Type system depth:** a comparator graph wired into conditions (the converter graph and rich-type serializers are done; conditions still use the simpler Comparisons facade).
 2. **Async sections:** explicit `async:` / `run … async` blocks. (`wait` anywhere in a trigger now works via the continuation interpreter; delays inside functions remain disallowed, as in Skript.)
-3. **Functions:** typed parameters with enforced return types, and local functions (default/optional params are done).
-4. **Pattern engine niceties:** plural handling and parse marks/tags from alternations (leading `the`/`a`/`an` articles are now tolerated).
+3. **Pattern engine niceties:** plural handling and parse marks/tags from alternations (leading `the`/`a`/`an` articles are now tolerated).
 
 ## Completing the gaps
 
