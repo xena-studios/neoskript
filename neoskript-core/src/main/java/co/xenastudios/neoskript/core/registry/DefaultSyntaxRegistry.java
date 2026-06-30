@@ -1,64 +1,68 @@
 package co.xenastudios.neoskript.core.registry;
 
 import co.xenastudios.neoskript.api.registry.SyntaxRegistry;
-import co.xenastudios.neoskript.api.syntax.Condition;
-import co.xenastudios.neoskript.api.syntax.Effect;
-import co.xenastudios.neoskript.api.syntax.Expression;
+import co.xenastudios.neoskript.api.syntax.ConditionFactory;
+import co.xenastudios.neoskript.api.syntax.EffectFactory;
+import co.xenastudios.neoskript.api.syntax.ExpressionFactory;
+import co.xenastudios.neoskript.core.parser.pattern.PatternCompiler;
+import co.xenastudios.neoskript.core.parser.pattern.SyntaxPattern;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
- * The default in-memory {@link SyntaxRegistry}.
+ * The default in-memory {@link SyntaxRegistry}. Patterns are compiled to {@link SyntaxPattern} on
+ * registration so the parser can match against them directly.
  *
- * <p>Phase 0 stores registrations in flat lists. Phase 1 replaces this with the indexed
- * pattern-dispatch structure (bucketing candidates by leading literal token) that gives NeoSkript
- * its fast, near-linear parsing.
+ * <p>Phase 1 stores registrations in flat lists, matched in registration order. Phase 3 replaces
+ * this with the indexed pattern-dispatch structure (bucketing candidates by leading literal token)
+ * for fast, near-linear parsing.
  */
 public final class DefaultSyntaxRegistry implements SyntaxRegistry {
 
-    /**
-     * One registered syntax element: its pattern and the factory that builds occurrences.
-     *
-     * @param pattern    the syntax pattern
-     * @param returnType the produced type for expressions, otherwise {@code null}
-     * @param factory    produces a fresh syntax-element instance
-     */
-    public record Entry(String pattern, Class<?> returnType, Supplier<?> factory) {
+    /** A registered effect: its compiled pattern and the factory that builds occurrences. */
+    public record EffectEntry(SyntaxPattern pattern, EffectFactory factory) {
     }
 
-    private final List<Entry> effects = new ArrayList<>();
-    private final List<Entry> conditions = new ArrayList<>();
-    private final List<Entry> expressions = new ArrayList<>();
-
-    @Override
-    public void registerEffect(String pattern, Supplier<? extends Effect> factory) {
-        effects.add(new Entry(pattern, null, factory));
+    /** A registered condition: its compiled pattern and the factory that builds occurrences. */
+    public record ConditionEntry(SyntaxPattern pattern, ConditionFactory factory) {
     }
 
+    /** A registered expression: its compiled pattern, produced type, and factory. */
+    public record ExpressionEntry(SyntaxPattern pattern, Class<?> returnType, ExpressionFactory<?> factory) {
+    }
+
+    private final List<EffectEntry> effects = new ArrayList<>();
+    private final List<ConditionEntry> conditions = new ArrayList<>();
+    private final List<ExpressionEntry> expressions = new ArrayList<>();
+
     @Override
-    public void registerCondition(String pattern, Supplier<? extends Condition> factory) {
-        conditions.add(new Entry(pattern, null, factory));
+    public void registerEffect(String pattern, EffectFactory factory) {
+        effects.add(new EffectEntry(PatternCompiler.compile(pattern), factory));
     }
 
     @Override
-    public <T> void registerExpression(String pattern, Class<T> returnType, Supplier<? extends Expression<T>> factory) {
-        expressions.add(new Entry(pattern, returnType, factory));
+    public void registerCondition(String pattern, ConditionFactory factory) {
+        conditions.add(new ConditionEntry(PatternCompiler.compile(pattern), factory));
+    }
+
+    @Override
+    public <T> void registerExpression(String pattern, Class<T> returnType, ExpressionFactory<T> factory) {
+        expressions.add(new ExpressionEntry(PatternCompiler.compile(pattern), returnType, factory));
     }
 
     /** @return the registered effects, in registration order */
-    public List<Entry> effects() {
+    public List<EffectEntry> effects() {
         return List.copyOf(effects);
     }
 
     /** @return the registered conditions, in registration order */
-    public List<Entry> conditions() {
+    public List<ConditionEntry> conditions() {
         return List.copyOf(conditions);
     }
 
     /** @return the registered expressions, in registration order */
-    public List<Entry> expressions() {
+    public List<ExpressionEntry> expressions() {
         return List.copyOf(expressions);
     }
 

@@ -36,4 +36,21 @@ public interface TriggerContext {
      * @param value the value to store; {@code null} clears the variable
      */
     void setLocal(String name, Object value);
+
+    /**
+     * Reads a global variable ({@code {name}} in script source). Global variables are shared across
+     * all triggers and (from Phase 2) persisted between restarts.
+     *
+     * @param name the global variable name, without delimiters
+     * @return the stored value, or {@code null} if unset
+     */
+    Object getGlobal(String name);
+
+    /**
+     * Writes a global variable ({@code {name}} in script source).
+     *
+     * @param name  the global variable name, without delimiters
+     * @param value the value to store; {@code null} clears the variable
+     */
+    void setGlobal(String name, Object value);
 }
