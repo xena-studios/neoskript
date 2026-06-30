@@ -53,15 +53,15 @@ class ItemExprTest {
                             send "HARD" to player
                         if hex code of rgb(255, 0, 0) is "#ff0000":
                             send "HEX" to player
-                        set {_face} to facing of player
-                        set {_yield} to explosive yield of player
-                        set {_cmd} to custom model data of item("stone")
                         send "DONE" to player
 
                 command /ie2:
                     trigger:
                         set {_o} to owner of player
                         set {_t} to targeted block of player
+                        set {_face} to facing of player
+                        set {_yield} to explosive yield of player
+                        set {_cmd} to custom model data of item("stone")
                 """, StandardCharsets.UTF_8);
         server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
 
