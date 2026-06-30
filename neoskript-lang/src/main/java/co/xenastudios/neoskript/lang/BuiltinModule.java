@@ -756,6 +756,26 @@ public final class BuiltinModule {
                 worldEffect(arguments.get(0), world -> world.setStorm(false)));
         registry.registerEffect("make %world% (rainy|stormy)", arguments ->
                 worldEffect(arguments.get(0), world -> world.setStorm(true)));
+        registry.registerEffect("make %world% thunder[ing]", arguments ->
+                worldEffect(arguments.get(0), world -> world.setThundering(true)));
+        registry.registerEffect("set (weather|storm) duration of %world% to %number% seconds", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> value = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof World world) {
+                    world.setWeatherDuration((int) (orZero(toNumber(value.getSingle(ctx))) * 20));
+                }
+            };
+        });
+        registry.registerEffect("set thunder duration of %world% to %number% seconds", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> value = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof World world) {
+                    world.setThunderDuration((int) (orZero(toNumber(value.getSingle(ctx))) * 20));
+                }
+            };
+        });
 
         registry.registerEffect("set (max health|maximum health) of %player% to %number%", arguments -> {
             Expression<?> target = arguments.get(0);

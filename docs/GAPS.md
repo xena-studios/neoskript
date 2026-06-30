@@ -60,7 +60,7 @@ atan2, min, max, sum, product, `vector()`, `location()`, `item()`, `world()`, `p
 - **Types:** entity (beyond generic Entity), block (beyond event-value), inventory,
   slot, biome, enchantment, material, chunk, offline player, direction, … (colour and date are implemented)
 - **Effects:** particles, open/modify inventories, set weather amount/duration, scoreboard,
-  ban/unban, … (`play sound` and apply/clear potion effects are implemented)
+  ban/unban, … (`play sound`, apply/clear potion effects, and thunder/weather duration are implemented)
 - **Expressions:** direction math, more item properties (name/lore/enchants), weather
   state, target/looked-at block, nearby entities, time differences, more string/number formatting, … (x/y/z and length now work on vectors; amount of an item gives its stack size)
 - **Events:** the remaining (leash, tame variants, server ping, tab complete, advancement, and the long tail).
