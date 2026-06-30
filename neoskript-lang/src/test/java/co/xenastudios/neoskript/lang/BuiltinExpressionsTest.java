@@ -97,6 +97,24 @@ class BuiltinExpressionsTest {
     }
 
     @Test
+    void chanceConditionBounds() {
+        assertTrue(condition("chance of 100"));
+        assertFalse(condition("chance of 0"));
+    }
+
+    @Test
+    void replaceEffect() {
+        List<Trigger> triggers = scripts.parse("""
+                on join:
+                    set {_s} to "hello"
+                    replace "l" with "L" in {_s}
+                """);
+        SimpleTriggerContext ctx = new SimpleTriggerContext(null, new HashMap<>());
+        triggers.get(0).execute(ctx);
+        assertEquals("heLLo", ctx.getLocal("s"));
+    }
+
+    @Test
     void loopsOverListLiterals() {
         List<Trigger> triggers = scripts.parse("""
                 on join:

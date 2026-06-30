@@ -331,6 +331,10 @@ public final class BuiltinModule {
                 }
             };
         });
+        registry.registerCondition("chance of %number%[ percent]", arguments -> {
+            Expression<?> chance = arguments.get(0);
+            return ctx -> ThreadLocalRandom.current().nextDouble() * 100.0 < orZero(toNumber(chance.getSingle(ctx)));
+        });
 
         registry.registerCondition("%object% (is greater than or equal to|is at least|>=) %object%",
                 arguments -> numeric(arguments, cmp -> cmp >= 0));
@@ -553,6 +557,17 @@ public final class BuiltinModule {
             VariableExpression variable = requireVariable(arguments.get(0));
             Expression<?> value = arguments.get(1);
             return ctx -> variable.set(ctx, value.getSingle(ctx));
+        });
+
+        registry.registerEffect("replace [all] %string% with %string% in %object%", arguments -> {
+            Expression<?> from = arguments.get(0);
+            Expression<?> to = arguments.get(1);
+            VariableExpression variable = requireVariable(arguments.get(2));
+            return ctx -> {
+                String text = Renderer.toDisplay(variable.getSingle(ctx));
+                variable.set(ctx, text.replace(Renderer.toDisplay(from.getSingle(ctx)),
+                        Renderer.toDisplay(to.getSingle(ctx))));
+            };
         });
 
         registry.registerEffect("add %object% to %object%", arguments -> {
