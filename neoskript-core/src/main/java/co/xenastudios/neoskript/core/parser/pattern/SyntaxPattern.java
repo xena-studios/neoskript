@@ -38,15 +38,55 @@ public final class SyntaxPattern {
      *         match
      */
     public Optional<List<String>> match(String input) {
-        Matcher matcher = regex.matcher(input.trim());
+        // Mask quoted strings to placeholders so the matcher treats them as atomic — otherwise a
+        // literal/optional in the pattern (e.g. " to ") could match text inside a string argument
+        // like "Welcome to the server!".
+        List<String> quotes = new ArrayList<>();
+        String masked = maskQuotes(input.trim(), quotes);
+
+        Matcher matcher = regex.matcher(masked);
         if (!matcher.matches()) {
             return Optional.empty();
         }
         List<String> captures = new ArrayList<>(argCount);
         for (int group = 1; group <= argCount; group++) {
-            captures.add(matcher.group(group));
+            captures.add(unmaskQuotes(matcher.group(group), quotes));
         }
         return Optional.of(captures);
+    }
+
+    private static final char MASK = '\u0001';
+
+    private static String maskQuotes(String input, List<String> quotes) {
+        StringBuilder out = new StringBuilder(input.length());
+        int i = 0;
+        while (i < input.length()) {
+            char c = input.charAt(i);
+            if (c == '"') {
+                int end = input.indexOf('"', i + 1);
+                if (end < 0) {
+                    end = input.length() - 1; // unterminated: mask to the end
+                }
+                quotes.add(input.substring(i, Math.min(end + 1, input.length())));
+                out.append(MASK).append(quotes.size() - 1).append(MASK);
+                i = end + 1;
+            } else {
+                out.append(c);
+                i++;
+            }
+        }
+        return out.toString();
+    }
+
+    private static String unmaskQuotes(String captured, List<String> quotes) {
+        if (captured == null || quotes.isEmpty() || captured.indexOf(MASK) < 0) {
+            return captured;
+        }
+        String result = captured;
+        for (int i = 0; i < quotes.size(); i++) {
+            result = result.replace(MASK + Integer.toString(i) + MASK, quotes.get(i));
+        }
+        return result;
     }
 
     /** @return the number of {@code %type%} argument slots */

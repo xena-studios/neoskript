@@ -47,12 +47,22 @@ public interface NeoScheduler {
     TaskHandle runRepeating(Runnable task, long initialDelayTicks, long periodTicks);
 
     /**
-     * Creates the default scheduler for the given plugin.
+     * Creates the scheduler appropriate for the running server: a Folia region-aware scheduler when
+     * on Folia, otherwise the standard Bukkit scheduler (plain Paper, and tests under MockBukkit).
      *
      * @param plugin the owning plugin
-     * @return a Folia-safe scheduler
+     * @return a scheduler
      */
     static NeoScheduler create(Plugin plugin) {
-        return new UnifiedScheduler(plugin);
+        return isFolia() ? new FoliaScheduler(plugin) : new BukkitSchedulerImpl(plugin);
+    }
+
+    private static boolean isFolia() {
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 }

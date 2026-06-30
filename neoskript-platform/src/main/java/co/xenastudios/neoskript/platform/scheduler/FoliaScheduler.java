@@ -4,14 +4,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
 /**
- * Default {@link NeoScheduler} built on Paper's region/global/async scheduler API. These schedulers
- * exist on both plain Paper and Folia, so this single implementation is Folia-safe.
+ * {@link NeoScheduler} for Folia, built on Paper's region/global/async scheduler API.
  */
-final class UnifiedScheduler implements NeoScheduler {
+final class FoliaScheduler implements NeoScheduler {
 
     private final Plugin plugin;
 
-    UnifiedScheduler(Plugin plugin) {
+    FoliaScheduler(Plugin plugin) {
         this.plugin = plugin;
     }
 

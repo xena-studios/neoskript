@@ -28,6 +28,21 @@ class SyntaxPatternTest {
     }
 
     @Test
+    void doesNotSplitOnKeywordsInsideQuotedStrings() {
+        SyntaxPattern pattern = PatternCompiler.compile("send %string% [to %player%]");
+
+        Optional<List<String>> noTarget = pattern.match("send \"Welcome to the server!\"");
+        assertTrue(noTarget.isPresent());
+        assertEquals("\"Welcome to the server!\"", noTarget.get().get(0));
+        assertNull(noTarget.get().get(1), "the 'to' inside the string must not be treated as the separator");
+
+        Optional<List<String>> withTarget = pattern.match("send \"Welcome to the server!\" to player");
+        assertTrue(withTarget.isPresent());
+        assertEquals("\"Welcome to the server!\"", withTarget.get().get(0));
+        assertEquals("player", withTarget.get().get(1));
+    }
+
+    @Test
     void matchesAreCaseInsensitiveAndWhitespaceFlexible() {
         SyntaxPattern pattern = PatternCompiler.compile("broadcast %string%");
         assertTrue(pattern.match("BROADCAST \"hello\"").isPresent());
