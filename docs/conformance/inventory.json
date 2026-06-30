@@ -6607,7 +6607,7 @@
       "%locations%'[s] altitude[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprAltitude.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "y[-coordinate] of %location%"
   },
@@ -6621,7 +6621,7 @@
       "[the] (amount|number|size) of %objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprAmount.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "(size|amount|number) of %objects%"
   },
@@ -6635,7 +6635,7 @@
       "%objects%'[s] amount[:s]"
     ],
     "source": "org/skriptlang/skript/common/properties/elements/expressions/PropExprAmount.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "(size|amount|number) of %objects%"
   },
@@ -6755,7 +6755,7 @@
       "[the] %*classinfo%( |-)arg[ument][( |-)<\\d+>]"
     ],
     "source": "ch/njol/skript/expressions/ExprArgument.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "arg-%number% / arg %number% / argument %number% / (args|arguments|all arguments)"
   },
@@ -7335,7 +7335,7 @@
       "[(1¦lower|2¦upper|3¦capital)[ ]]kebab[ ]case %strings%"
     ],
     "source": "ch/njol/skript/expressions/ExprStringCase.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "(uppercase|upper case) [of] %string% / (lowercase|lower case) [of] %string% / capitalized %string%"
   },
@@ -7544,7 +7544,7 @@
       "[command['s]] (sender|executor)"
     ],
     "source": "ch/njol/skript/expressions/ExprCommandSender.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "(sender|command sender|executor)"
   },
@@ -7582,7 +7582,7 @@
       "[the] (console|server)"
     ],
     "source": "ch/njol/skript/literals/LitConsole.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "console"
   },
@@ -7624,7 +7624,7 @@
       "%locations%'[s] (0¦x|1¦y|2¦z)(-| )(coord[inate]|pos[ition]|loc[ation])[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprCoordinate.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "x[-coordinate] of %location% / y[-coordinate] of %location% / z[-coordinate] of %location%"
   },
@@ -8233,7 +8233,7 @@
       "[the] elements (from|between) %integer% (to|and) %integer% [out] (of|in) %objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprElement.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "first element [out] of %objects% / last element [out] of %objects% / random element [out] of %objects%"
   },
@@ -9032,7 +9032,7 @@
       "%players%'[s] game[ ]mode"
     ],
     "source": "ch/njol/skript/expressions/ExprGameMode.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "set (gamemode|game mode) of %player% to %gamemode%"
   },
@@ -9195,7 +9195,7 @@
       "%livingentities%'[s] health"
     ],
     "source": "ch/njol/skript/expressions/ExprHealth.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "set health of %player% to %number% (effect implies settable/gettable expression)"
   },
@@ -9681,7 +9681,7 @@
       "regex %string% split (at|using|by) [[the] delimiter] %string% [trailing:without [the] trailing [empty] (string|text)]"
     ],
     "source": "ch/njol/skript/expressions/ExprJoinSplit.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "join %objects% with %string% / %string% split at %string%"
   },
@@ -9899,7 +9899,7 @@
       "%strings%'[s] length"
     ],
     "source": "ch/njol/skript/expressions/ExprLength.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "length of %string%"
   },
@@ -10013,7 +10013,7 @@
       "[the] loop(-| )(counter|iteration)[-%-*number%]"
     ],
     "source": "ch/njol/skript/expressions/ExprLoopIteration.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "loop-index / loop-number"
   },
@@ -10028,7 +10028,7 @@
       "[the] previous loop-<.+>"
     ],
     "source": "ch/njol/skript/expressions/ExprLoopValue.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "loop-value / loop-number / loop-index"
   },
@@ -10338,7 +10338,7 @@
       "my[self]"
     ],
     "source": "ch/njol/skript/expressions/ExprMe.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "player / [the] event-player"
   },
@@ -10512,7 +10512,7 @@
       "%objects%'[s] name[s]"
     ],
     "source": "org/skriptlang/skript/common/properties/elements/expressions/PropExprName.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "name of %player% / %player%'s name"
   },
@@ -10528,7 +10528,7 @@
       "%offlineplayers/entities/nameds/inventories%'[s] (display|nick|chat|custom)[ ]name[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprName.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "name of %player% / %player%'s name"
   },
@@ -10663,7 +10663,7 @@
       "now"
     ],
     "source": "ch/njol/skript/expressions/ExprNow.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "now"
   },
@@ -10677,7 +10677,7 @@
       "%objects%'[s] number[:s]"
     ],
     "source": "org/skriptlang/skript/common/properties/elements/expressions/PropExprNumber.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "(size|amount|number) of %objects%"
   },
@@ -11270,7 +11270,7 @@
       "[a] random %*classinfo% [out] of %objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprRandom.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "random element [out] of %objects%"
   },
@@ -11295,7 +11295,7 @@
       "[a|%-integer%] random (:integer|number)[s] (from|between) %number% (to|and) %number%"
     ],
     "source": "ch/njol/skript/expressions/ExprRandomNumber.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "random number (from|between) %number% (to|and) %number% / random integer (from|between) %number% (to|and) %number%"
   },
@@ -11541,7 +11541,7 @@
       "reversed %objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprReversedList.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "reversed %objects%"
   },
@@ -11791,7 +11791,7 @@
       "%objects%'[s] size[:s]"
     ],
     "source": "org/skriptlang/skript/common/properties/elements/expressions/PropExprSize.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "(size|amount|number) of %objects%"
   },
@@ -11842,7 +11842,7 @@
       "sorted %objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprSortedList.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "sorted %objects%"
   },
@@ -12224,7 +12224,7 @@
       "%worlds%'[s] time[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprTime.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "time of %world%"
   },
@@ -12358,7 +12358,7 @@
       "%entitydatas/itemtypes/inventories/potioneffects/blockdatas/enchantmenttypes%'s type"
     ],
     "source": "ch/njol/skript/expressions/ExprTypeOf.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "type of %object%"
   },
@@ -12726,7 +12726,7 @@
       "%entities/directionalparticles%'[s] velocit(y|ies)"
     ],
     "source": "ch/njol/skript/expressions/ExprVelocity.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "velocity of %entity%"
   },
@@ -13006,7 +13006,7 @@
       "%objects%'[s] (:x|:y|:z|:w)( |-)[component[s]|coord[inate][s]|dep:(pos[ition[s]]|loc[ation][s])]"
     ],
     "source": "org/skriptlang/skript/common/properties/elements/expressions/PropExprWXYZ.java",
-    "status": "todo",
+    "status": "done",
     "implemented": true,
     "neoMatch": "x[-coordinate] of %location% / y[-coordinate] of %location% / z[-coordinate] of %location%"
   },
