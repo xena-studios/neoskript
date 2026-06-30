@@ -3,6 +3,8 @@ package co.xenastudios.neoskript.plugin;
 import co.xenastudios.neoskript.api.runtime.TriggerContext;
 import co.xenastudios.neoskript.core.parser.ParseException;
 import co.xenastudios.neoskript.core.parser.ScriptParser;
+import co.xenastudios.neoskript.core.runtime.CommandDefinition;
+import co.xenastudios.neoskript.core.runtime.CommandRegistry;
 import co.xenastudios.neoskript.core.runtime.ExecutionEngine;
 import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 import co.xenastudios.neoskript.core.runtime.HotPathTracker;
@@ -14,6 +16,11 @@ import co.xenastudios.neoskript.core.runtime.Triggers;
 import co.xenastudios.neoskript.platform.event.BukkitEventBridge;
 import co.xenastudios.neoskript.platform.scheduler.NeoScheduler;
 import co.xenastudios.neoskript.platform.scheduler.TaskHandle;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandMap;
+import org.bukkit.command.CommandSender;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
@@ -45,6 +52,7 @@ public final class ScriptLoader {
     private final Plugin plugin;
     private final ScriptParser parser;
     private final FunctionRegistry functions;
+    private final CommandRegistry commands;
     private final Map<String, Object> globals;
     private final NeoScheduler scheduler;
     private final Profiler profiler;
@@ -53,14 +61,16 @@ public final class ScriptLoader {
 
     private final List<Listener> listeners = new ArrayList<>();
     private final List<TaskHandle> periodicTasks = new ArrayList<>();
+    private final List<Command> registeredCommands = new ArrayList<>();
 
     private Path scriptsDir;
 
-    public ScriptLoader(Plugin plugin, ScriptParser parser, FunctionRegistry functions,
+    public ScriptLoader(Plugin plugin, ScriptParser parser, FunctionRegistry functions, CommandRegistry commands,
                         Map<String, Object> globals, NeoScheduler scheduler, Profiler profiler) {
         this.plugin = plugin;
         this.parser = parser;
         this.functions = functions;
+        this.commands = commands;
         this.globals = globals;
         this.scheduler = scheduler;
         this.profiler = profiler;
@@ -90,6 +100,7 @@ public final class ScriptLoader {
                 .toList();
 
         registerTriggers(triggers);
+        registerCommands();
         return new Result(scriptFiles.size(), triggers.size(), failed.get());
     }
 
@@ -103,9 +114,47 @@ public final class ScriptLoader {
         listeners.clear();
         periodicTasks.forEach(TaskHandle::cancel);
         periodicTasks.clear();
+        CommandMap map = plugin.getServer().getCommandMap();
+        registeredCommands.forEach(command -> command.unregister(map));
+        registeredCommands.clear();
         functions.clear();
+        commands.clear();
         hotPaths.reset();
         return loadAll(scriptsDir);
+    }
+
+    private void registerCommands() {
+        CommandMap map = plugin.getServer().getCommandMap();
+        for (CommandDefinition definition : commands.commands()) {
+            Command command = new Command(
+                    definition.name(),
+                    definition.description() == null ? "" : definition.description(),
+                    definition.usage() == null ? "/" + definition.name() : definition.usage(),
+                    definition.aliases()) {
+                @Override
+                public boolean execute(CommandSender sender, String label, String[] args) {
+                    if (definition.permission() != null && !definition.permission().isBlank()
+                            && !sender.hasPermission(definition.permission())) {
+                        sender.sendMessage(Component.text("You don't have permission to do that.", NamedTextColor.RED));
+                        return true;
+                    }
+                    SimpleTriggerContext ctx = new SimpleTriggerContext(null, globals);
+                    ctx.setLocal("command-sender", sender);
+                    for (int i = 0; i < args.length; i++) {
+                        ctx.setLocal("arg-" + (i + 1), args[i]);
+                    }
+                    ctx.setLocal("arg-count", (double) args.length);
+                    try {
+                        definition.run(ctx);
+                    } catch (RuntimeException e) {
+                        plugin.getLogger().log(Level.WARNING, "Error in command /" + definition.name(), e);
+                    }
+                    return true;
+                }
+            };
+            map.register("neoskript", command);
+            registeredCommands.add(command);
+        }
     }
 
     private void registerTriggers(List<Trigger> triggers) {

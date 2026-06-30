@@ -5,6 +5,7 @@ import co.xenastudios.neoskript.core.addon.AddonManager;
 import co.xenastudios.neoskript.core.docs.DocsGenerator;
 import co.xenastudios.neoskript.core.parser.ScriptParser;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry;
+import co.xenastudios.neoskript.core.runtime.CommandRegistry;
 import co.xenastudios.neoskript.core.runtime.EventRegistry;
 import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 import co.xenastudios.neoskript.core.runtime.Profiler;
@@ -44,6 +45,7 @@ public class NeoSkriptPlugin extends JavaPlugin {
     private DefaultSyntaxRegistry registry;
     private EventRegistry events;
     private FunctionRegistry functions;
+    private CommandRegistry commandRegistry;
     private final Profiler profiler = new Profiler();
     private final Map<String, Object> globalVariables = new ConcurrentHashMap<>();
     private AddonManager addonManager;
@@ -65,6 +67,7 @@ public class NeoSkriptPlugin extends JavaPlugin {
 
         this.functions = new FunctionRegistry();
         BuiltinFunctions.registerAll(functions);
+        this.commandRegistry = new CommandRegistry();
 
         this.addonManager = new AddonManager(getLogger());
         addons.addAll(addonManager.enable(AddonManager.discover(getClassLoader()), registry));
@@ -72,9 +75,9 @@ public class NeoSkriptPlugin extends JavaPlugin {
         loadVariables();
         getLogger().info("Running on " + platform.describe());
 
-        ScriptParser parser = new ScriptParser(registry, events, functions);
+        ScriptParser parser = new ScriptParser(registry, events, functions, commandRegistry);
         ScriptLoader loader =
-                new ScriptLoader(this, parser, functions, globalVariables, scheduler, profiler);
+                new ScriptLoader(this, parser, functions, commandRegistry, globalVariables, scheduler, profiler);
         ScriptLoader.Result result = loader.loadAll(getDataFolder().toPath().resolve("scripts"));
 
         var command = getCommand("neoskript");

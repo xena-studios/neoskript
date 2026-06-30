@@ -99,6 +99,31 @@ public final class BuiltinModule {
                 arguments -> random(arguments.get(0), arguments.get(1), true));
 
         registerStringAndListExpressions(registry);
+        registerCommandExpressions(registry);
+    }
+
+    private static void registerCommandExpressions(SyntaxRegistry registry) {
+        registry.registerExpression("(sender|command sender|executor)", Object.class,
+                arguments -> new NamedLocalExpression("command-sender"));
+        registry.registerExpression("arg-%number%", Object.class, arguments -> argument(arguments.get(0)));
+        registry.registerExpression("arg %number%", Object.class, arguments -> argument(arguments.get(0)));
+        registry.registerExpression("argument %number%", Object.class, arguments -> argument(arguments.get(0)));
+        registry.registerExpression("(args|arguments|all arguments)", Object.class, arguments ->
+                new ComputedListExpression(ctx -> {
+                    int count = (int) orZero(toNumber(ctx.getLocal("arg-count")));
+                    Object[] values = new Object[Math.max(0, count)];
+                    for (int i = 0; i < values.length; i++) {
+                        values[i] = ctx.getLocal("arg-" + (i + 1));
+                    }
+                    return values;
+                }));
+    }
+
+    private static ComputedExpression argument(Expression<?> indexExpr) {
+        return new ComputedExpression(ctx -> {
+            int index = (int) orZero(toNumber(indexExpr.getSingle(ctx)));
+            return ctx.getLocal("arg-" + index);
+        });
     }
 
     private static void registerStringAndListExpressions(SyntaxRegistry registry) {

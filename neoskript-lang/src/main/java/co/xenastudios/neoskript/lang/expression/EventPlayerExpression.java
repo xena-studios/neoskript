@@ -39,7 +39,8 @@ public final class EventPlayerExpression implements Expression<Player> {
     public Player getSingle(TriggerContext ctx) {
         Event event = ctx.event().orElse(null);
         if (event == null) {
-            return null;
+            // In a command (no event), `player` refers to the command sender if it is a player.
+            return ctx.getLocal("command-sender") instanceof Player player ? player : null;
         }
         if (event instanceof PlayerEvent playerEvent) {
             return playerEvent.getPlayer();

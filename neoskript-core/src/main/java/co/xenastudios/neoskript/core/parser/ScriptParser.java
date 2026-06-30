@@ -4,6 +4,8 @@ import co.xenastudios.neoskript.api.syntax.Condition;
 import co.xenastudios.neoskript.api.syntax.Expression;
 import co.xenastudios.neoskript.core.expression.FunctionCallExpression;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry;
+import co.xenastudios.neoskript.core.runtime.CommandDefinition;
+import co.xenastudios.neoskript.core.runtime.CommandRegistry;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry.ConditionEntry;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry.EffectEntry;
 import co.xenastudios.neoskript.core.runtime.EffectStatement;
@@ -43,16 +45,25 @@ public final class ScriptParser {
     private static final Pattern LOOP_OVER = Pattern.compile("loop\\s+(.+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern FUNCTION_HEADER =
             Pattern.compile("function\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\((.*?)\\)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern COMMAND_HEADER =
+            Pattern.compile("command\\s+/?(\\S+).*", Pattern.CASE_INSENSITIVE);
 
     private final DefaultSyntaxRegistry registry;
     private final EventRegistry events;
     private final FunctionRegistry functions;
+    private final CommandRegistry commands;
     private final ExpressionParser expressions;
 
     public ScriptParser(DefaultSyntaxRegistry registry, EventRegistry events, FunctionRegistry functions) {
+        this(registry, events, functions, new CommandRegistry());
+    }
+
+    public ScriptParser(DefaultSyntaxRegistry registry, EventRegistry events, FunctionRegistry functions,
+                        CommandRegistry commands) {
         this.registry = registry;
         this.events = events;
         this.functions = functions;
+        this.commands = commands;
         this.expressions = new ExpressionParser(registry, functions);
     }
 
@@ -86,8 +97,10 @@ public final class ScriptParser {
                 triggers.add(parseEvent(node));
             } else if (lower.startsWith("function ") && node.content().endsWith(":")) {
                 parseFunction(node);
+            } else if (lower.startsWith("command ") && node.content().endsWith(":")) {
+                parseCommand(node);
             } else {
-                throw new ParseException("Expected an event or function, got: " + node.content(), node.line());
+                throw new ParseException("Expected an event, function, or command, got: " + node.content(), node.line());
             }
         }
         return triggers;
@@ -140,6 +153,52 @@ public final class ScriptParser {
             parameters.add((colon >= 0 ? trimmed.substring(0, colon) : trimmed).trim());
         }
         functions.register(new FunctionDefinition(name, parameters, parseStatements(node.children())));
+    }
+
+    private void parseCommand(Node node) {
+        String headerLine = node.content().substring(0, node.content().length() - 1).trim();
+        Matcher header = COMMAND_HEADER.matcher(headerLine);
+        if (!header.matches()) {
+            throw new ParseException("Malformed command: " + node.content(), node.line());
+        }
+        String name = header.group(1);
+        String permission = null;
+        String description = null;
+        String usage = null;
+        List<String> aliases = new ArrayList<>();
+        List<Statement> body = List.of();
+
+        for (Node child : node.children()) {
+            String content = child.content();
+            String lower = content.toLowerCase(Locale.ROOT);
+            if (lower.equals("trigger:")) {
+                body = parseStatements(child.children());
+            } else if (lower.startsWith("permission:")) {
+                permission = entryValue(content);
+            } else if (lower.startsWith("description:")) {
+                description = entryValue(content);
+            } else if (lower.startsWith("usage:")) {
+                usage = entryValue(content);
+            } else if (lower.startsWith("aliases:")) {
+                for (String alias : entryValue(content).split(",")) {
+                    String trimmed = alias.trim().replaceFirst("^/", "");
+                    if (!trimmed.isEmpty()) {
+                        aliases.add(trimmed);
+                    }
+                }
+            }
+            // Other entries (cooldown, executable by, …) are ignored for now.
+        }
+
+        if (body.isEmpty()) {
+            throw new ParseException("Command '/" + name + "' has no trigger", node.line());
+        }
+        commands.register(new CommandDefinition(name, permission, description, usage, aliases, body));
+    }
+
+    private static String entryValue(String line) {
+        int colon = line.indexOf(':');
+        return colon < 0 ? "" : line.substring(colon + 1).trim();
     }
 
     private List<Statement> parseStatements(List<Node> nodes) {
