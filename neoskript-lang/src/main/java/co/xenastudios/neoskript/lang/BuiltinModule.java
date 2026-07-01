@@ -420,6 +420,42 @@ public final class BuiltinModule {
             return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof Entity e
                     ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(e.getFireTicks()) : null);
         });
+        registry.registerExpression("[the] (potion duration|potion length) of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof org.bukkit.potion.PotionEffect pe
+                    ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(pe.getDuration()) : null);
+        });
+        registry.registerExpression("(display|nick|chat|custom)[ ]name[s] of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                Object o = src.getSingle(ctx);
+                if (o instanceof Player p) {
+                    return p.getDisplayName();
+                }
+                if (o instanceof Entity e) {
+                    return e.getCustomName();
+                }
+                return o instanceof ItemStack it && it.getItemMeta() != null && it.getItemMeta().hasDisplayName()
+                        ? it.getItemMeta().getDisplayName() : null;
+            });
+        });
+        registry.registerExpression("[the] loot[ ]table[s] of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                Object o = src.getSingle(ctx);
+                if (o instanceof org.bukkit.loot.Lootable lootable) {
+                    return lootable.getLootTable();
+                }
+                return o instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.loot.Lootable l
+                        ? l.getLootTable() : null;
+            });
+        });
+        registry.registerExpression("[the] [enchant[ment]] level of %object% (on|of) %object%", Object.class, arguments -> {
+            Expression<?> ench = arguments.get(0);
+            Expression<?> item = arguments.get(1);
+            return new ComputedExpression(ctx -> ench.getSingle(ctx) instanceof org.bukkit.enchantments.Enchantment en
+                    && item.getSingle(ctx) instanceof ItemStack it ? it.getEnchantmentLevel(en) : null);
+        });
         registry.registerExpression("[a] random uuid", Object.class,
                 arguments -> new ComputedExpression(ctx -> java.util.UUID.randomUUID()));
         registry.registerExpression("normalize[d] %vector%", Object.class, arguments -> {

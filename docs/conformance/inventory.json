@@ -8097,8 +8097,8 @@
       "%objects%'[s] (display|nick|chat|custom)[ ]name[s]"
     ],
     "source": "org/skriptlang/skript/common/properties/elements/expressions/PropExprCustomName.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:display-shadow-radius-strength",
@@ -8294,8 +8294,8 @@
       "%itemtypes%'[s] [enchant[ment]] level[s] of %enchantments%"
     ],
     "source": "ch/njol/skript/expressions/ExprEnchantmentLevel.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:enchantment-offer",
@@ -10102,8 +10102,8 @@
       "%entities/blocks%'[s] loot[ ]table[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/expressions/ExprLootTable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:loot-table-from-key",
@@ -11134,8 +11134,8 @@
       "%skriptpotioneffects%'[s] ([potion] duration|potion length)[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/expressions/ExprPotionDuration.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:potion-effect-of-entity-item",

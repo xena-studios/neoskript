@@ -116,6 +116,33 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void potionLootDisplayExpressions() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("pe.sk"), """
+                command /pe:
+                    trigger:
+                        set {_dn} to display name of player
+                        if {_dn} is set:
+                            send "DN" to player
+                        set {_lt} to loot table of player
+                        set {_pd} to potion duration of player
+                        set {_el} to enchantment level of "x" on item("diamond sword")
+                        send "DONE" to player
+                """, StandardCharsets.UTF_8);
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        PlayerMock player = server.addPlayer("Alex");
+        server.dispatchCommand(player, "pe");
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            seen.add(m);
+        }
+        assertTrue(seen.contains("DN"), "display name of player resolves");
+        assertTrue(seen.contains("DONE"), "loot table / potion duration / enchantment level parse and run");
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);
