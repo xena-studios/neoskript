@@ -4324,8 +4324,8 @@
       "every %timespan% in [world[s]] %worlds%"
     ],
     "source": "ch/njol/skript/events/EvtPeriodical.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "event:anvil-damage",
@@ -4586,8 +4586,8 @@
       "[block] (break[ing]|1¦min(e|ing)) [[of] %-itemtypes/blockdatas%]"
     ],
     "source": "ch/njol/skript/events/EvtBlock.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "event:broadcast",
@@ -5065,8 +5065,8 @@
       "first (join|login)"
     ],
     "source": "ch/njol/skript/events/EvtFirstJoin.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "event:flight-toggle",
@@ -5857,8 +5857,8 @@
       "[:async] [script] (unload|stop|disable)"
     ],
     "source": "ch/njol/skript/events/EvtScript.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:send-command-list",
@@ -13129,7 +13129,8 @@
       "axisAngle(angle: number, axis: vector)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "function:calcexperience",
@@ -13488,7 +13489,8 @@
       "quaternion(w: number, x: number, y: number, z: number)"
     ],
     "source": "ch/njol/skript/classes/data/DefaultFunctions.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "function:rgb",

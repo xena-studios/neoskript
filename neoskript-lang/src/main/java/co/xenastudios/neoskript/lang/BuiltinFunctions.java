@@ -54,6 +54,18 @@ public final class BuiltinFunctions {
 
         registry.register("vector", (args, ctx) ->
                 new Vector(coord(args, 0), coord(args, 1), coord(args, 2)));
+        // quaternion(w, x, y, z) — JOML stores components as (x, y, z, w).
+        registry.register("quaternion", (args, ctx) -> new org.joml.Quaternionf(
+                (float) coord(args, 1), (float) coord(args, 2), (float) coord(args, 3), (float) coord(args, 0)));
+        // axisAngle(angle, axis) — rotation of `angle` degrees about `axis`, as a quaternion.
+        registry.register("axisAngle", (args, ctx) -> {
+            if (args.size() < 2 || !(args.get(1) instanceof Vector axis)) {
+                return null;
+            }
+            float angle = (float) (coord(args, 0) / 180 * Math.PI);
+            return new org.joml.Quaternionf(new org.joml.AxisAngle4f(
+                    angle, (float) axis.getX(), (float) axis.getY(), (float) axis.getZ()));
+        });
         registry.register("location", (args, ctx) -> {
             World world = args.size() > 3 && args.get(3) instanceof World w ? w : null;
             return new Location(world, coord(args, 0), coord(args, 1), coord(args, 2));

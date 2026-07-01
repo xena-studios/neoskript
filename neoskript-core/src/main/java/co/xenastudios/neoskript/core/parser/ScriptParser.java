@@ -138,7 +138,8 @@ public final class ScriptParser {
         return List.copyOf(errors);
     }
 
-    private static final Set<String> LOAD_ALIASES = Set.of("load", "enable", "server load", "server start");
+    private static final Set<String> LOAD_ALIASES = Set.of("load", "enable", "server load", "server start",
+            "script load", "script init", "script enable", "skript start", "skript load");
 
     private Trigger parseEvent(Node node) {
         String eventName = node.content().substring(3, node.content().length() - 1).trim();

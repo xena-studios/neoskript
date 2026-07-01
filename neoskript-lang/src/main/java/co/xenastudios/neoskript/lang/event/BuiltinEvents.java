@@ -154,6 +154,15 @@ public final class BuiltinEvents {
      * (never for every occurrence, which would silently misbehave).
      */
     private static void registerFilters(EventRegistry events) {
+        // on first (join|login): a join by a player who has not played before.
+        events.registerFilter(name -> {
+            if (!name.matches("(?i)first (join|login)")) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(new EventRegistry.FilteredEvent(
+                    org.bukkit.event.player.PlayerJoinEvent.class,
+                    ev -> ev instanceof org.bukkit.event.player.PlayerJoinEvent e && !e.getPlayer().hasPlayedBefore()));
+        });
         events.registerFilter(name -> {
             java.util.regex.Matcher m =
                     java.util.regex.Pattern.compile("(?i)death of (?:a |an )?(.+)").matcher(name);
