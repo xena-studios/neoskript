@@ -1995,6 +1995,11 @@ public final class BuiltinModule {
                         meta.addItemFlags(flag);
                     }
                 }));
+        registry.registerExpression("[the] first empty slot[s] of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof org.bukkit.inventory.Inventory inv
+                    ? inv.firstEmpty() : null);
+        });
         registry.registerExpression("[the] exact %object%", Object.class, arguments -> {
             Expression<?> item = arguments.get(0);
             return new ComputedExpression(ctx -> item.getSingle(ctx) instanceof ItemStack it ? it : null);

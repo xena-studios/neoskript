@@ -8817,8 +8817,8 @@
       "[the] first empty slot[s] in %inventories%"
     ],
     "source": "ch/njol/skript/expressions/ExprFirstEmptySlot.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:fishing-approach-angle",
