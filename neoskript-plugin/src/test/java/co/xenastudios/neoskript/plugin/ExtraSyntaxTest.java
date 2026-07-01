@@ -363,6 +363,35 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void runningMinecraftAndItemExtras() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("rm.sk"), """
+                command /rm:
+                    trigger:
+                        if running minecraft "1.21":
+                            send "MC" to player
+                        set {_e} to exact item("stone")
+                        if {_e} is set:
+                            send "EXACT" to player
+                        set {_t} to item("stone") without tooltip
+                        if {_t} is set:
+                            send "TOOLTIP" to player
+                """, StandardCharsets.UTF_8);
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        PlayerMock player = server.addPlayer();
+        server.dispatchCommand(player, "rm");
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            seen.add(m);
+        }
+        assertTrue(seen.contains("MC"), "running minecraft 1.21 matches the 1.21.x server");
+        assertTrue(seen.contains("EXACT"), "exact item resolves");
+        assertTrue(seen.contains("TOOLTIP"), "item without tooltip resolves");
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);

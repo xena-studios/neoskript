@@ -1246,6 +1246,16 @@ public final class BuiltinModule {
             Expression<?> src = a.get(0);
             return ctx -> src.getSingle(ctx) instanceof org.bukkit.block.Block b && b.isBlockPowered();
         });
+        registry.registerCondition("running minecraft %object%", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> {
+                if (!(src.getSingle(ctx) instanceof String version)) {
+                    return false;
+                }
+                String actual = org.bukkit.Bukkit.getServer().getMinecraftVersion();
+                return actual.equals(version) || actual.startsWith(version + ".");
+            };
+        });
         registry.registerCondition("%object% (is|are) spawnable", a -> {
             Expression<?> src = a.get(0);
             return ctx -> src.getSingle(ctx) instanceof org.bukkit.entity.EntityType et && et.isSpawnable();
@@ -1985,6 +1995,14 @@ public final class BuiltinModule {
                         meta.addItemFlags(flag);
                     }
                 }));
+        registry.registerExpression("[the] exact %object%", Object.class, arguments -> {
+            Expression<?> item = arguments.get(0);
+            return new ComputedExpression(ctx -> item.getSingle(ctx) instanceof ItemStack it ? it : null);
+        });
+        registry.registerExpression("%object% with [shown] tooltip", Object.class, arguments ->
+                itemWithTooltip(arguments.get(0), false));
+        registry.registerExpression("%object% with(out| hidden) tooltip", Object.class, arguments ->
+                itemWithTooltip(arguments.get(0), true));
         registry.registerExpression("%object% with [enchant[ment]] glint", Object.class, arguments -> {
             Expression<?> item = arguments.get(0);
             return new ComputedExpression(ctx -> {
@@ -2167,6 +2185,24 @@ public final class BuiltinModule {
             return n.longValue();
         }
         return value instanceof java.util.Date d ? d.getTime() : null;
+    }
+
+    /** A copy of the item with its tooltip hidden or shown. */
+    private static Expression<Object> itemWithTooltip(Expression<?> item, boolean hidden) {
+        return new ComputedExpression(ctx -> {
+            Object o = item.getSingle(ctx);
+            org.bukkit.Material mat = material(o);
+            if (mat == null) {
+                return null;
+            }
+            ItemStack stack = o instanceof ItemStack existing ? existing.clone() : new ItemStack(mat);
+            org.bukkit.inventory.meta.ItemMeta meta = stack.getItemMeta();
+            if (meta != null) {
+                meta.setHideTooltip(hidden);
+                stack.setItemMeta(meta);
+            }
+            return stack;
+        });
     }
 
     /** A copy of the first argument (an item) with its {@link org.bukkit.inventory.meta.ItemMeta} mutated. */
