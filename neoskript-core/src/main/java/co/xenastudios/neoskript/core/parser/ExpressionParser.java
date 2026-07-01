@@ -1,19 +1,24 @@
 package co.xenastudios.neoskript.core.parser;
 
+import co.xenastudios.neoskript.api.syntax.Condition;
 import co.xenastudios.neoskript.api.syntax.Expression;
 import co.xenastudios.neoskript.core.expression.ArithmeticExpression;
+import co.xenastudios.neoskript.core.expression.ComputedExpression;
+import co.xenastudios.neoskript.core.expression.ComputedListExpression;
 import co.xenastudios.neoskript.core.expression.FunctionCallExpression;
 import co.xenastudios.neoskript.core.expression.ListExpression;
 import co.xenastudios.neoskript.core.expression.NumberLiteral;
 import co.xenastudios.neoskript.core.expression.VariableExpression;
 import co.xenastudios.neoskript.core.expression.VariableString;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry;
+import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry.ConditionEntry;
 import co.xenastudios.neoskript.core.registry.DefaultSyntaxRegistry.ExpressionEntry;
 import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -48,6 +53,13 @@ public final class ExpressionParser {
         String s = input.trim();
         if (s.isEmpty()) {
             throw new ParseException("Empty expression");
+        }
+        // Meta / list expressions (map/filter/ternary/whether) wrap a nested expression in `[...]` or
+        // use `if`/`else`; detect them before operator and list splitting so operators inside the
+        // nested part (e.g. the `*` in `[input * 2]`) are not mistaken for top-level operators.
+        Expression<?> meta = parseMetaExpression(s);
+        if (meta != null) {
+            return meta;
         }
         List<String> items = splitList(s);
         if (items.size() == 1) {
@@ -275,6 +287,106 @@ public final class ExpressionParser {
             args.add(capture == null ? null : parse(capture));
         }
         return args;
+    }
+
+    private static final Pattern META_MAP = Pattern.compile(
+            "(?i)^(.+?)\\s+(?:transformed|mapped)\\s+(?:using|with)\\s*\\[(.+)]$");
+    private static final Pattern META_FILTER = Pattern.compile(
+            "(?i)^(.+?)\\s+(?:where|that match(?:es)?)\\s*\\[(.+)]$");
+    private static final Pattern META_TERNARY = Pattern.compile(
+            "(?i)^(.+?)\\s+if\\s+(.+?),?\\s+(?:otherwise|else)\\s+(.+)$");
+
+    /**
+     * Parses a list/meta expression that evaluates a nested condition or expression per element:
+     * {@code %objects% transformed using [<expr>]}, {@code %objects% where [<cond>]},
+     * {@code %a% if <cond> else %b%}, or {@code whether <cond>}. The current element is bound to the
+     * {@code input} local while the nested part is evaluated. Returns {@code null} if none apply.
+     */
+    private Expression<?> parseMetaExpression(String s) {
+        if (s.regionMatches(true, 0, "whether ", 0, 8)) {
+            Condition condition = parseConditionText(s.substring(8).trim());
+            return new ComputedExpression(condition::check);
+        }
+        Matcher map = META_MAP.matcher(s);
+        if (map.matches()) {
+            Expression<?> source = parse(map.group(1).trim());
+            Expression<?> mapper = parse(map.group(2).trim());
+            return new ComputedListExpression(ctx -> perElement(ctx, source.getAll(ctx),
+                    () -> mapper.getSingle(ctx), true));
+        }
+        Matcher filter = META_FILTER.matcher(s);
+        if (filter.matches()) {
+            Expression<?> source = parse(filter.group(1).trim());
+            Condition condition = parseConditionText(filter.group(2).trim());
+            return new ComputedListExpression(ctx -> {
+                Object[] items = source.getAll(ctx);
+                Object previous = ctx.getLocal("input");
+                List<Object> kept = new ArrayList<>();
+                try {
+                    for (Object item : items) {
+                        ctx.setLocal("input", item);
+                        if (condition.check(ctx)) {
+                            kept.add(item);
+                        }
+                    }
+                } finally {
+                    ctx.setLocal("input", previous);
+                }
+                return kept.toArray();
+            });
+        }
+        Matcher ternary = META_TERNARY.matcher(s);
+        if (ternary.matches()) {
+            try {
+                Condition condition = parseConditionText(ternary.group(2).trim());
+                Expression<?> ifTrue = parse(ternary.group(1).trim());
+                Expression<?> ifFalse = parse(ternary.group(3).trim());
+                return new ComputedExpression(ctx -> condition.check(ctx)
+                        ? ifTrue.getSingle(ctx) : ifFalse.getSingle(ctx));
+            } catch (ParseException ignored) {
+                // not actually a ternary (the middle wasn't a condition) — fall through
+            }
+        }
+        return null;
+    }
+
+    /** Evaluates {@code op} for each item with the item bound to {@code input}, collecting results. */
+    private static Object[] perElement(co.xenastudios.neoskript.api.runtime.TriggerContext ctx,
+                                       Object[] items, java.util.function.Supplier<Object> op, boolean skipNull) {
+        Object previous = ctx.getLocal("input");
+        List<Object> out = new ArrayList<>();
+        try {
+            for (Object item : items) {
+                ctx.setLocal("input", item);
+                Object result = op.get();
+                if (!skipNull || result != null) {
+                    out.add(result);
+                }
+            }
+        } finally {
+            ctx.setLocal("input", previous);
+        }
+        return out.toArray();
+    }
+
+    /**
+     * Parses a condition from text (mirrors the script parser). Used by meta expressions/effects that
+     * embed a nested {@code [<condition>]}.
+     */
+    public Condition parseConditionText(String content) {
+        ParseException lastError = null;
+        for (ConditionEntry entry : registry.conditionCandidates(content)) {
+            Optional<List<String>> match = entry.pattern().match(content);
+            if (match.isPresent()) {
+                try {
+                    return entry.factory().create(new SimpleArguments(parseArguments(match.get())));
+                } catch (ParseException e) {
+                    lastError = e;
+                }
+            }
+        }
+        throw lastError != null ? lastError
+                : new ParseException("Don't understand the condition '" + content + "'");
     }
 
     private List<Expression<?>> parseArgumentList(String argsText) {

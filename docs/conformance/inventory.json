@@ -8778,8 +8778,8 @@
       "%objects% (where|that match) \\(<.+>\\)"
     ],
     "source": "ch/njol/skript/expressions/ExprFilter.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:final-damage",
@@ -9379,8 +9379,8 @@
       "input index"
     ],
     "source": "ch/njol/skript/expressions/ExprInput.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:interaction-height-width",
@@ -12117,8 +12117,8 @@
       "%objects% if <.+>[,] (otherwise|else) %objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprTernary.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:test-block",
@@ -12365,8 +12365,8 @@
       "%objects% (transformed|mapped) (using|with) \\(<.+>\\)"
     ],
     "source": "ch/njol/skript/expressions/ExprTransform.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:type-of",
@@ -12914,8 +12914,8 @@
       "whether <.+>"
     ],
     "source": "ch/njol/skript/expressions/ExprWhether.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:whitelist",
