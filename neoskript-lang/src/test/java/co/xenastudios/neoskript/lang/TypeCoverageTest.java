@@ -34,7 +34,7 @@ class TypeCoverageTest {
     @ValueSource(strings = {
             "gamemode", "entitytype", "damagecause", "clicktype", "inventoryaction", "weathertype",
             "difficulty", "blockface", "equipmentslot", "spawnreason", "environment", "entityeffect",
-            "healreason", "teleportcause", "soundcategory", "fireworktype",
+            "healreason", "teleportcause", "soundcategory", "fireworktype", "gene",
     })
     @SuppressWarnings({"unchecked", "rawtypes"})
     void enumTypeRoundTrips(String codeName) {
@@ -48,6 +48,51 @@ class TypeCoverageTest {
         String display = ((Type) type).toDisplayString(sample);
         assertEquals(sample, type.parse(display).orElseThrow(),
                 codeName + " must round-trip its display form");
+    }
+
+    /** Parseable scalar class types: parse a sample literal, then round-trip through display. */
+    @ParameterizedTest
+    @ValueSource(strings = {"integer", "long", "short", "byte", "double", "float"})
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void numericClassTypesRoundTrip(String codeName) {
+        TypeRegistry types = registry();
+        Type<?> type = types.byCodeName(codeName);
+        assertNotNull(type, "type not registered: " + codeName);
+        String sample = (codeName.equals("double") || codeName.equals("float")) ? "5.0" : "5";
+        Object parsed = type.parse(sample).orElseThrow();
+        assertEquals(sample, ((Type) type).toDisplayString(parsed), codeName + " parses and renders " + sample);
+        assertEquals(parsed, type.parse(((Type) type).toDisplayString(parsed)).orElseThrow(),
+                codeName + " round-trips");
+    }
+
+    @Test
+    void uuidTypeRoundTrips() {
+        TypeRegistry types = registry();
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        Type<Object> type = (Type) types.byCodeName("uuid");
+        assertNotNull(type, "uuid type not registered");
+        String sample = "12345678-1234-1234-1234-123456789abc";
+        Object parsed = type.parse(sample).orElseThrow();
+        assertEquals(sample, type.toDisplayString(parsed), "uuid round-trips display");
+    }
+
+    /** Class-backed types: registered, class-mapped, and display path is null-safe. */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "block", "blockdata", "chunk", "commandsender", "damagesource", "display", "entity",
+            "entitysnapshot", "enchantmentoffer", "enchantmenttype", "fireworkeffect", "inventory",
+            "inventoryholder", "itementity", "livingentity", "lootcontext", "loottable",
+            "metadataholder", "nameable", "offlineplayer", "potioneffect", "projectile",
+            "teleportflag", "textcomponent", "vehicle", "worldborder", "bannerpattern",
+            "cachedservericon", "minecrafttag", "quaternion",
+    })
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void classTypesRegistered(String codeName) {
+        TypeRegistry types = registry();
+        Type<?> type = types.byCodeName(codeName);
+        assertNotNull(type, "type not registered: " + codeName);
+        assertNotNull(type.typeClass(), codeName + " must map to a class");
+        assertEquals("<none>", ((Type) type).toDisplayString(null), codeName + " display is null-safe");
     }
 
     /** Non-enum types with explicit samples. */

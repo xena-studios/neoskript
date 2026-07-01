@@ -13908,7 +13908,8 @@
       "bannerpattern"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:bannerpatterntype",
@@ -13955,7 +13956,8 @@
       "block"
     ],
     "source": "org/skriptlang/skript/bukkit/types/BlockClassInfo.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:blockdata",
@@ -13966,7 +13968,8 @@
       "blockdata"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:boolean",
@@ -14001,7 +14004,8 @@
       "byte"
     ],
     "source": "ch/njol/skript/classes/data/JavaClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:cachedservericon",
@@ -14012,7 +14016,8 @@
       "cachedservericon"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:cattype",
@@ -14046,7 +14051,8 @@
       "chunk"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:classinfo",
@@ -14092,7 +14098,8 @@
       "commandsender"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:config",
@@ -14159,7 +14166,8 @@
       "damagesource"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/DamageSourceModule.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:damagetype",
@@ -14228,7 +14236,8 @@
       "display"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/DisplayModule.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:double",
@@ -14239,7 +14248,8 @@
       "double"
     ],
     "source": "ch/njol/skript/classes/data/JavaClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:enchantment",
@@ -14262,7 +14272,8 @@
       "enchantmentoffer"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:enchantmenttype",
@@ -14273,7 +14284,8 @@
       "enchantmenttype"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:entity",
@@ -14284,7 +14296,8 @@
       "entity"
     ],
     "source": "org/skriptlang/skript/bukkit/types/EntityClassInfo.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:entity-type",
@@ -14330,7 +14343,8 @@
       "entitysnapshot"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:environment",
@@ -14422,7 +14436,8 @@
       "fireworkeffect"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:fireworktype",
@@ -14445,7 +14460,8 @@
       "float"
     ],
     "source": "ch/njol/skript/classes/data/JavaClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:frog-variant",
@@ -14524,7 +14540,8 @@
       "gene"
     ],
     "source": "ch/njol/skript/entity/PandaData.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:healreason",
@@ -14559,7 +14576,8 @@
       "integer"
     ],
     "source": "ch/njol/skript/classes/data/JavaClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:inventory",
@@ -14570,7 +14588,8 @@
       "inventory"
     ],
     "source": "org/skriptlang/skript/bukkit/types/InventoryClassInfo.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:inventoryaction",
@@ -14605,7 +14624,8 @@
       "inventoryholder"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:inventorytype",
@@ -14651,7 +14671,8 @@
       "itementity"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:itemflag",
@@ -14699,7 +14720,8 @@
       "livingentities"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:location",
@@ -14722,7 +14744,8 @@
       "long"
     ],
     "source": "ch/njol/skript/classes/data/JavaClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:lootcontext",
@@ -14733,7 +14756,8 @@
       "lootcontext"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/LootTableModule.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:loottable",
@@ -14744,7 +14768,8 @@
       "loottable"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/LootTableModule.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:material",
@@ -14767,7 +14792,8 @@
       "metadataholder"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:minecraft-tag",
@@ -14778,7 +14804,8 @@
       "minecrafttag"
     ],
     "source": "org/skriptlang/skript/bukkit/tags/TagModule.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:money",
@@ -14812,7 +14839,8 @@
       "nameable"
     ],
     "source": "org/skriptlang/skript/bukkit/types/NameableClassInfo.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:named",
@@ -14879,7 +14907,8 @@
       "offlineplayer"
     ],
     "source": "org/skriptlang/skript/bukkit/types/OfflinePlayerClassInfo.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:particle",
@@ -14924,7 +14953,8 @@
       "potioneffect"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/PotionModule.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:potion-effect-event-action",
@@ -14983,7 +15013,8 @@
       "projectile"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:quaternion",
@@ -14994,7 +15025,8 @@
       "quaternion"
     ],
     "source": "org/skriptlang/skript/common/types/QuaternionClassInfo.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:queue",
@@ -15085,7 +15117,8 @@
       "short"
     ],
     "source": "ch/njol/skript/classes/data/JavaClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:skriptpotioneffect",
@@ -15178,7 +15211,8 @@
       "teleportflag"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:testgui",
@@ -15213,7 +15247,8 @@
       "textcomponent"
     ],
     "source": "org/skriptlang/skript/bukkit/text/types/TextComponentClassInfo.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:time",
@@ -15281,7 +15316,8 @@
       "uuid"
     ],
     "source": "ch/njol/skript/classes/data/JavaClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:valued",
@@ -15315,7 +15351,8 @@
       "vehicle"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:villagercareerchangereason",
@@ -15398,7 +15435,8 @@
       "worldborder"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:zombie-nautilus-variant",
