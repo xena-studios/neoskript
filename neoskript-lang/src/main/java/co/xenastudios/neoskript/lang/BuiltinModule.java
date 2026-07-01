@@ -2360,6 +2360,16 @@ public final class BuiltinModule {
             Expression<?> lhs = arguments.get(0);
             Expression<?> value = arguments.get(1);
             if (lhs instanceof VariableExpression variable) {
+                if (variable.isList()) {
+                    // `set {list::*} to <values>` replaces the whole list with every value.
+                    return ctx -> {
+                        Object[] values = value.getAll(ctx);
+                        variable.delete(ctx);
+                        for (Object v : values) {
+                            variable.addToList(ctx, v);
+                        }
+                    };
+                }
                 return ctx -> variable.set(ctx, value.getSingle(ctx));
             }
             requireChangeable(lhs, ChangeMode.SET);
