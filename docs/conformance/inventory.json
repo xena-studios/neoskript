@@ -7721,8 +7721,8 @@
       "%players%'[s] cursor slot"
     ],
     "source": "ch/njol/skript/expressions/ExprCursorSlot.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:custom-chest-inventory",
@@ -9283,8 +9283,8 @@
       "%players%'[s] [([current:currently] selected|current:current)] hotbar slot[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprHotbarSlot.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:hover-list",

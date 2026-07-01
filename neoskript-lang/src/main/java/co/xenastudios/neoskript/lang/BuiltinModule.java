@@ -411,6 +411,50 @@ public final class BuiltinModule {
                         : w.hasStorm() ? org.bukkit.WeatherType.DOWNFALL : org.bukkit.WeatherType.CLEAR);
             });
         });
+        registry.registerExpression("[the] hotbar slot [(index|number)] of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof Player p
+                    ? p.getInventory().getHeldItemSlot() : null);
+        });
+        // The item on a player's cursor — readable and settable.
+        registry.registerExpression("[the] cursor slot of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new Expression<Object>() {
+                @Override
+                public Object[] getAll(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                    Object v = getSingle(ctx);
+                    return v == null ? new Object[0] : new Object[]{v};
+                }
+
+                @Override
+                public Object getSingle(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                    return src.getSingle(ctx) instanceof Player p ? p.getItemOnCursor() : null;
+                }
+
+                @Override
+                public Class<Object> returnType() {
+                    return Object.class;
+                }
+
+                @Override
+                public boolean isSingle() {
+                    return true;
+                }
+
+                @Override
+                public Class<?>[] acceptChange(ChangeMode mode) {
+                    return mode == ChangeMode.SET ? new Class<?>[]{Object.class} : null;
+                }
+
+                @Override
+                public void change(co.xenastudios.neoskript.api.runtime.TriggerContext ctx, Object[] delta, ChangeMode mode) {
+                    if (mode == ChangeMode.SET && src.getSingle(ctx) instanceof Player p
+                            && delta != null && delta.length > 0 && delta[0] instanceof ItemStack item) {
+                        p.setItemOnCursor(item);
+                    }
+                }
+            };
+        });
         registry.registerExpression("[the] (tool|held item|weapon) of %object%", Object.class, arguments -> {
             Expression<?> src = arguments.get(0);
             return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof LivingEntity le

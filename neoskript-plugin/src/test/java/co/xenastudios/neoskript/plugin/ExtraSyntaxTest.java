@@ -348,6 +348,21 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void cursorAndHotbarSlots() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("sl.sk"), """
+                command /sl:
+                    trigger:
+                        set {_h} to hotbar slot of player
+                        set {_c} to cursor slot of player
+                        set cursor slot of player to item("diamond")
+                """, StandardCharsets.UTF_8);
+        // MockBukkit doesn't implement the player inventory internals, so this is a parse gate.
+        ReloadAssert.assertReloadHasNoFailures(server);
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);
