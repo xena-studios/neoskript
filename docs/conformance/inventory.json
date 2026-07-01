@@ -6378,8 +6378,8 @@
       "[the] absorbed blocks"
     ],
     "source": "ch/njol/skript/expressions/ExprAbsorbedBlocks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:active-item",
@@ -6416,8 +6416,8 @@
       "[the] affected entities"
     ],
     "source": "ch/njol/skript/expressions/ExprAffectedEntities.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:age-of-block-entity",
@@ -6726,8 +6726,8 @@
       "[the] applied [beacon] effect"
     ],
     "source": "ch/njol/skript/expressions/ExprAppliedEffect.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:applied-enchantments",
@@ -6872,8 +6872,8 @@
       "[the] (attacked|damaged|victim) [<(.+)>]"
     ],
     "source": "ch/njol/skript/expressions/ExprAttacked.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:attacker",
@@ -6884,8 +6884,8 @@
       "[the] (attacker|damager)"
     ],
     "source": "ch/njol/skript/expressions/ExprAttacker.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:banner-pattern",
@@ -6935,8 +6935,8 @@
       "[the] [piglin] barter[ing] drops"
     ],
     "source": "ch/njol/skript/expressions/ExprBarterDrops.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:barter-input",
@@ -6947,8 +6947,8 @@
       "[the] [piglin] barter[ing] input"
     ],
     "source": "ch/njol/skript/expressions/ExprBarterInput.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:beacon-effects",
@@ -7223,8 +7223,8 @@
       "[the] brewing results"
     ],
     "source": "org/skriptlang/skript/bukkit/brewing/elements/expressions/ExprBrewingResults.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:brewing-stand-fuel-level",
@@ -7282,8 +7282,8 @@
       "[the] broadcast(-|[ed] )message"
     ],
     "source": "org/skriptlang/skript/bukkit/misc/elements/expressions/ExprBroadcastMessage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:brushing-stage",
@@ -7406,8 +7406,8 @@
       "[the] [chat( |-)]message"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/expressions/ExprChatMessage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:chat-recipients",
@@ -7418,8 +7418,8 @@
       "[the] [chat( | -)]recipients"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/expressions/ExprChatRecipients.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:chunk",
@@ -7495,8 +7495,8 @@
       "[the] command [(label|alias)]"
     ],
     "source": "ch/njol/skript/expressions/ExprCommand.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:command-block-command",
@@ -7592,8 +7592,8 @@
       "[the] consumed item"
     ],
     "source": "ch/njol/skript/expressions/ExprConsumedItem.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:cooldown-time-remaining-time-elapsed-time-last-usage-bypass-permission",
@@ -7751,8 +7751,8 @@
       "[the] damage"
     ],
     "source": "ch/njol/skript/expressions/ExprDamage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage-amount-of-world-border",
@@ -8201,8 +8201,8 @@
       "[the] drops"
     ],
     "source": "ch/njol/skript/expressions/ExprDrops.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:drops-of-block",
@@ -8243,8 +8243,8 @@
       "[the] enchant[ed] item"
     ],
     "source": "ch/njol/skript/expressions/ExprEnchantItem.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:enchanting-experience-cost",
@@ -8255,7 +8255,8 @@
       "[the] [displayed] ([e]xp[erience]|enchanting) cost"
     ],
     "source": "ch/njol/skript/expressions/ExprEnchantingExpCost.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:enchantment-bonus",
@@ -8266,8 +8267,8 @@
       "[the] enchantment bonus"
     ],
     "source": "ch/njol/skript/expressions/ExprEnchantmentBonus.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:enchantment-level",
@@ -8673,8 +8674,8 @@
       "[the] exploded blocks"
     ],
     "source": "ch/njol/skript/expressions/ExprExplodedBlocks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:explosion-block-yield",
@@ -8686,8 +8687,8 @@
       "[the] percentage of blocks dropped"
     ],
     "source": "ch/njol/skript/expressions/ExprExplosionBlockYield.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:explosion-yield",
@@ -8699,8 +8700,8 @@
       "[the] (yield|radius|size) of [the] explosion"
     ],
     "source": "ch/njol/skript/expressions/ExprExplosionYield.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:explosive-yield",
@@ -8826,8 +8827,8 @@
       "fish[ing] bit(e|ing) [wait] time"
     ],
     "source": "org/skriptlang/skript/bukkit/fishing/elements/expressions/ExprFishingBiteTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:fishing-hook",
@@ -8838,8 +8839,8 @@
       "fish[ing] (hook|bobber)"
     ],
     "source": "org/skriptlang/skript/bukkit/fishing/elements/expressions/ExprFishingHook.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:fishing-hooked-entity",
@@ -8850,8 +8851,8 @@
       "[the] hook[ed] entity"
     ],
     "source": "org/skriptlang/skript/bukkit/fishing/elements/expressions/ExprFishingHookEntity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:fishing-wait-time",
@@ -8969,8 +8970,8 @@
       "[the] burned (fuel|item)"
     ],
     "source": "org/skriptlang/skript/bukkit/block/furnace/elements/expressions/ExprFurnaceEventItems.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:furnace-slot",
@@ -9128,7 +9129,8 @@
       "[the] hatching entity [type]"
     ],
     "source": "ch/njol/skript/expressions/ExprHatchingType.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:hatching-number",
@@ -9139,8 +9141,8 @@
       "[the] hatching number"
     ],
     "source": "ch/njol/skript/expressions/ExprHatchingNumber.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:head-location",
@@ -9164,8 +9166,8 @@
       "[the] heal[ing] amount"
     ],
     "source": "ch/njol/skript/expressions/ExprHealAmount.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:heal-reason",
@@ -9177,8 +9179,8 @@
       "%livingentities%'[s] (regen|health regain|heal[ing]) (reason|cause)"
     ],
     "source": "ch/njol/skript/expressions/ExprHealReason.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:health",
@@ -9242,8 +9244,8 @@
       "[the] (host|domain)[ ][name]"
     ],
     "source": "ch/njol/skript/expressions/ExprHostname.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:hotbar-button",
@@ -9254,8 +9256,8 @@
       "[the] hotbar button"
     ],
     "source": "ch/njol/skript/expressions/ExprHotbarButton.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:hotbar-slot",
@@ -9280,8 +9282,8 @@
       "[the] [custom] player [hover|sample] list"
     ],
     "source": "ch/njol/skript/expressions/ExprHoverList.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:humidity",
@@ -9349,8 +9351,8 @@
       "[the] [event-]initiator[( |-)inventory]"
     ],
     "source": "ch/njol/skript/expressions/ExprEvtInitiator.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:input",
@@ -9401,8 +9403,8 @@
       "%inventoryevents%'[s] inventory action"
     ],
     "source": "ch/njol/skript/expressions/ExprInventoryAction.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:inventory-close-reason",
@@ -9413,8 +9415,8 @@
       "[the] inventory clos(e|ing) (reason|cause)"
     ],
     "source": "ch/njol/skript/expressions/ExprInventoryCloseReason.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:inventory-holder-viewers-rows-slots",
@@ -9689,8 +9691,8 @@
       "[the] (join|log[ ]in)( |-)message"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/expressions/ExprJoinMessage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:keyed",
@@ -9713,8 +9715,8 @@
       "[the] kick( |-)message"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/expressions/ExprKickMessage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:language",
@@ -10036,8 +10038,8 @@
       "[the] loot"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/expressions/ExprLoot.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:loot-context",
@@ -10346,8 +10348,8 @@
       "[the] [mending] repair amount"
     ],
     "source": "ch/njol/skript/expressions/ExprMendingRepairAmount.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:message-of-the-day",
@@ -10494,8 +10496,8 @@
       "[the] moved blocks"
     ],
     "source": "ch/njol/skript/expressions/ExprPushedBlocks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:name",
@@ -10723,8 +10725,8 @@
       "[the] on-screen kick message"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/expressions/ExprOnScreenKickMessage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:online-player-count",
@@ -11079,8 +11081,8 @@
       "[the] blocks of [the] portal"
     ],
     "source": "ch/njol/skript/expressions/ExprPortal.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:portal-cooldown",
@@ -11193,8 +11195,8 @@
       "[the] projectile force"
     ],
     "source": "ch/njol/skript/expressions/ExprProjectileForce.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:protocol-version",
@@ -11205,8 +11207,8 @@
       "[the] [server] [(sent|required|fake)] protocol version [number]"
     ],
     "source": "ch/njol/skript/expressions/ExprProtocolVersion.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:queue-experimental",
@@ -11241,8 +11243,8 @@
       "[the] (quit|leave|log[ ]out)( |-)message"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/expressions/ExprQuitMessage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:quit-reason",
@@ -11339,8 +11341,8 @@
       "[the] (readied|selected|drawn) (:arrow|bow)"
     ],
     "source": "ch/njol/skript/expressions/ExprReadiedArrow.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:recursive",
@@ -11499,8 +11501,8 @@
       "[the] respawn location"
     ],
     "source": "ch/njol/skript/expressions/ExprRespawnLocation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:respawn-reason",
@@ -11698,8 +11700,8 @@
       "[the] [sent] [server] command[s] list"
     ],
     "source": "ch/njol/skript/expressions/ExprSentCommands.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:server-icon",
@@ -11710,8 +11712,8 @@
       "[the] [(1¦(default)|2¦(shown|sent))] [server] icon"
     ],
     "source": "ch/njol/skript/expressions/ExprServerIcon.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:sets",
@@ -11849,8 +11851,8 @@
       "[the] source block"
     ],
     "source": "ch/njol/skript/expressions/ExprSourceBlock.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:spawn",
@@ -12032,8 +12034,8 @@
       "[the] tamer"
     ],
     "source": "ch/njol/skript/expressions/ExprTamer.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:target",
@@ -12070,8 +12072,8 @@
       "teleport (cause|reason|type)"
     ],
     "source": "ch/njol/skript/expressions/ExprTeleportCause.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:temperature",
@@ -12205,8 +12207,8 @@
       "%entities%'[s] [thrown] egg"
     ],
     "source": "ch/njol/skript/expressions/ExprEgg.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:time",
@@ -12326,8 +12328,8 @@
       "[the] transform[ing] (cause|reason|type)"
     ],
     "source": "ch/njol/skript/expressions/ExprTransformReason.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:transformed-list",
@@ -12403,8 +12405,8 @@
       "[the] unleash[ing] reason"
     ],
     "source": "ch/njol/skript/expressions/ExprUnleashReason.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:uuid",
@@ -12745,8 +12747,8 @@
       "[the] [shown|custom] version [string|text]"
     ],
     "source": "ch/njol/skript/expressions/ExprVersionString.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:view-distance",
