@@ -317,6 +317,36 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void colorStringUtils() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("cx.sk"), """
+                command /cx:
+                    trigger:
+                        set {_c} to colored "&aHello"
+                        if {_c} is set:
+                            send "COLORED" to player
+                        set {_u} to uncolored "&aHello"
+                        if {_u} is "Hello":
+                            send "UNCOLORED" to player
+                        set {_s} to all string colors
+                        if {_s} is set:
+                            send "STRINGCOLORS" to player
+                """, StandardCharsets.UTF_8);
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        org.mockbukkit.mockbukkit.entity.PlayerMock player = server.addPlayer();
+        server.dispatchCommand(player, "cx");
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            seen.add(m);
+        }
+        assertTrue(seen.contains("COLORED"), "colored resolves");
+        assertTrue(seen.contains("UNCOLORED"), "uncolored strips codes to 'Hello'");
+        assertTrue(seen.contains("STRINGCOLORS"), "string colors resolves");
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);

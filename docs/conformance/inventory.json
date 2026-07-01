@@ -7493,8 +7493,8 @@
       "[negated:(un|non)[-]](format-|formatted )%strings%"
     ],
     "source": "org/skriptlang/skript/bukkit/text/elements/expressions/ExprColored.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:command",
@@ -11963,8 +11963,8 @@
       "[the] last string colo[u]r[s] [code:code[s]] of %strings%"
     ],
     "source": "org/skriptlang/skript/bukkit/text/elements/expressions/ExprStringColor.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:substring",

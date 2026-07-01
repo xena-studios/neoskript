@@ -445,6 +445,20 @@ public final class BuiltinModule {
                 }
             });
         });
+        registry.registerExpression("[the] (colo[u]red|formatted) %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof String str
+                    ? org.bukkit.ChatColor.translateAlternateColorCodes('&', str) : null);
+        });
+        registry.registerExpression("[the] (uncolo[u]red|unformatted|plain) %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof String str
+                    ? org.bukkit.ChatColor.stripColor(
+                            org.bukkit.ChatColor.translateAlternateColorCodes('&', str)) : null);
+        });
+        registry.registerExpression("[all [of the]] string colo[u]r[s]", Object.class, arguments ->
+                new ComputedListExpression(ctx -> java.util.Arrays.stream(org.bukkit.ChatColor.values())
+                        .map(c -> "&" + c.getChar()).toArray()));
         // Date/time arithmetic. Dates are millisecond timestamps (matching `now`); durations are timespans.
         registry.registerExpression("[the] time since %object%", Object.class, arguments -> {
             Expression<?> src = arguments.get(0);
