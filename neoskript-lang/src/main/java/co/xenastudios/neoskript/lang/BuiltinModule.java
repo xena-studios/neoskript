@@ -179,6 +179,9 @@ public final class BuiltinModule {
         registry.registerExpression("loop-value", Object.class, arguments -> new NamedLocalExpression("loop-value"));
         // The current element inside filter/map/sort/transform (`%objects% transformed using [input * 2]`).
         registry.registerExpression("input", Object.class, arguments -> new NamedLocalExpression("input"));
+        // The running accumulator inside `%objects% reduced with [accumulator + input]`.
+        registry.registerExpression("accumulator", Object.class, arguments -> new NamedLocalExpression("accumulator"));
+        registry.registerExpression("[the] reduced value", Object.class, arguments -> new NamedLocalExpression("accumulator"));
         registry.registerExpression("loop-number", Object.class, arguments -> new NamedLocalExpression("loop-index"));
         registry.registerExpression("loop-index", Object.class, arguments -> new NamedLocalExpression("loop-index"));
 

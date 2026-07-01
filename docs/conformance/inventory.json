@@ -8613,8 +8613,8 @@
       "%objects% (except|excluding|not including) %objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprExcept.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:exhaustion",
@@ -11409,8 +11409,8 @@
       "%objects% (reduced|folded) (to|with|by) \\(<.+>\\)"
     ],
     "source": "ch/njol/skript/expressions/ExprReduce.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:reduced-value",
@@ -11423,8 +11423,8 @@
       "[the] folded value"
     ],
     "source": "ch/njol/skript/expressions/ExprReducedValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:region",

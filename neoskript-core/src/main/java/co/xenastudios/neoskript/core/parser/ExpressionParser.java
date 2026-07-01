@@ -295,6 +295,10 @@ public final class ExpressionParser {
             "(?i)^(.+?)\\s+(?:where|that match(?:es)?)\\s*\\[(.+)]$");
     private static final Pattern META_TERNARY = Pattern.compile(
             "(?i)^(.+?)\\s+if\\s+(.+?),?\\s+(?:otherwise|else)\\s+(.+)$");
+    private static final Pattern META_REDUCE = Pattern.compile(
+            "(?i)^(.+?)\\s+(?:reduced|folded)\\s+(?:to|with|by)\\s*\\[(.+)]$");
+    private static final Pattern META_EXCEPT = Pattern.compile(
+            "(?i)^(.+?)\\s+(?:except|excluding|not including)\\s+(.+)$");
 
     /**
      * Parses a list/meta expression that evaluates a nested condition or expression per element:
@@ -334,6 +338,45 @@ public final class ExpressionParser {
                 }
                 return kept.toArray();
             });
+        }
+        Matcher reduce = META_REDUCE.matcher(s);
+        if (reduce.matches()) {
+            Expression<?> source = parse(reduce.group(1).trim());
+            Expression<?> reducer = parse(reduce.group(2).trim());
+            return new ComputedExpression(ctx -> {
+                Object[] items = source.getAll(ctx);
+                if (items.length == 0) {
+                    return null;
+                }
+                Object previousInput = ctx.getLocal("input");
+                Object previousAccumulator = ctx.getLocal("accumulator");
+                try {
+                    Object accumulator = items[0];
+                    for (int i = 1; i < items.length; i++) {
+                        ctx.setLocal("accumulator", accumulator);
+                        ctx.setLocal("input", items[i]);
+                        accumulator = reducer.getSingle(ctx);
+                    }
+                    return accumulator;
+                } finally {
+                    ctx.setLocal("input", previousInput);
+                    ctx.setLocal("accumulator", previousAccumulator);
+                }
+            });
+        }
+        Matcher except = META_EXCEPT.matcher(s);
+        if (except.matches()) {
+            try {
+                Expression<?> whole = parse(except.group(1).trim());
+                Expression<?> removed = parse(except.group(2).trim());
+                return new ComputedListExpression(ctx -> {
+                    java.util.Set<Object> exclude =
+                            new java.util.HashSet<>(java.util.Arrays.asList(removed.getAll(ctx)));
+                    return java.util.Arrays.stream(whole.getAll(ctx)).filter(x -> !exclude.contains(x)).toArray();
+                });
+            } catch (ParseException ignored) {
+                // not an `except` expression
+            }
         }
         Matcher ternary = META_TERNARY.matcher(s);
         if (ternary.matches()) {
