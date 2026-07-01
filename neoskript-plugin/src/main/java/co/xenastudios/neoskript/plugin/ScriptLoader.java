@@ -209,7 +209,14 @@ public final class ScriptLoader {
 
     private List<Trigger> parseFile(Path file, Path dir, AtomicInteger failed) {
         try {
-            return parser.parse(Files.readString(file, StandardCharsets.UTF_8));
+            List<Trigger> triggers = parser.parse(Files.readString(file, StandardCharsets.UTF_8));
+            // A parse error in one structure disables only that structure; log each and keep loading
+            // the rest of the file, exactly as Skript does.
+            for (ParseException e : parser.errors()) {
+                failed.incrementAndGet();
+                plugin.getLogger().warning("Failed to parse " + dir.relativize(file) + ": " + e.getMessage());
+            }
+            return triggers;
         } catch (ParseException e) {
             failed.incrementAndGet();
             plugin.getLogger().warning("Failed to parse " + dir.relativize(file) + ": " + e.getMessage());

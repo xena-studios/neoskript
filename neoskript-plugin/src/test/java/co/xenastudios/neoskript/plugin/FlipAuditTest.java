@@ -72,7 +72,11 @@ class FlipAuditTest {
                 default -> "command /a:\n    trigger:\n        " + line + "\n";
             };
             try {
-                new ScriptParser(registry, events, functions).parse(script);
+                ScriptParser parser = new ScriptParser(registry, events, functions);
+                parser.parse(script);
+                if (!parser.errors().isEmpty()) {
+                    failures.add(id + "\t" + cat + "\t" + line + "\t" + parser.errors().get(0).getMessage());
+                }
             } catch (Throwable t) {
                 failures.add(id + "\t" + cat + "\t" + line + "\t" + t.getMessage());
             }

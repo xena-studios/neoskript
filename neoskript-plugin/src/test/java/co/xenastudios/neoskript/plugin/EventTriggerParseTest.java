@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Verifies the newly-registered event triggers are recognised: each {@code on <event>:} parses. */
 class EventTriggerParseTest {
@@ -47,8 +47,9 @@ class EventTriggerParseTest {
         };
         for (String alias : aliases) {
             String script = "on " + alias + ":\n    set {_x} to 1\n";
-            assertDoesNotThrow(() -> new ScriptParser(registry, events, functions).parse(script),
-                    "on " + alias + " should parse");
+            ScriptParser parser = new ScriptParser(registry, events, functions);
+            parser.parse(script);
+            assertTrue(parser.errors().isEmpty(), "on " + alias + " should parse: " + parser.errors());
         }
     }
 }

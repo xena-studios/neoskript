@@ -75,7 +75,11 @@ class BulkParseCheckTest {
                 default -> "command /a:\n    trigger:\n        set {_x} to " + line + "\n";
             };
             try {
-                new ScriptParser(registry, events, functions).parse(script);
+                ScriptParser parser = new ScriptParser(registry, events, functions);
+                parser.parse(script);
+                if (!parser.errors().isEmpty()) {
+                    failures.add(id + "\t" + line + "\t" + parser.errors().get(0).getMessage());
+                }
             } catch (Throwable t) {
                 failures.add(id + "\t" + line + "\t" + t.getMessage());
             }

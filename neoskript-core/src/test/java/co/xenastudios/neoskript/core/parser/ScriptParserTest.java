@@ -18,6 +18,7 @@ import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ScriptParserTest {
 
@@ -142,19 +143,33 @@ class ScriptParserTest {
 
     @Test
     void reportsUnknownEvents() {
-        ParseException error = assertThrows(ParseException.class,
-                () -> parser.parse("on explode:\n    set {_x} to 1\n"));
-        assertEquals(1, error.line());
+        // A bad structure is collected as an error (and skipped) rather than aborting the whole file.
+        List<Trigger> triggers = parser.parse("on explode:\n    set {_x} to 1\n");
+        assertTrue(triggers.isEmpty(), "the bad event should not load");
+        assertEquals(1, parser.errors().size());
+        assertEquals(1, parser.errors().get(0).line());
     }
 
     @Test
     void reportsUnknownStatements() {
-        assertThrows(ParseException.class, () -> parser.parse("on join:\n    do a barrel roll\n"));
+        parser.parse("on join:\n    do a barrel roll\n");
+        assertEquals(1, parser.errors().size());
     }
 
     @Test
     void rejectsEmptyEventBody() {
-        assertThrows(ParseException.class, () -> parser.parse("on join:\n"));
+        parser.parse("on join:\n");
+        assertEquals(1, parser.errors().size());
+    }
+
+    @Test
+    void oneBadStructureDoesNotDiscardTheRest() {
+        // The crux of Skript compatibility: a parse error in one structure must not take down the
+        // other commands/events/functions in the same file.
+        List<Trigger> triggers = parser.parse(
+                "on join:\n    do a barrel roll\n\non join:\n    set {_x} to 1\n");
+        assertEquals(1, triggers.size(), "the valid trigger still loads");
+        assertEquals(1, parser.errors().size(), "the bad trigger is reported");
     }
 
     private Trigger parseOne(String source) {

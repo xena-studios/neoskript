@@ -376,6 +376,14 @@ public final class BuiltinModule {
         eventValue(registry, "[the] (xp|experience) [orb] amount", ctx ->
                 event(ctx) instanceof org.bukkit.event.player.PlayerExpChangeEvent e ? (double) e.getAmount() : null);
 
+        registry.registerExpression("[the] ping of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof Player p ? p.getPing() : null);
+        });
+        registry.registerExpression("%object%'[s] ping", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof Player p ? p.getPing() : null);
+        });
         registry.registerExpression("[a] random uuid", Object.class,
                 arguments -> new ComputedExpression(ctx -> java.util.UUID.randomUUID()));
         registry.registerExpression("normalize[d] %vector%", Object.class, arguments -> {

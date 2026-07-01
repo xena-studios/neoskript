@@ -1,0 +1,89 @@
+options:
+    prefix: &7[&bDemo&7]&r
+    max-homes: 3
+
+on load:
+    send "&a[Demo] sample.sk loaded." to console
+    set {stats::loaded-at} to now
+
+command /demo [<text>]:
+    description: Demonstrates a few subcommands
+    permission: demo.use
+    permission message: &cYou don't have permission for that.
+    aliases: /d, /sample
+    trigger:
+        if arg-1 is not set:
+            send "{@prefix} &aUsage: &f/demo <hello|info|roll>"
+            stop
+        if arg-1 is "hello":
+            send "{@prefix} &fHello, %player%! Nice to see you."
+        else if arg-1 is "info":
+            send "{@prefix} &7Online: &f%number of all players%&7/&f%max players%"
+            send "{@prefix} &7Your ping: &f%player's ping%&7ms"
+            send "{@prefix} &7Total joins tracked: &f%{stats::joins} ? 0%"
+        else if arg-1 is "roll":
+            set {_n} to a random integer between 1 and 6
+            send "{@prefix} &7You rolled a &e%{_n}%&7!"
+        else:
+            send "{@prefix} &cUnknown subcommand: &f%arg-1%"
+
+command /countdown:
+    description: Counts down from 5
+    trigger:
+        set {_i} to 5
+        while {_i} > 0:
+            send "&e%{_i}%..."
+            remove 1 from {_i}
+            wait 1 second
+        send "&a&lLiftoff!"
+
+command /players:
+    description: Lists everyone online with a loop
+    trigger:
+        send "&7--- Online players ---"
+        loop all players:
+            send "&8• &f%loop-player% &7(%loop-player's health%&7♥)"
+
+on join:
+    set join message to "{@prefix} &e%player% &7joined."
+    send "{@prefix} &fWelcome, %player%!" to player
+    add 1 to {stats::joins}
+    if {joined::%uuid of player%} is not set:
+        set {joined::%uuid of player%} to true
+        give player a diamond named "&bStarter Gift"
+        send "&aHere's a gift for your first visit!" to player
+
+on quit:
+    set quit message to "{@prefix} &e%player% &7left."
+
+on death of player:
+    broadcast "{@prefix} &c%victim% &7was slain by &f%attacker%&7."
+
+on chat:
+    if message contains "spam":
+        cancel event
+        send "&cPlease don't spam." to player
+
+on rightclick holding a stick:
+    send "&6 You wave the magic stick!" to player
+    push player upwards at speed 0.8
+
+on break of diamond ore:
+    send "&b+ You found diamond ore!" to player
+
+every 5 minutes:
+    loop all players:
+        send "&7[AutoMsg] &fThanks for playing, %loop-player%!" to loop-player
+
+function greet(name: text) :: text:
+    return "Hello, %{_name}%!"
+
+function fib(n: number) :: number:
+    if {_n} <= 1:
+        return {_n}
+    return fib({_n} - 1) + fib({_n} - 2)
+
+command /fntest:
+    trigger:
+        send greet(player's name)
+        send "&7fib(10) = &e%fib(10)%"

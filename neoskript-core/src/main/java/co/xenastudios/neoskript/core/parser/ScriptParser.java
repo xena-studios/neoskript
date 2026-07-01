@@ -59,6 +59,7 @@ public final class ScriptParser {
     private final FunctionRegistry functions;
     private final CommandRegistry commands;
     private final ExpressionParser expressions;
+    private final List<ParseException> errors = new ArrayList<>();
 
     public ScriptParser(DefaultSyntaxRegistry registry, EventRegistry events, FunctionRegistry functions) {
         this(registry, events, functions, new CommandRegistry());
@@ -94,31 +95,47 @@ public final class ScriptParser {
     public List<Trigger> parse(String source) {
         List<Node> roots = applyOptions(buildTree(readLines(source)));
         List<Trigger> triggers = new ArrayList<>();
+        errors.clear();
 
         for (Node node : roots) {
-            String lower = node.content().toLowerCase(Locale.ROOT);
-            if (lower.startsWith("every ") && node.content().endsWith(":")) {
-                triggers.add(parsePeriodic(node));
-            } else if (lower.startsWith("on ") && node.content().endsWith(":")) {
-                triggers.add(parseEvent(node));
-            } else if ((lower.startsWith("function ") || lower.startsWith("local function "))
-                    && node.content().endsWith(":")) {
-                parseFunction(node);
-            } else if (lower.startsWith("command ") && node.content().endsWith(":")) {
-                parseCommand(node);
-            } else if (lower.equals("variables:")) {
-                parseVariables(node).ifPresent(triggers::add);
-            } else if (lower.equals("aliases:")) {
-                parseAliases(node);
-            } else if (lower.startsWith("import ") || lower.startsWith("using ")) {
-                // `import`/`using` pull in Java types for effect-command use; NeoSkript has no such
-                // reflective bridge, so they are recognised and skipped rather than failing the parse.
-                continue;
-            } else {
-                throw new ParseException("Expected an event, function, or command, got: " + node.content(), node.line());
+            // Isolate each top-level structure: a parse error in one command/event/function disables
+            // only that structure and is collected, so the rest of the script still loads — matching
+            // Skript, where one bad trigger never takes down the whole file.
+            try {
+                String lower = node.content().toLowerCase(Locale.ROOT);
+                if (lower.startsWith("every ") && node.content().endsWith(":")) {
+                    triggers.add(parsePeriodic(node));
+                } else if (lower.startsWith("on ") && node.content().endsWith(":")) {
+                    triggers.add(parseEvent(node));
+                } else if ((lower.startsWith("function ") || lower.startsWith("local function "))
+                        && node.content().endsWith(":")) {
+                    parseFunction(node);
+                } else if (lower.startsWith("command ") && node.content().endsWith(":")) {
+                    parseCommand(node);
+                } else if (lower.equals("variables:")) {
+                    parseVariables(node).ifPresent(triggers::add);
+                } else if (lower.equals("aliases:")) {
+                    parseAliases(node);
+                } else if (lower.startsWith("import ") || lower.startsWith("using ")) {
+                    // `import`/`using` pull in Java types for effect-command use; NeoSkript has no such
+                    // reflective bridge, so they are recognised and skipped rather than failing the parse.
+                    continue;
+                } else {
+                    throw new ParseException("Expected an event, function, or command, got: " + node.content(), node.line());
+                }
+            } catch (ParseException e) {
+                errors.add(e);
             }
         }
         return triggers;
+    }
+
+    /**
+     * @return the per-structure parse errors from the most recent {@link #parse} call — each is a
+     * structure (command/event/function) that failed to load while the rest of the script loaded.
+     */
+    public List<ParseException> errors() {
+        return List.copyOf(errors);
     }
 
     private static final Set<String> LOAD_ALIASES = Set.of("load", "enable", "server load", "server start");
