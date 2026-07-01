@@ -60,15 +60,20 @@ class BulkParseCheckTest {
             json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
         Matcher m = Pattern.compile(
-                "\\{\\s*\"id\":\\s*\"(.*?)\",\\s*\"line\":\\s*\"(.*?)\"\\s*\\}")
+                "\\{\\s*\"id\":\\s*\"(.*?)\",\\s*\"cat\":\\s*\"(.*?)\",\\s*\"line\":\\s*\"(.*?)\"\\s*\\}")
                 .matcher(json);
         List<String> failures = new ArrayList<>();
         int total = 0;
         while (m.find()) {
             total++;
             String id = m.group(1);
-            String line = m.group(2).replace("\\\"", "\"").replace("\\\\", "\\");
-            String script = "command /a:\n    trigger:\n        set {_x} to " + line + "\n";
+            String cat = m.group(2);
+            String line = m.group(3).replace("\\\"", "\"").replace("\\\\", "\\");
+            String script = switch (cat) {
+                case "condition" -> "command /a:\n    trigger:\n        if " + line + ":\n            set {_r} to 1\n";
+                case "effect" -> "command /a:\n    trigger:\n        " + line + "\n";
+                default -> "command /a:\n    trigger:\n        set {_x} to " + line + "\n";
+            };
             try {
                 new ScriptParser(registry, events, functions).parse(script);
             } catch (Throwable t) {

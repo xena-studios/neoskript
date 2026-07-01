@@ -35,8 +35,8 @@
       "%blocks% (is|are)(n't| not) sedated"
     ],
     "source": "ch/njol/skript/conditions/CondIsSedated.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:bell-is-resonating",
@@ -48,8 +48,8 @@
       "%blocks% (is|are)(n't| not) resonating"
     ],
     "source": "ch/njol/skript/conditions/CondIsResonating.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:bell-is-ringing",
@@ -61,8 +61,8 @@
       "%blocks% (is|are)(n't| not) ringing"
     ],
     "source": "ch/njol/skript/conditions/CondIsRinging.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:brewing-will-consume-fuel",
@@ -449,8 +449,8 @@
       "%blocks%'[s] entity storage (isn't|is not|aren't|are not) full"
     ],
     "source": "ch/njol/skript/conditions/CondEntityStorageIsFull.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:equippable-component-can-be-dispensed",
@@ -464,8 +464,8 @@
       "%equippablecomponents% (isn't|is not|aren't|are not) (able to be dispensed|dispensable)"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/conditions/CondEquipCompDispensable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:equippable-component-can-be-sheared-off",
@@ -477,8 +477,8 @@
       "%equippablecomponents% (can't|cannot|can not) be sheared off [of entities]"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/conditions/CondEquipCompShearable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:equippable-component-can-equip-on-entities",
@@ -490,8 +490,8 @@
       "%equippablecomponents% (can't|cannot|can not) be (equipped|put) on[to] entities"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/conditions/CondEquipCompInteract.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:equippable-component-can-swap-equipment",
@@ -503,8 +503,8 @@
       "%equippablecomponents% (can't|cannot|can not) swap equipment [on right click|when right clicked]"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/conditions/CondEquipCompSwapEquipment.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:equippable-component-will-lose-durability",
@@ -516,8 +516,8 @@
       "%equippablecomponents% (will not|won't) (lose durability|be damaged) (on [wearer['s]] injury|when [[the] wearer [is]] (hurt|injured|damaged))"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/conditions/CondEquipCompDamage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:event-cancelled",
@@ -595,8 +595,8 @@
       "%players% (don't|doesn't|do not|does not) have (chat|text) filtering (on|enabled)"
     ],
     "source": "ch/njol/skript/conditions/CondChatFiltering.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-client-weather",
@@ -608,8 +608,8 @@
       "%players% (doesn't|does not|do not|don't) have [a] (client|custom) weather [set]"
     ],
     "source": "ch/njol/skript/conditions/CondHasClientWeather.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-custom-model-data",
@@ -634,8 +634,8 @@
       "%blocks/itemtypes% (doesn't|does not|do not|don't) have glowing text"
     ],
     "source": "ch/njol/skript/conditions/CondGlowingText.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-item-cooldown",
@@ -798,8 +798,8 @@
       "creeper[s] %livingentities% ((is|are)|1¦(isn't|is not|aren't|are not)) ignited"
     ],
     "source": "ch/njol/skript/conditions/CondIgnitionProcess.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:in-the-past-future",
@@ -974,8 +974,8 @@
       "%livingentities% (is|are)(n't| not) charging [a] fireball"
     ],
     "source": "ch/njol/skript/conditions/CondIsChargingFireball.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-climbing",
@@ -1000,8 +1000,8 @@
       "%blocks% (is|are)(n't| not) [:un]conditional"
     ],
     "source": "ch/njol/skript/conditions/CondIsCommandBlockConditional.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-custom-name-visible",
@@ -1028,8 +1028,8 @@
       "%livingentities% (is|are)(n't| not) dancing"
     ],
     "source": "ch/njol/skript/conditions/CondIsDancing.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-eating",
@@ -1041,8 +1041,8 @@
       "%livingentities% (is|are)(n't| not) eating"
     ],
     "source": "ch/njol/skript/conditions/CondIsEating.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-edible",
@@ -1121,8 +1121,8 @@
       "%itemtypes% (isn't|is not|aren't|are not) (fire resistant|resistant to fire)"
     ],
     "source": "ch/njol/skript/conditions/CondIsFireResistant.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-fish-hook-in-open-water",
@@ -1282,8 +1282,8 @@
       "the [event(-| )]explosion (is|1¦(is not|isn't)) (incendiary|fiery)"
     ],
     "source": "ch/njol/skript/conditions/CondIncendiary.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-infinite",
@@ -1509,8 +1509,8 @@
       "%livingentities% (is|are)(n't| not) pathfinding [to[wards] %-livingentity/location%]"
     ],
     "source": "ch/njol/skript/conditions/CondIsPathfinding.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-persistent",
@@ -1535,8 +1535,8 @@
       "%livingentities% (is|are)(n't| not) playing dead"
     ],
     "source": "ch/njol/skript/conditions/CondIsPlayingDead.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-plugin-enabled",
@@ -1604,8 +1604,8 @@
       "%entities% (is|are) not (responsive|unresponsive)"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/interactions/elements/conditions/CondIsResponsive.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-riding",
@@ -1657,8 +1657,8 @@
       "%livingentities% (is|are)(n't| not) screaming"
     ],
     "source": "ch/njol/skript/conditions/CondIsScreaming.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-script-loaded",
@@ -1737,8 +1737,8 @@
       "%itemtypes% (is|are)(n't| not) solid"
     ],
     "source": "ch/njol/skript/conditions/CondIsSolid.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-spawnable",
@@ -1779,8 +1779,8 @@
       "%itemstacks% (isn't|aren't|is not|are not) stackable"
     ],
     "source": "ch/njol/skript/conditions/CondIsStackable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-swimming",
@@ -1819,8 +1819,8 @@
       "%livingentities% (isn't|aren't|is not|are not) tameable"
     ],
     "source": "ch/njol/skript/conditions/CondIsTameable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-tamed",
@@ -1859,8 +1859,8 @@
       "%itemtypes% (isn't|aren't|is not|are not) transparent"
     ],
     "source": "ch/njol/skript/conditions/CondIsTransparent.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-unbreakable",
@@ -1872,8 +1872,8 @@
       "%itemtypes% (isn't|aren't|is not|are not) [:un]breakable"
     ],
     "source": "ch/njol/skript/conditions/CondIsUnbreakable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-using-experimental-feature",
@@ -1900,8 +1900,8 @@
       "%entities/scripts% (isn't|aren't|is not|are not) valid"
     ],
     "source": "ch/njol/skript/conditions/CondIsValid.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-wearing",
@@ -1972,8 +1972,8 @@
       "%itemtypes% (isn't|is not|aren't|are not) forced to [:not] glint"
     ],
     "source": "ch/njol/skript/conditions/CondItemEnchantmentGlint.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:leash-will-drop",
@@ -1999,8 +1999,8 @@
       "%players% (is|are)(n't| not) (:left|right)( |-)handed"
     ],
     "source": "ch/njol/skript/conditions/CondIsLeftHanded.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:lid-is-open-closed",
@@ -2014,8 +2014,8 @@
       "%blocks%'[s] lid[s] (isn't|is not|aren't|are not) (open[ed]|:close[d])"
     ],
     "source": "ch/njol/skript/conditions/CondLidState.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:matches",
@@ -2104,8 +2104,8 @@
       "%skriptpotioneffects% (has|have) [not] ([an] icon|icons)"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/conditions/CondPotionHasIcon.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:potion-effect-has-particles",
@@ -2116,8 +2116,8 @@
       "%skriptpotioneffects% (has|have) [not] particles"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/conditions/CondPotionHasParticles.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:potion-effect-is-ambient",
@@ -2128,8 +2128,8 @@
       "%skriptpotioneffects% (is|are) [not] ambient"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/conditions/CondIsPotionAmbient.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:potion-effect-type-is-instant",
@@ -2153,8 +2153,8 @@
       "(is PvP|PvP is) disabled [in %worlds%]"
     ],
     "source": "ch/njol/skript/conditions/CondPvP.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:region-contains",
@@ -2219,8 +2219,8 @@
       "%livingentities% (isn't|is not|aren't|are not) shivering"
     ],
     "source": "ch/njol/skript/conditions/CondStriderIsShivering.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:text-display-has-drop-shadow",
@@ -2234,8 +2234,8 @@
       "%displays%'[s] text (doesn't|does not|do not|don't) have [a] (drop|text) shadow"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/text/elements/conditions/CondTextDisplayHasDropShadow.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:text-display-visible-through-blocks",
