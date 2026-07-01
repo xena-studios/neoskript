@@ -1,29 +1,117 @@
 package co.xenastudios.neoskript.lang.event;
+
 import co.xenastudios.neoskript.core.runtime.EventRegistry;
+import io.papermc.paper.event.player.*;
+import org.bukkit.event.block.*;
+import org.bukkit.event.entity.*;
+import org.bukkit.event.inventory.*;
+import org.bukkit.event.player.*;
+import org.bukkit.event.vehicle.*;
+import org.bukkit.event.world.*;
 import com.destroystokyo.paper.event.block.*;
 import com.destroystokyo.paper.event.entity.*;
 import com.destroystokyo.paper.event.player.*;
 import com.destroystokyo.paper.event.server.*;
 import io.papermc.paper.event.block.*;
 import io.papermc.paper.event.entity.*;
-import io.papermc.paper.event.player.*;
 import io.papermc.paper.event.world.*;
-import org.bukkit.event.block.*;
 import org.bukkit.event.enchantment.*;
-import org.bukkit.event.entity.*;
 import org.bukkit.event.hanging.*;
-import org.bukkit.event.inventory.*;
-import org.bukkit.event.player.*;
 import org.bukkit.event.server.*;
-import org.bukkit.event.vehicle.*;
 import org.bukkit.event.weather.*;
-import org.bukkit.event.world.*;
 
-/** Generated bulk registration of all Skript registerEvent Bukkit-event classes. */
-public final class GenEvents2 {
-    private GenEvents2() {}
+/**
+ * Generated event-trigger registrations mapping script event names to Bukkit/Paper event classes,
+ * produced by the conformance tooling from the Skript 2.15.3 source.
+ */
+public final class GeneratedEvents {
+    private GeneratedEvents() {}
 
     public static void register(EventRegistry events) {
+        // simple Bukkit-event mappings
+        events.register(BlockCanBuildEvent.class, "can build check");
+        events.register(BlockDamageEvent.class, "block damaging");
+        events.register(BlockFromToEvent.class, "flow");
+        events.register(BlockIgniteEvent.class, "ignite");
+        events.register(BlockPhysicsEvent.class, "physics");
+        events.register(BlockPistonExtendEvent.class, "piston extend");
+        events.register(BlockPistonRetractEvent.class, "piston retract");
+        events.register(BlockRedstoneEvent.class, "redstone");
+        events.register(BlockSpreadEvent.class, "spread");
+        events.register(ChunkLoadEvent.class, "chunk load");
+        events.register(ChunkPopulateEvent.class, "chunk generate");
+        events.register(ChunkUnloadEvent.class, "chunk unload");
+        events.register(CreeperPowerEvent.class, "creeper power");
+        events.register(EntityBreakDoorEvent.class, "zombie break ] door");
+        events.register(EntityCombustEvent.class, "combust");
+        events.register(EntityExplodeEvent.class, "explod(e|sion)");
+        events.register(EntityPortalEnterEvent.class, "portal enter");
+        events.register(EntityTameEvent.class, "tame");
+        events.register(ExplosionPrimeEvent.class, "explosion prime");
+        events.register(FoodLevelChangeEvent.class, "food level|bar) change");
+        events.register(LeavesDecayEvent.class, "leaves decay");
+        events.register(PigZapEvent.class, "pigzap");
+        events.register(PlayerBedEnterEvent.class, "bed enter");
+        events.register(PlayerBedLeaveEvent.class, "bed leave");
+        events.register(PlayerBucketEmptyEvent.class, "bucket empty");
+        events.register(PlayerBucketFillEvent.class, "bucket fill");
+        events.register(PlayerEggThrowEvent.class, "throw egg");
+        events.register(PlayerItemBreakEvent.class, "tool break");
+        events.register(PlayerItemDamageEvent.class, "item damage");
+        events.register(PlayerItemHeldEvent.class, "] tool change");
+        events.register(PlayerJoinEvent.class, "login");
+        events.register(PlayerLoginEvent.class, "connect");
+        events.register(PlayerKickEvent.class, "kick");
+        events.register(PlayerQuitEvent.class, "quit)");
+        events.register(PlayerRespawnEvent.class, "respawn");
+        events.register(PlayerToggleSneakEvent.class, "toggle sneak");
+        events.register(PlayerToggleSprintEvent.class, "toggle sprint");
+        events.register(PortalCreateEvent.class, "portal create");
+        events.register(ProjectileHitEvent.class, "projectile hit");
+        events.register(ProjectileLaunchEvent.class, "shoot");
+        events.register(SignChangeEvent.class, "sign chang");
+        events.register(SpawnChangeEvent.class, "spawn change");
+        events.register(VehicleCreateEvent.class, "vehicle create");
+        events.register(VehicleDamageEvent.class, "vehicle damage");
+        events.register(VehicleDestroyEvent.class, "vehicle destroy");
+        events.register(VehicleEnterEvent.class, "vehicle enter");
+        events.register(VehicleExitEvent.class, "vehicle exit");
+        events.register(EntityToggleGlideEvent.class, "gliding state change gliding)");
+        events.register(AreaEffectCloudApplyEvent.class, "area effect");
+        events.register(SheepRegrowWoolEvent.class, "sheep grow wool");
+        events.register(InventoryOpenEvent.class, "inventory open");
+        events.register(InventoryCloseEvent.class, "inventory closing");
+        events.register(SlimeSplitEvent.class, "slime split");
+        events.register(EntityResurrectEvent.class, "resurrect");
+        events.register(PlayerChangedWorldEvent.class, "world changing");
+        events.register(PlayerToggleFlightEvent.class, "flight toggle");
+        events.register(PlayerLocaleChangeEvent.class, "language change");
+        events.register(PlayerSwapHandItemsEvent.class, "swap item");
+        events.register(EntityToggleSwimEvent.class, "toggle swim");
+        events.register(PlayerRiptideEvent.class, "riptide ]");
+        events.register(SpongeAbsorbEvent.class, "sponge absorb");
+        events.register(InventoryPickupItemEvent.class, "inventory pickup");
+        events.register(HorseJumpEvent.class, "horse jump");
+        events.register(BlockFertilizeEvent.class, "fertilize");
+        events.register(PlayerAnimationEvent.class, "arm swing");
+        events.register(PlayerItemMendEvent.class, "item mend");
+        events.register(PrepareAnvilEvent.class, "anvil prepare");
+        events.register(PlayerTradeEvent.class, "player trade");
+        events.register(PlayerStopUsingItemEvent.class, "stop using item");
+        events.register(PlayerInventorySlotChangeEvent.class, "inventory slot change");
+        events.register(PlayerDeepSleepEvent.class, "deep sleep");
+        events.register(PlayerPickupArrowEvent.class, "pickup arrow");
+        events.register(InventoryDragEvent.class, "inventory drag");
+        events.register(PiglinBarterEvent.class, "piglin barter)");
+        events.register(io.papermc.paper.event.block.BellRingEvent.class, "bell ring");
+        events.register(BellResonateEvent.class, "bell resonate");
+        events.register(PlayerChangeBeaconEffectEvent.class, "beacon change effect");
+        events.register(PlayerExpCooldownChangeEvent.class, "player experience cooldown change");
+        events.register(VehicleMoveEvent.class, "vehicle move");
+        events.register(BatToggleSleepEvent.class, "bat toggle sleep");
+        events.register(VaultDisplayItemEvent.class, "vault display item");
+        events.register(VillagerCareerChangeEvent.class, "villager career change");
+        // all registerEvent Bukkit classes
         events.register(org.bukkit.event.player.PlayerCommandSendEvent.class, "send ] command list");
         events.register(BlockCanBuildEvent.class, "can build check");
         events.register(BlockDamageEvent.class, "block damaging");
@@ -157,5 +245,17 @@ public final class GenEvents2 {
         events.register(org.bukkit.event.world.WorldUnloadEvent.class, "world unload");
         events.register(org.bukkit.event.world.WorldLoadEvent.class, "world load");
         events.register(org.bukkit.event.entity.FireworkExplodeEvent.class, "firework explod(e|sion) red ]");
+        // additional standard Bukkit/Paper events
+        events.register(org.bukkit.event.player.PlayerEditBookEvent.class, "book edit", "book change", "book write");
+        events.register(org.bukkit.event.entity.EntityMountEvent.class, "mount", "mounting");
+        events.register(org.bukkit.event.entity.EntityDismountEvent.class, "dismount", "dismounting");
+        events.register(org.bukkit.event.entity.PlayerLeashEntityEvent.class, "leash", "leashing", "player leash");
+        events.register(org.bukkit.event.entity.EntityUnleashEvent.class, "unleash", "unleashing");
+        events.register(org.bukkit.event.world.LootGenerateEvent.class, "loot generate", "loot generating");
+        events.register(org.bukkit.event.server.ServerListPingEvent.class, "server list ping", "server ping");
+        events.register(org.bukkit.event.vehicle.VehicleBlockCollisionEvent.class, "vehicle collision");
+        events.register(org.bukkit.event.server.ServerLoadEvent.class, "server start", "server load", "skript start", "skript load");
+        events.register(org.bukkit.event.entity.EntityChangeBlockEvent.class, "enderman place", "entity change block");
+        events.register(com.destroystokyo.paper.event.player.PlayerStartSpectatingEntityEvent.class, "start spectating", "spectate");
     }
 }

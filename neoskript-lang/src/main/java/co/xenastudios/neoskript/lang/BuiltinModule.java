@@ -80,24 +80,8 @@ public final class BuiltinModule {
         registerExpressions(registry);
         registerConditions(registry);
         registerEffects(registry);
-        GenExpressions.register(registry); // bulk property getters (generated)
-        GenExpressions2.register(registry); // deterministic SimplePropertyExpression extraction
-        GenExpressions3.register(registry); // broader getter/list expressions (generated)
-        GenConditions.register(registry); // bulk boolean conditions (generated)
-        GenConditions2.register(registry); // deterministic PropertyCondition extraction
-        GenConditions3.register(registry); // remaining boolean conditions (generated)
-        GenEffects.register(registry); // bulk no-value action effects (generated)
-        GenExprBulk.register(registry); // source-grounded property/noarg getters (generated)
-        GenCondBulk.register(registry); // source-grounded property conditions (generated)
-        GenEffBulk.register(registry); // source-grounded target/target+value effects (generated)
-        GenEventValues.register(registry); // source-grounded event-value expressions (generated)
-        GenExprBulk2.register(registry); // second-pass recovered expressions (generated)
-        GenEffBulk2.register(registry); // second-pass recovered effects (generated)
-        GenCondBulk2.register(registry); // second-pass recovered conditions (generated)
-        GenExprMulti.register(registry); // multi-argument value expressions (generated)
-        GenEventBulk.register(registry); // event-restricted expressions/conditions/effects (generated)
-        GenExprUnified.register(registry); // final permissive expression recovery (generated)
-        GenCEUnified.register(registry); // final permissive condition/effect recovery (generated)
+        // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
+        co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
 
     private static void registerTypes() {
@@ -173,9 +157,7 @@ public final class BuiltinModule {
                 "cattype", org.bukkit.entity.Cat.Type.class, () -> org.bukkit.Registry.CAT_VARIANT));
         types.register(new co.xenastudios.neoskript.lang.type.RegistryType<>(
                 "frogvariant", org.bukkit.entity.Frog.Variant.class, () -> org.bukkit.Registry.FROG_VARIANT));
-        co.xenastudios.neoskript.lang.type.GenTypes.register(types);
-        co.xenastudios.neoskript.lang.type.GenTypes2.register(types);
-        co.xenastudios.neoskript.lang.type.GenTypes3.register(types);
+        co.xenastudios.neoskript.lang.type.GeneratedTypes.register(types);
 
         Renderer.setTypeRegistry(types);
         BuiltinSerializers.registerAll();

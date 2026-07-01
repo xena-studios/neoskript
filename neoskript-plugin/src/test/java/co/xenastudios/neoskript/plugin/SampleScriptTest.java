@@ -59,7 +59,6 @@ class SampleScriptTest {
         for (ParseException e : parser.errors()) {
             sb.append("  line ").append(e.line()).append(": ").append(e.getMessage()).append('\n');
         }
-        System.out.println(sb + "triggers loaded: " + triggers.size());
         // Every canonical sample structure must load; the whole point is drop-in compatibility.
         assertTrue(parser.errors().isEmpty(), sb.toString());
     }

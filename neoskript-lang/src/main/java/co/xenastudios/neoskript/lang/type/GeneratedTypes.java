@@ -2,11 +2,39 @@ package co.xenastudios.neoskript.lang.type;
 
 import co.xenastudios.neoskript.core.type.TypeRegistry;
 
-/** Class/enum/registry-backed value types (source-grounded). One registration per line for compile-drop. */
-public final class GenTypes3 {
-    private GenTypes3() {}
+/**
+ * Generated built-in value-type registrations (enum-, registry-, and class-backed), produced by the
+ * conformance tooling from the Skript 2.15.3 source. Hand-written {@link Type} implementations live
+ * alongside this class in the same package.
+ */
+public final class GeneratedTypes {
+    private GeneratedTypes() {}
 
     public static void register(TypeRegistry types) {
+        // enum / registry-backed types
+        types.register(new RegistryType<>("bannerpatterntype", org.bukkit.block.banner.PatternType.class, () -> org.bukkit.Registry.BANNER_PATTERN));
+        types.register(new EnumType<>("billboard", org.bukkit.entity.Display.Billboard.class));
+        types.register(new EnumType<>("bukkitparticle", org.bukkit.Particle.class));
+        types.register(new EnumType<>("experiencecooldownchangereason", org.bukkit.event.player.PlayerExpCooldownChangeEvent.ChangeReason.class));
+        types.register(new EnumType<>("inventoryclosereason", org.bukkit.event.inventory.InventoryCloseEvent.Reason.class));
+        types.register(new EnumType<>("itemdisplaytransform", org.bukkit.entity.ItemDisplay.ItemDisplayTransform.class));
+        types.register(new EnumType<>("itemflag", org.bukkit.inventory.ItemFlag.class));
+        types.register(new EnumType<>("moonphase", io.papermc.paper.world.MoonPhase.class));
+        types.register(new EnumType<>("potionaction", org.bukkit.event.entity.EntityPotionEffectEvent.Action.class));
+        types.register(new EnumType<>("potioncause", org.bukkit.event.entity.EntityPotionEffectEvent.Cause.class));
+        types.register(new RegistryType<>("potioneffecttype", org.bukkit.potion.PotionEffectType.class, () -> org.bukkit.Registry.MOB_EFFECT));
+        types.register(new EnumType<>("potioneffecttypecategory", org.bukkit.potion.PotionEffectTypeCategory.class));
+        types.register(new EnumType<>("quitreason", org.bukkit.event.player.PlayerQuitEvent.QuitReason.class));
+        types.register(new EnumType<>("resourcepackstate", org.bukkit.event.player.PlayerResourcePackStatusEvent.Status.class));
+        types.register(new EnumType<>("respawnreason", org.bukkit.event.player.PlayerRespawnEvent.RespawnReason.class));
+        types.register(new EnumType<>("textalignment", org.bukkit.entity.TextDisplay.TextAlignment.class));
+        types.register(new EnumType<>("transformreason", org.bukkit.event.entity.EntityTransformEvent.TransformReason.class));
+        types.register(new EnumType<>("unleashreason", org.bukkit.event.entity.EntityUnleashEvent.UnleashReason.class));
+        types.register(new RegistryType<>("wolfvariant", org.bukkit.entity.Wolf.Variant.class, () -> org.bukkit.Registry.WOLF_VARIANT));
+        // more enum types
+        types.register(new EnumType<>("experiencecooldownchangereason", org.bukkit.event.player.PlayerExpCooldownChangeEvent.ChangeReason.class));
+        types.register(new EnumType<>("villagercareerchangereason", org.bukkit.event.entity.VillagerCareerChangeEvent.ChangeReason.class));
+        // class / enum / registry-backed value types
         types.register(new ClassType<>("block", org.bukkit.block.Block.class, b -> b.getType().name().toLowerCase()));
         types.register(new ClassType<>("blockdata", org.bukkit.block.data.BlockData.class, org.bukkit.block.data.BlockData::getAsString));
         types.register(new ClassType<>("chunk", org.bukkit.Chunk.class));
@@ -36,7 +64,6 @@ public final class GenTypes3 {
         types.register(new ClassType<>("worldborder", org.bukkit.WorldBorder.class));
         types.register(new ClassType<>("bannerpattern", org.bukkit.block.banner.Pattern.class));
         types.register(new ClassType<>("cachedservericon", org.bukkit.util.CachedServerIcon.class));
-
         types.register(new ClassType<>("minecrafttag", org.bukkit.Tag.class));
         types.register(new ClassType<>("quaternion", org.joml.Quaternionf.class));
         types.register(new ClassType<>("timespan", co.xenastudios.neoskript.core.runtime.Timespan.class,
