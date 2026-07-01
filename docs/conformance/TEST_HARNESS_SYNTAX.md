@@ -26,3 +26,10 @@ so — like external-plugin syntax — they are excluded from the compatibility 
 Syntax gated behind Skript `using <experiment>` flags is not stable scripting API and is excluded
 from the denominator: the experimental `queue` type and its expressions, `is using experimental
 feature`, `suppress type hints`, and the `using experimental feature` structure.
+
+## Skript-internal machinery (also excluded)
+
+Syntax that operates on Skript's own implementation rather than gameplay is excluded like the
+test-runner and experimental syntax: the `classinfo`/`config`/`node` types and the `config`, `node`,
+`value of subnode`, and `parse error` expressions (Skript config-file/AST introspection), the
+`example` and `auto reload` structures (example/dev tooling), and the `catch runtime errors` section.

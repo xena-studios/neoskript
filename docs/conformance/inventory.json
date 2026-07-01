@@ -7578,8 +7578,9 @@
       "[the] [skript] config"
     ],
     "source": "ch/njol/skript/expressions/ExprConfig.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "Skript-internal machinery (config-file/AST parsing, type-system reflection, example/auto-reload dev tooling); not gameplay scripting"
   },
   {
     "id": "expression:console",
@@ -10661,8 +10662,9 @@
       "%node%'[s] nodes"
     ],
     "source": "ch/njol/skript/expressions/ExprNode.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "Skript-internal machinery (config-file/AST parsing, type-system reflection, example/auto-reload dev tooling); not gameplay scripting"
   },
   {
     "id": "expression:now",
@@ -10801,8 +10803,9 @@
       "[the] [last] [parse] error"
     ],
     "source": "ch/njol/skript/expressions/ExprParseError.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "Skript-internal machinery (config-file/AST parsing, type-system reflection, example/auto-reload dev tooling); not gameplay scripting"
   },
   {
     "id": "expression:parse-logs",
@@ -12479,8 +12482,9 @@
       "[the] %*classinfo% value [at] %string% (from|in) %node%"
     ],
     "source": "ch/njol/skript/expressions/ExprSubnodeValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "Skript-internal machinery (config-file/AST parsing, type-system reflection, example/auto-reload dev tooling); not gameplay scripting"
   },
   {
     "id": "expression:value-within",
@@ -13651,7 +13655,8 @@
       "catch [run[ ]time] error[s]"
     ],
     "source": "ch/njol/skript/sections/SecCatchErrors.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "Skript-internal machinery (config-file/AST parsing, type-system reflection, example/auto-reload dev tooling); not gameplay scripting"
   },
   {
     "id": "section:conditionals",
@@ -13780,7 +13785,8 @@
       "auto[matically] reload [(this|the) script]"
     ],
     "source": "ch/njol/skript/structures/StructAutoReload.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "Skript-internal machinery (config-file/AST parsing, type-system reflection, example/auto-reload dev tooling); not gameplay scripting"
   },
   {
     "id": "structure:command",
@@ -13815,7 +13821,8 @@
       "example"
     ],
     "source": "ch/njol/skript/structures/StructExample.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "Skript-internal machinery (config-file/AST parsing, type-system reflection, example/auto-reload dev tooling); not gameplay scripting"
   },
   {
     "id": "structure:function",
@@ -14077,7 +14084,8 @@
       "classinfo"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "Skript-internal machinery (config-file/AST parsing, type-system reflection, example/auto-reload dev tooling); not gameplay scripting"
   },
   {
     "id": "type:clicktype",
@@ -14124,7 +14132,8 @@
       "config"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "Skript-internal machinery (config-file/AST parsing, type-system reflection, example/auto-reload dev tooling); not gameplay scripting"
   },
   {
     "id": "type:containing",
@@ -14880,7 +14889,8 @@
       "node"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "Skript-internal machinery (config-file/AST parsing, type-system reflection, example/auto-reload dev tooling); not gameplay scripting"
   },
   {
     "id": "type:number",
