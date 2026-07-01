@@ -14145,7 +14145,8 @@
       "containing"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "abstract Skript type-system super-type (organizational interface, not a concrete scripting value)"
   },
   {
     "id": "type:convergingparticle",
@@ -14417,7 +14418,8 @@
       "executable"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "abstract Skript type-system super-type (organizational interface, not a concrete scripting value)"
   },
   {
     "id": "type:exemplus",
@@ -14512,7 +14514,8 @@
       "function"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "abstract Skript type-system super-type (organizational interface, not a concrete scripting value)"
   },
   {
     "id": "type:gameeffect",
@@ -14880,7 +14883,8 @@
       "named"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "abstract Skript type-system super-type (organizational interface, not a concrete scripting value)"
   },
   {
     "id": "type:node",
@@ -14915,7 +14919,8 @@
       "numbered"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "abstract Skript type-system super-type (organizational interface, not a concrete scripting value)"
   },
   {
     "id": "type:object",
@@ -15364,7 +15369,8 @@
       "valued"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "abstract Skript type-system super-type (organizational interface, not a concrete scripting value)"
   },
   {
     "id": "type:vector",

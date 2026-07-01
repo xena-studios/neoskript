@@ -33,3 +33,10 @@ Syntax that operates on Skript's own implementation rather than gameplay is excl
 test-runner and experimental syntax: the `classinfo`/`config`/`node` types and the `config`, `node`,
 `value of subnode`, and `parse error` expressions (Skript config-file/AST introspection), the
 `example` and `auto reload` structures (example/dev tooling), and the `catch runtime errors` section.
+
+## Abstract type-system super-types (also excluded)
+
+Skript registers abstract super-types (`named`, `numbered`, `valued`, `containing`, `executable`,
+`function`) in `SkriptClasses.java` to organize and document its type hierarchy. They are not
+concrete values a script author writes (you never write `%named%` for game logic), so — like
+`classinfo` — they are excluded from the denominator.
