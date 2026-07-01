@@ -84,6 +84,7 @@ public final class BuiltinModule {
         registerConditions(registry);
         registerEffects(registry);
         registerParticleSyntax(registry);
+        registerHashAndVectorSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -869,6 +870,80 @@ public final class BuiltinModule {
                 (copy, value) -> { if (value instanceof Number n) copy.extra(n.doubleValue()); });
     }
 
+    /**
+     * String hashing and vector-construction expressions:
+     * {@code %strings% hashed with <algorithm>}, {@code vector from yaw %n% and pitch %n%}, and
+     * {@code vector from %directions%}. All are pure value transforms (faithful to Skript's formulas).
+     */
+    private static void registerHashAndVectorSyntax(SyntaxRegistry registry) {
+        // %strings% hashed with MD5/SHA-256/SHA-384/SHA-512 — lowercase hex of the UTF-8 bytes.
+        for (String algorithm : new String[]{"MD5", "SHA-256", "SHA-384", "SHA-512"}) {
+            registry.registerExpression("%strings% hash[ed] with " + algorithm, Object.class, arguments -> {
+                Expression<?> source = arguments.get(0);
+                return new ComputedListExpression(ctx -> {
+                    java.security.MessageDigest digest;
+                    try {
+                        digest = java.security.MessageDigest.getInstance(algorithm);
+                    } catch (java.security.NoSuchAlgorithmException impossible) {
+                        return new Object[0];
+                    }
+                    List<Object> out = new ArrayList<>();
+                    for (Object value : source.getAll(ctx)) {
+                        byte[] bytes = Renderer.toDisplay(value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                        out.add(java.util.HexFormat.of().withLowerCase().formatHex(digest.digest(bytes)));
+                    }
+                    return out.toArray();
+                });
+            });
+        }
+
+        // vector from yaw %number% and pitch %number% — Skript-convention yaw/pitch (ExprYawPitch).
+        registry.registerExpression("[a] [new] vector (from|with) yaw %number% and pitch %number%",
+                Object.class, arguments -> {
+                    Expression<?> yaw = arguments.get(0);
+                    Expression<?> pitch = arguments.get(1);
+                    return new ComputedExpression(ctx -> {
+                        Object y = yaw.getSingle(ctx);
+                        Object p = pitch.getSingle(ctx);
+                        if (!(y instanceof Number yn) || !(p instanceof Number pn)) {
+                            return null;
+                        }
+                        return vectorFromSkriptYawPitch(yn.floatValue(), pn.floatValue());
+                    });
+                });
+        // Note: `vector from %directions%` is intentionally NOT registered — its pattern is ambiguous
+        // with both `%number% blocks <direction>` and the comma form `vector from %o%, %o%, %o%`, and
+        // without Skript's value-type filtering on the argument slot it would shadow those. Left as a
+        // future item pending type-aware argument matching.
+    }
+
+    private static final double DEG_TO_RAD = Math.PI / 180;
+
+    /** Normalises a degree angle to {@code (-180, 180]} (Skript's {@code wrapAngleDeg}). */
+    private static float wrapAngleDeg(float angle) {
+        angle %= 360f;
+        if (angle <= -180) {
+            return angle + 360;
+        }
+        return angle > 180 ? angle - 360 : angle;
+    }
+
+    /**
+     * Builds a unit-ish vector from a Skript-convention yaw and pitch, mirroring Skript's
+     * {@code ExprVectorFromYawAndPitch}: convert Skript yaw/pitch to Bukkit yaw/pitch (a +90° yaw
+     * offset and a negated pitch), then apply {@code ExprYawPitch.fromYawAndPitch}.
+     */
+    private static Vector vectorFromSkriptYawPitch(float skriptYaw, float skriptPitch) {
+        float wrappedYaw = wrapAngleDeg(skriptYaw);
+        float bukkitYaw = wrappedYaw > 270 ? wrappedYaw - 270 : wrappedYaw + 90;
+        float bukkitPitch = -wrapAngleDeg(skriptPitch);
+        double y = Math.sin(bukkitPitch * DEG_TO_RAD);
+        double div = Math.cos(bukkitPitch * DEG_TO_RAD);
+        double x = Math.cos(bukkitYaw * DEG_TO_RAD) * div;
+        double z = Math.sin(bukkitYaw * DEG_TO_RAD) * div;
+        return new Vector(x, y, z);
+    }
+
     /** Applies a change to a {@link ParticleEffect} in place, given the delta values and mode. */
     @FunctionalInterface
     private interface ParticleChange {
@@ -1119,6 +1194,9 @@ public final class BuiltinModule {
         registry.registerExpression("last element [out] of %objects%", Object.class,
                 arguments -> element(arguments.get(0), Element.LAST));
         registry.registerExpression("random element [out] of %objects%", Object.class,
+                arguments -> element(arguments.get(0), Element.RANDOM));
+        // `any of {list::*}` / `one of {list::*}` — a single random element.
+        registry.registerExpression("(any [one]|one) of %objects%", Object.class,
                 arguments -> element(arguments.get(0), Element.RANDOM));
 
         registry.registerExpression("reversed %objects%", Object.class, arguments -> {

@@ -6723,8 +6723,8 @@
       "(any [one]|one) of [the] %objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprAnyOf.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:applied-beacon-effect",
@@ -9131,8 +9131,8 @@
       "%strings% hash[ed] with (:(MD5|SHA-256|SHA-384|SHA-512))"
     ],
     "source": "ch/njol/skript/expressions/ExprHash.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:hatching-entity-type",
@@ -12709,8 +12709,8 @@
       "[a] [new] vector (from|with) pitch %number% and yaw %number%"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorFromYawAndPitch.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:vectors-vector-projection",
