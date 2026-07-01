@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Conformance coverage for the events the audit confirmed implemented. All event names are declared
- * in one file alongside an {@code on join} marker; if any name failed to resolve the whole file would
- * be rejected and the marker would never fire — so receiving it proves every event name registered.
+ * in one file alongside an {@code on join} marker; the reload summary reports how many structures failed to parse; asserting zero failures
+ * proves every event name in the file resolved and registered.
  */
 class ConformanceEventsTest {
 
@@ -70,7 +70,7 @@ class ConformanceEventsTest {
                 on vehicle enter:
                     set {_x} to 1
                 """, StandardCharsets.UTF_8);
-        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        ReloadAssert.assertReloadHasNoFailures(server);
 
         PlayerMock player = server.addPlayer();
         boolean joined = false;
@@ -80,6 +80,6 @@ class ConformanceEventsTest {
                 joined = true;
             }
         }
-        assertTrue(joined, "all event names must resolve (else the file is rejected and join never fires)");
+        assertTrue(joined, "all event names must resolve ");
     }
 }

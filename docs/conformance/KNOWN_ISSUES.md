@@ -9,10 +9,9 @@ inventory until fixed, so coverage stays honest.
   Skript pattern, not *all* canonical aliases/optional forms. E.g. we accept `%entity% is in a vehicle`
   but not the canonical `is riding`; `clear the title of %player%` but not bare `clear title`;
   `x-coordinate` but not `x-coord`. For true drop-in compatibility every canonical form should parse.
-  `FlipAuditTest` concretizes each flipped entry's canonical first pattern and reports which don't
-  parse (see `docs/conformance/audit_concretize.py`) — that list is the alias-completeness backlog.
   These are *coverage-completeness* gaps, not mis-flips: the underlying behaviour is implemented and
-  tested under the alias we registered.
+  tested under the alias we registered. The remaining canonical forms are tracked in the inventory
+  (`docs/conformance/inventory.json`) and summarised by `coverage.py`.
 
 
 ## Fixed during the conformance effort

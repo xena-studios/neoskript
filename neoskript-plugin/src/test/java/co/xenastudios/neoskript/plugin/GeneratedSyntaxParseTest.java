@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Parse-conformance for the generated property expressions and boolean conditions: the command body
  * is parsed at reload but never dispatched (their getters call Bukkit APIs MockBukkit doesn't
- * implement). If any pattern failed to parse the whole file is rejected and the join marker won't fire.
+ * implement). The reload summary reports how many structures failed to parse; we assert zero failures.
  */
 class GeneratedSyntaxParseTest {
 
@@ -278,13 +278,13 @@ class GeneratedSyntaxParseTest {
                         unleash player
                         untame player
                 """, StandardCharsets.UTF_8);
-        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        ReloadAssert.assertReloadHasNoFailures(server);
         PlayerMock player = server.addPlayer();
         boolean joined = false;
         String m;
         while ((m = player.nextMessage()) != null) {
             if (m.contains("JOINED")) joined = true;
         }
-        assertTrue(joined, "all generated patterns must parse (else file rejected, join never fires)");
+        assertTrue(joined, "all generated patterns must parse ");
     }
 }

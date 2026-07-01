@@ -111,7 +111,7 @@ class ConformanceEvents2Test {
                 on world save:
                     set {_x} to 1
                 """, StandardCharsets.UTF_8);
-        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        ReloadAssert.assertReloadHasNoFailures(server);
 
         PlayerMock player = server.addPlayer();
         boolean joined = false;

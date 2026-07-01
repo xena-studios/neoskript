@@ -41,3 +41,6 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+# Stale inventory-extraction shards (intermediate tooling artifacts)
+/undefined/
+/inv-shards/

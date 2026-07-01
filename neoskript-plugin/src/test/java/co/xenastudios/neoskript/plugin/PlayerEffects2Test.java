@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Verifies stop sound, reset title, and make-say effects parse and register (their runtime behaviour
  * relies on Bukkit methods MockBukkit doesn't implement, so this is a parse-conformance check: if any
- * effect's syntax were invalid the whole file would be rejected and the join marker would not fire).
+ * effect's syntax were invalid its command would fail to load, which the reload-failure assertion catches).
  */
 class PlayerEffects2Test {
 
@@ -65,7 +65,7 @@ class PlayerEffects2Test {
                         make player persistent
                         make player not persistent
                 """, StandardCharsets.UTF_8);
-        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        ReloadAssert.assertReloadHasNoFailures(server);
 
         PlayerMock player = server.addPlayer();
         boolean joined = false;
