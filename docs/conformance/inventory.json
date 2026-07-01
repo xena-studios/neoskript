@@ -692,8 +692,8 @@
       "%blocks/entities% (do[es]n't|do[es] not) have [a] loot[ ]table"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/conditions/CondHasLootTable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-metadata",
@@ -732,8 +732,8 @@
       "%objects% (doesn't|don't|does not|do not) have [persistent] data tag[s] %strings%"
     ],
     "source": "org/skriptlang/skript/bukkit/pdc/elements/conditions/CondHasPersistentDataTag.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-played-before",
@@ -1109,8 +1109,8 @@
       "%numbers% (can't|can[ ]not) be evenly divided by %number% [with [a] tolerance [of] %-number%]"
     ],
     "source": "ch/njol/skript/conditions/CondIsDivisibleBy.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-fire-resistant",
@@ -1236,8 +1236,8 @@
       "off[ |-]hand[s] of %livingentities% (isn't|is not|aren't|are not) raised"
     ],
     "source": "ch/njol/skript/conditions/CondIsHandRaised.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-holding",
@@ -1378,8 +1378,8 @@
       "world[s] %worlds% (is|are)[1:(n't| not)] loaded"
     ],
     "source": "ch/njol/skript/conditions/CondIsLoaded.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-lootable",
@@ -1391,8 +1391,8 @@
       "%blocks/entities% (is[n't]|are[n't]|is not|are not) lootable"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/conditions/CondIsLootable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-member-owner-of-region",
@@ -1442,8 +1442,8 @@
       "%itemstacks/entities% (is|are)(n't| not) of type[s] %itemtypes/entitydatas%"
     ],
     "source": "ch/njol/skript/conditions/CondIsOfType.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-on-ground",
@@ -1577,8 +1577,8 @@
       "%itemtypes% (is|are)(n't| not) [the|a] preferred tool[s] (for|of) %blocks%"
     ],
     "source": "ch/njol/skript/conditions/CondIsPreferredTool.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-pressing-key",
@@ -1807,8 +1807,8 @@
       "%itemtypes/entities/entitydatas% (are|is)(n't| not) tagged (as|with) %minecrafttags%"
     ],
     "source": "org/skriptlang/skript/bukkit/tags/elements/conditions/CondIsTagged.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-tameable",
@@ -1946,8 +1946,8 @@
       "%locations% (isn't|is not|aren't|are not) (within|in[side [of]]) %entities/chunks/worlds/worldborders/blocks%"
     ],
     "source": "ch/njol/skript/conditions/CondIsWithin.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-within-radius",
@@ -1959,8 +1959,8 @@
       "%locations% (isn't|is not|aren't|are not) within %number% (block|metre|meter)[s] (around|of) %locations%"
     ],
     "source": "ch/njol/skript/conditions/CondWithinRadius.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:item-has-enchantment-glint-override",
@@ -3068,8 +3068,8 @@
       "generate [the] loot (of|using) %loottable% [(with|using) %-lootcontext%] in %inventories%"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/effects/EffGenerateLoot.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:goat-horns",
@@ -3806,8 +3806,8 @@
       "disable PVP [in %worlds%]"
     ],
     "source": "ch/njol/skript/effects/EffPvP.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:register-tag",
@@ -3889,8 +3889,8 @@
       "rotate %quaternions/displays% by x %number%, y %number%(, [and]| and) z %number%"
     ],
     "source": "org/skriptlang/skript/bukkit/misc/elements/effects/EffRotate.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:run",
@@ -3927,8 +3927,8 @@
       "make %players% see %locations% as [the|its] (original|normal|actual) [block]"
     ],
     "source": "ch/njol/skript/effects/EffSendBlockChange.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:send-resource-pack",
@@ -4008,8 +4008,8 @@
       "restart [the] server"
     ],
     "source": "ch/njol/skript/effects/EffStopServer.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:stop-sound",
@@ -4269,8 +4269,8 @@
       "(eject|dismount) (any|the|) passenger[s] (of|from) %entities%"
     ],
     "source": "ch/njol/skript/effects/EffVehicle.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:wake-and-sleep",
