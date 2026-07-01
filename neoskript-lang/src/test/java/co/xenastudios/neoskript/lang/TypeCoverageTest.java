@@ -35,6 +35,7 @@ class TypeCoverageTest {
             "gamemode", "entitytype", "damagecause", "clicktype", "inventoryaction", "weathertype",
             "difficulty", "blockface", "equipmentslot", "spawnreason", "environment", "entityeffect",
             "healreason", "teleportcause", "soundcategory", "fireworktype", "gene",
+            "entitydata", "particle",
     })
     @SuppressWarnings({"unchecked", "rawtypes"})
     void enumTypeRoundTrips(String codeName) {
@@ -84,7 +85,8 @@ class TypeCoverageTest {
             "inventoryholder", "itementity", "livingentity", "lootcontext", "loottable",
             "metadataholder", "nameable", "offlineplayer", "potioneffect", "projectile",
             "teleportflag", "textcomponent", "vehicle", "worldborder", "bannerpattern",
-            "cachedservericon", "minecrafttag", "quaternion",
+            "cachedservericon", "minecrafttag", "quaternion", "gamerule",
+            "equippablecomponent", "audience",
     })
     @SuppressWarnings({"unchecked", "rawtypes"})
     void classTypesRegistered(String codeName) {

@@ -13909,7 +13909,8 @@
       "audience"
     ],
     "source": "org/skriptlang/skript/bukkit/text/types/AudienceClassInfo.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:bannerpattern",
@@ -14320,7 +14321,8 @@
       "entitydata"
     ],
     "source": "ch/njol/skript/entity/EntityData.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:entity-type-with-amount",
@@ -14391,7 +14393,8 @@
       "equippablecomponent"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/EquippableModule.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:executable",
@@ -14530,7 +14533,8 @@
       "gamerule"
     ],
     "source": "ch/njol/skript/classes/data/BukkitClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:gamerulevalue",
@@ -14931,7 +14935,8 @@
       "particle"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/ParticleModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:pig-variant",
