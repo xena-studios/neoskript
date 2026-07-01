@@ -247,8 +247,9 @@
       "running junit"
     ],
     "source": "ch/njol/skript/test/runner/CondRunningJUnit.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "condition:comparison",
@@ -2040,8 +2041,9 @@
       "method[s] %strings% [dont:do(esn't|n't)] exist[s]"
     ],
     "source": "ch/njol/skript/test/runner/CondMethodExists.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "condition:panda-is-on-its-back",
@@ -2398,8 +2400,9 @@
       "assert [:unsafely] <.+> [(1:to fail)]"
     ],
     "source": "ch/njol/skript/test/runner/EffAssert.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "effect:ban",
@@ -2688,8 +2691,9 @@
       "debug-condition <.+>"
     ],
     "source": "ch/njol/skript/test/runner/EffDebug.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "effect:delay",
@@ -3557,8 +3561,9 @@
       "complete [(objective|trigger)[s]] %strings% (for|on) [[junit] test] %string%"
     ],
     "source": "ch/njol/skript/test/runner/EffObjectives.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "effect:op-deop",
@@ -4100,8 +4105,9 @@
       "classinfo test for %hooves%"
     ],
     "source": "ch/njol/skript/test/runner/EffTestPluralClassInfos.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "effect:text-display-drop-shadow",
@@ -6130,8 +6136,9 @@
       "test %string% [when <.+>]"
     ],
     "source": "ch/njol/skript/test/runner/EvtTestCase.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "event:tool-change",
@@ -8662,8 +8669,9 @@
       "experimental only"
     ],
     "source": "ch/njol/skript/test/runner/ExprExperimentalOnly.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "expression:exploded-blocks",
@@ -10800,8 +10808,9 @@
       "[the] [last] parse logs"
     ],
     "source": "ch/njol/skript/test/runner/ExprParseLogs.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "expression:particle-count",
@@ -12109,8 +12118,9 @@
       "[the] test(-| )block"
     ],
     "source": "ch/njol/skript/test/runner/ExprTestBlock.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "expression:test-location",
@@ -12121,8 +12131,9 @@
       "[the] test(-| )location"
     ],
     "source": "ch/njol/skript/test/runner/ExprTestLocation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "expression:test-string-literal",
@@ -12133,8 +12144,9 @@
       "test string literal %*string%"
     ],
     "source": "ch/njol/skript/test/runner/ExprTestStringLiteral.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "expression:test-world",
@@ -12145,8 +12157,9 @@
       "[the] test(-| )world"
     ],
     "source": "ch/njol/skript/test/runner/ExprTestWorld.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "expression:text-display-alignment",
@@ -13695,7 +13708,8 @@
       "parse"
     ],
     "source": "ch/njol/skript/test/runner/SecParse.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "section:shoot",
@@ -13824,7 +13838,8 @@
       "parse"
     ],
     "source": "ch/njol/skript/test/runner/StructParse.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "structure:using-experimental-feature",
@@ -13858,7 +13873,8 @@
       "aardwolf"
     ],
     "source": "ch/njol/skript/test/runner/EffTestPluralClassInfos.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "type:attributetype",
@@ -14371,7 +14387,8 @@
       "exemplus"
     ],
     "source": "ch/njol/skript/test/runner/EffTestPluralClassInfos.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "type:experience",
@@ -14530,7 +14547,8 @@
       "hoof"
     ],
     "source": "ch/njol/skript/test/runner/EffTestPluralClassInfos.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "type:integer",
@@ -15171,7 +15189,8 @@
       "testgui"
     ],
     "source": "ch/njol/skript/test/runner/EffTestPluralClassInfos.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "skript-internal test-runner syntax (not public scripting language)"
   },
   {
     "id": "type:textalignment",
