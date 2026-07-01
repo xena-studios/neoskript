@@ -4562,8 +4562,8 @@
       "book (edit|change|write)"
     ],
     "source": "ch/njol/skript/events/EvtBookEdit.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:book-sign",
@@ -4908,8 +4908,8 @@
       "falling block land[ing]"
     ],
     "source": "ch/njol/skript/events/EvtEntityBlockChange.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:entity-dismount",
@@ -4920,8 +4920,8 @@
       "dismount[ing]"
     ],
     "source": "ch/njol/skript/events/SimpleEvents.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:entity-jump",
@@ -4944,8 +4944,8 @@
       "mount[ing]"
     ],
     "source": "ch/njol/skript/events/SimpleEvents.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:entity-shoot-bow",
@@ -5436,8 +5436,8 @@
       "[:player] [:un]leash[ing] [of %-entitydatas%]"
     ],
     "source": "ch/njol/skript/events/EvtLeash.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:leaves-decay",
@@ -5486,8 +5486,8 @@
       "loot generat(e|ing)"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/LootTableModule.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:move-rotate",
@@ -5882,8 +5882,8 @@
       "server [list] ping"
     ],
     "source": "ch/njol/skript/events/SimpleEvents.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:server-start-stop",
@@ -5895,8 +5895,8 @@
       "(:server|skript) (stop|unload|disable)"
     ],
     "source": "ch/njol/skript/events/EvtSkript.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:sheep-regrow-wool",
@@ -5997,8 +5997,8 @@
       "[player] start spectating [of %-*entitydatas%]"
     ],
     "source": "ch/njol/skript/events/EvtSpectate.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:sponge-absorb",
@@ -6175,8 +6175,8 @@
       "vehicle entity collision [(with|of) [a[n]] %-entitydatas%]"
     ],
     "source": "ch/njol/skript/events/EvtVehicleCollision.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:vehicle-create",
