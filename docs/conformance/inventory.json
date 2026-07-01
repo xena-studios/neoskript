@@ -6413,8 +6413,8 @@
       "%livingentities%'[s] [elapsed|:remaining] (item|tool) us[ag]e time"
     ],
     "source": "ch/njol/skript/expressions/ExprEntityItemUseTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:affected-entities",
@@ -6656,8 +6656,8 @@
       "[the] (amount|number) of %itemtypes% (in|of) %inventories%"
     ],
     "source": "ch/njol/skript/expressions/ExprAmountOfItems.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:an-eternity",
@@ -6670,8 +6670,8 @@
       "[an] (indefinite|infinite) (duration|timespan)"
     ],
     "source": "ch/njol/skript/literals/LitEternity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:angle",
@@ -6905,8 +6905,8 @@
       "[a] %bannerpatterntype% colo[u]red %color%"
     ],
     "source": "ch/njol/skript/expressions/ExprNewBannerPattern.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:banner-pattern-item",
@@ -6969,8 +6969,8 @@
       "%blocks%'[s] (:primary|secondary) [beacon] effect"
     ],
     "source": "ch/njol/skript/expressions/ExprBeaconEffects.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:beacon-range",
@@ -7540,8 +7540,8 @@
       "command[s] %strings%'[s] aliases"
     ],
     "source": "ch/njol/skript/expressions/ExprCommandInfo.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:command-sender",
@@ -7914,8 +7914,8 @@
       "%itemtype% damaged by %number%"
     ],
     "source": "ch/njol/skript/expressions/ExprDamagedItem.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:date-ago-later",
@@ -8084,8 +8084,8 @@
       "%displays%'[s] interpolation (:delay|duration)[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/elements/expressions/ExprDisplayInterpolation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:display-name",
@@ -8600,8 +8600,8 @@
       "%blocks%'[s] exact item[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprExactItem.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:except",
@@ -8802,8 +8802,8 @@
       "(1¦|2¦flickering|3¦trailing|4¦flickering trailing|5¦trailing flickering) %fireworktype% [firework [effect]] colo[u]red %colors% fad(e|ing) [to] %colors%"
     ],
     "source": "ch/njol/skript/expressions/ExprFireworkEffect.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:first-empty-slot-in-inventory",
@@ -8915,8 +8915,8 @@
       "[human-readable] formatted %dates% [(with|as) %-string%]"
     ],
     "source": "ch/njol/skript/expressions/ExprFormatDate.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:former-future-state",
@@ -9017,8 +9017,8 @@
       "%blocks%'[s] fuel burn[ing] time"
     ],
     "source": "org/skriptlang/skript/bukkit/block/furnace/elements/expressions/ExprFurnaceTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:game-effects-with-data",
@@ -9635,8 +9635,8 @@
       "%itemtype% with [a|the] lore %textcomponents/strings%"
     ],
     "source": "org/skriptlang/skript/bukkit/item/elements/ExprItemWithLore.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:item-with-tooltip",
@@ -9647,8 +9647,8 @@
       "%itemtypes% with[:out] [entire|:additional] tool[ ]tip[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprItemWithTooltip.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:items",
@@ -9662,8 +9662,8 @@
       "[all [[of] the]|the|every] item[s] of type[s] %itemtypes%"
     ],
     "source": "ch/njol/skript/expressions/ExprItems.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:items-in",
@@ -9754,8 +9754,8 @@
       "%entity%'[s] last attacker"
     ],
     "source": "ch/njol/skript/expressions/ExprLastAttacker.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:last-caught-errors",
@@ -10089,8 +10089,8 @@
       "%loottables%'[s] loot [(with|using) [[loot] context] %-lootcontext%]"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/expressions/ExprLootItems.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:loot-table",
@@ -10170,8 +10170,8 @@
       "%livingentities%'[s] love[d] time"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/expressions/ExprLoveTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:lowest-highest-solid-block",
@@ -10386,8 +10386,8 @@
       "%metadataholders%'[s] metadata [(value|tag)[s]] %string%"
     ],
     "source": "ch/njol/skript/expressions/ExprMetadata.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:middle-of-location",
@@ -10620,8 +10620,8 @@
       "%*potioneffecttype% <integer number>"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/expressions/ExprSecPotionEffect.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:no-damage-ticks",
@@ -10714,8 +10714,8 @@
       "[(all [[of] the]|the)] (numbers|1¦integers|2¦decimals) (between|from) %number% (and|to) %number%"
     ],
     "source": "ch/njol/skript/expressions/ExprNumbers.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:offline-players",
@@ -11004,8 +11004,8 @@
       "[a[n]] (plain|unmodified) %itemtype%"
     ],
     "source": "ch/njol/skript/expressions/ExprPlain.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:player-chat-completions",
@@ -11082,8 +11082,8 @@
       "%offlineplayers%'[s] skull"
     ],
     "source": "ch/njol/skript/expressions/ExprSkull.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:portal",
@@ -11147,8 +11147,8 @@
       "%livingentities/itemtypes%'[s] [:active|:hidden|both:(active and hidden|hidden and active)] %potioneffecttypes% [potion] effect[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/expressions/ExprPotionEffect.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:potion-effect-type-category",
@@ -11333,8 +11333,8 @@
       "(raw|minecraft|vanilla) name[s] of %itemtypes%"
     ],
     "source": "ch/njol/skript/expressions/ExprRawName.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:raw-string",
@@ -11583,8 +11583,8 @@
       "%quaternions% rotated by x %number%, y %number%(, [and]| and) z %number%"
     ],
     "source": "org/skriptlang/skript/bukkit/misc/elements/expressions/ExprRotate.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:rotation-axis-angle",
@@ -12294,8 +12294,8 @@
       "%timespans%'[s] (:(tick|second|minute|hour|day|week|month|year))s"
     ],
     "source": "ch/njol/skript/expressions/ExprTimespanDetails.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:tool",
@@ -12388,8 +12388,8 @@
       "[:un]breakable %itemtypes%"
     ],
     "source": "ch/njol/skript/expressions/ExprUnbreakable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:unix-date",
@@ -12414,8 +12414,8 @@
       "%dates%'s unix timestamp"
     ],
     "source": "ch/njol/skript/expressions/ExprUnixTicks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:unleash-reason",
@@ -12579,8 +12579,8 @@
       "[a] [new] cylindrical vector [from|with] [radius] %number%, [yaw] %number%(,[ and]| and) [height] %number%"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorCylindrical.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-dot-product",
@@ -12654,8 +12654,8 @@
       "[a] [new] spherical vector [(from|with)] [radius] %number%, [yaw] %number%(,[ and]| and) [pitch] %number%"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorSpherical.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-squared-length",
@@ -12935,8 +12935,8 @@
       "fire resistant %itemtype%"
     ],
     "source": "ch/njol/skript/expressions/ExprWithFireResistance.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:world",
@@ -13036,8 +13036,8 @@
       "%number% of %itemstacks/itemtypes/entitytypes/particles%"
     ],
     "source": "ch/njol/skript/expressions/ExprXOf.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:x-times",
