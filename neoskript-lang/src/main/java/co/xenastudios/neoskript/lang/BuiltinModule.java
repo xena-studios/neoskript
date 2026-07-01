@@ -85,6 +85,7 @@ public final class BuiltinModule {
         registerEffects(registry);
         registerParticleSyntax(registry);
         registerHashAndVectorSyntax(registry);
+        registerSlotSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -915,6 +916,106 @@ public final class BuiltinModule {
         // with both `%number% blocks <direction>` and the comma form `vector from %o%, %o%, %o%`, and
         // without Skript's value-type filtering on the argument slot it would shadow those. Left as a
         // future item pending type-aware argument matching.
+    }
+
+    /**
+     * The {@code slot %numbers% of %inventory%} expression — a settable reference to one or more
+     * inventory slots. Reading yields each slot ({@link co.xenastudios.neoskript.lang.type.Slot},
+     * which renders as its contents); {@code SET}/{@code DELETE} write the item into the inventory.
+     */
+    private static void registerSlotSyntax(SyntaxRegistry registry) {
+        // inventory of %inventoryholders% — a holder's (player/block) inventory.
+        registry.registerExpression("inventor(y|ies) of %objects%", Object.class,
+                arguments -> inventoryExpression(arguments.get(0)));
+        registry.registerExpression("%objects%'[s] inventor(y|ies)", Object.class,
+                arguments -> inventoryExpression(arguments.get(0)));
+
+        registry.registerExpression("[the] slot[s] %numbers% of %inventory%", Object.class,
+                arguments -> slotExpression(arguments.get(1), arguments.get(0)));
+        registry.registerExpression("%inventory%'[s] slot[s] %numbers%", Object.class,
+                arguments -> slotExpression(arguments.get(0), arguments.get(1)));
+    }
+
+    /** {@code inventory of %inventoryholders%} — resolves each holder to its {@link org.bukkit.inventory.Inventory}. */
+    private static Expression<Object> inventoryExpression(Expression<?> source) {
+        return new ComputedListExpression(ctx -> {
+            List<Object> out = new ArrayList<>();
+            for (Object value : source.getAll(ctx)) {
+                if (value instanceof org.bukkit.inventory.InventoryHolder holder) {
+                    out.add(holder.getInventory());
+                } else if (value instanceof org.bukkit.block.Block block
+                        && block.getState() instanceof org.bukkit.inventory.InventoryHolder holder) {
+                    out.add(holder.getInventory());
+                }
+            }
+            return out.toArray();
+        });
+    }
+
+    /** Builds the settable slot expression from an inventory source and a set of slot indices. */
+    private static Expression<Object> slotExpression(Expression<?> inventoryExpr, Expression<?> indexExpr) {
+        return new Expression<Object>() {
+            private List<co.xenastudios.neoskript.lang.type.Slot> slots(
+                    co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                List<co.xenastudios.neoskript.lang.type.Slot> out = new ArrayList<>();
+                if (!(inventoryExpr.getSingle(ctx) instanceof org.bukkit.inventory.Inventory inventory)) {
+                    return out;
+                }
+                for (Object index : indexExpr.getAll(ctx)) {
+                    if (index instanceof Number number) {
+                        out.add(new co.xenastudios.neoskript.lang.type.Slot(inventory, number.intValue()));
+                    }
+                }
+                return out;
+            }
+
+            @Override
+            public Object[] getAll(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                return slots(ctx).toArray();
+            }
+
+            @Override
+            public Object getSingle(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                List<co.xenastudios.neoskript.lang.type.Slot> slots = slots(ctx);
+                return slots.isEmpty() ? null : slots.get(0);
+            }
+
+            @Override
+            public Class<Object> returnType() {
+                return Object.class;
+            }
+
+            @Override
+            public boolean isSingle() {
+                return indexExpr.isSingle();
+            }
+
+            @Override
+            public Class<?>[] acceptChange(ChangeMode mode) {
+                return switch (mode) {
+                    case SET, DELETE, RESET -> new Class<?>[]{Object.class};
+                    default -> null;
+                };
+            }
+
+            @Override
+            public void change(co.xenastudios.neoskript.api.runtime.TriggerContext ctx,
+                               Object[] delta, ChangeMode mode) {
+                ItemStack item = mode == ChangeMode.SET
+                        ? toItemStack(delta != null && delta.length > 0 ? delta[0] : null) : null;
+                for (co.xenastudios.neoskript.lang.type.Slot slot : slots(ctx)) {
+                    slot.setItem(item);
+                }
+            }
+        };
+    }
+
+    /** Coerces a value to an {@link ItemStack}: an item directly, or a Material as a single item. */
+    private static ItemStack toItemStack(Object value) {
+        if (value instanceof ItemStack item) {
+            return item;
+        }
+        return value instanceof org.bukkit.Material material ? new ItemStack(material) : null;
     }
 
     private static final double DEG_TO_RAD = Math.PI / 180;

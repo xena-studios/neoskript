@@ -82,6 +82,7 @@ public final class GeneratedTypes {
         types.register(ParticleEffectType.scalable());
         types.register(new EnumType<>("treetype", org.bukkit.TreeType.class));
         types.register(new ClassType<>("skriptpotioneffect", org.bukkit.potion.PotionEffect.class));
+        types.register(new SlotType());
         types.register(new ClassType<>("object", java.lang.Object.class));
         types.register(new ClassType<>("direction", Direction.class));
         types.register(new ClassType<>("time", WorldTime.class, WorldTime::toString,

@@ -9455,8 +9455,8 @@
       "%inventory%'[s] slot[s] %numbers%"
     ],
     "source": "ch/njol/skript/expressions/ExprInventorySlot.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:inverse-boolean",
@@ -15182,7 +15182,8 @@
       "slot"
     ],
     "source": "org/skriptlang/skript/bukkit/types/SlotClassInfo.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:soundcategory",
