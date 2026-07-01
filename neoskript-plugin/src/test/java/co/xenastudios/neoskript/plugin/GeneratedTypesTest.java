@@ -13,8 +13,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Verifies bulk-resolved (GenTypes) enum/registry types parse a sample value under a live server. */
-class GenTypesTest {
+/** Verifies bulk-resolved (generated types) enum/registry types parse a sample value under a live server. */
+class GeneratedTypesTest {
 
     private ServerMock server;
 

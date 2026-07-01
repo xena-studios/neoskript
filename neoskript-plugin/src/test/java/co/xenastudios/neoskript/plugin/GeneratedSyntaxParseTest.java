@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * is parsed at reload but never dispatched (their getters call Bukkit APIs MockBukkit doesn't
  * implement). If any pattern failed to parse the whole file is rejected and the join marker won't fire.
  */
-class GenParseTest {
+class GeneratedSyntaxParseTest {
 
     private ServerMock server;
     private NeoSkriptPlugin plugin;
