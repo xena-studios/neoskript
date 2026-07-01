@@ -30,7 +30,7 @@ class GeneratedTypesTest {
         Map<String, String> samples = Map.ofEntries(
             java.util.Map.entry("bannerpatterntype", "minecraft:base"),
             java.util.Map.entry("billboard", "fixed"),
-            java.util.Map.entry("bukkitparticle", "flame"),
+            java.util.Map.entry("particle", "flame"),
             java.util.Map.entry("inventoryclosereason", "player"),
             java.util.Map.entry("itemdisplaytransform", "none"),
             java.util.Map.entry("itemflag", "hide_enchants"),

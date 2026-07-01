@@ -65,10 +65,11 @@ public final class ExpressionParser {
         if (items.size() == 1) {
             return parseAdditive(s);
         }
-        // A registered expression whose own pattern contains `and` (e.g. `distance between A and B`)
-        // would otherwise be mis-split on that `and`. When the split came only from `and`/`or` (no
-        // top-level comma) and the whole string matches such an expression, prefer the single match.
-        if (!hasTopLevelComma(s) && matchesRegisteredExpression(s)) {
+        // A registered expression whose own pattern contains a `,` or `and` (e.g. `vector %o%, %o%,
+        // %o%` or `distance between A and B`) would otherwise be mis-split on that separator. When the
+        // whole string matches such an expression, prefer the single match over list-splitting — the
+        // same order Skript uses (try the complete expression before treating commas as a list).
+        if (matchesRegisteredExpression(s)) {
             return parseAdditive(s);
         }
         List<Expression<?>> elements = new ArrayList<>(items.size());
@@ -82,27 +83,6 @@ public final class ExpressionParser {
     private boolean matchesRegisteredExpression(String s) {
         for (ExpressionEntry entry : registry.expressionCandidates(s)) {
             if (entry.pattern().match(s).isPresent()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** @return true if {@code s} has a comma at depth 0 outside quotes (a real list separator). */
-    private static boolean hasTopLevelComma(String s) {
-        int depth = 0;
-        boolean inQuotes = false;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '"') {
-                inQuotes = !inQuotes;
-            } else if (inQuotes) {
-                continue;
-            } else if (c == '(' || c == '{') {
-                depth++;
-            } else if (c == ')' || c == '}') {
-                depth--;
-            } else if (c == ',' && depth == 0) {
                 return true;
             }
         }

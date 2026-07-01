@@ -35,7 +35,7 @@ class TypeCoverageTest {
             "gamemode", "entitytype", "damagecause", "clicktype", "inventoryaction", "weathertype",
             "difficulty", "blockface", "equipmentslot", "spawnreason", "environment", "entityeffect",
             "healreason", "teleportcause", "soundcategory", "fireworktype", "gene",
-            "entitydata", "particle",
+            "entitydata",
     })
     @SuppressWarnings({"unchecked", "rawtypes"})
     void enumTypeRoundTrips(String codeName) {

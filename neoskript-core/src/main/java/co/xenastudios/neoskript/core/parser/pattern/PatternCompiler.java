@@ -35,11 +35,18 @@ public final class PatternCompiler {
         int argCount = 0;
         int i = 0;
         int length = pattern.length();
-        // Per optional group `[...]`: was it at the very start of the pattern? A leading optional's
-        // trailing space is pulled inside so it isn't required when omitted (`[the] block` ->
-        // `(?:the\s+)?block`, matching "block" and "the block"). A non-leading optional like the
-        // `[-coordinate]` in `x[-coordinate] of` keeps its trailing space as a real separator.
-        java.util.Deque<Boolean> leadingOptional = new java.util.ArrayDeque<>();
+        // An optional group `[...]` absorbs exactly ONE adjacent space so that the separator around it
+        // stays balanced when the group is omitted:
+        //   - If a required space precedes it (the regex already ends with `\s+`, e.g. after `x ` in
+        //     `x [component] of`), absorb THAT space and keep the following one required:
+        //     `x(?:\s+component)?\s+of` matches "x of".
+        //   - Else if it is a standalone "word" optional (preceded by the pattern start, whitespace, or
+        //     another group), absorb the FOLLOWING space: `[the] [new] block` -> `(?:the\s+)?(?:new\s+)?
+        //     block` matches "block".
+        //   - Else it is attached to a preceding literal token (`max[imum] players`, `x[-coordinate]
+        //     of`); the following space is a real separator, so absorb nothing: `max(?:imum)?\s+players`.
+        // Each Boolean on the stack records whether the group should absorb its FOLLOWING space on close.
+        java.util.Deque<Boolean> absorbFollowing = new java.util.ArrayDeque<>();
 
         while (i < length) {
             char c = pattern.charAt(i);
@@ -54,30 +61,34 @@ public final class PatternCompiler {
                     i = end + 1;
                 }
                 case '[' -> {
-                    boolean atStart = regex.length() == 1; // only "^" so far
-                    // Pull a preceding whitespace matcher inside the optional group so that the
-                    // surrounding space is also optional when the group is absent.
-                    if (endsWith(regex, "\\s+")) {
+                    // An optional compiles to `(?:(?:CONTENT)...)?`; the inner group means an absorbed
+                    // space binds to the whole content even when it is an alternation (`[vector|
+                    // quaternion] x` -> `(?:(?:vector|quaternion)\s+)?x`, not `(?:vector|quaternion\s+)`).
+                    boolean preceding = endsWith(regex, "\\s+");
+                    char prev = i == 0 ? ' ' : pattern.charAt(i - 1);
+                    boolean attached = !(i == 0 || Character.isWhitespace(prev)
+                            || prev == ']' || prev == ')');
+                    if (preceding) {
                         regex.setLength(regex.length() - 3);
-                        regex.append("(?:\\s+");
+                        regex.append("(?:\\s+(?:");
                     } else {
-                        regex.append("(?:");
+                        regex.append("(?:(?:");
                     }
-                    leadingOptional.push(atStart);
+                    // Absorb the following space only for a standalone word optional that did not already
+                    // absorb a preceding space; an attached suffix optional keeps it as a separator.
+                    absorbFollowing.push(!preceding && !attached);
                     i++;
                 }
                 case ']' -> {
-                    boolean atStart = !leadingOptional.isEmpty() && leadingOptional.pop();
-                    // A leading optional pulls its trailing space inside so the space isn't required
-                    // when the group is omitted (e.g. `[the] block` matches "block").
-                    if (atStart && i + 1 < length && Character.isWhitespace(pattern.charAt(i + 1))) {
-                        regex.append("\\s+)?");
+                    boolean following = !absorbFollowing.isEmpty() && absorbFollowing.pop();
+                    if (following && i + 1 < length && Character.isWhitespace(pattern.charAt(i + 1))) {
+                        regex.append(")\\s+)?");
                         i++;
                         while (i < length && Character.isWhitespace(pattern.charAt(i))) {
                             i++;
                         }
                     } else {
-                        regex.append(")?");
+                        regex.append("))?");
                         i++;
                     }
                 }

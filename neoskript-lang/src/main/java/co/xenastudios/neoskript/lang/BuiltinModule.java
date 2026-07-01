@@ -25,6 +25,7 @@ import co.xenastudios.neoskript.lang.type.GameModeType;
 import co.xenastudios.neoskript.lang.type.ItemType;
 import co.xenastudios.neoskript.lang.type.LocationType;
 import co.xenastudios.neoskript.lang.type.NumberType;
+import co.xenastudios.neoskript.lang.type.ParticleEffect;
 import co.xenastudios.neoskript.lang.type.PlayerType;
 import co.xenastudios.neoskript.lang.type.StringType;
 import co.xenastudios.neoskript.lang.type.VectorType;
@@ -54,6 +55,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.PatternSyntaxException;
@@ -80,6 +83,7 @@ public final class BuiltinModule {
         registerExpressions(registry);
         registerConditions(registry);
         registerEffects(registry);
+        registerParticleSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -805,6 +809,191 @@ public final class BuiltinModule {
         gameMode(registry, "creative", GameMode.CREATIVE);
         gameMode(registry, "adventure", GameMode.ADVENTURE);
         gameMode(registry, "spectator", GameMode.SPECTATOR);
+    }
+
+    /**
+     * The particle-configuration syntax: the count / offset / distribution / speed properties of a
+     * particle, and the {@code %particles% with an offset/distribution/velocity/speed} builders. Each
+     * property is settable and mutates the underlying {@link ParticleEffect} in place; each builder
+     * returns fresh copies, leaving the source untouched (mirroring Skript).
+     */
+    private static void registerParticleSyntax(SyntaxRegistry registry) {
+        // particle count — clamped 0..1000; count == 0 flips offset/extra to velocity/speed semantics.
+        particleProperty(registry, "particle count of %particles%", "%particles%'[s] particle count",
+                p -> (double) p.count(),
+                (p, delta, mode) -> {
+                    double d = delta.length > 0 && delta[0] instanceof Number n ? n.doubleValue() : 0;
+                    int next = switch (mode) {
+                        case SET -> (int) d;
+                        case ADD -> p.count() + (int) d;
+                        case REMOVE -> p.count() - (int) d;
+                        default -> 1; // RESET → Bukkit default
+                    };
+                    p.count(Math.max(0, Math.min(1000, next)));
+                });
+        // particle offset — the raw offset X/Y/Z vector.
+        particleProperty(registry, "particle offset of %particles%", "%particles%'[s] particle offset",
+                ParticleEffect::offset,
+                (p, delta, mode) -> p.offset(mode == ChangeMode.SET && delta.length > 0
+                        && delta[0] instanceof Vector v ? v : new Vector(0, 0, 0)));
+        // particle distribution — the same field as offset, but null while count == 0, and setting it
+        // forces count back to 1 so the offset is read as a spread again.
+        particleProperty(registry, "particle distribution of %particles%",
+                "%particles%'[s] particle distribution",
+                ParticleEffect::distribution,
+                (p, delta, mode) -> p.distribution(mode == ChangeMode.SET && delta.length > 0
+                        && delta[0] instanceof Vector v ? v : new Vector(0, 0, 0)));
+        // particle speed / extra value.
+        particleProperty(registry, "(particle speed [value]|extra value) of %particles%",
+                "%particles%'[s] (particle speed [value]|extra value)",
+                ParticleEffect::extra,
+                (p, delta, mode) -> {
+                    double d = delta.length > 0 && delta[0] instanceof Number n ? n.doubleValue() : 0;
+                    p.extra(switch (mode) {
+                        case SET -> d;
+                        case ADD -> p.extra() + d;
+                        case REMOVE -> p.extra() - d;
+                        default -> 0; // RESET
+                    });
+                });
+
+        // Builders — copy each source particle, apply one field, return the copies.
+        particleBuilder(registry, "%particles% with [an] offset [of] %vector%",
+                (copy, value) -> { if (value instanceof Vector v) copy.offset(v); });
+        particleBuilder(registry, "%particles% with [a] distribution [of] %vector%",
+                (copy, value) -> { if (value instanceof Vector v) copy.distribution(v); });
+        particleBuilder(registry, "%directionalparticles% with [a] velocity [of] %vector%",
+                (copy, value) -> { if (value instanceof Vector v) copy.velocity(v); });
+        particleBuilder(registry,
+                "%particles% with ([a] particle speed [value]|[an] extra value) [of] %number%",
+                (copy, value) -> { if (value instanceof Number n) copy.extra(n.doubleValue()); });
+    }
+
+    /** Applies a change to a {@link ParticleEffect} in place, given the delta values and mode. */
+    @FunctionalInterface
+    private interface ParticleChange {
+        void apply(ParticleEffect effect, Object[] delta, ChangeMode mode);
+    }
+
+    /** Coerces a value to a {@link ParticleEffect}: a raw {@link org.bukkit.Particle} gets defaults. */
+    private static ParticleEffect asParticleEffect(Object value) {
+        if (value instanceof ParticleEffect effect) {
+            return effect;
+        }
+        if (value instanceof org.bukkit.Particle raw) {
+            return new ParticleEffect(raw);
+        }
+        return null;
+    }
+
+    /**
+     * Registers a settable particle property under both a {@code <prop> of %particles%} and a
+     * {@code %particles%'s <prop>} phrasing. Reading maps each source particle through {@code getter}
+     * (dropping {@code null}s); {@code SET}/{@code ADD}/{@code REMOVE}/{@code RESET} route through
+     * {@code changer}, mutating the referenced particles.
+     */
+    private static void particleProperty(SyntaxRegistry registry, String ofPattern, String possessivePattern,
+                                         Function<ParticleEffect, Object> getter, ParticleChange changer) {
+        co.xenastudios.neoskript.api.syntax.ExpressionFactory<Object> factory = arguments -> {
+            Expression<?> source = arguments.get(0);
+            return new Expression<Object>() {
+                @Override
+                public Object[] getAll(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                    List<Object> out = new ArrayList<>();
+                    for (Object o : source.getAll(ctx)) {
+                        ParticleEffect p = asParticleEffect(o);
+                        if (p != null) {
+                            Object v = getter.apply(p);
+                            if (v != null) {
+                                out.add(v);
+                            }
+                        }
+                    }
+                    return out.toArray();
+                }
+
+                @Override
+                public Object getSingle(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                    Object[] all = getAll(ctx);
+                    return all.length > 0 ? all[0] : null;
+                }
+
+                @Override
+                public Class<Object> returnType() {
+                    return Object.class;
+                }
+
+                @Override
+                public boolean isSingle() {
+                    return source.isSingle();
+                }
+
+                @Override
+                public Class<?>[] acceptChange(ChangeMode mode) {
+                    return switch (mode) {
+                        case SET, ADD, REMOVE, RESET -> new Class<?>[]{Object.class};
+                        default -> null;
+                    };
+                }
+
+                @Override
+                public void change(co.xenastudios.neoskript.api.runtime.TriggerContext ctx,
+                                   Object[] delta, ChangeMode mode) {
+                    Object[] d = delta == null ? new Object[0] : delta;
+                    for (Object o : source.getAll(ctx)) {
+                        if (o instanceof ParticleEffect p) {
+                            changer.apply(p, d, mode);
+                        }
+                    }
+                }
+            };
+        };
+        registry.registerExpression(ofPattern, Object.class, factory);
+        registry.registerExpression(possessivePattern, Object.class, factory);
+    }
+
+    /**
+     * Registers a {@code %particles% with ...} builder: copies each source particle, applies
+     * {@code apply} with the trailing value, and returns the copies (the source is left unchanged).
+     */
+    private static void particleBuilder(SyntaxRegistry registry, String pattern,
+                                        java.util.function.BiConsumer<ParticleEffect, Object> apply) {
+        registry.registerExpression(pattern, Object.class, arguments -> {
+            Expression<?> source = arguments.get(0);
+            Expression<?> value = arguments.get(1);
+            return new Expression<Object>() {
+                @Override
+                public Object[] getAll(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                    Object v = value.getSingle(ctx);
+                    List<Object> out = new ArrayList<>();
+                    for (Object o : source.getAll(ctx)) {
+                        ParticleEffect p = asParticleEffect(o);
+                        if (p != null) {
+                            ParticleEffect copy = p.copy();
+                            apply.accept(copy, v);
+                            out.add(copy);
+                        }
+                    }
+                    return out.toArray();
+                }
+
+                @Override
+                public Object getSingle(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                    Object[] all = getAll(ctx);
+                    return all.length > 0 ? all[0] : null;
+                }
+
+                @Override
+                public Class<Object> returnType() {
+                    return Object.class;
+                }
+
+                @Override
+                public boolean isSingle() {
+                    return source.isSingle();
+                }
+            };
+        });
     }
 
     /** Registers {@code <prop> of %player%} and {@code %player%'s <prop>} for a player accessor. */

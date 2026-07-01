@@ -10830,8 +10830,8 @@
       "%particles%'[s] particle count"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/elements/expressions/ExprParticleCount.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:particle-distribution",
@@ -10843,8 +10843,8 @@
       "%particles%'[s] particle distribution"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/elements/expressions/ExprParticleDistribution.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:particle-offset",
@@ -10856,8 +10856,8 @@
       "%particles%'[s] particle offset"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/elements/expressions/ExprParticleOffset.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:particle-speed-extra-value",
@@ -10869,8 +10869,8 @@
       "%particles%'[s] (particle speed [value]|extra value)"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/elements/expressions/ExprParticleSpeed.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:particle-with-offset-distribution-velocity",
@@ -10883,8 +10883,8 @@
       "%directionalparticles% with [a] velocity [of] %vector%"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/elements/expressions/ExprParticleWithOffset.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:particle-with-speed-extra-value",
@@ -10895,8 +10895,8 @@
       "%particles% with ([a] particle speed [value]|[an] extra value) [of] %number%"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/elements/expressions/ExprParticleWithSpeed.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:particles-with-data",
@@ -14157,7 +14157,8 @@
       "convergingparticle"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/ParticleModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:cow-variant",
@@ -14251,7 +14252,8 @@
       "directionalparticle"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/ParticleModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:display",
@@ -15133,7 +15135,8 @@
       "scalableparticle"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/ParticleModule.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:script",

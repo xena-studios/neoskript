@@ -14,7 +14,6 @@ public final class GeneratedTypes {
         // enum / registry-backed types
         types.register(new RegistryType<>("bannerpatterntype", org.bukkit.block.banner.PatternType.class, () -> org.bukkit.Registry.BANNER_PATTERN));
         types.register(new EnumType<>("billboard", org.bukkit.entity.Display.Billboard.class));
-        types.register(new EnumType<>("bukkitparticle", org.bukkit.Particle.class));
         types.register(new EnumType<>("experiencecooldownchangereason", org.bukkit.event.player.PlayerExpCooldownChangeEvent.ChangeReason.class));
         types.register(new EnumType<>("inventoryclosereason", org.bukkit.event.inventory.InventoryCloseEvent.Reason.class));
         types.register(new EnumType<>("itemdisplaytransform", org.bukkit.entity.ItemDisplay.ItemDisplayTransform.class));
@@ -77,7 +76,10 @@ public final class GeneratedTypes {
         types.register(new ClassType<>("float", java.lang.Float.class, String::valueOf, Float::parseFloat));
         types.register(new EnumType<>("gene", org.bukkit.entity.Panda.Gene.class));
         types.register(new EnumType<>("entitydata", org.bukkit.entity.EntityType.class));
-        types.register(new EnumType<>("particle", org.bukkit.Particle.class));
+        types.register(ParticleEffectType.particle());
+        types.register(ParticleEffectType.directional());
+        types.register(ParticleEffectType.converging());
+        types.register(ParticleEffectType.scalable());
         types.register(new EnumType<>("treetype", org.bukkit.TreeType.class));
         types.register(new ClassType<>("skriptpotioneffect", org.bukkit.potion.PotionEffect.class));
         types.register(new ClassType<>("object", java.lang.Object.class));
