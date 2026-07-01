@@ -103,6 +103,7 @@ class TypeCoverageTest {
         TypeRegistry types = registry();
         Map<String, String> samples = Map.of(
                 "color", "red",
+                "time", "12:00",
                 "date", "2026/06/30 12:00:00");
         samples.forEach((codeName, sample) -> {
             Type<?> type = types.byCodeName(codeName);

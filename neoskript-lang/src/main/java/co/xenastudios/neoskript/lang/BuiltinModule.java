@@ -410,6 +410,11 @@ public final class BuiltinModule {
         registerDirection(registry, "behind|in back of", -1, 0, 0, true);
         registerDirection(registry, "to the left of|left of", 0, 0, 1, true);
         registerDirection(registry, "to the right of|right of", 0, 0, -1, true);
+        registry.registerExpression("[the] time of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof World w
+                    ? co.xenastudios.neoskript.lang.type.WorldTime.ofTicks(w.getTime()) : null);
+        });
         // Timespan-valued expressions.
         registry.registerExpression("(time played|play[ ]time) of %object%", Object.class, arguments -> {
             Expression<?> src = arguments.get(0);

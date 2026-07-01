@@ -15291,7 +15291,8 @@
       "time"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:timeperiod",
