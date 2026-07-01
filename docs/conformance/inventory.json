@@ -7467,8 +7467,8 @@
       "[the] colo[u]r[s] (from|of) hex[adecimal] code[s] %strings%"
     ],
     "source": "org/skriptlang/skript/common/elements/expressions/ExprColorFromHexCode.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:color-of",
@@ -9676,8 +9676,8 @@
       "all [[of] the] %itemtypes% ([with]in|of|contained in|out of) [1:inventor(y|ies)] %inventories%"
     ],
     "source": "ch/njol/skript/expressions/ExprItemsIn.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:join-split",
@@ -12067,8 +12067,8 @@
       "%livingentities%'[s] target[[ed] %-*entitydata%] [blocks:ignoring blocks] [[with|at] [a] ray[ ]size [of] %-number%]"
     ],
     "source": "ch/njol/skript/expressions/ExprTarget.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:targeted-block",
@@ -12312,8 +12312,8 @@
       "%livingentities%'[s] off[ ]hand (tool|item)"
     ],
     "source": "ch/njol/skript/expressions/ExprTool.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:total-experience",
@@ -12902,8 +12902,8 @@
       "%players%'[s] (custom|client) weather"
     ],
     "source": "ch/njol/skript/expressions/ExprWeather.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:whether",

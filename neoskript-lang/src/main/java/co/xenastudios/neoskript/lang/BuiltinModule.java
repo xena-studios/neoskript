@@ -402,6 +402,49 @@ public final class BuiltinModule {
             return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof World w
                     ? co.xenastudios.neoskript.lang.type.WorldTime.ofTicks(w.getTime()) : null);
         });
+        registry.registerExpression("[the] weather (in|of) %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                Object o = src.getSingle(ctx);
+                World w = o instanceof World world ? world : (o instanceof Player p ? p.getWorld() : null);
+                return w == null ? null : (w.isThundering() ? org.bukkit.WeatherType.DOWNFALL
+                        : w.hasStorm() ? org.bukkit.WeatherType.DOWNFALL : org.bukkit.WeatherType.CLEAR);
+            });
+        });
+        registry.registerExpression("[the] (tool|held item|weapon) of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof LivingEntity le
+                    && le.getEquipment() != null ? le.getEquipment().getItemInMainHand() : null);
+        });
+        registry.registerExpression("[the] target[ed entity] of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof org.bukkit.entity.Mob mob
+                    ? mob.getTarget() : null);
+        });
+        registry.registerExpression("[all [of the]] items (in|of|contained in) %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedListExpression(ctx -> {
+                Object o = src.getSingle(ctx);
+                if (!(o instanceof org.bukkit.inventory.Inventory inv)) {
+                    return new Object[0];
+                }
+                return java.util.Arrays.stream(inv.getContents())
+                        .filter(java.util.Objects::nonNull).toArray();
+            });
+        });
+        registry.registerExpression("[the] colo[u]r (from|of) hex[adecimal] [code] %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                if (!(src.getSingle(ctx) instanceof String hex)) {
+                    return null;
+                }
+                try {
+                    return org.bukkit.Color.fromRGB(Integer.parseInt(hex.trim().replace("#", ""), 16));
+                } catch (NumberFormatException e) {
+                    return null;
+                }
+            });
+        });
         // Timespan-valued expressions.
         registry.registerExpression("(time played|play[ ]time) of %object%", Object.class, arguments -> {
             Expression<?> src = arguments.get(0);

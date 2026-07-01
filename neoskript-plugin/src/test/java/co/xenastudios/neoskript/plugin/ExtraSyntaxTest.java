@@ -223,6 +223,37 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void weatherToolTargetItemsColor() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("wx.sk"), """
+                command /wx:
+                    trigger:
+                        set {_w} to weather in world of player
+                        if {_w} is set:
+                            send "WEATHER" to player
+                        set {_c} to color from hex code "FF0000"
+                        if {_c} is set:
+                            send "COLOR" to player
+                        set {_t} to tool of player
+                        set {_i} to all items in inventory of player
+                        set {_tg} to target of player
+                        send "DONE" to player
+                """, StandardCharsets.UTF_8);
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        org.mockbukkit.mockbukkit.entity.PlayerMock player = server.addPlayer();
+        server.dispatchCommand(player, "wx");
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            seen.add(m);
+        }
+        assertTrue(seen.contains("WEATHER"), "weather of world resolves");
+        assertTrue(seen.contains("COLOR"), "color from hex code resolves");
+        assertTrue(seen.contains("DONE"), "tool / items in / target parse and run");
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);
