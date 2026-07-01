@@ -74,8 +74,8 @@
       "[the] brewing stand (will not|won't) consume [the] fuel"
     ],
     "source": "org/skriptlang/skript/bukkit/brewing/elements/conditions/CondBrewingConsume.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:camel-is-dashing",
@@ -382,8 +382,8 @@
       "[the] egg (:will|will not|won't) hatch"
     ],
     "source": "ch/njol/skript/conditions/CondWillHatch.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:enderman-has-been-stared-at",
@@ -530,8 +530,8 @@
       "[the] event (is not|isn't) cancel[l]ed"
     ],
     "source": "ch/njol/skript/conditions/CondCancelled.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:exists-is-set",
@@ -557,8 +557,8 @@
       "lure enchantment bonus is(n't| not) (applied|active)"
     ],
     "source": "org/skriptlang/skript/bukkit/fishing/elements/conditions/CondFishingLure.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:goat-has-horns",
@@ -893,8 +893,8 @@
       "[the] respawn location (was|is)[1:(n'| no)t] [a] (:bed|respawn anchor)"
     ],
     "source": "ch/njol/skript/conditions/CondRespawnLocation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-block",
@@ -1986,8 +1986,8 @@
       "[the] (lead|leash) [item] (will|not:(won't|will not)) (drop|be dropped)"
     ],
     "source": "ch/njol/skript/conditions/CondLeashWillDrop.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:left-handed",
@@ -2276,8 +2276,8 @@
       "[the] (boosting|used) firework (will not|won't) be consumed"
     ],
     "source": "ch/njol/skript/conditions/CondElytraBoostConsume.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:will-despawn",
@@ -2332,8 +2332,8 @@
       "(block|disallow|prevent) [the] (lead|leash) [item] from dropping"
     ],
     "source": "ch/njol/skript/effects/EffDropLeash.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:allow-aging",
@@ -2374,8 +2374,8 @@
       "remove [the] lure enchantment bonus"
     ],
     "source": "org/skriptlang/skript/bukkit/fishing/elements/effects/EffFishingLure.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:apply-potion-effect",
@@ -2482,8 +2482,8 @@
       "(cancel|clear|delete) [the] (items:item|xp:[e]xp[erience]) drops"
     ],
     "source": "ch/njol/skript/effects/EffCancelDrops.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:cancel-event",
@@ -2609,8 +2609,8 @@
       "allow [the] (boosting|used) firework to be consumed"
     ],
     "source": "ch/njol/skript/effects/EffElytraBoostConsume.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:consume-brewing-fuel",
@@ -2622,8 +2622,8 @@
       "prevent [the] brewing stand from consuming [its|the] fuel"
     ],
     "source": "org/skriptlang/skript/bukkit/brewing/elements/effects/EffBrewingConsume.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:continue",
@@ -3175,8 +3175,8 @@
       "keep [the] [e]xp[erience][s] [point[s]] [(1:and (inventory|items))]"
     ],
     "source": "ch/njol/skript/effects/EffKeepInventory.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:kick",
@@ -3377,8 +3377,8 @@
       "make [the] egg [:not] hatch"
     ],
     "source": "ch/njol/skript/effects/EffMakeEggHatch.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-entity-scream",
@@ -3705,8 +3705,8 @@
       "(show|reveal) [all] player [related] info[rmation] [(in|to|on|from) [the] server list]"
     ],
     "source": "ch/njol/skript/effects/EffPlayerInfoVisibility.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:poison-cure",
@@ -3780,8 +3780,8 @@
       "(reel|pull) in [the] hook[ed] entity"
     ],
     "source": "org/skriptlang/skript/bukkit/fishing/elements/effects/EffPullHookedEntity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:push",
@@ -6792,8 +6792,8 @@
       "(new|equipped) armo[u]r item"
     ],
     "source": "ch/njol/skript/expressions/ExprArmorChangeItem.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:armor-slot",
@@ -7222,7 +7222,8 @@
       "[the] breeder"
     ],
     "source": "org/skriptlang/skript/bukkit/breeding/elements/expressions/ExprBreedingFamily.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:brewing-results",
@@ -8307,8 +8308,8 @@
       "[the] %number%(st|nd|rd|th) enchant[ment] offer"
     ],
     "source": "ch/njol/skript/expressions/ExprEnchantmentOffer.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:enchantment-offer-cost",
@@ -8636,8 +8637,8 @@
       "[the] (spawned|dropped|) [e]xp[erience] [orb[s]]"
     ],
     "source": "ch/njol/skript/expressions/ExprExperience.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:experience-cooldown-change-reason",
@@ -8648,8 +8649,8 @@
       "[the] (experience|[e]xp) cooldown change (reason|cause|type)"
     ],
     "source": "ch/njol/skript/expressions/ExprExperienceCooldownChangeReason.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:experience-pickup-cooldown",
@@ -8763,8 +8764,8 @@
       "[all] [the] fertilized blocks"
     ],
     "source": "ch/njol/skript/expressions/ExprFertilizedBlocks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:filter",
@@ -8827,8 +8828,8 @@
       "(min:min[imum]|max[imum]) fish[ing] approach[ing] angle"
     ],
     "source": "org/skriptlang/skript/bukkit/fishing/elements/expressions/ExprFishingApproachAngle.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:fishing-bite-time",
@@ -9117,8 +9118,8 @@
       "[the] hanging (entity|:remover)"
     ],
     "source": "ch/njol/skript/expressions/ExprHanging.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:hash",
@@ -9492,8 +9493,8 @@
       "%itemstacks%'[s] item"
     ],
     "source": "ch/njol/skript/expressions/ExprItem.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:item-amount",
@@ -9972,8 +9973,8 @@
       "[the] (location|position) %directions% [%location%]"
     ],
     "source": "ch/njol/skript/expressions/ExprLocation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:location-2",
@@ -10062,8 +10063,8 @@
       "[the] loot[ ]context"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/expressions/ExprLootContext.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:loot-location-of-loot-context",
@@ -10965,8 +10966,8 @@
       "[the] picked (item|1:block|2:entity)"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/expressions/ExprPickedItem.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:pickup-delay",
@@ -11270,8 +11271,8 @@
       "(quit|disconnect) (cause|reason)"
     ],
     "source": "ch/njol/skript/expressions/ExprQuitReason.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:random",

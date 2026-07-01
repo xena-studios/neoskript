@@ -95,6 +95,7 @@ public final class BuiltinModule {
         GenEffBulk2.register(registry); // second-pass recovered effects (generated)
         GenCondBulk2.register(registry); // second-pass recovered conditions (generated)
         GenExprMulti.register(registry); // multi-argument value expressions (generated)
+        GenEventBulk.register(registry); // event-restricted expressions/conditions/effects (generated)
     }
 
     private static void registerTypes() {
