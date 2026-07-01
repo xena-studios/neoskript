@@ -1075,6 +1075,10 @@ public final class BuiltinModule {
             Expression<?> src = a.get(0);
             return ctx -> src.getSingle(ctx) instanceof org.bukkit.block.Block b && b.isBlockPowered();
         });
+        registry.registerCondition("%object% (is|are) spawnable", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> src.getSingle(ctx) instanceof org.bukkit.entity.EntityType et && et.isSpawnable();
+        });
         registry.registerCondition("%object% (is|are) enchanted", a -> {
             Expression<?> src = a.get(0);
             return ctx -> src.getSingle(ctx) instanceof ItemStack it && it.getItemMeta() != null
@@ -1720,6 +1724,24 @@ public final class BuiltinModule {
                 }
             };
         });
+        // Shoot a projectile/entity of a type from a living entity in its facing direction.
+        registry.registerEffect("shoot %object% from %object% at [speed] %number%", arguments -> {
+            Expression<?> type = arguments.get(0);
+            Expression<?> shooter = arguments.get(1);
+            Expression<?> speed = arguments.get(2);
+            return ctx -> shoot(type.getSingle(ctx), shooter.getSingle(ctx),
+                    speed.getSingle(ctx) instanceof Number n ? n.doubleValue() : 2.0);
+        });
+        registry.registerEffect("shoot %object% from %object%", arguments -> {
+            Expression<?> type = arguments.get(0);
+            Expression<?> shooter = arguments.get(1);
+            return ctx -> shoot(type.getSingle(ctx), shooter.getSingle(ctx), 2.0);
+        });
+        registry.registerEffect("shoot %object%", arguments -> {
+            Expression<?> type = arguments.get(0);
+            return ctx -> shoot(type.getSingle(ctx),
+                    event(ctx) instanceof org.bukkit.event.player.PlayerEvent pe ? pe.getPlayer() : null, 2.0);
+        });
         // Spawn an entity of a type at a location.
         registry.registerEffect("(spawn|summon) %object% at %object%", arguments -> {
             Expression<?> type = arguments.get(0);
@@ -1933,6 +1955,23 @@ public final class BuiltinModule {
             return new ComputedExpression(ctx ->
                     len.getSingle(ctx) instanceof Number num ? base.scaled(num.doubleValue()) : base);
         });
+    }
+
+    /** Shoots an entity of {@code type} from {@code shooter} in its facing direction at {@code speed}. */
+    private static void shoot(Object type, Object shooter, double speed) {
+        if (!(shooter instanceof org.bukkit.entity.LivingEntity le)
+                || !(type instanceof org.bukkit.entity.EntityType et)) {
+            return;
+        }
+        org.bukkit.Location from = le.getEyeLocation();
+        if (from.getWorld() == null) {
+            return;
+        }
+        org.bukkit.entity.Entity spawned = from.getWorld().spawnEntity(from, et);
+        spawned.setVelocity(from.getDirection().multiply(speed));
+        if (spawned instanceof org.bukkit.entity.Projectile projectile) {
+            projectile.setShooter(le);
+        }
     }
 
     /** Registers `push %entity% <dir> [at speed %number%]` (with and without an explicit speed). */

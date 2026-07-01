@@ -199,6 +199,30 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void shootAndSpawnable() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("sh.sk"), """
+                command /sh:
+                    trigger:
+                        if zombie is spawnable:
+                            send "SPAWNABLE" to player
+                        shoot arrow from player
+                        send "DONE" to player
+                """, StandardCharsets.UTF_8);
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        org.mockbukkit.mockbukkit.entity.PlayerMock player = server.addPlayer();
+        server.dispatchCommand(player, "sh");
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            seen.add(m);
+        }
+        assertTrue(seen.contains("SPAWNABLE"), "zombie is spawnable");
+        assertTrue(seen.contains("DONE"), "shoot parses and runs (MockBukkit can't spawn the projectile)");
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);
@@ -208,7 +232,7 @@ class ExtraSyntaxTest {
         BuiltinFunctions.registerAll(functions);
         String[] aliases = {
                 "first join", "break of diamond ore", "mine of stone", "place of stone",
-                "death of zombie", "rightclick holding a stick", "script load",
+                "death of zombie", "rightclick holding a stick", "script load", "walk on stone",
         };
         for (String alias : aliases) {
             ScriptParser parser = new ScriptParser(registry, events, functions, new CommandRegistry());

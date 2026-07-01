@@ -1753,8 +1753,8 @@
       "%entitydatas% (can't|can not) be spawned [in [the [world]] %world%]"
     ],
     "source": "ch/njol/skript/conditions/CondIsSpawnable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-sprinting",
@@ -5515,8 +5515,8 @@
       "(step|walk)[ing] (on|over) %*itemtypes%"
     ],
     "source": "ch/njol/skript/events/EvtMoveOn.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "event:physics",
@@ -13737,7 +13737,8 @@
       "(make|let) %livingentities/locations% shoot %entitydatas% [(at|with) (speed|velocity) %-number%] [%-direction%]"
     ],
     "source": "ch/njol/skript/sections/EffSecShoot.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "section:spawn",

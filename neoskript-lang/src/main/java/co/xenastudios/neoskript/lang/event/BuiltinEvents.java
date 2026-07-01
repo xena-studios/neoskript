@@ -152,6 +152,30 @@ public final class BuiltinEvents {
      * (never for every occurrence, which would silently misbehave).
      */
     private static void registerFilters(EventRegistry events) {
+        // on (step|walk) on %block%: a player moves onto a new block of the given type.
+        events.registerFilter(name -> {
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("(?i)(?:step|stepping|walk|walking) (?:on|over) (?:a |an )?(.+)").matcher(name);
+            if (!m.matches()) {
+                return java.util.Optional.empty();
+            }
+            org.bukkit.Material mat = material(m.group(1).trim());
+            if (mat == null) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(new EventRegistry.FilteredEvent(
+                    org.bukkit.event.player.PlayerMoveEvent.class, ev -> {
+                if (!(ev instanceof org.bukkit.event.player.PlayerMoveEvent e) || e.getTo() == null) {
+                    return false;
+                }
+                if (e.getFrom().getBlockX() == e.getTo().getBlockX()
+                        && e.getFrom().getBlockY() == e.getTo().getBlockY()
+                        && e.getFrom().getBlockZ() == e.getTo().getBlockZ()) {
+                    return false; // only fire on entering a new block
+                }
+                return e.getTo().clone().subtract(0, 1, 0).getBlock().getType() == mat;
+            }));
+        });
         // on first (join|login): a join by a player who has not played before.
         events.registerFilter(name -> {
             if (!name.matches("(?i)first (join|login)")) {
