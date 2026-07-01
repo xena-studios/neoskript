@@ -82,10 +82,19 @@ public class NeoSkriptPlugin extends JavaPlugin {
                 new ScriptLoader(this, parser, functions, commandRegistry, globalVariables, scheduler, profiler);
         ScriptLoader.Result result = loader.loadAll(getDataFolder().toPath().resolve("scripts"));
 
-        var command = getCommand("neoskript");
-        if (command != null) {
-            command.setExecutor(new NeoSkriptCommand(this, loader, profiler));
-        }
+        // Paper plugins do not support YAML command declarations, so JavaPlugin#getCommand throws
+        // during startup. Register the admin command directly with the server's command map — the
+        // same runtime path used for script-defined commands.
+        NeoSkriptCommand executor = new NeoSkriptCommand(this, loader, profiler);
+        org.bukkit.command.Command adminCommand = new org.bukkit.command.Command(
+                "neoskript", "Manage NeoSkript (status, reload, profile).",
+                "/neoskript [reload|profile]", java.util.List.of("nsk", "ns")) {
+            @Override
+            public boolean execute(org.bukkit.command.CommandSender sender, String label, String[] args) {
+                return executor.onCommand(sender, this, label, args);
+            }
+        };
+        getServer().getCommandMap().register("neoskript", adminCommand);
 
         // Periodically persist globals off-thread so a crash loses at most one interval of data.
         this.autoSaveTask = scheduler.runRepeating(
