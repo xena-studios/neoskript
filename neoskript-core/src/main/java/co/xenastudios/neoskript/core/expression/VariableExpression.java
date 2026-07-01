@@ -219,6 +219,18 @@ public final class VariableExpression implements Expression<Object> {
         return value == null ? new Object[0] : new Object[]{value};
     }
 
+    /** @return the direct index keys of a list variable (relative to the list prefix), or empty. */
+    public Object[] listKeys(TriggerContext ctx) {
+        if (!list) {
+            return new Object[0];
+        }
+        String prefix = listPrefix(ctx);
+        Map<String, Object> children = local ? ctx.listLocal(prefix) : ctx.listGlobal(prefix);
+        return children.keySet().stream()
+                .map(key -> key.startsWith(prefix) ? key.substring(prefix.length()) : key)
+                .toArray();
+    }
+
     @Override
     public Object getSingle(TriggerContext ctx) {
         if (list) {

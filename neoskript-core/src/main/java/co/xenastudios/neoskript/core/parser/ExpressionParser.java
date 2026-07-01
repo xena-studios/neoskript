@@ -299,6 +299,8 @@ public final class ExpressionParser {
             "(?i)^(.+?)\\s+(?:reduced|folded)\\s+(?:to|with|by)\\s*\\[(.+)]$");
     private static final Pattern META_EXCEPT = Pattern.compile(
             "(?i)^(.+?)\\s+(?:except|excluding|not including)\\s+(.+)$");
+    private static final Pattern META_INDICES = Pattern.compile(
+            "(?i)^(?:all\\s+(?:of\\s+)?(?:the\\s+)?|the\\s+)?(?:indexes|indices)\\s+of\\s+(\\{.+})$");
 
     /**
      * Parses a list/meta expression that evaluates a nested condition or expression per element:
@@ -338,6 +340,11 @@ public final class ExpressionParser {
                 }
                 return kept.toArray();
             });
+        }
+        Matcher indices = META_INDICES.matcher(s);
+        if (indices.matches() && parse(indices.group(1).trim()) instanceof VariableExpression list
+                && list.isList()) {
+            return new ComputedListExpression(list::listKeys);
         }
         Matcher reduce = META_REDUCE.matcher(s);
         if (reduce.matches()) {

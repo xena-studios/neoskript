@@ -9324,8 +9324,8 @@
       "[sorted] %~objects%'[s] (indices|indexes) in (ascending|1¦descending) order"
     ],
     "source": "ch/njol/skript/expressions/ExprIndices.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:indices-of-value",
