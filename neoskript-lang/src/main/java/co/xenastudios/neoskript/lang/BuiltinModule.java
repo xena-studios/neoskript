@@ -1841,6 +1841,39 @@ public final class BuiltinModule {
                 }
             };
         });
+        // Item builders: a copy of the item with a modified meta field.
+        registry.registerExpression("%object% with lore %object%", Object.class, arguments ->
+                itemWith(arguments, (meta, value) -> meta.setLore(java.util.List.of(
+                        org.bukkit.ChatColor.translateAlternateColorCodes('&', String.valueOf(value))))));
+        registry.registerExpression("%object% with [custom] model data %object%", Object.class, arguments ->
+                itemWith(arguments, (meta, value) -> {
+                    if (value instanceof Number n) {
+                        meta.setCustomModelData(n.intValue());
+                    }
+                }));
+        registry.registerExpression("%object% with [the] item flag[s] %object%", Object.class, arguments ->
+                itemWith(arguments, (meta, value) -> {
+                    if (value instanceof org.bukkit.inventory.ItemFlag flag) {
+                        meta.addItemFlags(flag);
+                    }
+                }));
+        registry.registerExpression("%object% with [enchant[ment]] glint", Object.class, arguments -> {
+            Expression<?> item = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                Object o = item.getSingle(ctx);
+                org.bukkit.Material mat = material(o);
+                if (mat == null) {
+                    return null;
+                }
+                ItemStack stack = o instanceof ItemStack existing ? existing.clone() : new ItemStack(mat);
+                org.bukkit.inventory.meta.ItemMeta meta = stack.getItemMeta();
+                if (meta != null) {
+                    meta.setEnchantmentGlintOverride(true);
+                    stack.setItemMeta(meta);
+                }
+                return stack;
+            });
+        });
         // Named item: `a diamond named "&bStarter Gift"` — a copy of the item with a display name.
         registry.registerExpression("%object% (named|with name) %string%", Object.class, arguments -> {
             Expression<?> item = arguments.get(0);
@@ -1997,6 +2030,27 @@ public final class BuiltinModule {
             Expression<?> len = a.get(0);
             return new ComputedExpression(ctx ->
                     len.getSingle(ctx) instanceof Number num ? base.scaled(num.doubleValue()) : base);
+        });
+    }
+
+    /** A copy of the first argument (an item) with its {@link org.bukkit.inventory.meta.ItemMeta} mutated. */
+    private static Expression<Object> itemWith(co.xenastudios.neoskript.api.syntax.Arguments arguments,
+            java.util.function.BiConsumer<org.bukkit.inventory.meta.ItemMeta, Object> mutator) {
+        Expression<?> item = arguments.get(0);
+        Expression<?> value = arguments.get(1);
+        return new ComputedExpression(ctx -> {
+            Object o = item.getSingle(ctx);
+            org.bukkit.Material mat = material(o);
+            if (mat == null) {
+                return null;
+            }
+            ItemStack stack = o instanceof ItemStack existing ? existing.clone() : new ItemStack(mat);
+            org.bukkit.inventory.meta.ItemMeta meta = stack.getItemMeta();
+            if (meta != null) {
+                mutator.accept(meta, value.getSingle(ctx));
+                stack.setItemMeta(meta);
+            }
+            return stack;
         });
     }
 

@@ -9598,8 +9598,8 @@
       "%itemtype% with [custom] model data %number%"
     ],
     "source": "ch/njol/skript/expressions/ExprItemWithCustomModelData.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:item-with-enchantment-glint",
@@ -9610,8 +9610,8 @@
       "%itemtypes% with[:out] [enchant[ment]] glint"
     ],
     "source": "ch/njol/skript/expressions/ExprItemWithEnchantmentGlint.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:item-with-item-flags",
@@ -9624,8 +9624,8 @@
       "%itemtypes% with all [the] item flags"
     ],
     "source": "ch/njol/skript/expressions/ExprWithItemFlags.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:item-with-lore",
@@ -9636,7 +9636,7 @@
       "%itemtype% with [a|the] lore %textcomponents/strings%"
     ],
     "source": "org/skriptlang/skript/bukkit/item/elements/ExprItemWithLore.java",
-    "status": "parse-verified",
+    "status": "done",
     "implemented": true
   },
   {

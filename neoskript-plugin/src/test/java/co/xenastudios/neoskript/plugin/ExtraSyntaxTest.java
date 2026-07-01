@@ -254,6 +254,36 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void itemBuilders() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("iw.sk"), """
+                command /iw:
+                    trigger:
+                        set {_l} to item("diamond sword") with lore "&7Legendary"
+                        if {_l} is set:
+                            send "LORE" to player
+                        set {_g} to item("stone") with glint
+                        if {_g} is set:
+                            send "GLINT" to player
+                        set {_c} to item("stone") with custom model data 5
+                        set {_f} to item("stone") with item flag hide_enchants
+                        send "DONE" to player
+                """, StandardCharsets.UTF_8);
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        org.mockbukkit.mockbukkit.entity.PlayerMock player = server.addPlayer();
+        server.dispatchCommand(player, "iw");
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            seen.add(m);
+        }
+        assertTrue(seen.contains("LORE"), "item with lore resolves");
+        assertTrue(seen.contains("GLINT"), "item with glint resolves");
+        assertTrue(seen.contains("DONE"), "item with custom model data / item flags parse and run");
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);
