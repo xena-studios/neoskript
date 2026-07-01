@@ -399,6 +399,17 @@ public final class BuiltinModule {
             Expression<?> src = arguments.get(0);
             return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof Player p ? p.getPing() : null);
         });
+        // Directional locations: absolute (north/above/…) and facing-relative (in front of/…).
+        registerDirection(registry, "above|over|on top of", 0, 1, 0, false);
+        registerDirection(registry, "below|under[neath]|beneath", 0, -1, 0, false);
+        registerDirection(registry, "north[ward[s]]|to the north", 0, 0, -1, false);
+        registerDirection(registry, "south[ward[s]]|to the south", 0, 0, 1, false);
+        registerDirection(registry, "east[ward[s]]|to the east", 1, 0, 0, false);
+        registerDirection(registry, "west[ward[s]]|to the west", -1, 0, 0, false);
+        registerDirection(registry, "in front of|forward[s]|ahead of", 1, 0, 0, true);
+        registerDirection(registry, "behind|in back of", -1, 0, 0, true);
+        registerDirection(registry, "to the left of|left of", 0, 0, 1, true);
+        registerDirection(registry, "to the right of|right of", 0, 0, -1, true);
         // Timespan-valued expressions.
         registry.registerExpression("(time played|play[ ]time) of %object%", Object.class, arguments -> {
             Expression<?> src = arguments.get(0);
@@ -1901,6 +1912,35 @@ public final class BuiltinModule {
                 action.accept(player);
             }
         };
+    }
+
+    /**
+     * Registers directional-location expressions for one direction: {@code %number% blocks <dir> [of]
+     * %object%} and {@code [the] <dir> [of] %object%} both return the offset location; the base-less
+     * numeric form returns a {@link co.xenastudios.neoskript.lang.type.Direction} value.
+     */
+    private static void registerDirection(SyntaxRegistry registry, String dir,
+                                          double fwd, double up, double left, boolean relative) {
+        co.xenastudios.neoskript.lang.type.Direction base =
+                new co.xenastudios.neoskript.lang.type.Direction(fwd, up, left, relative);
+        registry.registerExpression("%number% [(block[s]|met(er|re)[s])] (" + dir + ") [(of|from)] %object%",
+                Object.class, a -> {
+            Expression<?> len = a.get(0);
+            Expression<?> target = a.get(1);
+            return new ComputedExpression(ctx -> {
+                double n = len.getSingle(ctx) instanceof Number num ? num.doubleValue() : 1;
+                return base.scaled(n).relativeTo(target.getSingle(ctx));
+            });
+        });
+        registry.registerExpression("[the] (" + dir + ") [(of|from)] %object%", Object.class, a -> {
+            Expression<?> target = a.get(0);
+            return new ComputedExpression(ctx -> base.relativeTo(target.getSingle(ctx)));
+        });
+        registry.registerExpression("%number% [(block[s]|met(er|re)[s])] (" + dir + ")", Object.class, a -> {
+            Expression<?> len = a.get(0);
+            return new ComputedExpression(ctx ->
+                    len.getSingle(ctx) instanceof Number num ? base.scaled(num.doubleValue()) : base);
+        });
     }
 
     /** Registers `push %entity% <dir> [at speed %number%]` (with and without an explicit speed). */

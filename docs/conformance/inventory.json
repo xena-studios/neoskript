@@ -8019,8 +8019,8 @@
       "[%-number% [(block|met(er|re))[s]]] horizontal[ly] (in[ ]front [of]|forward[s]|behind|backwards|to the right [of]|to the left [of])"
     ],
     "source": "ch/njol/skript/expressions/ExprDirection.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:display-billboard",
@@ -14228,7 +14228,8 @@
       "direction"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:directionalparticle",

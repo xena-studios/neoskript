@@ -54,6 +54,7 @@ public final class GenTypes3 {
         types.register(new EnumType<>("treetype", org.bukkit.TreeType.class));
         types.register(new ClassType<>("skriptpotioneffect", org.bukkit.potion.PotionEffect.class));
         types.register(new ClassType<>("object", java.lang.Object.class));
+        types.register(new ClassType<>("direction", Direction.class));
         types.register(new ClassType<>("gamerule", org.bukkit.GameRule.class));
         types.register(new ClassType<>("equippablecomponent", io.papermc.paper.datacomponent.item.Equippable.class));
         types.register(new ClassType<>("audience", net.kyori.adventure.audience.Audience.class));

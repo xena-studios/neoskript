@@ -169,6 +169,36 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void directionalLocations() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("dir.sk"), """
+                command /dir:
+                    trigger:
+                        set {_base} to location of player
+                        set {_up} to 3 blocks above {_base}
+                        if y-coordinate of {_up} is (y-coordinate of {_base}) + 3:
+                            send "UP3" to player
+                        set {_n} to 2 meters north of {_base}
+                        if {_n} is set:
+                            send "NORTH" to player
+                        set {_f} to 1 block in front of player
+                        if {_f} is set:
+                            send "FRONT" to player
+                """, StandardCharsets.UTF_8);
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        org.mockbukkit.mockbukkit.entity.PlayerMock player = server.addPlayer();
+        server.dispatchCommand(player, "dir");
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            seen.add(m);
+        }
+        assertTrue(seen.contains("UP3"), "3 blocks above raises y by 3; got " + seen);
+        assertTrue(seen.contains("NORTH") && seen.contains("FRONT"), "cardinal + relative directions resolve");
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);
