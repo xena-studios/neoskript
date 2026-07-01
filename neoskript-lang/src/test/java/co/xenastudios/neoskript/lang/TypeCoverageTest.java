@@ -86,7 +86,7 @@ class TypeCoverageTest {
             "metadataholder", "nameable", "offlineplayer", "potioneffect", "projectile",
             "teleportflag", "textcomponent", "vehicle", "worldborder", "bannerpattern",
             "cachedservericon", "minecrafttag", "quaternion", "gamerule", "skriptpotioneffect",
-            "equippablecomponent", "audience",
+            "equippablecomponent", "audience", "direction", "time", "experience",
     })
     @SuppressWarnings({"unchecked", "rawtypes"})
     void classTypesRegistered(String codeName) {

@@ -410,6 +410,11 @@ public final class BuiltinModule {
         registerDirection(registry, "behind|in back of", -1, 0, 0, true);
         registerDirection(registry, "to the left of|left of", 0, 0, 1, true);
         registerDirection(registry, "to the right of|right of", 0, 0, -1, true);
+        registry.registerExpression("%number% (exp|xp|experience) [point[s]]", Object.class, arguments -> {
+            Expression<?> amount = arguments.get(0);
+            return new ComputedExpression(ctx -> amount.getSingle(ctx) instanceof Number n
+                    ? new co.xenastudios.neoskript.lang.type.Experience(n.intValue()) : null);
+        });
         registry.registerExpression("[the] time of %object%", Object.class, arguments -> {
             Expression<?> src = arguments.get(0);
             return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof World w

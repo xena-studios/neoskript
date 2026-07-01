@@ -14439,7 +14439,8 @@
       "experience"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:experiencecooldownchangereason",
