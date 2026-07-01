@@ -406,7 +406,26 @@ public final class ScriptParser {
         throw new ParseException("Malformed loop: " + content, node.line());
     }
 
+    private static final Pattern SORT = Pattern.compile(
+            "(?i)^sort\\s+(\\{.+?})(?:\\s+in\\s+(ascending|descending)\\s+order)?"
+                    + "(?:\\s+(?:by|based on)\\s*\\[(.+)])?$");
+    private static final Pattern TRANSFORM = Pattern.compile(
+            "(?i)^(?:transform|map)\\s+(\\{.+?})\\s+(?:using|with)\\s*\\[(.+)]$");
+
     private Statement parseLeaf(Node node) {
+        String content = node.content();
+
+        // do-if: `<effect> if <condition>` — run the effect only when the condition holds.
+        Statement conditional = parseDoIf(node);
+        if (conditional != null) {
+            return conditional;
+        }
+        // sort / transform a list variable in place.
+        Statement listOp = parseListEffect(node);
+        if (listOp != null) {
+            return listOp;
+        }
+
         // Overlapping patterns share a leading word (e.g. `send %string%` vs `send actionbar %string%`).
         // If a matching candidate's arguments fail to parse, fall through to the next candidate rather
         // than aborting the line, so the more specific pattern still gets a chance.
@@ -435,6 +454,111 @@ public final class ScriptParser {
             throw new ParseException(lastError.getMessage(), node.line());
         }
         throw new ParseException("Don't understand the statement '" + node.content() + "'", node.line());
+    }
+
+    /** Parses {@code <effect> if <condition>}: the effect runs only when the condition holds. */
+    private Statement parseDoIf(Node node) {
+        String content = node.content();
+        int idx = lastTopLevelIf(content);
+        if (idx < 0) {
+            return null;
+        }
+        String head = content.substring(0, idx).trim();
+        String tail = content.substring(idx + 4).trim();
+        if (head.isEmpty() || tail.isEmpty()) {
+            return null;
+        }
+        try {
+            Condition condition = expressions.parseConditionText(tail);
+            Statement effect = parseLeaf(new Node(head, node.line(), List.of()));
+            return new IfSection(condition, List.of(effect), List.of());
+        } catch (ParseException ignored) {
+            return null; // not a do-if; parse normally
+        }
+    }
+
+    /** @return the index of the last top-level {@code " if "} (outside quotes/brackets), or -1. */
+    private static int lastTopLevelIf(String s) {
+        boolean inQuotes = false;
+        int depth = 0;
+        int result = -1;
+        for (int i = 0; i + 4 <= s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (inQuotes) {
+                continue;
+            } else if (c == '(' || c == '{' || c == '[') {
+                depth++;
+            } else if (c == ')' || c == '}' || c == ']') {
+                depth--;
+            } else if (depth == 0 && c == ' ' && s.regionMatches(true, i, " if ", 0, 4)) {
+                result = i;
+            }
+        }
+        return result;
+    }
+
+    /** Parses {@code sort {list::*} [order] [by [<expr>]]} and {@code (transform|map) {list::*} using [<expr>]}. */
+    private Statement parseListEffect(Node node) {
+        String content = node.content();
+        Matcher sort = SORT.matcher(content);
+        if (sort.matches() && expressions.parse(sort.group(1).trim()) instanceof VariableExpression list
+                && list.isList()) {
+            boolean descending = "descending".equalsIgnoreCase(sort.group(2));
+            Expression<?> key = sort.group(3) != null ? expressions.parse(sort.group(3).trim()) : null;
+            return ctx -> {
+                java.util.List<Object> items =
+                        new java.util.ArrayList<>(java.util.Arrays.asList(list.getAll(ctx)));
+                Object previous = ctx.getLocal("input");
+                try {
+                    java.util.Comparator<Object> comparator = (a, b) -> {
+                        Object ka = a;
+                        Object kb = b;
+                        if (key != null) {
+                            ctx.setLocal("input", a);
+                            ka = key.getSingle(ctx);
+                            ctx.setLocal("input", b);
+                            kb = key.getSingle(ctx);
+                        }
+                        return compareValues(ka, kb);
+                    };
+                    items.sort(descending ? comparator.reversed() : comparator);
+                } finally {
+                    ctx.setLocal("input", previous);
+                }
+                list.delete(ctx);
+                items.forEach(item -> list.addToList(ctx, item));
+            };
+        }
+        Matcher transform = TRANSFORM.matcher(content);
+        if (transform.matches() && expressions.parse(transform.group(1).trim()) instanceof VariableExpression list
+                && list.isList()) {
+            Expression<?> mapper = expressions.parse(transform.group(2).trim());
+            return ctx -> {
+                Object[] items = list.getAll(ctx);
+                Object previous = ctx.getLocal("input");
+                java.util.List<Object> mapped = new java.util.ArrayList<>();
+                try {
+                    for (Object item : items) {
+                        ctx.setLocal("input", item);
+                        mapped.add(mapper.getSingle(ctx));
+                    }
+                } finally {
+                    ctx.setLocal("input", previous);
+                }
+                list.delete(ctx);
+                mapped.forEach(item -> list.addToList(ctx, item));
+            };
+        }
+        return null;
+    }
+
+    private static int compareValues(Object a, Object b) {
+        if (a instanceof Number na && b instanceof Number nb) {
+            return Double.compare(na.doubleValue(), nb.doubleValue());
+        }
+        return String.valueOf(a).compareTo(String.valueOf(b));
     }
 
     private Condition parseCondition(String content, int line) {

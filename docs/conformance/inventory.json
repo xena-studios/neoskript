@@ -2729,8 +2729,8 @@
       "<.+> if <.+>"
     ],
     "source": "ch/njol/skript/effects/EffDoIf.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:drop",
@@ -3980,8 +3980,8 @@
       "sort %~objects% [in (:descending|ascending) order] [(by|based on) <.+>]"
     ],
     "source": "ch/njol/skript/effects/EffSort.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:sprinting",
@@ -4230,8 +4230,8 @@
       "(transform|map) %~objects% (using|with) <.+>"
     ],
     "source": "ch/njol/skript/effects/EffTransform.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:tree",
