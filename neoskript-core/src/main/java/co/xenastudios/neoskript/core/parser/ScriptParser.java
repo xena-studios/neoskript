@@ -146,9 +146,9 @@ public final class ScriptParser {
         if (LOAD_ALIASES.contains(eventName.toLowerCase(Locale.ROOT))) {
             return Trigger.onLoad(body);
         }
-        Class<?> eventClass = events.resolve(eventName)
+        EventRegistry.FilteredEvent resolved = events.resolveFiltered(eventName)
                 .orElseThrow(() -> new ParseException("Unknown event '" + eventName + "'", node.line()));
-        return new Trigger(eventName, eventClass, body);
+        return new Trigger(eventName, resolved.eventClass(), body, resolved.filter());
     }
 
     private Trigger parsePeriodic(Node node) {
@@ -261,7 +261,9 @@ public final class ScriptParser {
             String content = child.content();
             String lower = content.toLowerCase(Locale.ROOT);
             if (lower.equals("trigger:")) {
-                body = parseStatements(child.children(), false);
+                // Commands run on the interpreter (see CommandDefinition#run), so `wait` is honoured
+                // inside command triggers and their sections, just like event triggers.
+                body = parseStatements(child.children(), true);
             } else if (lower.startsWith("permission:")) {
                 permission = entryValue(content);
             } else if (lower.startsWith("description:")) {
@@ -326,9 +328,7 @@ public final class ScriptParser {
 
     private Statement parseDelay(Node node, boolean allowDelays) {
         if (!allowDelays) {
-            throw new ParseException(
-                    "'wait' is only supported at the top level of a trigger (not inside sections or functions yet)",
-                    node.line());
+            throw new ParseException("'wait' is not supported inside functions", node.line());
         }
         String spec = node.content().substring(node.content().indexOf(' ') + 1).trim();
         OptionalLong ticks = Timespan.parseTicks(spec);

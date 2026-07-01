@@ -214,6 +214,22 @@ public final class ExpressionParser {
             }
         }
 
+        // Boolean literals.
+        if (s.equalsIgnoreCase("true")) {
+            return new co.xenastudios.neoskript.core.expression.ComputedExpression(ctx -> Boolean.TRUE);
+        }
+        if (s.equalsIgnoreCase("false")) {
+            return new co.xenastudios.neoskript.core.expression.ComputedExpression(ctx -> Boolean.FALSE);
+        }
+
+        // Typed loop variable: inside `loop all players:`, `loop-player` (or loop-<any type>) is the
+        // current element, an alias for loop-value. loop-value/number/index are registered explicitly,
+        // so they never reach here; this catches the typed forms Skript scripts actually use.
+        if (s.regionMatches(true, 0, "loop-", 0, 5) && s.length() > 5
+                && s.substring(5).chars().allMatch(c -> Character.isLetter(c) || c == '-')) {
+            return new co.xenastudios.neoskript.core.expression.NamedLocalExpression("loop-value");
+        }
+
         // Type literal: "hard" -> a difficulty, "survival" -> a gamemode, "creeper" -> an entity type.
         // Only reached once no registered expression matched, so it never shadows real syntax.
         co.xenastudios.neoskript.core.type.TypeRegistry typeRegistry =

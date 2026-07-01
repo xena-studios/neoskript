@@ -38,7 +38,6 @@ class SampleScriptTest {
         MockBukkit.unmock();
     }
 
-    @org.junit.jupiter.api.Disabled("Enabled incrementally as sample.sk syntax gaps are closed")
     @Test
     void sampleScriptParsesFully() throws Exception {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
@@ -63,6 +62,32 @@ class SampleScriptTest {
         System.out.println(sb + "triggers loaded: " + triggers.size());
         // Every canonical sample structure must load; the whole point is drop-in compatibility.
         assertTrue(parser.errors().isEmpty(), sb.toString());
+    }
+
+    @Test
+    void sampleScriptRunsEndToEnd() throws Exception {
+        NeoSkriptPlugin plugin = (NeoSkriptPlugin) server.getPluginManager().getPlugin("NeoSkript");
+        java.nio.file.Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        java.nio.file.Files.createDirectories(scripts);
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream("sample.sk")) {
+            java.nio.file.Files.write(scripts.resolve("sample.sk"), in.readAllBytes());
+        }
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+
+        org.mockbukkit.mockbukkit.entity.PlayerMock player = server.addPlayer("Steve");
+        player.addAttachment(plugin, "demo.use", true);
+
+        server.dispatchCommand(player, "demo hello");
+        server.dispatchCommand(player, "fntest");
+        java.util.List<String> messages = new java.util.ArrayList<>();
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            messages.add(m);
+        }
+        String plain = String.join("\n", messages).replaceAll("§.", "");
+        assertTrue(plain.contains("Hello, Steve"), "/demo hello + greet() reach the sender; got:\n" + plain);
+        assertTrue(plain.contains("fib(10) = 55"), "/fntest computes fib(10)=55 recursively; got:\n" + plain);
+        assertTrue(plain.contains("Welcome, Steve"), "on join welcome fired; got:\n" + plain);
     }
 
     /** Regression guard for the core fix: one bad structure never discards the rest of the file. */

@@ -210,9 +210,9 @@ public final class BuiltinModule {
             });
         });
 
-        registry.registerExpression("random number (from|between) %number% (to|and) %number%", Object.class,
+        registry.registerExpression("[a] random number (from|between) %number% (to|and) %number%", Object.class,
                 arguments -> random(arguments.get(0), arguments.get(1), false));
-        registry.registerExpression("random integer (from|between) %number% (to|and) %number%", Object.class,
+        registry.registerExpression("[a] random integer (from|between) %number% (to|and) %number%", Object.class,
                 arguments -> random(arguments.get(0), arguments.get(1), true));
 
         registerStringAndListExpressions(registry);
@@ -349,10 +349,22 @@ public final class BuiltinModule {
                 event(ctx) instanceof org.bukkit.event.entity.EntityDamageEvent e ? e.getEntity() : null);
         eventValue(registry, "[the] death message", ctx ->
                 event(ctx) instanceof org.bukkit.event.entity.PlayerDeathEvent e ? e.getDeathMessage() : null);
-        eventValue(registry, "[the] join message", ctx ->
-                event(ctx) instanceof org.bukkit.event.player.PlayerJoinEvent e ? e.getJoinMessage() : null);
-        eventValue(registry, "[the] (quit|leave) message", ctx ->
-                event(ctx) instanceof org.bukkit.event.player.PlayerQuitEvent e ? e.getQuitMessage() : null);
+        settableEventValue(registry, "[the] join message",
+                ctx -> event(ctx) instanceof org.bukkit.event.player.PlayerJoinEvent e ? e.getJoinMessage() : null,
+                (ev, v) -> {
+                    if (ev instanceof org.bukkit.event.player.PlayerJoinEvent e) {
+                        e.setJoinMessage(v == null ? null
+                                : org.bukkit.ChatColor.translateAlternateColorCodes('&', String.valueOf(v)));
+                    }
+                });
+        settableEventValue(registry, "[the] (quit|leave) message",
+                ctx -> event(ctx) instanceof org.bukkit.event.player.PlayerQuitEvent e ? e.getQuitMessage() : null,
+                (ev, v) -> {
+                    if (ev instanceof org.bukkit.event.player.PlayerQuitEvent e) {
+                        e.setQuitMessage(v == null ? null
+                                : org.bukkit.ChatColor.translateAlternateColorCodes('&', String.valueOf(v)));
+                    }
+                });
         eventValue(registry, "[the] spawn[ing] reason", ctx ->
                 event(ctx) instanceof org.bukkit.event.entity.CreatureSpawnEvent e ? e.getSpawnReason() : null);
         eventValue(registry, "[the] (clicked|interacted) block", ctx ->
@@ -1297,6 +1309,14 @@ public final class BuiltinModule {
                 }
             };
         });
+        // Directional push: `push %entity% upwards [at speed %number%]`, etc. Each direction is a fixed
+        // unit vector scaled by the optional speed (default 1), added to the entity's velocity.
+        pushDirection(registry, "up|upward[s]", 0, 1, 0);
+        pushDirection(registry, "down|downward[s]", 0, -1, 0);
+        pushDirection(registry, "north", 0, 0, -1);
+        pushDirection(registry, "south", 0, 0, 1);
+        pushDirection(registry, "east", 1, 0, 0);
+        pushDirection(registry, "west", -1, 0, 0);
         registry.registerEffect("stop [all] sound[s] [(for|to) %player%]", arguments ->
                 playerOrEventEffect(arguments.get(0), Player::stopAllSounds));
         registry.registerEffect("(clear|reset) [the] title[s] [(of|for|from) %player%]", arguments ->
@@ -1597,6 +1617,36 @@ public final class BuiltinModule {
                 }
             };
         });
+        // Player-first order: `give %player% %item%` (equivalent to `give %item% to %player%`).
+        registry.registerEffect("give %player% %object%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> item = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Player player && item.getSingle(ctx) instanceof ItemStack stack) {
+                    player.getInventory().addItem(stack);
+                }
+            };
+        });
+        // Named item: `a diamond named "&bStarter Gift"` — a copy of the item with a display name.
+        registry.registerExpression("%object% (named|with name) %string%", Object.class, arguments -> {
+            Expression<?> item = arguments.get(0);
+            Expression<?> name = arguments.get(1);
+            return new ComputedExpression(ctx -> {
+                Object base = item.getSingle(ctx);
+                org.bukkit.Material mat = material(base);
+                if (mat == null) {
+                    return null;
+                }
+                ItemStack stack = base instanceof ItemStack existing ? existing.clone() : new ItemStack(mat);
+                Object rawName = name.getSingle(ctx);
+                org.bukkit.inventory.meta.ItemMeta meta = stack.getItemMeta();
+                if (meta != null && rawName != null) {
+                    meta.setDisplayName(org.bukkit.ChatColor.translateAlternateColorCodes('&', String.valueOf(rawName)));
+                    stack.setItemMeta(meta);
+                }
+                return stack;
+            });
+        });
     }
 
     private static co.xenastudios.neoskript.api.syntax.Effect worldEffect(Expression<?> target,
@@ -1647,6 +1697,50 @@ public final class BuiltinModule {
         registry.registerExpression(pattern, Object.class, a -> new ComputedExpression(getter::apply));
     }
 
+    /** A read+writable event value: {@code set join message to ...} routes through {@link Expression#change}. */
+    private static void settableEventValue(SyntaxRegistry registry, String pattern,
+            Function<co.xenastudios.neoskript.api.runtime.TriggerContext, Object> getter,
+            java.util.function.BiConsumer<org.bukkit.event.Event, Object> setter) {
+        registry.registerExpression(pattern, Object.class, a -> new Expression<Object>() {
+            @Override
+            public Object[] getAll(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                Object v = getter.apply(ctx);
+                return v == null ? new Object[0] : new Object[]{v};
+            }
+
+            @Override
+            public Object getSingle(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                return getter.apply(ctx);
+            }
+
+            @Override
+            public Class<Object> returnType() {
+                return Object.class;
+            }
+
+            @Override
+            public boolean isSingle() {
+                return true;
+            }
+
+            @Override
+            public Class<?>[] acceptChange(ChangeMode mode) {
+                return mode == ChangeMode.SET ? new Class<?>[]{Object.class} : null;
+            }
+
+            @Override
+            public void change(co.xenastudios.neoskript.api.runtime.TriggerContext ctx, Object[] delta, ChangeMode mode) {
+                if (mode != ChangeMode.SET) {
+                    return;
+                }
+                org.bukkit.event.Event ev = event(ctx);
+                if (ev != null) {
+                    setter.accept(ev, delta != null && delta.length > 0 ? delta[0] : null);
+                }
+            }
+        });
+    }
+
     /** Applies an action to the target player, or the event's player when the target is omitted. */
     private static co.xenastudios.neoskript.api.syntax.Effect playerOrEventEffect(Expression<?> target,
                                                                                   Consumer<Player> action) {
@@ -1661,6 +1755,28 @@ public final class BuiltinModule {
                 action.accept(player);
             }
         };
+    }
+
+    /** Registers `push %entity% <dir> [at speed %number%]` (with and without an explicit speed). */
+    private static void pushDirection(SyntaxRegistry registry, String dir, double dx, double dy, double dz) {
+        registry.registerEffect("push %entity% (" + dir + ") at [speed] %number%", arguments -> {
+            Expression<?> target = arguments.get(0);
+            Expression<?> speed = arguments.get(1);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Entity entity) {
+                    double s = speed.getSingle(ctx) instanceof Number n ? n.doubleValue() : 1;
+                    entity.setVelocity(entity.getVelocity().add(new Vector(dx * s, dy * s, dz * s)));
+                }
+            };
+        });
+        registry.registerEffect("push %entity% (" + dir + ")", arguments -> {
+            Expression<?> target = arguments.get(0);
+            return ctx -> {
+                if (target.getSingle(ctx) instanceof Entity entity) {
+                    entity.setVelocity(entity.getVelocity().add(new Vector(dx, dy, dz)));
+                }
+            };
+        });
     }
 
     private static co.xenastudios.neoskript.api.syntax.Effect entityEffect(Expression<?> target,
@@ -1903,13 +2019,19 @@ public final class BuiltinModule {
     }
 
     private static CommandSender resolveReceiver(Expression<?> target, TriggerContext ctx) {
-        if (target != null) {
-            return target.getSingle(ctx) instanceof CommandSender sender ? sender : null;
+        if (target != null && target.getSingle(ctx) instanceof CommandSender sender) {
+            return sender;
         }
-        return ctx.event()
+        // No explicit `to %player%`: default to the event's player, else the command sender — so bare
+        // `send "..."` reaches the player in both `on <event>:` and command triggers, as in Skript.
+        CommandSender fromEvent = ctx.event()
                 .filter(PlayerEvent.class::isInstance)
                 .map(event -> (CommandSender) ((PlayerEvent) event).getPlayer())
                 .orElse(null);
+        if (fromEvent != null) {
+            return fromEvent;
+        }
+        return ctx.getLocal("command-sender") instanceof CommandSender sender ? sender : null;
     }
 
     private static Double add(Object current, Object value) {

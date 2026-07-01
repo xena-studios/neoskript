@@ -27,28 +27,45 @@ public final class Trigger {
     private final Class<?> eventClass;
     private final long intervalTicks;
     private final List<Statement> statements;
+    private final java.util.function.Predicate<Object> filter;
 
-    private Trigger(Kind kind, String eventName, Class<?> eventClass, long intervalTicks, List<Statement> statements) {
+    private Trigger(Kind kind, String eventName, Class<?> eventClass, long intervalTicks,
+                    List<Statement> statements, java.util.function.Predicate<Object> filter) {
         this.kind = kind;
         this.eventName = eventName;
         this.eventClass = eventClass;
         this.intervalTicks = intervalTicks;
         this.statements = List.copyOf(statements);
+        this.filter = filter;
     }
 
     /** Creates an event trigger. */
     public Trigger(String eventName, Class<?> eventClass, List<Statement> statements) {
-        this(Kind.EVENT, eventName, eventClass, 0L, statements);
+        this(Kind.EVENT, eventName, eventClass, 0L, statements, null);
+    }
+
+    /** Creates an event trigger that only runs when {@code filter} accepts the event object. */
+    public Trigger(String eventName, Class<?> eventClass, List<Statement> statements,
+                   java.util.function.Predicate<Object> filter) {
+        this(Kind.EVENT, eventName, eventClass, 0L, statements, filter);
+    }
+
+    /**
+     * @return the runtime event filter, or {@code null} if the trigger runs for every occurrence.
+     * A dispatcher must skip the trigger when a non-null filter rejects the event object.
+     */
+    public java.util.function.Predicate<Object> filter() {
+        return filter;
     }
 
     /** Creates a periodic trigger running every {@code intervalTicks}. */
     public static Trigger periodic(long intervalTicks, List<Statement> statements) {
-        return new Trigger(Kind.PERIODIC, "every " + intervalTicks + " ticks", null, intervalTicks, statements);
+        return new Trigger(Kind.PERIODIC, "every " + intervalTicks + " ticks", null, intervalTicks, statements, null);
     }
 
     /** Creates a load trigger, run once when scripts load. */
     public static Trigger onLoad(List<Statement> statements) {
-        return new Trigger(Kind.LOAD, "load", null, 0L, statements);
+        return new Trigger(Kind.LOAD, "load", null, 0L, statements, null);
     }
 
     /** @return the trigger kind */

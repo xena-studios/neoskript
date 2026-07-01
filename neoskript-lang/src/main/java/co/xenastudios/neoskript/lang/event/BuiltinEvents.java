@@ -143,5 +143,122 @@ public final class BuiltinEvents {
         events.register(EntityTargetEvent.class, "target", "entity target");
         events.register(ServerLoadEvent.class, "server load", "server start");
         events.register(InventoryDragEvent.class, "inventory drag");
+
+        registerFilters(events);
+    }
+
+    /**
+     * Registers resolvers for filtered event names — {@code on death of %entity%},
+     * {@code on break of %block%}, {@code on (right|left)click [holding %item%] [on %block%]} — that
+     * resolve to a base event plus a runtime predicate, so the trigger only fires for matching values
+     * (never for every occurrence, which would silently misbehave).
+     */
+    private static void registerFilters(EventRegistry events) {
+        events.registerFilter(name -> {
+            java.util.regex.Matcher m =
+                    java.util.regex.Pattern.compile("(?i)death of (?:a |an )?(.+)").matcher(name);
+            if (!m.matches()) {
+                return java.util.Optional.empty();
+            }
+            String type = m.group(1).trim();
+            if (type.equalsIgnoreCase("player") || type.equalsIgnoreCase("players")) {
+                return java.util.Optional.of(new EventRegistry.FilteredEvent(
+                        org.bukkit.event.entity.PlayerDeathEvent.class, null));
+            }
+            org.bukkit.entity.EntityType et = entityType(type);
+            if (et == null) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(new EventRegistry.FilteredEvent(
+                    org.bukkit.event.entity.EntityDeathEvent.class,
+                    ev -> ev instanceof org.bukkit.event.entity.EntityDeathEvent e && e.getEntity().getType() == et));
+        });
+        events.registerFilter(name -> {
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("(?i)(?:break|breaking|mine|mining) of (?:a |an )?(.+)").matcher(name);
+            if (!m.matches()) {
+                return java.util.Optional.empty();
+            }
+            org.bukkit.Material mat = material(m.group(1).trim());
+            if (mat == null) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(new EventRegistry.FilteredEvent(
+                    org.bukkit.event.block.BlockBreakEvent.class,
+                    ev -> ev instanceof org.bukkit.event.block.BlockBreakEvent e && e.getBlock().getType() == mat));
+        });
+        events.registerFilter(name -> {
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("(?i)(?:place|placing) of (?:a |an )?(.+)").matcher(name);
+            if (!m.matches()) {
+                return java.util.Optional.empty();
+            }
+            org.bukkit.Material mat = material(m.group(1).trim());
+            if (mat == null) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(new EventRegistry.FilteredEvent(
+                    org.bukkit.event.block.BlockPlaceEvent.class,
+                    ev -> ev instanceof org.bukkit.event.block.BlockPlaceEvent e && e.getBlock().getType() == mat));
+        });
+        events.registerFilter(name -> {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                    "(?i)(right|left)[ -]?click(?:ing)?(?:\\s+holding\\s+(?:a |an )?(.+?))?"
+                            + "(?:\\s+(?:on|at)\\s+(?:a |an )?(.+))?").matcher(name);
+            if (!m.matches()) {
+                return java.util.Optional.empty();
+            }
+            boolean right = m.group(1).equalsIgnoreCase("right");
+            org.bukkit.Material held = m.group(2) == null ? null : material(m.group(2).trim());
+            org.bukkit.Material block = m.group(3) == null ? null : material(m.group(3).trim());
+            if ((m.group(2) != null && held == null) || (m.group(3) != null && block == null)) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(new EventRegistry.FilteredEvent(
+                    org.bukkit.event.player.PlayerInteractEvent.class, ev -> {
+                if (!(ev instanceof org.bukkit.event.player.PlayerInteractEvent e)) {
+                    return false;
+                }
+                org.bukkit.event.block.Action a = e.getAction();
+                boolean click = right
+                        ? a == org.bukkit.event.block.Action.RIGHT_CLICK_AIR
+                                || a == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK
+                        : a == org.bukkit.event.block.Action.LEFT_CLICK_AIR
+                                || a == org.bukkit.event.block.Action.LEFT_CLICK_BLOCK;
+                if (!click) {
+                    return false;
+                }
+                if (held != null && (e.getItem() == null || e.getItem().getType() != held)) {
+                    return false;
+                }
+                return block == null || (e.getClickedBlock() != null && e.getClickedBlock().getType() == block);
+            }));
+        });
+    }
+
+    /** Resolves a Skript material name ("diamond ore") to a Bukkit {@link org.bukkit.Material}. */
+    private static org.bukkit.Material material(String text) {
+        org.bukkit.Material m = org.bukkit.Material.matchMaterial(text.replace(' ', '_'));
+        if (m == null && text.endsWith("s")) {
+            m = org.bukkit.Material.matchMaterial(text.substring(0, text.length() - 1).replace(' ', '_'));
+        }
+        return m;
+    }
+
+    /** Resolves a Skript entity name ("zombie", "zombies") to a Bukkit {@link org.bukkit.entity.EntityType}. */
+    private static org.bukkit.entity.EntityType entityType(String text) {
+        String key = text.trim().toUpperCase(java.util.Locale.ROOT).replace(' ', '_').replace('-', '_');
+        try {
+            return org.bukkit.entity.EntityType.valueOf(key);
+        } catch (IllegalArgumentException ex) {
+            if (key.endsWith("S")) {
+                try {
+                    return org.bukkit.entity.EntityType.valueOf(key.substring(0, key.length() - 1));
+                } catch (IllegalArgumentException ignored) {
+                    return null;
+                }
+            }
+            return null;
+        }
     }
 }

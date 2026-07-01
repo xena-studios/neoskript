@@ -146,7 +146,7 @@ public final class ScriptLoader {
                     }
                     ctx.setLocal("arg-count", (double) args.length);
                     try {
-                        definition.run(ctx);
+                        definition.run(ctx, delays);
                     } catch (RuntimeException e) {
                         plugin.getLogger().log(Level.WARNING, "Error in command /" + definition.name(), e);
                     }
@@ -176,7 +176,11 @@ public final class ScriptLoader {
             List<Trigger> forEvent = entry.getValue();
             listeners.add(BukkitEventBridge.register(plugin, eventClass, event -> {
                 for (Trigger trigger : forEvent) {
-                    run(trigger, event);
+                    // A filtered event (e.g. `on break of diamond ore`) only runs when its predicate
+                    // accepts this occurrence; unfiltered triggers always run.
+                    if (trigger.filter() == null || trigger.filter().test(event)) {
+                        run(trigger, event);
+                    }
                 }
             }));
         }

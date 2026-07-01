@@ -69,4 +69,15 @@ public final class CommandDefinition {
             // `stop` aborts the rest of the command.
         }
     }
+
+    /**
+     * Runs the command's trigger on the iterative interpreter so that {@code wait} delays (including
+     * inside {@code if}/{@code while}/{@code loop}) suspend and resume via {@code scheduler}.
+     *
+     * @param ctx       the execution context (with the sender and arguments set as locals)
+     * @param scheduler schedules delayed continuations
+     */
+    public void run(TriggerContext ctx, DelayScheduler scheduler) {
+        new Interpreter(ctx, scheduler).run(body);
+    }
 }
