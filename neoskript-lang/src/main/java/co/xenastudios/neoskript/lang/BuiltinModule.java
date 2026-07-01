@@ -89,6 +89,7 @@ public final class BuiltinModule {
         GenEffects.register(registry); // bulk no-value action effects (generated)
         GenExprBulk.register(registry); // source-grounded property/noarg getters (generated)
         GenCondBulk.register(registry); // source-grounded property conditions (generated)
+        GenEffBulk.register(registry); // source-grounded target/target+value effects (generated)
     }
 
     private static void registerTypes() {

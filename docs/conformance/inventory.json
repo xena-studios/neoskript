@@ -2358,8 +2358,8 @@
       "apply [%-number%] bone[ ]meal[s] [to %blocks%]"
     ],
     "source": "ch/njol/skript/effects/EffApplyBoneMeal.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:apply-fishing-lure",
@@ -2384,8 +2384,8 @@
       "(affect|afflict) %livingentities% with %skriptpotioneffects% [for %-timespan%]"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/effects/EffApplyPotionEffect.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:assert",
@@ -2538,8 +2538,8 @@
       "(clear|empty) the (stored entities|entity storage) of %blocks%"
     ],
     "source": "ch/njol/skript/effects/EffClearEntityStorage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:color-items",
@@ -2551,8 +2551,8 @@
       "(dye|colo[u]r|paint) %itemtypes% \\(%number%, %number%, %number%\\)"
     ],
     "source": "ch/njol/skript/effects/EffColorItems.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:command",
@@ -2578,8 +2578,8 @@
       "make command block[s] %blocks% [not:(un|not )]conditional"
     ],
     "source": "ch/njol/skript/effects/EffCommandBlockConditional.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:connect",
@@ -2674,8 +2674,8 @@
       "make %livingentities% (stop dancing|not dance)"
     ],
     "source": "ch/njol/skript/effects/EffDancing.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:debug",
@@ -2764,8 +2764,8 @@
       "disenchant %~itemtypes%"
     ],
     "source": "ch/njol/skript/effects/EffEnchant.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:enderman-teleport",
@@ -2779,8 +2779,8 @@
       "force %livingentities% to teleport [randomly] towards %entity%"
     ],
     "source": "ch/njol/skript/effects/EffEndermanTeleport.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:enforce-whitelist",
@@ -2880,8 +2880,8 @@
       "(disallow|prevent) %equippablecomponents% from (lose durability|being damaged) (on [wearer['s]] injury|when [[the] wearer [is]] (hurt|injured|damaged))"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/effects/EffEquipCompDamageable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:equippable-component-shear-off",
@@ -2893,8 +2893,8 @@
       "(disallow|prevent) %equippablecomponents% from being sheared off [of entities]"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/effects/EffEquipCompShearable.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:equippable-component-swap-equipment",
@@ -2908,8 +2908,8 @@
       "make %equippablecomponents% not swap equipment [on right click|when right clicked]"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/effects/EffEquipCompSwapEquipment.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:exit",
@@ -2939,8 +2939,8 @@
       "(contract|shrink) %worldborders%['s (diameter|:radius)] (by|:to) %number% [over [a period of] %-timespan%]"
     ],
     "source": "ch/njol/skript/effects/EffWorldBorderExpand.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:explode-creeper",
@@ -2970,8 +2970,8 @@
       "[(create|make)] [an] explosion[ ]effect [%directions% %locations%]"
     ],
     "source": "ch/njol/skript/effects/EffExplosion.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:feed",
@@ -3011,8 +3011,8 @@
       "force %livingentities% to (:start|stop) eating"
     ],
     "source": "ch/njol/skript/effects/EffEating.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:force-enchantment-glint",
@@ -3026,8 +3026,8 @@
       "(clear|delete|reset) %itemtypes%'s enchantment glint override"
     ],
     "source": "ch/njol/skript/effects/EffForceEnchantmentGlint.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:force-panda-on-back",
@@ -3039,8 +3039,8 @@
       "force %livingentities% to get (:on|off) (its|their) back[s]"
     ],
     "source": "ch/njol/skript/effects/EffPandaOnBack.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:force-respawn",
@@ -3078,8 +3078,8 @@
       "(regrow|replace) %livingentities%'[s] (left horn[s]|right:right horn[s]|both:horns)"
     ],
     "source": "ch/njol/skript/effects/EffGoatHorns.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:handedness",
@@ -3130,8 +3130,8 @@
       "(add|insert) %livingentities% [in[ ]]to [the] (stored entities|entity storage) of %block%"
     ],
     "source": "ch/njol/skript/effects/EffInsertEntityStorage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:item-despawn",
@@ -3157,8 +3157,8 @@
       "(show|reveal|:hide) [the] [entire|:additional] tool[ ]tip of %itemtypes%"
     ],
     "source": "ch/njol/skript/effects/EffTooltip.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:keep-inventory-experience",
@@ -3271,8 +3271,8 @@
       "unload [[the] world[s]] %worlds% [:without saving]"
     ],
     "source": "ch/njol/skript/effects/EffWorldLoad.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:locally-suppress-warning",
@@ -3360,8 +3360,8 @@
       "make %livingentities% sense [a] disturbance %direction% %location%"
     ],
     "source": "ch/njol/skript/effects/EffWardenDisturbance.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-egg-hatch",
@@ -3387,8 +3387,8 @@
       "force %livingentities% to stop screaming"
     ],
     "source": "ch/njol/skript/effects/EffScreaming.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-fire-resistant",
@@ -3399,8 +3399,8 @@
       "make %itemtypes% [:not] (fire resistant|resistant to fire)"
     ],
     "source": "ch/njol/skript/effects/EffFireResistant.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-fly",
@@ -3426,8 +3426,8 @@
       "force %livingentities% to ram %livingentity%"
     ],
     "source": "ch/njol/skript/effects/EffGoatRam.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-incendiary",
@@ -3453,8 +3453,8 @@
       "make %entities% (not |un)responsive"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/interactions/elements/effects/EffMakeResponsive.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-invisible",
@@ -3492,8 +3492,8 @@
       "force %livingentities% to (:start|stop) rolling"
     ],
     "source": "ch/njol/skript/effects/EffPandaRolling.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-panda-sneeze",
@@ -3505,8 +3505,8 @@
       "force %livingentities% to (:start|stop) sneezing"
     ],
     "source": "ch/njol/skript/effects/EffPandaSneezing.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:make-say",
@@ -3518,7 +3518,7 @@
       "force %players% to (say|send [the] message[s]) %strings%"
     ],
     "source": "ch/njol/skript/effects/EffMakeSay.java",
-    "status": "todo",
+    "status": "parse-verified",
     "implemented": true
   },
   {
@@ -3531,8 +3531,8 @@
       "make %blocks/itemtypes% have (normal|non[-| ]glowing) text"
     ],
     "source": "ch/njol/skript/effects/EffGlowingText.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:message",
@@ -3582,8 +3582,8 @@
       "(open|show) book %itemtype% (to|for) %players%"
     ],
     "source": "ch/njol/skript/effects/EffOpenBook.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:open-close-inventory",
@@ -3615,8 +3615,8 @@
       "(open|:close) %blocks%'[s] lid[s]"
     ],
     "source": "ch/njol/skript/effects/EffLidState.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:pathfind",
@@ -3628,8 +3628,8 @@
       "make %livingentities% stop (pathfinding|moving)"
     ],
     "source": "ch/njol/skript/effects/EffPathfind.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:persistent",
@@ -3657,8 +3657,8 @@
       "force %livingentities% to (stop playing|not play) dead"
     ],
     "source": "ch/njol/skript/effects/EffPlayingDead.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:play-or-draw-an-effect",
@@ -3712,8 +3712,8 @@
       "(cure|unpoison) %livingentities% [(from|of) poison]"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/effects/EffPoison.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:potion-effect-ambient",
@@ -3824,8 +3824,8 @@
       "(release|evict) [the] (stored entities|entity storage) of %blocks% [for %-timespan%]"
     ],
     "source": "ch/njol/skript/effects/EffReleaseEntityStorage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:replace",
@@ -3868,8 +3868,8 @@
       "(make|let) %entity% ring %blocks% [from [the]] [%-direction%]"
     ],
     "source": "ch/njol/skript/effects/EffRing.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:rotate",
@@ -3934,8 +3934,8 @@
       "send [the] resource pack [from [[the] URL]] %string% with hash %string% to %players%"
     ],
     "source": "ch/njol/skript/effects/EffSendResourcePack.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:shear",
@@ -3947,8 +3947,8 @@
       "un[-]shear %livingentities%"
     ],
     "source": "ch/njol/skript/effects/EffShear.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:silence-entity",
@@ -3989,8 +3989,8 @@
       "force %players% to (stop sprinting|not sprint)"
     ],
     "source": "ch/njol/skript/effects/EffSprinting.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:stop-server",
@@ -4030,8 +4030,8 @@
       "force %livingentities% to stop shivering"
     ],
     "source": "ch/njol/skript/effects/EffStriderShivering.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:suppress-type-hints-experimental",
@@ -4115,8 +4115,8 @@
       "(remove|clear) (drop|text) shadow from %displays%'[s] text"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/text/elements/effects/EffTextDisplayDropShadow.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:text-display-see-through-blocks",
@@ -4129,8 +4129,8 @@
       "(prevent|block) %displays% from being (visible|seen) through (blocks|walls)"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/text/elements/effects/EffTextDisplaySeeThroughBlocks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:title-clear-reset",
@@ -4170,8 +4170,8 @@
       "(toggle|switch) [[the] state of] %blocks/booleans%"
     ],
     "source": "ch/njol/skript/effects/EffToggle.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:toggle-custom-name-visibility",
@@ -4183,8 +4183,8 @@
       "(:show|hide) %entities%'[s] (custom|display)[ ]name"
     ],
     "source": "ch/njol/skript/effects/EffCustomName.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:toggle-flight",
@@ -4210,8 +4210,8 @@
       "(forbid|disallow) %livingentities% (from|to) pick([ing | ]up items|[ing] items up)"
     ],
     "source": "ch/njol/skript/effects/EffToggleCanPickUpItems.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:transform-list",
@@ -4247,8 +4247,8 @@
       "update %blocks% (as|to be) %blockdata% [physics:without [neighbo[u]r[ing]|adjacent] [physics] update[s]]"
     ],
     "source": "ch/njol/skript/effects/EffBlockUpdate.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:vehicle",
@@ -4293,8 +4293,8 @@
       "unzombify %livingentities% [(in|after) %-timespan%]"
     ],
     "source": "ch/njol/skript/effects/EffZombify.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "event:at-time",
