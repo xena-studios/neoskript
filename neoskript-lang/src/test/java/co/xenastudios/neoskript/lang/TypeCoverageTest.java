@@ -85,7 +85,7 @@ class TypeCoverageTest {
             "inventoryholder", "itementity", "livingentity", "lootcontext", "loottable",
             "metadataholder", "nameable", "offlineplayer", "potioneffect", "projectile",
             "teleportflag", "textcomponent", "vehicle", "worldborder", "bannerpattern",
-            "cachedservericon", "minecrafttag", "quaternion", "gamerule",
+            "cachedservericon", "minecrafttag", "quaternion", "gamerule", "skriptpotioneffect",
             "equippablecomponent", "audience",
     })
     @SuppressWarnings({"unchecked", "rawtypes"})

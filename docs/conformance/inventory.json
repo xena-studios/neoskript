@@ -14913,7 +14913,8 @@
       "object"
     ],
     "source": "ch/njol/skript/classes/data/JavaClasses.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:offlineplayer",
@@ -15148,7 +15149,8 @@
       "skriptpotioneffect"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/PotionModule.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "type:slot",
