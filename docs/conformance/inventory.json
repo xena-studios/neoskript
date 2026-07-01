@@ -10578,8 +10578,8 @@
       "[the] %*entitydatas% (nearest|closest) [to %entity/location%]"
     ],
     "source": "ch/njol/skript/expressions/ExprNearestEntity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:negative-infinity",

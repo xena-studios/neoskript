@@ -456,6 +456,32 @@ public final class BuiltinModule {
                     ? org.bukkit.ChatColor.stripColor(
                             org.bukkit.ChatColor.translateAlternateColorCodes('&', str)) : null);
         });
+        registry.registerExpression("[the] (nearest|closest) %object% (relative to|to) %object%", Object.class, arguments -> {
+            Expression<?> type = arguments.get(0);
+            Expression<?> center = arguments.get(1);
+            return new ComputedExpression(ctx -> {
+                Object c = center.getSingle(ctx);
+                org.bukkit.Location loc = c instanceof org.bukkit.Location l ? l
+                        : (c instanceof Entity e ? e.getLocation() : null);
+                if (loc == null || loc.getWorld() == null
+                        || !(type.getSingle(ctx) instanceof org.bukkit.entity.EntityType et)) {
+                    return null;
+                }
+                Entity best = null;
+                double bestDistance = Double.MAX_VALUE;
+                for (Entity entity : loc.getWorld().getEntities()) {
+                    if (entity.getType() != et) {
+                        continue;
+                    }
+                    double distance = entity.getLocation().distanceSquared(loc);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = entity;
+                    }
+                }
+                return best;
+            });
+        });
         registry.registerExpression("[all [of the]] string colo[u]r[s]", Object.class, arguments ->
                 new ComputedListExpression(ctx -> java.util.Arrays.stream(org.bukkit.ChatColor.values())
                         .map(c -> "&" + c.getChar()).toArray()));

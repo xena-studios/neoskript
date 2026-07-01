@@ -238,6 +238,7 @@ class ExtraSyntaxTest {
                         set {_t} to tool of player
                         set {_i} to all items in inventory of player
                         set {_tg} to target of player
+                        set {_ne} to nearest zombie to player
                         send "DONE" to player
                 """, StandardCharsets.UTF_8);
         server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
