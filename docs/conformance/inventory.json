@@ -2495,7 +2495,7 @@
       "uncancel [the] event"
     ],
     "source": "ch/njol/skript/effects/EffCancelEvent.java",
-    "status": "todo",
+    "status": "parse-verified",
     "implemented": true,
     "neoMatch": "cancel [the] event / uncancel [the] event"
   },
@@ -2705,8 +2705,8 @@
       "(wait|halt) [for] %timespan%"
     ],
     "source": "ch/njol/skript/effects/Delay.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:detonate-entities",
@@ -3313,8 +3313,8 @@
       "(force|make) %livingentities% [to] (face [towards]|look [(at|towards)]) %vector/location/entity% [(at|with) [head] [rotation] speed %-number%] [[and] max[imum] [head] pitch %-number%]"
     ],
     "source": "ch/njol/skript/effects/EffLook.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:make-adult-baby",
@@ -4243,8 +4243,8 @@
       "(grow|create|generate) %structuretype% %directions% %locations%"
     ],
     "source": "ch/njol/skript/effects/EffTree.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:update-block",
@@ -13744,7 +13744,8 @@
       "(spawn|summon) %number% of %entitytypes/entitysnapshots% [%directions% %locations%]"
     ],
     "source": "ch/njol/skript/sections/EffSecSpawn.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "section:while-loop",

@@ -1717,6 +1717,52 @@ public final class BuiltinModule {
                 }
             };
         });
+        // Spawn an entity of a type at a location.
+        registry.registerEffect("(spawn|summon) %object% at %object%", arguments -> {
+            Expression<?> type = arguments.get(0);
+            Expression<?> where = arguments.get(1);
+            return ctx -> {
+                if (where.getSingle(ctx) instanceof org.bukkit.Location loc && loc.getWorld() != null
+                        && type.getSingle(ctx) instanceof org.bukkit.entity.EntityType et) {
+                    loc.getWorld().spawnEntity(loc, et);
+                }
+            };
+        });
+        // Face an entity toward a target location or entity.
+        registry.registerEffect("(force|make) %object% [to] (face [toward[s]]|look at) %object%", arguments -> {
+            Expression<?> who = arguments.get(0);
+            Expression<?> target = arguments.get(1);
+            return ctx -> {
+                Object o = who.getSingle(ctx);
+                Object t = target.getSingle(ctx);
+                org.bukkit.Location to = t instanceof org.bukkit.Location l ? l
+                        : (t instanceof Entity te ? te.getLocation() : null);
+                if (o instanceof Entity ent && to != null && ent.getWorld().equals(to.getWorld())) {
+                    org.bukkit.Location from = ent.getLocation();
+                    from.setDirection(to.toVector().subtract(from.toVector()));
+                    ent.teleport(from);
+                }
+            };
+        });
+        // Grow a tree at a location.
+        registry.registerEffect("(grow|create|generate) tree of type %object% at %object%", arguments -> {
+            Expression<?> type = arguments.get(0);
+            Expression<?> where = arguments.get(1);
+            return ctx -> {
+                if (where.getSingle(ctx) instanceof org.bukkit.Location loc && loc.getWorld() != null
+                        && type.getSingle(ctx) instanceof org.bukkit.TreeType tt) {
+                    loc.getWorld().generateTree(loc, tt);
+                }
+            };
+        });
+        registry.registerEffect("(grow|create|generate) tree at %object%", arguments -> {
+            Expression<?> where = arguments.get(0);
+            return ctx -> {
+                if (where.getSingle(ctx) instanceof org.bukkit.Location loc && loc.getWorld() != null) {
+                    loc.getWorld().generateTree(loc, org.bukkit.TreeType.TREE);
+                }
+            };
+        });
         // Player-first order: `give %player% %item%` (equivalent to `give %item% to %player%`).
         registry.registerEffect("give %player% %object%", arguments -> {
             Expression<?> target = arguments.get(0);

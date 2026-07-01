@@ -143,6 +143,32 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void spawnEffectRuns() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("sp.sk"), """
+                command /sp:
+                    trigger:
+                        spawn zombie at location of player
+                        make player look at location of player
+                        send "DONE" to player
+                """, StandardCharsets.UTF_8);
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        org.mockbukkit.mockbukkit.entity.PlayerMock player = server.addPlayer();
+        int before = player.getWorld().getEntities().size();
+        server.dispatchCommand(player, "sp");
+        boolean done = false;
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            if (m.contains("DONE")) {
+                done = true;
+            }
+        }
+        assertTrue(done, "spawn + look at parse and run");
+        assertTrue(player.getWorld().getEntities().size() > before, "a zombie was spawned");
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);

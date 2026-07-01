@@ -51,6 +51,7 @@ public final class GenTypes3 {
         types.register(new EnumType<>("gene", org.bukkit.entity.Panda.Gene.class));
         types.register(new EnumType<>("entitydata", org.bukkit.entity.EntityType.class));
         types.register(new EnumType<>("particle", org.bukkit.Particle.class));
+        types.register(new EnumType<>("treetype", org.bukkit.TreeType.class));
         types.register(new ClassType<>("gamerule", org.bukkit.GameRule.class));
         types.register(new ClassType<>("equippablecomponent", io.papermc.paper.datacomponent.item.Equippable.class));
         types.register(new ClassType<>("audience", net.kyori.adventure.audience.Audience.class));
