@@ -284,6 +284,39 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void dateTimeArithmetic() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("dt.sk"), """
+                command /dt:
+                    trigger:
+                        set {_s} to time since now
+                        if {_s} is set:
+                            send "SINCE" to player
+                        set {_u} to unix date of 1000000
+                        if {_u} is set:
+                            send "UNIX" to player
+                        set {_a} to 5 minutes ago
+                        if {_a} is set:
+                            send "AGO" to player
+                        set {_ll} to last login of player
+                        send "DONE" to player
+                """, StandardCharsets.UTF_8);
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        org.mockbukkit.mockbukkit.entity.PlayerMock player = server.addPlayer();
+        server.dispatchCommand(player, "dt");
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            seen.add(m);
+        }
+        assertTrue(seen.contains("SINCE"), "time since now resolves");
+        assertTrue(seen.contains("UNIX"), "unix date resolves");
+        assertTrue(seen.contains("AGO"), "5 minutes ago resolves");
+        assertTrue(seen.contains("DONE"), "last login parses and runs");
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);

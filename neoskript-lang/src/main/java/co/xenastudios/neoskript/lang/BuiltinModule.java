@@ -445,6 +445,50 @@ public final class BuiltinModule {
                 }
             });
         });
+        // Date/time arithmetic. Dates are millisecond timestamps (matching `now`); durations are timespans.
+        registry.registerExpression("[the] time since %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                Long ms = dateMillis(src.getSingle(ctx));
+                return ms == null ? null : co.xenastudios.neoskript.core.runtime.Timespan
+                        .ofMillis(Math.max(0, System.currentTimeMillis() - ms));
+            });
+        });
+        registry.registerExpression("[the] time until %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                Long ms = dateMillis(src.getSingle(ctx));
+                return ms == null ? null : co.xenastudios.neoskript.core.runtime.Timespan
+                        .ofMillis(Math.max(0, ms - System.currentTimeMillis()));
+            });
+        });
+        registry.registerExpression("%object% (ago|in the past)", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx)
+                    instanceof co.xenastudios.neoskript.core.runtime.Timespan t
+                    ? (double) (System.currentTimeMillis() - t.millis()) : null);
+        });
+        registry.registerExpression("%object% (later|from now|in the future)", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx)
+                    instanceof co.xenastudios.neoskript.core.runtime.Timespan t
+                    ? (double) (System.currentTimeMillis() + t.millis()) : null);
+        });
+        registry.registerExpression("unix date of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof Number n
+                    ? (double) (long) (n.doubleValue() * 1000) : null);
+        });
+        registry.registerExpression("[the] last login [time] of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof org.bukkit.OfflinePlayer p
+                    ? (double) p.getLastLogin() : null);
+        });
+        registry.registerExpression("[the] first login [time] of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof org.bukkit.OfflinePlayer p
+                    ? (double) p.getFirstPlayed() : null);
+        });
         // Timespan-valued expressions.
         registry.registerExpression("(time played|play[ ]time) of %object%", Object.class, arguments -> {
             Expression<?> src = arguments.get(0);
@@ -2031,6 +2075,14 @@ public final class BuiltinModule {
             return new ComputedExpression(ctx ->
                     len.getSingle(ctx) instanceof Number num ? base.scaled(num.doubleValue()) : base);
         });
+    }
+
+    /** Extracts a millisecond timestamp from a date value (a millis {@link Number} or a {@link java.util.Date}). */
+    private static Long dateMillis(Object value) {
+        if (value instanceof Number n) {
+            return n.longValue();
+        }
+        return value instanceof java.util.Date d ? d.getTime() : null;
     }
 
     /** A copy of the first argument (an item) with its {@link org.bukkit.inventory.meta.ItemMeta} mutated. */

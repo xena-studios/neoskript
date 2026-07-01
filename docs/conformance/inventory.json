@@ -7928,8 +7928,8 @@
       "%timespan% (later|(from|after) [the] [date] %-date%)"
     ],
     "source": "ch/njol/skript/expressions/ExprDateAgoLater.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:de-queue-queue-experimental",
@@ -9884,8 +9884,8 @@
       "%offlineplayers%'[s] (1¦last|2¦first) login"
     ],
     "source": "ch/njol/skript/expressions/ExprLastLoginTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:leash-holder",
@@ -12284,8 +12284,8 @@
       "[the] (time [remaining]|remaining time) until %dates%"
     ],
     "source": "ch/njol/skript/expressions/ExprTimeSince.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:timespan-details",
@@ -12404,8 +12404,8 @@
       "%numbers%'s unix date"
     ],
     "source": "ch/njol/skript/expressions/ExprUnixDate.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:unix-timestamp",
