@@ -39,6 +39,9 @@ public final class GenTypes3 {
 
         types.register(new ClassType<>("minecrafttag", org.bukkit.Tag.class));
         types.register(new ClassType<>("quaternion", org.joml.Quaternionf.class));
+        types.register(new ClassType<>("timespan", co.xenastudios.neoskript.core.runtime.Timespan.class,
+                co.xenastudios.neoskript.core.runtime.Timespan::toString,
+                s -> co.xenastudios.neoskript.core.runtime.Timespan.parse(s).orElse(null)));
         types.register(new ClassType<>("integer", java.lang.Integer.class, String::valueOf, Integer::parseInt));
         types.register(new ClassType<>("long", java.lang.Long.class, String::valueOf, Long::parseLong));
         types.register(new ClassType<>("short", java.lang.Short.class, String::valueOf, Short::parseShort));

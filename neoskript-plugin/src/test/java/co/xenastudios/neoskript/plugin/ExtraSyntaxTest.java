@@ -90,6 +90,32 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void timespanValueTypeRenders() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("ts.sk"), """
+                command /ts:
+                    trigger:
+                        set {_span} to 90 seconds
+                        send "SPAN:%{_span}%" to player
+                        set {_c} to the item cooldown of stone for player
+                        set {_f} to the fire burning time of player
+                        set {_p} to time played of player
+                        send "DONE" to player
+                """, StandardCharsets.UTF_8);
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        PlayerMock player = server.addPlayer();
+        server.dispatchCommand(player, "ts");
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            seen.add(m);
+        }
+        assertTrue(seen.contains("SPAN:1 minute 30 seconds"), "timespan literal parses and renders; got " + seen);
+        assertTrue(seen.contains("DONE"), "timespan expressions parse and run");
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);

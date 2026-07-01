@@ -396,6 +396,29 @@ public final class BuiltinModule {
             Expression<?> src = arguments.get(0);
             return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof Player p ? p.getPing() : null);
         });
+        // Timespan-valued expressions.
+        registry.registerExpression("(time played|play[ ]time) of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof Player p
+                    ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(
+                            p.getStatistic(org.bukkit.Statistic.PLAY_ONE_MINUTE))
+                    : null);
+        });
+        registry.registerExpression("[the] [item] cooldown of %object% for %object%", Object.class, arguments -> {
+            Expression<?> item = arguments.get(0);
+            Expression<?> who = arguments.get(1);
+            return new ComputedExpression(ctx -> {
+                org.bukkit.Material mat = material(item.getSingle(ctx));
+                return mat != null && who.getSingle(ctx) instanceof Player p
+                        ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(p.getCooldown(mat))
+                        : null;
+            });
+        });
+        registry.registerExpression("[the] fire burn[ing] (time|duration) of %object%", Object.class, arguments -> {
+            Expression<?> src = arguments.get(0);
+            return new ComputedExpression(ctx -> src.getSingle(ctx) instanceof Entity e
+                    ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(e.getFireTicks()) : null);
+        });
         registry.registerExpression("[a] random uuid", Object.class,
                 arguments -> new ComputedExpression(ctx -> java.util.UUID.randomUUID()));
         registry.registerExpression("normalize[d] %vector%", Object.class, arguments -> {

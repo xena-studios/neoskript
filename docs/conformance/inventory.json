@@ -8399,8 +8399,8 @@
       "%entities%'[s] [:max[imum]] (burn[ing]|fire) (time|duration)"
     ],
     "source": "ch/njol/skript/expressions/ExprFireTicks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:entity-owner",
@@ -9528,8 +9528,8 @@
       "%players%'[s] [item] cooldown for %itemtypes%"
     ],
     "source": "ch/njol/skript/expressions/ExprItemCooldown.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:item-display-transform",
@@ -12262,8 +12262,8 @@
       "%offlineplayers%'[s] (time played|play[ ]time)"
     ],
     "source": "ch/njol/skript/expressions/ExprTimePlayed.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:time-since-until",
@@ -15286,7 +15286,8 @@
       "timespan"
     ],
     "source": "ch/njol/skript/classes/data/SkriptClasses.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:transformreason",
