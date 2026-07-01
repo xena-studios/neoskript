@@ -1034,6 +1034,44 @@ public final class BuiltinModule {
             Expression<?> src = a.get(0);
             return ctx -> src.getSingle(ctx) instanceof org.bukkit.block.Block b && b.isBlockPowered();
         });
+        registry.registerCondition("%object% (is|are) enchanted", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> src.getSingle(ctx) instanceof ItemStack it && it.getItemMeta() != null
+                    && it.getItemMeta().hasEnchants();
+        });
+        registry.registerCondition("%object% (is|are) empty", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> {
+                Object o = src.getSingle(ctx);
+                if (o instanceof org.bukkit.inventory.Inventory inv) {
+                    return inv.isEmpty();
+                }
+                if (o instanceof String str) {
+                    return str.isEmpty();
+                }
+                return o instanceof ItemStack it && it.getType().isAir();
+            };
+        });
+        registry.registerCondition("%object% can see %object%", a -> {
+            Expression<?> viewer = a.get(0);
+            Expression<?> target = a.get(1);
+            return ctx -> viewer.getSingle(ctx) instanceof Player p
+                    && target.getSingle(ctx) instanceof Entity e && p.canSee(e);
+        });
+        registry.registerCondition("%object% (has|have) metadata %string%", a -> {
+            Expression<?> holder = a.get(0);
+            Expression<?> key = a.get(1);
+            return ctx -> holder.getSingle(ctx) instanceof org.bukkit.metadata.Metadatable md
+                    && key.getSingle(ctx) instanceof String k && md.hasMetadata(k);
+        });
+        registry.registerCondition("%object% (has|have) [item] cooldown [for] %object%", a -> {
+            Expression<?> who = a.get(0);
+            Expression<?> item = a.get(1);
+            return ctx -> {
+                org.bukkit.Material mat = material(item.getSingle(ctx));
+                return who.getSingle(ctx) instanceof Player p && mat != null && p.hasCooldown(mat);
+            };
+        });
         registry.registerCondition("%object% can (age|grow (up|old[er]))", a -> {
             Expression<?> src = a.get(0);
             return ctx -> src.getSingle(ctx) instanceof org.bukkit.entity.Breedable br && !br.getAgeLock();

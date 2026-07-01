@@ -193,8 +193,8 @@
       "%players% can('t| not) see %entities%"
     ],
     "source": "ch/njol/skript/conditions/CondCanSee.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:can-see-chat-colors",
@@ -650,8 +650,8 @@
       "%players% (doesn't|does not|do not|don't) have %itemtypes% on [(item|a)] cooldown"
     ],
     "source": "ch/njol/skript/conditions/CondHasItemCooldown.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-item-tooltips",
@@ -705,8 +705,8 @@
       "%metadataholders% (doesn't|does not|do not|don't) have metadata [(value|tag)[s]] %strings%"
     ],
     "source": "ch/njol/skript/conditions/CondHasMetadata.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-permission",
@@ -1068,8 +1068,8 @@
       "%inventories/slots/strings/numbered% (isn't|is not|aren't|are not) empty"
     ],
     "source": "ch/njol/skript/conditions/CondIsEmpty.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-empty-2",
@@ -1081,8 +1081,8 @@
       "%objects% (is not|are not|isn't|aren't) empty"
     ],
     "source": "org/skriptlang/skript/common/properties/elements/conditions/PropCondIsEmpty.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-enchanted",
@@ -1094,8 +1094,8 @@
       "%itemtypes% (isn't|is not|aren't|are not) enchanted [with %-enchantmenttypes% [or (1:(better|greater|higher|above)|2:(worse|lesser|lower|below))]]"
     ],
     "source": "ch/njol/skript/conditions/CondIsEnchanted.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-evenly-divisible-by",

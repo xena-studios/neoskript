@@ -65,6 +65,15 @@ class SimpleConditionsTest {
                             send "OCC" to player
                         if plugin "NeoSkript" is enabled:
                             send "PLUG" to player
+                        if item("stone") is empty:
+                            send "no" to player
+                        if "" is empty:
+                            send "EMPTY" to player
+                        if player can see player:
+                            send "CANSEE" to player
+                        set {_ench} to item("diamond sword")
+                        if {_ench} is enchanted:
+                            send "no" to player
 
                 command /sc2:
                     trigger:
@@ -95,5 +104,7 @@ class SimpleConditionsTest {
         assertTrue(seen.contains("INT"), "chest is interactable");
         assertTrue(seen.contains("OCC"), "stone is occluding");
         assertTrue(seen.contains("PLUG"), "NeoSkript plugin is enabled");
+        assertTrue(seen.contains("EMPTY"), "empty string is empty");
+        assertTrue(seen.contains("CANSEE"), "player can see themselves");
     }
 }
