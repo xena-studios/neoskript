@@ -87,6 +87,7 @@ public final class BuiltinModule {
         GenConditions2.register(registry); // deterministic PropertyCondition extraction
         GenConditions3.register(registry); // remaining boolean conditions (generated)
         GenEffects.register(registry); // bulk no-value action effects (generated)
+        GenExprBulk.register(registry); // source-grounded property/noarg getters (generated)
     }
 
     private static void registerTypes() {

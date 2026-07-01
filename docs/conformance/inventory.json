@@ -6489,8 +6489,8 @@
       "[(all [[of] the]|the)] %players%'[s] permissions"
     ],
     "source": "ch/njol/skript/expressions/ExprPermissions.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:all-persistent-data-keys",
@@ -6568,8 +6568,8 @@
       "%livingentities%'[s] target jukebox"
     ],
     "source": "ch/njol/skript/expressions/ExprAllayJukebox.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:alpha-red-green-blue-color-value",
@@ -6973,8 +6973,8 @@
       "%blocks%'[s] beacon [effect] range"
     ],
     "source": "ch/njol/skript/expressions/ExprBeaconRange.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:beacon-tier",
@@ -6986,8 +6986,8 @@
       "%blocks%'[s] beacon tier"
     ],
     "source": "ch/njol/skript/expressions/ExprBeaconTier.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:bed",
@@ -7024,8 +7024,8 @@
       "%blocks%'[s] target flower"
     ],
     "source": "ch/njol/skript/expressions/ExprBeehiveFlower.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:biome",
@@ -7037,8 +7037,8 @@
       "%locations%'[s] biome"
     ],
     "source": "ch/njol/skript/expressions/ExprBiome.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:blank-equippable-component",
@@ -7089,8 +7089,8 @@
       "%blocks/displays/entities%'[s] block[ ]data"
     ],
     "source": "ch/njol/skript/expressions/ExprBlockData.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:block-hardness",
@@ -7370,8 +7370,8 @@
       "character (from|at|with) code([ ]point| position) %integer%"
     ],
     "source": "ch/njol/skript/expressions/ExprCharacterFromCodepoint.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:characters-between",
@@ -7432,8 +7432,8 @@
       "[(all [[of] the]|the)] loaded chunks (of|in) %worlds%"
     ],
     "source": "ch/njol/skript/expressions/ExprChunk.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:clicked-block-entity-inventory-slot",
@@ -7508,8 +7508,8 @@
       "%blocks/entities%'[s] [command[ ]block] command"
     ],
     "source": "ch/njol/skript/expressions/ExprCommandBlockCommand.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:command-info",
@@ -8334,8 +8334,8 @@
       "%livingentities%'[s] carr(ied|ying) block[[ ]data]"
     ],
     "source": "ch/njol/skript/expressions/ExprCarryingBlockData.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:entities",
@@ -8416,8 +8416,8 @@
       "%livingentities%'[s] entity size"
     ],
     "source": "ch/njol/skript/expressions/ExprEntitySize.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:entity-snapshot",
@@ -8469,8 +8469,8 @@
       "%blocks%'[s] [max:max[imum]] [stored] entity count"
     ],
     "source": "ch/njol/skript/expressions/ExprEntityStorageEntityCount.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:entity-player-world-from-uuid",
@@ -9337,8 +9337,8 @@
       "value of [positive] (infinity|∞)"
     ],
     "source": "ch/njol/skript/literals/LitInfinity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:initiator-inventory",
@@ -9451,8 +9451,8 @@
       "[the] (inverse|opposite)[s] of %booleans%"
     ],
     "source": "ch/njol/skript/expressions/ExprInverse.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:ip",
@@ -9764,8 +9764,8 @@
       "%livingentities%'[s] last damage"
     ],
     "source": "ch/njol/skript/expressions/ExprLastDamage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:last-damage-cause",
@@ -9777,8 +9777,8 @@
       "%livingentities%'[s] last damage (cause|reason|type)"
     ],
     "source": "ch/njol/skript/expressions/ExprLastDamageCause.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:last-death-location",
@@ -9945,8 +9945,8 @@
       "[(all [[of] the]|the)] [loaded] plugins"
     ],
     "source": "ch/njol/skript/expressions/ExprPlugins.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:location",
@@ -10099,8 +10099,8 @@
       "[the] loot[ ]table[s] %strings%"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/expressions/ExprLootTableFromString.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:looted-entity-of-loot-context",
@@ -10258,8 +10258,8 @@
       "[the] max[imum] double value"
     ],
     "source": "ch/njol/skript/literals/LitDoubleMaxValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:maximum-float-value",
@@ -10270,8 +10270,8 @@
       "[the] max[imum] float value"
     ],
     "source": "ch/njol/skript/literals/LitFloatMaxValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:maximum-freeze-time",
@@ -10295,8 +10295,8 @@
       "[the] max[imum] integer value"
     ],
     "source": "ch/njol/skript/literals/LitIntMaxValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:maximum-long-value",
@@ -10307,8 +10307,8 @@
       "[the] max[imum] long value"
     ],
     "source": "ch/njol/skript/literals/LitLongMaxValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:maximum-stack-size",
@@ -10320,8 +10320,8 @@
       "%itemtypes/inventories%'[s] max[imum] stack[[ ]size]"
     ],
     "source": "ch/njol/skript/expressions/ExprMaxStack.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:me",
@@ -10384,8 +10384,8 @@
       "%location%'[s] (middle|center) [point]"
     ],
     "source": "ch/njol/skript/expressions/ExprMiddleOfLocation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:midpoint",
@@ -10421,8 +10421,8 @@
       "[the] min[imum] double value"
     ],
     "source": "ch/njol/skript/literals/LitDoubleMinValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:minimum-float-value",
@@ -10433,8 +10433,8 @@
       "[the] min[imum] float value"
     ],
     "source": "ch/njol/skript/literals/LitFloatMinValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:minimum-integer-value",
@@ -10445,8 +10445,8 @@
       "[the] min[imum] integer value"
     ],
     "source": "ch/njol/skript/literals/LitIntMinValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:minimum-long-value",
@@ -10457,8 +10457,8 @@
       "[the] min[imum] long value"
     ],
     "source": "ch/njol/skript/literals/LitLongMinValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:money",
@@ -10549,8 +10549,8 @@
       "value of NaN"
     ],
     "source": "ch/njol/skript/literals/LitNaN.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:nearest-entity",
@@ -10575,8 +10575,8 @@
       "value of (-|minus |negative )(infinity|∞)"
     ],
     "source": "ch/njol/skript/literals/LitNegativeInfinity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:new-line",
@@ -10711,8 +10711,8 @@
       "[(all [[of] the]|the)] offline[ ]players"
     ],
     "source": "ch/njol/skript/expressions/ExprOfflinePlayers.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:on-screen-kick-message",
@@ -10749,8 +10749,8 @@
       "%players%'[s] (current|open|top) inventory"
     ],
     "source": "ch/njol/skript/expressions/ExprOpenedInventory.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:panda-gene",
@@ -10938,8 +10938,8 @@
       "(pi|π)"
     ],
     "source": "ch/njol/skript/literals/LitPi.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:picked-item-block-entity",
@@ -11181,8 +11181,8 @@
       "%projectiles%'[s] (projectile|arrow) critical (state|ability|mode)"
     ],
     "source": "ch/njol/skript/expressions/ExprProjectileCriticalState.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:projectile-force",
@@ -11474,8 +11474,8 @@
       "%block%'[s] resonat(e|ing) time"
     ],
     "source": "ch/njol/skript/expressions/ExprResonatingTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:respawn-anchor-charges",
@@ -11487,8 +11487,8 @@
       "%blocks%'[s] [:max[imum]] charge[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprCharges.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:respawn-location",
@@ -11550,8 +11550,8 @@
       "%block%'[s] ring[ing] time"
     ],
     "source": "ch/njol/skript/expressions/ExprRingingTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:rotated-quaternion-vector",
@@ -11674,8 +11674,8 @@
       "%blocks%'[s] [:(min|max)[imum]] [sea] pickle(s| (count|amount))"
     ],
     "source": "ch/njol/skript/expressions/ExprSeaPickles.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:seed-of-loot-table",
@@ -11734,8 +11734,8 @@
       "[the] shooter [of %projectile%]"
     ],
     "source": "ch/njol/skript/expressions/ExprShooter.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:shuffled-list",
@@ -11772,8 +11772,8 @@
       "%worlds/players%'[s] simulation distance[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprSimulationDistance.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:size",
@@ -11969,8 +11969,8 @@
       "%players%'[s] (tablist[ed]|listed) players"
     ],
     "source": "ch/njol/skript/expressions/ExprTablistedPlayers.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:tag",
@@ -12416,8 +12416,8 @@
       "%offlineplayers/worlds/entities%'s UUID"
     ],
     "source": "ch/njol/skript/expressions/ExprUUID.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:value",
@@ -12619,8 +12619,8 @@
       "[a] random vector"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorRandom.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-spherical-shape",
@@ -12758,8 +12758,8 @@
       "%players/worlds%'[s] view distance[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprViewDistance.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:view-distance-of-client",
@@ -12797,8 +12797,8 @@
       "%livingentities%'[s] villager profession"
     ],
     "source": "ch/njol/skript/expressions/ExprVillagerProfession.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:villager-type",
@@ -12810,8 +12810,8 @@
       "%livingentities%'[s] villager type"
     ],
     "source": "ch/njol/skript/expressions/ExprVillagerType.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:warden-anger-level",
@@ -12899,8 +12899,8 @@
       "[the] white[ ]list"
     ],
     "source": "ch/njol/skript/expressions/ExprWhitelist.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:with-fire-resistance",
@@ -12925,8 +12925,8 @@
       "%locations/entities/chunk%'[s] world"
     ],
     "source": "ch/njol/skript/expressions/ExprWorld.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:world-border",
@@ -12938,8 +12938,8 @@
       "%worlds/players%'[s] world[ ]border"
     ],
     "source": "ch/njol/skript/expressions/ExprWorldBorder.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:world-environment",
@@ -12962,8 +12962,8 @@
       "[the] world [(named|with name)] %string%"
     ],
     "source": "ch/njol/skript/expressions/ExprWorldFromName.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:world-seed",
@@ -12987,8 +12987,8 @@
       "[(all [[of] the]|the)] worlds"
     ],
     "source": "ch/njol/skript/expressions/ExprWorlds.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:wxyz-component-coordinate",
