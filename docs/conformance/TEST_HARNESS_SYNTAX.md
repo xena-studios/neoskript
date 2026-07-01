@@ -20,3 +20,9 @@ so — like external-plugin syntax — they are excluded from the compatibility 
 | section: parse-section | SecParse.java |
 | structure: parse-structure | StructParse.java |
 | type: aardwolf / exemplus / hoof / testgui | EffTestPluralClassInfos.java (test-only class infos) |
+
+## Experimental syntax (also excluded)
+
+Syntax gated behind Skript `using <experiment>` flags is not stable scripting API and is excluded
+from the denominator: the experimental `queue` type and its expressions, `is using experimental
+feature`, `suppress type hints`, and the `using experimental feature` structure.

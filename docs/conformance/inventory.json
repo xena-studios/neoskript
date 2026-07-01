@@ -1888,8 +1888,9 @@
       "%scripts% are(n't| not) using %strings%"
     ],
     "source": "ch/njol/skript/conditions/CondIsUsingFeature.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "experimental Skript feature behind an experiment flag (not stable scripting API)"
   },
   {
     "id": "condition:is-valid",
@@ -4048,8 +4049,9 @@
       "(start|:stop) suppressing [local variable] type hints"
     ],
     "source": "ch/njol/skript/effects/EffSuppressTypeHints.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "experimental Skript feature behind an experiment flag (not stable scripting API)"
   },
   {
     "id": "effect:swing-hand",
@@ -7937,8 +7939,9 @@
       "unrolled %queue%"
     ],
     "source": "ch/njol/skript/expressions/ExprDequeuedQueue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "experimental Skript feature behind an experiment flag (not stable scripting API)"
   },
   {
     "id": "expression:death-message",
@@ -11229,8 +11232,9 @@
       "[a] [new] queue [(of|with) %-objects%]"
     ],
     "source": "ch/njol/skript/expressions/ExprQueue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "experimental Skript feature behind an experiment flag (not stable scripting API)"
   },
   {
     "id": "expression:queue-start-end-experimental",
@@ -11241,8 +11245,9 @@
       "(:start|end) of %queues%"
     ],
     "source": "ch/njol/skript/expressions/ExprQueueStartEnd.java",
-    "status": "todo",
-    "implemented": false
+    "status": "external",
+    "implemented": false,
+    "excluded_reason": "experimental Skript feature behind an experiment flag (not stable scripting API)"
   },
   {
     "id": "expression:quit-message",
@@ -13855,7 +13860,8 @@
       "using [[the] experiment] <.+>"
     ],
     "source": "ch/njol/skript/structures/StructUsing.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "experimental Skript feature behind an experiment flag (not stable scripting API)"
   },
   {
     "id": "structure:variables",
@@ -15042,7 +15048,8 @@
       "queue"
     ],
     "source": "org/skriptlang/skript/common/types/QueueClassInfo.java",
-    "status": "todo"
+    "status": "external",
+    "excluded_reason": "experimental Skript feature behind an experiment flag (not stable scripting API)"
   },
   {
     "id": "type:quitreason",
