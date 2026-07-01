@@ -6588,8 +6588,8 @@
       "%colors%'[s] (:alpha|:red|:green|:blue) (value|component)"
     ],
     "source": "ch/njol/skript/expressions/ExprARGB.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:alphabetical-sort",
@@ -6683,8 +6683,8 @@
       "%numbers% in rad[ian][s]"
     ],
     "source": "ch/njol/skript/expressions/ExprAngle.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:anvil-repair-cost",
@@ -6696,8 +6696,8 @@
       "%inventories%'[s] [anvil] [item] [:max[imum]] repair cost"
     ],
     "source": "ch/njol/skript/expressions/ExprAnvilRepairCost.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:anvil-text-input",
@@ -6930,8 +6930,8 @@
       "%itemstacks/itemtypes/slots/blocks%'[s] %integer%[st|nd|rd|th] [banner] pattern"
     ],
     "source": "ch/njol/skript/expressions/ExprBannerPatterns.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:barter-drops",
@@ -7019,7 +7019,8 @@
       "%blocks%'[s] [max:max[imum]] honey level"
     ],
     "source": "ch/njol/skript/expressions/ExprBeehiveHoneyLevel.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:beehive-target-flower",
@@ -7176,8 +7177,8 @@
       "%itemtypes%'[s] [book] (author|writer|publisher)"
     ],
     "source": "org/skriptlang/skript/bukkit/item/book/elements/expressions/ExprBookAuthor.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:book-pages",
@@ -7191,8 +7192,8 @@
       "%itemtypes%'[s] [book] page %integer%"
     ],
     "source": "org/skriptlang/skript/bukkit/item/book/elements/expressions/ExprBookPages.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:book-title",
@@ -7204,8 +7205,8 @@
       "%itemtypes%'[s] book (name|title)"
     ],
     "source": "org/skriptlang/skript/bukkit/item/book/elements/expressions/ExprBookTitle.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:breeding-family",
@@ -7302,8 +7303,8 @@
       "%blocks/blockdatas%'[s] [:max[imum]] (dust|brush)[ed|ing] (value|stage|progress[ion])"
     ],
     "source": "ch/njol/skript/expressions/ExprDustedStage.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:buried-item",
@@ -7653,8 +7654,8 @@
       "a [virtual] world[ ]border"
     ],
     "source": "ch/njol/skript/sections/ExprSecCreateWorldBorder.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:created-damage-source",
@@ -7806,8 +7807,8 @@
       "[a] custom damage source [(with|using) [the|a] [damage type [of]] %-damagetype%]"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/elements/expressions/ExprSecDamageSource.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:damage-source-causing-entity",
@@ -8040,8 +8041,8 @@
       "%displays%'[s] [:block|:sky] (light [level]|brightness) override[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/elements/expressions/ExprDisplayBrightness.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:display-glow-color-override",
@@ -8066,8 +8067,8 @@
       "%displays%'[s] display (:height|width)"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/elements/expressions/ExprDisplayHeightWidth.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:display-interpolation-delay-duration",
