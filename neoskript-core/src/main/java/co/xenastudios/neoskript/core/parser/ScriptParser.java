@@ -317,6 +317,11 @@ public final class ScriptParser {
             } else if (lower.startsWith("loop ") && content.endsWith(":")) {
                 result.add(parseLoop(node, allowDelays));
                 i++;
+            } else if ((lower.startsWith("for each ") || lower.startsWith("for "))
+                    && content.endsWith(":")
+                    && FOR_EACH.matcher(content.substring(0, content.length() - 1).trim()).matches()) {
+                result.add(parseForEach(node, allowDelays));
+                i++;
             } else if (content.endsWith(":")) {
                 throw new ParseException("Unknown section: " + content, node.line());
             } else {
@@ -362,6 +367,28 @@ public final class ScriptParser {
             }
         }
         return new IfResult(new IfSection(condition, thenBranch, elseBranch), next);
+    }
+
+    private static final Pattern FOR_EACH = Pattern.compile(
+            "(?i)for(?:\\s+each)?\\s+(?:value\\s+)?(\\{.+?\\})\\s+in\\s+(.+)");
+
+    /**
+     * Parses {@code for [each] [value] {var} in %objects%:} — a loop that binds each element to the
+     * given variable (in addition to {@code loop-value}), matching Skript's for-each section.
+     */
+    private Statement parseForEach(Node node, boolean allowDelays) {
+        String content = node.content().substring(0, node.content().length() - 1).trim();
+        Matcher m = FOR_EACH.matcher(content);
+        if (!m.matches()) {
+            throw new ParseException("Malformed 'for each': " + content, node.line());
+        }
+        Expression<?> variable = expressions.parse(m.group(1).trim());
+        if (!(variable instanceof VariableExpression var)) {
+            throw new ParseException("'for each' needs a variable, got: " + m.group(1), node.line());
+        }
+        Expression<?> values = expressions.parse(m.group(2).trim());
+        List<Statement> body = parseStatements(node.children(), allowDelays);
+        return LoopSection.forEach(values, body, var::set);
     }
 
     private Statement parseLoop(Node node, boolean allowDelays) {

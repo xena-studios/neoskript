@@ -13689,7 +13689,8 @@
       "(for [each]|loop) [key|index] %~object%(,| and) [value] %~object% in %objects%"
     ],
     "source": "ch/njol/skript/sections/SecFor.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "section:loop",

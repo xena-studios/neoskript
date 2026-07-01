@@ -162,6 +162,7 @@ public final class Interpreter {
         private final boolean times;
         private final long count;
         private final Object[] values;
+        private final java.util.function.BiConsumer<TriggerContext, Object> binder;
         private final long deadline = System.nanoTime() + LoopSection.MAX_NANOS;
         private final Object previousValue;
         private final Object previousIndex;
@@ -170,6 +171,7 @@ public final class Interpreter {
         LoopFrame(LoopSection section, TriggerContext ctx) {
             this.body = section.body();
             this.times = section.isTimes();
+            this.binder = section.binder();
             Expression<?> source = section.source();
             if (times) {
                 Object value = source.getSingle(ctx);
@@ -201,6 +203,9 @@ public final class Interpreter {
             }
             ctx.setLocal("loop-value", values[(int) position]);
             ctx.setLocal("loop-index", (double) (position + 1));
+            if (binder != null) {
+                binder.accept(ctx, values[(int) position]);
+            }
             position++;
             return true;
         }

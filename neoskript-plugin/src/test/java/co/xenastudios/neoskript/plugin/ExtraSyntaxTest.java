@@ -66,6 +66,30 @@ class ExtraSyntaxTest {
     }
 
     @Test
+    void forEachLoopRuns() throws IOException {
+        Path scripts = plugin.getDataFolder().toPath().resolve("scripts");
+        Files.createDirectories(scripts);
+        Files.writeString(scripts.resolve("fe.sk"), """
+                command /fe:
+                    trigger:
+                        set {_l::1} to "alpha"
+                        set {_l::2} to "beta"
+                        for each {_x} in {_l::*}:
+                            send "ITEM:%{_x}%" to player
+                """, StandardCharsets.UTF_8);
+        server.dispatchCommand(server.getConsoleSender(), "neoskript reload");
+        PlayerMock player = server.addPlayer();
+        server.dispatchCommand(player, "fe");
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        String m;
+        while ((m = player.nextMessage()) != null) {
+            seen.add(m);
+        }
+        assertTrue(seen.contains("ITEM:alpha") && seen.contains("ITEM:beta"),
+                "for each binds {_x} to every list element; got " + seen);
+    }
+
+    @Test
     void filteredEventsParse() {
         DefaultSyntaxRegistry registry = new DefaultSyntaxRegistry();
         BuiltinModule.registerAll(registry);

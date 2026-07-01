@@ -21,21 +21,38 @@ public final class LoopSection implements Statement {
     private final Expression<?> source;
     private final boolean times;
     private final List<Statement> body;
+    private final java.util.function.BiConsumer<TriggerContext, Object> binder;
 
-    private LoopSection(Expression<?> source, boolean times, List<Statement> body) {
+    private LoopSection(Expression<?> source, boolean times, List<Statement> body,
+                        java.util.function.BiConsumer<TriggerContext, Object> binder) {
         this.source = source;
         this.times = times;
         this.body = List.copyOf(body);
+        this.binder = binder;
     }
 
     /** Creates a {@code loop N times} section. */
     public static LoopSection times(Expression<?> count, List<Statement> body) {
-        return new LoopSection(count, true, body);
+        return new LoopSection(count, true, body, null);
     }
 
     /** Creates a {@code loop <values>} section. */
     public static LoopSection over(Expression<?> values, List<Statement> body) {
-        return new LoopSection(values, false, body);
+        return new LoopSection(values, false, body, null);
+    }
+
+    /**
+     * Creates a {@code for each %var% in <values>} section: like {@link #over}, but each iteration
+     * also binds the current element via {@code binder} (in addition to {@code loop-value}).
+     */
+    public static LoopSection forEach(Expression<?> values, List<Statement> body,
+                                      java.util.function.BiConsumer<TriggerContext, Object> binder) {
+        return new LoopSection(values, false, body, binder);
+    }
+
+    /** @return the per-iteration binder for a for-each loop, or {@code null} for a plain loop. */
+    public java.util.function.BiConsumer<TriggerContext, Object> binder() {
+        return binder;
     }
 
     /** Wall-clock safety budget for a single loop run (nanoseconds). */
@@ -76,6 +93,9 @@ public final class LoopSection implements Statement {
                 for (int i = 0; i < values.length; i++) {
                     ctx.setLocal("loop-value", values[i]);
                     ctx.setLocal("loop-index", (double) (i + 1));
+                    if (binder != null) {
+                        binder.accept(ctx, values[i]);
+                    }
                     if (runIteration(ctx) || System.nanoTime() >= deadline) {
                         break;
                     }
