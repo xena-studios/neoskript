@@ -6448,8 +6448,8 @@
       "[all [[of] the]|the] banned (players|ips:(ips|ip addresses))"
     ],
     "source": "ch/njol/skript/expressions/ExprAllBannedEntries.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:all-commands",
@@ -6483,8 +6483,8 @@
       "[all [[of] the]|the] [server] [:non(-| )]op[erator]s"
     ],
     "source": "ch/njol/skript/expressions/ExprOps.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:all-permissions",
@@ -6509,8 +6509,8 @@
       "[all of] %objects%'[s] [persistent] data [tag] keys"
     ],
     "source": "org/skriptlang/skript/bukkit/pdc/elements/expressions/ExprAllPersistentDataKeys.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:all-scripts",
@@ -6696,8 +6696,8 @@
       "%inventories%'[s] [anvil] [item] [:max[imum]] repair cost"
     ],
     "source": "ch/njol/skript/expressions/ExprAnvilRepairCost.java",
-    "status": "parse-verified",
-    "implemented": true
+    "status": "todo",
+    "implemented": false
   },
   {
     "id": "expression:anvil-text-input",
@@ -8106,8 +8106,8 @@
       "%displays%'[s] shadow (:radius|strength)"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/elements/expressions/ExprDisplayShadow.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:display-teleport-duration",
@@ -8132,8 +8132,8 @@
       "%displays%'[s] (:left|right) [transformation] rotation"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/elements/expressions/ExprDisplayTransformationRotation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:display-transformation-scale-translation",
@@ -8145,8 +8145,8 @@
       "%displays%'[s] (display|[display] transformation) (:scale|translation)"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/displays/elements/expressions/ExprDisplayTransformationScaleTranslation.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:display-view-range",
@@ -8222,8 +8222,8 @@
       "%blocks%'s drops [(using|with) %-itemtype% [(as %-entity%)]]"
     ],
     "source": "ch/njol/skript/expressions/ExprDropsOfBlock.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:elements",
@@ -8492,8 +8492,8 @@
       "world[s] from %uuids%"
     ],
     "source": "ch/njol/skript/expressions/ExprFromUUID.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:equippable-component",
@@ -8505,8 +8505,8 @@
       "%slots/itemtypes%'[s] equippable component[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/expressions/ExprEquippableComponent.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:equippable-component-allowed-entities",
@@ -8531,8 +8531,8 @@
       "%equippablecomponents%'[s] camera overlay"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/expressions/ExprEquipCompCameraOverlay.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:equippable-component-equip-sound",
@@ -8544,8 +8544,8 @@
       "%equippablecomponents%'[s] equip sound"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/expressions/ExprEquipCompEquipSound.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:equippable-component-equipment-slot",
@@ -8938,8 +8938,8 @@
       "[the] [server] (:free|max:max[imum]|total) (memory|ram)"
     ],
     "source": "ch/njol/skript/expressions/ExprMemory.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:freeze-time",
@@ -9386,8 +9386,8 @@
       "[interaction (height|:width)[s]] of %entities%"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/interactions/elements/expressions/ExprInteractionDimensions.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:inventory",
@@ -9437,8 +9437,8 @@
       "%inventories%'[s] (1¦holder[s]|2¦viewers|3¦[amount of] rows|4¦[amount of] slots)"
     ],
     "source": "ch/njol/skript/expressions/ExprInventoryInfo.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:inventory-slot",
@@ -9826,8 +9826,8 @@
       "[the] last player[s] (who|that) (attacked|1:interacted with|2:clicked [on]) %entities%"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/interactions/elements/expressions/ExprLastInteractionPlayer.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:last-loaded-server-icon",
@@ -9944,8 +9944,8 @@
       "[(1¦sky|1¦sun|2¦block)[ ]]light[ ]level [(of|%direction%) %location%]"
     ],
     "source": "ch/njol/skript/expressions/ExprLightLevel.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:loaded-plugins",
@@ -9982,8 +9982,8 @@
       "%location%'[s] (location|position)"
     ],
     "source": "ch/njol/skript/expressions/ExprLocationOf.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:location-at",
@@ -10179,8 +10179,8 @@
       "%locations%'[s] (highest|:lowest) [solid] block"
     ],
     "source": "ch/njol/skript/expressions/ExprLowestHighestSolidBlock.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:luck-of-loot-context",
@@ -10369,8 +10369,8 @@
       "[the] [1:default|2:shown|2:displayed] (MOTD|message of [the] day)"
     ],
     "source": "org/skriptlang/skript/bukkit/misc/elements/expressions/ExprMOTD.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:metadata",
@@ -10420,8 +10420,8 @@
       "%entities%'[s] [minecart] (1¦derailed|2¦flying) velocity"
     ],
     "source": "ch/njol/skript/expressions/ExprMinecartDerailedFlyingVelocity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:minimum-double-value",
@@ -10698,8 +10698,8 @@
       "number of digit char(acters|s) in %string%"
     ],
     "source": "ch/njol/skript/expressions/ExprNumberOfCharacters.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:numbers",
@@ -10773,8 +10773,8 @@
       "%livingentities%'[s] (:main|hidden) gene[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprPandaGene.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:parse",
@@ -11039,8 +11039,8 @@
       "%players%'[s] (player|tab)[ ]list (header|:footer) [text|message]"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/expressions/ExprPlayerListHeaderFooter.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:player-list-name",
@@ -11117,8 +11117,8 @@
       "%skriptpotioneffects%'[s] ([potion] amplifier|potion tier|potion level)[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/expressions/ExprPotionAmplifier.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:potion-effect-duration",
@@ -11169,8 +11169,8 @@
       "%livingentities/itemtypes%'[s] [:active|:hidden|both:(active and hidden|hidden and active)] potion effects"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/expressions/ExprPotionEffects.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:prefix-suffix",
@@ -11339,8 +11339,8 @@
       "raw %strings%"
     ],
     "source": "org/skriptlang/skript/bukkit/text/elements/expressions/ExprRawString.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:readied-arrow-bow",
@@ -11590,8 +11590,8 @@
       "%quaternions%'[s] rotation (angle|:axis)"
     ],
     "source": "org/skriptlang/skript/bukkit/misc/elements/expressions/ExprQuaternionAxisAngle.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:rounding",
@@ -11699,7 +11699,8 @@
       "%entities/blocks%'[s] loot[[ ]table] seed[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/loottables/elements/expressions/ExprLootTableSeed.java",
-    "status": "todo"
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:sent-command-list",
@@ -11823,8 +11824,8 @@
       "%slots/itemtypes/itemstacks/blocks%'[s] (head|skull) owner"
     ],
     "source": "ch/njol/skript/expressions/ExprSkullOwner.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:slot-index",
@@ -11887,8 +11888,8 @@
       "%itemstacks/itemtypes/slots%'[s] spawn egg entity"
     ],
     "source": "ch/njol/skript/expressions/ExprSpawnEggEntity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:spawn-reason",
@@ -11913,8 +11914,8 @@
       "%blocks%'[s] (spawner|entity|creature) type[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprSpawnerType.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:spectator-target",
@@ -11939,8 +11940,8 @@
       "%players%'[s] (walk[ing]|fl(y[ing]|ight))[( |-)]speed"
     ],
     "source": "ch/njol/skript/expressions/ExprSpeed.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:string-colors",
@@ -12330,8 +12331,8 @@
       "[the] tps"
     ],
     "source": "ch/njol/skript/expressions/ExprTPS.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:transform-reason",
@@ -12496,8 +12497,8 @@
       "[vector|quaternion] (:w|:x|:y|:z) [component[s]] of %vectors/quaternions%"
     ],
     "source": "ch/njol/skript/expressions/ExprXYZComponent.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-angle-between",
@@ -12749,8 +12750,8 @@
       "(0¦[craft]bukkit|1¦minecraft|2¦skript)( |-)version"
     ],
     "source": "ch/njol/skript/expressions/ExprVersion.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:version-string",
@@ -12800,8 +12801,8 @@
       "%livingentities%'[s] villager (level|:experience)"
     ],
     "source": "ch/njol/skript/expressions/ExprVillagerLevel.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:villager-profession",
@@ -13044,8 +13045,8 @@
       "thrice"
     ],
     "source": "ch/njol/skript/expressions/ExprTimes.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:yaw-pitch",
@@ -13056,8 +13057,8 @@
       "(:yaw|pitch) of %entities/locations/vectors%"
     ],
     "source": "ch/njol/skript/expressions/ExprYawPitch.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "function:abs",
