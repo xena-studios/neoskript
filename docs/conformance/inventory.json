@@ -222,8 +222,8 @@
       "%player% can('t|[ ]not) only see (commands|system messages) [in chat]"
     ],
     "source": "ch/njol/skript/conditions/CondChatVisibility.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:chance",
@@ -358,8 +358,8 @@
       "%damagesources% (was not|wasn't|were not|weren't) ([:in]directly caused|caused [:in]directly)"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/elements/conditions/CondWasIndirect.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:do-respawn-anchors-work",
@@ -570,8 +570,8 @@
       "%livingentities% (doesn't|does not|do not|don't) have ((any|a) horn|left:[a] left horn[s]|right:[a] right horn[s]|both:both horns)"
     ],
     "source": "ch/njol/skript/conditions/CondGoatHasHorns.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-ai",
@@ -622,8 +622,8 @@
       "%itemtypes% (doesn't|does not|do not|don't) have [custom] model data [1:floats|2:flags|3:strings|4:colo[u]rs]"
     ],
     "source": "ch/njol/skript/conditions/CondHasCustomModelData.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-glowing-text",
@@ -665,8 +665,8 @@
       "%itemtypes%'[s] [entire|:additional] tool[ ]tip[s] (isn't|is not|aren't|are not) (:shown|hidden)"
     ],
     "source": "ch/njol/skript/conditions/CondTooltip.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:has-line-of-sight",
@@ -1296,8 +1296,8 @@
       "%potioneffects/timespans% (isn't|is not|aren't|are not) infinite"
     ],
     "source": "ch/njol/skript/conditions/CondIsInfinite.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "condition:is-interactable",
@@ -2418,8 +2418,8 @@
       "(IP(-| )unban|un[-]IP[-]ban) %players%"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/effects/EffBan.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:break-block",
@@ -2595,8 +2595,8 @@
       "transfer %players% to server %string% [on port %-number%]"
     ],
     "source": "ch/njol/skript/effects/EffConnect.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:consume-boosting-firework",
@@ -3212,8 +3212,8 @@
       "(apply knockback to|knock[back]) %livingentities% [%direction%] [with (strength|force) %-number%]"
     ],
     "source": "ch/njol/skript/effects/EffKnockback.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:launch-firework",
@@ -3224,8 +3224,8 @@
       "(launch|deploy) [[a] firework [with effect[s]]] %fireworkeffects% at %locations% [([with] (duration|power)|timed) %number%]"
     ],
     "source": "ch/njol/skript/effects/EffFireworkLaunch.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:leash-entities",
@@ -3677,8 +3677,8 @@
       "(play|show|draw) %entityeffects% on %entities%"
     ],
     "source": "org/skriptlang/skript/bukkit/particles/elements/effects/EffPlayEffect.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "effect:play-sound",
@@ -7084,8 +7084,8 @@
       "%block%'[s] break speed[s] [for %players%]"
     ],
     "source": "ch/njol/skript/expressions/ExprBreakSpeed.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:block-data",
@@ -7390,8 +7390,8 @@
       "[(all [[of] the]|the)] [:alphanumeric] characters (between|from) %string% (and|to) %string%"
     ],
     "source": "ch/njol/skript/expressions/ExprCharacters.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:chat-format",
@@ -7730,8 +7730,8 @@
       "[a] [new] chest inventory with %number% row[s] [(named|with name) %-textcomponent%]"
     ],
     "source": "ch/njol/skript/expressions/ExprChestInventory.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:custom-model-data",
@@ -7974,8 +7974,8 @@
       "%objects% (otherwise|?) %objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprDefaultValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:difference",
@@ -8386,8 +8386,8 @@
       "%entities%'[s] %attributetype% [(1:(total|final|modified))] attribute [value]"
     ],
     "source": "ch/njol/skript/expressions/ExprEntityAttribute.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:entity-fire-burn-duration",
@@ -9994,8 +9994,8 @@
       "[the] (location|position) [at] [\\(][x[ ][=[ ]]]%number%, [y[ ][=[ ]]]%number%, [and] [z[ ][=[ ]]]%number%[\\)] [[(in|of) [[the] world]] %world%]"
     ],
     "source": "ch/njol/skript/expressions/ExprLocationAt.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:location-with-yaw-pitch",
@@ -10007,8 +10007,8 @@
       "%locations% with [a] yaw [of] %number% and [a] pitch [of] %number%"
     ],
     "source": "org/skriptlang/skript/bukkit/misc/elements/expressions/ExprWithYawPitch.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:loop-iteration",
@@ -10925,8 +10925,8 @@
       "%number%(\\%| percent) of %numbers%"
     ],
     "source": "ch/njol/skript/expressions/ExprPercent.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:persistent-data-value",
@@ -11290,8 +11290,8 @@
       "[a|%-integer%] random [:alphanumeric] character[s] (from|between) %string% (to|and) %string%"
     ],
     "source": "ch/njol/skript/expressions/ExprRandomCharacter.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:random-numbers",
@@ -11607,8 +11607,8 @@
       "%numbers% (round[ed] up|ceil[ing]ed)"
     ],
     "source": "ch/njol/skript/expressions/ExprRound.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:saturation",
@@ -12509,8 +12509,8 @@
       "[the] angle between [[the] vectors] %vector% and %vector%"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorAngleBetween.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-create-from-direction",
@@ -12534,8 +12534,8 @@
       "[a] [new] vector [(from|at|to)] %number%,[ ]%number%(,[ ]| and )%number%"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorFromXYZ.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-create-location-from-vector",
@@ -12549,8 +12549,8 @@
       "location (from|of) %vector% in %world% with yaw %number% and pitch %number%"
     ],
     "source": "ch/njol/skript/expressions/ExprLocationFromVector.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-cross-product",
@@ -12561,8 +12561,8 @@
       "%vector% cross %vector%"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorCrossProduct.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-cylindrical-shape",
@@ -12585,8 +12585,8 @@
       "%vector% dot %vector%"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorDotProduct.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-length",
@@ -12611,8 +12611,8 @@
       "%location%[ ]~[~][ ]%vectors%"
     ],
     "source": "ch/njol/skript/expressions/ExprLocationVectorOffset.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vectors-normalized",
@@ -12711,8 +12711,8 @@
       "[vector] projection [of] %vector% on[to] %vector%"
     ],
     "source": "ch/njol/skript/expressions/ExprVectorProjection.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:vehicle",
@@ -12840,8 +12840,8 @@
       "%livingentities%'[s] anger level towards %livingentities%"
     ],
     "source": "ch/njol/skript/expressions/ExprWardenEntityAnger.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:warden-most-angered-at",
