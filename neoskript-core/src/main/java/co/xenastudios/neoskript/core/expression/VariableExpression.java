@@ -27,11 +27,23 @@ public final class VariableExpression implements Expression<Object> {
     /** Parts are either {@link String} literals or {@link Expression} interpolations. */
     private final List<Object> nameParts;
 
+    /**
+     * The reserved trigger-local name a section expression stores its in-progress value under; the
+     * {@code created <thing>} expressions read and write it. Starts with {@code §} so it never
+     * collides with a user-written variable name.
+     */
+    public static final String SECTION_VALUE = "§section-value";
+
     private VariableExpression(boolean local, boolean list, String rawName, List<Object> nameParts) {
         this.local = local;
         this.list = list;
         this.rawName = rawName;
         this.nameParts = nameParts;
+    }
+
+    /** @return a plain (non-interpolated) trigger-local variable reference for {@code name} */
+    public static VariableExpression local(String name) {
+        return new VariableExpression(true, false, name, List.of(name));
     }
 
     /**

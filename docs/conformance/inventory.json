@@ -7682,8 +7682,8 @@
       "[created] [potion] effect"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/expressions/ExprSkriptPotionEffect.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:creature-entity-player-projectile-villager-powered-creeper-etc",

@@ -17,6 +17,7 @@ import co.xenastudios.neoskript.core.runtime.EventRegistry;
 import co.xenastudios.neoskript.core.runtime.FunctionDefinition;
 import co.xenastudios.neoskript.core.runtime.FunctionRegistry;
 import co.xenastudios.neoskript.core.runtime.IfSection;
+import co.xenastudios.neoskript.core.runtime.SectionValueStatement;
 import co.xenastudios.neoskript.core.runtime.LoopSection;
 import co.xenastudios.neoskript.core.runtime.Statement;
 import co.xenastudios.neoskript.core.runtime.Timespan;
@@ -322,6 +323,10 @@ public final class ScriptParser {
                     && FOR_EACH.matcher(content.substring(0, content.length() - 1).trim()).matches()) {
                 result.add(parseForEach(node, allowDelays));
                 i++;
+            } else if (content.endsWith(":") && SECTION_SET.matcher(content).matches()
+                    && lower.contains("potion effect")) {
+                result.add(parseSectionSet(node, allowDelays));
+                i++;
             } else if (content.endsWith(":")) {
                 throw new ParseException("Unknown section: " + content, node.line());
             } else {
@@ -371,6 +376,26 @@ public final class ScriptParser {
 
     private static final Pattern FOR_EACH = Pattern.compile(
             "(?i)for(?:\\s+each)?\\s+(?:value\\s+)?(\\{.+?\\})\\s+in\\s+(.+)");
+
+    /** {@code set <var> to <section value>:} — a section-expression assignment (see {@link SectionValueStatement}). */
+    private static final Pattern SECTION_SET = Pattern.compile("(?i)^set\\s+(.+?)\\s+to\\s+(.+):$");
+
+    /**
+     * Parses a section-expression assignment: {@code set {var} to <value>:} with an indented body that
+     * customises the created value.
+     */
+    private Statement parseSectionSet(Node node, boolean allowDelays) {
+        Matcher matcher = SECTION_SET.matcher(node.content());
+        if (!matcher.matches()) {
+            throw new ParseException("Malformed section assignment: " + node.content(), node.line());
+        }
+        if (!(expressions.parse(matcher.group(1).trim()) instanceof VariableExpression target)) {
+            throw new ParseException("A section value must be stored in a variable", node.line());
+        }
+        Expression<?> base = expressions.parse(matcher.group(2).trim());
+        List<Statement> body = parseStatements(node.children(), allowDelays);
+        return new SectionValueStatement(target, base, body);
+    }
 
     /**
      * Parses {@code for [each] [value] {var} in %objects%:} — a loop that binds each element to the

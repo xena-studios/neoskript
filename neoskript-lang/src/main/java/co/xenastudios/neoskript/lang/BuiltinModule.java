@@ -1475,6 +1475,12 @@ public final class BuiltinModule {
      * the duration to Skript's default of 600 ticks, matching the wrapper.
      */
     private static void registerPotionSyntax(SyntaxRegistry registry) {
+        // The value being built inside a `set {_p} to a potion effect ...:` section. It aliases the
+        // reserved section-value local, so the potion modifiers (which need a variable) work on it.
+        registry.registerExpression("[the] [created] [potion] effect", Object.class,
+                a -> co.xenastudios.neoskript.core.expression.VariableExpression.local(
+                        co.xenastudios.neoskript.core.expression.VariableExpression.SECTION_VALUE));
+
         registry.registerEffect("make %skriptpotioneffects% ambient",
                 a -> modifyPotionEffects(a.get(0), pe -> withAmbient(pe, true)));
         registry.registerEffect("make %skriptpotioneffects% not ambient",
