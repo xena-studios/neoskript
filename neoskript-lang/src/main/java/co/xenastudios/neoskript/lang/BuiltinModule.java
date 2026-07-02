@@ -96,6 +96,7 @@ public final class BuiltinModule {
         registerAnvilAndNamedSyntax(registry);
         registerPersistentDataSyntax(registry);
         registerEquippableSyntax(registry);
+        registerScriptSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -1081,6 +1082,39 @@ public final class BuiltinModule {
             }
             return out.toArray();
         });
+    }
+
+    /**
+     * Script introspection: {@code [all] scripts} lists the loaded scripts, and {@code script[s]
+     * %strings% (is|are) [not] loaded} tests whether the named scripts are loaded (via the loader's
+     * published {@link co.xenastudios.neoskript.core.runtime.LoadedScripts} snapshot).
+     */
+    private static void registerScriptSyntax(SyntaxRegistry registry) {
+        registry.registerExpression("[(all [[of] the]|the)] [(enabled|loaded)] scripts", Object.class,
+                a -> new ComputedListExpression(ctx ->
+                        co.xenastudios.neoskript.core.runtime.LoadedScripts.names().stream()
+                                .map(co.xenastudios.neoskript.lang.type.Script::new).toArray()));
+        registry.registerCondition("script[s] %strings% (is|are) loaded",
+                a -> scriptsLoaded(a.get(0), true));
+        registry.registerCondition("script[s] %strings% (is|are) not loaded",
+                a -> scriptsLoaded(a.get(0), false));
+    }
+
+    /** Whether every named script is loaded (compared to {@code expected}). */
+    private static Condition scriptsLoaded(Expression<?> names, boolean expected) {
+        return ctx -> {
+            Object[] values = names.getAll(ctx);
+            if (values.length == 0) {
+                return false;
+            }
+            for (Object value : values) {
+                if (co.xenastudios.neoskript.core.runtime.LoadedScripts.isLoaded(Renderer.toDisplay(value))
+                        != true) {
+                    return !expected;
+                }
+            }
+            return expected;
+        };
     }
 
     /**

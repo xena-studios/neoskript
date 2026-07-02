@@ -1671,8 +1671,8 @@
       "script[s] [%-strings%] (isn't|is not|aren't|are not) loaded"
     ],
     "source": "ch/njol/skript/conditions/CondScriptLoaded.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-silent",
@@ -6525,8 +6525,8 @@
       "[all [[of] the]|the] (disabled|unloaded) scripts"
     ],
     "source": "ch/njol/skript/expressions/ExprScripts.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:all-scripts-2",
@@ -15147,7 +15147,8 @@
       "script"
     ],
     "source": "org/skriptlang/skript/common/types/ScriptClassInfo.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "type:short",

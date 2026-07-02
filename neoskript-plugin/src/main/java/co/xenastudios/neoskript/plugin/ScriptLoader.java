@@ -91,6 +91,8 @@ public final class ScriptLoader {
         ensureScriptsDirectory(dir);
 
         List<Path> scriptFiles = discover(dir);
+        co.xenastudios.neoskript.core.runtime.LoadedScripts.set(
+                scriptFiles.stream().map(file -> dir.relativize(file).toString()).toList());
         AtomicInteger failed = new AtomicInteger();
 
         // Parse sequentially: the shared ScriptParser accumulates per-file parse errors in a single
