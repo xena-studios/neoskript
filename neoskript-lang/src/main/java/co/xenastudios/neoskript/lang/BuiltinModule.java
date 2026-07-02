@@ -1088,6 +1088,25 @@ public final class BuiltinModule {
      * anything else in the main hand). With no explicit entity it targets the event's player.
      */
     private static void registerEquipSyntax(SyntaxRegistry registry) {
+        // armour items worn by an entity (the non-empty armour slots).
+        registry.registerExpression("[the] armo[u]r[s] [item[s]] of %livingentities%", Object.class,
+                arguments -> {
+                    Expression<?> entities = arguments.get(0);
+                    return new ComputedListExpression(ctx -> {
+                        List<Object> out = new ArrayList<>();
+                        for (Object value : entities.getAll(ctx)) {
+                            if (value instanceof LivingEntity living && living.getEquipment() != null) {
+                                for (ItemStack piece : living.getEquipment().getArmorContents()) {
+                                    if (piece != null && piece.getType() != org.bukkit.Material.AIR) {
+                                        out.add(piece);
+                                    }
+                                }
+                            }
+                        }
+                        return out.toArray();
+                    });
+                });
+
         registry.registerEffect("equip [%livingentities%] with %itemtypes%", arguments -> {
             Expression<?> entities = arguments.get(0);
             Expression<?> items = arguments.get(1);

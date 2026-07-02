@@ -6805,8 +6805,8 @@
       "%livingentities%'[s] (%-*equipmentslots%|[the] armo[u]r[s]) [item:item[s]]"
     ],
     "source": "ch/njol/skript/expressions/ExprArmorSlot.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:arrow-attached-block",
