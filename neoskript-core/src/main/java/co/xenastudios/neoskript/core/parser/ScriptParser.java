@@ -324,7 +324,7 @@ public final class ScriptParser {
                 result.add(parseForEach(node, allowDelays));
                 i++;
             } else if (content.endsWith(":") && SECTION_SET.matcher(content).matches()
-                    && lower.contains("potion effect")) {
+                    && (lower.contains("potion effect") || lower.contains("damage source"))) {
                 result.add(parseSectionSet(node, allowDelays));
                 i++;
             } else if (content.endsWith(":")) {

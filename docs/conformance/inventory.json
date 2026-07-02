@@ -7670,8 +7670,8 @@
       "created damage source"
     ],
     "source": "org/skriptlang/skript/bukkit/damagesource/elements/expressions/ExprCreatedDamageSource.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:created-potion-effect",

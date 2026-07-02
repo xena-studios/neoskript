@@ -1480,6 +1480,10 @@ public final class BuiltinModule {
         registry.registerExpression("[the] [created] [potion] effect", Object.class,
                 a -> co.xenastudios.neoskript.core.expression.VariableExpression.local(
                         co.xenastudios.neoskript.core.expression.VariableExpression.SECTION_VALUE));
+        // The damage source being built inside a `set {_d} to a ... damage source:` section.
+        registry.registerExpression("[the] created damage source", Object.class,
+                a -> co.xenastudios.neoskript.core.expression.VariableExpression.local(
+                        co.xenastudios.neoskript.core.expression.VariableExpression.SECTION_VALUE));
 
         registry.registerEffect("make %skriptpotioneffects% ambient",
                 a -> modifyPotionEffects(a.get(0), pe -> withAmbient(pe, true)));
