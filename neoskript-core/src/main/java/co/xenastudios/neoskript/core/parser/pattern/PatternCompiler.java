@@ -98,6 +98,19 @@ public final class PatternCompiler {
                         i++;
                     }
                 }
+                case '\\' -> {
+                    // A backslash escapes the next character as a literal (Skript uses `\(`, `\)` for
+                    // literal parentheses, since `(` normally opens an alternation).
+                    i++;
+                    if (i < length) {
+                        char escaped = pattern.charAt(i);
+                        if (REGEX_SPECIALS.indexOf(escaped) >= 0 || "()[]|".indexOf(escaped) >= 0) {
+                            regex.append('\\');
+                        }
+                        regex.append(escaped);
+                        i++;
+                    }
+                }
                 case '(' -> {
                     regex.append("(?:");
                     i++;

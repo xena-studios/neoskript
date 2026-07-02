@@ -229,14 +229,17 @@ public final class BuiltinModule {
     private static void registerEntityExpressions(SyntaxRegistry registry) {
         playerProperty(registry, "health", LivingEntity::getHealth);
         playerProperty(registry, "(max health|maximum health)", LivingEntity::getMaxHealth);
-        playerProperty(registry, "(food level|hunger|food)", player -> (double) ((Player) player).getFoodLevel());
-        playerProperty(registry, "level", player -> (double) ((Player) player).getLevel());
+        playerProperty(registry, "(food level|hunger|food)",
+                player -> player instanceof Player p ? (double) p.getFoodLevel() : null);
+        playerProperty(registry, "level", player -> player instanceof Player p ? (double) p.getLevel() : null);
         playerProperty(registry, "(uuid|unique id)", player -> player.getUniqueId().toString());
-        playerProperty(registry, "(gamemode|game mode)", player -> ((Player) player).getGameMode());
+        playerProperty(registry, "(gamemode|game mode)",
+                player -> player instanceof Player p ? p.getGameMode() : null);
         playerProperty(registry, "world", LivingEntity::getWorld);
         playerProperty(registry, "location", LivingEntity::getLocation);
         playerProperty(registry, "name", player -> player.getName());
-        playerProperty(registry, "(display name|displayname)", player -> ((Player) player).getName());
+        playerProperty(registry, "(display name|displayname)",
+                player -> player instanceof Player p ? p.getDisplayName() : null);
 
         // Changeable numeric properties (gettable + set/add/remove/reset via the generic changer).
         numericProperty(registry, "saturation", Player.class,
@@ -314,8 +317,11 @@ public final class BuiltinModule {
                     return new ComputedExpression(ctx -> {
                         Location first = toLocation(a.getSingle(ctx));
                         Location second = toLocation(b.getSingle(ctx));
-                        return (first == null || second == null) ? null
-                                : first.clone().add(second).multiply(0.5);
+                        if (first == null || second == null || first.getWorld() == null
+                                || !first.getWorld().equals(second.getWorld())) {
+                            return null;
+                        }
+                        return first.clone().add(second).multiply(0.5);
                     });
                 });
         registry.registerExpression("vector (from|between) %location% (to|and) %location%", Object.class,
@@ -2451,10 +2457,15 @@ public final class BuiltinModule {
             Expression<?> src = a.get(0);
             return ctx -> src.getSingle(ctx) instanceof Entity e && e.isPersistent();
         });
-        registry.registerCondition("%object% (is|are) [not] poisoned", a -> {
+        registry.registerCondition("%object% (is|are) poisoned", a -> {
             Expression<?> src = a.get(0);
             return ctx -> src.getSingle(ctx) instanceof LivingEntity le
                     && le.hasPotionEffect(org.bukkit.potion.PotionEffectType.POISON);
+        });
+        registry.registerCondition("%object% (is|are) not poisoned", a -> {
+            Expression<?> src = a.get(0);
+            return ctx -> !(src.getSingle(ctx) instanceof LivingEntity le
+                    && le.hasPotionEffect(org.bukkit.potion.PotionEffectType.POISON));
         });
         registry.registerCondition("%object% (is|are) [properly] saddled", a -> {
             Expression<?> src = a.get(0);

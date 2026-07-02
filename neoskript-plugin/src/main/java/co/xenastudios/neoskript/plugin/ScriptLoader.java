@@ -93,9 +93,10 @@ public final class ScriptLoader {
         List<Path> scriptFiles = discover(dir);
         AtomicInteger failed = new AtomicInteger();
 
-        // Scripts parse independently; the syntax/event registries are read-only here and the
-        // function registry is concurrent, so parsing fans out across files safely.
-        List<Trigger> triggers = scriptFiles.parallelStream()
+        // Parse sequentially: the shared ScriptParser accumulates per-file parse errors in a single
+        // mutable list, so fanning out across files would race on (and misattribute) those errors.
+        // Parsing is a one-time load/reload step, so the sequential cost is negligible.
+        List<Trigger> triggers = scriptFiles.stream()
                 .flatMap(file -> parseFile(file, dir, failed).stream())
                 .toList();
 

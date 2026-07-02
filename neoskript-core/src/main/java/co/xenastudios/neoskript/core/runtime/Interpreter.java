@@ -33,6 +33,17 @@ public final class Interpreter {
     }
 
     private void pump() {
+        // A loop's time budget guards against a runaway loop that spins within a single tick. A `wait`
+        // suspends pump() and the scheduler resumes it later, so on (re)entry reset the deadlines of
+        // any loop frames still on the stack — otherwise a loop containing waits would be terminated
+        // after MAX_NANOS of wall-clock time (which is mostly time spent asleep on the waits).
+        for (Frame frame : stack) {
+            if (frame instanceof WhileFrame whileFrame) {
+                whileFrame.resetDeadline();
+            } else if (frame instanceof LoopFrame loopFrame) {
+                loopFrame.resetDeadline();
+            }
+        }
         while (!stack.isEmpty()) {
             Frame frame = stack.peek();
             if (frame instanceof SeqFrame seq) {
@@ -137,8 +148,12 @@ public final class Interpreter {
     private static final class WhileFrame implements Frame {
         private final co.xenastudios.neoskript.api.syntax.Condition condition;
         private final List<Statement> body;
-        private final long deadline = System.nanoTime() + WhileSection.MAX_NANOS;
+        private long deadline = System.nanoTime() + WhileSection.MAX_NANOS;
         private long iterations;
+
+        void resetDeadline() {
+            deadline = System.nanoTime() + WhileSection.MAX_NANOS;
+        }
 
         WhileFrame(WhileSection section) {
             this.condition = section.condition();
@@ -163,7 +178,7 @@ public final class Interpreter {
         private final long count;
         private final Object[] values;
         private final java.util.function.BiConsumer<TriggerContext, Object> binder;
-        private final long deadline = System.nanoTime() + LoopSection.MAX_NANOS;
+        private long deadline = System.nanoTime() + LoopSection.MAX_NANOS;
         private final Object previousValue;
         private final Object previousIndex;
         private long position;
@@ -183,6 +198,10 @@ public final class Interpreter {
             }
             this.previousValue = ctx.getLocal("loop-value");
             this.previousIndex = ctx.getLocal("loop-index");
+        }
+
+        void resetDeadline() {
+            deadline = System.nanoTime() + LoopSection.MAX_NANOS;
         }
 
         boolean advance(TriggerContext ctx) {
