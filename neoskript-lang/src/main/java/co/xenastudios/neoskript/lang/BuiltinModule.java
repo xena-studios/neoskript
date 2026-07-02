@@ -1091,7 +1091,7 @@ public final class BuiltinModule {
      */
     private static void registerScriptSyntax(SyntaxRegistry registry) {
         registry.registerExpression(
-                "[(all [[of] the]|the)] [(enabled|loaded)] scripts without [subdirectory] (paths|parents)",
+                "[(all [[of] the]|the)] [(enabled|loaded)] scripts without ([subdirectory] paths|parents)",
                 Object.class, a -> new ComputedListExpression(ctx ->
                         co.xenastudios.neoskript.core.runtime.LoadedScripts.names().stream()
                                 .map(name -> new co.xenastudios.neoskript.lang.type.Script(

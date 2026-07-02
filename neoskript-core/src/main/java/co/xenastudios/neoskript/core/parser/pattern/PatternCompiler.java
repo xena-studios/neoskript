@@ -72,8 +72,12 @@ public final class PatternCompiler {
                     // quaternion] x` -> `(?:(?:vector|quaternion)\s+)?x`, not `(?:vector|quaternion\s+)`).
                     boolean preceding = endsWith(regex, "\\s+");
                     char prev = i == 0 ? ' ' : pattern.charAt(i - 1);
+                    // A group is "word-level" (not attached to a preceding literal) when it starts the
+                    // pattern, follows whitespace, or begins an alternation branch or sub-group: after
+                    // `(`/`|`/`]`/`)` there is no preceding literal token, so `([x] y|z)` treats `[x]`
+                    // as word-level and its trailing space as optional (matching "y" as well as "x y").
                     boolean attached = !(i == 0 || Character.isWhitespace(prev)
-                            || prev == ']' || prev == ')');
+                            || prev == ']' || prev == ')' || prev == '(' || prev == '|');
                     if (preceding) {
                         regex.setLength(regex.length() - 3);
                         regex.append("(?:\\s+(?:");
