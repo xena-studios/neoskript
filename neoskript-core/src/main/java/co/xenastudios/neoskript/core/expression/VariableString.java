@@ -83,7 +83,13 @@ public final class VariableString implements Expression<String> {
                 sb.append(literal);
             } else {
                 Expression<?> expression = (Expression<?>) part;
-                sb.append(Renderer.toDisplay(expression.getSingle(ctx)));
+                // A single-valued expression renders its one value; a multi-valued one (e.g. a list
+                // variable {list::*}) joins as "a, b and c", matching Skript.
+                if (expression.isSingle()) {
+                    sb.append(Renderer.toDisplay(expression.getSingle(ctx)));
+                } else {
+                    sb.append(Renderer.toDisplayList(expression.getAll(ctx)));
+                }
             }
         }
         return sb.toString();

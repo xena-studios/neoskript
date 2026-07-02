@@ -13687,7 +13687,8 @@
       "filter %~objects% to match [:any|all]"
     ],
     "source": "ch/njol/skript/sections/SecFilter.java",
-    "status": "todo"
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "section:for-each-loop",

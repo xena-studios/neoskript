@@ -56,6 +56,31 @@ public final class Renderer {
         return String.valueOf(value);
     }
 
+    /**
+     * Renders a multi-value expression result the way Skript joins lists in strings: single values as
+     * themselves, and several as {@code "a, b and c"} (comma-separated with {@code " and "} before the
+     * last). An empty result renders as {@code "<none>"}.
+     *
+     * @param values the values to join
+     * @return the joined display text
+     */
+    public static String toDisplayList(Object[] values) {
+        if (values.length == 0) {
+            return "<none>";
+        }
+        if (values.length == 1) {
+            return toDisplay(values[0]);
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                sb.append(i == values.length - 1 ? " and " : ", ");
+            }
+            sb.append(toDisplay(values[i]));
+        }
+        return sb.toString();
+    }
+
     private static String formatNumber(Number number) {
         double d = number.doubleValue();
         if (d == Math.rint(d) && !Double.isInfinite(d)) {

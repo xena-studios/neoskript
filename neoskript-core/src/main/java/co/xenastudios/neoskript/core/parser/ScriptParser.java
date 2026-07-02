@@ -417,6 +417,10 @@ public final class ScriptParser {
                     && FOR_EACH.matcher(content.substring(0, content.length() - 1).trim()).matches()) {
                 result.add(parseForEach(node, allowDelays));
                 i++;
+            } else if (lower.startsWith("filter ") && content.endsWith(":")
+                    && FILTER_SECTION.matcher(content.substring(0, content.length() - 1).trim()).matches()) {
+                result.add(parseFilterSection(node));
+                i++;
             } else if (content.endsWith(":") && SECTION_SET.matcher(content).matches()
                     && (lower.contains("potion effect") || lower.contains("damage source"))) {
                 result.add(parseSectionSet(node, allowDelays));
@@ -473,6 +477,34 @@ public final class ScriptParser {
 
     /** {@code set <var> to <section value>:} — a section-expression assignment (see {@link SectionValueStatement}). */
     private static final Pattern SECTION_SET = Pattern.compile("(?i)^set\\s+(.+?)\\s+to\\s+(.+):$");
+
+    /** {@code filter <objects> to match [any|all]:} — see {@link co.xenastudios.neoskript.core.runtime.FilterSection}. */
+    private static final Pattern FILTER_SECTION =
+            Pattern.compile("(?i)^filter\\s+(.+?)\\s+to\\s+match(?:\\s+(any|all))?$");
+
+    /**
+     * Parses a {@code filter %~objects% to match [any|all]:} section: the body's condition lines are
+     * evaluated per element (bound to {@code input}) and non-matching elements are dropped from the
+     * list variable in place.
+     */
+    private Statement parseFilterSection(Node node) {
+        String header = node.content().substring(0, node.content().length() - 1).trim();
+        Matcher m = FILTER_SECTION.matcher(header);
+        if (!m.matches()) {
+            throw new ParseException("Malformed 'filter': " + header, node.line());
+        }
+        if (!(expressions.parse(m.group(1).trim()) instanceof VariableExpression var) || !var.isList()) {
+            throw new ParseException("'filter' needs a list variable, got: " + m.group(1), node.line());
+        }
+        boolean matchAny = "any".equalsIgnoreCase(m.group(2));
+        List<co.xenastudios.neoskript.api.syntax.Condition> conditions = new java.util.ArrayList<>();
+        for (Node child : node.children()) {
+            String line = child.content();
+            conditions.add(parseCondition(line.endsWith(":")
+                    ? line.substring(0, line.length() - 1).trim() : line, child.line()));
+        }
+        return new co.xenastudios.neoskript.core.runtime.FilterSection(var, conditions, matchAny);
+    }
 
     /**
      * Parses a section-expression assignment: {@code set {var} to <value>:} with an indented body that
