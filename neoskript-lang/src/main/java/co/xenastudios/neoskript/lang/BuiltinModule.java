@@ -1520,6 +1520,15 @@ public final class BuiltinModule {
         registry.registerCondition("%date% (was|were) less than %timespan% [ago]",
                 a -> dateElapsed(a.get(0), a.get(1), false));
 
+        // Inventory capacity.
+        registry.registerCondition(
+                "%inventories% (can hold|ha(s|ve) [enough] space (for|to hold)) %itemtypes%",
+                a -> canHold(a.get(0), a.get(1), true));
+        registry.registerCondition(
+                "%inventories% (can(no|')t hold|(ha(s|ve) not|ha(s|ve)n't|do[es]n't have) "
+                        + "[enough] space (for|to hold)) %itemtypes%",
+                a -> canHold(a.get(0), a.get(1), false));
+
         // Player-state conditions — registered before the generic equality they would otherwise shadow.
         registerEntityConditions(registry);
 
@@ -2637,6 +2646,63 @@ public final class BuiltinModule {
     }
 
     /** Extracts a millisecond timestamp from a date value (a millis {@link Number} or a {@link java.util.Date}). */
+    /** Whether every inventory can hold all the given items (simulated on a copy of the contents). */
+    private static Condition canHold(Expression<?> inventories, Expression<?> itemtypes, boolean expected) {
+        return ctx -> {
+            Object[] invs = inventories.getAll(ctx);
+            if (invs.length == 0) {
+                return false;
+            }
+            List<ItemStack> items = new ArrayList<>();
+            for (Object value : itemtypes.getAll(ctx)) {
+                ItemStack item = toItemStack(value);
+                if (item != null && item.getType() != org.bukkit.Material.AIR) {
+                    items.add(item);
+                }
+            }
+            for (Object value : invs) {
+                if (!(value instanceof org.bukkit.inventory.Inventory inventory)
+                        || !fits(inventory, items)) {
+                    return !expected;
+                }
+            }
+            return expected;
+        };
+    }
+
+    /** Simulates adding every item to a clone of the inventory's storage; true if all fit. */
+    private static boolean fits(org.bukkit.inventory.Inventory inventory, List<ItemStack> items) {
+        ItemStack[] source = inventory.getStorageContents();
+        ItemStack[] slots = new ItemStack[source.length];
+        for (int i = 0; i < source.length; i++) {
+            slots[i] = source[i] == null ? null : source[i].clone();
+        }
+        for (ItemStack item : items) {
+            int remaining = item.getAmount();
+            int max = item.getMaxStackSize();
+            for (int i = 0; i < slots.length && remaining > 0; i++) {
+                if (slots[i] != null && slots[i].isSimilar(item) && slots[i].getAmount() < max) {
+                    int add = Math.min(remaining, max - slots[i].getAmount());
+                    slots[i].setAmount(slots[i].getAmount() + add);
+                    remaining -= add;
+                }
+            }
+            for (int i = 0; i < slots.length && remaining > 0; i++) {
+                if (slots[i] == null || slots[i].getType() == org.bukkit.Material.AIR) {
+                    ItemStack placed = item.clone();
+                    int add = Math.min(remaining, max);
+                    placed.setAmount(add);
+                    slots[i] = placed;
+                    remaining -= add;
+                }
+            }
+            if (remaining > 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Tests whether every date lies before ({@code past}) or after "now"; result compared to {@code expected}. */
     private static Condition datesVsNow(Expression<?> dates, boolean past, boolean expected) {
         return ctx -> {
