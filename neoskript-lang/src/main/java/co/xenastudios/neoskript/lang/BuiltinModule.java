@@ -1510,6 +1510,16 @@ public final class BuiltinModule {
         registry.registerCondition("%object% (is not|isn't|is not) set", arguments -> isSet(arguments.get(0), false));
         registry.registerCondition("%object% ((is|are) set|exist[s])", arguments -> isSet(arguments.get(0), true));
 
+        // Date comparisons relative to the current moment.
+        registry.registerCondition("%dates% (is|are) in the past", a -> datesVsNow(a.get(0), true, true));
+        registry.registerCondition("%dates% (is|are)(n't| not) in the past", a -> datesVsNow(a.get(0), true, false));
+        registry.registerCondition("%dates% (is|are) in the future", a -> datesVsNow(a.get(0), false, true));
+        registry.registerCondition("%dates% (is|are)(n't| not) in the future", a -> datesVsNow(a.get(0), false, false));
+        registry.registerCondition("%date% (was|were) more than %timespan% [ago]",
+                a -> dateElapsed(a.get(0), a.get(1), true));
+        registry.registerCondition("%date% (was|were) less than %timespan% [ago]",
+                a -> dateElapsed(a.get(0), a.get(1), false));
+
         // Player-state conditions — registered before the generic equality they would otherwise shadow.
         registerEntityConditions(registry);
 
@@ -2627,6 +2637,38 @@ public final class BuiltinModule {
     }
 
     /** Extracts a millisecond timestamp from a date value (a millis {@link Number} or a {@link java.util.Date}). */
+    /** Tests whether every date lies before ({@code past}) or after "now"; result compared to {@code expected}. */
+    private static Condition datesVsNow(Expression<?> dates, boolean past, boolean expected) {
+        return ctx -> {
+            Object[] values = dates.getAll(ctx);
+            if (values.length == 0) {
+                return false;
+            }
+            long now = System.currentTimeMillis();
+            for (Object value : values) {
+                Long ms = dateMillis(value);
+                boolean matches = ms != null && (past ? ms < now : ms > now);
+                if (!matches) {
+                    return !expected;
+                }
+            }
+            return expected;
+        };
+    }
+
+    /** Tests whether the time elapsed since {@code date} is more (or less) than {@code timespan}. */
+    private static Condition dateElapsed(Expression<?> date, Expression<?> timespan, boolean moreThan) {
+        return ctx -> {
+            Long ms = dateMillis(date.getSingle(ctx));
+            if (ms == null
+                    || !(timespan.getSingle(ctx) instanceof co.xenastudios.neoskript.core.runtime.Timespan span)) {
+                return false;
+            }
+            long elapsed = System.currentTimeMillis() - ms;
+            return moreThan ? elapsed > span.millis() : elapsed < span.millis();
+        };
+    }
+
     private static Long dateMillis(Object value) {
         if (value instanceof Number n) {
             return n.longValue();

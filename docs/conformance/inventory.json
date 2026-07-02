@@ -812,8 +812,8 @@
       "%dates% ha(s|ve)[negated:(n't| not)] passed"
     ],
     "source": "ch/njol/skript/conditions/CondPastFuture.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-a-skript-command",
@@ -2263,8 +2263,8 @@
       "%date% (was|were)((n't| not) more| less) than %timespan% [ago]"
     ],
     "source": "ch/njol/skript/conditions/CondDate.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:will-consume-boosting-firework",
