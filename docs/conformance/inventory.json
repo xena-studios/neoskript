@@ -6698,8 +6698,8 @@
       "%inventories%'[s] [anvil] [item] [:max[imum]] repair cost"
     ],
     "source": "ch/njol/skript/expressions/ExprAnvilRepairCost.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:anvil-text-input",
@@ -10552,8 +10552,8 @@
       "%itemtype/inventorytype% (named|with name[s]) %textcomponent%"
     ],
     "source": "ch/njol/skript/expressions/ExprNamed.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:nan",

@@ -93,6 +93,7 @@ public final class BuiltinModule {
         registerVisibilitySyntax(registry);
         registerLogSyntax(registry);
         registerEntitiesSyntax(registry);
+        registerAnvilAndNamedSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -1072,6 +1073,91 @@ public final class BuiltinModule {
             }
             return out.toArray();
         });
+    }
+
+    /**
+     * The anvil repair-cost expression (settable) and the {@code %itemtype% named %textcomponent%}
+     * item builder.
+     */
+    private static void registerAnvilAndNamedSyntax(SyntaxRegistry registry) {
+        registry.registerExpression("[anvil] [item] repair cost of %inventories%", Object.class,
+                arguments -> anvilRepairCost(arguments.get(0), false));
+        registry.registerExpression("[anvil] [item] max[imum] repair cost of %inventories%", Object.class,
+                arguments -> anvilRepairCost(arguments.get(0), true));
+
+        registry.registerExpression("%itemtype% (named|with name[s]) %textcomponent%", Object.class,
+                arguments -> {
+                    Expression<?> item = arguments.get(0);
+                    Expression<?> name = arguments.get(1);
+                    return new ComputedExpression(ctx -> {
+                        ItemStack base = toItemStack(item.getSingle(ctx));
+                        if (base == null) {
+                            return null;
+                        }
+                        Object nameValue = name.getSingle(ctx);
+                        net.kyori.adventure.text.Component component =
+                                nameValue instanceof net.kyori.adventure.text.Component c
+                                        ? c : net.kyori.adventure.text.Component.text(Renderer.toDisplay(nameValue));
+                        ItemStack copy = base.clone();
+                        copy.editMeta(meta -> meta.displayName(component));
+                        return copy;
+                    });
+                });
+    }
+
+    /** A settable anvil repair-cost (or maximum repair-cost) over the given anvil inventories. */
+    private static Expression<Object> anvilRepairCost(Expression<?> inventories, boolean maximum) {
+        return new Expression<Object>() {
+            @Override
+            public Object[] getAll(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                List<Object> out = new ArrayList<>();
+                for (Object value : inventories.getAll(ctx)) {
+                    if (value instanceof org.bukkit.inventory.AnvilInventory anvil) {
+                        out.add((double) (maximum ? anvil.getMaximumRepairCost() : anvil.getRepairCost()));
+                    }
+                }
+                return out.toArray();
+            }
+
+            @Override
+            public Object getSingle(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                Object[] all = getAll(ctx);
+                return all.length > 0 ? all[0] : null;
+            }
+
+            @Override
+            public Class<Object> returnType() {
+                return Object.class;
+            }
+
+            @Override
+            public boolean isSingle() {
+                return inventories.isSingle();
+            }
+
+            @Override
+            public Class<?>[] acceptChange(ChangeMode mode) {
+                return mode == ChangeMode.SET ? new Class<?>[]{Object.class} : null;
+            }
+
+            @Override
+            public void change(co.xenastudios.neoskript.api.runtime.TriggerContext ctx,
+                               Object[] delta, ChangeMode mode) {
+                if (mode != ChangeMode.SET || delta == null || delta.length == 0
+                        || !(delta[0] instanceof Number number)) {
+                    return;
+                }
+                for (Object value : inventories.getAll(ctx)) {
+                    if (value instanceof org.bukkit.inventory.AnvilInventory anvil) {
+                        if (maximum) {
+                            anvil.setMaximumRepairCost(number.intValue());
+                        } else {
+                            anvil.setRepairCost(number.intValue());
+                        }
+                    }
+                }
+            }
+        };
     }
 
     /** The most recent entity spawned by the {@code spawn}/{@code summon} effect (Bukkit is single-threaded). */
