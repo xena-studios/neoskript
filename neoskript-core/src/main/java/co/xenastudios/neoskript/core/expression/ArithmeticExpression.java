@@ -4,9 +4,9 @@ import co.xenastudios.neoskript.api.runtime.TriggerContext;
 import co.xenastudios.neoskript.api.syntax.Expression;
 
 /**
- * A binary arithmetic expression ({@code +}, {@code -}, {@code *}, {@code /}) over numeric operands.
- * Operands that are not numbers (and cannot be parsed as one) make the result {@code null}; division
- * by zero yields {@code null}.
+ * A binary arithmetic expression ({@code +}, {@code -}, {@code *}, {@code /}, {@code ^}) over numeric
+ * operands. Operands that are not numbers (and cannot be parsed as one) make the result {@code null};
+ * division by zero yields {@code null}.
  */
 public final class ArithmeticExpression implements Expression<Double> {
 
@@ -38,6 +38,7 @@ public final class ArithmeticExpression implements Expression<Double> {
             case '-' -> a - b;
             case '*' -> a * b;
             case '/' -> b == 0 ? null : a / b;
+            case '^' -> Math.pow(a, b);
             default -> null;
         };
     }

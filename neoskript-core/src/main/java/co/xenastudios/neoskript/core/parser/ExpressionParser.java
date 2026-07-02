@@ -139,10 +139,45 @@ public final class ExpressionParser {
         int op = findTopLevelOperator(s, "*/");
         if (op >= 0) {
             Expression<?> left = parseMultiplicative(s.substring(0, op).trim());
-            Expression<?> right = parsePrimary(s.substring(op + 1).trim());
+            Expression<?> right = parsePower(s.substring(op + 1).trim());
             return arithmetic(left, s.charAt(op), right);
         }
+        return parsePower(s);
+    }
+
+    /**
+     * Parses exponentiation ({@code ^}), which binds tighter than {@code * /} and is right-associative
+     * ({@code 2 ^ 3 ^ 2} is {@code 2 ^ (3 ^ 2)}), so we split at the <em>leftmost</em> top-level caret.
+     */
+    private Expression<?> parsePower(String s) {
+        int op = findFirstTopLevelOperator(s, '^');
+        if (op >= 0) {
+            Expression<?> left = parsePrimary(s.substring(0, op).trim());
+            Expression<?> right = parsePower(s.substring(op + 1).trim());
+            return arithmetic(left, '^', right);
+        }
         return parsePrimary(s);
+    }
+
+    /** Finds the leftmost top-level (depth-0, outside quotes) occurrence of {@code op}, or -1. */
+    private static int findFirstTopLevelOperator(String s, char op) {
+        int depth = 0;
+        boolean inQuotes = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (inQuotes) {
+                // skip
+            } else if (c == '(' || c == '{') {
+                depth++;
+            } else if (c == ')' || c == '}') {
+                depth--;
+            } else if (depth == 0 && c == op) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /**

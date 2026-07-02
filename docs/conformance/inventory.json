@@ -6779,8 +6779,8 @@
       "%object%[ ]<operator>[ ]%object%"
     ],
     "source": "ch/njol/skript/expressions/arithmetic/ExprArithmetic.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:armor-change-item",
