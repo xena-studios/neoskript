@@ -6462,8 +6462,8 @@
       "[(all|the|all [of] the)] [registered] [(1¦script)] commands"
     ],
     "source": "ch/njol/skript/expressions/ExprAllCommands.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:all-groups",
@@ -6539,8 +6539,8 @@
       "[all [of the]|the] (disabled|unloaded) scripts [1:without ([subdirectory] paths|parents)]"
     ],
     "source": "ch/njol/skript/expressions/ExprScriptsOld.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:all-tags-of-a-type",

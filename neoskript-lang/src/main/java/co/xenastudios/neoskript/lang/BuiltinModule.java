@@ -1090,10 +1090,26 @@ public final class BuiltinModule {
      * published {@link co.xenastudios.neoskript.core.runtime.LoadedScripts} snapshot).
      */
     private static void registerScriptSyntax(SyntaxRegistry registry) {
+        registry.registerExpression(
+                "[(all [[of] the]|the)] [(enabled|loaded)] scripts without [subdirectory] (paths|parents)",
+                Object.class, a -> new ComputedListExpression(ctx ->
+                        co.xenastudios.neoskript.core.runtime.LoadedScripts.names().stream()
+                                .map(name -> new co.xenastudios.neoskript.lang.type.Script(
+                                        name.replaceAll(".*[/\\\\]", "")))
+                                .toArray()));
         registry.registerExpression("[(all [[of] the]|the)] [(enabled|loaded)] scripts", Object.class,
                 a -> new ComputedListExpression(ctx ->
                         co.xenastudios.neoskript.core.runtime.LoadedScripts.names().stream()
                                 .map(co.xenastudios.neoskript.lang.type.Script::new).toArray()));
+        registry.registerExpression("[(all|the|all [of] the)] [registered] commands", Object.class,
+                a -> new ComputedListExpression(ctx -> {
+                    java.util.Set<String> out = new java.util.LinkedHashSet<>();
+                    for (String label : Bukkit.getServer().getCommandMap().getKnownCommands().keySet()) {
+                        int colon = label.indexOf(':');
+                        out.add(colon >= 0 ? label.substring(colon + 1) : label);
+                    }
+                    return out.toArray();
+                }));
         registry.registerCondition("script[s] %strings% (is|are) loaded",
                 a -> scriptsLoaded(a.get(0), true));
         registry.registerCondition("script[s] %strings% (is|are) not loaded",
