@@ -3730,8 +3730,8 @@
       "make %skriptpotioneffects% [:not] ambient"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/effects/EffPotionAmbient.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:potion-effect-icon",
@@ -3743,8 +3743,8 @@
       "(show|not:hide) %skriptpotioneffects%'[s] icon[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/effects/EffPotionIcon.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:potion-effect-infinite",
@@ -3755,8 +3755,8 @@
       "make %skriptpotioneffects% [:not] (infinite|permanent)"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/effects/EffPotionInfinite.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:potion-effect-particles",
@@ -3768,8 +3768,8 @@
       "(show|not:hide) %skriptpotioneffects%'[s] particles"
     ],
     "source": "org/skriptlang/skript/bukkit/potion/elements/effects/EffPotionParticles.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:pull-in-hooked-entity",

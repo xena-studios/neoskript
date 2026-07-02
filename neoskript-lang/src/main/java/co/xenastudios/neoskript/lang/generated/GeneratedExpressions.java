@@ -2876,34 +2876,34 @@ public final class GeneratedExpressions {
         }));
         registry.registerExpression("[a[n]] potion effect of %object% [[of tier] %object%] [for %object%]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = a.get(1).getSingle(ctx);
-            Object a2 = a.get(2).getSingle(ctx);
+            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
+            Object a2 = (a.get(2) == null ? null : a.get(2).getSingle(ctx));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && a2 instanceof co.xenastudios.neoskript.core.runtime.Timespan && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, (int) Math.max(0L, Math.min(((co.xenastudios.neoskript.core.runtime.Timespan) a2).ticks(), (long) Integer.MAX_VALUE)), a1 == null ? 0 : ((Number) a1).intValue() - 1, false, true, true) : null);
         }));
         registry.registerExpression("[a[n]] ambient potion effect of %object% [[of tier] %object%] [for %object%]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = a.get(1).getSingle(ctx);
-            Object a2 = a.get(2).getSingle(ctx);
+            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
+            Object a2 = (a.get(2) == null ? null : a.get(2).getSingle(ctx));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && a2 instanceof co.xenastudios.neoskript.core.runtime.Timespan && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, (int) Math.max(0L, Math.min(((co.xenastudios.neoskript.core.runtime.Timespan) a2).ticks(), (long) Integer.MAX_VALUE)), a1 == null ? 0 : ((Number) a1).intValue() - 1, true, true, true) : null);
         }));
         registry.registerExpression("[an] (infinite|permanent) potion effect of %object% [[of tier] %object%]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = a.get(1).getSingle(ctx);
+            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, -1, a1 == null ? 0 : ((Number) a1).intValue() - 1, false, true, true) : null);
         }));
         registry.registerExpression("[an] (infinite|permanent) ambient potion effect of %object% [[of tier] %object%]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = a.get(1).getSingle(ctx);
+            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, -1, a1 == null ? 0 : ((Number) a1).intValue() - 1, true, true, true) : null);
         }));
         registry.registerExpression("[an] (infinite|permanent) %object% [[of tier] %object%] [potion [effect]]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = a.get(1).getSingle(ctx);
+            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, -1, a1 == null ? 0 : ((Number) a1).intValue() - 1, false, true, true) : null);
         }));
         registry.registerExpression("[an] (infinite|permanent) ambient %object% [[of tier] %object%] [potion [effect]]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = a.get(1).getSingle(ctx);
+            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, -1, a1 == null ? 0 : ((Number) a1).intValue() - 1, true, true, true) : null);
         }));
         registry.registerExpression("[a] potion effect [of %object%] (from|using|based on) %object%", Object.class, a -> new ComputedExpression(ctx -> {

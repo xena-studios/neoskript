@@ -87,6 +87,7 @@ public final class BuiltinModule {
         registerHashAndVectorSyntax(registry);
         registerSlotSyntax(registry);
         registerClassInfoSyntax(registry);
+        registerPotionSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -957,6 +958,69 @@ public final class BuiltinModule {
             }
             return out.toArray();
         });
+    }
+
+    /**
+     * Potion-effect modifier effects: {@code make %potioneffects% [not] ambient/infinite} and
+     * {@code show/hide [potion] icon[s]/particles of %potioneffects%}. Bukkit's {@link PotionEffect} is
+     * immutable, so each rebuilds the effect with one field changed and reassigns it in the source
+     * variable (mirroring Skript's mutable {@code SkriptPotionEffect} wrapper). "Not infinite" resets
+     * the duration to Skript's default of 600 ticks, matching the wrapper.
+     */
+    private static void registerPotionSyntax(SyntaxRegistry registry) {
+        registry.registerEffect("make %skriptpotioneffects% ambient",
+                a -> modifyPotionEffects(a.get(0), pe -> withAmbient(pe, true)));
+        registry.registerEffect("make %skriptpotioneffects% not ambient",
+                a -> modifyPotionEffects(a.get(0), pe -> withAmbient(pe, false)));
+        registry.registerEffect("make %skriptpotioneffects% (infinite|permanent)",
+                a -> modifyPotionEffects(a.get(0), pe -> withInfinite(pe, true)));
+        registry.registerEffect("make %skriptpotioneffects% not (infinite|permanent)",
+                a -> modifyPotionEffects(a.get(0), pe -> withInfinite(pe, false)));
+        registry.registerEffect("show [the] [potion] icon[s] (of|for) %skriptpotioneffects%",
+                a -> modifyPotionEffects(a.get(0), pe -> withIcon(pe, true)));
+        registry.registerEffect("hide [the] [potion] icon[s] (of|for) %skriptpotioneffects%",
+                a -> modifyPotionEffects(a.get(0), pe -> withIcon(pe, false)));
+        registry.registerEffect("show [the] [potion] particles (of|for) %skriptpotioneffects%",
+                a -> modifyPotionEffects(a.get(0), pe -> withParticles(pe, true)));
+        registry.registerEffect("hide [the] [potion] particles (of|for) %skriptpotioneffects%",
+                a -> modifyPotionEffects(a.get(0), pe -> withParticles(pe, false)));
+    }
+
+    /** Rebuilds and reassigns each potion effect in a variable source through {@code transform}. */
+    private static co.xenastudios.neoskript.api.syntax.Effect modifyPotionEffects(
+            Expression<?> source, java.util.function.UnaryOperator<PotionEffect> transform) {
+        VariableExpression variable = requireVariable(source);
+        return ctx -> {
+            if (variable.isList()) {
+                Object[] values = variable.getAll(ctx);
+                variable.delete(ctx);
+                for (Object value : values) {
+                    variable.addToList(ctx, value instanceof PotionEffect pe ? transform.apply(pe) : value);
+                }
+            } else if (variable.getSingle(ctx) instanceof PotionEffect pe) {
+                variable.set(ctx, transform.apply(pe));
+            }
+        };
+    }
+
+    private static PotionEffect withAmbient(PotionEffect pe, boolean value) {
+        return new PotionEffect(pe.getType(), pe.getDuration(), pe.getAmplifier(),
+                value, pe.hasParticles(), pe.hasIcon());
+    }
+
+    private static PotionEffect withParticles(PotionEffect pe, boolean value) {
+        return new PotionEffect(pe.getType(), pe.getDuration(), pe.getAmplifier(),
+                pe.isAmbient(), value, pe.hasIcon());
+    }
+
+    private static PotionEffect withIcon(PotionEffect pe, boolean value) {
+        return new PotionEffect(pe.getType(), pe.getDuration(), pe.getAmplifier(),
+                pe.isAmbient(), pe.hasParticles(), value);
+    }
+
+    private static PotionEffect withInfinite(PotionEffect pe, boolean infinite) {
+        return new PotionEffect(pe.getType(), infinite ? PotionEffect.INFINITE_DURATION : 600,
+                pe.getAmplifier(), pe.isAmbient(), pe.hasParticles(), pe.hasIcon());
     }
 
     /**

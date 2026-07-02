@@ -6,7 +6,7 @@ Tiers: **`done`** = implemented and covered by a behaviour test (strongest). **`
 
 | Category | Documented | External | In-scope | Done | Parse-verified | Verified | % |
 |---|---|---|---|---|---|---|---|
-| effect | 148 | 5 | 143 | 33 | 94 | 127 | 88.8% |
+| effect | 148 | 5 | 143 | 37 | 94 | 131 | 91.6% |
 | condition | 168 | 6 | 162 | 59 | 98 | 157 | 96.9% |
 | expression | 515 | 21 | 494 | 100 | 340 | 440 | 89.1% |
 | event | 167 | 2 | 165 | 148 | 11 | 159 | 96.4% |
@@ -14,6 +14,6 @@ Tiers: **`done`** = implemented and covered by a behaviour test (strongest). **`
 | function | 48 | 0 | 48 | 48 | 0 | 48 | 100.0% |
 | section | 9 | 2 | 7 | 5 | 1 | 6 | 85.7% |
 | structure | 10 | 4 | 6 | 6 | 0 | 6 | 100.0% |
-| **Total** | **1200** | **56** | **1144** | **471** | **582** | **1053** | **92.0%** |
+| **Total** | **1200** | **56** | **1144** | **475** | **582** | **1057** | **92.4%** |
 
-_Verified 1053/1144 (92.0%) — of which behaviour-tested (done) 471 (41.2%). Goal: 100% of the 1144 in-scope entries._
+_Verified 1057/1144 (92.4%) — of which behaviour-tested (done) 475 (41.5%). Goal: 100% of the 1144 in-scope entries._
