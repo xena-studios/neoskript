@@ -199,7 +199,8 @@ public final class ExpressionParser {
             Optional<List<String>> match = entry.pattern().match(s);
             if (match.isPresent()) {
                 try {
-                    return entry.factory().create(new SimpleArguments(parseArguments(match.get())));
+                    return entry.factory().create(new SimpleArguments(
+                            parseArguments(match.get(), entry.pattern().argTypes())));
                 } catch (ParseException ignored) {
                     // Overlapping pattern whose arguments don't parse — try the next candidate.
                 }
@@ -262,11 +263,58 @@ public final class ExpressionParser {
      * @return the parsed argument expressions
      */
     public List<Expression<?>> parseArguments(List<String> captures) {
+        return parseArguments(captures, null);
+    }
+
+    /**
+     * Parses captured argument substrings into expressions, resolving type-reference slots specially.
+     * A slot whose declared type is {@code classinfo} does not parse its capture as an expression;
+     * instead the capture names a type ({@code "number"}, {@code "a player"}, {@code "integers"}),
+     * which is resolved to a {@link co.xenastudios.neoskript.api.type.Type} and supplied as a constant
+     * expression yielding that type. If the name resolves to no known type the argument fails to parse
+     * (so the enclosing pattern falls through), mirroring Skript's {@code %classinfo%} handling.
+     *
+     * @param captures the captured argument strings
+     * @param argTypes the declared base type name of each slot (may be {@code null})
+     * @return the parsed argument expressions
+     */
+    public List<Expression<?>> parseArguments(List<String> captures, List<String> argTypes) {
         List<Expression<?>> args = new ArrayList<>(captures.size());
-        for (String capture : captures) {
-            args.add(capture == null ? null : parse(capture));
+        for (int i = 0; i < captures.size(); i++) {
+            String capture = captures.get(i);
+            String slotType = argTypes != null && i < argTypes.size() ? argTypes.get(i) : null;
+            if (capture == null) {
+                args.add(null);
+            } else if ("classinfo".equals(slotType)) {
+                args.add(classInfoArgument(capture));
+            } else {
+                args.add(parse(capture));
+            }
         }
         return args;
+    }
+
+    /** Resolves a {@code %classinfo%} capture (a type name) to a constant expression yielding its type. */
+    private Expression<?> classInfoArgument(String capture) {
+        co.xenastudios.neoskript.core.type.TypeRegistry types =
+                co.xenastudios.neoskript.core.runtime.Renderer.typeRegistry();
+        if (types == null) {
+            throw new ParseException("No type registry available to resolve '" + capture + "'");
+        }
+        String name = capture.trim().toLowerCase(java.util.Locale.ROOT);
+        String withoutArticle = stripLeadingArticle(name);
+        if (withoutArticle != null) {
+            name = withoutArticle;
+        }
+        co.xenastudios.neoskript.api.type.Type<?> type = types.byCodeName(name);
+        if (type == null && name.endsWith("s")) {
+            type = types.byCodeName(name.substring(0, name.length() - 1));
+        }
+        if (type == null) {
+            throw new ParseException("There is no type named '" + capture + "'");
+        }
+        co.xenastudios.neoskript.api.type.Type<?> resolved = type;
+        return new ComputedExpression(ctx -> resolved);
     }
 
     private static final Pattern META_MAP = Pattern.compile(
@@ -409,7 +457,8 @@ public final class ExpressionParser {
             Optional<List<String>> match = entry.pattern().match(content);
             if (match.isPresent()) {
                 try {
-                    return entry.factory().create(new SimpleArguments(parseArguments(match.get())));
+                    return entry.factory().create(new SimpleArguments(
+                            parseArguments(match.get(), entry.pattern().argTypes())));
                 } catch (ParseException e) {
                     lastError = e;
                 }

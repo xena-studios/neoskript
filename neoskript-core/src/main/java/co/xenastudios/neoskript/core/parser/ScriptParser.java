@@ -435,7 +435,8 @@ public final class ScriptParser {
             if (match.isPresent()) {
                 try {
                     return new EffectStatement(
-                            entry.factory().create(new SimpleArguments(expressions.parseArguments(match.get()))));
+                            entry.factory().create(new SimpleArguments(
+                                    expressions.parseArguments(match.get(), entry.pattern().argTypes()))));
                 } catch (ParseException e) {
                     lastError = e;
                 }
@@ -567,7 +568,8 @@ public final class ScriptParser {
             Optional<List<String>> match = entry.pattern().match(content);
             if (match.isPresent()) {
                 try {
-                    return entry.factory().create(new SimpleArguments(expressions.parseArguments(match.get())));
+                    return entry.factory().create(new SimpleArguments(
+                            expressions.parseArguments(match.get(), entry.pattern().argTypes())));
                 } catch (ParseException e) {
                     lastError = e; // try the next overlapping candidate
                 }

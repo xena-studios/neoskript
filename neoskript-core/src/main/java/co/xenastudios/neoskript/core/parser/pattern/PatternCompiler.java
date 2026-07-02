@@ -33,6 +33,9 @@ public final class PatternCompiler {
     public static SyntaxPattern compile(String pattern) {
         StringBuilder regex = new StringBuilder("^");
         int argCount = 0;
+        // The declared base type name of each `%type%` slot, in order (modifiers -/*/~ stripped). Used
+        // so slots such as `%classinfo%` can be resolved to a type reference instead of an expression.
+        java.util.List<String> argTypes = new java.util.ArrayList<>();
         int i = 0;
         int length = pattern.length();
         // An optional group `[...]` absorbs exactly ONE adjacent space so that the separator around it
@@ -58,6 +61,9 @@ public final class PatternCompiler {
                     }
                     regex.append("(.+?)");
                     argCount++;
+                    // Record the slot's base type name (e.g. `%-*classinfo%` -> "classinfo").
+                    argTypes.add(pattern.substring(i + 1, end)
+                            .replaceFirst("^[-*~]+", "").toLowerCase(java.util.Locale.ROOT));
                     i = end + 1;
                 }
                 case '[' -> {
@@ -123,7 +129,7 @@ public final class PatternCompiler {
 
         regex.append('$');
         return new SyntaxPattern(pattern, Pattern.compile(regex.toString(), Pattern.CASE_INSENSITIVE),
-                argCount, leadingLiteral(pattern));
+                argCount, leadingLiteral(pattern), java.util.List.copyOf(argTypes));
     }
 
     /**

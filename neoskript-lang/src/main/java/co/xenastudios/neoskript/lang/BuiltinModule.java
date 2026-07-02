@@ -86,6 +86,7 @@ public final class BuiltinModule {
         registerParticleSyntax(registry);
         registerHashAndVectorSyntax(registry);
         registerSlotSyntax(registry);
+        registerClassInfoSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -934,6 +935,52 @@ public final class BuiltinModule {
                 arguments -> slotExpression(arguments.get(1), arguments.get(0)));
         registry.registerExpression("%inventory%'[s] slot[s] %numbers%", Object.class,
                 arguments -> slotExpression(arguments.get(0), arguments.get(1)));
+    }
+
+    /**
+     * Expressions that consume a {@code %classinfo%} type-reference argument (resolved by the parser to
+     * a {@link co.xenastudios.neoskript.api.type.Type}): {@code %string% parsed as %type%} and
+     * {@code %type% value of %objects%}. Parsing runs the type's own parser on the string; the value
+     * form keeps objects already of the type and otherwise re-parses their display form.
+     */
+    private static void registerClassInfoSyntax(SyntaxRegistry registry) {
+        registry.registerExpression("%string% parsed as %classinfo%", Object.class, arguments -> {
+            Expression<?> text = arguments.get(0);
+            Expression<?> typeArg = arguments.get(1);
+            return new ComputedExpression(ctx -> {
+                Object value = text.getSingle(ctx);
+                if (value == null
+                        || !(typeArg.getSingle(ctx) instanceof co.xenastudios.neoskript.api.type.Type<?> type)) {
+                    return null;
+                }
+                return type.parse(Renderer.toDisplay(value)).orElse(null);
+            });
+        });
+        registry.registerExpression("[the] %classinfo% value of %objects%", Object.class,
+                arguments -> valueExpression(arguments.get(0), arguments.get(1)));
+        registry.registerExpression("%objects%'[s] %classinfo% value", Object.class,
+                arguments -> valueExpression(arguments.get(1), arguments.get(0)));
+    }
+
+    /** {@code %type% value of %objects%} — each object as the target type (kept if already so, else re-parsed). */
+    private static Expression<Object> valueExpression(Expression<?> typeArg, Expression<?> objects) {
+        return new ComputedListExpression(ctx -> {
+            if (!(typeArg.getSingle(ctx) instanceof co.xenastudios.neoskript.api.type.Type<?> type)) {
+                return new Object[0];
+            }
+            List<Object> out = new ArrayList<>();
+            for (Object value : objects.getAll(ctx)) {
+                if (value == null) {
+                    continue;
+                }
+                if (type.typeClass().isInstance(value)) {
+                    out.add(value);
+                } else {
+                    type.parse(Renderer.toDisplay(value)).ifPresent(out::add);
+                }
+            }
+            return out.toArray();
+        });
     }
 
     /** {@code inventory of %inventoryholders%} — resolves each holder to its {@link org.bukkit.inventory.Inventory}. */

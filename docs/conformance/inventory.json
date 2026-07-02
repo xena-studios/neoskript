@@ -10791,8 +10791,8 @@
       "%string% parsed as (%-*classinfo%|\"<.*>\")"
     ],
     "source": "ch/njol/skript/expressions/ExprParse.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:parse-error",
@@ -12457,8 +12457,8 @@
       "%valueds%'[s] %*classinfo% values"
     ],
     "source": "ch/njol/skript/expressions/ExprValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:value-2",
@@ -12470,8 +12470,8 @@
       "%objects%'[s] [%-*classinfo%] value"
     ],
     "source": "org/skriptlang/skript/common/properties/elements/expressions/PropExprValueOf.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:value-of-subnode",

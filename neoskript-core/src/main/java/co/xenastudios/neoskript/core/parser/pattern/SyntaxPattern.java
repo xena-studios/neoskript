@@ -21,12 +21,14 @@ public final class SyntaxPattern {
     private final Pattern regex;
     private final int argCount;
     private final String firstLiteral;
+    private final List<String> argTypes;
 
-    SyntaxPattern(String raw, Pattern regex, int argCount, String firstLiteral) {
+    SyntaxPattern(String raw, Pattern regex, int argCount, String firstLiteral, List<String> argTypes) {
         this.raw = raw;
         this.regex = regex;
         this.argCount = argCount;
         this.firstLiteral = firstLiteral;
+        this.argTypes = argTypes;
     }
 
     /**
@@ -92,6 +94,14 @@ public final class SyntaxPattern {
     /** @return the number of {@code %type%} argument slots */
     public int argCount() {
         return argCount;
+    }
+
+    /**
+     * @return the declared base type name of each argument slot in order (modifiers stripped), e.g.
+     *         {@code "classinfo"} or {@code "player"}. Used to resolve type-reference slots.
+     */
+    public List<String> argTypes() {
+        return argTypes;
     }
 
     /**
