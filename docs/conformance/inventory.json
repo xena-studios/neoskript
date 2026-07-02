@@ -10945,8 +10945,8 @@
       "%chunks/worlds/entities/blocks/itemtypes/offlineplayers%'[s] [persistent] [%-*classinfo%] [:list] data (value|tag) %string%"
     ],
     "source": "org/skriptlang/skript/bukkit/pdc/elements/expressions/ExprPersistentData.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:pi",

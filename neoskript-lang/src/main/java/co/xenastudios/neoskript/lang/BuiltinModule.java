@@ -94,6 +94,7 @@ public final class BuiltinModule {
         registerLogSyntax(registry);
         registerEntitiesSyntax(registry);
         registerAnvilAndNamedSyntax(registry);
+        registerPersistentDataSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -1073,6 +1074,135 @@ public final class BuiltinModule {
             }
             return out.toArray();
         });
+    }
+
+    /**
+     * The {@code [persistent] data value %string% of %objects%} expression — reads/writes a custom
+     * value in the holder's {@link org.bukkit.persistence.PersistentDataContainer}. The PDC type is
+     * inferred from the value on set (string/number/boolean) and probed on read.
+     */
+    private static void registerPersistentDataSyntax(SyntaxRegistry registry) {
+        registry.registerExpression("[persistent] data (value|tag) %string% of %objects%", Object.class,
+                arguments -> {
+                    Expression<?> key = arguments.get(0);
+                    Expression<?> holders = arguments.get(1);
+                    return new Expression<Object>() {
+                        private org.bukkit.NamespacedKey key(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                            org.bukkit.plugin.Plugin owner = Bukkit.getPluginManager().getPlugin("NeoSkript");
+                            Object raw = key.getSingle(ctx);
+                            if (owner == null || raw == null) {
+                                return null;
+                            }
+                            String name = Renderer.toDisplay(raw).toLowerCase(Locale.ROOT)
+                                    .replaceAll("[^a-z0-9._-]", "_");
+                            return name.isEmpty() ? null : new org.bukkit.NamespacedKey(owner, name);
+                        }
+
+                        private java.util.List<org.bukkit.persistence.PersistentDataHolder> holders(
+                                co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                            java.util.List<org.bukkit.persistence.PersistentDataHolder> out = new ArrayList<>();
+                            for (Object value : holders.getAll(ctx)) {
+                                if (value instanceof org.bukkit.persistence.PersistentDataHolder holder) {
+                                    out.add(holder);
+                                } else if (value instanceof org.bukkit.block.Block block
+                                        && block.getState() instanceof org.bukkit.persistence.PersistentDataHolder held) {
+                                    out.add(held);
+                                }
+                            }
+                            return out;
+                        }
+
+                        @Override
+                        public Object[] getAll(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                            org.bukkit.NamespacedKey namespaced = key(ctx);
+                            if (namespaced == null) {
+                                return new Object[0];
+                            }
+                            List<Object> out = new ArrayList<>();
+                            for (org.bukkit.persistence.PersistentDataHolder holder : holders(ctx)) {
+                                Object read = readPersistent(holder.getPersistentDataContainer(), namespaced);
+                                if (read != null) {
+                                    out.add(read);
+                                }
+                            }
+                            return out.toArray();
+                        }
+
+                        @Override
+                        public Object getSingle(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                            Object[] all = getAll(ctx);
+                            return all.length > 0 ? all[0] : null;
+                        }
+
+                        @Override
+                        public Class<Object> returnType() {
+                            return Object.class;
+                        }
+
+                        @Override
+                        public boolean isSingle() {
+                            return holders.isSingle();
+                        }
+
+                        @Override
+                        public Class<?>[] acceptChange(ChangeMode mode) {
+                            return switch (mode) {
+                                case SET, DELETE, RESET -> new Class<?>[]{Object.class};
+                                default -> null;
+                            };
+                        }
+
+                        @Override
+                        public void change(co.xenastudios.neoskript.api.runtime.TriggerContext ctx,
+                                           Object[] delta, ChangeMode mode) {
+                            org.bukkit.NamespacedKey namespaced = key(ctx);
+                            if (namespaced == null) {
+                                return;
+                            }
+                            Object value = mode == ChangeMode.SET && delta != null && delta.length > 0
+                                    ? delta[0] : null;
+                            for (org.bukkit.persistence.PersistentDataHolder holder : holders(ctx)) {
+                                org.bukkit.persistence.PersistentDataContainer pdc =
+                                        holder.getPersistentDataContainer();
+                                if (value == null) {
+                                    pdc.remove(namespaced);
+                                } else {
+                                    writePersistent(pdc, namespaced, value);
+                                }
+                                if (holder instanceof org.bukkit.block.BlockState state) {
+                                    state.update();
+                                }
+                            }
+                        }
+                    };
+                });
+    }
+
+    /** Reads a persistent value, probing the common PDC types in turn. */
+    private static Object readPersistent(org.bukkit.persistence.PersistentDataContainer pdc,
+                                         org.bukkit.NamespacedKey key) {
+        if (pdc.has(key, org.bukkit.persistence.PersistentDataType.STRING)) {
+            return pdc.get(key, org.bukkit.persistence.PersistentDataType.STRING);
+        }
+        if (pdc.has(key, org.bukkit.persistence.PersistentDataType.DOUBLE)) {
+            return pdc.get(key, org.bukkit.persistence.PersistentDataType.DOUBLE);
+        }
+        if (pdc.has(key, org.bukkit.persistence.PersistentDataType.BYTE)) {
+            return pdc.get(key, org.bukkit.persistence.PersistentDataType.BYTE) != 0;
+        }
+        return null;
+    }
+
+    /** Writes a persistent value, choosing the PDC type from the value (string/number/boolean). */
+    private static void writePersistent(org.bukkit.persistence.PersistentDataContainer pdc,
+                                        org.bukkit.NamespacedKey key, Object value) {
+        if (value instanceof Number number) {
+            pdc.set(key, org.bukkit.persistence.PersistentDataType.DOUBLE, number.doubleValue());
+        } else if (value instanceof Boolean bool) {
+            pdc.set(key, org.bukkit.persistence.PersistentDataType.BYTE, (byte) (bool ? 1 : 0));
+        } else {
+            pdc.set(key, org.bukkit.persistence.PersistentDataType.STRING, Renderer.toDisplay(value));
+        }
     }
 
     /**
