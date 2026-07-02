@@ -99,6 +99,7 @@ public final class BuiltinModule {
         registerScriptSyntax(registry);
         registerTagSyntax(registry);
         registerTagEffect(registry);
+        registerSoundSyntax(registry);
         registerFunctionSyntax(registry);
         registerEventSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
@@ -1497,6 +1498,60 @@ public final class BuiltinModule {
                                         skriptKey(name.toString().trim()), members));
                     });
         }
+    }
+
+    /**
+     * Registers {@code [the] (break|fall|hit|place|step) sound[s] of %blocks/blockdatas/itemtypes%}
+     * (Skript 2.10) — each block's sound-group sound as its namespaced key. Not behaviour-tested:
+     * MockBukkit leaves {@code BlockData#getSoundGroup} unimplemented, so it is parse-verified only.
+     */
+    private static void registerSoundSyntax(SyntaxRegistry registry) {
+        registry.registerExpression("[the] break sound[s] of %objects%", Object.class,
+                a -> blockSound(a.get(0), org.bukkit.SoundGroup::getBreakSound));
+        registry.registerExpression("[the] fall sound[s] of %objects%", Object.class,
+                a -> blockSound(a.get(0), org.bukkit.SoundGroup::getFallSound));
+        registry.registerExpression("[the] hit sound[s] of %objects%", Object.class,
+                a -> blockSound(a.get(0), org.bukkit.SoundGroup::getHitSound));
+        registry.registerExpression("[the] place sound[s] of %objects%", Object.class,
+                a -> blockSound(a.get(0), org.bukkit.SoundGroup::getPlaceSound));
+        registry.registerExpression("[the] step sound[s] of %objects%", Object.class,
+                a -> blockSound(a.get(0), org.bukkit.SoundGroup::getStepSound));
+    }
+
+    /** Maps each source block/blockdata/itemtype to one of its sound-group sounds (as a key string). */
+    private static Expression<Object> blockSound(Expression<?> source,
+            java.util.function.Function<org.bukkit.SoundGroup, org.bukkit.Sound> picker) {
+        return new ComputedListExpression(ctx -> {
+            List<Object> out = new ArrayList<>();
+            for (Object value : source.getAll(ctx)) {
+                org.bukkit.block.data.BlockData data = blockDataOf(value);
+                if (data == null) {
+                    continue;
+                }
+                org.bukkit.Sound sound = picker.apply(data.getSoundGroup());
+                if (sound != null) {
+                    out.add(sound.getKey().toString());
+                }
+            }
+            return out.toArray();
+        });
+    }
+
+    /** Resolves a block, block data, item stack, or material to its block data, or {@code null}. */
+    private static org.bukkit.block.data.BlockData blockDataOf(Object value) {
+        if (value instanceof org.bukkit.block.data.BlockData data) {
+            return data;
+        }
+        if (value instanceof org.bukkit.block.Block block) {
+            return block.getBlockData();
+        }
+        if (value instanceof ItemStack item && item.getType().isBlock()) {
+            return item.getType().createBlockData();
+        }
+        if (value instanceof org.bukkit.Material material && material.isBlock()) {
+            return material.createBlockData();
+        }
+        return null;
     }
 
     private static void registerScriptSyntax(SyntaxRegistry registry) {

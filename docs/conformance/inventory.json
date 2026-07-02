@@ -7125,8 +7125,8 @@
       "%blocks/blockdatas/itemtypes%'[s] (break|fall|hit|place|step) sound[s]"
     ],
     "source": "ch/njol/skript/expressions/ExprBlockSound.java",
-    "status": "todo",
-    "implemented": false
+    "status": "parse-verified",
+    "implemented": true
   },
   {
     "id": "expression:block-sphere",
