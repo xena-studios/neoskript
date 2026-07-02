@@ -1887,6 +1887,24 @@ public final class BuiltinModule {
         });
         registry.registerExpression("[the] %classinfo% value of %objects%", Object.class,
                 arguments -> valueExpression(arguments.get(0), arguments.get(1)));
+        // %type% within %objects% — keeps only the objects that are instances of the type. Uses
+        // "within" (not the generic "in") to avoid shadowing the many "... in ..." expressions.
+        registry.registerExpression("[the] %classinfo% within %objects%", Object.class, arguments -> {
+            Expression<?> typeArg = arguments.get(0);
+            Expression<?> objects = arguments.get(1);
+            return new ComputedListExpression(ctx -> {
+                if (!(typeArg.getSingle(ctx) instanceof co.xenastudios.neoskript.api.type.Type<?> type)) {
+                    return new Object[0];
+                }
+                List<Object> out = new ArrayList<>();
+                for (Object value : objects.getAll(ctx)) {
+                    if (value != null && type.typeClass().isInstance(value)) {
+                        out.add(value);
+                    }
+                }
+                return out.toArray();
+            });
+        });
         registry.registerExpression("%objects%'[s] %classinfo% value", Object.class,
                 arguments -> valueExpression(arguments.get(1), arguments.get(0)));
     }

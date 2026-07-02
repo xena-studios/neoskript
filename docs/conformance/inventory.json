@@ -12495,8 +12495,8 @@
       "[the] (%-*classinfo%|value[:s]) (within|in) %~objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprValueWithin.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:vector-quaternion-wxyz-component",
