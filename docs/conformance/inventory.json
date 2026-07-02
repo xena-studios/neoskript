@@ -2648,8 +2648,8 @@
       "copy %~objects% [in]to %~objects%"
     ],
     "source": "ch/njol/skript/effects/EffCopy.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:damage-heal-repair",
@@ -11846,8 +11846,8 @@
       "%slots%'[s] [raw:(raw|unique)] index"
     ],
     "source": "ch/njol/skript/expressions/ExprSlotIndex.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:sorted-list",

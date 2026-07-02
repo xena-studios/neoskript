@@ -925,16 +925,38 @@ public final class BuiltinModule {
      * which renders as its contents); {@code SET}/{@code DELETE} write the item into the inventory.
      */
     private static void registerSlotSyntax(SyntaxRegistry registry) {
+        // Slot expressions register BEFORE the possessive inventory expression below: the latter is a
+        // greedy wildcard (`%objects%'s inventory`) that would otherwise capture "slot N of player"
+        // out of "slot N of player's inventory". Lower registration order = higher match priority.
+        registry.registerExpression("[the] slot[s] %numbers% of %inventory%", Object.class,
+                arguments -> slotExpression(arguments.get(1), arguments.get(0)));
+        registry.registerExpression("%inventory%'[s] slot[s] %numbers%", Object.class,
+                arguments -> slotExpression(arguments.get(0), arguments.get(1)));
+
         // inventory of %inventoryholders% — a holder's (player/block) inventory.
         registry.registerExpression("inventor(y|ies) of %objects%", Object.class,
                 arguments -> inventoryExpression(arguments.get(0)));
         registry.registerExpression("%objects%'[s] inventor(y|ies)", Object.class,
                 arguments -> inventoryExpression(arguments.get(0)));
 
-        registry.registerExpression("[the] slot[s] %numbers% of %inventory%", Object.class,
-                arguments -> slotExpression(arguments.get(1), arguments.get(0)));
-        registry.registerExpression("%inventory%'[s] slot[s] %numbers%", Object.class,
-                arguments -> slotExpression(arguments.get(0), arguments.get(1)));
+        // index of %slots% — the slot's position within its inventory.
+        registry.registerExpression("[(raw|unique)] index of %slots%", Object.class,
+                arguments -> slotIndexExpression(arguments.get(0)));
+        registry.registerExpression("%slots%'[s] [(raw|unique)] index", Object.class,
+                arguments -> slotIndexExpression(arguments.get(0)));
+    }
+
+    /** {@code index of %slots%} — each slot's inventory index as a number. */
+    private static Expression<Object> slotIndexExpression(Expression<?> source) {
+        return new ComputedListExpression(ctx -> {
+            List<Object> out = new ArrayList<>();
+            for (Object value : source.getAll(ctx)) {
+                if (value instanceof co.xenastudios.neoskript.lang.type.Slot slot) {
+                    out.add((double) slot.index());
+                }
+            }
+            return out.toArray();
+        });
     }
 
     /**
@@ -2877,6 +2899,23 @@ public final class BuiltinModule {
             throw StopSignal.INSTANCE;
         });
 
+        // copy %objects% into %objects% — deep-copies the source values into a target variable.
+        registry.registerEffect("copy %objects% [in]to %objects%", arguments -> {
+            Expression<?> source = arguments.get(0);
+            VariableExpression target = requireVariable(arguments.get(1));
+            return ctx -> {
+                Object[] values = source.getAll(ctx);
+                target.delete(ctx);
+                if (target.isList()) {
+                    for (Object value : values) {
+                        target.addToList(ctx, deepCopy(value));
+                    }
+                } else {
+                    target.set(ctx, values.length > 0 ? deepCopy(values[0]) : null);
+                }
+            };
+        });
+
         registry.registerEffect("(exit|stop) [the] [current] loop", arguments -> ctx -> {
             throw BreakSignal.INSTANCE;
         });
@@ -2899,6 +2938,17 @@ public final class BuiltinModule {
             return variable;
         }
         throw new ParseException("Expected a variable, got: " + expression);
+    }
+
+    /** Deep-copies a value where it is mutable (item/location/vector), else returns it unchanged. */
+    private static Object deepCopy(Object value) {
+        if (value instanceof ItemStack item) {
+            return item.clone();
+        }
+        if (value instanceof Location location) {
+            return location.clone();
+        }
+        return value instanceof Vector vector ? vector.clone() : value;
     }
 
     /** Ensures an expression accepts the given change mode (else this candidate fails, allowing fall-through). */
