@@ -7138,8 +7138,8 @@
       "[(all [[of] the]|the)] blocks around %location% in radius %number%"
     ],
     "source": "ch/njol/skript/expressions/ExprBlockSphere.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:blocks",

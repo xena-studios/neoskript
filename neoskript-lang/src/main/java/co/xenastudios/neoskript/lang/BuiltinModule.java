@@ -1019,6 +1019,40 @@ public final class BuiltinModule {
                 Object.class, arguments -> blocksBetween(arguments.get(0), arguments.get(1)));
         registry.registerExpression("[(all [[of] the]|the)] blocks from %location% to %location%",
                 Object.class, arguments -> blocksBetween(arguments.get(0), arguments.get(1)));
+
+        registry.registerExpression("[(all [[of] the]|the)] blocks in radius %number% (of|around) %location%",
+                Object.class, arguments -> blocksInRadius(arguments.get(1), arguments.get(0)));
+        registry.registerExpression("[(all [[of] the]|the)] blocks around %location% in radius %number%",
+                Object.class, arguments -> blocksInRadius(arguments.get(0), arguments.get(1)));
+    }
+
+    /** Every block whose integer offset from the centre is within {@code radius} (Skript's sphere). */
+    private static Expression<Object> blocksInRadius(Expression<?> center, Expression<?> radiusExpr) {
+        return new ComputedListExpression(ctx -> {
+            Location origin = toLocation(center.getSingle(ctx));
+            if (origin == null || origin.getWorld() == null
+                    || !(radiusExpr.getSingle(ctx) instanceof Number number)) {
+                return new Object[0];
+            }
+            double radius = number.doubleValue();
+            double radiusSquared = radius * radius;
+            int bound = (int) Math.ceil(radius);
+            World world = origin.getWorld();
+            int cx = origin.getBlockX();
+            int cy = origin.getBlockY();
+            int cz = origin.getBlockZ();
+            List<Object> out = new ArrayList<>();
+            for (int x = -bound; x <= bound; x++) {
+                for (int y = -bound; y <= bound; y++) {
+                    for (int z = -bound; z <= bound; z++) {
+                        if (x * x + y * y + z * z <= radiusSquared) {
+                            out.add(world.getBlockAt(cx + x, cy + y, cz + z));
+                        }
+                    }
+                }
+            }
+            return out.toArray();
+        });
     }
 
     /** Every block in the axis-aligned cuboid between two corner locations (inclusive). */
