@@ -9871,8 +9871,8 @@
       "[the] [last[ly]] (launched|deployed) (4:firework)"
     ],
     "source": "ch/njol/skript/expressions/ExprLastSpawnedEntity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:last-first-login-time",

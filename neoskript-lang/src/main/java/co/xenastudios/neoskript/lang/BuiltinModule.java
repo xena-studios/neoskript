@@ -1074,6 +1074,9 @@ public final class BuiltinModule {
         });
     }
 
+    /** The most recent entity spawned by the {@code spawn}/{@code summon} effect (Bukkit is single-threaded). */
+    private static volatile Entity lastSpawnedEntity;
+
     /**
      * The {@code entities of type[s] %entitydatas% [in world[s] %worlds%]} expression — every loaded
      * entity of the given type(s), across the named worlds (all worlds when none are given).
@@ -1115,6 +1118,23 @@ public final class BuiltinModule {
                         return out.toArray();
                     });
                 });
+
+        // the last entity spawned by the spawn/summon effect, when it matches the requested type(s).
+        registry.registerExpression("[the] [last[ly]] spawned %entitydatas%", Object.class, arguments -> {
+            Expression<?> types = arguments.get(0);
+            return new ComputedExpression(ctx -> {
+                Entity spawned = lastSpawnedEntity;
+                if (spawned == null || !spawned.isValid()) {
+                    return null;
+                }
+                for (Object value : types.getAll(ctx)) {
+                    if (value instanceof org.bukkit.entity.EntityType type && spawned.getType() == type) {
+                        return spawned;
+                    }
+                }
+                return null;
+            });
+        });
     }
 
     /**
@@ -2856,7 +2876,7 @@ public final class BuiltinModule {
             return ctx -> {
                 if (where.getSingle(ctx) instanceof org.bukkit.Location loc && loc.getWorld() != null
                         && type.getSingle(ctx) instanceof org.bukkit.entity.EntityType et) {
-                    loc.getWorld().spawnEntity(loc, et);
+                    lastSpawnedEntity = loc.getWorld().spawnEntity(loc, et);
                 }
             };
         });
