@@ -72,11 +72,16 @@ public final class VariableExpression implements Expression<Object> {
                 if (end < 0) {
                     throw new ParseException("Unbalanced '%' in variable name: {" + body + "}");
                 }
-                if (literal.length() > 0) {
-                    parts.add(literal.toString());
-                    literal.setLength(0);
+                String inner = body.substring(i + 1, end);
+                if (inner.isEmpty()) {
+                    literal.append('%'); // "%%" -> literal percent, matching VariableString
+                } else {
+                    if (literal.length() > 0) {
+                        parts.add(literal.toString());
+                        literal.setLength(0);
+                    }
+                    parts.add(parser.parse(inner));
                 }
-                parts.add(parser.parse(body.substring(i + 1, end)));
                 i = end + 1;
             } else {
                 literal.append(c);

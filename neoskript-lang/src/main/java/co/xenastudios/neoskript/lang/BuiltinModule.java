@@ -1712,10 +1712,12 @@ public final class BuiltinModule {
         return ctx -> {
             if (variable.isList()) {
                 Object[] values = variable.getAll(ctx);
-                variable.delete(ctx);
-                for (Object value : values) {
-                    variable.addToList(ctx, value instanceof PotionEffect pe ? transform.apply(pe) : value);
-                }
+                mutate(ctx, variable, () -> {
+                    variable.delete(ctx);
+                    for (Object value : values) {
+                        variable.addToList(ctx, value instanceof PotionEffect pe ? transform.apply(pe) : value);
+                    }
+                });
             } else if (variable.getSingle(ctx) instanceof PotionEffect pe) {
                 variable.set(ctx, transform.apply(pe));
             }
@@ -3694,13 +3696,17 @@ public final class BuiltinModule {
             Expression<?> value = arguments.get(1);
             if (lhs instanceof VariableExpression variable) {
                 if (variable.isList()) {
-                    // `set {list::*} to <values>` replaces the whole list with every value.
+                    // `set {list::*} to <values>` replaces the whole list with every value. The
+                    // clear-and-refill is done atomically so a concurrent reader/writer of a global
+                    // list (e.g. another region thread on Folia) never observes it half-replaced.
                     return ctx -> {
                         Object[] values = value.getAll(ctx);
-                        variable.delete(ctx);
-                        for (Object v : values) {
-                            variable.addToList(ctx, v);
-                        }
+                        mutate(ctx, variable, () -> {
+                            variable.delete(ctx);
+                            for (Object v : values) {
+                                variable.addToList(ctx, v);
+                            }
+                        });
                     };
                 }
                 return ctx -> variable.set(ctx, value.getSingle(ctx));
@@ -3801,14 +3807,16 @@ public final class BuiltinModule {
             VariableExpression target = requireVariable(arguments.get(1));
             return ctx -> {
                 Object[] values = source.getAll(ctx);
-                target.delete(ctx);
-                if (target.isList()) {
-                    for (Object value : values) {
-                        target.addToList(ctx, deepCopy(value));
+                mutate(ctx, target, () -> {
+                    target.delete(ctx);
+                    if (target.isList()) {
+                        for (Object value : values) {
+                            target.addToList(ctx, deepCopy(value));
+                        }
+                    } else {
+                        target.set(ctx, values.length > 0 ? deepCopy(values[0]) : null);
                     }
-                } else {
-                    target.set(ctx, values.length > 0 ? deepCopy(values[0]) : null);
-                }
+                });
             };
         });
 

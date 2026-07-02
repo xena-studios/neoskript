@@ -553,8 +553,7 @@ public final class ScriptParser {
                 } finally {
                     ctx.setLocal("input", previous);
                 }
-                list.delete(ctx);
-                items.forEach(item -> list.addToList(ctx, item));
+                replaceListAtomically(ctx, list, items);
             };
         }
         Matcher transform = TRANSFORM.matcher(content);
@@ -573,11 +572,27 @@ public final class ScriptParser {
                 } finally {
                     ctx.setLocal("input", previous);
                 }
-                list.delete(ctx);
-                mapped.forEach(item -> list.addToList(ctx, item));
+                replaceListAtomically(ctx, list, mapped);
             };
         }
         return null;
+    }
+
+    /**
+     * Replaces a list variable's contents with {@code items}, atomically for a global list so a
+     * concurrent reader/writer (e.g. another region thread on Folia) never sees it half-replaced.
+     */
+    private static void replaceListAtomically(co.xenastudios.neoskript.api.runtime.TriggerContext ctx,
+            VariableExpression list, java.util.List<Object> items) {
+        Runnable op = () -> {
+            list.delete(ctx);
+            items.forEach(item -> list.addToList(ctx, item));
+        };
+        if (!list.isLocal() && ctx instanceof co.xenastudios.neoskript.core.runtime.VariableScope scope) {
+            scope.runAtomic(op);
+        } else {
+            op.run();
+        }
     }
 
     private static int compareValues(Object a, Object b) {
