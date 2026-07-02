@@ -11669,8 +11669,8 @@
       "[the] scripts in [directory|folder] %string%"
     ],
     "source": "ch/njol/skript/expressions/ExprScript.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:sea-level",

@@ -1296,6 +1296,57 @@ public final class BuiltinModule {
                     }
                     return out.toArray();
                 }));
+        // [the] [current] script — the script this expression is written in, captured at parse time
+        // (the factory's create() runs while that script is being parsed).
+        registry.registerExpression("[the] current script", Object.class, a -> {
+            String parsing = co.xenastudios.neoskript.core.runtime.LoadedScripts.parsing();
+            return new ComputedExpression(ctx -> parsing == null
+                    ? null : new co.xenastudios.neoskript.lang.type.Script(parsing));
+        });
+        // [the] script[s] [named] %strings% — the loaded scripts with the given names (unloaded names
+        // yield nothing, matching Skript).
+        registry.registerExpression("[the] script[s] [named] %strings%", Object.class, a -> {
+            Expression<?> names = a.get(0);
+            return new ComputedListExpression(ctx -> {
+                List<Object> out = new ArrayList<>();
+                for (Object value : names.getAll(ctx)) {
+                    if (value == null) {
+                        continue;
+                    }
+                    String query = value.toString().trim();
+                    for (String loaded : co.xenastudios.neoskript.core.runtime.LoadedScripts.names()) {
+                        if (loaded.equalsIgnoreCase(query) || loaded.equalsIgnoreCase(query + ".sk")
+                                || (loaded.toLowerCase(java.util.Locale.ROOT).endsWith(".sk")
+                                && loaded.substring(0, loaded.length() - 3).equalsIgnoreCase(query))) {
+                            out.add(new co.xenastudios.neoskript.lang.type.Script(loaded));
+                        }
+                    }
+                }
+                return out.toArray();
+            });
+        });
+        // [the] scripts in [directory|folder] %string% — loaded scripts whose relative path is under it.
+        registry.registerExpression("[the] scripts in [directory|folder] %string%", Object.class, a -> {
+            Expression<?> folder = a.get(0);
+            return new ComputedListExpression(ctx -> {
+                Object dir = folder.getSingle(ctx);
+                if (dir == null) {
+                    return new Object[0];
+                }
+                String prefix = dir.toString().trim().replace('\\', '/');
+                if (!prefix.isEmpty() && !prefix.endsWith("/")) {
+                    prefix += "/";
+                }
+                String needle = prefix.toLowerCase(java.util.Locale.ROOT);
+                List<Object> out = new ArrayList<>();
+                for (String loaded : co.xenastudios.neoskript.core.runtime.LoadedScripts.names()) {
+                    if (loaded.replace('\\', '/').toLowerCase(java.util.Locale.ROOT).startsWith(needle)) {
+                        out.add(new co.xenastudios.neoskript.lang.type.Script(loaded));
+                    }
+                }
+                return out.toArray();
+            });
+        });
         registry.registerCondition("script[s] %strings% (is|are) loaded",
                 a -> scriptsLoaded(a.get(0), true));
         registry.registerCondition("script[s] %strings% (is|are) not loaded",

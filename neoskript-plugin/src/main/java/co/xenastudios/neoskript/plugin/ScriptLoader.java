@@ -277,6 +277,7 @@ public final class ScriptLoader {
     }
 
     private List<Trigger> parseFile(Path file, Path dir, AtomicInteger failed) {
+        co.xenastudios.neoskript.core.runtime.LoadedScripts.setParsing(dir.relativize(file).toString());
         try {
             List<Trigger> triggers = parser.parse(Files.readString(file, StandardCharsets.UTF_8));
             // A parse error in one structure disables only that structure; log each and keep loading
@@ -292,6 +293,8 @@ public final class ScriptLoader {
         } catch (IOException e) {
             failed.incrementAndGet();
             plugin.getLogger().log(Level.WARNING, "Failed to read " + file, e);
+        } finally {
+            co.xenastudios.neoskript.core.runtime.LoadedScripts.setParsing(null);
         }
         return List.of();
     }

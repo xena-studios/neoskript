@@ -13,7 +13,28 @@ public final class LoadedScripts {
 
     private static volatile List<String> names = List.of();
 
+    /**
+     * The script currently being parsed on this thread, if any. Set by the loader around each file's
+     * parse so that the {@code [the] [current] script} expression can capture its source at build time
+     * (an expression factory runs while the script that contains it is being parsed).
+     */
+    private static final ThreadLocal<String> PARSING = new ThreadLocal<>();
+
     private LoadedScripts() {
+    }
+
+    /** Records (or clears, with {@code null}) the script name being parsed on the current thread. */
+    public static void setParsing(String name) {
+        if (name == null) {
+            PARSING.remove();
+        } else {
+            PARSING.set(name);
+        }
+    }
+
+    /** @return the name of the script being parsed on this thread, or {@code null} if none */
+    public static String parsing() {
+        return PARSING.get();
     }
 
     /** Replaces the set of loaded script names (called on each load/reload). */
