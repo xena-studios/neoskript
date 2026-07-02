@@ -40,6 +40,31 @@ public final class ListVariables {
         return result;
     }
 
+    /**
+     * Returns <em>all</em> descendants of a list prefix at every depth (full-name keyed), ordered by
+     * their full relative path. Unlike {@link #directChildren}, this includes entries nested under
+     * sub-lists ({@code a::b::c} is a descendant of {@code a::}) — the basis for recursive list size.
+     *
+     * @param map    the variable map
+     * @param prefix the list prefix including the trailing {@code ::}
+     * @return an ordered map of full descendant name to value
+     */
+    public static Map<String, Object> recursiveChildren(Map<String, Object> map, String prefix) {
+        List<Map.Entry<String, Object>> matches = new ArrayList<>();
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            if (entry.getKey().startsWith(prefix)) {
+                matches.add(entry);
+            }
+        }
+        matches.sort(Comparator.comparing(e -> e.getKey().substring(prefix.length()), ListVariables::compareIndex));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : matches) {
+            result.put(entry.getKey(), entry.getValue());
+        }
+        return result;
+    }
+
     private static int compareIndex(String a, String b) {
         try {
             return Long.compare(Long.parseLong(a), Long.parseLong(b));

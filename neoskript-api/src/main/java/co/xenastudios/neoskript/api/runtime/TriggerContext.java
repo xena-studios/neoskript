@@ -70,4 +70,21 @@ public interface TriggerContext {
      * @return a map of full child name to value; empty if none
      */
     Map<String, Object> listGlobal(String prefix);
+
+    /**
+     * Returns <em>all</em> descendants of a local list variable at every depth, including entries
+     * nested under sub-lists — the basis for the recursive-list expressions.
+     *
+     * @param prefix the list prefix, including the trailing {@code ::}
+     * @return a map of full descendant name to value; empty if none
+     */
+    Map<String, Object> listLocalRecursive(String prefix);
+
+    /**
+     * Returns <em>all</em> descendants of a global list variable at every depth.
+     *
+     * @param prefix the list prefix, including the trailing {@code ::}
+     * @return a map of full descendant name to value; empty if none
+     */
+    Map<String, Object> listGlobalRecursive(String prefix);
 }

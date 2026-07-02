@@ -11372,8 +11372,8 @@
       "recursive %~objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprRecursive.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:recursive-size",
@@ -11384,8 +11384,8 @@
       "[the] recursive (amount|number|size) of %objects%"
     ],
     "source": "org/skriptlang/skript/common/elements/expressions/ExprRecursiveSize.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:redstone-block-power",

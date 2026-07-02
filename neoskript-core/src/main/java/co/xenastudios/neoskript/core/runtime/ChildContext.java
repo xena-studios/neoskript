@@ -60,6 +60,16 @@ public final class ChildContext implements TriggerContext, VariableScope {
     }
 
     @Override
+    public Map<String, Object> listLocalRecursive(String prefix) {
+        return ListVariables.recursiveChildren(locals, prefix);
+    }
+
+    @Override
+    public Map<String, Object> listGlobalRecursive(String prefix) {
+        return parent.listGlobalRecursive(prefix);
+    }
+
+    @Override
     public void runAtomic(Runnable action) {
         // Delegate to the owning scope so global mutations share one lock.
         if (parent instanceof VariableScope scope) {

@@ -219,6 +219,14 @@ public final class BuiltinModule {
             });
         });
 
+        // [the] recursive (amount|number|size) of %objects% — the count of recursive values. Registered
+        // before `recursive %objects%` so the greedy plain form does not swallow "size of ..." captures.
+        registry.registerExpression("[the] recursive (amount|number|size) of %objects%", Object.class,
+                arguments -> new ComputedExpression(ctx -> (double) recursiveEntries(arguments.get(0), ctx).size()));
+        // recursive %~objects% — all values of a list variable at every depth (nested sub-lists too).
+        registry.registerExpression("recursive %objects%", Object.class,
+                arguments -> new ComputedListExpression(ctx -> recursiveEntries(arguments.get(0), ctx).toArray()));
+
         registry.registerExpression("[a] random number (from|between) %number% (to|and) %number%", Object.class,
                 arguments -> random(arguments.get(0), arguments.get(1), false));
         registry.registerExpression("[a] random integer (from|between) %number% (to|and) %number%", Object.class,
@@ -2586,6 +2594,21 @@ public final class BuiltinModule {
     private static int compareForSort(Object a, Object b) {
         Integer numeric = Comparisons.compare(a, b);
         return numeric != null ? numeric : Renderer.toDisplay(a).compareTo(Renderer.toDisplay(b));
+    }
+
+    /**
+     * The recursive values of {@code source}: for a list variable, every descendant value at any depth
+     * (nested sub-lists included); for anything else, just its own values. Backs the {@code recursive
+     * %objects%} and {@code recursive size of %objects%} expressions.
+     */
+    private static List<Object> recursiveEntries(Expression<?> source, TriggerContext ctx) {
+        if (source instanceof VariableExpression variable && variable.isList()) {
+            String prefix = variable.listPrefix(ctx);
+            java.util.Map<String, Object> all = variable.isLocal()
+                    ? ctx.listLocalRecursive(prefix) : ctx.listGlobalRecursive(prefix);
+            return new ArrayList<>(all.values());
+        }
+        return new ArrayList<>(java.util.Arrays.asList(source.getAll(ctx)));
     }
 
     private static ComputedExpression random(Expression<?> minExpr, Expression<?> maxExpr, boolean integer) {

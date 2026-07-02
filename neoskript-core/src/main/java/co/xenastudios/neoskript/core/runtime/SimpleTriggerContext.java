@@ -67,6 +67,16 @@ public final class SimpleTriggerContext implements TriggerContext, VariableScope
     }
 
     @Override
+    public Map<String, Object> listLocalRecursive(String prefix) {
+        return ListVariables.recursiveChildren(locals, prefix);
+    }
+
+    @Override
+    public Map<String, Object> listGlobalRecursive(String prefix) {
+        return ListVariables.recursiveChildren(globals, prefix);
+    }
+
+    @Override
     public void runAtomic(Runnable action) {
         // Serialize compound global mutations across concurrently-firing (Folia) handlers.
         synchronized (globals) {
