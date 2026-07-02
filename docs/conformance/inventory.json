@@ -3902,8 +3902,8 @@
       "execute %executable% [arguments:with arg[ument]s %-objects%]"
     ],
     "source": "ch/njol/skript/effects/EffRun.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:save-world",
@@ -8970,8 +8970,8 @@
       "[all [[of] the]|the] functions (in|from) %script%"
     ],
     "source": "ch/njol/skript/expressions/ExprFunction.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:furnace-event-items",
@@ -11545,8 +11545,8 @@
       "[the] result[plural:s] of [running|executing] %executable% [arguments:with arg[ument]s %-objects%]"
     ],
     "source": "ch/njol/skript/expressions/ExprResult.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:reversed-list",

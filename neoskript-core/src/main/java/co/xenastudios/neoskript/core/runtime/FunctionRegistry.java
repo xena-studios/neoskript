@@ -14,6 +14,18 @@ public final class FunctionRegistry {
 
     private final Map<String, ScriptFunction> functions = new ConcurrentHashMap<>();
 
+    /** The most recently constructed registry, so syntax like {@code run %executable%} can resolve it. */
+    private static volatile FunctionRegistry active;
+
+    public FunctionRegistry() {
+        active = this;
+    }
+
+    /** @return the active function registry (the plugin's), or {@code null} before one is created */
+    public static FunctionRegistry active() {
+        return active;
+    }
+
     /**
      * Registers (or replaces) a user-defined function.
      *

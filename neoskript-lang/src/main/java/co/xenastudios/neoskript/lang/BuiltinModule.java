@@ -97,6 +97,7 @@ public final class BuiltinModule {
         registerPersistentDataSyntax(registry);
         registerEquippableSyntax(registry);
         registerScriptSyntax(registry);
+        registerFunctionSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -1082,6 +1083,57 @@ public final class BuiltinModule {
             }
             return out.toArray();
         });
+    }
+
+    /**
+     * Function objects: {@code function named %string%} produces a reference, {@code run %executable%}
+     * calls it (discarding the result), and {@code result of %executable%} calls it and returns the
+     * result. Both resolve against the active {@link co.xenastudios.neoskript.core.runtime.FunctionRegistry}.
+     */
+    private static void registerFunctionSyntax(SyntaxRegistry registry) {
+        registry.registerExpression("[the|a] function [named] %string% [(in|from) %-script%]", Object.class,
+                a -> {
+                    Expression<?> name = a.get(0);
+                    return new ComputedExpression(ctx -> {
+                        Object value = name.getSingle(ctx);
+                        return value == null ? null
+                                : new co.xenastudios.neoskript.lang.type.FunctionReference(Renderer.toDisplay(value));
+                    });
+                });
+        registry.registerEffect("run %executable% [with arg[ument][s] %-objects%]", a -> {
+            Expression<?> executable = a.get(0);
+            Expression<?> args = a.get(1);
+            return ctx -> callExecutable(executable.getSingle(ctx), args, ctx);
+        });
+        registry.registerExpression(
+                "[the] result[s] of [(running|executing)] %executable% [with arg[ument][s] %-objects%]",
+                Object.class, a -> {
+                    Expression<?> executable = a.get(0);
+                    Expression<?> args = a.get(1);
+                    return new ComputedExpression(ctx -> callExecutable(executable.getSingle(ctx), args, ctx));
+                });
+    }
+
+    /** Resolves a function reference against the active registry and calls it, returning its result. */
+    private static Object callExecutable(Object executable, Expression<?> argsExpr,
+                                         co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+        if (!(executable instanceof co.xenastudios.neoskript.lang.type.FunctionReference reference)) {
+            return null;
+        }
+        co.xenastudios.neoskript.core.runtime.FunctionRegistry registry =
+                co.xenastudios.neoskript.core.runtime.FunctionRegistry.active();
+        co.xenastudios.neoskript.core.runtime.ScriptFunction function =
+                registry == null ? null : registry.get(reference.name());
+        if (function == null) {
+            return null;
+        }
+        List<Object> args = new ArrayList<>();
+        if (argsExpr != null) {
+            for (Object value : argsExpr.getAll(ctx)) {
+                args.add(value);
+            }
+        }
+        return function.call(args, ctx);
     }
 
     /**
