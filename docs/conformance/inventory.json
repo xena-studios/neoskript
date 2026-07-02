@@ -825,8 +825,8 @@
       "%string% (is|are)(n't| not) [a] s(k|c)ript (command|cmd)"
     ],
     "source": "ch/njol/skript/conditions/CondIsSkriptCommand.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:is-adult",

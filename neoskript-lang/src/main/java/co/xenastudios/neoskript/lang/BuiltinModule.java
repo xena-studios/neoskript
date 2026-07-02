@@ -1166,6 +1166,26 @@ public final class BuiltinModule {
                 a -> scriptsLoaded(a.get(0), true));
         registry.registerCondition("script[s] %strings% (is|are) not loaded",
                 a -> scriptsLoaded(a.get(0), false));
+        registry.registerCondition("%string% (is|are) [a] s(k|c)ript (command|cmd)",
+                a -> stringsAreCommands(a.get(0), true));
+        registry.registerCondition("%string% (is|are)(n't| not) [a] s(k|c)ript (command|cmd)",
+                a -> stringsAreCommands(a.get(0), false));
+    }
+
+    /** Whether every given string names a registered script command (compared to {@code expected}). */
+    private static Condition stringsAreCommands(Expression<?> strings, boolean expected) {
+        return ctx -> {
+            Object[] values = strings.getAll(ctx);
+            if (values.length == 0) {
+                return false;
+            }
+            for (Object value : values) {
+                if (!co.xenastudios.neoskript.core.runtime.LoadedCommands.isCommand(Renderer.toDisplay(value))) {
+                    return !expected;
+                }
+            }
+            return expected;
+        };
     }
 
     /** Whether every named script is loaded (compared to {@code expected}). */

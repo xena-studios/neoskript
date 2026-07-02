@@ -129,6 +129,12 @@ public final class ScriptLoader {
 
     private void registerCommands() {
         CommandMap map = plugin.getServer().getCommandMap();
+        java.util.Set<String> commandNames = new java.util.HashSet<>();
+        for (CommandDefinition definition : commands.commands()) {
+            commandNames.add(definition.name());
+            commandNames.addAll(definition.aliases());
+        }
+        co.xenastudios.neoskript.core.runtime.LoadedCommands.set(commandNames);
         for (CommandDefinition definition : commands.commands()) {
             Command command = new Command(
                     definition.name(),
