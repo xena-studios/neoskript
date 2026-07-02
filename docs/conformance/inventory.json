@@ -2823,8 +2823,8 @@
       "reveal %entities% [(to|for|from) %-players%]"
     ],
     "source": "ch/njol/skript/effects/EffEntityVisibility.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:equip",

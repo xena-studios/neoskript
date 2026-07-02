@@ -90,6 +90,7 @@ public final class BuiltinModule {
         registerPotionSyntax(registry);
         registerEquipSyntax(registry);
         registerBlocksSyntax(registry);
+        registerVisibilitySyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -1006,6 +1007,49 @@ public final class BuiltinModule {
             }
             return out.toArray();
         });
+    }
+
+    /**
+     * Entity visibility: {@code hide/reveal %entities% [(from|for) %players%]} toggles whether each
+     * entity is visible to the given viewers (all online players when none are named), via Bukkit's
+     * per-player {@code hideEntity}/{@code showEntity}.
+     */
+    private static void registerVisibilitySyntax(SyntaxRegistry registry) {
+        registry.registerEffect("hide %entities% [(from|for) %-players%]",
+                a -> entityVisibility(a.get(0), a.get(1), false));
+        registry.registerEffect("reveal %entities% [(to|for|from) %-players%]",
+                a -> entityVisibility(a.get(0), a.get(1), true));
+    }
+
+    private static co.xenastudios.neoskript.api.syntax.Effect entityVisibility(
+            Expression<?> entities, Expression<?> viewersExpr, boolean reveal) {
+        return ctx -> {
+            org.bukkit.plugin.Plugin owner = Bukkit.getPluginManager().getPlugin("NeoSkript");
+            if (owner == null) {
+                return;
+            }
+            List<Player> viewers = new ArrayList<>();
+            if (viewersExpr != null) {
+                for (Object value : viewersExpr.getAll(ctx)) {
+                    if (value instanceof Player player) {
+                        viewers.add(player);
+                    }
+                }
+            } else {
+                viewers.addAll(Bukkit.getOnlinePlayers());
+            }
+            for (Object value : entities.getAll(ctx)) {
+                if (value instanceof Entity entity) {
+                    for (Player viewer : viewers) {
+                        if (reveal) {
+                            viewer.showEntity(owner, entity);
+                        } else {
+                            viewer.hideEntity(owner, entity);
+                        }
+                    }
+                }
+            }
+        };
     }
 
     /**
