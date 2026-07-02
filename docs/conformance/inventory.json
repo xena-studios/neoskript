@@ -330,8 +330,8 @@
       "[the] damage (was|is|has)(0¦|1¦n('|o)t) [been] (caused|done|made) by %damagecause%"
     ],
     "source": "ch/njol/skript/conditions/CondDamageCause.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:damage-source-does-scale-with-difficulty",
@@ -2183,8 +2183,8 @@
       "[the] resource pack (was|is|has)(n't| not) [been] %resourcepackstate%"
     ],
     "source": "ch/njol/skript/conditions/CondResourcePack.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "condition:running-minecraft",
@@ -4454,8 +4454,8 @@
       "beacon deactivat(e|ion)"
     ],
     "source": "ch/njol/skript/events/EvtBeaconToggle.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "event:bed-enter",
@@ -4612,8 +4612,8 @@
       "bucket (catch[ing]|captur(e|ing)) [[of] %-entitydatas%]"
     ],
     "source": "org/skriptlang/skript/bukkit/fishing/elements/events/EvtBucketEntity.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "event:bucket-empty",
@@ -4892,8 +4892,8 @@
       "enderman (enrage|anger)"
     ],
     "source": "ch/njol/skript/events/SimpleEvents.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "event:enderman-sheep-silverfish-falling-block",
@@ -6747,8 +6747,8 @@
       "[the] applied enchant[ment]s"
     ],
     "source": "ch/njol/skript/expressions/ExprAppliedEnchantments.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:argument",
@@ -7405,8 +7405,8 @@
       "[the] (message|chat) format[ting]"
     ],
     "source": "org/skriptlang/skript/bukkit/entity/player/elements/expressions/ExprChatFormat.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:chat-message",

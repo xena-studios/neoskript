@@ -130,6 +130,16 @@ public final class BuiltinEvents {
         events.register(PlayerPortalEvent.class, "portal");
         events.register(PlayerBucketEmptyEvent.class, "bucket empty", "empty bucket");
         events.register(PlayerBucketFillEvent.class, "bucket fill", "fill bucket");
+        events.register(org.bukkit.event.player.PlayerBucketEntityEvent.class,
+                "bucket catch", "bucket catching", "bucket capture", "bucket capturing", "bucket catch entity");
+        // Beacon toggle: one alias per Bukkit event (the registry maps a name to a single class), so
+        // "beacon toggle" fires on activation; deactivation has its own alias.
+        events.register(io.papermc.paper.event.block.BeaconActivatedEvent.class,
+                "beacon toggle", "beacon activate", "beacon activation");
+        events.register(io.papermc.paper.event.block.BeaconDeactivatedEvent.class,
+                "beacon deactivate", "beacon deactivation");
+        events.register(com.destroystokyo.paper.event.entity.EndermanAttackPlayerEvent.class,
+                "enderman enrage", "enderman anger");
         events.register(BlockRedstoneEvent.class, "redstone", "redstone change");
         events.register(BlockIgniteEvent.class, "block ignite");
         events.register(BlockBurnEvent.class, "block burn");

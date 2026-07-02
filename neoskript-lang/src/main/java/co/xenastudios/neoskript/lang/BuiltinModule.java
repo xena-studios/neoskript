@@ -98,6 +98,7 @@ public final class BuiltinModule {
         registerEquippableSyntax(registry);
         registerScriptSyntax(registry);
         registerFunctionSyntax(registry);
+        registerEventSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -1083,6 +1084,102 @@ public final class BuiltinModule {
             }
             return out.toArray();
         });
+    }
+
+    /**
+     * Event-value conditions/expressions that read the current Bukkit event: the damage cause, the
+     * resource-pack state, the chat format, and the applied enchantments. Each yields nothing (or
+     * false) outside its event.
+     */
+    private static void registerEventSyntax(SyntaxRegistry registry) {
+        registry.registerCondition("[the] damage (was|is|has) [been] (caused|done|made) by %damagecause%",
+                a -> damageCausedBy(a.get(0), true));
+        registry.registerCondition(
+                "[the] damage (wasn't|isn't|hasn't|was not|is not|has not) [been] (caused|done|made) by %damagecause%",
+                a -> damageCausedBy(a.get(0), false));
+
+        registry.registerCondition("[the] resource pack (was|is|has) [been] %resourcepackstate%",
+                a -> resourcePackState(a.get(0), true));
+        registry.registerCondition("[the] resource pack (wasn't|isn't|hasn't|was not|is not|has not) [been] %resourcepackstate%",
+                a -> resourcePackState(a.get(0), false));
+
+        // The enchantments added by the current enchant event.
+        registry.registerExpression("[the] applied enchant[ment]s", Object.class,
+                a -> new ComputedListExpression(ctx ->
+                        event(ctx) instanceof org.bukkit.event.enchantment.EnchantItemEvent enchant
+                                ? enchant.getEnchantsToAdd().keySet().toArray() : new Object[0]));
+
+        // The chat format (write-only, via Paper's async-chat renderer). Supports [player]/[sender]
+        // and [message]/[msg] placeholders and legacy '&' colour codes.
+        registry.registerExpression("[the] (message|chat) format[ting]", Object.class, a -> new Expression<Object>() {
+            @Override
+            public Object[] getAll(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                return new Object[0];
+            }
+
+            @Override
+            public Object getSingle(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                return null;
+            }
+
+            @Override
+            public Class<Object> returnType() {
+                return Object.class;
+            }
+
+            @Override
+            public boolean isSingle() {
+                return true;
+            }
+
+            @Override
+            public Class<?>[] acceptChange(ChangeMode mode) {
+                return mode == ChangeMode.SET || mode == ChangeMode.RESET ? new Class<?>[]{Object.class} : null;
+            }
+
+            @Override
+            public void change(co.xenastudios.neoskript.api.runtime.TriggerContext ctx, Object[] delta, ChangeMode mode) {
+                if (!(event(ctx) instanceof io.papermc.paper.event.player.AsyncChatEvent chat)) {
+                    return;
+                }
+                if (mode == ChangeMode.RESET) {
+                    chat.renderer(io.papermc.paper.chat.ChatRenderer.defaultRenderer());
+                    return;
+                }
+                if (delta == null || delta.length == 0) {
+                    return;
+                }
+                String format = Renderer.toDisplay(delta[0]);
+                chat.renderer((source, sourceDisplayName, message, viewer) -> {
+                    net.kyori.adventure.text.Component result = net.kyori.adventure.text.serializer.legacy
+                            .LegacyComponentSerializer.legacyAmpersand().deserialize(format);
+                    result = result.replaceText(b -> b.matchLiteral("[player]").replacement(sourceDisplayName));
+                    result = result.replaceText(b -> b.matchLiteral("[sender]").replacement(sourceDisplayName));
+                    result = result.replaceText(b -> b.matchLiteral("[message]").replacement(message));
+                    return result.replaceText(b -> b.matchLiteral("[msg]").replacement(message));
+                });
+            }
+        });
+    }
+
+    /** Whether the current damage event's cause equals the given cause (compared to {@code expected}). */
+    private static Condition damageCausedBy(Expression<?> cause, boolean expected) {
+        return ctx -> {
+            boolean matches = event(ctx) instanceof org.bukkit.event.entity.EntityDamageEvent damage
+                    && cause.getSingle(ctx) instanceof org.bukkit.event.entity.EntityDamageEvent.DamageCause wanted
+                    && damage.getCause() == wanted;
+            return matches == expected;
+        };
+    }
+
+    /** Whether the current resource-pack event's status equals the given state (compared to {@code expected}). */
+    private static Condition resourcePackState(Expression<?> state, boolean expected) {
+        return ctx -> {
+            boolean matches = event(ctx) instanceof org.bukkit.event.player.PlayerResourcePackStatusEvent resourcePack
+                    && state.getSingle(ctx) instanceof org.bukkit.event.player.PlayerResourcePackStatusEvent.Status wanted
+                    && resourcePack.getStatus() == wanted;
+            return matches == expected;
+        };
     }
 
     /**
