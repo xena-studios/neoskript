@@ -8,12 +8,12 @@ Tiers: **`done`** = implemented and covered by a behaviour test (strongest). **`
 |---|---|---|---|---|---|---|---|
 | effect | 148 | 5 | 143 | 42 | 94 | 136 | 95.1% |
 | condition | 168 | 6 | 162 | 63 | 98 | 161 | 99.4% |
-| expression | 515 | 21 | 494 | 134 | 340 | 474 | 96.0% |
+| expression | 515 | 21 | 494 | 135 | 340 | 475 | 96.2% |
 | event | 167 | 2 | 165 | 154 | 11 | 165 | 100.0% |
 | type | 135 | 16 | 119 | 73 | 38 | 111 | 93.3% |
 | function | 48 | 0 | 48 | 48 | 0 | 48 | 100.0% |
 | section | 9 | 2 | 7 | 6 | 1 | 7 | 100.0% |
 | structure | 10 | 4 | 6 | 6 | 0 | 6 | 100.0% |
-| **Total** | **1200** | **56** | **1144** | **526** | **582** | **1108** | **96.9%** |
+| **Total** | **1200** | **56** | **1144** | **527** | **582** | **1109** | **96.9%** |
 
-_Verified 1108/1144 (96.9%) — of which behaviour-tested (done) 526 (46.0%). Goal: 100% of the 1144 in-scope entries._
+_Verified 1109/1144 (96.9%) — of which behaviour-tested (done) 527 (46.1%). Goal: 100% of the 1144 in-scope entries._

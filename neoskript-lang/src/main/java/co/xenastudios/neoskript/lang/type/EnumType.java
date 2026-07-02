@@ -17,7 +17,7 @@ import java.util.Optional;
  *
  * @param <T> the enum type represented
  */
-public final class EnumType<T> implements Type<T> {
+public final class EnumType<T> implements Type<T>, ValueSet {
 
     private final String codeName;
     private final Class<T> typeClass;
@@ -73,5 +73,11 @@ public final class EnumType<T> implements Type<T> {
     @Override
     public String toDisplayString(T value) {
         return ((Enum<?>) value).name().toLowerCase(Locale.ROOT).replace('_', ' ');
+    }
+
+    @Override
+    public java.util.List<?> allValues() {
+        T[] values = constants();
+        return values == null ? java.util.List.of() : java.util.List.of(values);
     }
 }

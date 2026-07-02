@@ -11744,8 +11744,8 @@
       "[all [[of] the]|the|every] %*classinfo%"
     ],
     "source": "ch/njol/skript/expressions/ExprSets.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:shooter",

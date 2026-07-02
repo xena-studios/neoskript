@@ -103,6 +103,28 @@ public final class BuiltinModule {
         registerEventSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
+        // Registered LAST so it is the lowest-priority fallback: `all X` / `every X` only reaches it
+        // when no earlier expression matched, mirroring Skript's low-priority ExprSets.
+        registerSetsSyntax(registry);
+    }
+
+    /**
+     * Registers {@code [all [[of] the]|the|every] %*classinfo%} — every value of an enumerable type
+     * ({@code all game modes}, {@code every attribute type}). The factory throws at parse time for a
+     * non-enumerable type so the candidate is skipped and the line falls through, exactly as if this
+     * expression did not match.
+     */
+    private static void registerSetsSyntax(SyntaxRegistry registry) {
+        registry.registerExpression("[all [[of] the]|the|every] %classinfo%", Object.class, a -> {
+            Object typeObject = a.get(0).getSingle(null);
+            if (!(typeObject instanceof co.xenastudios.neoskript.lang.type.ValueSet set)
+                    || set.allValues().isEmpty()) {
+                throw new ParseException("'"
+                        + (typeObject instanceof co.xenastudios.neoskript.api.type.Type<?> t ? t.codeName() : typeObject)
+                        + "' has no enumerable values");
+            }
+            return new ComputedListExpression(ctx -> set.allValues().toArray());
+        });
     }
 
     private static void registerTypes() {

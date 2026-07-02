@@ -79,11 +79,22 @@ public final class ExpressionParser {
         return new ListExpression(elements);
     }
 
-    /** @return true if a registered expression pattern matches the whole input. */
+    /**
+     * @return true if the whole input parses as a single registered expression. A pattern match alone
+     * is not enough: its arguments must also parse, so a wildcard slot (e.g. {@code %classinfo%}) that
+     * textually matches a comma-list doesn't suppress list-splitting when the capture isn't valid.
+     */
     private boolean matchesRegisteredExpression(String s) {
         for (ExpressionEntry entry : registry.expressionCandidates(s)) {
-            if (entry.pattern().match(s).isPresent()) {
-                return true;
+            Optional<List<String>> match = entry.pattern().match(s);
+            if (match.isPresent()) {
+                try {
+                    parseArguments(match.get(), entry.pattern().argTypes());
+                    return true;
+                } catch (ParseException ignored) {
+                    // Pattern matched but its arguments don't parse — not a genuine single-expression
+                    // match; keep looking (and fall back to list-splitting if none qualifies).
+                }
             }
         }
         return false;

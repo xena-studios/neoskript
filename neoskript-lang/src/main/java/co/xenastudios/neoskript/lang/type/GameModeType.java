@@ -9,7 +9,7 @@ import java.util.Optional;
 /**
  * The built-in {@code gamemode} type.
  */
-public final class GameModeType implements Type<GameMode> {
+public final class GameModeType implements Type<GameMode>, ValueSet {
 
     @Override
     public Class<GameMode> typeClass() {
@@ -33,5 +33,10 @@ public final class GameModeType implements Type<GameMode> {
     @Override
     public String toDisplayString(GameMode value) {
         return value.name().toLowerCase(Locale.ROOT);
+    }
+
+    @Override
+    public java.util.List<?> allValues() {
+        return java.util.List.of(GameMode.values());
     }
 }

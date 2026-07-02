@@ -18,7 +18,7 @@ import java.util.function.Supplier;
  *
  * @param <T> the keyed registry value type
  */
-public final class RegistryType<T extends Keyed> implements Type<T> {
+public final class RegistryType<T extends Keyed> implements Type<T>, ValueSet {
 
     private final String codeName;
     private final Class<T> typeClass;
@@ -66,5 +66,27 @@ public final class RegistryType<T extends Keyed> implements Type<T> {
     @Override
     public String toDisplayString(T value) {
         return value.getKey().getKey();
+    }
+
+    @Override
+    public java.util.List<?> allValues() {
+        Registry<T> reg;
+        try {
+            reg = registry.get();
+        } catch (Throwable noServer) {
+            return java.util.List.of();
+        }
+        if (reg == null) {
+            return java.util.List.of();
+        }
+        java.util.List<T> out = new java.util.ArrayList<>();
+        try {
+            for (T value : reg) {
+                out.add(value);
+            }
+        } catch (Throwable unavailable) {
+            return java.util.List.of();
+        }
+        return out;
     }
 }
