@@ -92,6 +92,7 @@ public final class BuiltinModule {
         registerBlocksSyntax(registry);
         registerVisibilitySyntax(registry);
         registerLogSyntax(registry);
+        registerEntitiesSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -1071,6 +1072,49 @@ public final class BuiltinModule {
             }
             return out.toArray();
         });
+    }
+
+    /**
+     * The {@code entities of type[s] %entitydatas% [in world[s] %worlds%]} expression — every loaded
+     * entity of the given type(s), across the named worlds (all worlds when none are given).
+     */
+    private static void registerEntitiesSyntax(SyntaxRegistry registry) {
+        registry.registerExpression(
+                "[(all [[of] the]|the)] entities of type[s] %entitydatas% [(in|of) [world[s]] %worlds%]",
+                Object.class, arguments -> {
+                    Expression<?> types = arguments.get(0);
+                    Expression<?> worlds = arguments.get(1);
+                    return new ComputedListExpression(ctx -> {
+                        java.util.Set<org.bukkit.entity.EntityType> wanted = new java.util.HashSet<>();
+                        for (Object value : types.getAll(ctx)) {
+                            if (value instanceof org.bukkit.entity.EntityType type) {
+                                wanted.add(type);
+                            }
+                        }
+                        if (wanted.isEmpty()) {
+                            return new Object[0];
+                        }
+                        List<World> scope = new ArrayList<>();
+                        if (worlds != null) {
+                            for (Object value : worlds.getAll(ctx)) {
+                                if (value instanceof World world) {
+                                    scope.add(world);
+                                }
+                            }
+                        } else {
+                            scope.addAll(Bukkit.getWorlds());
+                        }
+                        List<Object> out = new ArrayList<>();
+                        for (World world : scope) {
+                            for (Entity entity : world.getEntities()) {
+                                if (wanted.contains(entity.getType())) {
+                                    out.add(entity);
+                                }
+                            }
+                        }
+                        return out.toArray();
+                    });
+                });
     }
 
     /**

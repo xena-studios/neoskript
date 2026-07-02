@@ -8365,8 +8365,8 @@
       "[(all [[of] the]|the)] entities of type[s] %entitydatas% within %location% and %location%"
     ],
     "source": "ch/njol/skript/expressions/ExprEntities.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:entity-ai",
