@@ -89,6 +89,7 @@ public final class BuiltinModule {
         registerClassInfoSyntax(registry);
         registerPotionSyntax(registry);
         registerEquipSyntax(registry);
+        registerBlocksSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -1001,6 +1002,46 @@ public final class BuiltinModule {
             for (Object value : source.getAll(ctx)) {
                 if (value instanceof co.xenastudios.neoskript.lang.type.Slot slot) {
                     out.add((double) slot.index());
+                }
+            }
+            return out.toArray();
+        });
+    }
+
+    /**
+     * The {@code blocks between %location% and %location%} family — every block in the cuboid spanned
+     * by two corner locations (inclusive). The two locations must share a world.
+     */
+    private static void registerBlocksSyntax(SyntaxRegistry registry) {
+        registry.registerExpression("[(all [[of] the]|the)] blocks between %location% and %location%",
+                Object.class, arguments -> blocksBetween(arguments.get(0), arguments.get(1)));
+        registry.registerExpression("[(all [[of] the]|the)] blocks within %location% and %location%",
+                Object.class, arguments -> blocksBetween(arguments.get(0), arguments.get(1)));
+        registry.registerExpression("[(all [[of] the]|the)] blocks from %location% to %location%",
+                Object.class, arguments -> blocksBetween(arguments.get(0), arguments.get(1)));
+    }
+
+    /** Every block in the axis-aligned cuboid between two corner locations (inclusive). */
+    private static Expression<Object> blocksBetween(Expression<?> first, Expression<?> second) {
+        return new ComputedListExpression(ctx -> {
+            Location a = toLocation(first.getSingle(ctx));
+            Location b = toLocation(second.getSingle(ctx));
+            if (a == null || b == null || a.getWorld() == null || !a.getWorld().equals(b.getWorld())) {
+                return new Object[0];
+            }
+            World world = a.getWorld();
+            int minX = Math.min(a.getBlockX(), b.getBlockX());
+            int maxX = Math.max(a.getBlockX(), b.getBlockX());
+            int minY = Math.min(a.getBlockY(), b.getBlockY());
+            int maxY = Math.max(a.getBlockY(), b.getBlockY());
+            int minZ = Math.min(a.getBlockZ(), b.getBlockZ());
+            int maxZ = Math.max(a.getBlockZ(), b.getBlockZ());
+            List<Object> out = new ArrayList<>();
+            for (int x = minX; x <= maxX; x++) {
+                for (int y = minY; y <= maxY; y++) {
+                    for (int z = minZ; z <= maxZ; z++) {
+                        out.add(world.getBlockAt(x, y, z));
+                    }
                 }
             }
             return out.toArray();

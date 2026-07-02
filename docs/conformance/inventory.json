@@ -7155,8 +7155,8 @@
       "[(all [[of] the]|the)] blocks (in|within) %chunk%"
     ],
     "source": "ch/njol/skript/expressions/ExprBlocks.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:blocks-in-region",
