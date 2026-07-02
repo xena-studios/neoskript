@@ -2838,8 +2838,8 @@
       "unequip %livingentities%'[s] (armo[u]r|equipment)"
     ],
     "source": "ch/njol/skript/effects/EffEquip.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:equippable-component-dispense",

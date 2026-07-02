@@ -88,6 +88,7 @@ public final class BuiltinModule {
         registerSlotSyntax(registry);
         registerClassInfoSyntax(registry);
         registerPotionSyntax(registry);
+        registerEquipSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -958,6 +959,64 @@ public final class BuiltinModule {
             }
             return out.toArray();
         });
+    }
+
+    /**
+     * The {@code equip [%livingentities%] with %itemtypes%} effect: places each item in the entity's
+     * matching equipment slot (helmet/chestplate/leggings/boots by material, shield in the off hand,
+     * anything else in the main hand). With no explicit entity it targets the event's player.
+     */
+    private static void registerEquipSyntax(SyntaxRegistry registry) {
+        registry.registerEffect("equip [%livingentities%] with %itemtypes%", arguments -> {
+            Expression<?> entities = arguments.get(0);
+            Expression<?> items = arguments.get(1);
+            return ctx -> {
+                List<LivingEntity> targets = new ArrayList<>();
+                if (entities != null) {
+                    for (Object value : entities.getAll(ctx)) {
+                        if (value instanceof LivingEntity living) {
+                            targets.add(living);
+                        }
+                    }
+                } else if (event(ctx) instanceof org.bukkit.event.player.PlayerEvent playerEvent) {
+                    targets.add(playerEvent.getPlayer());
+                }
+                for (LivingEntity target : targets) {
+                    org.bukkit.inventory.EntityEquipment equipment = target.getEquipment();
+                    if (equipment == null) {
+                        continue;
+                    }
+                    for (Object value : items.getAll(ctx)) {
+                        ItemStack item = toItemStack(value);
+                        if (item != null) {
+                            equipment.setItem(equipmentSlotFor(item.getType()), item);
+                        }
+                    }
+                }
+            };
+        });
+    }
+
+    /** Maps an item's material to the equipment slot Skript's {@code equip} places it in. */
+    private static org.bukkit.inventory.EquipmentSlot equipmentSlotFor(org.bukkit.Material material) {
+        String name = material.name();
+        if (name.endsWith("_HELMET") || name.endsWith("_HEAD") || name.endsWith("SKULL")
+                || name.equals("CARVED_PUMPKIN")) {
+            return org.bukkit.inventory.EquipmentSlot.HEAD;
+        }
+        if (name.endsWith("_CHESTPLATE") || name.equals("ELYTRA")) {
+            return org.bukkit.inventory.EquipmentSlot.CHEST;
+        }
+        if (name.endsWith("_LEGGINGS")) {
+            return org.bukkit.inventory.EquipmentSlot.LEGS;
+        }
+        if (name.endsWith("_BOOTS")) {
+            return org.bukkit.inventory.EquipmentSlot.FEET;
+        }
+        if (name.equals("SHIELD")) {
+            return org.bukkit.inventory.EquipmentSlot.OFF_HAND;
+        }
+        return org.bukkit.inventory.EquipmentSlot.HAND;
     }
 
     /**
