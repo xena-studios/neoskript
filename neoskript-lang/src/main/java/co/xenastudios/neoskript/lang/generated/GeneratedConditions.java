@@ -831,7 +831,7 @@ public final class GeneratedConditions {
         registry.registerCondition("%object% (is|are) evenly divisible by %object% [with [a] tolerance [of] %object%]", a -> ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
             Object a1 = a.get(1).getSingle(ctx);
-            Object a2 = a.get(2).getSingle(ctx);
+            Object a2 = (a.get(2) == null ? null : a.get(2).getSingle(ctx));
             return (a0 instanceof java.lang.Number && a1 instanceof java.lang.Number && ((java.lang.Number)a1).doubleValue() != 0 && (a2 instanceof java.lang.Number ? ((java.lang.Number)a2).doubleValue() : 1e-10) > 0 && !java.lang.Double.isNaN(a2 instanceof java.lang.Number ? ((java.lang.Number)a2).doubleValue() : 1e-10) && ((java.lang.Number)a1).doubleValue() >= (a2 instanceof java.lang.Number ? ((java.lang.Number)a2).doubleValue() : 1e-10) && (java.lang.Math.abs(((java.lang.Number)a0).doubleValue() % ((java.lang.Number)a1).doubleValue()) <= (a2 instanceof java.lang.Number ? ((java.lang.Number)a2).doubleValue() : 1e-10) || java.lang.Math.abs(((java.lang.Number)a0).doubleValue() % ((java.lang.Number)a1).doubleValue()) >= ((java.lang.Number)a1).doubleValue() - (a2 instanceof java.lang.Number ? ((java.lang.Number)a2).doubleValue() : 1e-10)));
         });
         registry.registerCondition("hand[s] of %object% (is|are) raised", a -> ctx -> {

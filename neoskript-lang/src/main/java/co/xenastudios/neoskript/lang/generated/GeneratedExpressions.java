@@ -2367,13 +2367,13 @@ public final class GeneratedExpressions {
             return (!(a0 instanceof org.bukkit.Location l) || !(a1 instanceof org.bukkit.util.Vector v) ? null : l.clone().add(v));
         }));
         registry.registerExpression("[the] break speed[s] [of %object%] [for %object%]", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = a.get(1).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
+            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
             return (!(a0 instanceof org.bukkit.block.Block b) || !(a1 instanceof org.bukkit.entity.Player p) ? null : b.getBreakSpeed(p));
         }));
         registry.registerExpression("%object%'[s] break speed[s] [for %object%]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = a.get(1).getSingle(ctx);
+            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
             return (!(a0 instanceof org.bukkit.block.Block b) || !(a1 instanceof org.bukkit.entity.Player p) ? null : b.getBreakSpeed(p));
         }));
         registry.registerExpression("%object% with [a] yaw [of] %object%", Object.class, a -> new ComputedExpression(ctx -> {
@@ -2422,17 +2422,17 @@ public final class GeneratedExpressions {
             Object a0 = a.get(0).getSingle(ctx);
             Object a1 = a.get(1).getSingle(ctx);
             Object a2 = a.get(2).getSingle(ctx);
-            Object a3 = a.get(3).getSingle(ctx);
+            Object a3 = (a.get(3) == null ? null : a.get(3).getSingle(ctx));
             return (!(a0 instanceof java.lang.Number nx) || !(a1 instanceof java.lang.Number ny) || !(a2 instanceof java.lang.Number nz) || !(a3 instanceof org.bukkit.World w) ? null : new org.bukkit.Location(w, nx.doubleValue(), ny.doubleValue(), nz.doubleValue()));
         }));
         registry.registerExpression("[a] [new] chest inventory (named|with name) %object% [with %object% row[s]]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = a.get(1).getSingle(ctx);
+            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
             return (org.bukkit.Bukkit.createInventory(null, java.lang.Math.max(0, java.lang.Math.min(54, (a1 instanceof java.lang.Number rn ? rn.intValue()*9 : 27))), (a0 instanceof net.kyori.adventure.text.Component nm ? nm : org.bukkit.event.inventory.InventoryType.CHEST.defaultTitle())));
         }));
         registry.registerExpression("[a] [new] chest inventory with %object% row[s] [(named|with name) %object%]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = a.get(1).getSingle(ctx);
+            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
             return (org.bukkit.Bukkit.createInventory(null, java.lang.Math.max(0, java.lang.Math.min(54, (a0 instanceof java.lang.Number rn ? rn.intValue()*9 : 27))), (a1 instanceof net.kyori.adventure.text.Component nm ? nm : org.bukkit.event.inventory.InventoryType.CHEST.defaultTitle())));
         }));
         registry.registerExpression("%object% to location in %object%", Object.class, a -> new ComputedExpression(ctx -> {
@@ -2595,23 +2595,23 @@ public final class GeneratedExpressions {
             return ((a0 instanceof org.bukkit.block.Block && ((org.bukkit.block.Block) a0).getState() instanceof org.bukkit.block.Beacon && ((org.bukkit.block.Beacon) ((org.bukkit.block.Block) a0).getState()).getSecondaryEffect() != null) ? ((org.bukkit.block.Beacon) ((org.bukkit.block.Block) a0).getState()).getSecondaryEffect().getType() : null);
         }));
         registry.registerExpression("[the] main command [label|name] [of [[the] command[s] %object%]]", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (((java.util.function.Function<org.bukkit.command.Command,String>)(c -> c == null ? null : c.getName())).apply(a0 instanceof String ? org.bukkit.Bukkit.getServer().getCommandMap().getCommand((String) a0) : null));
         }));
         registry.registerExpression("[the] description [of [[the] command[s] %object%]]", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (((java.util.function.Function<org.bukkit.command.Command,String>)(c -> c == null ? null : c.getDescription())).apply(a0 instanceof String ? org.bukkit.Bukkit.getServer().getCommandMap().getCommand((String) a0) : null));
         }));
         registry.registerExpression("[the] label [of [[the] command[s] %object%]]", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (((java.util.function.Function<org.bukkit.command.Command,String>)(c -> c == null ? null : c.getLabel())).apply(a0 instanceof String ? org.bukkit.Bukkit.getServer().getCommandMap().getCommand((String) a0) : null));
         }));
         registry.registerExpression("[the] usage [of [[the] command[s] %object%]]", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (((java.util.function.Function<org.bukkit.command.Command,String>)(c -> c == null ? null : c.getUsage())).apply(a0 instanceof String ? org.bukkit.Bukkit.getServer().getCommandMap().getCommand((String) a0) : null));
         }));
         registry.registerExpression("[(all|the|all [of] the)] aliases [of [[the] command[s] %object%]]", Object.class, a -> new ComputedListExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             Object _c = (((java.util.function.Function<org.bukkit.command.Command,java.util.List<String>>)(c -> c == null ? null : c.getAliases())).apply(a0 instanceof String ? org.bukkit.Bukkit.getServer().getCommandMap().getCommand((String) a0) : null));
             if (_c == null) return new Object[0];
             if (_c instanceof java.util.Collection<?> _col) return _col.toArray();
@@ -2621,15 +2621,15 @@ public final class GeneratedExpressions {
             };
         }));
         registry.registerExpression("[the] permission [of [[the] command[s] %object%]]", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (((java.util.function.Function<org.bukkit.command.Command,String>)(c -> c == null ? null : c.getPermission())).apply(a0 instanceof String ? org.bukkit.Bukkit.getServer().getCommandMap().getCommand((String) a0) : null));
         }));
         registry.registerExpression("[the] permission message [of [[the] command[s] %object%]]", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (((java.util.function.Function<org.bukkit.command.Command,String>)(c -> c == null ? null : c.getPermissionMessage())).apply(a0 instanceof String ? org.bukkit.Bukkit.getServer().getCommandMap().getCommand((String) a0) : null));
         }));
         registry.registerExpression("[the] plugin [owner] [of [[the] command[s] %object%]]", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (((java.util.function.Function<org.bukkit.command.Command,String>)(c -> c == null ? null : c instanceof org.bukkit.command.PluginCommand ? ((org.bukkit.command.PluginCommand) c).getPlugin().getName() : c instanceof org.bukkit.command.defaults.BukkitCommand ? "Bukkit" : c.getClass().getPackage().getName().startsWith("org.spigot") ? "Spigot" : c.getClass().getPackage().getName().startsWith("com.destroystokyo.paper") ? "Paper" : "Unknown")).apply(a0 instanceof String ? org.bukkit.Bukkit.getServer().getCommandMap().getCommand((String) a0) : null));
         }));
         registry.registerExpression("%object% with (damage|data) [value] %object%", Object.class, a -> new ComputedExpression(ctx -> {
@@ -2728,7 +2728,7 @@ public final class GeneratedExpressions {
             return ((a0 instanceof java.util.Date && a1 instanceof String) ? new java.text.SimpleDateFormat((String) a1).format((java.util.Date) a0) : null);
         }));
         registry.registerExpression("[the] [furnace] cook[ing] time [of %object%]", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (a0 instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.block.Furnace f ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(f.getCookTime()) : null);
         }));
         registry.registerExpression("%object%'[s]cook[ing] time", Object.class, a -> new ComputedExpression(ctx -> {
@@ -2736,7 +2736,7 @@ public final class GeneratedExpressions {
             return (a0 instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.block.Furnace f ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(f.getCookTime()) : null);
         }));
         registry.registerExpression("[the] [furnace] total cook[ing] time [of %object%]", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (a0 instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.block.Furnace f ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(f.getCookTimeTotal()) : null);
         }));
         registry.registerExpression("%object%'[s]total cook[ing] time", Object.class, a -> new ComputedExpression(ctx -> {
@@ -2744,7 +2744,7 @@ public final class GeneratedExpressions {
             return (a0 instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.block.Furnace f ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(f.getCookTimeTotal()) : null);
         }));
         registry.registerExpression("[the] [furnace] fuel burn[ing] time [of %object%]", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (a0 instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.block.Furnace f ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(f.getBurnTime()) : null);
         }));
         registry.registerExpression("%object%'[s]fuel burn[ing] time", Object.class, a -> new ComputedExpression(ctx -> {
@@ -2876,38 +2876,38 @@ public final class GeneratedExpressions {
         }));
         registry.registerExpression("[a[n]] potion effect of %object% [[of tier] %object%] [for %object%]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
-            Object a2 = (a.get(2) == null ? null : a.get(2).getSingle(ctx));
+            Object a1 = (a.get(1) == null ? null : (a.get(1) == null ? null : a.get(1).getSingle(ctx)));
+            Object a2 = (a.get(2) == null ? null : (a.get(2) == null ? null : a.get(2).getSingle(ctx)));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && a2 instanceof co.xenastudios.neoskript.core.runtime.Timespan && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, (int) Math.max(0L, Math.min(((co.xenastudios.neoskript.core.runtime.Timespan) a2).ticks(), (long) Integer.MAX_VALUE)), a1 == null ? 0 : ((Number) a1).intValue() - 1, false, true, true) : null);
         }));
         registry.registerExpression("[a[n]] ambient potion effect of %object% [[of tier] %object%] [for %object%]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
-            Object a2 = (a.get(2) == null ? null : a.get(2).getSingle(ctx));
+            Object a1 = (a.get(1) == null ? null : (a.get(1) == null ? null : a.get(1).getSingle(ctx)));
+            Object a2 = (a.get(2) == null ? null : (a.get(2) == null ? null : a.get(2).getSingle(ctx)));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && a2 instanceof co.xenastudios.neoskript.core.runtime.Timespan && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, (int) Math.max(0L, Math.min(((co.xenastudios.neoskript.core.runtime.Timespan) a2).ticks(), (long) Integer.MAX_VALUE)), a1 == null ? 0 : ((Number) a1).intValue() - 1, true, true, true) : null);
         }));
         registry.registerExpression("[an] (infinite|permanent) potion effect of %object% [[of tier] %object%]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
+            Object a1 = (a.get(1) == null ? null : (a.get(1) == null ? null : a.get(1).getSingle(ctx)));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, -1, a1 == null ? 0 : ((Number) a1).intValue() - 1, false, true, true) : null);
         }));
         registry.registerExpression("[an] (infinite|permanent) ambient potion effect of %object% [[of tier] %object%]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
+            Object a1 = (a.get(1) == null ? null : (a.get(1) == null ? null : a.get(1).getSingle(ctx)));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, -1, a1 == null ? 0 : ((Number) a1).intValue() - 1, true, true, true) : null);
         }));
         registry.registerExpression("[an] (infinite|permanent) %object% [[of tier] %object%] [potion [effect]]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
+            Object a1 = (a.get(1) == null ? null : (a.get(1) == null ? null : a.get(1).getSingle(ctx)));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, -1, a1 == null ? 0 : ((Number) a1).intValue() - 1, false, true, true) : null);
         }));
         registry.registerExpression("[an] (infinite|permanent) ambient %object% [[of tier] %object%] [potion [effect]]", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
+            Object a1 = (a.get(1) == null ? null : (a.get(1) == null ? null : a.get(1).getSingle(ctx)));
             return ((a0 instanceof org.bukkit.potion.PotionEffectType && (a1 == null || a1 instanceof Number)) ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, -1, a1 == null ? 0 : ((Number) a1).intValue() - 1, true, true, true) : null);
         }));
         registry.registerExpression("[a] potion effect [of %object%] (from|using|based on) %object%", Object.class, a -> new ComputedExpression(ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             Object a1 = a.get(1).getSingle(ctx);
             return (!(a1 instanceof org.bukkit.potion.PotionEffect) ? null : (a0 == null ? (org.bukkit.potion.PotionEffect) a1 : (a0 instanceof org.bukkit.potion.PotionEffectType ? new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) a0, ((org.bukkit.potion.PotionEffect) a1).getDuration(), ((org.bukkit.potion.PotionEffect) a1).getAmplifier(), ((org.bukkit.potion.PotionEffect) a1).isAmbient(), ((org.bukkit.potion.PotionEffect) a1).hasParticles(), ((org.bukkit.potion.PotionEffect) a1).hasIcon()) : null)));
         }));

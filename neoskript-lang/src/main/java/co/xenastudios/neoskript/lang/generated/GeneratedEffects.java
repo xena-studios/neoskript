@@ -1013,7 +1013,7 @@ public final class GeneratedEffects {
         // final permissive condition / effect recovery
         registry.registerEffect("generate [the] loot (of|using) %object% [(with|using) %object%] in %object%", a -> ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
-            Object a1 = a.get(1).getSingle(ctx);
+            Object a1 = (a.get(1) == null ? null : a.get(1).getSingle(ctx));
             Object a2 = a.get(2).getSingle(ctx);
             if (a0 instanceof org.bukkit.loot.LootTable && a2 instanceof org.bukkit.inventory.Inventory) {
                 org.bukkit.loot.LootContext __ctx;
@@ -1028,12 +1028,12 @@ public final class GeneratedEffects {
             };
         });
         registry.registerEffect("enable PvP [in %object%]", a -> ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             if (a0 instanceof org.bukkit.World w) w.setGameRule(org.bukkit.GameRule.PVP, true);
             ;
         });
         registry.registerEffect("disable PVP [in %object%]", a -> ctx -> {
-            Object a0 = a.get(0).getSingle(ctx);
+            Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             if (a0 instanceof org.bukkit.World w) w.setGameRule(org.bukkit.GameRule.PVP, false);
             ;
         });
