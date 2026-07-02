@@ -941,11 +941,57 @@ public final class BuiltinModule {
         registry.registerExpression("%objects%'[s] inventor(y|ies)", Object.class,
                 arguments -> inventoryExpression(arguments.get(0)));
 
+        // indices/positions of a value within a list — registered BEFORE `index of %slots%` so the
+        // "... in %objects%" form wins over the slot form (which would greedily capture "value in list").
+        registry.registerExpression("[the] [first] (index|position) of %object% in %objects%", Object.class,
+                arguments -> indicesOfValue(arguments.get(0), arguments.get(1), 0));
+        registry.registerExpression("[the] last (index|position) of %object% in %objects%", Object.class,
+                arguments -> indicesOfValue(arguments.get(0), arguments.get(1), 1));
+        registry.registerExpression("[the] [all] (indices|positions) of %object% in %objects%", Object.class,
+                arguments -> indicesOfValue(arguments.get(0), arguments.get(1), 2));
+
         // index of %slots% — the slot's position within its inventory.
         registry.registerExpression("[(raw|unique)] index of %slots%", Object.class,
                 arguments -> slotIndexExpression(arguments.get(0)));
         registry.registerExpression("%slots%'[s] [(raw|unique)] index", Object.class,
                 arguments -> slotIndexExpression(arguments.get(0)));
+    }
+
+    /**
+     * {@code index of %value% in %list%} — the list key(s) whose value equals the target.
+     * {@code mode}: 0 = first match, 1 = last match, 2 = all matches. The list must be a list variable.
+     */
+    private static Expression<Object> indicesOfValue(Expression<?> value, Expression<?> listExpr, int mode) {
+        return new ComputedListExpression(ctx -> {
+            if (!(listExpr instanceof VariableExpression list) || !list.isList()) {
+                return new Object[0];
+            }
+            Object target = value.getSingle(ctx);
+            Object[] keys = list.listKeys(ctx);
+            Object[] values = list.getAll(ctx);
+            List<Object> matches = new ArrayList<>();
+            for (int i = 0; i < Math.min(keys.length, values.length); i++) {
+                if (valuesEqual(values[i], target)) {
+                    matches.add(keys[i]);
+                }
+            }
+            if (matches.isEmpty()) {
+                return new Object[0];
+            }
+            return switch (mode) {
+                case 0 -> new Object[]{matches.get(0)};
+                case 1 -> new Object[]{matches.get(matches.size() - 1)};
+                default -> matches.toArray();
+            };
+        });
+    }
+
+    /** Equality that treats numeric values by their double value (so 1 and 1.0 match). */
+    private static boolean valuesEqual(Object a, Object b) {
+        if (a instanceof Number x && b instanceof Number y) {
+            return x.doubleValue() == y.doubleValue();
+        }
+        return java.util.Objects.equals(a, b);
     }
 
     /** {@code index of %slots%} — each slot's inventory index as a number. */

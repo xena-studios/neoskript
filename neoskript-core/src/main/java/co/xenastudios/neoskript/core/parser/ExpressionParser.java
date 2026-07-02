@@ -370,9 +370,15 @@ public final class ExpressionParser {
             });
         }
         Matcher indices = META_INDICES.matcher(s);
-        if (indices.matches() && parse(indices.group(1).trim()) instanceof VariableExpression list
-                && list.isList()) {
-            return new ComputedListExpression(list::listKeys);
+        if (indices.matches()) {
+            try {
+                if (parse(indices.group(1).trim()) instanceof VariableExpression list && list.isList()) {
+                    return new ComputedListExpression(list::listKeys);
+                }
+            } catch (ParseException ignored) {
+                // The capture isn't a bare list variable (e.g. `indices of %value% in %list%`); fall
+                // through so the registered index-of-value expression can handle it.
+            }
         }
         Matcher reduce = META_REDUCE.matcher(s);
         if (reduce.matches()) {

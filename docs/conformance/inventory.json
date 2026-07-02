@@ -9338,8 +9338,8 @@
       "[the] [1:first|2:last|3:all] (mult:indices|index[mult:es]) of [[the] value] %objects% in %~objects%"
     ],
     "source": "ch/njol/skript/expressions/ExprIndicesOfValue.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:infinity",
