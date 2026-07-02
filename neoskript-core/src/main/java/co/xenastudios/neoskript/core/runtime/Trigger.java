@@ -19,7 +19,7 @@ public final class Trigger {
 
     /** The kind of trigger. */
     public enum Kind {
-        EVENT, PERIODIC, LOAD
+        EVENT, PERIODIC, LOAD, TIMED
     }
 
     private final Kind kind;
@@ -28,15 +28,25 @@ public final class Trigger {
     private final long intervalTicks;
     private final List<Statement> statements;
     private final java.util.function.Predicate<Object> filter;
+    private final boolean realTime;
+    private final List<String> worldNames;
 
     private Trigger(Kind kind, String eventName, Class<?> eventClass, long intervalTicks,
-                    List<Statement> statements, java.util.function.Predicate<Object> filter) {
+                    List<Statement> statements, java.util.function.Predicate<Object> filter,
+                    boolean realTime, List<String> worldNames) {
         this.kind = kind;
         this.eventName = eventName;
         this.eventClass = eventClass;
         this.intervalTicks = intervalTicks;
         this.statements = List.copyOf(statements);
         this.filter = filter;
+        this.realTime = realTime;
+        this.worldNames = worldNames == null ? List.of() : List.copyOf(worldNames);
+    }
+
+    private Trigger(Kind kind, String eventName, Class<?> eventClass, long intervalTicks,
+                    List<Statement> statements, java.util.function.Predicate<Object> filter) {
+        this(kind, eventName, eventClass, intervalTicks, statements, filter, false, List.of());
     }
 
     /** Creates an event trigger. */
@@ -48,6 +58,27 @@ public final class Trigger {
     public Trigger(String eventName, Class<?> eventClass, List<Statement> statements,
                    java.util.function.Predicate<Object> filter) {
         this(Kind.EVENT, eventName, eventClass, 0L, statements, filter);
+    }
+
+    /**
+     * Creates a time-scheduled trigger, run when a world reaches {@code targetTime} ticks (0–24000), or
+     * when the real clock reaches {@code targetTime} seconds-of-day if {@code realTime}. An empty
+     * {@code worldNames} means every world (ignored for real time).
+     */
+    public static Trigger timed(long targetTime, boolean realTime, List<String> worldNames,
+                                List<Statement> statements) {
+        String name = realTime ? "at " + targetTime + " real time" : "at " + targetTime + " ticks";
+        return new Trigger(Kind.TIMED, name, null, targetTime, statements, null, realTime, worldNames);
+    }
+
+    /** @return {@code true} if a {@link Kind#TIMED} trigger schedules against the real clock */
+    public boolean realTime() {
+        return realTime;
+    }
+
+    /** @return the world names a {@link Kind#TIMED} trigger is limited to (empty = all worlds) */
+    public List<String> worldNames() {
+        return worldNames;
     }
 
     /**

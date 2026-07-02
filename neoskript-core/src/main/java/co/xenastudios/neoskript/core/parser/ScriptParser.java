@@ -106,6 +106,8 @@ public final class ScriptParser {
                 String lower = node.content().toLowerCase(Locale.ROOT);
                 if (lower.startsWith("every ") && node.content().endsWith(":")) {
                     triggers.add(parsePeriodic(node));
+                } else if (lower.startsWith("at ") && node.content().endsWith(":")) {
+                    triggers.add(parseAtTime(node));
                 } else if (lower.startsWith("on ") && node.content().endsWith(":")) {
                     triggers.add(parseEvent(node));
                 } else if ((lower.startsWith("function ") || lower.startsWith("local function "))
@@ -151,6 +153,98 @@ public final class ScriptParser {
         EventRegistry.FilteredEvent resolved = events.resolveFiltered(eventName)
                 .orElseThrow(() -> new ParseException("Unknown event '" + eventName + "'", node.line()));
         return new Trigger(eventName, resolved.eventClass(), body, resolved.filter());
+    }
+
+    /**
+     * Parses a time-scheduled trigger: {@code at %time% [in %worlds%]:} (world time) or
+     * {@code at %time% [in] real time:} (real clock time).
+     */
+    private Trigger parseAtTime(Node node) {
+        String content = node.content();
+        String spec = content.substring("at ".length(), content.length() - 1).trim();
+        Matcher real = Pattern.compile("(?i)^(.*?)\\s+(?:in\\s+)?real\\s*time$").matcher(spec);
+        if (real.matches()) {
+            long seconds = parseRealSeconds(real.group(1).trim());
+            if (seconds < 0) {
+                throw new ParseException("Unknown real time '" + real.group(1).trim() + "'", node.line());
+            }
+            return Trigger.timed(seconds, true, List.of(), parseBody(node, content));
+        }
+        String timeSpec = spec;
+        List<String> worlds = List.of();
+        Matcher in = Pattern.compile("(?i)^(.*?)\\s+in\\s+(.+)$").matcher(spec);
+        if (in.matches()) {
+            timeSpec = in.group(1).trim();
+            worlds = extractWorldNames(in.group(2).trim());
+        }
+        long ticks = parseWorldTicks(timeSpec);
+        if (ticks < 0) {
+            throw new ParseException("Unknown time '" + timeSpec + "'", node.line());
+        }
+        return Trigger.timed(ticks, false, worlds, parseBody(node, content));
+    }
+
+    /** Extracts world names from an {@code in %worlds%} clause: quoted strings split on commas/and. */
+    private static List<String> extractWorldNames(String spec) {
+        List<String> names = new ArrayList<>();
+        for (String part : spec.split("(?i),|\\s+and\\s+")) {
+            String name = part.trim();
+            if (name.startsWith("\"") && name.endsWith("\"") && name.length() >= 2) {
+                name = name.substring(1, name.length() - 1);
+            }
+            if (!name.isEmpty()) {
+                names.add(name);
+            }
+        }
+        return names;
+    }
+
+    /** Converts a Minecraft time ({@code 18:00}, a named period, or raw ticks) to world ticks, or -1. */
+    private static long parseWorldTicks(String spec) {
+        String lower = spec.trim().toLowerCase(Locale.ROOT);
+        Long named = switch (lower) {
+            case "day", "sunrise", "morning" -> 0L;
+            case "noon" -> 6000L;
+            case "sunset", "dusk", "evening" -> 12000L;
+            case "night" -> 14000L;
+            case "midnight" -> 18000L;
+            case "dawn" -> 23000L;
+            default -> null;
+        };
+        if (named != null) {
+            return named;
+        }
+        Matcher clock = Pattern.compile("(\\d{1,2}):(\\d{2})").matcher(lower);
+        if (clock.matches()) {
+            long hours = Long.parseLong(clock.group(1));
+            long minutes = Long.parseLong(clock.group(2));
+            if (hours > 23 || minutes > 59) {
+                return -1;
+            }
+            // Minecraft tick 0 is 06:00; each hour is 1000 ticks.
+            return Math.floorMod((hours - 6) * 1000 + minutes * 1000 / 60, 24000);
+        }
+        try {
+            long ticks = Long.parseLong(lower.replace("ticks", "").trim());
+            return Math.floorMod(ticks, 24000);
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
+    }
+
+    /** Converts a real clock time ({@code HH:MM[:SS]}) to seconds-of-day, or -1 if unparseable. */
+    private static long parseRealSeconds(String spec) {
+        Matcher clock = Pattern.compile("(\\d{1,2}):(\\d{2})(?::(\\d{2}))?").matcher(spec.trim());
+        if (!clock.matches()) {
+            return -1;
+        }
+        long hours = Long.parseLong(clock.group(1));
+        long minutes = Long.parseLong(clock.group(2));
+        long seconds = clock.group(3) != null ? Long.parseLong(clock.group(3)) : 0;
+        if (hours > 23 || minutes > 59 || seconds > 59) {
+            return -1;
+        }
+        return hours * 3600 + minutes * 60 + seconds;
     }
 
     private Trigger parsePeriodic(Node node) {

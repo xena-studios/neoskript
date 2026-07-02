@@ -4313,8 +4313,8 @@
       "at %time% [in %worlds%]"
     ],
     "source": "ch/njol/skript/events/EvtAtTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "event:periodical",
@@ -5007,8 +5007,8 @@
       "spawn of [a[n]] [e]xp[erience] [orb]"
     ],
     "source": "ch/njol/skript/events/EvtExperienceSpawn.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "event:explode",
@@ -6086,8 +6086,8 @@
       "at %times% [in] real time"
     ],
     "source": "ch/njol/skript/events/EvtRealTime.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "event:tame",
@@ -8931,8 +8931,8 @@
       "%~objects%(-to-be| after[(wards| the event)])"
     ],
     "source": "ch/njol/skript/expressions/ExprTimeState.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:free-max-total-memory",

@@ -186,6 +186,16 @@ public final class BuiltinEvents {
                 return e.getTo().clone().subtract(0, 1, 0).getBlock().getType() == mat;
             }));
         });
+        // on experience [orb] spawn: an experience orb entity spawns.
+        events.registerFilter(name -> {
+            if (!name.matches("(?i)(e?xp|experience)( orb)? spawn|spawn of (a |an )?(e?xp|experience)( orb)?")) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(new EventRegistry.FilteredEvent(
+                    org.bukkit.event.entity.EntitySpawnEvent.class,
+                    ev -> ev instanceof org.bukkit.event.entity.EntitySpawnEvent e
+                            && e.getEntity() instanceof org.bukkit.entity.ExperienceOrb));
+        });
         // on first (join|login): a join by a player who has not played before.
         events.registerFilter(name -> {
             if (!name.matches("(?i)first (join|login)")) {

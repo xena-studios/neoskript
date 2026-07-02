@@ -1103,6 +1103,19 @@ public final class BuiltinModule {
         registry.registerCondition("[the] resource pack (wasn't|isn't|hasn't|was not|is not|has not) [been] %resourcepackstate%",
                 a -> resourcePackState(a.get(0), false));
 
+        // Former/future state: during a move/teleport event the player's current location is still the
+        // from-location, so "former"/"before" is the current value and "future"/"after" is the to-value.
+        // (A full time-state framework covering every event value is out of scope; locations and worlds
+        // in move/teleport events are the common, faithful case.)
+        registry.registerExpression("[the] (former|past|old) [state[s]] [of] %objects%", Object.class,
+                a -> formerFutureState(a.get(0), false));
+        registry.registerExpression("%objects% before [the] [event]", Object.class,
+                a -> formerFutureState(a.get(0), false));
+        registry.registerExpression("[the] (future|to-be|new) [state[s]] [of] %objects%", Object.class,
+                a -> formerFutureState(a.get(0), true));
+        registry.registerExpression("%objects% (-to-be|after[(wards| the event)])", Object.class,
+                a -> formerFutureState(a.get(0), true));
+
         // The enchantments added by the current enchant event.
         registry.registerExpression("[the] applied enchant[ment]s", Object.class,
                 a -> new ComputedListExpression(ctx ->
@@ -1159,6 +1172,30 @@ public final class BuiltinModule {
                     return result.replaceText(b -> b.matchLiteral("[msg]").replacement(message));
                 });
             }
+        });
+    }
+
+    /**
+     * The former (pre-event) or future (post-event) value of an expression. During a move/teleport
+     * event the wrapped expression already reflects the from-state, so {@code former} returns it as-is
+     * and {@code future} substitutes the destination for locations/worlds; outside such events (or for
+     * other value types) it falls back to the current value.
+     */
+    private static Expression<Object> formerFutureState(Expression<?> wrapped, boolean future) {
+        return new ComputedListExpression(ctx -> {
+            Object[] current = wrapped.getAll(ctx);
+            if (!future || !(event(ctx) instanceof org.bukkit.event.player.PlayerMoveEvent move)
+                    || move.getTo() == null) {
+                return current;
+            }
+            Location to = move.getTo();
+            Object[] out = new Object[current.length];
+            for (int i = 0; i < current.length; i++) {
+                Object value = current[i];
+                out[i] = value instanceof Location ? to.clone()
+                        : value instanceof World ? to.getWorld() : value;
+            }
+            return out;
         });
     }
 

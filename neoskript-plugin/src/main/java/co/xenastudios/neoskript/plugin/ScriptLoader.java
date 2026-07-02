@@ -171,6 +171,7 @@ public final class ScriptLoader {
         for (Trigger trigger : triggers) {
             switch (trigger.kind()) {
                 case PERIODIC -> schedulePeriodic(trigger);
+                case TIMED -> scheduleTimed(trigger);
                 case LOAD -> run(trigger, null);
                 case EVENT -> { /* registered together below */ }
             }
@@ -198,6 +199,61 @@ public final class ScriptLoader {
     private void schedulePeriodic(Trigger trigger) {
         long interval = trigger.intervalTicks();
         periodicTasks.add(scheduler.runRepeating(() -> run(trigger, null), interval, interval));
+    }
+
+    /**
+     * Schedules a time-conditional trigger: for world time, checks every tick and fires once each time
+     * a target world crosses the target tick; for real time, checks about once a second and fires once
+     * per day at the target minute.
+     */
+    private void scheduleTimed(Trigger trigger) {
+        if (trigger.realTime()) {
+            long targetHour = trigger.intervalTicks() / 3600;
+            long targetMinute = (trigger.intervalTicks() % 3600) / 60;
+            long[] lastFiredDay = {Long.MIN_VALUE};
+            periodicTasks.add(scheduler.runRepeating(() -> {
+                java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                long day = now.toLocalDate().toEpochDay();
+                if (now.getHour() == targetHour && now.getMinute() == targetMinute
+                        && lastFiredDay[0] != day) {
+                    lastFiredDay[0] = day;
+                    run(trigger, null);
+                }
+            }, 20L, 20L));
+        } else {
+            // Fire when a world crosses the target tick (robust to time advancing several ticks at
+            // once, e.g. under lag), tracking each world's previous time between checks.
+            java.util.Map<java.util.UUID, Long> previous = new java.util.HashMap<>();
+            long target = trigger.intervalTicks();
+            periodicTasks.add(scheduler.runRepeating(() -> {
+                for (org.bukkit.World world : timedWorlds(trigger)) {
+                    long current = world.getTime();
+                    Long prior = previous.put(world.getUID(), current);
+                    if (prior != null && prior != current) {
+                        long span = Math.floorMod(current - prior, 24000L);
+                        long toTarget = Math.floorMod(target - prior, 24000L);
+                        if (toTarget > 0 && toTarget <= span) {
+                            run(trigger, null);
+                        }
+                    }
+                }
+            }, 1L, 1L));
+        }
+    }
+
+    /** The worlds a timed trigger applies to: the named ones, or all worlds when none are named. */
+    private java.util.List<org.bukkit.World> timedWorlds(Trigger trigger) {
+        if (trigger.worldNames().isEmpty()) {
+            return new ArrayList<>(plugin.getServer().getWorlds());
+        }
+        java.util.List<org.bukkit.World> worlds = new ArrayList<>();
+        for (String name : trigger.worldNames()) {
+            org.bukkit.World world = plugin.getServer().getWorld(name);
+            if (world != null) {
+                worlds.add(world);
+            }
+        }
+        return worlds;
     }
 
     /** Runs a trigger with a fresh local scope, applying profiling and hot-path tracking. */
