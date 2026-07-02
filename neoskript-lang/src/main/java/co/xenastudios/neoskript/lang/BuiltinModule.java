@@ -953,6 +953,13 @@ public final class BuiltinModule {
         registry.registerExpression("[the] [all] (indices|positions) of %object% in %objects%", Object.class,
                 arguments -> indicesOfValue(arguments.get(0), arguments.get(1), 2));
 
+        // furnace ore/input slot(s) of the given furnace block(s), settable.
+        registry.registerExpression("[the] (ore|input) slot[s] of %blocks%", Object.class,
+                arguments -> blockInventorySlot(arguments.get(0), 0));
+        // brewing stand first bottle slot(s), settable.
+        registry.registerExpression("[the] [brewing stand['s]] (first|1st) bottle slot[s] of %blocks%",
+                Object.class, arguments -> blockInventorySlot(arguments.get(0), 0));
+
         // index of %slots% — the slot's position within its inventory.
         registry.registerExpression("[(raw|unique)] index of %slots%", Object.class,
                 arguments -> slotIndexExpression(arguments.get(0)));
@@ -995,6 +1002,62 @@ public final class BuiltinModule {
             return x.doubleValue() == y.doubleValue();
         }
         return java.util.Objects.equals(a, b);
+    }
+
+    /** A settable slot at a fixed index of each block's container inventory (e.g. a furnace ore slot). */
+    private static Expression<Object> blockInventorySlot(Expression<?> blocks, int index) {
+        return new Expression<Object>() {
+            private List<co.xenastudios.neoskript.lang.type.Slot> slots(
+                    co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                List<co.xenastudios.neoskript.lang.type.Slot> out = new ArrayList<>();
+                for (Object value : blocks.getAll(ctx)) {
+                    if (value instanceof org.bukkit.block.Block block
+                            && block.getState() instanceof org.bukkit.inventory.InventoryHolder holder) {
+                        out.add(new co.xenastudios.neoskript.lang.type.Slot(holder.getInventory(), index));
+                    }
+                }
+                return out;
+            }
+
+            @Override
+            public Object[] getAll(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                return slots(ctx).toArray();
+            }
+
+            @Override
+            public Object getSingle(co.xenastudios.neoskript.api.runtime.TriggerContext ctx) {
+                List<co.xenastudios.neoskript.lang.type.Slot> slots = slots(ctx);
+                return slots.isEmpty() ? null : slots.get(0);
+            }
+
+            @Override
+            public Class<Object> returnType() {
+                return Object.class;
+            }
+
+            @Override
+            public boolean isSingle() {
+                return blocks.isSingle();
+            }
+
+            @Override
+            public Class<?>[] acceptChange(ChangeMode mode) {
+                return switch (mode) {
+                    case SET, DELETE, RESET -> new Class<?>[]{Object.class};
+                    default -> null;
+                };
+            }
+
+            @Override
+            public void change(co.xenastudios.neoskript.api.runtime.TriggerContext ctx,
+                               Object[] delta, ChangeMode mode) {
+                ItemStack item = mode == ChangeMode.SET
+                        ? toItemStack(delta != null && delta.length > 0 ? delta[0] : null) : null;
+                for (co.xenastudios.neoskript.lang.type.Slot slot : slots(ctx)) {
+                    slot.setItem(item);
+                }
+            }
+        };
     }
 
     /** {@code index of %slots%} — each slot's inventory index as a number. */

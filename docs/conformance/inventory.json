@@ -7268,8 +7268,8 @@
       "%blocks%'[s] brewing [stand] fuel slot[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/brewing/elements/expressions/ExprBrewingSlot.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:brewing-time",
@@ -9001,8 +9001,8 @@
       "%blocks%'[s] (result|output) slot[s]"
     ],
     "source": "org/skriptlang/skript/bukkit/block/furnace/elements/expressions/ExprFurnaceSlot.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:furnace-times",
