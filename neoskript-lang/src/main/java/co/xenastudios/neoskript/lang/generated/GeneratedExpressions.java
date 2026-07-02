@@ -2731,7 +2731,7 @@ public final class GeneratedExpressions {
             Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (a0 instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.block.Furnace f ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(f.getCookTime()) : null);
         }));
-        registry.registerExpression("%object%'[s]cook[ing] time", Object.class, a -> new ComputedExpression(ctx -> {
+        registry.registerExpression("%object%'[s] cook[ing] time", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
             return (a0 instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.block.Furnace f ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(f.getCookTime()) : null);
         }));
@@ -2739,7 +2739,7 @@ public final class GeneratedExpressions {
             Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (a0 instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.block.Furnace f ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(f.getCookTimeTotal()) : null);
         }));
-        registry.registerExpression("%object%'[s]total cook[ing] time", Object.class, a -> new ComputedExpression(ctx -> {
+        registry.registerExpression("%object%'[s] total cook[ing] time", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
             return (a0 instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.block.Furnace f ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(f.getCookTimeTotal()) : null);
         }));
@@ -2747,7 +2747,7 @@ public final class GeneratedExpressions {
             Object a0 = (a.get(0) == null ? null : a.get(0).getSingle(ctx));
             return (a0 instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.block.Furnace f ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(f.getBurnTime()) : null);
         }));
-        registry.registerExpression("%object%'[s]fuel burn[ing] time", Object.class, a -> new ComputedExpression(ctx -> {
+        registry.registerExpression("%object%'[s] fuel burn[ing] time", Object.class, a -> new ComputedExpression(ctx -> {
             Object a0 = a.get(0).getSingle(ctx);
             return (a0 instanceof org.bukkit.block.Block b && b.getState() instanceof org.bukkit.block.Furnace f ? co.xenastudios.neoskript.core.runtime.Timespan.ofTicks(f.getBurnTime()) : null);
         }));
