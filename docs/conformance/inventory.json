@@ -3299,8 +3299,8 @@
       "log %strings% [(to|in) [file[s]] %-strings%] [with [the|a] severity [of] (1:warning|2:severe)]"
     ],
     "source": "ch/njol/skript/effects/EffLog.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:look-at",

@@ -91,6 +91,7 @@ public final class BuiltinModule {
         registerEquipSyntax(registry);
         registerBlocksSyntax(registry);
         registerVisibilitySyntax(registry);
+        registerLogSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -1006,6 +1007,56 @@ public final class BuiltinModule {
                 }
             }
             return out.toArray();
+        });
+    }
+
+    /**
+     * The {@code log %strings% [(to|in) [file[s]] %strings%]} effect: writes each message to the
+     * plugin's console log, or appends it (one line each) to the named file(s) under the plugin's
+     * {@code logs/} directory (a {@code .log} extension is added when the name has none).
+     */
+    private static void registerLogSyntax(SyntaxRegistry registry) {
+        registry.registerEffect("log %strings%", arguments -> {
+            Expression<?> messages = arguments.get(0);
+            return ctx -> {
+                org.bukkit.plugin.Plugin owner = Bukkit.getPluginManager().getPlugin("NeoSkript");
+                if (owner == null) {
+                    return;
+                }
+                for (Object message : messages.getAll(ctx)) {
+                    owner.getLogger().info(Renderer.toDisplay(message));
+                }
+            };
+        });
+        registry.registerEffect("log %strings% (to|in) [file[s]] %strings%", arguments -> {
+            Expression<?> messages = arguments.get(0);
+            Expression<?> files = arguments.get(1);
+            return ctx -> {
+                org.bukkit.plugin.Plugin owner = Bukkit.getPluginManager().getPlugin("NeoSkript");
+                if (owner == null) {
+                    return;
+                }
+                for (Object fileValue : files.getAll(ctx)) {
+                    String name = Renderer.toDisplay(fileValue);
+                    if (!name.contains(".")) {
+                        name += ".log";
+                    }
+                    java.io.File file = new java.io.File(new java.io.File(owner.getDataFolder(), "logs"), name);
+                    try {
+                        java.io.File parent = file.getParentFile();
+                        if (parent != null) {
+                            parent.mkdirs();
+                        }
+                        try (java.io.FileWriter writer = new java.io.FileWriter(file, true)) {
+                            for (Object message : messages.getAll(ctx)) {
+                                writer.write(Renderer.toDisplay(message) + System.lineSeparator());
+                            }
+                        }
+                    } catch (java.io.IOException ignored) {
+                        // best-effort logging; a failed file write should not abort the trigger
+                    }
+                }
+            };
         });
     }
 
