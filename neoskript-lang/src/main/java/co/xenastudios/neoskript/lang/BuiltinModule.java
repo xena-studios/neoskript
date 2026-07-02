@@ -95,6 +95,7 @@ public final class BuiltinModule {
         registerEntitiesSyntax(registry);
         registerAnvilAndNamedSyntax(registry);
         registerPersistentDataSyntax(registry);
+        registerEquippableSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
         co.xenastudios.neoskript.lang.generated.GeneratedSyntax.registerAll(registry);
     }
@@ -1074,6 +1075,71 @@ public final class BuiltinModule {
             }
             return out.toArray();
         });
+    }
+
+    /**
+     * Read-only accessors on an equippable item component (Paper's immutable {@code Equippable}): a
+     * blank component, its equipment slot, model/asset key, shear sound, and allowed entities.
+     */
+    private static void registerEquippableSyntax(SyntaxRegistry registry) {
+        registry.registerExpression("[a[n]] (blank|empty) equippable component", Object.class,
+                a -> new ComputedExpression(ctx -> io.papermc.paper.datacomponent.item.Equippable
+                        .equippable(org.bukkit.inventory.EquipmentSlot.HEAD).build()));
+        equippableProperty(registry, "[the] equipment slot of %equippablecomponents%",
+                io.papermc.paper.datacomponent.item.Equippable::slot);
+        equippableProperty(registry, "[the] equipped (model|asset) (key|id) of %equippablecomponents%",
+                eq -> eq.assetId() == null ? null : eq.assetId().toString());
+        equippableProperty(registry, "[the] shear[ed [off]] sound of %equippablecomponents%",
+                eq -> eq.shearSound() == null ? null : eq.shearSound().toString());
+        registry.registerExpression("[the] allowed entities of %equippablecomponents%", Object.class,
+                a -> {
+                    Expression<?> source = a.get(0);
+                    return new ComputedListExpression(ctx -> {
+                        List<Object> out = new ArrayList<>();
+                        for (Object value : source.getAll(ctx)) {
+                            if (value instanceof io.papermc.paper.datacomponent.item.Equippable eq) {
+                                out.addAll(allowedEntityTypes(eq));
+                            }
+                        }
+                        return out.toArray();
+                    });
+                });
+    }
+
+    /** Registers a read-only property that maps each equippable component through {@code getter}. */
+    private static void equippableProperty(SyntaxRegistry registry, String pattern,
+            java.util.function.Function<io.papermc.paper.datacomponent.item.Equippable, Object> getter) {
+        registry.registerExpression(pattern, Object.class, a -> {
+            Expression<?> source = a.get(0);
+            return new ComputedExpression(ctx -> {
+                Object value = source.getSingle(ctx);
+                return value instanceof io.papermc.paper.datacomponent.item.Equippable eq
+                        ? getter.apply(eq) : null;
+            });
+        });
+    }
+
+    /** Resolves an equippable component's allowed-entities key set to concrete entity types. */
+    private static List<org.bukkit.entity.EntityType> allowedEntityTypes(
+            io.papermc.paper.datacomponent.item.Equippable component) {
+        List<org.bukkit.entity.EntityType> out = new ArrayList<>();
+        io.papermc.paper.registry.set.RegistryKeySet<org.bukkit.entity.EntityType> allowed =
+                component.allowedEntities();
+        if (allowed == null) {
+            return out;
+        }
+        try {
+            for (io.papermc.paper.registry.TypedKey<org.bukkit.entity.EntityType> key : allowed) {
+                org.bukkit.entity.EntityType type =
+                        org.bukkit.Registry.ENTITY_TYPE.get(org.bukkit.NamespacedKey.fromString(key.key().asString()));
+                if (type != null) {
+                    out.add(type);
+                }
+            }
+        } catch (Throwable ignored) {
+            // best-effort resolution; unsupported key-set shapes yield an empty list rather than a crash
+        }
+        return out;
     }
 
     /**

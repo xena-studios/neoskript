@@ -7059,8 +7059,8 @@
       "a (blank|empty) equippable component"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/expressions/ExprSecBlankEquipComp.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:block",
@@ -8523,8 +8523,8 @@
       "%equippablecomponents%'[s] allowed entities"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/expressions/ExprEquipCompEntities.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:equippable-component-camera-overlay",
@@ -8562,8 +8562,8 @@
       "%equippablecomponents%'[s] equipment slot"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/expressions/ExprEquipCompSlot.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:equippable-component-model",
@@ -8575,8 +8575,8 @@
       "%equippablecomponents%'[s] equipped (model|asset) (key|id)"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/expressions/ExprEquipCompModel.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:equippable-component-shear-sound",
@@ -8588,8 +8588,8 @@
       "%equippablecomponents%'[s] shear[ed [off]] sound"
     ],
     "source": "org/skriptlang/skript/bukkit/itemcomponents/equippable/elements/expressions/ExprEquipCompShearSound.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:exact-item",
