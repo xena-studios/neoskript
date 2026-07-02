@@ -98,6 +98,7 @@ public final class BuiltinModule {
         registerEquippableSyntax(registry);
         registerScriptSyntax(registry);
         registerTagSyntax(registry);
+        registerTagEffect(registry);
         registerFunctionSyntax(registry);
         registerEventSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
@@ -1290,8 +1291,13 @@ public final class BuiltinModule {
     /** A Minecraft tag kind: its registry key, the class its values are, and the pattern word for it. */
     private record TagKind(String registry, Class<?> valueClass, String word) {}
 
-    /** A tag-source namespace filter: the pattern word ({@code ""} = all) and the key-namespace test. */
-    private record TagSource(String word, java.util.function.Predicate<org.bukkit.NamespacedKey> matches) {}
+    /**
+     * A tag-source filter: the pattern word ({@code ""} = all), the key-namespace test, and whether it
+     * reads user-registered {@link co.xenastudios.neoskript.lang.type.CustomTags custom} tags rather
+     * than Minecraft's built-in ones.
+     */
+    private record TagSource(String word, java.util.function.Predicate<org.bukkit.NamespacedKey> matches,
+                             boolean custom) {}
 
     private static final List<TagKind> TAG_KINDS = List.of(
             new TagKind(org.bukkit.Tag.REGISTRY_BLOCKS, org.bukkit.Material.class, "block"),
@@ -1299,13 +1305,13 @@ public final class BuiltinModule {
             new TagKind(org.bukkit.Tag.REGISTRY_ENTITY_TYPES, org.bukkit.entity.EntityType.class, "entity [type]"));
 
     private static final List<TagSource> TAG_SOURCES = List.of(
-            new TagSource("", key -> true),
-            new TagSource("minecraft ", key -> key.getNamespace().equals("minecraft")),
-            new TagSource("paper ", key -> key.getNamespace().equals("paper")),
+            new TagSource("", key -> true, false),
+            new TagSource("minecraft ", key -> key.getNamespace().equals("minecraft"), false),
+            new TagSource("paper ", key -> key.getNamespace().equals("paper"), false),
             new TagSource("datapack ", key -> !key.getNamespace().equals("minecraft")
-                    && !key.getNamespace().equals("paper")),
-            // Skript-registered custom tags; NeoSkript registers none, so this source is always empty.
-            new TagSource("custom ", key -> false));
+                    && !key.getNamespace().equals("paper"), false),
+            // Tags registered by the `register ... tag` effect, keyed under the skript namespace.
+            new TagSource("custom ", key -> true, true));
 
     /**
      * Registers the Minecraft tag expressions (Skript 2.10): {@code [all] [<source>] <kind> tags},
@@ -1335,9 +1341,13 @@ public final class BuiltinModule {
         }
     }
 
-    /** All tags of a kind whose key matches the source namespace. */
+    /** All tags of a kind for the given source (custom tags, or built-ins filtered by namespace). */
     private static List<org.bukkit.Tag<?>> allTags(TagKind kind, TagSource source) {
         List<org.bukkit.Tag<?>> out = new ArrayList<>();
+        if (source.custom()) {
+            out.addAll(co.xenastudios.neoskript.lang.type.CustomTags.all(kind.registry()));
+            return out;
+        }
         try {
             for (org.bukkit.Tag<?> tag : Bukkit.getTags(kind.registry(), cast(kind.valueClass()))) {
                 if (source.matches().test(tag.getKey())) {
@@ -1357,8 +1367,17 @@ public final class BuiltinModule {
             if (name == null) {
                 continue;
             }
-            org.bukkit.NamespacedKey key = keyOf(name.toString().trim());
+            org.bukkit.NamespacedKey key = source.custom() ? skriptKey(name.toString().trim())
+                    : keyOf(name.toString().trim());
             if (key == null) {
+                continue;
+            }
+            if (source.custom()) {
+                co.xenastudios.neoskript.lang.type.CustomTag tag =
+                        co.xenastudios.neoskript.lang.type.CustomTags.get(kind.registry(), key);
+                if (tag != null) {
+                    out.add(tag);
+                }
                 continue;
             }
             try {
@@ -1415,6 +1434,47 @@ public final class BuiltinModule {
         String normalized = name.toLowerCase(java.util.Locale.ROOT).replace(' ', '_');
         org.bukkit.NamespacedKey key = org.bukkit.NamespacedKey.fromString(normalized);
         return key != null ? key : org.bukkit.NamespacedKey.minecraft(normalized);
+    }
+
+    /** The key a custom tag is stored under: an explicit namespace if given, else the skript one. */
+    @SuppressWarnings("deprecation")
+    private static org.bukkit.NamespacedKey skriptKey(String name) {
+        String normalized = name.toLowerCase(java.util.Locale.ROOT).replace(' ', '_');
+        if (normalized.contains(":")) {
+            org.bukkit.NamespacedKey key = org.bukkit.NamespacedKey.fromString(normalized);
+            if (key != null) {
+                return key;
+            }
+        }
+        return new org.bukkit.NamespacedKey("skript", normalized);
+    }
+
+    /**
+     * Registers the {@code register [a] [custom] <kind> tag named %string% (containing|using) %objects%}
+     * effect. Each kind is a concrete pattern (the engine has no parse-marks); the members are coerced
+     * to their tag values (item stacks to materials, entities to entity types).
+     */
+    private static void registerTagEffect(SyntaxRegistry registry) {
+        for (TagKind kind : TAG_KINDS) {
+            registry.registerEffect(
+                    "register [a[n]] [custom] " + kind.word() + " tag named %string% (containing|using) %objects%",
+                    a -> ctx -> {
+                        Object name = a.get(0).getSingle(ctx);
+                        if (name == null) {
+                            return;
+                        }
+                        java.util.Set<org.bukkit.Keyed> members = new java.util.LinkedHashSet<>();
+                        for (Object value : a.get(1).getAll(ctx)) {
+                            Object resolved = tagValue(value);
+                            if (kind.valueClass().isInstance(resolved) && resolved instanceof org.bukkit.Keyed keyed) {
+                                members.add(keyed);
+                            }
+                        }
+                        co.xenastudios.neoskript.lang.type.CustomTags.register(kind.registry(),
+                                new co.xenastudios.neoskript.lang.type.CustomTag(
+                                        skriptKey(name.toString().trim()), members));
+                    });
+        }
     }
 
     private static void registerScriptSyntax(SyntaxRegistry registry) {

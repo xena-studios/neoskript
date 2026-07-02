@@ -3818,8 +3818,8 @@
       "register [a[n]] [custom] (1:item|2:block|3:entity [type]) tag named %string% (containing|using) %entitydatas/itemtypes%"
     ],
     "source": "org/skriptlang/skript/bukkit/tags/elements/effects/EffRegisterTag.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "effect:release-from-entity-storage",

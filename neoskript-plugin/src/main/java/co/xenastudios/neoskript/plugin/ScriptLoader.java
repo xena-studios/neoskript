@@ -93,6 +93,8 @@ public final class ScriptLoader {
         List<Path> scriptFiles = discover(dir);
         co.xenastudios.neoskript.core.runtime.LoadedScripts.set(
                 scriptFiles.stream().map(file -> dir.relativize(file).toString()).toList());
+        // Drop custom tags from the previous load; `register ... tag` effects re-add them on this one.
+        co.xenastudios.neoskript.lang.type.CustomTags.clear();
         AtomicInteger failed = new AtomicInteger();
 
         // Parse sequentially: the shared ScriptParser accumulates per-file parse errors in a single
