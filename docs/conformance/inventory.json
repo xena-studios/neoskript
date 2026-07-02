@@ -6551,8 +6551,8 @@
       "[all [[of] the]|the] [:minecraft|:datapack|:paper|custom:(custom|skript)] [1:item|2:block|3:entity [type]] tags"
     ],
     "source": "org/skriptlang/skript/bukkit/tags/elements/expressions/ExprTagsOfType.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:allay-duplication-cooldown",
@@ -12003,8 +12003,8 @@
       "[:minecraft|:datapack|:paper|custom:(custom|skript)] [1:item|2:block|3:entity [type]] tag %strings%"
     ],
     "source": "org/skriptlang/skript/bukkit/tags/elements/expressions/ExprTag.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:tag-namespaced-key",
@@ -12042,8 +12042,8 @@
       "%itemtype/entity/entitydata%'[s] [:minecraft|:datapack|:paper|custom:(custom|skript)] [1:item|2:block|3:entity [type]] tags"
     ],
     "source": "org/skriptlang/skript/bukkit/tags/elements/expressions/ExprTagsOf.java",
-    "status": "todo",
-    "implemented": false
+    "status": "done",
+    "implemented": true
   },
   {
     "id": "expression:tamer",

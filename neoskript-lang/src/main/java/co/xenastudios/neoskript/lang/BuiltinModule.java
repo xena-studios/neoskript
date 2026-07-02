@@ -97,6 +97,7 @@ public final class BuiltinModule {
         registerPersistentDataSyntax(registry);
         registerEquippableSyntax(registry);
         registerScriptSyntax(registry);
+        registerTagSyntax(registry);
         registerFunctionSyntax(registry);
         registerEventSyntax(registry);
         // Machine-generated syntax batches (see the co.xenastudios.neoskript.lang.generated package).
@@ -116,6 +117,9 @@ public final class BuiltinModule {
         types.register(new ItemType());
         types.register(new co.xenastudios.neoskript.lang.type.ColourType());
         types.register(new co.xenastudios.neoskript.lang.type.DateType());
+        // A Minecraft registry tag (blocks/items/entity types), displayed by its namespaced key.
+        types.register(new co.xenastudios.neoskript.lang.type.ClassType<>(
+                "minecrafttag", org.bukkit.Tag.class, tag -> tag.getKey().toString()));
         // Generic enum-backed types (reflective, version-robust). Code names follow Skript's.
         types.register(new co.xenastudios.neoskript.lang.type.EnumType<>(
                 "entitytype", org.bukkit.entity.EntityType.class));
@@ -1283,6 +1287,136 @@ public final class BuiltinModule {
      * %strings% (is|are) [not] loaded} tests whether the named scripts are loaded (via the loader's
      * published {@link co.xenastudios.neoskript.core.runtime.LoadedScripts} snapshot).
      */
+    /** A Minecraft tag kind: its registry key, the class its values are, and the pattern word for it. */
+    private record TagKind(String registry, Class<?> valueClass, String word) {}
+
+    /** A tag-source namespace filter: the pattern word ({@code ""} = all) and the key-namespace test. */
+    private record TagSource(String word, java.util.function.Predicate<org.bukkit.NamespacedKey> matches) {}
+
+    private static final List<TagKind> TAG_KINDS = List.of(
+            new TagKind(org.bukkit.Tag.REGISTRY_BLOCKS, org.bukkit.Material.class, "block"),
+            new TagKind(org.bukkit.Tag.REGISTRY_ITEMS, org.bukkit.Material.class, "item"),
+            new TagKind(org.bukkit.Tag.REGISTRY_ENTITY_TYPES, org.bukkit.entity.EntityType.class, "entity [type]"));
+
+    private static final List<TagSource> TAG_SOURCES = List.of(
+            new TagSource("", key -> true),
+            new TagSource("minecraft ", key -> key.getNamespace().equals("minecraft")),
+            new TagSource("paper ", key -> key.getNamespace().equals("paper")),
+            new TagSource("datapack ", key -> !key.getNamespace().equals("minecraft")
+                    && !key.getNamespace().equals("paper")),
+            // Skript-registered custom tags; NeoSkript registers none, so this source is always empty.
+            new TagSource("custom ", key -> false));
+
+    /**
+     * Registers the Minecraft tag expressions (Skript 2.10): {@code [all] [<source>] <kind> tags},
+     * {@code [<source>] <kind> tag %strings%}, and {@code [all] [<source>] <kind> tags of %objects%}.
+     * Our pattern engine has no parse-marks, so the kind (block/item/entity) and source
+     * (minecraft/paper/datapack/custom) are enumerated as concrete patterns instead.
+     */
+    private static void registerTagSyntax(SyntaxRegistry registry) {
+        for (TagKind kind : TAG_KINDS) {
+            for (TagSource source : TAG_SOURCES) {
+                String k = source.word() + kind.word();
+                registry.registerExpression("[all [[of] the]|the] " + k + " tags", Object.class,
+                        a -> new ComputedListExpression(ctx -> allTags(kind, source).toArray()));
+                registry.registerExpression(k + " tag %strings%", Object.class, a -> {
+                    Expression<?> names = a.get(0);
+                    return new ComputedListExpression(ctx -> namedTags(kind, source, names.getAll(ctx)).toArray());
+                });
+                registry.registerExpression("[all [[of] the]|the] " + k + " tags of %objects%", Object.class, a -> {
+                    Expression<?> items = a.get(0);
+                    return new ComputedListExpression(ctx -> tagsOf(kind, source, items.getAll(ctx)).toArray());
+                });
+                registry.registerExpression("%objects%'[s] " + k + " tags", Object.class, a -> {
+                    Expression<?> items = a.get(0);
+                    return new ComputedListExpression(ctx -> tagsOf(kind, source, items.getAll(ctx)).toArray());
+                });
+            }
+        }
+    }
+
+    /** All tags of a kind whose key matches the source namespace. */
+    private static List<org.bukkit.Tag<?>> allTags(TagKind kind, TagSource source) {
+        List<org.bukkit.Tag<?>> out = new ArrayList<>();
+        try {
+            for (org.bukkit.Tag<?> tag : Bukkit.getTags(kind.registry(), cast(kind.valueClass()))) {
+                if (source.matches().test(tag.getKey())) {
+                    out.add(tag);
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // No such registry on this server build.
+        }
+        return out;
+    }
+
+    /** The named tags of a kind (missing names and wrong-namespace matches are skipped). */
+    private static List<org.bukkit.Tag<?>> namedTags(TagKind kind, TagSource source, Object[] names) {
+        List<org.bukkit.Tag<?>> out = new ArrayList<>();
+        for (Object name : names) {
+            if (name == null) {
+                continue;
+            }
+            org.bukkit.NamespacedKey key = keyOf(name.toString().trim());
+            if (key == null) {
+                continue;
+            }
+            try {
+                org.bukkit.Tag<?> tag = Bukkit.getTag(kind.registry(), key, cast(kind.valueClass()));
+                if (tag != null && source.matches().test(tag.getKey())) {
+                    out.add(tag);
+                }
+            } catch (RuntimeException ignored) {
+                // Unknown registry; skip.
+            }
+        }
+        return out;
+    }
+
+    /** The tags of a kind that contain any of the given items/entities. */
+    private static List<org.bukkit.Tag<?>> tagsOf(TagKind kind, TagSource source, Object[] values) {
+        List<org.bukkit.Tag<?>> out = new ArrayList<>();
+        for (org.bukkit.Tag<?> tag : allTags(kind, source)) {
+            for (Object value : values) {
+                Object resolved = tagValue(value);
+                if (resolved != null && kind.valueClass().isInstance(resolved)
+                        && isTagged(tag, resolved)) {
+                    out.add(tag);
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Coerces a script value to a tag member: an item stack to its material, else the value itself. */
+    private static Object tagValue(Object value) {
+        if (value instanceof ItemStack item) {
+            return item.getType();
+        }
+        if (value instanceof org.bukkit.entity.Entity entity) {
+            return entity.getType();
+        }
+        return value;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean isTagged(org.bukkit.Tag<?> tag, Object value) {
+        return ((org.bukkit.Tag<org.bukkit.Keyed>) tag).isTagged((org.bukkit.Keyed) value);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T extends org.bukkit.Keyed> Class<T> cast(Class<?> clazz) {
+        return (Class<T>) clazz;
+    }
+
+    /** Parses a tag name into a namespaced key ({@code "wool"} → {@code minecraft:wool}), or null. */
+    private static org.bukkit.NamespacedKey keyOf(String name) {
+        String normalized = name.toLowerCase(java.util.Locale.ROOT).replace(' ', '_');
+        org.bukkit.NamespacedKey key = org.bukkit.NamespacedKey.fromString(normalized);
+        return key != null ? key : org.bukkit.NamespacedKey.minecraft(normalized);
+    }
+
     private static void registerScriptSyntax(SyntaxRegistry registry) {
         registry.registerExpression(
                 "[(all [[of] the]|the)] [(enabled|loaded)] scripts without ([subdirectory] paths|parents)",
