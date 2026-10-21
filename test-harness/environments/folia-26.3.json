@@ -1,0 +1,12 @@
+{
+  "name": "folia-26.3",
+  "platform": "folia",
+  "minecraftVersion": "26.3",
+  "build": 5,
+  "javaVersion": 25,
+  "download": {
+    "url": "https://fill-data.papermc.io/v1/objects/c105f6be9463b2da37568b620e81b9ab2f6a6ae771f8fff9caf7a1c0946b340a/folia-26.3-5.jar",
+    "sha256": "c105f6be9463b2da37568b620e81b9ab2f6a6ae771f8fff9caf7a1c0946b340a"
+  },
+  "skriptReference": false
+}
