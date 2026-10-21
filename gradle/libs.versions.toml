@@ -1,0 +1,20 @@
+[versions]
+# The oldest Paper API we support (D6). Code compiles against this, so newer-only API can't slip in.
+paper-api = "1.21.4-R0.1-SNAPSHOT"
+gson = "2.14.0"
+junit = "6.1.3"
+shadow = "9.6.1"
+spotless = "8.10.4"
+run-paper = "3.1.0"
+
+[libraries]
+paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+spotless-gradle = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
+
+[plugins]
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+run-paper = { id = "xyz.jpenilla.run-paper", version.ref = "run-paper" }
