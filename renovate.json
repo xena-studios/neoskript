@@ -1,0 +1,16 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["local>xena-studios/.github:renovate-config"],
+  "packageRules": [
+    {
+      "description": "The oldest Paper NeoSkript supports. Raising it drops every server still on it, so it's changed by hand.",
+      "matchPackageNames": ["io.papermc.paper:paper-api"],
+      "enabled": false
+    },
+    {
+      "description": "Nothing is released yet and CI covers the build, so small updates merge themselves once it passes. Majors wait for a review.",
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true
+    }
+  ]
+}
