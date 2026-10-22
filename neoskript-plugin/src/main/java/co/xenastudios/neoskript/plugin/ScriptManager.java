@@ -50,8 +50,9 @@ final class ScriptManager {
     private final Path scriptsDir;
     private final Library library;
     private final Scheduler scheduler;
+    private final EventDispatcher events;
     private final Logger logger;
-    /** Global variables. Kept in memory for now; saving them comes in M3. */
+    /** Global variables. */
     private final VariableStore globals = new VariableStore();
     /** Function handles, kept across reloads so callers always reach the current version. */
     private final Map<FunctionInfo, FunctionHandle> functions = new ConcurrentHashMap<>();
@@ -61,10 +62,12 @@ final class ScriptManager {
     /** In test mode, what to do after the tests ran (stop the server); otherwise {@code null}. */
     private Runnable afterTests;
 
-    ScriptManager(Path scriptsDir, Library library, Scheduler scheduler, Logger logger, Runnable afterTests) {
+    ScriptManager(Path scriptsDir, Library library, Scheduler scheduler, EventDispatcher events, Logger logger,
+            Runnable afterTests) {
         this.scriptsDir = scriptsDir;
         this.library = library;
         this.scheduler = scheduler;
+        this.events = events;
         this.logger = logger;
         this.afterTests = afterTests;
     }
@@ -148,6 +151,7 @@ final class ScriptManager {
         for (String name : switching) {
             loaded.put(name, triggers.getOrDefault(name, List.of()));
         }
+        events.update(loaded.values().stream().flatMap(List::stream).toList());
         long millis = (System.nanoTime() - start) / 1_000_000;
 
         for (String name : switching) {

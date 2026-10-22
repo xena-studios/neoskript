@@ -202,6 +202,35 @@ Global/list variables, the concurrent store, a Yggdrasil reader/writer, CSV/SQLi
 Types, converters, aliases, events, effects, expressions, conditions, commands (Brigadier), implemented in usage-ranked order.
 *Exit:* ≥95% of the corpus behaves identically under differential testing, and all of Skript's own tests pass.
 
+> **Steps** (one PR each). The order comes from `syntaxUsage` in the `neoskript-parse-corpus` report, which counts how often the corpus uses each Skript element. At the start of M4, the real-world corpus used 152 distinct elements and functions, and NeoSkript had 15 of them. Skript's tests use 785.
+> 1. **The event foundation:**
+>    - Bukkit events, with event values (`player`, `event-world`) and `cancel event`.
+>    - Types' default values (`send "hi"` goes to the event's player).
+>    - Changing expressions, not just variables (`set name of player to ...`).
+>    - Property expressions and conditions (`X's name`, `name of X`, `X is online`).
+>    - Waits in events resume on the right Folia thread: the entity's for player events, the region's for block events.
+>
+>    **Status: done (2026-10-22).**
+>    - **API:**
+>      - `Registrar.event(id, eventClasses, filter, patterns)` and `eventValue(eventClass, type, getter)`.
+>      - `eventDefault(type)`, so unused optional placeholders get the event's value.
+>      - `Changeable` for expressions that `set`/`add`/`remove`/`delete`/`reset` can change.
+>      - `property`/`propertyCondition`, with Skript's pattern shapes in `Patterns`.
+>    - **Event values follow Skript's rules:**
+>      - It's enough for one of an event's classes to have the value; the closest event class wins, then the exact type.
+>      - Otherwise it's a compile error: "There's no world in a command event".
+>    - **Listening:** each event class the loaded scripts use gets one Bukkit listener, rebuilt on reload, at `high` priority and skipping cancelled events, as Skript does by default (`config.yml` → `events`).
+>    - **Events so far:** join, first join, quit, chat and command, with `cancel event`, `sender`, and some player syntax (UUID, name, online, permission, kick). The rest comes in step 3.
+>    - **Tested by:**
+>      - Unit tests (`EventsTest`) with stand-in event classes.
+>      - `neoskript-events` on all four servers, driven by console commands.
+>      - The test servers have no players, so player events are only checked when compiled. Running them needs a bot client, which comes with the differential runner in step 6.
+> 2. **Commands:** `command /x <args>:` with every entry (aliases, permission, usage, cooldown, executable by), `arg-1` and `sender`, registered through Brigadier with tab completion, and reloadable.
+> 3. **The real-world corpus:** the text, player, time and location syntax it uses, and converters between types. *Done when* all 12 real-world scripts load on NeoSkript and pass their self-tests, on all four servers.
+> 4. **Items and aliases:** item types from Paper's registries plus Skript's alias names, inventories, and item stack codecs, so M3's raw item values become real items.
+> 5. **The world:** entities and spawning, blocks, locations and vectors, worlds, potions.
+> 6. **The long tail:** whatever Skript's tests still need, most-used first, then the differential runner for the 95% check.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.

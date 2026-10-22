@@ -1,0 +1,21 @@
+# The neoskript-events scenario: server events, driven by console commands (the test servers have no
+# players). Each line the harness checks starts with "[harness] events".
+
+on load:
+	send "[harness] events loaded" to console
+
+on command "nsk-greet":
+	cancel event
+	# No 'to': it goes to the event's command sender, here the console.
+	send "[harness] events greeted by %sender%"
+
+on command:
+	send "[harness] events any command" to console
+
+on command "nsk-elsewhere":
+	send "[harness] events wrong filter ran" to console
+
+on command "nsk-wait":
+	cancel event
+	wait 2 ticks
+	send "[harness] events after wait: %sender%" to console

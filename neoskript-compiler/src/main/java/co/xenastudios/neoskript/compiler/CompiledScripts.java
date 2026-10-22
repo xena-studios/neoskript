@@ -47,7 +47,9 @@ public record CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunct
     public record CompiledFunctionBody(String script, FunctionHandle handle, CompiledFunction body) {}
 
     /**
-     * A trigger and what runs it: an event, or for a test ({@code test "name":}) its name and a null event.
+     * A trigger and what runs it: an event NeoSkript fires itself, the classes of the server events it runs
+     * for, or for a test ({@code test "name":}) its name. The others are {@code null}.
      */
-    public record CompiledTrigger(String script, int line, ScriptEvent event, String testName, Trigger trigger) {}
+    public record CompiledTrigger(String script, int line, ScriptEvent event, java.util.List<Class<?>> eventClasses,
+            String testName, Trigger trigger) {}
 }

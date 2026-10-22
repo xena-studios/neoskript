@@ -14,7 +14,9 @@ public final class StandardLibrary {
     public static void register(Registrar registrar) {
         CoreTypes.register(registrar);
         ScriptEvents.register(registrar);
+        ServerEvents.register(registrar);
         Messages.register(registrar);
+        Players.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
         StorageCodecs.register(registrar);

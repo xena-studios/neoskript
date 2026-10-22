@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
+import org.bukkit.event.EventPriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class NeoSkriptPlugin extends JavaPlugin {
@@ -73,7 +74,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         // Waiting triggers carry on through the scheduler; their errors can only be logged.
         Waits.install(scheduler, e -> getSLF4JLogger().error("Error in {}, line {}: {}", e.script(), e.line(),
                 e.getCause().toString(), e.getCause()));
-        ScriptManager scripts = new ScriptManager(getDataPath().resolve("scripts"), library, scheduler,
+        EventDispatcher events = new EventDispatcher(this, getSLF4JLogger(), eventPriority(),
+                getConfig().getBoolean("events.listen-to-cancelled", false));
+        ScriptManager scripts = new ScriptManager(getDataPath().resolve("scripts"), library, scheduler, events,
                 getSLF4JLogger(), TestRunner.enabled() ? () -> getServer().shutdown() : null);
         storage = new VariableStorage(scripts.globals(), library.codecs(),
                 getDataPath().resolve(getConfig().getString("variables.file", "variables.csv")));
@@ -85,6 +88,17 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
         // D10: NeoSkript takes over /skript and /sk, with /neoskript as an alias.
         getCommand("skript").setExecutor(new SkriptCommand(scripts, getPluginMeta().getVersion()));
+    }
+
+    /** The priority triggers listen to events at, {@code high} by default as in Skript. */
+    private EventPriority eventPriority() {
+        String name = getConfig().getString("events.priority", "high");
+        try {
+            return EventPriority.valueOf(name.strip().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            getSLF4JLogger().warn("Unknown event priority '{}' in config.yml; using high", name);
+            return EventPriority.HIGH;
+        }
     }
 
     /** Loads saved variables, then saves changed ones every {@code variables.save-interval}. */

@@ -128,6 +128,15 @@ public final class SyntaxRegistry {
         return !strictTypes.contains(from) && !strictTypes.contains(to);
     }
 
+    /** Whether {@code from} is {@code to} or one of its registered subtypes, with no leniency. */
+    public boolean isSubtype(String from, String to) {
+        if (from.equals(to)) {
+            return true;
+        }
+        Set<String> supers = supertypes.get(from);
+        return supers != null && supers.contains(to);
+    }
+
     /** Whether {@code name} names a kind of entity, as in {@code the zombie} or {@code event-creeper}. */
     public boolean isEntityName(String name) {
         return entityNames.contains(normalize(name));

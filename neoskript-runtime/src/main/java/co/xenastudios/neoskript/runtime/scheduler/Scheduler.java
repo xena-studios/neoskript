@@ -15,4 +15,12 @@ public interface Scheduler {
 
     /** Runs {@code task} on the global thread after {@code ticks} server ticks. */
     void runGlobalLater(long ticks, Runnable task);
+
+    /**
+     * Runs {@code task} after {@code ticks} on the thread that owns {@code owner}: an entity's, or a
+     * location's region, on Folia. Without an owner, or on Paper, it's the global thread.
+     */
+    default void runLater(Object owner, long ticks, Runnable task) {
+        runGlobalLater(ticks, task);
+    }
 }

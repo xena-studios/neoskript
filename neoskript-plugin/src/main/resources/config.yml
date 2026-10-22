@@ -10,3 +10,10 @@ variables:
   file: variables.csv
   # How often changed variables are saved. They're also saved when the server stops.
   save-interval: 5 minutes
+
+events:
+  # The priority scripts listen to events at: lowest, low, normal, high or highest. As in Skript, the
+  # default is high, so scripts see what most other plugins did to an event, and can still cancel it.
+  priority: high
+  # Whether 'on <event>' triggers also run for events another plugin cancelled.
+  listen-to-cancelled: false

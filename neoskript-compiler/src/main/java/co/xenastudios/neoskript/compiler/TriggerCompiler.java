@@ -45,6 +45,7 @@ import static org.objectweb.asm.Opcodes.PUTFIELD;
 import static org.objectweb.asm.Opcodes.RETURN;
 import static org.objectweb.asm.Opcodes.V21;
 
+import co.xenastudios.neoskript.api.element.Changeable;
 import co.xenastudios.neoskript.api.element.Condition;
 import co.xenastudios.neoskript.api.element.Effect;
 import co.xenastudios.neoskript.api.element.ElementFactory;
@@ -166,6 +167,10 @@ final class TriggerCompiler {
     private int line;
     /** The name of the script being compiled, for test failures. */
     private String constantsScript;
+    /** The classes of the event a trigger runs for, or {@code null} outside server events. */
+    private List<Class<?>> eventClasses;
+    /** The event's name, for errors: {@code join} in {@code on join:}. */
+    private String eventName;
 
     TriggerCompiler(Library library, Map<FunctionInfo, FunctionHandle> functions, VariableStore globals,
             ParsedScript script) {
@@ -178,6 +183,36 @@ final class TriggerCompiler {
 
     Trigger compileTrigger(String scriptName, List<Statement> body) throws CompileException {
         return (Trigger) define(generate(scriptName, () -> statements(body)));
+    }
+
+    /**
+     * A trigger for a server event. If the event has a filter ({@code on break of stone}), the trigger
+     * stops straight away when it fails.
+     */
+    Trigger compileTrigger(String scriptName, ParsedStructure.Event event, Library.ServerEvent binding)
+            throws CompileException {
+        eventClasses = binding.classes();
+        String key = event.structure().node().line().key();
+        eventName = key.regionMatches(true, 0, "on ", 0, 3) ? key.substring(3).strip() : key.strip();
+        return (Trigger) define(generate(scriptName, () -> {
+            if (binding.filter() != null) {
+                line = event.structure().node().line().number();
+                source = key;
+                ParsedSyntax syntax = event.event();
+                Condition filter = binding.filter().create(
+                        new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags()));
+                constant(filter, Condition.class);
+                method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+                arguments(syntax);
+                method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Condition.class), "check",
+                        "(" + CONTEXT + OBJECTS + ")Z", true);
+                Label run = new Label();
+                method.visitJumpInsn(IFNE, run);
+                method.visitInsn(RETURN);
+                method.visitLabel(run);
+            }
+            statements(event.body());
+        }));
     }
 
     /** A Skript test ({@code test "name" [when <condition>]:}): skipped if its condition is false. */
@@ -844,6 +879,10 @@ final class TriggerCompiler {
     private void change(ParsedSyntax effect) throws CompileException {
         CoreSyntax.ChangeMode mode = CoreSyntax.ChangeMode.values()[effect.pattern()];
         Object target = effect.match().values().get(mode.target);
+        if (target instanceof Expr.Syntax syntax && !(library.binding(syntax.syntax().syntax()) instanceof Library.Core)) {
+            changeExpression(effect, mode, syntax);
+            return;
+        }
         if (!(target instanceof Expr.Variable variable)) {
             throw unsupported("changing anything but variables");
         }
@@ -885,6 +924,47 @@ final class TriggerCompiler {
         }
     }
 
+    /** {@code set name of player to "x"}: changes an expression that implements {@link Changeable}. */
+    private void changeExpression(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr.Syntax target)
+            throws CompileException {
+        Changeable.Mode changeMode = switch (mode) {
+            case SET -> Changeable.Mode.SET;
+            case ADD, INCREASE -> Changeable.Mode.ADD;
+            case REMOVE, REDUCE -> Changeable.Mode.REMOVE;
+            case REMOVE_ALL -> Changeable.Mode.REMOVE_ALL;
+            case DELETE -> effect.match().hasTag("reset") ? Changeable.Mode.RESET : Changeable.Mode.DELETE;
+        };
+        ParsedSyntax syntax = target.syntax();
+        Object element = library.binding(syntax.syntax()) instanceof ElementFactory<?> factory
+                ? factory.create(new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags()))
+                : null;
+        Class<?>[] accepted = element instanceof Changeable changeable ? changeable.acceptChange(changeMode) : null;
+        if (accepted == null) {
+            String text = source.substring(target.start(), target.end());
+            throw new CompileException(line, text + switch (changeMode) {
+                case SET -> " can't be set to anything";
+                case ADD -> " can't have anything added to it";
+                case REMOVE, REMOVE_ALL -> " can't have anything removed from it";
+                case DELETE -> " can't be deleted";
+                case RESET -> " can't be reset";
+            });
+        }
+        constant(element, Changeable.class);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        arguments(syntax);
+        if (mode.value >= 0) {
+            expression((Expr) effect.match().values().get(mode.value));
+            constant(accepted, Class[].class);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "narrow",
+                    "(" + OBJECT_DESC + "[Ljava/lang/Class;)" + OBJECTS, false);
+        } else {
+            method.visitInsn(ACONST_NULL);
+        }
+        constant(changeMode, Changeable.Mode.class);
+        method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Changeable.class), "change",
+                "(" + CONTEXT + OBJECTS + OBJECTS + Type.getDescriptor(Changeable.Mode.class) + ")V", true);
+    }
+
     // ---------------------------------------------------------------- elements
 
     private void condition(ParsedSyntax condition) throws CompileException {
@@ -919,6 +999,14 @@ final class TriggerCompiler {
         method.visitTypeInsn(ANEWARRAY, OBJECT);
         for (int i = 0; i < values.size(); i++) {
             if (!(values.get(i) instanceof Expr expr)) {
+                java.util.function.Function<Object, Object> fallback = eventDefault(specs[i]);
+                if (fallback != null) {
+                    method.visitInsn(DUP);
+                    pushInt(i);
+                    eventValue(fallback);
+                    convert(isPlural(specs[i]));
+                    method.visitInsn(AASTORE);
+                }
                 continue;
             }
             method.visitInsn(DUP);
@@ -927,6 +1015,55 @@ final class TriggerCompiler {
             convert(isPlural(specs[i]));
             method.visitInsn(AASTORE);
         }
+    }
+
+    /**
+     * For a placeholder in an optional part that wasn't used: how to get the event's value of its type,
+     * if the type defaults to it and the event has one, else {@code null}.
+     */
+    private java.util.function.Function<Object, Object> eventDefault(PlaceholderSpec spec) {
+        if (eventClasses == null || spec.nullable()) {
+            return null;
+        }
+        for (String name : spec.types()) {
+            TypeRef ref = registry.resolveType(name);
+            if (ref != null && library.hasEventDefault(ref.type().id())) {
+                java.util.function.Function<Object, Object> getter = library.eventValue(eventClasses, ref.type().id());
+                if (getter != null) {
+                    return getter;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Pushes the value {@code getter} gets from the trigger's event. */
+    private void eventValue(java.util.function.Function<Object, Object> getter) {
+        constant(getter, java.util.function.Function.class);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(TriggerContext.class), "event",
+                "()" + OBJECT_DESC, true);
+        method.visitMethodInsn(INVOKEINTERFACE, "java/util/function/Function", "apply",
+                "(" + OBJECT_DESC + ")" + OBJECT_DESC, true);
+    }
+
+    /** {@code player}, {@code event-world}: the event's value of the named type. */
+    private void eventValue(Expr.Syntax syntax) throws CompileException {
+        if (!(syntax.syntax().match().regexValues().getFirst() instanceof TypeRef ref)) {
+            throw unsupported("'" + source.substring(syntax.start(), syntax.end()) + "'");
+        }
+        java.util.function.Function<Object, Object> getter =
+                eventClasses == null ? null : library.eventValue(eventClasses, ref.type().id());
+        if (getter == null) {
+            String where = eventClasses == null ? (function != null ? "a function" : "this event")
+                    : article(eventName) + " " + eventName + " event";
+            throw new CompileException(line, "There's no " + ref.type().name() + " in " + where);
+        }
+        eventValue(getter);
+    }
+
+    private static String article(String word) {
+        return !word.isEmpty() && "aeiou".indexOf(Character.toLowerCase(word.charAt(0))) >= 0 ? "an" : "a";
     }
 
     /** Converts the value on the stack to a plural ({@code Object[]}) or singular argument. */
@@ -991,6 +1128,7 @@ final class TriggerCompiler {
             case Expr.FunctionCall call -> call(call);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARITHMETIC) -> arithmetic(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.LOOP_VALUE) -> loopValue(syntax.syntax());
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE) -> eventValue(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TERNARY) -> {
                 if (!(syntax.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition)) {
                     throw unsupported("'" + source + "'");
