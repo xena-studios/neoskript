@@ -43,6 +43,7 @@ final class LineParser {
     private final String input;
     private final String lowerInput;
     private final Map<Key, Object> memo = new HashMap<>();
+    private String functionProblem;
     /** Per kind, the unindexed patterns whose required literals all occur somewhere in the line. */
     private final Map<SyntaxKind, List<PatternIndex.Entry<SyntaxRegistry.Candidate>>> viableUnindexed =
             new EnumMap<>(SyntaxKind.class);
@@ -179,7 +180,8 @@ final class LineParser {
             case Expr.Unresolved unresolved -> true;
             case Expr.Syntax syntax -> hasUnresolved(syntax.syntax());
             case Expr.ListOf list -> list.items().stream().anyMatch(LineParser::hasUnresolved);
-            case Expr.FunctionCall call -> call.arguments().stream().anyMatch(LineParser::hasUnresolved);
+            case Expr.FunctionCall call ->
+                    call.arguments().stream().anyMatch(a -> a != null && hasUnresolved(a));
             case Expr.Text text -> text.embedded().stream().anyMatch(LineParser::hasUnresolved);
             case Expr.Variable variable -> variable.embedded().stream().anyMatch(LineParser::hasUnresolved);
             case Expr.Literal literal -> false;
@@ -405,9 +407,11 @@ final class LineParser {
     }
 
     /**
-     * {@code name(arguments)} for a known function, trying each overload in turn. With one parameter, all
-     * the arguments go to it as a list; otherwise each comma-separated argument goes to the next parameter,
-     * or to the one it names ({@code name: value}), and extra ones to the last parameter if it's plural.
+     * {@code name(arguments)} for a known function. Each comma-separated argument goes to the next
+     * parameter, or to the one it names ({@code name: value}). If exactly one overload takes the arguments
+     * as given, it's called; if several do, the call is ambiguous. Only if none do can an overload whose
+     * last parameter takes a list take the extra values. Problems are recorded in Skript's wording, for
+     * the line's error.
      */
     private Expr.FunctionCall functionCall(int start, int end, boolean needsValue) {
         int open = input.indexOf('(', start);
@@ -416,82 +420,201 @@ final class LineParser {
             return null;
         }
         String name = input.substring(start, open);
+        List<FunctionInfo> overloads = context.functions(name);
+        if (overloads.isEmpty()) {
+            return null;
+        }
         int[] inner = trim(open + 1, end - 1);
         List<int[]> pieces = inner[0] >= inner[1] ? List.of() : Scanner.split(input, inner[0], inner[1], ',');
-        for (FunctionInfo function : context.functions(name)) {
+        List<Expr.FunctionCall> matches = new ArrayList<>();
+        String problem = null;
+        for (FunctionInfo function : overloads) {
             if (needsValue && function.returnType() == null) {
                 continue;
             }
-            List<Expr> arguments = arguments(function, pieces, inner);
-            if (arguments != null) {
-                String type = function.returnType() == null ? SyntaxRegistry.OBJECT : function.returnType();
-                return new Expr.FunctionCall(start, end, name, arguments, type);
+            Object result = arguments(function, pieces, inner, false);
+            if (result instanceof List<?> arguments) {
+                matches.add(call(start, end, function, arguments));
+            } else if (result instanceof String error && (problem == null
+                    || function.parameters().size() == pieces.size())) {
+                problem = error;
             }
         }
+        if (matches.size() == 1) {
+            return matches.getFirst();
+        }
+        if (matches.size() > 1) {
+            functionProblem("Cannot determine which function named '" + name + "' to call");
+            return null;
+        }
+        for (FunctionInfo function : overloads) {
+            if (!needsValue || function.returnType() != null) {
+                if (arguments(function, pieces, inner, true) instanceof List<?> arguments) {
+                    return call(start, end, function, arguments);
+                }
+            }
+        }
+        boolean onlyUnknownNames = pieces.stream().anyMatch(piece -> argumentName(piece) != null)
+                && pieces.stream().map(this::argumentName).noneMatch(n -> n != null
+                        && overloads.stream().anyMatch(f -> parameterIndex(f.parameters(), n) >= 0));
+        functionProblem(problem != null && !onlyUnknownNames
+                ? problem
+                : "The function " + name + "(" + describe(pieces) + ") does not exist");
         return null;
     }
 
-    private List<Expr> arguments(FunctionInfo function, List<int[]> pieces, int[] inner) {
+    @SuppressWarnings("unchecked")
+    private Expr.FunctionCall call(int start, int end, FunctionInfo function, List<?> arguments) {
+        String type = function.returnType() == null ? SyntaxRegistry.OBJECT : function.returnType();
+        return new Expr.FunctionCall(start, end, function, (List<Expr>) arguments, type);
+    }
+
+    /**
+     * Maps the argument pieces to {@code function}'s parameters. Returns the arguments by parameter, an
+     * error message, or {@code null} if the function just doesn't take that many arguments. With
+     * {@code absorb}, a list parameter at the end takes all the remaining arguments.
+     */
+    private Object arguments(FunctionInfo function, List<int[]> pieces, int[] inner, boolean absorb) {
         List<FunctionInfo.Parameter> parameters = function.parameters();
-        if (parameters.size() == 1 && !pieces.isEmpty()) {
-            pieces = List.of(new int[] {inner[0], inner[1]});
-        } else if (pieces.size() > parameters.size()) {
-            if (parameters.isEmpty() || !parameters.getLast().plural()) {
+        boolean anyNamed = pieces.stream().anyMatch(piece -> argumentName(piece) != null);
+        if (absorb) {
+            // Only plain values are absorbed into a list parameter, never named arguments.
+            if (anyNamed || parameters.isEmpty() || !parameters.getLast().plural() || pieces.size() <= parameters.size()) {
                 return null;
             }
             int[] last = {pieces.get(parameters.size() - 1)[0], inner[1]};
             pieces = new ArrayList<>(pieces.subList(0, parameters.size() - 1));
             pieces.add(last);
         }
+        if (mixesNamedAndUnnamed(pieces, parameters)) {
+            return "Mixing named and unnamed arguments is not allowed";
+        }
         Expr[] byParameter = new Expr[parameters.size()];
         int next = 0;
-        for (int[] piece : pieces) {
+        for (int p = 0; p < pieces.size(); p++) {
+            int[] piece = pieces.get(p);
             int index = next;
             int valueStart = piece[0];
-            int colon = namedArgument(piece, parameters);
-            if (colon >= 0) {
-                String argumentName = input.substring(piece[0], colon).strip();
-                for (int i = 0; i < parameters.size(); i++) {
-                    if (parameters.get(i).name().equals(argumentName)) {
-                        index = i;
-                    }
+            String named = argumentName(piece);
+            if (named != null) {
+                int found = parameterIndex(parameters, named);
+                if (found >= 0) {
+                    index = found;
+                    valueStart = input.indexOf(':', piece[0]) + 1;
+                } else if (pieces.subList(p + 1, pieces.size()).stream().anyMatch(q -> argumentName(q) != null)) {
+                    return "The argument named '" + named + "' is unexpected";
                 }
-                valueStart = colon + 1;
             }
-            if (index >= parameters.size() || byParameter[index] != null) {
+            if (index >= parameters.size()) {
                 return null;
             }
             FunctionInfo.Parameter parameter = parameters.get(index);
+            if (byParameter[index] != null) {
+                return "A value has already been assigned to parameter '" + parameter.name() + "'";
+            }
             TypeRef ref = registry.resolveType(parameter.type());
             // Skript only checks the number of values when the function runs, so lists are accepted here.
             Expected expected = ref == null ? Expected.OBJECTS : context.expected(new TypeRef(ref.type(), true));
             Expr argument = expression(valueStart, piece[1], expected);
             if (argument == null) {
-                return null;
+                Expr anything = expression(valueStart, piece[1], Expected.OBJECTS);
+                if (anything != null && !(anything instanceof Expr.Unresolved)) {
+                    // It's a value, just not of this parameter's type: no such overload.
+                    return null;
+                }
+                String typeName = ref == null ? parameter.type() : ref.type().name().toLowerCase(java.util.Locale.ROOT);
+                return "Can't understand the argument for the parameter '" + parameter.name() + "' with type '"
+                        + typeName + "': " + input.substring(valueStart, piece[1]).strip() + ".";
             }
             byParameter[index] = argument;
             next = index + 1;
         }
-        List<Expr> arguments = new ArrayList<>();
         for (int i = 0; i < parameters.size(); i++) {
             if (byParameter[i] == null && !parameters.get(i).optional()) {
                 return null;
             }
-            if (byParameter[i] != null) {
-                arguments.add(byParameter[i]);
-            }
         }
-        return arguments;
+        return java.util.Arrays.asList(byParameter);
     }
 
-    /** The index of the {@code :} in {@code name: value} if {@code name} is one of the parameters, or -1. */
-    private int namedArgument(int[] piece, List<FunctionInfo.Parameter> parameters) {
+    /**
+     * Whether an unnamed argument follows a named one that's out of order: named arguments then have to be
+     * in parameter order, each at or after its own position.
+     */
+    private boolean mixesNamedAndUnnamed(List<int[]> pieces, List<FunctionInfo.Parameter> parameters) {
+        boolean namedSeen = false;
+        boolean unnamedAfterNamed = false;
+        for (int[] piece : pieces) {
+            boolean isNamed = argumentName(piece) != null;
+            unnamedAfterNamed |= namedSeen && !isNamed;
+            namedSeen |= isNamed;
+        }
+        if (!unnamedAfterNamed) {
+            return false;
+        }
+        int last = -1;
+        for (int p = 0; p < pieces.size(); p++) {
+            String named = argumentName(pieces.get(p));
+            int index = named == null ? -1 : parameterIndex(parameters, named);
+            if (index < 0) {
+                continue;
+            }
+            if (index < p || index < last) {
+                return true;
+            }
+            last = index;
+        }
+        return false;
+    }
+
+    private static int parameterIndex(List<FunctionInfo.Parameter> parameters, String name) {
+        for (int i = 0; i < parameters.size(); i++) {
+            if (parameters.get(i).name().equals(name)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** The name in a {@code name: value} argument, or {@code null}. */
+    private String argumentName(int[] piece) {
         int colon = input.indexOf(':', piece[0]);
         if (colon < 0 || colon >= piece[1]) {
-            return -1;
+            return null;
         }
         String name = input.substring(piece[0], colon).strip();
-        return parameters.stream().anyMatch(p -> p.name().equals(name)) ? colon : -1;
+        return FUNCTION_NAME.matcher(name).matches() ? name : null;
+    }
+
+    /** The arguments' types as Skript describes them in errors: {@code integer, n: integers, ?}. */
+    private String describe(List<int[]> pieces) {
+        List<String> types = new ArrayList<>();
+        for (int[] piece : pieces) {
+            String named = argumentName(piece);
+            int valueStart = named == null ? piece[0] : input.indexOf(':', piece[0]) + 1;
+            Expr value = expression(valueStart, piece[1], Expected.OBJECTS);
+            String type;
+            if (value == null) {
+                type = "?";
+            } else {
+                co.xenastudios.neoskript.frontend.registry.TypeInfo info = registry.type(value.type());
+                String typeName = info == null ? value.type() : info.name().toLowerCase(java.util.Locale.ROOT);
+                type = value instanceof Expr.ListOf ? SyntaxRegistry.plural(typeName) : typeName;
+            }
+            types.add(named == null ? type : named + ": " + type);
+        }
+        return String.join(", ", types);
+    }
+
+    /** The first problem found with a function call in this line, in Skript's wording, or {@code null}. */
+    String functionProblem() {
+        return functionProblem;
+    }
+
+    private void functionProblem(String problem) {
+        if (functionProblem == null) {
+            functionProblem = problem;
+        }
     }
 
     /**

@@ -6,3 +6,13 @@ folia-supported: true
 description: A fast, modern drop-in replacement for Skript.
 website: https://xenastudios.co
 authors: [Xena Studios]
+commands:
+  skript:
+    description: Reloads scripts and shows NeoSkript's version.
+    usage: /<command> reload [all|scripts|<script>]
+    aliases: [sk, neoskript]
+    permission: skript.admin
+permissions:
+  skript.admin:
+    description: Use /skript (reload scripts and so on).
+    default: op

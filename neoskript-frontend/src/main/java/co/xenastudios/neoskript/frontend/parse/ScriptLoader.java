@@ -47,6 +47,11 @@ public final class ScriptLoader {
     private static final Pattern ON_PREFIX = Pattern.compile("(?:on\\s+)?(.*?)", Pattern.CASE_INSENSITIVE);
 
     private final SyntaxRegistry registry;
+    /** Function headers whose signature another function already has, with their script. */
+    private Map<Line, String> duplicates = Map.of();
+    /** Function headers registered while collecting signatures (those outside parse blocks). */
+    private Map<Line, Boolean> registered = Map.of();
+    private Map<String, List<FunctionInfo>> functions = Map.of();
 
     public ScriptLoader(SyntaxRegistry registry) {
         this.registry = registry;
@@ -66,18 +71,38 @@ public final class ScriptLoader {
     public List<ParsedScript> load(List<SourceFile> files) {
         List<ScriptParser.Result> results = files.parallelStream().map(ScriptParser::parse).toList();
         Map<String, List<FunctionInfo>> functions = new HashMap<>();
+        Map<String, Map<String, List<FunctionInfo>>> locals = new HashMap<>();
+        Map<Line, String> duplicates = new java.util.IdentityHashMap<>();
+        Map<Line, Boolean> registered = new java.util.IdentityHashMap<>();
         for (ScriptParser.Result result : results) {
+            String script = result.file().name();
             for (Structure structure : result.structures()) {
                 if (structure.kind() == Structure.Kind.FUNCTION) {
-                    FunctionInfo signature = signature(structure.section().line(), null);
-                    if (signature != null) {
-                        functions.computeIfAbsent(signature.name(), k -> new ArrayList<>()).add(signature);
+                    Line line = structure.section().line();
+                    FunctionInfo signature = signature(line, null, script);
+                    if (signature == null) {
+                        continue;
+                    }
+                    Map<String, List<FunctionInfo>> scope = signature.localTo() == null
+                            ? functions
+                            : locals.computeIfAbsent(script, k -> new HashMap<>());
+                    List<FunctionInfo> overloads = scope.computeIfAbsent(signature.name(), k -> new ArrayList<>());
+                    if (overloads.stream().anyMatch(f -> sameParameters(f, signature))) {
+                        duplicates.put(line, script);
+                    } else {
+                        overloads.add(signature);
+                        registered.put(line, Boolean.TRUE);
                     }
                 }
             }
         }
-        ParserContext context = new ParserContext(registry, functions);
-        return results.parallelStream().map(result -> parse(result, context)).toList();
+        this.duplicates = duplicates;
+        this.registered = registered;
+        this.functions = functions;
+        return results.parallelStream()
+                .map(result -> parse(result, new ParserContext(registry, functions,
+                        locals.getOrDefault(result.file().name(), Map.of()))))
+                .toList();
     }
 
     private ParsedScript parse(ScriptParser.Result result, ParserContext context) {
@@ -93,14 +118,14 @@ public final class ScriptLoader {
                 parsed.add(p);
             }
         }
-        return new ParsedScript(result.file(), parsed, diagnostics.all());
+        return new ParsedScript(result.file(), parsed, diagnostics.all(), statements.delays());
     }
 
     private ParsedStructure structure(Structure structure, ParserContext context, StatementParser statements,
             Diagnostics diagnostics) {
         return switch (structure.kind()) {
             case OPTIONS, VARIABLES, ALIASES, USING -> new ParsedStructure.Data(structure);
-            case FUNCTION -> function(structure, statements, diagnostics);
+            case FUNCTION -> function(structure, statements, diagnostics, diagnostics.file().name());
             case COMMAND -> command(structure, statements, diagnostics);
             case EVENT -> structure.section().line().key().equalsIgnoreCase(PARSE_STRUCTURE)
                     ? parseBlock(structure, context, statements, diagnostics)
@@ -159,18 +184,50 @@ public final class ScriptLoader {
         return parser.event(matcher.start(1), matcher.end(1));
     }
 
-    private ParsedStructure function(Structure structure, StatementParser statements, Diagnostics diagnostics) {
+    private ParsedStructure function(Structure structure, StatementParser statements, Diagnostics diagnostics,
+            String scriptName) {
         Line line = structure.section().line();
-        FunctionInfo signature = signature(line, diagnostics);
+        FunctionInfo signature = signature(line, diagnostics, scriptName);
         if (signature == null) {
             return null;
         }
+        String duplicateIn = duplicates.get(line);
+        boolean inParseBlock = !registered.containsKey(line) && duplicateIn == null;
+        if (duplicateIn != null || inParseBlock && functions.getOrDefault(signature.name(), List.of()).stream()
+                .anyMatch(f -> sameParameters(f, signature))) {
+            report(diagnostics, line, "Function '" + signature.name() + "' with the same argument types already exists"
+                    + " in script" + (duplicateIn == null ? "" : " '" + duplicateIn + "'"));
+            return null;
+        }
         boolean local = line.key().strip().toLowerCase(java.util.Locale.ROOT).startsWith("local");
-        return new ParsedStructure.Function(structure, signature, local, statements.body(structure.section().children()));
+        List<String> defaultTexts = defaultTexts(line);
+        List<Expr> defaults = new ArrayList<>();
+        for (int i = 0; i < signature.parameters().size(); i++) {
+            FunctionInfo.Parameter parameter = signature.parameters().get(i);
+            String text = defaultTexts.get(i);
+            defaults.add(text == null ? null : statements.expression(line, text, parameter.type(), parameter.plural()));
+        }
+        return new ParsedStructure.Function(structure, signature, local, defaults, defaultTexts,
+                statements.body(structure.section().children()));
+    }
+
+    /** The text of each parameter's default value in a function header, or null where there's none. */
+    private static List<String> defaultTexts(Line line) {
+        Matcher header = FUNCTION_HEADER.matcher(line.key().strip());
+        List<String> texts = new ArrayList<>();
+        if (!header.matches() || header.group(3).isBlank()) {
+            return texts;
+        }
+        String list = header.group(3).strip();
+        for (int[] piece : Scanner.split(list, 0, list.length(), ',')) {
+            Matcher parameter = PARAMETER.matcher(list.substring(piece[0], piece[1]));
+            texts.add(parameter.matches() && parameter.group(3) != null ? parameter.group(3).strip() : null);
+        }
+        return texts;
     }
 
     /** Parses a function header. Reports problems if {@code diagnostics} isn't null. */
-    private FunctionInfo signature(Line line, Diagnostics diagnostics) {
+    private FunctionInfo signature(Line line, Diagnostics diagnostics, String scriptName) {
         Matcher header = FUNCTION_HEADER.matcher(line.key().strip());
         if (!header.matches()) {
             report(diagnostics, line, "Invalid function header: " + line.key());
@@ -202,7 +259,23 @@ public final class ScriptLoader {
             returnType = type.type().id();
             returnsPlural = type.plural();
         }
-        return new FunctionInfo(header.group(2), parameters, returnType, returnsPlural);
+        return new FunctionInfo(header.group(2), parameters, returnType, returnsPlural,
+                header.group(1) != null ? scriptName : null);
+    }
+
+    /** Whether two overloads take the same types, so a call couldn't tell them apart. */
+    private static boolean sameParameters(FunctionInfo a, FunctionInfo b) {
+        if (a.parameters().size() != b.parameters().size()) {
+            return false;
+        }
+        for (int i = 0; i < a.parameters().size(); i++) {
+            FunctionInfo.Parameter x = a.parameters().get(i);
+            FunctionInfo.Parameter y = b.parameters().get(i);
+            if (!x.type().equals(y.type()) || x.plural() != y.plural()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private ParsedStructure command(Structure structure, StatementParser statements, Diagnostics diagnostics) {

@@ -1,6 +1,6 @@
 # NeoSkript: Design & Roadmap
 
-Status: v1 (decisions locked) · M0 and M1 done · 2026-10-22
+Status: v1 (decisions locked) · M0, M1 and M2 done · 2026-10-22
 
 ## 1. Goal
 
@@ -33,6 +33,7 @@ A fast, modern, **clean-room** replacement for Skript. Existing `.sk` scripts ru
 | D16 | License header | `GPL-3.0-or-later` (SPDX header on every source file, checked by Spotless) | Same terms as Skript. |
 | D17 | Test servers | Pinned to exact Paper/Folia builds and SHA-256 hashes, bumped on purpose | Paper ships daily, and build 211 of 26.3 broke Skript 2.17.0 the day it came out. |
 | D18 | Where the Skript baseline runs | Paper 26.x only. Skript doesn't support Folia, and Skript 2.17.0 needs 1.21.5 or newer. NeoSkript-only checks run on all four servers. | |
+| D19 | Moving over from Skript | NeoSkript uses `plugins/NeoSkript`. On its first start it copies `scripts/` and `variables.csv` from `plugins/Skript`, then leaves a marker so it never copies again. It copies rather than moves, so Skript's folder stays as it was. Skript's `config.sk` isn't copied. | Swapping the jar just works, and switching back is safe. |
 
 ## 3. Architecture
 
@@ -148,6 +149,32 @@ Structure parser, pattern language + compiler + matcher, type system skeleton, A
 **M2: Compiler + runtime core (Paper and Folia)**
 IR, ASM backend, control flow, locals, functions, options, waits as state machines, scheduler abstraction with both implementations, reload with atomic swap.
 *Exit:* the control-flow and function tests from Skript's suite pass on Paper **and** Folia.
+
+> **Status: done (2026-10-22).** Skript's own control-flow and function tests run on NeoSkript on Paper and Folia, 1.21.4 and 26.3 (`neoskript-skript-tests`).
+> - **Results:** 33 of the tests in `SecConditional`, `SecLoop`, `SecWhile`, `EffContinue`, `ExprLoopValue`, `StructFunction` and function overloading pass. The other 8 need later milestones, and the scenario lists each one with the reason:
+>   - the `location()` function, item literals, entities, vectors and `keyed` lists
+>   - Skript's test-only loop peeking
+>   - two error messages worded exactly as Skript has them
+> - **Running scripts:**
+>   - The plugin loads `plugins/NeoSkript/scripts`. On its first start it copies Skript's scripts and variables (D19).
+>   - Each trigger and function compiles to a hidden class with ASM. Elements are called through class-data constants, so each call site has one target the JIT can inline. The compiler implements the core syntax itself.
+>   - Runtime errors are reported once, at the script line, even through deep recursion.
+> - **Core language:**
+>   - local and global variables (lists, dynamic names, case-insensitive, numeric index order) and their changes
+>   - arithmetic with Skript's precedence, and comparisons
+>   - `if` / `else if` / `else`, `if any`/`if all` … `then`, and `X if C, else Y`
+>   - `loop` (`loop-value`, `-index`, `-counter`, `next`/`previous`, `-N`), `while` and `do while`, `exit` / `continue`
+>   - functions with defaults, named arguments, overloads (with Skript's ambiguity rules and errors), local functions, and recursion
+> - **`wait`:** a trigger that waits compiles into a resumable state machine. Its frame saves the locals and the enclosing loops, and it carries on through the scheduler: the main thread on Paper, the global region on Folia. The frontend tracks Skript's delay state through branches, loops and `parse:` sections.
+> - **`/sk reload`** (`/skript`, `/sk`, `/neoskript`, D10):
+>   - It compiles everything first, then switches over together.
+>   - A script with errors keeps its last version, and its functions keep their old code (D12). Function handles last across reloads.
+>   - Replies use Skript's wording. A two-script reload takes about 2 ms (`neoskript-reload`).
+> - **Test mode** (`-Dneoskript.testing.enabled=true`): it runs Skript's test syntax and writes JSON results like Skript's runner.
+> - **Left for later:**
+>   - Waits in functions, and resuming on entity or region schedulers on Folia, come with events in M4.
+>   - Saving global variables is M3.
+>   - The harness's parse check still has zero false errors, and now catches 30 of the 90 errors Skript reports in its tests (up from 21).
 
 **M3: Variables & storage**
 Global/list variables, the concurrent store, a Yggdrasil reader/writer, CSV/SQLite/MySQL.

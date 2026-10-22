@@ -23,6 +23,8 @@ final class ParserContext {
 
     private final SyntaxRegistry registry;
     private final Map<String, List<FunctionInfo>> scriptFunctions;
+    /** The current script's local functions, which take precedence over global ones with the same name. */
+    private final Map<String, List<FunctionInfo>> localFunctions;
     /** Per registry: what each placeholder of every registered pattern accepts, built once. */
     private static final Map<SyntaxRegistry, Map<PlaceholderSpec, Expected>> PLACEHOLDERS =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
@@ -32,8 +34,14 @@ final class ParserContext {
     private final Map<Expected, Expected> interned = new ConcurrentHashMap<>();
 
     ParserContext(SyntaxRegistry registry, Map<String, List<FunctionInfo>> scriptFunctions) {
+        this(registry, scriptFunctions, Map.of());
+    }
+
+    ParserContext(SyntaxRegistry registry, Map<String, List<FunctionInfo>> scriptFunctions,
+            Map<String, List<FunctionInfo>> localFunctions) {
         this.registry = registry;
         this.scriptFunctions = Map.copyOf(scriptFunctions);
+        this.localFunctions = Map.copyOf(localFunctions);
         this.byPlaceholder = PLACEHOLDERS.computeIfAbsent(registry, this::placeholders);
         byPlaceholder.values().forEach(this::intern);
     }
@@ -72,6 +80,10 @@ final class ParserContext {
 
     /** The overloads of a function: the scripts' own, or else the built-in one. Empty if there's none. */
     List<FunctionInfo> functions(String name) {
+        List<FunctionInfo> local = localFunctions.get(name);
+        if (local != null) {
+            return local;
+        }
         List<FunctionInfo> functions = scriptFunctions.get(name);
         if (functions != null) {
             return functions;

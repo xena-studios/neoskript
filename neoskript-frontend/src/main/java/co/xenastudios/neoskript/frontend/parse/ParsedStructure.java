@@ -34,10 +34,18 @@ public sealed interface ParsedStructure {
     /** {@code <type>} or {@code [<type=default>]} in a command header. */
     record CommandArgument(String type, boolean plural, boolean optional, String defaultValue) {}
 
-    record Function(Structure structure, FunctionInfo signature, boolean local, List<Statement> body)
-            implements ParsedStructure {
+    /**
+     * A function.
+     *
+     * @param defaults each parameter's default value, by parameter; {@code null} where there's none. Their
+     *     positions are in the default value's own text, {@code defaultTexts}.
+     */
+    record Function(Structure structure, FunctionInfo signature, boolean local, List<Expr> defaults,
+            List<String> defaultTexts, List<Statement> body) implements ParsedStructure {
 
         public Function {
+            defaults = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(defaults));
+            defaultTexts = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(defaultTexts));
             body = List.copyOf(body);
         }
     }

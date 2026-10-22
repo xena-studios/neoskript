@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.parse;
 
+import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
 import java.util.List;
 
 /** A parsed expression, covering {@code [start, end)} of its line. */
@@ -46,10 +47,21 @@ public sealed interface Expr {
         }
     }
 
-    record FunctionCall(int start, int end, String name, List<Expr> arguments, String type) implements Expr {
+    /**
+     * A call to a function.
+     *
+     * @param function the overload that matched
+     * @param arguments by parameter; {@code null} where an optional parameter wasn't given
+     */
+    record FunctionCall(int start, int end, FunctionInfo function, List<Expr> arguments, String type)
+            implements Expr {
 
         public FunctionCall {
-            arguments = List.copyOf(arguments);
+            arguments = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(arguments));
+        }
+
+        public String name() {
+            return function.name();
         }
     }
 

@@ -25,6 +25,10 @@ public final class Diagnostics {
         all.add(new Diagnostic(Severity.WARNING, file.name(), line, column, length, message));
     }
 
+    public SourceFile file() {
+        return file;
+    }
+
     /** Adds a diagnostic produced elsewhere, e.g. by the structure parser. */
     public void add(Diagnostic diagnostic) {
         all.add(diagnostic);
