@@ -112,7 +112,7 @@ class PatternTest {
     @Test
     void regexes() {
         MatchResult result = match("(exit|stop) <-?\\d+(_\\d+)*> (section|loop|conditional)s", "exit 2 loops");
-        assertEquals("2", result.regexes().getFirst().group());
+        assertEquals("2", ((java.util.regex.MatchResult) result.regexValues().getFirst()).group());
         assertNull(match("(exit|stop) <-?\\d+(_\\d+)*> (section|loop|conditional)s", "exit x loops"));
         assertEquals(List.of("{_x}", "{_y}"), values("%objects% if <.+>[,] (otherwise|else) %objects%",
                 "{_x} if 1 is 1, otherwise {_y}"));

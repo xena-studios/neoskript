@@ -25,6 +25,23 @@ public final class Diagnostics {
         all.add(new Diagnostic(Severity.WARNING, file.name(), line, column, length, message));
     }
 
+    /** Adds a diagnostic produced elsewhere, e.g. by the structure parser. */
+    public void add(Diagnostic diagnostic) {
+        all.add(diagnostic);
+    }
+
+    /** A position to {@link #takeSince(int)} from, for capturing the problems in part of a script. */
+    public int mark() {
+        return all.size();
+    }
+
+    /** Removes and returns the diagnostics added since {@code mark}. */
+    public List<Diagnostic> takeSince(int mark) {
+        List<Diagnostic> taken = List.copyOf(all.subList(mark, all.size()));
+        all.subList(mark, all.size()).clear();
+        return taken;
+    }
+
     public List<Diagnostic> all() {
         return List.copyOf(all);
     }

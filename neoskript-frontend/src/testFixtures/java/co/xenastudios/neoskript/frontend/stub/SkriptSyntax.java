@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Xena Studios
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-package co.xenastudios.neoskript.frontend.syntax;
+package co.xenastudios.neoskript.frontend.stub;
 
 import com.google.gson.Gson;
 import java.io.IOException;

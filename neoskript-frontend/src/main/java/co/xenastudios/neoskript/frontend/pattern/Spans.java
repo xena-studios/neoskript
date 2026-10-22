@@ -12,7 +12,7 @@ import java.util.Deque;
  * string, a {@code {variable}}, parentheses or square brackets, and can't run past a closing bracket it
  * didn't open.
  */
-final class Spans {
+public final class Spans {
 
     private enum Context {
         CODE,
@@ -29,8 +29,13 @@ final class Spans {
      * Returns, in increasing order, every index {@code end > start} such that {@code input[start, end)} is
      * balanced and doesn't start or end with whitespace.
      */
-    static int[] candidateEnds(String input, int start) {
-        int length = input.length();
+    public static int[] candidateEnds(String input, int start) {
+        return candidateEnds(input, start, input.length());
+    }
+
+    /** Like {@link #candidateEnds(String, int)}, considering only {@code input[start, limit)}. */
+    public static int[] candidateEnds(String input, int start, int limit) {
+        int length = limit;
         if (start >= length || Character.isWhitespace(input.charAt(start))) {
             return new int[0];
         }
@@ -80,8 +85,14 @@ final class Spans {
                 case VARIABLE -> {
                     if (c == '}') {
                         contexts.pop();
+                    } else if (c == '{') {
+                        contexts.push(Context.VARIABLE);
                     } else if (c == '%') {
-                        contexts.push(Context.EXPRESSION);
+                        if (next == '%') {
+                            i++;
+                        } else {
+                            contexts.push(Context.EXPRESSION);
+                        }
                     }
                 }
             }

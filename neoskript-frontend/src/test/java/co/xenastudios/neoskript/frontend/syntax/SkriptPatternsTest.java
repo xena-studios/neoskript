@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import co.xenastudios.neoskript.frontend.pattern.CompiledPattern;
 import co.xenastudios.neoskript.frontend.pattern.PatternCompiler;
 import co.xenastudios.neoskript.frontend.pattern.PatternIndex;
+import co.xenastudios.neoskript.frontend.stub.SkriptSyntax;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;

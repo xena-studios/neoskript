@@ -16,4 +16,12 @@ public interface PlaceholderResolver {
      * The span never starts or ends with whitespace and is balanced (see {@link Spans}).
      */
     Object resolve(String input, int start, int end, PlaceholderSpec spec);
+
+    /**
+     * Checks the text a {@code <regex>} matched, e.g. that the {@code <.+>} in {@code if <.+>} is a
+     * condition. Returns what it parses to, or {@code null} to reject it. By default any match is accepted.
+     */
+    default Object resolveRegex(String input, int start, int end, int index, java.util.regex.MatchResult match) {
+        return match;
+    }
 }

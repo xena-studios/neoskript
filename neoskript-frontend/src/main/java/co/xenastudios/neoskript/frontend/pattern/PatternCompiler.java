@@ -146,6 +146,7 @@ public final class PatternCompiler {
             }
         }
         flush(literal, elements);
+        linkLookahead(elements);
         return elements.size() == 1 ? elements.getFirst() : new PatternElement.Sequence(elements);
     }
 
@@ -207,7 +208,7 @@ public final class PatternCompiler {
             throw error("Missing type in '%" + body + "%'");
         }
         return new PatternElement.Placeholder(placeholders++,
-                new PlaceholderSpec(typeNames, nullable, literalOnly, changeableOnly, time));
+                new PlaceholderSpec(typeNames, nullable, literalOnly, changeableOnly, time), null);
     }
 
     /** The index of the {@code >} closing a regex that starts at {@code pos}, or -1 if there is none. */
@@ -226,11 +227,37 @@ public final class PatternCompiler {
     private PatternElement regex(int end) {
         String regex = source.substring(pos + 1, end);
         try {
-            PatternElement element = new PatternElement.Regex(regexes++, java.util.regex.Pattern.compile(regex));
+            PatternElement element = new PatternElement.Regex(regexes++, java.util.regex.Pattern.compile(regex), null,
+                    regex.equals(".+") || regex.equals("(.+)"));
             pos = end + 1;
             return element;
         } catch (PatternSyntaxException e) {
             throw error("Invalid regex <" + regex + ">: " + e.getDescription());
+        }
+    }
+
+    /** Records the literal after each placeholder and regex in a sequence, skipping whitespace. */
+    private static void linkLookahead(List<PatternElement> elements) {
+        for (int i = 0; i < elements.size(); i++) {
+            if (elements.get(i) instanceof PatternElement.Placeholder placeholder) {
+                int next = i + 1;
+                if (next < elements.size() && elements.get(next) instanceof PatternElement.Whitespace) {
+                    next++;
+                }
+                if (next < elements.size() && elements.get(next) instanceof PatternElement.Literal literal) {
+                    elements.set(i, new PatternElement.Placeholder(placeholder.index(), placeholder.spec(),
+                            literal.text()));
+                }
+            } else if (elements.get(i) instanceof PatternElement.Regex regex) {
+                int next = i + 1;
+                if (next < elements.size() && elements.get(next) instanceof PatternElement.Whitespace) {
+                    next++;
+                }
+                if (next < elements.size() && elements.get(next) instanceof PatternElement.Literal literal) {
+                    elements.set(i, new PatternElement.Regex(regex.index(), regex.regex(), literal.text(),
+                            regex.matchesCode()));
+                }
+            }
         }
     }
 

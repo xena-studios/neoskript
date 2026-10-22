@@ -50,7 +50,8 @@ public final class StructureParser {
             while (indentEnd < text.length() && Character.isWhitespace(text.charAt(indentEnd))) {
                 indentEnd++;
             }
-            String code = Comments.strip(text.substring(indentEnd)).stripTrailing();
+            // A line starting with # is a comment, even ### this, where ## would otherwise be a #.
+            String code = text.startsWith("#", indentEnd) ? "" : Comments.strip(text.substring(indentEnd)).stripTrailing();
             if (!code.isEmpty()) {
                 lines.add(new Line(i + 1, text.substring(0, indentEnd), code));
             }

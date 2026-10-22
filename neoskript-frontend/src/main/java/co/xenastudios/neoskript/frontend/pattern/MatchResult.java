@@ -16,10 +16,12 @@ import java.util.Set;
  * @param values what each placeholder resolved to, by placeholder index; {@code null} where an optional
  *     part containing the placeholder wasn't used
  * @param spans the {@code [start, end)} of each placeholder's text, or {@code null} where it wasn't used
- * @param regexes each regex's match, by regex index; {@code null} where it wasn't used
+ * @param regexValues what each regex's text resolved to (see {@link PlaceholderResolver#resolveRegex}), by
+ *     regex index; {@code null} where it wasn't used
+ * @param regexSpans the {@code [start, end)} of each regex's text, or {@code null} where it wasn't used
  */
 public record MatchResult(int mark, Set<String> tags, List<Object> values, List<int[]> spans,
-        List<java.util.regex.MatchResult> regexes) {
+        List<Object> regexValues, List<int[]> regexSpans) {
 
     public boolean hasTag(String tag) {
         return tags.contains(tag);
@@ -28,6 +30,6 @@ public record MatchResult(int mark, Set<String> tags, List<Object> values, List<
     @Override
     public String toString() {
         return "MatchResult[mark=" + mark + ", tags=" + tags + ", values=" + values + ", spans="
-                + spans.stream().map(Arrays::toString).toList() + "]";
+                + spans.stream().map(s -> s == null ? "null" : Arrays.toString(s)).toList() + "]";
     }
 }
