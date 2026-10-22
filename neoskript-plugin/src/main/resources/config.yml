@@ -1,0 +1,5 @@
+# NeoSkript configuration
+
+# Send anonymous usage statistics to bStats: https://bstats.org/plugin/bukkit/NeoSkript/34868
+# You can also turn bStats off for every plugin in plugins/bStats/config.yml.
+metrics: true
