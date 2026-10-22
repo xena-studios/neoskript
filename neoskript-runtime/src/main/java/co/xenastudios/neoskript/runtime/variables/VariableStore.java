@@ -10,7 +10,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.UnaryOperator;
 
 /**
@@ -62,6 +64,39 @@ public final class VariableStore {
     }
 
     private final Node root = new Node();
+    private final AtomicLong modifications = new AtomicLong();
+
+    /** A counter that goes up with every change, so storage can tell whether there's anything to save. */
+    public long modifications() {
+        return modifications.get();
+    }
+
+    /**
+     * Visits every variable that has a value, depth first in index order: each variable, then the ones
+     * under it. That's the order Skript saves them in.
+     */
+    public void forEach(BiConsumer<String, Object> visitor) {
+        visit(root, null, visitor);
+    }
+
+    private static void visit(Node node, String name, BiConsumer<String, Object> visitor) {
+        if (name != null) {
+            Object value = node.value.get();
+            if (value != null) {
+                visitor.accept(name, value);
+            }
+        }
+        ConcurrentSkipListMap<String, Node> children = node.children;
+        if (children != null) {
+            for (Map.Entry<String, Node> child : children.entrySet()) {
+                visit(child.getValue(), name == null ? child.getKey() : name + SEPARATOR + child.getKey(), visitor);
+            }
+        }
+    }
+
+    private void changed() {
+        modifications.incrementAndGet();
+    }
 
     /** The value of {@code {name}}, or {@code null} if it's not set. */
     public Object get(String name) {
@@ -71,6 +106,7 @@ public final class VariableStore {
 
     /** Sets {@code {name}}; {@code null} deletes it. Values under it ({@code {name::*}}) are kept. */
     public void set(String name, Object value) {
+        changed();
         if (value == null) {
             Node node = find(name);
             if (node != null) {
@@ -83,6 +119,7 @@ public final class VariableStore {
 
     /** Atomically replaces {@code {name}} with {@code change} applied to its current value. */
     public void update(String name, UnaryOperator<Object> change) {
+        changed();
         create(name).value.updateAndGet(change);
     }
 
@@ -137,6 +174,7 @@ public final class VariableStore {
 
     /** Replaces {@code {prefix::*}} with {@code values}, at indices 1, 2, 3... */
     public void setList(String prefix, Object[] values) {
+        changed();
         deleteList(prefix);
         Node node = create(prefix);
         int index = 1;
@@ -149,6 +187,7 @@ public final class VariableStore {
 
     /** Adds {@code values} to {@code {prefix::*}}, each at the lowest free index from the list's size + 1. */
     public void addToList(String prefix, Object[] values) {
+        changed();
         Node node = create(prefix);
         synchronized (node) {
             ConcurrentSkipListMap<String, Node> children = node.children();
@@ -167,6 +206,7 @@ public final class VariableStore {
 
     /** Removes {@code values} from {@code {prefix::*}}: the first match of each, or every match if {@code all}. */
     public void removeFromList(String prefix, Object[] values, boolean all) {
+        changed();
         Node node = find(prefix);
         if (node == null || node.children == null) {
             return;
@@ -184,6 +224,7 @@ public final class VariableStore {
 
     /** Deletes everything under {@code {prefix::*}}. */
     public void deleteList(String prefix) {
+        changed();
         Node node = find(prefix);
         if (node != null && node.children != null) {
             node.children.clear();

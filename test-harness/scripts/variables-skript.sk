@@ -1,0 +1,32 @@
+# Harness: the reference Skript writes these, and NeoSkript must read and rewrite them byte for byte.
+on load:
+	set {t::text} to "hello"
+	set {t::unicode} to "héllo ✓ 日本"
+	set {t::quote} to "say ""hi"""
+	set {t::empty} to ""
+	set {_s} to ""
+	loop 300 times:
+		set {_s} to "%{_s}%abc"
+	set {t::long text} to {_s}
+	set {t::long} to 42
+	set {t::negative} to -7
+	set {t::big} to 1234567890123
+	set {t::double} to 2.5
+	set {t::bool} to true
+	set {t::timespan} to 5 minutes
+	set {t::ticks} to 3 ticks
+	set {t::date} to now
+	set {t::list::1} to "a"
+	set {t::list::2} to "b"
+	set {t::list::10} to "ten"
+	set {t::list::x::deep} to 1
+	set {t::Mixed::Case} to "m"
+	set {t::with, comma} to 1
+	set {t::loc} to location(1.5, 64, -2, world "world", 90, 10)
+	set {t::world} to world "world"
+	set {t::offline} to "Notch" parsed as offline player
+	set {t::item} to diamond sword named "x"
+	set {t::vector} to vector(1, 2, 3)
+	set {t::gamemode} to creative
+	set {-t::memory} to 1
+	broadcast "[harness] variables set"
