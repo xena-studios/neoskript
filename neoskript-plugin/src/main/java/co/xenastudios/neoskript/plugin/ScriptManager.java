@@ -89,6 +89,11 @@ final class ScriptManager {
         });
     }
 
+    /** Global variables, for storage to load and save. */
+    VariableStore globals() {
+        return globals;
+    }
+
     /** Whether {@code name} is an enabled script in the scripts folder. */
     boolean exists(String name) {
         Path path = scriptsDir.resolve(name).normalize();

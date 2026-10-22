@@ -1,6 +1,6 @@
 # NeoSkript: Design & Roadmap
 
-Status: v1 (decisions locked) · M0, M1 and M2 done · 2026-10-22
+Status: v1 (decisions locked) · M0 to M3 done · 2026-10-22
 
 ## 1. Goal
 
@@ -34,6 +34,7 @@ A fast, modern, **clean-room** replacement for Skript. Existing `.sk` scripts ru
 | D17 | Test servers | Pinned to exact Paper/Folia builds and SHA-256 hashes, bumped on purpose | Paper ships daily, and build 211 of 26.3 broke Skript 2.17.0 the day it came out. |
 | D18 | Where the Skript baseline runs | Paper 26.x only. Skript doesn't support Folia, and Skript 2.17.0 needs 1.21.5 or newer. NeoSkript-only checks run on all four servers. | |
 | D19 | Moving over from Skript | NeoSkript uses `plugins/NeoSkript`. On its first start it copies `scripts/` and `variables.csv` from `plugins/Skript`, then leaves a marker so it never copies again. It copies rather than moves, so Skript's folder stays as it was. Skript's `config.sk` isn't copied. | Swapping the jar just works, and switching back is safe. |
+| D20 | Database storage | Deferred to 1.x. Skript 2.17 itself only supports `CSV` and `disabled` out of the box (its SQLite and MySQL storage needs the abandoned SQLibrary plugin), so `variables.csv` is what servers actually use. | M3 matches Skript's CSV byte for byte instead of spreading thin. |
 
 ## 3. Architecture
 
@@ -179,6 +180,23 @@ IR, ASM backend, control flow, locals, functions, options, waits as state machin
 **M3: Variables & storage**
 Global/list variables, the concurrent store, a Yggdrasil reader/writer, CSV/SQLite/MySQL.
 *Exit:* round-trips real `variables.csv`/DB files from Skript servers byte-compatibly.
+
+> **Status: done (2026-10-22).** NeoSkript reads and writes Skript's `variables.csv` byte for byte, both ways (`neoskript-variables`, run against the reference Skript).
+> - **The check:**
+>   - Skript saves 25 variables of every common type, including unicode and long text, lists, nested names, names with commas and spaces, locations, worlds, players, items, vectors and game modes.
+>   - NeoSkript picks them up through the migration, decodes them, and rewrites a byte-identical file.
+>   - In the other direction, Skript reads NeoSkript's file correctly and its rewrite is byte-identical too.
+> - **The format:** worked out from files Skript writes, not from Skript's code:
+>   - The header, then `name, type, hex` lines in tree order. Indices sort numbers by value; names are lowercased, and quoted if they contain commas, quotes or whitespace. The file ends with an empty line.
+>   - Values use Skript's binary encoding: raw primitives, compact string lengths, objects as tagged fields, and back-referenced names.
+>   - On reading, later lines win, and a line without a type deletes the variable.
+> - **What's decoded:** text, whole numbers, decimals, booleans, timespans, worlds, locations and players. Anything else (items, dates, vectors and so on) is kept as `RawValue` and written back unchanged until M4 gives it a type, so nothing is ever lost.
+> - **Storage** (`config.yml` → `variables`):
+>   - Variables load before scripts and save every 5 minutes if anything changed, and when the server stops.
+>   - Saving writes a temporary file and swaps it in. Skript only writes at shutdown, so a crash loses everything since start; NeoSkript loses at most the last interval.
+>   - `-` variables stay in memory, as in Skript.
+>   - Addons register codecs through `Registrar.storage`.
+> - **Databases:** deferred (D20).
 
 **M4: Standard library**
 Types, converters, aliases, events, effects, expressions, conditions, commands (Brigadier), implemented in usage-ranked order.

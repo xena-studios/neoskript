@@ -53,6 +53,12 @@ public interface Registrar {
     void function(String name, List<Parameter> parameters, String returnType, boolean returnsPlural,
             Function function);
 
+    /**
+     * How values of {@code type} are saved in variables files, as Skript's type {@code name} (its type
+     * column in {@code variables.csv}, e.g. {@code location}).
+     */
+    <T> void storage(String name, Class<T> type, co.xenastudios.neoskript.api.storage.VariableCodec<T> codec);
+
     /** How values of {@code type} read as text, as when embedded in a string. */
     <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText);
 }

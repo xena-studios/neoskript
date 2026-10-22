@@ -3,3 +3,10 @@
 # Send anonymous usage statistics to bStats: https://bstats.org/plugin/bukkit/NeoSkript/34868
 # You can also turn bStats off for every plugin in plugins/bStats/config.yml.
 metrics: true
+
+variables:
+  # Where global variables are saved, in Skript's variables.csv format (Skript can read it too).
+  # Relative to plugins/NeoSkript. Variables whose names start with - aren't saved.
+  file: variables.csv
+  # How often changed variables are saved. They're also saved when the server stops.
+  save-interval: 5 minutes

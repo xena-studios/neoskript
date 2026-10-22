@@ -19,7 +19,9 @@ import co.xenastudios.neoskript.frontend.registry.SyntaxInfo;
 import co.xenastudios.neoskript.frontend.registry.SyntaxKind;
 import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
 import co.xenastudios.neoskript.frontend.registry.TypeInfo;
+import co.xenastudios.neoskript.api.storage.VariableCodec;
 import co.xenastudios.neoskript.runtime.Timespan;
+import co.xenastudios.neoskript.runtime.variables.storage.VariableCodecs;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -47,12 +49,14 @@ public final class Library implements Registrar {
     private final Map<String, Class<?>> javaClasses = new HashMap<>();
     private final Map<FunctionInfo, Function> functions = new HashMap<>();
     private final Map<String, Object> literalValues = new HashMap<>();
+    private final VariableCodecs codecs = new VariableCodecs();
     private SyntaxRegistry registry;
 
     public Library() {
         type(SyntaxRegistry.OBJECT, "object", Object.class);
         type("timespan", "timespan", Timespan.class);
         CoreSyntax.register(this);
+        CoreCodecs.register(this);
     }
 
     @Override
@@ -109,6 +113,16 @@ public final class Library implements Registrar {
                 .toList(), returnType, returnsPlural);
         builder.function(info);
         functions.put(info, function);
+    }
+
+    @Override
+    public <T> void storage(String name, Class<T> type, VariableCodec<T> codec) {
+        codecs.register(name, type, codec);
+    }
+
+    /** How variable values are saved, as registered with {@link #storage}. */
+    public VariableCodecs codecs() {
+        return codecs;
     }
 
     @Override

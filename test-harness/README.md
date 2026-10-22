@@ -23,6 +23,7 @@ Reports go to `build/harness/reports/`, and each run's server directory and `har
 | `neoskript-language` | smoke | all | NeoSkript runs `scripts/neoskript-language.sk`: variables, arithmetic, loops, conditionals and functions |
 | `neoskript-skript-tests` | smoke | all | M2's exit check: NeoSkript runs Skript's own control-flow and function tests in test mode. The must-pass tests have to pass; the pending ones need later milestones (listed with reasons in the scenario) |
 | `neoskript-reload` | smoke | all | `/sk reload`: changed scripts switch over, a script with errors keeps its last version (D12), and one script can be reloaded on its own |
+| `neoskript-variables` | smoke | Skript envs | M3's exit check: Skript's `variables.csv` round-trips through NeoSkript byte for byte, and Skript reads and rewrites NeoSkript's file byte for byte |
 | `neoskript-skript-migration` | smoke | all | With only `plugins/Skript/scripts`, NeoSkript copies the scripts over on first start and runs them |
 | `neoskript-skript-conflict` | smoke | Skript envs | With Skript installed, NeoSkript refuses to run and Skript still works (D10) |
 | `skript-smoke` | smoke | Skript envs | The reference Skript runs `scripts/smoke.sk` |
