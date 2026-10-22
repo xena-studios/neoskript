@@ -23,6 +23,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class NeoSkriptPlugin extends JavaPlugin {
 
     private VariableStorage storage;
+    private ScriptCommands commands;
 
     /** https://bstats.org/plugin/bukkit/NeoSkript/34868 */
     private static final int BSTATS_PLUGIN_ID = 34868;
@@ -76,8 +77,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 e.getCause().toString(), e.getCause()));
         EventDispatcher events = new EventDispatcher(this, getSLF4JLogger(), eventPriority(),
                 getConfig().getBoolean("events.listen-to-cancelled", false));
+        commands = new ScriptCommands(this, getSLF4JLogger(), scheduler);
         ScriptManager scripts = new ScriptManager(getDataPath().resolve("scripts"), library, scheduler, events,
-                getSLF4JLogger(), TestRunner.enabled() ? () -> getServer().shutdown() : null);
+                commands, getSLF4JLogger(), TestRunner.enabled() ? () -> getServer().shutdown() : null);
         storage = new VariableStorage(scripts.globals(), library.codecs(),
                 getDataPath().resolve(getConfig().getString("variables.file", "variables.csv")));
         loadVariables();
@@ -140,6 +142,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         getServer().getAsyncScheduler().cancelTasks(this);
+        if (commands != null) {
+            commands.unregister(getServer().getCommandMap());
+        }
         saveVariables(false);
     }
 }

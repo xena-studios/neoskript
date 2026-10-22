@@ -5,6 +5,7 @@
 package co.xenastudios.neoskript.frontend.parse;
 
 import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
+import co.xenastudios.neoskript.frontend.structure.Line;
 import co.xenastudios.neoskript.frontend.structure.Structure;
 import java.util.List;
 import java.util.Map;
@@ -21,18 +22,44 @@ public sealed interface ParsedStructure {
         }
     }
 
-    record Command(Structure structure, String name, List<CommandArgument> arguments, Map<String, String> entries,
-            List<Statement> trigger) implements ParsedStructure {
+    /** A {@code command /name <arguments>:} structure. Its subcommands are in {@code root}. */
+    record Command(Structure structure, String name, CommandNode root) implements ParsedStructure {
 
-        public Command {
-            arguments = List.copyOf(arguments);
-            entries = Map.copyOf(entries);
-            trigger = List.copyOf(trigger);
+        /** The code of every trigger: the command's and its subcommands'. */
+        public List<Statement> statements() {
+            List<Statement> statements = new java.util.ArrayList<>();
+            root.collect(statements);
+            return statements;
         }
     }
 
-    /** {@code <type>} or {@code [<type=default>]} in a command header. */
-    record CommandArgument(String type, boolean plural, boolean optional, String defaultValue) {}
+    /**
+     * A command, a {@code subcommand <pattern>:} or a {@code subcommands:} group.
+     *
+     * @param pattern what follows its parent's pattern; empty for a group
+     * @param entries entries such as {@code permission}, by lower case name
+     * @param messages entries that are text with expressions in them, like {@code cooldown message}
+     * @param trigger its code, or {@code null} if it has no {@code trigger:}
+     * @param subcommands its subcommands and groups, in order
+     */
+    record CommandNode(Line line, boolean group, List<CommandPattern.Part> pattern, Map<String, String> entries,
+            Map<String, Expr> messages, List<Statement> trigger, List<CommandNode> subcommands) {
+
+        public CommandNode {
+            pattern = List.copyOf(pattern);
+            entries = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(entries));
+            messages = Map.copyOf(messages);
+            trigger = trigger == null ? null : List.copyOf(trigger);
+            subcommands = List.copyOf(subcommands);
+        }
+
+        private void collect(List<Statement> statements) {
+            if (trigger != null) {
+                statements.addAll(trigger);
+            }
+            subcommands.forEach(s -> s.collect(statements));
+        }
+    }
 
     /**
      * A function.

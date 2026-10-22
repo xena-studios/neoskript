@@ -55,7 +55,7 @@ public final class SyntaxUsage {
                 }
                 case ParsedStructure.Command command -> {
                     count("STRUCTURE command");
-                    body(command.trigger());
+                    body(command.statements());
                 }
                 case ParsedStructure.Function function -> {
                     count("STRUCTURE function");

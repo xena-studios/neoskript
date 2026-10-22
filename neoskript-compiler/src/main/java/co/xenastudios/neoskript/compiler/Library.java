@@ -59,11 +59,13 @@ public final class Library implements Registrar {
     private final VariableCodecs codecs = new VariableCodecs();
     private final List<EventValue> eventValues = new ArrayList<>();
     private final Set<String> eventDefaults = new HashSet<>();
+    private final Map<String, java.util.function.Function<String, ?>> parsers = new HashMap<>();
     private SyntaxRegistry registry;
 
     public Library() {
         type(SyntaxRegistry.OBJECT, "object", Object.class);
         type("timespan", "timespan", Timespan.class);
+        parser("timespan", Timespan::parse);
         CoreSyntax.register(this);
         CoreCodecs.register(this);
     }
@@ -76,6 +78,16 @@ public final class Library implements Registrar {
         if (STRICT_TYPES.contains(id)) {
             builder.strict(id);
         }
+    }
+
+    @Override
+    public <T> void namedType(String id, String name, Class<T> javaClass, Map<String, ? extends T> values) {
+        checkOpen();
+        builder.type(new TypeInfo(id, name, values.keySet(), false));
+        javaClasses.put(id, javaClass);
+        literalValues.putAll(values);
+        Map<String, T> copy = Map.copyOf(values);
+        parsers.put(id, text -> copy.get(text.strip().toLowerCase(java.util.Locale.ROOT)));
     }
 
     @Override
@@ -129,6 +141,20 @@ public final class Library implements Registrar {
             throw new IllegalArgumentException("Event value of unknown type '" + typeId + "'");
         }
         eventValues.add(new EventValue(eventClass, typeId, (java.util.function.Function<Object, ?>) getter));
+    }
+
+    @Override
+    public void parser(String typeId, java.util.function.Function<String, ?> parser) {
+        checkOpen();
+        if (!javaClasses.containsKey(typeId)) {
+            throw new IllegalArgumentException("Parser for unknown type '" + typeId + "'");
+        }
+        parsers.put(typeId, parser);
+    }
+
+    /** How text becomes a value of {@code typeId}, or {@code null} if it can't. */
+    java.util.function.Function<String, ?> parser(String typeId) {
+        return parsers.get(typeId);
     }
 
     @Override
@@ -284,6 +310,7 @@ public final class Library implements Registrar {
     /** The syntax registry for the frontend. Nothing can be registered after this is called. */
     public synchronized SyntaxRegistry registry() {
         if (registry == null) {
+            CoreSyntax.registerLast(this);
             registry = builder.build();
         }
         return registry;

@@ -17,6 +17,7 @@ public final class StandardLibrary {
         ServerEvents.register(registrar);
         Messages.register(registrar);
         Players.register(registrar);
+        Commands.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
         StorageCodecs.register(registrar);

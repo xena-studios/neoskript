@@ -13,7 +13,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 
 /** Sending and broadcasting messages, and the console. */
-final class Messages {
+public final class Messages {
 
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacyAmpersand();
     static final LegacyComponentSerializer LEGACY_SECTION = LegacyComponentSerializer.legacySection();
@@ -55,7 +55,7 @@ final class Messages {
     }
 
     /** A message as a text component. {@code &} color codes are applied to text. */
-    static Component component(Object message) {
+    public static Component component(Object message) {
         return message instanceof Component component ? component : LEGACY.deserialize(Values.text(message));
     }
 }

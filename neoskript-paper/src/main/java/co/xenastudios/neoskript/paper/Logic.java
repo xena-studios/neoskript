@@ -78,6 +78,9 @@ final class Logic {
                     : values[0];
         }, "[the] (first|last:last|random:random) element [out] of %objects%");
 
+        // 'arg-1 ? "home"': the first values, or the others if there are none.
+        registrar.expression("ExprDefaultValue", "object", info -> (context, args) ->
+                ((Object[]) args[0]).length > 0 ? args[0] : args[1], "%objects% (otherwise|?) %objects%");
         registrar.expression("ExprAmount", "integer", info -> (context, args) -> (long) ((Object[]) args[0]).length,
                 "[the] (amount|number|size) of %objects%");
     }

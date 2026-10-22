@@ -34,6 +34,9 @@ final class CoreSyntax {
     static final String HAS_DELAY = "ExprHasDelay";
     static final String DELAY_CHECK = "CondDelayCheck";
     static final String EVENT_VALUE = "ExprEventValue";
+    static final String ARGUMENT = "ExprArgument";
+    static final String TYPED_ARGUMENT = "ExprTypedArgument";
+    static final String CHOICE_ARGUMENT = "ExprChoiceArgument";
 
     /** {@link #CHANGE} patterns, by index. */
     enum ChangeMode {
@@ -130,6 +133,30 @@ final class CoreSyntax {
                 "[the] (<.+>|value[s]) (within|in) %~objects%");
         library.core(SyntaxKind.EXPRESSION, LOOP_VALUE, "object", List.of(),
                 "[the] [current] loop-<.+>", "[the] next loop-<.+>", "[the] previous loop-<.+>");
+        // A command's arguments. Before arithmetic, so 'arg-1' isn't 'arg - 1'.
+        // 'arg-1', 'the second argument', 'the last argument', 'the arguments'.
+        String ordinal = "(first:first|second:second|third:third|<(\\d*1)st|(\\d*2)nd|(\\d*3)rd|(\\d*[4-90])th>)";
+        library.core(SyntaxKind.EXPRESSION, ARGUMENT, "object", List.of(),
+                "[the] last arg[ument]",
+                "[the] arg[ument](-| )<(\\d+)>",
+                "[the] " + ordinal + " arg[ument][s]",
+                "[all [[of] the]|the] arg[ument][s]");
+        // 'player-arg', 'the text argument 2': the Nth argument of that type.
+        library.core(SyntaxKind.EXPRESSION, TYPED_ARGUMENT, "object", List.of(RegexRole.TYPE, RegexRole.ANY),
+                "[the] <.+>( |-)arg[ument][( |-)<\\d+>]",
+                "[the] arg[ument]( |-)<.+>[( |-)<\\d+>]");
+        // The text typed for a choice, '(give|take)': 'the first choice argument'.
+        library.core(SyntaxKind.EXPRESSION, CHOICE_ARGUMENT, "object", List.of(),
+                "[the] choice arg[ument] <(\\d+)>",
+                "[the] " + ordinal + " choice arg[ument][s]",
+                "[the] [last] choice arg[ument]");
+    }
+
+    /**
+     * Syntax tried after everything else, so the library's elements win: arithmetic, as {@code %object% - %object%}
+     * fits nearly anything ({@code arg-1 ? "x"} isn't {@code arg - (1 ? "x")}), then event values.
+     */
+    static void registerLast(Library library) {
         library.core(SyntaxKind.EXPRESSION, ARITHMETIC, "object", List.of(),
                 "%object%[ ]+[ ]%object%",
                 "%object%[ ]-[ ]%object%",

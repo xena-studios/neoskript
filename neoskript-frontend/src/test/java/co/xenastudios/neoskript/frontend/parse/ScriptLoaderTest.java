@@ -57,8 +57,9 @@ class ScriptLoaderTest {
         assertInstanceOf(Statement.Section.class, join.body().get(1));
         ParsedStructure.Command command = assertInstanceOf(ParsedStructure.Command.class, script.structures().get(2));
         assertEquals("balance", command.name());
-        assertEquals("offlineplayer", command.arguments().getFirst().type());
-        assertEquals("bal", command.entries().get("aliases"));
+        CommandPattern.Optional optional = assertInstanceOf(CommandPattern.Optional.class, command.root().pattern().getFirst());
+        assertEquals("offlineplayer", assertInstanceOf(CommandPattern.Argument.class, optional.parts().getFirst()).type());
+        assertEquals("bal", command.root().entries().get("aliases"));
         ParsedStructure.Function function = assertInstanceOf(ParsedStructure.Function.class, script.structures().get(3));
         assertEquals("number", function.signature().returnType());
     }

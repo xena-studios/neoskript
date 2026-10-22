@@ -53,6 +53,7 @@ import co.xenastudios.neoskript.api.element.ElementInfo;
 import co.xenastudios.neoskript.api.element.Expression;
 import co.xenastudios.neoskript.api.element.Function;
 import co.xenastudios.neoskript.api.element.TriggerContext;
+import co.xenastudios.neoskript.frontend.parse.CommandPattern;
 import co.xenastudios.neoskript.frontend.parse.Expr;
 import co.xenastudios.neoskript.frontend.parse.ParsedScript;
 import co.xenastudios.neoskript.frontend.parse.ParsedStructure;
@@ -74,6 +75,7 @@ import co.xenastudios.neoskript.runtime.Waits;
 import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
 import co.xenastudios.neoskript.runtime.Trigger;
 import co.xenastudios.neoskript.runtime.Values;
+import co.xenastudios.neoskript.runtime.command.CommandEvent;
 import co.xenastudios.neoskript.runtime.generated.TriggerHost;
 import co.xenastudios.neoskript.runtime.variables.VariableStore;
 import java.lang.invoke.MethodHandles;
@@ -111,6 +113,7 @@ final class TriggerCompiler {
     private static final String PACKAGE = HOST.substring(0, HOST.lastIndexOf('/') + 1);
     private static final String CONTEXT = Type.getDescriptor(TriggerContext.class);
     private static final String VALUES = Type.getInternalName(Values.class);
+    private static final String COMMAND_EVENT = Type.getInternalName(CommandEvent.class);
     private static final String STORE = Type.getInternalName(VariableStore.class);
     private static final String OBJECT = "java/lang/Object";
     private static final String OBJECT_DESC = "Ljava/lang/Object;";
@@ -171,6 +174,10 @@ final class TriggerCompiler {
     private List<Class<?>> eventClasses;
     /** The event's name, for errors: {@code join} in {@code on join:}. */
     private String eventName;
+    /** A command trigger's arguments, by number, or {@code null} outside commands. */
+    private List<CommandPattern.Argument> commandArguments;
+    /** How many choices a command trigger's pattern has. */
+    private int commandChoices;
 
     TriggerCompiler(Library library, Map<FunctionInfo, FunctionHandle> functions, VariableStore globals,
             ParsedScript script) {
@@ -212,6 +219,67 @@ final class TriggerCompiler {
                 method.visitLabel(run);
             }
             statements(event.body());
+        }));
+    }
+
+    /**
+     * A command's (or subcommand's) trigger. Left-out arguments get their default values first, then
+     * named arguments become local variables: {@code <x: number>} is {@code {_x}}.
+     */
+    Trigger compileCommand(String scriptName, int headerLine, String header, List<CommandPattern.Argument> arguments,
+            int choices, List<Statement> body) throws CompileException {
+        commandArguments = arguments;
+        commandChoices = choices;
+        eventClasses = List.of(CommandEvent.class);
+        eventName = "command";
+        return (Trigger) define(generate(scriptName, () -> {
+            line = headerLine;
+            for (int i = 0; i < arguments.size(); i++) {
+                CommandPattern.Argument argument = arguments.get(i);
+                if (argument.defaultValue() != null) {
+                    source = argument.defaultText();
+                    method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+                    pushInt(i);
+                    expression(argument.defaultValue());
+                    convert(argument.plural());
+                    method.visitMethodInsn(INVOKESTATIC, COMMAND_EVENT, "defaultArgument",
+                            "(" + CONTEXT + "I" + OBJECT_DESC + ")V", false);
+                }
+            }
+            source = header;
+            for (int i = 0; i < arguments.size(); i++) {
+                CommandPattern.Argument argument = arguments.get(i);
+                if (argument.name() == null) {
+                    continue;
+                }
+                method.visitVarInsn(ALOAD, LOCALS_SLOT);
+                method.visitLdcInsn("_" + argument.name());
+                commandArgument(i);
+                if (argument.plural()) {
+                    convert(true);
+                    method.visitMethodInsn(INVOKEVIRTUAL, STORE, "setList", "(" + STRING_DESC + OBJECTS + ")V", false);
+                } else {
+                    convert(false);
+                    method.visitMethodInsn(INVOKEVIRTUAL, STORE, "set", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
+                }
+            }
+            statements(body);
+        }));
+    }
+
+    /**
+     * A command's message, such as its {@code cooldown message}: a trigger that stores the text in the
+     * {@link CommandEvent}'s result.
+     */
+    Trigger compileCommandMessage(String scriptName, int entryLine, String text, Expr message) throws CompileException {
+        eventClasses = List.of(CommandEvent.class);
+        eventName = "command";
+        return (Trigger) define(generate(scriptName, () -> {
+            line = entryLine;
+            source = text;
+            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+            expression(message);
+            method.visitMethodInsn(INVOKESTATIC, COMMAND_EVENT, "result", "(" + CONTEXT + OBJECT_DESC + ")V", false);
         }));
     }
 
@@ -1062,6 +1130,108 @@ final class TriggerCompiler {
         eventValue(getter);
     }
 
+    // ---------------------------------------------------------------- command arguments
+
+    private void commandArgument(int index) {
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        pushInt(index);
+        method.visitMethodInsn(INVOKESTATIC, COMMAND_EVENT, "argument", "(" + CONTEXT + "I)" + OBJECT_DESC, false);
+    }
+
+    private List<CommandPattern.Argument> commandArguments(Expr.Syntax syntax) throws CompileException {
+        if (commandArguments == null) {
+            throw new CompileException(line, "'" + source.substring(syntax.start(), syntax.end())
+                    + "' can only be used in a command");
+        }
+        return commandArguments;
+    }
+
+    /** The number in {@code 2nd} or {@code 12}, or 1 to 3 for {@code first} to {@code third}. */
+    private static int ordinal(ParsedSyntax syntax) {
+        if (syntax.match().hasTag("first")) {
+            return 1;
+        } else if (syntax.match().hasTag("second")) {
+            return 2;
+        } else if (syntax.match().hasTag("third")) {
+            return 3;
+        }
+        String text = ((java.util.regex.MatchResult) syntax.match().regexValues().getFirst()).group();
+        return Integer.parseInt(text.replaceAll("\\D", ""));
+    }
+
+    private static String ordinalText(int n) {
+        String suffix = (n % 100 >= 11 && n % 100 <= 13) ? "th" : switch (n % 10) {
+            case 1 -> "st";
+            case 2 -> "nd";
+            case 3 -> "rd";
+            default -> "th";
+        };
+        return n + suffix;
+    }
+
+    /** {@code arg-1}, {@code the second argument}, {@code the last argument}, {@code the arguments}. */
+    private void argument(Expr.Syntax expr) throws CompileException {
+        List<CommandPattern.Argument> arguments = commandArguments(expr);
+        ParsedSyntax syntax = expr.syntax();
+        int n = switch (syntax.pattern()) {
+            case 0 -> arguments.size();
+            case 1, 2 -> ordinal(syntax);
+            default -> -1;
+        };
+        if (n == -1) {
+            // 'the argument' is the only one; with several, it's all of them.
+            if (arguments.size() == 1) {
+                commandArgument(0);
+            } else {
+                method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+                method.visitMethodInsn(INVOKESTATIC, COMMAND_EVENT, "arguments", "(" + CONTEXT + ")" + OBJECTS, false);
+            }
+            return;
+        }
+        if (n < 1 || n > arguments.size()) {
+            throw new CompileException(line, arguments.isEmpty() ? "This command doesn't have any arguments"
+                    : "This command doesn't have a " + ordinalText(n) + " argument");
+        }
+        commandArgument(n - 1);
+    }
+
+    /** {@code player-arg}, {@code the text argument 2}: the Nth argument of that type. */
+    private void typedArgument(Expr.Syntax expr) throws CompileException {
+        List<CommandPattern.Argument> arguments = commandArguments(expr);
+        List<Object> regexes = expr.syntax().match().regexValues();
+        if (!(regexes.getFirst() instanceof TypeRef ref)) {
+            throw unsupported("'" + source.substring(expr.start(), expr.end()) + "'");
+        }
+        int n = regexes.size() > 1 && regexes.get(1) instanceof java.util.regex.MatchResult number
+                ? Integer.parseInt(number.group()) : 1;
+        int seen = 0;
+        for (int i = 0; i < arguments.size(); i++) {
+            String type = arguments.get(i).type();
+            if ((type.equals(ref.type().id()) || registry.isSubtype(type, ref.type().id())) && ++seen == n) {
+                commandArgument(i);
+                return;
+            }
+        }
+        throw new CompileException(line, "This command doesn't have " + (n == 1 ? "a" : "a " + ordinalText(n)) + " "
+                + ref.type().name() + " argument");
+    }
+
+    /** {@code the first choice argument}: the text typed for a choice such as {@code (give|take)}. */
+    private void choiceArgument(Expr.Syntax expr) throws CompileException {
+        commandArguments(expr);
+        ParsedSyntax syntax = expr.syntax();
+        int n = syntax.pattern() == 2 ? commandChoices : syntax.pattern() == 0
+                ? Integer.parseInt(((java.util.regex.MatchResult) syntax.match().regexValues().getFirst()).group())
+                : ordinal(syntax);
+        if (n < 1 || n > commandChoices) {
+            throw new CompileException(line, commandChoices == 0 ? "This command doesn't have any choices"
+                    : "This command doesn't have a " + ordinalText(n) + " choice");
+        }
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        pushInt(n - 1);
+        method.visitMethodInsn(INVOKESTATIC, COMMAND_EVENT, "choice", "(" + CONTEXT + "I)" + OBJECT_DESC, false);
+    }
+
     private static String article(String word) {
         return !word.isEmpty() && "aeiou".indexOf(Character.toLowerCase(word.charAt(0))) >= 0 ? "an" : "a";
     }
@@ -1129,6 +1299,9 @@ final class TriggerCompiler {
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARITHMETIC) -> arithmetic(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.LOOP_VALUE) -> loopValue(syntax.syntax());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE) -> eventValue(syntax);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TYPED_ARGUMENT) -> typedArgument(syntax);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.CHOICE_ARGUMENT) -> choiceArgument(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TERNARY) -> {
                 if (!(syntax.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition)) {
                     throw unsupported("'" + source + "'");

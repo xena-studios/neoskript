@@ -5,6 +5,7 @@
 package co.xenastudios.neoskript.plugin;
 
 import co.xenastudios.neoskript.api.registration.ScriptEvent;
+import co.xenastudios.neoskript.compiler.CompiledCommand;
 import co.xenastudios.neoskript.compiler.CompiledScripts;
 import co.xenastudios.neoskript.compiler.Library;
 import co.xenastudios.neoskript.compiler.ScriptCompiler;
@@ -51,6 +52,7 @@ final class ScriptManager {
     private final Library library;
     private final Scheduler scheduler;
     private final EventDispatcher events;
+    private final ScriptCommands commands;
     private final Logger logger;
     /** Global variables. */
     private final VariableStore globals = new VariableStore();
@@ -58,16 +60,19 @@ final class ScriptManager {
     private final Map<FunctionInfo, FunctionHandle> functions = new ConcurrentHashMap<>();
     /** The triggers of each loaded script. */
     private final Map<String, List<CompiledScripts.CompiledTrigger>> loaded = new LinkedHashMap<>();
+    /** The commands of each loaded script. */
+    private final Map<String, List<CompiledCommand>> loadedCommands = new LinkedHashMap<>();
 
     /** In test mode, what to do after the tests ran (stop the server); otherwise {@code null}. */
     private Runnable afterTests;
 
-    ScriptManager(Path scriptsDir, Library library, Scheduler scheduler, EventDispatcher events, Logger logger,
-            Runnable afterTests) {
+    ScriptManager(Path scriptsDir, Library library, Scheduler scheduler, EventDispatcher events,
+            ScriptCommands commands, Logger logger, Runnable afterTests) {
         this.scriptsDir = scriptsDir;
         this.library = library;
         this.scheduler = scheduler;
         this.events = events;
+        this.commands = commands;
         this.logger = logger;
         this.afterTests = afterTests;
     }
@@ -140,6 +145,7 @@ final class ScriptManager {
         }
         if (only == null) {
             loaded.keySet().removeIf(name -> !byName.containsKey(name));
+            loadedCommands.keySet().removeIf(name -> !byName.containsKey(name));
         }
         compiled.linkFunctions(switching);
         Map<String, List<CompiledScripts.CompiledTrigger>> triggers = new LinkedHashMap<>();
@@ -148,10 +154,18 @@ final class ScriptManager {
                 triggers.computeIfAbsent(trigger.script(), k -> new ArrayList<>()).add(trigger);
             }
         }
+        Map<String, List<CompiledCommand>> scriptCommands = new LinkedHashMap<>();
+        for (CompiledCommand command : compiled.commands()) {
+            if (switching.contains(command.script())) {
+                scriptCommands.computeIfAbsent(command.script(), k -> new ArrayList<>()).add(command);
+            }
+        }
         for (String name : switching) {
             loaded.put(name, triggers.getOrDefault(name, List.of()));
+            loadedCommands.put(name, scriptCommands.getOrDefault(name, List.of()));
         }
         events.update(loaded.values().stream().flatMap(List::stream).toList());
+        commands.update(loadedCommands.values().stream().flatMap(List::stream).toList());
         long millis = (System.nanoTime() - start) / 1_000_000;
 
         for (String name : switching) {

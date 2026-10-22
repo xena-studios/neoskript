@@ -34,10 +34,6 @@ public final class ScriptLoader {
             Pattern.CASE_INSENSITIVE);
     private static final Pattern PARAMETER =
             Pattern.compile("\\s*([\\p{L}_][\\p{L}\\p{N}_]*)\\s*:\\s*(.+?)(?:\\s*=\\s*(.+))?\\s*");
-    private static final Pattern COMMAND_HEADER = Pattern.compile("command\\s+/?(\\S+)(?:\\s+(.*))?",
-            Pattern.CASE_INSENSITIVE);
-    private static final Pattern COMMAND_ARGUMENT =
-            Pattern.compile("(\\[)?<(?:\\s*[\\p{L}_][\\p{L}\\p{N}_]*\\s*:\\s*)?([^>=]+)(?:=([^>]*))?>(\\])?");
     /** Skript's test-only top-level {@code parse:} block, whose {@code code:} holds structures. */
     private static final String PARSE_STRUCTURE = "parse";
     private static final Pattern EVENT_MODIFIERS = Pattern.compile(
@@ -126,7 +122,7 @@ public final class ScriptLoader {
         return switch (structure.kind()) {
             case OPTIONS, VARIABLES, ALIASES, USING -> new ParsedStructure.Data(structure);
             case FUNCTION -> function(structure, statements, diagnostics, diagnostics.file().name());
-            case COMMAND -> command(structure, statements, diagnostics);
+            case COMMAND -> new CommandParser(registry, statements, diagnostics).parse(structure);
             case EVENT -> structure.section().line().key().equalsIgnoreCase(PARSE_STRUCTURE)
                     ? parseBlock(structure, context, statements, diagnostics)
                     : event(structure, context, statements, diagnostics);
@@ -276,85 +272,6 @@ public final class ScriptLoader {
             }
         }
         return true;
-    }
-
-    private ParsedStructure command(Structure structure, StatementParser statements, Diagnostics diagnostics) {
-        Node.Section section = structure.section();
-        Line line = section.line();
-        Matcher header = COMMAND_HEADER.matcher(line.key().strip());
-        if (!header.matches()) {
-            report(diagnostics, line, "Invalid command header: " + line.key());
-            return null;
-        }
-        List<ParsedStructure.CommandArgument> arguments = new ArrayList<>();
-        if (header.group(2) != null) {
-            Matcher argument = COMMAND_ARGUMENT.matcher(header.group(2));
-            while (argument.find()) {
-                TypeRef type = resolveLeading(argument.group(2));
-                if (type == null) {
-                    report(diagnostics, line, "'" + argument.group(2).strip() + "' is not a type");
-                    return null;
-                }
-                arguments.add(new ParsedStructure.CommandArgument(type.type().id(), type.plural(),
-                        argument.group(1) != null, argument.group(3)));
-            }
-        }
-        Map<String, String> entries = new LinkedHashMap<>();
-        List<Statement> trigger = new ArrayList<>();
-        if (!commandBody(section.children(), entries, trigger, statements, diagnostics)) {
-            report(diagnostics, line, "Command /" + header.group(1) + " has no 'trigger:' section");
-            return null;
-        }
-        return new ParsedStructure.Command(structure, header.group(1), arguments, entries, trigger);
-    }
-
-    /**
-     * Reads a command's (or subcommand's) entries and code: {@code trigger:}, {@code subcommand <args>:}
-     * sections and {@code subcommands:} groups. Returns whether there's any code to run.
-     */
-    private boolean commandBody(List<Node> children, Map<String, String> entries, List<Statement> trigger,
-            StatementParser statements, Diagnostics diagnostics) {
-        boolean hasCode = false;
-        for (Node child : children) {
-            Line entry = child.line();
-            String key = entry.key().strip().toLowerCase(java.util.Locale.ROOT);
-            if (child instanceof Node.Section s) {
-                if (key.equals("trigger")) {
-                    trigger.addAll(statements.body(s.children()));
-                    hasCode = true;
-                } else if (key.equals("subcommands") || key.startsWith("subcommand ")) {
-                    hasCode |= commandBody(s.children(), new LinkedHashMap<>(), trigger, statements, diagnostics);
-                } else {
-                    report(diagnostics, entry, "Invalid section in command: " + entry.text());
-                }
-                continue;
-            }
-            int separator = entry.text().indexOf(':');
-            if (separator <= 0) {
-                report(diagnostics, entry, "Invalid entry in command: " + entry.text());
-                continue;
-            }
-            entries.put(entry.text().substring(0, separator).strip().toLowerCase(java.util.Locale.ROOT),
-                    entry.text().substring(separator + 1).strip());
-        }
-        return hasCode;
-    }
-
-    /** Resolves a type, dropping trailing words until it does: {@code number above 5 and below 10}. */
-    private TypeRef resolveLeading(String text) {
-        String name = text.strip();
-        while (!name.isEmpty()) {
-            TypeRef ref = registry.resolveType(name);
-            if (ref != null) {
-                return ref;
-            }
-            int space = name.lastIndexOf(' ');
-            if (space < 0) {
-                return null;
-            }
-            name = name.substring(0, space).strip();
-        }
-        return null;
     }
 
     private static void report(Diagnostics diagnostics, Line line, String message) {
