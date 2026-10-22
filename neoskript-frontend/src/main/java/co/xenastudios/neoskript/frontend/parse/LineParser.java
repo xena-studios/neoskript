@@ -43,6 +43,8 @@ final class LineParser {
     private final String input;
     private final String lowerInput;
     private final Map<Key, Object> memo = new HashMap<>();
+    /** How many times a placeholder was refused for starting inside a token like {@code arg-1}. */
+    private int tokenSplits;
     private String functionProblem;
     /** Per kind, the unindexed patterns whose required literals all occur somewhere in the line. */
     private final Map<SyntaxKind, List<PatternIndex.Entry<SyntaxRegistry.Candidate>>> viableUnindexed =
@@ -111,10 +113,22 @@ final class LineParser {
         return result instanceof ParsedSyntax syntax ? syntax : null;
     }
 
+    /**
+     * Matches the text as one of {@code kind}. Placeholders can't start inside a token like {@code arg-1}
+     * ({@code arg-1 * arg-2} isn't {@code arg - (1 * arg-2)}), unless nothing parses otherwise.
+     */
     private Object matchSyntax(SyntaxKind kind, int start, int end, boolean literalOnly, Expected expected) {
         if (start >= end) {
             return null;
         }
+        int rejected = tokenSplits;
+        Object result = matchSyntax(kind, start, end, literalOnly, expected, false);
+        return result != null || tokenSplits == rejected ? result
+                : matchSyntax(kind, start, end, literalOnly, expected, true);
+    }
+
+    private Object matchSyntax(SyntaxKind kind, int start, int end, boolean literalOnly, Expected expected,
+            boolean splitTokens) {
         String text = input.substring(start, end);
         String lower = lowerInput.substring(start, end);
         PatternIndex<SyntaxRegistry.Candidate> index = registry.index(kind);
@@ -135,7 +149,7 @@ final class LineParser {
             if (!pattern.couldMatch(lower)) {
                 continue;
             }
-            MatchResult match = pattern.match(input, start, end, resolver(syntax, literalOnly));
+            MatchResult match = pattern.match(input, start, end, resolver(syntax, literalOnly, splitTokens));
             if (match == null) {
                 continue;
             }
@@ -158,6 +172,15 @@ final class LineParser {
             }
         }
         return fallback;
+    }
+
+    /**
+     * Whether {@code position} is just after a letter and a hyphen, as the {@code 1} of {@code arg-1}: there
+     * the hyphen is part of a word, not a minus sign.
+     */
+    private boolean splitsToken(int position) {
+        return position >= 2 && position < input.length() && Character.isDigit(input.charAt(position))
+                && input.charAt(position - 1) == '-' && Character.isLetter(input.charAt(position - 2));
     }
 
     private static boolean hasUnresolved(ParsedSyntax parsed) {
@@ -223,10 +246,14 @@ final class LineParser {
         return type == null ? SyntaxRegistry.OBJECT : type;
     }
 
-    private PlaceholderResolver resolver(SyntaxInfo syntax, boolean literalOnly) {
+    private PlaceholderResolver resolver(SyntaxInfo syntax, boolean literalOnly, boolean splitTokens) {
         return new PlaceholderResolver() {
             @Override
             public Object resolve(String text, int start, int end, PlaceholderSpec spec) {
+                if (!splitTokens && splitsToken(start)) {
+                    tokenSplits++;
+                    return null;
+                }
                 Expected expected = context.expected(spec);
                 return expression(start, end, literalOnly ? context.intern(expected.asLiteralOnly()) : expected);
             }

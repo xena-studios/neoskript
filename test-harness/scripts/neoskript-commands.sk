@@ -1,0 +1,50 @@
+# The neoskript-commands scenario: script commands, run from the console (the test servers have no
+# players). Each line the harness checks starts with "[harness] commands".
+
+on load:
+	send "[harness] commands loaded" to console
+
+command /nsk-add <number> <number>:
+	aliases: nsk-plus
+	description: Adds two numbers
+	trigger:
+		send "[harness] commands sum %arg-1 + arg-2% via %the command%"
+
+command /nsk-calc <x: number>:
+	subcommand double:
+		trigger:
+			send "[harness] commands double %{_x} * 2%"
+	subcommand (inc|dec) [<by: number = 1>]:
+		trigger:
+			if the first choice argument is "inc":
+				send "[harness] commands calc %{_x} + {_by}%"
+			else:
+				send "[harness] commands calc %{_x} - {_by}%"
+	trigger:
+		send "[harness] commands calc %{_x}%"
+
+command /nsk-say [<text>]:
+	trigger:
+		set {_text} to arg-1 ? "nothing"
+		send "[harness] commands said %{_text}% by %sender%"
+
+command /nsk-players-only:
+	executable by: players
+	trigger:
+		send "[harness] commands players only ran" to console
+
+command /nsk-run:
+	trigger:
+		execute console command "nsk-add 2 3"
+		make console execute command "/nsk-say from execute"
+
+command /nsk-info:
+	trigger:
+		if all script commands contain "nsk-add":
+			send "[harness] commands listed"
+		if "nsk-add" is a script command:
+			send "[harness] commands nsk-add is a script command"
+		if "help" is not a script command:
+			send "[harness] commands help isn't a script command"
+		set {_description} to description of command "nsk-add"
+		send "[harness] commands description: %{_description}%"

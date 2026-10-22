@@ -28,6 +28,14 @@ public interface Registrar {
      */
     void type(String id, String name, Class<?> javaClass);
 
+    /**
+     * A type whose values have names, like game modes. Scripts can write the names ({@code creative}), and
+     * the type's parser accepts them.
+     *
+     * @param values each value by its lower case name
+     */
+    <T> void namedType(String id, String name, Class<T> javaClass, java.util.Map<String, ? extends T> values);
+
     /** Another name for a type in patterns and scripts, like {@code int} for {@code integer}. */
     void alias(String typeId, String singular, String plural);
 
@@ -101,6 +109,12 @@ public interface Registrar {
      * column in {@code variables.csv}, e.g. {@code location}).
      */
     <T> void storage(String name, Class<T> type, co.xenastudios.neoskript.api.storage.VariableCodec<T> codec);
+
+    /**
+     * How text people type, such as a command's arguments, becomes a value of {@code typeId}. The parser
+     * returns {@code null} for text that isn't one.
+     */
+    void parser(String typeId, java.util.function.Function<String, ?> parser);
 
     /** How values of {@code type} read as text, as when embedded in a string. */
     <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText);

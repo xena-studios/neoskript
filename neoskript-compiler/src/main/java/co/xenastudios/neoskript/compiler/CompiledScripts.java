@@ -20,9 +20,10 @@ import java.util.List;
  * @param unrunnableTests in test mode, the tests that couldn't be compiled, by name, with the reason
  */
 public record CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunctionBody> functions,
-        List<Diagnostic> diagnostics, java.util.Map<String, String> unrunnableTests) {
+        List<Diagnostic> diagnostics, java.util.Map<String, String> unrunnableTests, List<CompiledCommand> commands) {
 
     public CompiledScripts {
+        commands = List.copyOf(commands);
         triggers = List.copyOf(triggers);
         functions = List.copyOf(functions);
         diagnostics = List.copyOf(diagnostics);

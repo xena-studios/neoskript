@@ -57,6 +57,18 @@ class LanguageTest {
     }
 
     @Test
+    void defaultValues() {
+        assertEquals(List.of("nothing", "set", "nothing"), run("""
+                on load:
+                \tsay {_none} ? "nothing"
+                \tset {_some} to "set"
+                \tsay {_some} ? "nothing"
+                \tset {_t} to {_none} ? "nothing"
+                \tsay {_t}
+                """));
+    }
+
+    @Test
     void variables() {
         assertEquals(List.of("7", "6", "4", "<none>", "x and y"), run("""
                 on load:

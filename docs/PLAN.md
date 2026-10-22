@@ -105,7 +105,7 @@ Rules on Folia:
 
 - Everything is built on the **public `neoskript-api`**, which dogfoods the modern addon API.
 - Aliases: generated from Paper registries (materials, item types, block data), plus Skript's alias data for matching names. This reuse is allowed under GPL-3.0.
-- Commands: Skript `command /x:` structures are registered through **Paper's Brigadier lifecycle API**, which gives proper tab-completion.
+- Commands: Skript `command /x:` structures are registered in the **server's command map** under the `skript` namespace, which Paper turns into Brigadier commands. Paper's Brigadier lifecycle API only registers commands while the server builds its command tree (startup, `/minecraft:reload`), so it can't follow `/sk reload`; the command map can. Tab completion comes from the arguments' types.
 - Coverage is ranked by real usage: we count how often each syntax appears in the corpus and implement the most-used first.
 
 ### 3.6 Addon APIs
@@ -225,7 +225,23 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - Unit tests (`EventsTest`) with stand-in event classes.
 >      - `neoskript-events` on all four servers, driven by console commands.
 >      - The test servers have no players, so player events are only checked when compiled. Running them needs a bot client, which comes with the differential runner in step 6.
-> 2. **Commands:** `command /x <args>:` with every entry (aliases, permission, usage, cooldown, executable by), `arg-1` and `sender`, registered through Brigadier with tab completion, and reloadable.
+> 2. **Commands:** `command /x <args>:` with every entry (aliases, permission, usage, cooldown, executable by), `arg-1` and `sender`, registered with tab completion, and reloadable.
+>
+>    **Status: done (2026-10-22).**
+>    - **Patterns, as in Skript 2.17:**
+>      - Words, `[optional]` parts and `(a|b)` choices.
+>      - Arguments: `<type>`, plural `<numbers>`, named `<x: number>` (the local `{_x}`), ranged `<x: number above 5 and below 10>`, and defaults `<text = home>` or `<player = %player%>`.
+>      - Subcommands, with `subcommands:` groups whose entries apply to what's in them.
+>      - Skript's errors for missing triggers, optional subcommands, `executable by` that a parent rules out, repeated argument names, and ranges.
+>    - **Matching:** the first route that what's typed fits wins, subcommands before their command. Arguments take as few words as they can, so the last text argument gets the rest, and optional arguments are skipped when the next one fits.
+>    - **Entries:** aliases, description, usage, permission and permission message, executable by, cooldown with its message and bypass permission. `cooldown storage` is a compile error for now (it needs dates).
+>    - **Syntax:** `arg-1` and every other form of `ExprArgument`, choice arguments, `the [full] command`, `execute command`, cooldown info and `cancel the cooldown`, command info (`the description of command "x"`), `is a script command`, `all [script] commands`, and `X ? Y`.
+>    - **Registration:** in the server's command map under `skript:` (see 3.5), replaced on every reload, then each online player gets the new command list.
+>    - **Parser changes:** arithmetic and event values are tried after every library element, and a placeholder can't start inside a token like `arg-1` unless nothing else parses. So `arg-1 ? "x"` and `arg-1 * arg-2` mean what they say.
+>    - **Tested by:**
+>      - Unit tests (`CommandParserTest`, `CommandsTest`).
+>      - `neoskript-commands` on all four servers, driven by the console, including a reload that changes one command and removes the others.
+>    - **Not yet:** Skript's `StructCommand` test also needs local variable type hints and item types; `execute command` doesn't report "Failed to execute command" errors yet, as there's no `catch runtime errors`.
 > 3. **The real-world corpus:** the text, player, time and location syntax it uses, and converters between types. *Done when* all 12 real-world scripts load on NeoSkript and pass their self-tests, on all four servers.
 > 4. **Items and aliases:** item types from Paper's registries plus Skript's alias names, inventories, and item stack codecs, so M3's raw item values become real items.
 > 5. **The world:** entities and spawning, blocks, locations and vectors, worlds, potions.

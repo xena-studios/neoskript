@@ -72,7 +72,7 @@ public final class CorpusCheck {
         for (ParsedStructure structure : structures) {
             switch (structure) {
                 case ParsedStructure.Event event -> body(script, event.body(), counter);
-                case ParsedStructure.Command command -> body(script, command.trigger(), counter);
+                case ParsedStructure.Command command -> body(script, command.statements(), counter);
                 case ParsedStructure.Function function -> body(script, function.body(), counter);
                 case ParsedStructure.Custom custom -> body(script, custom.body(), counter);
                 // Top-level parse blocks store their results in a variable; nothing says what's expected.
