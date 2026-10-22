@@ -4,6 +4,8 @@
  */
 package co.xenastudios.neoskript.runtime.scheduler;
 
+import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
 
 /** Folia: regionized schedulers. */
@@ -26,6 +28,22 @@ public final class FoliaScheduler implements Scheduler {
             runGlobal(task);
         } else {
             plugin.getServer().getGlobalRegionScheduler().runDelayed(plugin, scheduled -> task.run(), ticks);
+        }
+    }
+
+    @Override
+    public void runLater(Object owner, long ticks, Runnable task) {
+        // Folia's delayed tasks wait at least a tick.
+        long delay = Math.max(ticks, 1);
+        if (owner instanceof Entity entity) {
+            // If the entity is gone by then (a player who left), the trigger carries on on the global thread.
+            if (entity.getScheduler().runDelayed(plugin, scheduled -> task.run(), () -> runGlobal(task), delay) == null) {
+                runGlobalLater(ticks, task);
+            }
+        } else if (owner instanceof Location location) {
+            plugin.getServer().getRegionScheduler().runDelayed(plugin, location, scheduled -> task.run(), delay);
+        } else {
+            runGlobalLater(ticks, task);
         }
     }
 }

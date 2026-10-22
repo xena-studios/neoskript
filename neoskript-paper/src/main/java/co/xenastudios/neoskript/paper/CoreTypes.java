@@ -8,10 +8,12 @@ import co.xenastudios.neoskript.api.registration.Registrar;
 import net.kyori.adventure.audience.Audience;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
+import java.util.UUID;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
-/** The basic types: text, numbers, booleans, and who messages go to. */
+/** The basic types: text, numbers, booleans, who messages go to, players, worlds and entities. */
 final class CoreTypes {
 
     private CoreTypes() {}
@@ -31,9 +33,12 @@ final class CoreTypes {
         registrar.type("offlineplayer", "offline player", OfflinePlayer.class);
         registrar.type("player", "player", Player.class);
         registrar.type("world", "world", World.class);
+        registrar.type("entity", "entity", Entity.class);
+        registrar.type("uuid", "uuid", UUID.class);
         registrar.subtype("commandsender", "audience");
         registrar.subtype("player", "commandsender");
         registrar.subtype("player", "offlineplayer");
+        registrar.subtype("player", "entity");
 
         // How they read in text: players and worlds by name, the console as Skript writes it.
         registrar.text(OfflinePlayer.class, player -> String.valueOf(player.getName()));

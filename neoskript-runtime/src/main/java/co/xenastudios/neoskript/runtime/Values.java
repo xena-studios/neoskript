@@ -34,6 +34,20 @@ public final class Values {
         return value;
     }
 
+    /** The values that are instances of one of {@code classes}: what a changed expression accepts. */
+    public static Object[] narrow(Object value, Class<?>[] classes) {
+        List<Object> values = new ArrayList<>();
+        for (Object element : array(value)) {
+            for (Class<?> type : classes) {
+                if (type.isInstance(element)) {
+                    values.add(element);
+                    break;
+                }
+            }
+        }
+        return values.toArray();
+    }
+
     /** The values that are instances of {@code type}, for {@code number within {_x}}. */
     public static Object[] cast(Object value, Class<?> type) {
         List<Object> values = new ArrayList<>();

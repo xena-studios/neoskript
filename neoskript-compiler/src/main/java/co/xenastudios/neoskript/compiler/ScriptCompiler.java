@@ -66,18 +66,25 @@ public final class ScriptCompiler {
                 try {
                     switch (structure) {
                         case ParsedStructure.Event event -> {
-                            if (!(library.binding(event.event().syntax()) instanceof ScriptEvent scriptEvent)) {
+                            Object binding = library.binding(event.event().syntax());
+                            if (binding instanceof ScriptEvent scriptEvent) {
+                                triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), scriptEvent, null,
+                                        null, new TriggerCompiler(library, functions, globals, script)
+                                                .compileTrigger(name, event.body())));
+                            } else if (binding instanceof Library.ServerEvent serverEvent) {
+                                triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), null,
+                                        serverEvent.classes(), null, new TriggerCompiler(library, functions, globals,
+                                                script).compileTrigger(name, event, serverEvent)));
+                            } else {
                                 throw new CompileException(header.number(), "NeoSkript can't run this event yet: '"
                                         + header.key() + "'");
                             }
-                            triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), scriptEvent, null,
-                                    new TriggerCompiler(library, functions, globals, script).compileTrigger(name, event.body())));
                         }
                         case ParsedStructure.Function function -> bodies.add(new CompiledScripts.CompiledFunctionBody(name,
                                 functions.get(function.signature()),
                                 new TriggerCompiler(library, functions, globals, script).compileFunction(name, function)));
                         case ParsedStructure.Custom custom when testName != null -> triggers.add(
-                                new CompiledScripts.CompiledTrigger(name, header.number(), null, testName,
+                                new CompiledScripts.CompiledTrigger(name, header.number(), null, null, testName,
                                         new TriggerCompiler(library, functions, globals, script).compileTest(name, custom)));
                         case ParsedStructure.Data data -> {}
                         case ParsedStructure.Parse parse -> parseResults(parse);

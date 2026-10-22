@@ -23,8 +23,10 @@ import co.xenastudios.neoskript.api.storage.VariableCodec;
 import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.variables.storage.VariableCodecs;
 import co.xenastudios.neoskript.runtime.Values;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,12 +46,19 @@ public final class Library implements Registrar {
     /** The binding of the core syntax the compiler implements itself: control flow, variables, arithmetic. */
     record Core(String id) {}
 
+    /** The binding of a server event. */
+    public record ServerEvent(List<Class<?>> classes, ElementFactory<Condition> filter) {}
+
+    private record EventValue(Class<?> eventClass, String type, java.util.function.Function<Object, ?> getter) {}
+
     private final SyntaxRegistry.Builder builder = SyntaxRegistry.builder();
     private final Map<Key, Object> bindings = new HashMap<>();
     private final Map<String, Class<?>> javaClasses = new HashMap<>();
     private final Map<FunctionInfo, Function> functions = new HashMap<>();
     private final Map<String, Object> literalValues = new HashMap<>();
     private final VariableCodecs codecs = new VariableCodecs();
+    private final List<EventValue> eventValues = new ArrayList<>();
+    private final Set<String> eventDefaults = new HashSet<>();
     private SyntaxRegistry registry;
 
     public Library() {
@@ -102,6 +111,83 @@ public final class Library implements Registrar {
     @Override
     public void event(String id, ScriptEvent event, String... patterns) {
         add(SyntaxKind.EVENT, id, null, event, patterns);
+    }
+
+    @Override
+    public void event(String id, List<Class<?>> eventClasses, ElementFactory<Condition> filter, String... patterns) {
+        if (eventClasses.isEmpty()) {
+            throw new IllegalArgumentException("Event " + id + " has no event classes");
+        }
+        add(SyntaxKind.EVENT, id, null, new ServerEvent(List.copyOf(eventClasses), filter), patterns);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <E> void eventValue(Class<E> eventClass, String typeId, java.util.function.Function<? super E, ?> getter) {
+        checkOpen();
+        if (!javaClasses.containsKey(typeId)) {
+            throw new IllegalArgumentException("Event value of unknown type '" + typeId + "'");
+        }
+        eventValues.add(new EventValue(eventClass, typeId, (java.util.function.Function<Object, ?>) getter));
+    }
+
+    @Override
+    public void eventDefault(String typeId) {
+        checkOpen();
+        eventDefaults.add(typeId);
+    }
+
+    /** Whether unused optional placeholders of {@code typeId} get the event's value of that type. */
+    boolean hasEventDefault(String typeId) {
+        return eventDefaults.contains(typeId);
+    }
+
+    /**
+     * How to get a value of {@code typeId}, or a subtype, from events of {@code eventClasses}, or
+     * {@code null} if none of them has one. As in Skript, it's enough for one of the classes to have it:
+     * for the others the value is {@code null}. For each class, the value registered for the closest
+     * superclass wins, and among those, one of exactly {@code typeId}.
+     */
+    java.util.function.Function<Object, Object> eventValue(List<Class<?>> eventClasses, String typeId) {
+        SyntaxRegistry registry = registry();
+        List<Map.Entry<Class<?>, java.util.function.Function<Object, ?>>> getters = new ArrayList<>();
+        for (Class<?> eventClass : eventClasses) {
+            EventValue best = null;
+            for (EventValue value : eventValues) {
+                if (!value.eventClass().isAssignableFrom(eventClass)
+                        || !registry.isSubtype(value.type(), typeId)) {
+                    continue;
+                }
+                if (best == null || isBetter(value, best, typeId)) {
+                    best = value;
+                }
+            }
+            if (best != null) {
+                getters.add(Map.entry(eventClass, best.getter()));
+            }
+        }
+        if (getters.isEmpty()) {
+            return null;
+        }
+        if (getters.size() == 1 && eventClasses.size() == 1) {
+            java.util.function.Function<Object, ?> getter = getters.getFirst().getValue();
+            return event -> getter.apply(event);
+        }
+        return event -> {
+            for (Map.Entry<Class<?>, java.util.function.Function<Object, ?>> getter : getters) {
+                if (getter.getKey().isInstance(event)) {
+                    return getter.getValue().apply(event);
+                }
+            }
+            return null;
+        };
+    }
+
+    private static boolean isBetter(EventValue value, EventValue than, String typeId) {
+        if (value.eventClass() != than.eventClass()) {
+            return than.eventClass().isAssignableFrom(value.eventClass());
+        }
+        return value.type().equals(typeId) && !than.type().equals(typeId);
     }
 
     @Override
@@ -203,7 +289,10 @@ public final class Library implements Registrar {
         return registry;
     }
 
-    /** What a syntax element is bound to: an {@link ElementFactory} or, for events, a {@link ScriptEvent}. */
+    /**
+     * What a syntax element is bound to: an {@link ElementFactory}, or for events a {@link ScriptEvent} or
+     * {@link ServerEvent}.
+     */
     Object binding(SyntaxInfo syntax) {
         return bindings.get(new Key(syntax.kind(), syntax.id()));
     }

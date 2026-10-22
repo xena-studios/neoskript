@@ -16,13 +16,15 @@ import org.bukkit.World;
 final class Messages {
 
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacyAmpersand();
+    static final LegacyComponentSerializer LEGACY_SECTION = LegacyComponentSerializer.legacySection();
 
     private Messages() {}
 
     static void register(Registrar registrar) {
         registrar.effect("EffMessage", info -> (context, args) -> {
-            // TODO: without 'to', Skript sends to the event's player or command sender; that needs event values.
-            Object[] recipients = args[1] == null ? new Object[] {Bukkit.getConsoleSender()} : (Object[]) args[1];
+            // Without 'to', it goes to the event's player or command sender, or the console if there's none.
+            Object[] recipients = args[1] == null || ((Object[]) args[1]).length == 0
+                    ? new Object[] {Bukkit.getConsoleSender()} : (Object[]) args[1];
             for (Object message : (Object[]) args[0]) {
                 Component component = component(message);
                 for (Object recipient : recipients) {

@@ -38,11 +38,54 @@ public interface Registrar {
 
     void condition(String id, ElementFactory<Condition> factory, String... patterns);
 
+    /**
+     * A property condition, {@code %owners% (is|are) <property>} and its negation (see
+     * {@link Patterns#isProperty}). It's true when {@code test} holds for every owner, or for none when
+     * negated.
+     */
+    default <T> void propertyCondition(String id, String property, String owners, Class<T> ownerClass,
+            java.util.function.Predicate<? super T> test) {
+        condition(id, info -> (context, arguments) -> Properties.test(arguments[0], ownerClass, test,
+                info.pattern() == 1), Patterns.isProperty(property, owners));
+    }
+
     /** @param returnType the id of the type the expression returns */
     void expression(String id, String returnType, ElementFactory<Expression> factory, String... patterns);
 
+    /**
+     * A property expression, {@code [the] <property> of %owners%} and {@code %owners%'[s] <property>}: the
+     * value of {@code getter} for each owner of {@code ownerClass}. Owners of other classes, and
+     * {@code null} results, are left out.
+     */
+    default <T> void property(String id, String returnType, String property, String owners, Class<T> ownerClass,
+            java.util.function.Function<? super T, ?> getter) {
+        expression(id, returnType, info -> (context, arguments) -> Properties.map(arguments[0], ownerClass, getter),
+                Patterns.property(property, owners));
+    }
+
     /** An event NeoSkript fires itself, like a script loading. */
     void event(String id, ScriptEvent event, String... patterns);
+
+    /**
+     * A server event. Triggers run when an event of one of {@code eventClasses} fires, and {@code filter},
+     * if there is one, passes. The filter gets the values of the pattern's placeholders, as in
+     * {@code on break of stone}.
+     */
+    void event(String id, List<Class<?>> eventClasses, ElementFactory<Condition> filter, String... patterns);
+
+    /**
+     * A value triggers can get from events of {@code eventClass} (or its subclasses), as {@code event-<type>}
+     * or by the type's name ({@code player}). The most specific event class wins.
+     *
+     * @param typeId the id of the value's type
+     */
+    <E> void eventValue(Class<E> eventClass, String typeId, java.util.function.Function<? super E, ?> getter);
+
+    /**
+     * Where a placeholder of {@code typeId} sits in an optional part that wasn't used, it gets the event's
+     * value of that type instead, if the event has one: {@code send "hi"} goes to the event's player.
+     */
+    void eventDefault(String typeId);
 
     /**
      * Registers a built-in function. Scripts can define their own functions with the same name, which

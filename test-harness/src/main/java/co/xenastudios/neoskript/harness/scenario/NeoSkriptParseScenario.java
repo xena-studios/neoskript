@@ -9,6 +9,7 @@ import co.xenastudios.neoskript.frontend.parse.ScriptLoader;
 import co.xenastudios.neoskript.frontend.source.SourceFile;
 import co.xenastudios.neoskript.frontend.stub.CorpusCheck;
 import co.xenastudios.neoskript.frontend.stub.SkriptRegistry;
+import co.xenastudios.neoskript.frontend.stub.SyntaxUsage;
 import co.xenastudios.neoskript.harness.Environment;
 import co.xenastudios.neoskript.harness.HarnessFailure;
 import co.xenastudios.neoskript.harness.Scenario;
@@ -90,6 +91,7 @@ public final class NeoSkriptParseScenario implements Scenario {
             entry.put("parseBlocksErrorsCaught", result.caughtErrors());
             entry.put("parseBlocksExpectingNoErrors", result.expectedClean());
             entry.put("missedErrors", result.missed());
+            entry.put("syntaxUsage", SyntaxUsage.of(scripts).ranked());
             report.put(set.getKey(), entry);
             context.summary(set.getKey() + "Ms", SkriptLoadBenchmark.median(times));
         }

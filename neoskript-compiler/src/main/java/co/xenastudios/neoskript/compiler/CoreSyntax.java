@@ -33,6 +33,7 @@ final class CoreSyntax {
     static final String TERNARY = "ExprTernary";
     static final String HAS_DELAY = "ExprHasDelay";
     static final String DELAY_CHECK = "CondDelayCheck";
+    static final String EVENT_VALUE = "ExprEventValue";
 
     /** {@link #CHANGE} patterns, by index. */
     enum ChangeMode {
@@ -119,7 +120,7 @@ final class CoreSyntax {
                 "remove (all|every) %objects% from %~objects%",
                 "(remove|subtract) %objects% from %~objects%",
                 "reduce %~objects% by %objects%",
-                "(delete|clear|reset) %~objects%");
+                "(delete|clear|reset:reset) %~objects%");
 
         // Pattern 1 is the next value and 2 the previous one.
         // 'number within {_x}': the values of that type. Its type comes from the type name.
@@ -135,5 +136,7 @@ final class CoreSyntax {
                 "%object%[ ]*[ ]%object%",
                 "%object%[ ]/[ ]%object%",
                 "%object%[ ]^[ ]%object%");
+        // 'player', 'event-world': the event's value of that type. Tried last, as it matches any type name.
+        library.core(SyntaxKind.EXPRESSION, EVENT_VALUE, "object", List.of(RegexRole.TYPE), "[the] [event-]<.+>");
     }
 }

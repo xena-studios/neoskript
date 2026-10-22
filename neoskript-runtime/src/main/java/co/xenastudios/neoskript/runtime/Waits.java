@@ -9,8 +9,9 @@ import co.xenastudios.neoskript.runtime.scheduler.Scheduler;
 import java.util.function.Consumer;
 
 /**
- * Carries on waiting triggers. The plugin installs the scheduler (main thread on Paper, global region on
- * Folia) and where errors in resumed code are reported, since nothing up the stack can catch them then.
+ * Carries on waiting triggers. The plugin installs the scheduler and where errors in resumed code are
+ * reported, since nothing up the stack can catch them then. A trigger carries on on the main thread on
+ * Paper; on Folia, on the thread of what its event happened to (see {@link SimpleTriggerContext#owner}).
  */
 public final class Waits {
 
@@ -37,7 +38,8 @@ public final class Waits {
         if (current == null) {
             throw new IllegalStateException("Waiting isn't available: no scheduler is installed");
         }
-        current.runGlobalLater(ticks, () -> {
+        Object owner = context instanceof SimpleTriggerContext simple ? simple.owner() : null;
+        current.runLater(owner, ticks, () -> {
             try {
                 trigger.resume(context, frame);
             } catch (ScriptRuntimeException e) {
