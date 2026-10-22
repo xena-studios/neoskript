@@ -5,6 +5,7 @@
 package co.xenastudios.neoskript.harness;
 
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptBootScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptMigrationScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptParseScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptRunScenario;
 import co.xenastudios.neoskript.harness.scenario.SkriptConflictScenario;
@@ -28,6 +29,7 @@ public final class HarnessMain {
     static final List<Scenario> SCENARIOS = List.of(
             new NeoSkriptBootScenario(),
             new NeoSkriptRunScenario(),
+            new NeoSkriptMigrationScenario(),
             new SkriptConflictScenario(),
             new SkriptSmokeScenario(),
             new SkriptCorpusScenario(),

@@ -33,6 +33,7 @@ A fast, modern, **clean-room** replacement for Skript. Existing `.sk` scripts ru
 | D16 | License header | `GPL-3.0-or-later` (SPDX header on every source file, checked by Spotless) | Same terms as Skript. |
 | D17 | Test servers | Pinned to exact Paper/Folia builds and SHA-256 hashes, bumped on purpose | Paper ships daily, and build 211 of 26.3 broke Skript 2.17.0 the day it came out. |
 | D18 | Where the Skript baseline runs | Paper 26.x only. Skript doesn't support Folia, and Skript 2.17.0 needs 1.21.5 or newer. NeoSkript-only checks run on all four servers. | |
+| D19 | Moving over from Skript | NeoSkript uses `plugins/NeoSkript`. On its first start it copies `scripts/` and `variables.csv` from `plugins/Skript`, then leaves a marker so it never copies again. It copies rather than moves, so Skript's folder stays as it was. Skript's `config.sk` isn't copied. | Swapping the jar just works, and switching back is safe. |
 
 ## 3. Architecture
 
@@ -153,6 +154,7 @@ IR, ASM backend, control flow, locals, functions, options, waits as state machin
 > - **Step 1 is done:** the first script runs end to end on Paper and Folia, 1.21.4 and 26.3 (`neoskript-hello`). The plugin loads `plugins/NeoSkript/scripts` (files starting with `-` are disabled), reports problems in Skript's format, compiles each trigger into a hidden class with ASM, and runs `on load` triggers through the scheduler abstraction: the main thread on Paper, the global region on Folia.
 > - **How elements run:** elements are called through. The generated code evaluates the placeholders and calls the element, and each element instance is a class-data constant (`MethodHandles.classDataAt`), so every call site is monomorphic. The JVM leaves hidden classes out of stack traces, so the generated code tracks the current script line in a local and rethrows errors as `ScriptRuntimeException(script, line)`.
 > - **New in the API:** `Effect`, `Condition`, `Expression`, `ElementFactory` and `Registrar`. The standard library has started, with real Skript patterns: the load event, `send`, `broadcast` and `console`.
+> - **Moving over from Skript (D19):** on its first start, NeoSkript copies Skript's scripts and variables. The `neoskript-skript-migration` check covers this on all four servers.
 > - **Next:** local and global variables, arithmetic and comparisons, `if`/`else`, loops, functions, and options.
 
 **M3: Variables & storage**

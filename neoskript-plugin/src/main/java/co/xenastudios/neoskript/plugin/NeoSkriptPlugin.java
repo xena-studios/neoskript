@@ -45,6 +45,19 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 platform.displayName(),
                 getServer().getMinecraftVersion());
 
+        try {
+            // Drop-in replacement: the first time, bring over Skript's scripts and variables.
+            SkriptMigration.Result migration = SkriptMigration.migrate(
+                    getDataPath().resolveSibling("Skript"), getDataPath());
+            if (!migration.copied().isEmpty()) {
+                getSLF4JLogger().info("Copied {} from plugins/Skript ({} {}). Skript's folder was left as it was.",
+                        String.join(" and ", migration.copied()), migration.scriptCount(),
+                        migration.scriptCount() == 1 ? "script" : "scripts");
+            }
+        } catch (IOException e) {
+            getSLF4JLogger().error("Couldn't copy Skript's scripts and variables", e);
+        }
+
         Library library = new Library();
         StandardLibrary.register(library);
         Scheduler scheduler = platform == Platform.FOLIA ? new FoliaScheduler(this) : new PaperScheduler(this);
