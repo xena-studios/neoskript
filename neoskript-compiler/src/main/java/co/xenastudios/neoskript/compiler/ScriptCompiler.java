@@ -26,22 +26,33 @@ public final class ScriptCompiler {
 
     private final Library library;
     private final VariableStore globals;
+    private final Map<FunctionInfo, FunctionHandle> handles;
 
     /** @param globals where global variables live; generated code refers to it directly */
     public ScriptCompiler(Library library, VariableStore globals) {
+        this(library, globals, new java.util.concurrent.ConcurrentHashMap<>());
+    }
+
+    /**
+     * @param handles the function handles to call functions through, kept from one load to the next so
+     *     scripts that aren't reloaded keep calling the current version. Missing ones are added.
+     */
+    public ScriptCompiler(Library library, VariableStore globals, Map<FunctionInfo, FunctionHandle> handles) {
         this.library = library;
         this.globals = globals;
+        this.handles = handles;
     }
 
     public CompiledScripts compile(List<ParsedScript> scripts) {
         List<CompiledScripts.CompiledTrigger> triggers = new ArrayList<>();
         List<Diagnostic> diagnostics = new ArrayList<>();
         Map<String, String> unrunnableTests = new java.util.LinkedHashMap<>();
-        Map<FunctionInfo, FunctionHandle> functions = new HashMap<>();
+        Map<FunctionInfo, FunctionHandle> functions = handles;
+        List<CompiledScripts.CompiledFunctionBody> bodies = new ArrayList<>();
         for (ParsedScript script : scripts) {
             for (ParsedStructure structure : script.structures()) {
                 if (structure instanceof ParsedStructure.Function function) {
-                    functions.putIfAbsent(function.signature(), new FunctionHandle(function.signature().name()));
+                    functions.computeIfAbsent(function.signature(), f -> new FunctionHandle(f.name()));
                 }
             }
         }
@@ -62,8 +73,9 @@ public final class ScriptCompiler {
                             triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), scriptEvent, null,
                                     new TriggerCompiler(library, functions, globals, script).compileTrigger(name, event.body())));
                         }
-                        case ParsedStructure.Function function -> functions.get(function.signature()).target(
-                                new TriggerCompiler(library, functions, globals, script).compileFunction(name, function));
+                        case ParsedStructure.Function function -> bodies.add(new CompiledScripts.CompiledFunctionBody(name,
+                                functions.get(function.signature()),
+                                new TriggerCompiler(library, functions, globals, script).compileFunction(name, function)));
                         case ParsedStructure.Custom custom when testName != null -> triggers.add(
                                 new CompiledScripts.CompiledTrigger(name, header.number(), null, testName,
                                         new TriggerCompiler(library, functions, globals, script).compileTest(name, custom)));
@@ -83,7 +95,7 @@ public final class ScriptCompiler {
                 }
             }
         }
-        return new CompiledScripts(triggers, diagnostics, unrunnableTests);
+        return new CompiledScripts(triggers, bodies, diagnostics, unrunnableTests);
     }
 
     /**

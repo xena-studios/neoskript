@@ -36,6 +36,7 @@ class LanguageTest {
         assertEquals(List.of(), parsed.getFirst().diagnostics(), "parse problems");
         CompiledScripts compiled = new ScriptCompiler(library, globals).compile(parsed);
         assertEquals(List.of(), compiled.diagnostics(), "compile problems");
+        compiled.linkFunctions();
         compiled.triggers().forEach(t -> t.trigger().execute(new SimpleTriggerContext(null)));
         return said;
     }
@@ -254,6 +255,7 @@ class LanguageTest {
         assertEquals(List.of(), parsed.getFirst().diagnostics());
         CompiledScripts compiled = new ScriptCompiler(library, globals).compile(parsed);
         assertEquals(List.of(), compiled.diagnostics());
+        compiled.linkFunctions();
         compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
         assertEquals(List.of("false", "unknown", "true", "<none>"), said);
     }

@@ -68,11 +68,14 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         // Waiting triggers carry on through the scheduler; their errors can only be logged.
         Waits.install(scheduler, e -> getSLF4JLogger().error("Error in {}, line {}: {}", e.script(), e.line(),
                 e.getCause().toString(), e.getCause()));
+        ScriptManager scripts = new ScriptManager(getDataPath().resolve("scripts"), library, scheduler,
+                getSLF4JLogger(), TestRunner.enabled() ? () -> getServer().shutdown() : null);
         try {
-            new ScriptManager(getDataPath().resolve("scripts"), library, scheduler, getSLF4JLogger(),
-                    TestRunner.enabled() ? () -> getServer().shutdown() : null).loadAll();
+            scripts.loadAll();
         } catch (IOException e) {
             getSLF4JLogger().error("Couldn't read the scripts folder", e);
         }
+        // D10: NeoSkript takes over /skript and /sk, with /neoskript as an alias.
+        getCommand("skript").setExecutor(new SkriptCommand(scripts, getPluginMeta().getVersion()));
     }
 }
