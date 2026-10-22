@@ -1,0 +1,87 @@
+# tpa.sk: teleport requests with /tpa, /tpaccept and /tpdeny. Requests expire after a minute.
+
+options:
+	prefix: &3&lTPA &8» &7
+	expiry: 60
+
+# Records a request from one player to another. Returns "ok", "self" or "pending".
+function tpa_request(from: text, to: text, at: number) :: text:
+	if {_from} is {_to}:
+		return "self"
+	if all:
+		{tpa::%{_to}%::from} is {_from}
+		{tpa::%{_to}%::at} + {@expiry} > {_at}
+	then:
+		return "pending"
+	set {tpa::%{_to}%::from} to {_from}
+	set {tpa::%{_to}%::at} to {_at}
+	return "ok"
+
+# Takes the pending request for a player. Returns who sent it, or nothing if there isn't a live one.
+function tpa_take(to: text, at: number) :: text:
+	set {_from} to {tpa::%{_to}%::from}
+	set {_sent} to {tpa::%{_to}%::at}
+	delete {tpa::%{_to}%::*}
+	if {_from} is not set:
+		stop
+	if {_sent} + {@expiry} <= {_at}:
+		stop
+	return {_from}
+
+command /tpa <player>:
+	executable by: players
+	cooldown: 10 seconds
+	cooldown message: {@prefix}&cWait %remaining time% before sending another request.
+	trigger:
+		set {_result} to tpa_request("%uuid of player%", "%uuid of arg-1%", now_seconds())
+		if {_result} is "self":
+			send "{@prefix}&cYou can't teleport to yourself." to player
+		else if {_result} is "pending":
+			send "{@prefix}&cYou already have a request waiting for &e%arg-1%&c." to player
+		else:
+			send "{@prefix}Request sent to &e%arg-1%&7." to player
+			send "{@prefix}&e%player% &7wants to teleport to you. &a/tpaccept &7or &c/tpdeny" to arg-1
+
+command /tpaccept:
+	aliases: tpyes
+	executable by: players
+	trigger:
+		set {_from} to tpa_take("%uuid of player%", now_seconds())
+		if {_from} is not set:
+			send "{@prefix}&cYou don't have any pending requests." to player
+			stop
+		set {_requester} to player({_from})
+		if {_requester} is not set:
+			send "{@prefix}&cThat player is no longer online." to player
+			stop
+		teleport {_requester} to player
+		send "{@prefix}Teleported to &e%player%&7." to {_requester}
+		send "{@prefix}Accepted &e%{_requester}%&7's request." to player
+
+command /tpdeny:
+	aliases: tpno
+	executable by: players
+	trigger:
+		set {_from} to tpa_take("%uuid of player%", now_seconds())
+		if {_from} is not set:
+			send "{@prefix}&cYou don't have any pending requests." to player
+			stop
+		send "{@prefix}Request denied." to player
+		set {_requester} to player({_from})
+		if {_requester} is set:
+			send "{@prefix}&e%player% &cdenied your request." to {_requester}
+
+function selftest_tpa():
+	delete {tpa::*}
+	check("tpa", "self", tpa_request("a", "a", 0), "self")
+	check("tpa", "request", tpa_request("a", "b", 0), "ok")
+	check("tpa", "duplicate", tpa_request("a", "b", 30), "pending")
+	check("tpa", "after expiry", tpa_request("a", "b", 61), "ok")
+	check("tpa", "newer request replaces", tpa_request("c", "b", 70), "ok")
+	check("tpa", "take", tpa_take("b", 80), "c")
+	if tpa_take("b", 80) is set:
+		fail("tpa", "take twice: expected nothing")
+	tpa_request("a", "d", 0)
+	if tpa_take("d", 60) is set:
+		fail("tpa", "take expired: expected nothing")
+	delete {tpa::*}

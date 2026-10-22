@@ -113,7 +113,7 @@ Rules on Folia:
 
 ## 4. Quality: corpus, differential testing, benchmarks
 
-- **Corpus:** Skript's own test scripts (GPL, reusable) plus a curated set of popular real-world scripts.
+- **Corpus:** Skript's own test scripts (GPL, reusable) plus our own real-world scripts in `test-harness/corpus/real-world`. They're written like typical server scripts (economy, homes, chat, punishments and so on), and each has a self-test whose results on Skript are the expected behavior. Scripts contributed by the community can join later, with permission.
 - **Differential runner:** runs the same script on headless real Skript and on NeoSkript, on both Paper and Folia, then diffs messages sent, variable state, and world effects. This runs in CI on every PR.
 - **Compat dashboard:** % of the corpus that parses, % that behaves identically, and the list of missing syntax. Published publicly.
 - **Benchmarks:** JMH microbenchmarks (expressions, variables, loops), plus server benchmarks for script load time, `/sk reload` time, per-event cost under simulated players, and variable save time. Every run compares against Skript. Results are published so the "lose the lag" claim is backed up.
@@ -131,7 +131,7 @@ Milestones are ordered by dependency. The exit criteria are what "done" means.
 Gradle multi-module setup, CI, license and headers, pinning the latest stable Skript, headless Paper and Folia test servers, the benchmark harness with a Skript baseline, corpus collection.
 *Exit:* CI boots Paper + Folia + reference Skript and runs one script on each.
 
-> **Status: done (2026-10-21).** The harness boots NeoSkript on Paper and Folia, from 1.21.4 to 26.3. The reference Skript (2.17.0) runs on Paper 26.3, where its own suite passes 853/853 under our harness, and NeoSkript correctly refuses to run alongside it. Skript can't run on Folia (D18), so the Folia half of the exit criterion is NeoSkript booting there. Baseline on an Apple Silicon dev machine: Skript loads the 600-structure, 5,960-line benchmark in ~1.7 s and reloads it in ~1.1–1.2 s (median). Still to do: a curated set of real-world scripts for the corpus. It needs scripts we have permission to use, so it moves to the start of M1. JMH microbenchmarks wait until M2, when there's compiled code to measure.
+> **Status: done (2026-10-21).** The harness boots NeoSkript on Paper and Folia, from 1.21.4 to 26.3. The reference Skript (2.17.0) runs on Paper 26.3, where its own suite passes 853/853 under our harness, and NeoSkript correctly refuses to run alongside it. Skript can't run on Folia (D18), so the Folia half of the exit criterion is NeoSkript booting there. Baseline on an Apple Silicon dev machine: Skript loads the 600-structure, 5,960-line benchmark in ~1.7 s and reloads it in ~1.1–1.2 s (median). The real-world corpus is 12 scripts written in-house, about 1,100 lines: Skript loads them with no errors or warnings and passes all 12 self-tests. bStats is wired up (plugin ID 34868, `metrics: false` to opt out), and test servers never report to it. JMH microbenchmarks wait until M2, when there's compiled code to measure.
 
 **M1: Frontend**
 Structure parser, pattern language + compiler + matcher, type system skeleton, AST, diagnostics, stub syntax registry imported from Skript's syntax list.

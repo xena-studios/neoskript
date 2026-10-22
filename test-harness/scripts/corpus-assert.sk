@@ -1,0 +1,25 @@
+# Assertions for the real-world corpus self-tests. The harness installs this next to the corpus,
+# along with a generated /corpustest command that runs every selftest_<script>() and reports results.
+
+function fail(suite: text, message: text):
+	add {_message} to {corpus::failures::%{_suite}%::*}
+
+function check(suite: text, label: text, actual: object, expected: object):
+	if {_actual} is not set:
+		fail({_suite}, "%{_label}%: expected '%{_expected}%', got nothing")
+	else if {_actual} is not {_expected}:
+		fail({_suite}, "%{_label}%: expected '%{_expected}%', got '%{_actual}%'")
+	# Skript compares text without case by default, so also require an exact (regex-quoted) match.
+	else if "%{_actual}%" doesn't match "\Q%{_expected}%\E":
+		fail({_suite}, "%{_label}%: expected '%{_expected}%', got '%{_actual}%' (case differs)")
+
+function check_true(suite: text, label: text, value: boolean):
+	if {_value} is not true:
+		fail({_suite}, "%{_label}%: expected true")
+
+function corpus_report(suite: text):
+	if {corpus::failures::%{_suite}%::*} is set:
+		loop {corpus::failures::%{_suite}%::*}:
+			send "[corpus] %{_suite}%: FAIL %loop-value%" to console
+	else:
+		send "[corpus] %{_suite}%: ok" to console

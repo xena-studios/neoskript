@@ -1,0 +1,94 @@
+# warps.sk: server warps with a clickable menu. /warp with no name opens the menu.
+
+options:
+    prefix: &d&lWARPS &8» &7
+
+function valid_warp_name(name: text) :: boolean:
+    if length of {_name} > 24:
+        return false
+    if {_name} matches "[a-z0-9_]+":
+        return true
+    return false
+
+function warp_names() :: texts:
+    set {_names::*} to indices of {warps::*}
+    sort {_names::*}
+    return {_names::*}
+
+function set_warp(name: text, loc: location) :: boolean:
+    set {_name} to {_name} in lower case
+    if valid_warp_name({_name}) is false:
+        return false
+    set {warps::%{_name}%} to {_loc}
+    return true
+
+function open_warp_menu(p: player):
+    set {_names::*} to warp_names()
+    set {_rows} to min(max(ceil(size of {_names::*} / 9), 1), 6)
+    set {_menu} to chest inventory with {_rows} rows named "&5&lWarps"
+    set {_slot} to 0
+    loop {_names::*}:
+        if {_slot} >= {_rows} * 9:
+            exit loop
+        set slot {_slot} of {_menu} to ender pearl named "&d%loop-value%" with lore "&7Click to teleport"
+        add 1 to {_slot}
+    open {_menu} to {_p}
+    set {-warps::menu::%uuid of {_p}%::*} to {_names::*}
+
+on inventory click:
+    {-warps::menu::%uuid of player%::*} is set
+    cancel event
+    set {_index} to index of event-slot
+    set {_name} to {-warps::menu::%uuid of player%::%{_index} + 1%}
+    if {_name} is not set:
+        stop
+    close player's inventory
+    make player execute command "/warp %{_name}%"
+
+on inventory close:
+    delete {-warps::menu::%uuid of player%::*}
+
+command /warp [<text>]:
+    executable by: players
+    trigger:
+        if arg-1 is not set:
+            open_warp_menu(player)
+            stop
+        set {_loc} to {warps::%arg-1 in lower case%}
+        if {_loc} is not set:
+            send "{@prefix}&cThere's no warp called &e%arg-1%&c." to player
+            stop
+        if player doesn't have permission "warps.use.%arg-1 in lower case%" or "warps.use.*":
+            send "{@prefix}&cYou can't use that warp." to player
+            stop
+        teleport player to {_loc}
+        send action bar "&dWarped to &f%arg-1%" to player
+
+command /setwarp <text>:
+    permission: warps.admin
+    executable by: players
+    trigger:
+        if set_warp(arg-1, location of player) is false:
+            send "{@prefix}&cWarp names can only use a-z, 0-9 and _." to player
+            stop
+        send "{@prefix}Warp &e%arg-1 in lower case% &7set." to player
+
+command /delwarp <text>:
+    permission: warps.admin
+    trigger:
+        if {warps::%arg-1 in lower case%} is not set:
+            send "{@prefix}&cThere's no warp called &e%arg-1%&c." to sender
+            stop
+        delete {warps::%arg-1 in lower case%}
+        send "{@prefix}Deleted warp &e%arg-1%&7." to sender
+
+function selftest_warps():
+    delete {warps::*}
+    set {_loc} to location(10, 80, 10, world("world"))
+    check_true("warps", "set", set_warp("Spawn", {_loc}))
+    check_true("warps", "set second", set_warp("arena_1", {_loc}))
+    check("warps", "invalid name", set_warp("pvp arena", {_loc}), false)
+    check("warps", "stored lower case", {warps::spawn}, {_loc})
+    set {_names} to join warp_names() with ","
+    check("warps", "names sorted", {_names}, "arena_1,spawn")
+    delete {warps::*}

@@ -26,12 +26,12 @@ public final class SkriptLoadBenchmark implements Scenario {
 
     static final int RELOADS = 5;
 
-    private static final Pattern LOADED =
+    static final Pattern LOADED =
             Pattern.compile("Loaded (\\d+) scripts? with a total of (\\d+) structures? in (.+)$");
     private static final Pattern RELOAD_DONE = Pattern.compile("(Successfully reloaded|Encountered (\\d+) errors?).*\\((\\d+)ms\\)");
-    private static final Pattern NO_ERRORS = Pattern.compile("\\[Skript] All scripts loaded without errors\\.");
+    static final Pattern NO_ERRORS = Pattern.compile("\\[Skript] All scripts loaded without errors\\.");
     /** Skript reports script errors and warnings as "Line 12: (file.sk)". */
-    private static final Pattern SCRIPT_PROBLEM = Pattern.compile("Line \\d+: \\(");
+    static final Pattern SCRIPT_PROBLEM = Pattern.compile("Line \\d+: \\(");
 
     @Override
     public String name() {

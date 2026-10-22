@@ -1,0 +1,167 @@
+# punishments.sk: mutes, temporary bans and warnings with escalation.
+# Durations are written like 30m, 2h or 7d. Expiry times are stored as unix seconds.
+
+options:
+	prefix: &c&lMOD &8» &7
+	warnings-before-mute: 3
+
+# "30m" -> 1800. Returns -1 if the text isn't a duration.
+function duration_seconds(input: text) :: number:
+	if length of {_input} < 2:
+		return -1
+	set {_input} to {_input} in lower case
+	set {_unit} to last character of {_input}
+	set {_amount} to (first (length of {_input} - 1) characters of {_input}) parsed as integer
+	if {_amount} is not set:
+		return -1
+	if {_amount} <= 0:
+		return -1
+	if {_unit} is "s":
+		return {_amount}
+	else if {_unit} is "m":
+		return {_amount} * 60
+	else if {_unit} is "h":
+		return {_amount} * 3600
+	else if {_unit} is "d":
+		return {_amount} * 86400
+	else if {_unit} is "w":
+		return {_amount} * 604800
+	return -1
+
+# Pass -1 seconds for a permanent mute.
+function mute(id: text, seconds: number, reason: text):
+	delete {punish::mute::%{_id}%::*}
+	set {punish::mute::%{_id}%::reason} to {_reason}
+	if {_seconds} < 0:
+		set {punish::mute::%{_id}%::permanent} to true
+	else:
+		set {punish::mute::%{_id}%::expires} to now_seconds() + {_seconds}
+
+function unmute(id: text) :: boolean:
+	if {punish::mute::%{_id}%::reason} is not set:
+		return false
+	delete {punish::mute::%{_id}%::*}
+	return true
+
+function is_muted(id: text) :: boolean:
+	if {punish::mute::%{_id}%::permanent} is true:
+		return true
+	set {_expires} to {punish::mute::%{_id}%::expires}
+	if {_expires} is not set:
+		return false
+	if {_expires} <= now_seconds():
+		delete {punish::mute::%{_id}%::*}
+		return false
+	return true
+
+function mute_remaining(id: text) :: text:
+	if {punish::mute::%{_id}%::permanent} is true:
+		return "forever"
+	return format_duration(max({punish::mute::%{_id}%::expires} - now_seconds(), 0))
+
+# Adds a warning and returns how many the player has now.
+function warn(id: text, reason: text) :: number:
+	add {_reason} to {punish::warnings::%{_id}%::*}
+	return size of {punish::warnings::%{_id}%::*}
+
+function ban_message(reason: text, expires: number) :: text:
+	if {_expires} < 0:
+		return "&cYou are permanently banned.%nl%&7Reason: &f%{_reason}%"
+	return "&cYou are banned for another %format_duration({_expires} - now_seconds())%.%nl%&7Reason: &f%{_reason}%"
+
+on join:
+	set {_id} to "%uuid of player%"
+	set {_expires} to {punish::ban::%{_id}%::expires}
+	{_expires} is set
+	if {_expires} >= 0:
+		if {_expires} <= now_seconds():
+			delete {punish::ban::%{_id}%::*}
+			stop
+	kick player due to ban_message({punish::ban::%{_id}%::reason}, {_expires})
+
+command /mute <offlineplayer> <text> [<text>]:
+	permission: punish.mute
+	usage: /mute <player> <duration|perm> [reason]
+	trigger:
+		if arg-2 is "perm" or "permanent":
+			set {_seconds} to -1
+		else:
+			set {_seconds} to duration_seconds(arg-2)
+			if {_seconds} < 0:
+				send "{@prefix}&cThat isn't a duration. Try 30m, 2h, 7d or perm." to sender
+				stop
+		set {_reason} to arg-3 ? "No reason given"
+		mute("%uuid of arg-1%", {_seconds}, {_reason})
+		broadcast "{@prefix}&e%arg-1% &7was muted by &e%sender%&7: &f%{_reason}%"
+
+command /unmute <offlineplayer>:
+	permission: punish.mute
+	trigger:
+		if unmute("%uuid of arg-1%") is false:
+			send "{@prefix}&c%arg-1% isn't muted." to sender
+			stop
+		send "{@prefix}Unmuted &e%arg-1%&7." to sender
+
+command /tempban <offlineplayer> <text> [<text>]:
+	permission: punish.ban
+	usage: /tempban <player> <duration> [reason]
+	trigger:
+		set {_seconds} to duration_seconds(arg-2)
+		if {_seconds} < 0:
+			send "{@prefix}&cThat isn't a duration. Try 30m, 2h or 7d." to sender
+			stop
+		set {_id} to "%uuid of arg-1%"
+		set {punish::ban::%{_id}%::expires} to now_seconds() + {_seconds}
+		set {punish::ban::%{_id}%::reason} to arg-3 ? "No reason given"
+		if arg-1 is online:
+			kick arg-1 due to ban_message({punish::ban::%{_id}%::reason}, {punish::ban::%{_id}%::expires})
+		broadcast "{@prefix}&e%arg-1% &7was banned for &e%format_duration({_seconds})%&7."
+
+command /warn <offlineplayer> <text>:
+	permission: punish.warn
+	trigger:
+		set {_id} to "%uuid of arg-1%"
+		set {_count} to warn({_id}, arg-2)
+		send "{@prefix}Warned &e%arg-1% &7(%{_count}%/{@warnings-before-mute}): &f%arg-2%" to sender
+		if {_count} >= {@warnings-before-mute}:
+			mute({_id}, 3600, "Too many warnings")
+			broadcast "{@prefix}&e%arg-1% &7was muted for 1 hour after %{_count}% warnings."
+
+command /warnings <offlineplayer>:
+	permission: punish.warn
+	trigger:
+		set {_id} to "%uuid of arg-1%"
+		if {punish::warnings::%{_id}%::*} is not set:
+			send "{@prefix}&e%arg-1% &7has no warnings." to sender
+			stop
+		send "{@prefix}Warnings for &e%arg-1%&7:" to sender
+		loop {punish::warnings::%{_id}%::*}:
+			send "&8 %loop-index%. &f%loop-value%" to sender
+
+function selftest_punishments():
+	check("punishments", "seconds", duration_seconds("45s"), 45)
+	check("punishments", "minutes", duration_seconds("30m"), 1800)
+	check("punishments", "hours, upper case", duration_seconds("2H"), 7200)
+	check("punishments", "weeks", duration_seconds("1w"), 604800)
+	check("punishments", "bad unit", duration_seconds("5y"), -1)
+	check("punishments", "not a number", duration_seconds("abcm"), -1)
+	check("punishments", "too short", duration_seconds("m"), -1)
+	mute("test", 600, "spam")
+	check_true("punishments", "muted", is_muted("test"))
+	# The clock can tick between muting and asking, so allow one second.
+	set {_left} to mute_remaining("test")
+	if {_left} is not "10m":
+		if {_left} is not "9m 59s":
+			fail("punishments", "remaining: expected '10m', got '%{_left}%'")
+	set {punish::mute::test::expires} to now_seconds() - 1
+	check("punishments", "expired mute", is_muted("test"), false)
+	if {punish::mute::test::reason} is set:
+		fail("punishments", "expired mute was not cleared")
+	mute("test", -1, "permanent")
+	check("punishments", "permanent remaining", mute_remaining("test"), "forever")
+	check_true("punishments", "unmute", unmute("test"))
+	check("punishments", "unmuted", is_muted("test"), false)
+	delete {punish::warnings::test::*}
+	warn("test", "spam")
+	check("punishments", "second warning", warn("test", "caps"), 2)
+	delete {punish::warnings::test::*}
