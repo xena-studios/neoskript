@@ -137,6 +137,13 @@ Gradle multi-module setup, CI, license and headers, pinning the latest stable Sk
 Structure parser, pattern language + compiler + matcher, type system skeleton, AST, diagnostics, stub syntax registry imported from Skript's syntax list.
 *Exit:* the full corpus parses with zero false errors against the stub registry. Parse time is measured.
 
+> **Progress (2026-10-21).**
+> - **Done:** the structure parser and the pattern compiler, matcher and index.
+>   - The structure parser reads all 549 corpus files with no diagnostics in about 100 ms. That covers comments (rules taken from Skript's own `misc/comments.sk` tests), indentation, nested options and one-line `using` structures.
+>   - All 2,127 of Skript 2.17.0's patterns compile.
+> - **Stub registry:** generated from Skript's own docs export (`/sk gen-docs` with `-Dskript.testing.genDocs=true`) into `neoskript-frontend/src/test/resources/skript-syntax/`. Those patterns are in documentation form: no parse marks, no tags, no `-` or `@`, and display-name types. That's enough to decide whether a line parses. The real marks and tags come with each element's implementation in M4.
+> - **Next:** expression parsing (literals, strings with `%…%`, variables, lists, function calls), the type system skeleton, and the corpus parse scenario.
+
 **M2: Compiler + runtime core (Paper and Folia)**
 IR, ASM backend, control flow, locals, functions, options, waits as state machines, scheduler abstraction with both implementations, reload with atomic swap.
 *Exit:* the control-flow and function tests from Skript's suite pass on Paper **and** Folia.

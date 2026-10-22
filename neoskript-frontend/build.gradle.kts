@@ -4,4 +4,5 @@ plugins {
 
 dependencies {
     api(project(":neoskript-api"))
+    testImplementation(libs.gson)
 }
