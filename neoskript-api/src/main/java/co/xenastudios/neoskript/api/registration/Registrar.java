@@ -28,6 +28,9 @@ public interface Registrar {
      */
     void type(String id, String name, Class<?> javaClass);
 
+    /** Another name for a type in patterns and scripts, like {@code int} for {@code integer}. */
+    void alias(String typeId, String singular, String plural);
+
     /** Values of type {@code sub} can be used where {@code supertype} is expected. */
     void subtype(String sub, String supertype);
 

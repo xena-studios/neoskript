@@ -34,6 +34,23 @@ public final class Values {
         return value;
     }
 
+    /** The values that are instances of {@code type}, for {@code number within {_x}}. */
+    public static Object[] cast(Object value, Class<?> type) {
+        List<Object> values = new ArrayList<>();
+        for (Object element : array(value)) {
+            if (type.isInstance(element)) {
+                values.add(element);
+            }
+        }
+        return values.toArray();
+    }
+
+    /** {@code array[index + offset]}, or {@code null} if that's outside the array: for next/previous loop values. */
+    public static Object element(Object[] array, int index, int offset) {
+        int i = index + offset;
+        return i >= 0 && i < array.length ? array[i] : null;
+    }
+
     /** The values of a list expression, with nested lists flattened. */
     public static Object[] list(Object[] items) {
         List<Object> values = new ArrayList<>(items.length);
@@ -80,7 +97,7 @@ public final class Values {
     }
 
     /** Decimals as Skript shows them: at most two decimal places, without trailing zeros. */
-    static String decimal(double value) {
+    public static String decimal(double value) {
         if (Double.isNaN(value) || Double.isInfinite(value)) {
             return Double.toString(value);
         }

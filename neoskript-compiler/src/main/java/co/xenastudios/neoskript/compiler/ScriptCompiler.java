@@ -36,6 +36,7 @@ public final class ScriptCompiler {
     public CompiledScripts compile(List<ParsedScript> scripts) {
         List<CompiledScripts.CompiledTrigger> triggers = new ArrayList<>();
         List<Diagnostic> diagnostics = new ArrayList<>();
+        Map<String, String> unrunnableTests = new java.util.LinkedHashMap<>();
         Map<FunctionInfo, FunctionHandle> functions = new HashMap<>();
         for (ParsedScript script : scripts) {
             for (ParsedStructure structure : script.structures()) {
@@ -46,8 +47,11 @@ public final class ScriptCompiler {
         }
         for (ParsedScript script : scripts) {
             String name = script.file().name();
+            Map<Integer, String> parseProblems = new HashMap<>();
+            script.diagnostics().forEach(d -> parseProblems.putIfAbsent(d.line(), d.message()));
             for (ParsedStructure structure : script.structures()) {
                 Line header = structure.structure().node().line();
+                String testName = testName(structure);
                 try {
                     switch (structure) {
                         case ParsedStructure.Event event -> {
@@ -55,12 +59,16 @@ public final class ScriptCompiler {
                                 throw new CompileException(header.number(), "NeoSkript can't run this event yet: '"
                                         + header.key() + "'");
                             }
-                            triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), scriptEvent,
-                                    new TriggerCompiler(library, functions, globals).compileTrigger(name, event.body())));
+                            triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), scriptEvent, null,
+                                    new TriggerCompiler(library, functions, globals, script).compileTrigger(name, event.body())));
                         }
                         case ParsedStructure.Function function -> functions.get(function.signature()).target(
-                                new TriggerCompiler(library, functions, globals).compileFunction(name, function));
+                                new TriggerCompiler(library, functions, globals, script).compileFunction(name, function));
+                        case ParsedStructure.Custom custom when testName != null -> triggers.add(
+                                new CompiledScripts.CompiledTrigger(name, header.number(), null, testName,
+                                        new TriggerCompiler(library, functions, globals, script).compileTest(name, custom)));
                         case ParsedStructure.Data data -> {}
+                        case ParsedStructure.Parse parse -> parseResults(parse);
                         default -> throw new CompileException(header.number(),
                                 "NeoSkript can't run this yet: '" + header.key() + "'");
                     }
@@ -68,9 +76,42 @@ public final class ScriptCompiler {
                     if (!e.alreadyReported()) {
                         diagnostics.add(new Diagnostic(Severity.ERROR, name, e.line(), 0, 0, e.getMessage()));
                     }
+                    if (testName != null) {
+                        String reason = e.alreadyReported() ? parseProblems.get(e.line()) : e.getMessage();
+                        unrunnableTests.put(testName, "line " + e.line() + ": " + reason);
+                    }
                 }
             }
         }
-        return new CompiledScripts(triggers, diagnostics);
+        return new CompiledScripts(triggers, diagnostics, unrunnableTests);
+    }
+
+    /**
+     * Skript's test-only top-level {@code parse:} block: the problems its code had are stored in the list
+     * variable named by its {@code results:} entry, for tests to check.
+     */
+    private void parseResults(ParsedStructure.Parse parse) {
+        for (co.xenastudios.neoskript.frontend.structure.Node child : parse.structure().section().children()) {
+            String text = child.line().text().strip();
+            if (text.toLowerCase(java.util.Locale.ROOT).startsWith("results:")) {
+                String variable = text.substring("results:".length()).strip();
+                if (variable.startsWith("{") && variable.endsWith("::*}")) {
+                    globals.setList(variable.substring(1, variable.length() - 4),
+                            parse.captured().stream().map(Diagnostic::message).toArray());
+                }
+            }
+        }
+    }
+
+    /** The name of a {@code test "name":} structure, or {@code null} if it isn't one. */
+    private String testName(ParsedStructure structure) {
+        if (!(structure instanceof ParsedStructure.Custom custom)
+                || !(library.binding(custom.syntax().syntax()) instanceof Library.Core core)
+                || !core.id().equals(CoreSyntax.TEST)
+                || !(custom.syntax().match().values().getFirst() instanceof co.xenastudios.neoskript.frontend.parse.Expr.Text text)) {
+            return null;
+        }
+        String key = custom.structure().node().line().key();
+        return key.substring(text.start() + 1, text.end() - 1).replace("\"\"", "\"");
     }
 }

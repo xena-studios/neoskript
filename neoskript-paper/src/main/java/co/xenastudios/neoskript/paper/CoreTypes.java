@@ -22,6 +22,9 @@ final class CoreTypes {
         registrar.type("integer", "integer", Long.class);
         registrar.type("boolean", "boolean", Boolean.class);
         registrar.subtype("integer", "number");
+        // Numbers can be used where whole numbers are expected; they're rounded when they're used.
+        registrar.subtype("number", "integer");
+        registrar.alias("integer", "int", "ints");
 
         registrar.type("audience", "audience", Audience.class);
         registrar.type("commandsender", "command sender", CommandSender.class);

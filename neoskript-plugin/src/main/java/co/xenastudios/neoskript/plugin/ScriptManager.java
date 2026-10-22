@@ -41,11 +41,15 @@ final class ScriptManager {
     /** Global variables. Kept in memory for now; saving them comes in M3. */
     private final VariableStore globals = new VariableStore();
 
-    ScriptManager(Path scriptsDir, Library library, Scheduler scheduler, Logger logger) {
+    /** In test mode, what to do after the tests ran (stop the server); otherwise {@code null}. */
+    private final Runnable afterTests;
+
+    ScriptManager(Path scriptsDir, Library library, Scheduler scheduler, Logger logger, Runnable afterTests) {
         this.scriptsDir = scriptsDir;
         this.library = library;
         this.scheduler = scheduler;
         this.logger = logger;
+        this.afterTests = afterTests;
     }
 
     void loadAll() throws IOException {
@@ -73,6 +77,16 @@ final class ScriptManager {
             if (trigger.event() == ScriptEvent.LOAD) {
                 scheduler.runGlobal(() -> run(trigger));
             }
+        }
+        if (afterTests != null) {
+            scheduler.runGlobal(() -> {
+                try {
+                    TestRunner.run(compiled, logger);
+                } catch (IOException e) {
+                    logger.error("Couldn't write the test results", e);
+                }
+                afterTests.run();
+            });
         }
     }
 

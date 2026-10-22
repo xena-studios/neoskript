@@ -12,4 +12,7 @@ public interface Scheduler {
 
     /** Runs {@code task} on the global thread: the main thread on Paper, the global region on Folia. */
     void runGlobal(Runnable task);
+
+    /** Runs {@code task} on the global thread after {@code ticks} server ticks. */
+    void runGlobalLater(long ticks, Runnable task);
 }

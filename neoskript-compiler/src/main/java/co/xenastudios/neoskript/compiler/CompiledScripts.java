@@ -14,14 +14,19 @@ import java.util.List;
  *
  * @param triggers the compiled triggers, in script order
  * @param diagnostics errors for the code that couldn't be compiled. Those triggers are left out.
+ * @param unrunnableTests in test mode, the tests that couldn't be compiled, by name, with the reason
  */
-public record CompiledScripts(List<CompiledTrigger> triggers, List<Diagnostic> diagnostics) {
+public record CompiledScripts(List<CompiledTrigger> triggers, List<Diagnostic> diagnostics,
+        java.util.Map<String, String> unrunnableTests) {
 
     public CompiledScripts {
         triggers = List.copyOf(triggers);
         diagnostics = List.copyOf(diagnostics);
+        unrunnableTests = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(unrunnableTests));
     }
 
-    /** A trigger and what runs it. */
-    public record CompiledTrigger(String script, int line, ScriptEvent event, Trigger trigger) {}
+    /**
+     * A trigger and what runs it: an event, or for a test ({@code test "name":}) its name and a null event.
+     */
+    public record CompiledTrigger(String script, int line, ScriptEvent event, String testName, Trigger trigger) {}
 }

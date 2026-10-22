@@ -19,6 +19,7 @@ import co.xenastudios.neoskript.frontend.registry.SyntaxInfo;
 import co.xenastudios.neoskript.frontend.registry.SyntaxKind;
 import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
 import co.xenastudios.neoskript.frontend.registry.TypeInfo;
+import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -45,10 +46,12 @@ public final class Library implements Registrar {
     private final Map<Key, Object> bindings = new HashMap<>();
     private final Map<String, Class<?>> javaClasses = new HashMap<>();
     private final Map<FunctionInfo, Function> functions = new HashMap<>();
+    private final Map<String, Object> literalValues = new HashMap<>();
     private SyntaxRegistry registry;
 
     public Library() {
         type(SyntaxRegistry.OBJECT, "object", Object.class);
+        type("timespan", "timespan", Timespan.class);
         CoreSyntax.register(this);
     }
 
@@ -60,6 +63,12 @@ public final class Library implements Registrar {
         if (STRICT_TYPES.contains(id)) {
             builder.strict(id);
         }
+    }
+
+    @Override
+    public void alias(String typeId, String singular, String plural) {
+        checkOpen();
+        builder.alias(typeId, singular, plural);
     }
 
     @Override
@@ -107,6 +116,42 @@ public final class Library implements Registrar {
         Values.registerText(type, toText);
     }
 
+    /**
+     * Turns on Skript's test syntax ({@code test "name":}, {@code assert}, {@code parse:} and
+     * {@code last parse logs}), for running Skript's own tests. Call it before registering anything else.
+     */
+    public void enableTesting() {
+        CoreSyntax.registerTesting(this);
+    }
+
+    /** Marks core syntax as making the trigger wait. */
+    void delays(SyntaxKind kind, String id) {
+        builder.delays(kind, id);
+    }
+
+    /** Adds a parse-time check to core syntax. */
+    void check(SyntaxKind kind, String id, co.xenastudios.neoskript.frontend.registry.ParseCheck check) {
+        builder.check(kind, id, check);
+    }
+
+    /**
+     * A core type whose values are the words in {@code literals}, which compile to {@code toValue} of the
+     * word. Used for Skript's test-only {@code unknown}.
+     */
+    void literalType(String id, String name, Set<String> literals, java.util.function.Function<String, Object> toValue) {
+        checkOpen();
+        builder.type(new TypeInfo(id, name, literals, false));
+        javaClasses.put(id, Object.class);
+        for (String literal : literals) {
+            literalValues.put(literal, toValue.apply(literal));
+        }
+    }
+
+    /** The value of a word literal of a {@link #literalType}, or {@code null} if it isn't one. */
+    Object literalValue(String word) {
+        return literalValues.get(word.strip().toLowerCase(java.util.Locale.ROOT));
+    }
+
     /** Registers core syntax the compiler implements itself. */
     void core(SyntaxKind kind, String id, String returnType, List<RegexRole> regexRoles, String... patterns) {
         add(kind, id, returnType, new Core(id), regexRoles, patterns);
@@ -124,6 +169,11 @@ public final class Library implements Registrar {
         }
         builder.syntax(new SyntaxInfo(kind, id, Arrays.stream(patterns).map(PatternCompiler::compile).toList(),
                 returnType, regexRoles));
+    }
+
+    /** The class values of a type have, or {@code Object} if the type is unknown. */
+    Class<?> javaClass(String typeId) {
+        return javaClasses.getOrDefault(typeId, Object.class);
     }
 
     /** The implementation of a built-in function, or {@code null} if {@code function} isn't one. */

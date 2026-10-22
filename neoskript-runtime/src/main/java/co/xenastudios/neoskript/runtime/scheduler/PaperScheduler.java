@@ -19,4 +19,9 @@ public final class PaperScheduler implements Scheduler {
     public void runGlobal(Runnable task) {
         plugin.getServer().getScheduler().runTask(plugin, task);
     }
+
+    @Override
+    public void runGlobalLater(long ticks, Runnable task) {
+        plugin.getServer().getScheduler().runTaskLater(plugin, task, ticks);
+    }
 }

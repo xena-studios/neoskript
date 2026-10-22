@@ -47,8 +47,83 @@ final class Logic {
             return numbers;
         }, "%number% times");
 
+        registrar.expression("ExprNumbers", "number", info -> (context, args) ->
+                range(((Number) args[0]).doubleValue(), ((Number) args[1]).doubleValue(), info.hasTag("integers")),
+                "[(all [[of] the]|the)] (numbers|integers:integers) (between|from) %number% (and|to) %number%");
+
+        registrar.condition("CondPluginEnabled", info -> {
+            boolean negated = info.hasTag("not");
+            return (context, args) -> {
+                for (Object name : (Object[]) args[0]) {
+                    if (negated == org.bukkit.Bukkit.getPluginManager().isPluginEnabled(String.valueOf(name))) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+        }, "plugin[s] %strings% (is|are) enabled", "plugin[s] %strings% (not:(is|are)(n't| not) enabled)");
+
+        registrar.condition("CondContains", info -> {
+            boolean negated = info.hasTag("not");
+            return (context, args) -> negated != contains((Object[]) args[0], (Object[]) args[1]);
+        }, "%objects% contain[s] %objects%", "%objects% (not:(doesn't|does not|do not|don't) contain) %objects%");
+
+        registrar.expression("ExprElement", "object", info -> (context, args) -> {
+            Object[] values = (Object[]) args[0];
+            if (values.length == 0) {
+                return null;
+            }
+            return info.hasTag("last") ? values[values.length - 1]
+                    : info.hasTag("random") ? values[java.util.concurrent.ThreadLocalRandom.current().nextInt(values.length)]
+                    : values[0];
+        }, "[the] (first|last:last|random:random) element [out] of %objects%");
+
         registrar.expression("ExprAmount", "integer", info -> (context, args) -> (long) ((Object[]) args[0]).length,
                 "[the] (amount|number|size) of %objects%");
+    }
+
+    /**
+     * Texts contain text (ignoring case); anything else contains a value when one of its values equals it.
+     * Every value on the right has to be contained.
+     */
+    private static boolean contains(Object[] containers, Object[] values) {
+        if (containers.length == 0 || values.length == 0) {
+            return false;
+        }
+        boolean texts = java.util.Arrays.stream(containers).allMatch(String.class::isInstance);
+        for (Object value : values) {
+            boolean found = false;
+            for (Object container : containers) {
+                if (texts && value instanceof String text
+                        ? ((String) container).toLowerCase(java.util.Locale.ROOT).contains(text.toLowerCase(java.util.Locale.ROOT))
+                        : Comparison.equal(container, value)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The numbers from {@code from} to {@code to}, counting up or down by one. Integers are rounded inward
+     * first; otherwise whole bounds give whole numbers.
+     */
+    private static Object[] range(double from, double to, boolean integers) {
+        boolean down = from > to;
+        double start = integers ? (down ? Math.floor(from) : Math.ceil(from)) : from;
+        double end = integers ? (down ? Math.ceil(to) : Math.floor(to)) : to;
+        boolean whole = start == Math.rint(start);
+        int count = (int) Math.min(Math.floor(Math.abs(end - start)) + 1, 1_000_000);
+        Object[] numbers = new Object[Math.max(count, 0)];
+        for (int i = 0; i < numbers.length; i++) {
+            double value = down ? start - i : start + i;
+            numbers[i] = whole ? (Object) (long) value : (Object) value;
+        }
+        return numbers;
     }
 
     private static Relation relation(java.util.Set<String> tags) {

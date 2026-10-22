@@ -7,6 +7,7 @@ package co.xenastudios.neoskript.compiler;
 import static org.objectweb.asm.Opcodes.AALOAD;
 import static org.objectweb.asm.Opcodes.AASTORE;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 import static org.objectweb.asm.Opcodes.ACC_SUPER;
 import static org.objectweb.asm.Opcodes.ACONST_NULL;
@@ -16,7 +17,9 @@ import static org.objectweb.asm.Opcodes.ARETURN;
 import static org.objectweb.asm.Opcodes.ARRAYLENGTH;
 import static org.objectweb.asm.Opcodes.ASTORE;
 import static org.objectweb.asm.Opcodes.ATHROW;
+import static org.objectweb.asm.Opcodes.CHECKCAST;
 import static org.objectweb.asm.Opcodes.DUP;
+import static org.objectweb.asm.Opcodes.GETFIELD;
 import static org.objectweb.asm.Opcodes.GETSTATIC;
 import static org.objectweb.asm.Opcodes.GOTO;
 import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
@@ -38,6 +41,7 @@ import static org.objectweb.asm.Opcodes.LADD;
 import static org.objectweb.asm.Opcodes.LCONST_1;
 import static org.objectweb.asm.Opcodes.NEW;
 import static org.objectweb.asm.Opcodes.POP;
+import static org.objectweb.asm.Opcodes.PUTFIELD;
 import static org.objectweb.asm.Opcodes.RETURN;
 import static org.objectweb.asm.Opcodes.V21;
 
@@ -49,6 +53,7 @@ import co.xenastudios.neoskript.api.element.Expression;
 import co.xenastudios.neoskript.api.element.Function;
 import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.frontend.parse.Expr;
+import co.xenastudios.neoskript.frontend.parse.ParsedScript;
 import co.xenastudios.neoskript.frontend.parse.ParsedStructure;
 import co.xenastudios.neoskript.frontend.parse.ParsedSyntax;
 import co.xenastudios.neoskript.frontend.parse.Statement;
@@ -60,7 +65,11 @@ import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
 import co.xenastudios.neoskript.frontend.registry.TypeRef;
 import co.xenastudios.neoskript.runtime.Arithmetic;
 import co.xenastudios.neoskript.runtime.CompiledFunction;
+import co.xenastudios.neoskript.runtime.Frame;
 import co.xenastudios.neoskript.runtime.FunctionHandle;
+import co.xenastudios.neoskript.runtime.Resumable;
+import co.xenastudios.neoskript.runtime.Timespan;
+import co.xenastudios.neoskript.runtime.Waits;
 import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
 import co.xenastudios.neoskript.runtime.Trigger;
 import co.xenastudios.neoskript.runtime.Values;
@@ -106,6 +115,9 @@ final class TriggerCompiler {
     private static final String OBJECT_DESC = "Ljava/lang/Object;";
     private static final String OBJECTS = "[Ljava/lang/Object;";
     private static final String STRING_DESC = "Ljava/lang/String;";
+    private static final String TEST_RUN = "co/xenastudios/neoskript/runtime/testing/TestRun";
+    private static final String FRAME_DESC = Type.getDescriptor(Frame.class);
+    private static final String STORE_DESC = Type.getDescriptor(VariableStore.class);
     private static final Handle CLASS_DATA_AT = new Handle(H_INVOKESTATIC, "java/lang/invoke/MethodHandles",
             "classDataAt", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;I)Ljava/lang/Object;",
             false);
@@ -117,6 +129,8 @@ final class TriggerCompiler {
     private static final int LINE_SLOT = 3;
     private static final int EXCEPTION_SLOT = 4;
     private static final int LOCALS_SLOT = 5;
+    /** The problems captured by the last {@code parse:} section, for {@code last parse logs}. */
+    private static final int PARSE_LOGS_SLOT = 6;
 
     private enum BlockKind {
         CONDITIONAL,
@@ -127,6 +141,17 @@ final class TriggerCompiler {
     /** A section being compiled, for exit, continue and loop values. */
     private record Block(BlockKind kind, Label end, Label next, int valuesSlot, int indicesSlot, int indexSlot) {}
 
+    /** A {@code wait}: where the trigger carries on, and the loop state it saves. */
+    private record WaitPoint(Label resume, int line, List<int[]> savedSlots) {}
+
+    /** Kinds of saved local variable slots, as {@code {slot, kind}}. */
+    private static final int SAVED_VALUES = 0;
+    private static final int SAVED_INDICES = 1;
+    private static final int SAVED_INDEX = 2;
+
+    private final ParsedScript script;
+    private final List<WaitPoint> waits = new ArrayList<>();
+    private co.xenastudios.neoskript.frontend.structure.Line currentLine;
     private final Library library;
     private final SyntaxRegistry registry;
     private final Map<FunctionInfo, FunctionHandle> functions;
@@ -134,13 +159,17 @@ final class TriggerCompiler {
     private final List<Object> constants = new ArrayList<>();
     private final Deque<Block> blocks = new ArrayDeque<>();
     private MethodVisitor method;
-    private int nextSlot = LOCALS_SLOT + 1;
+    private int nextSlot = PARSE_LOGS_SLOT + 1;
     private FunctionInfo function;
     /** The text expression positions refer to: the current line, a section header's key, or a default value. */
     private String source;
     private int line;
+    /** The name of the script being compiled, for test failures. */
+    private String constantsScript;
 
-    TriggerCompiler(Library library, Map<FunctionInfo, FunctionHandle> functions, VariableStore globals) {
+    TriggerCompiler(Library library, Map<FunctionInfo, FunctionHandle> functions, VariableStore globals,
+            ParsedScript script) {
+        this.script = script;
         this.library = library;
         this.registry = library.registry();
         this.functions = functions;
@@ -148,14 +177,30 @@ final class TriggerCompiler {
     }
 
     Trigger compileTrigger(String scriptName, List<Statement> body) throws CompileException {
-        byte[] bytes = generate(scriptName, Trigger.class, "execute", "(" + CONTEXT + ")V", () -> statements(body));
+        return (Trigger) define(generate(scriptName, () -> statements(body)));
+    }
+
+    /** A Skript test ({@code test "name" [when <condition>]:}): skipped if its condition is false. */
+    Trigger compileTest(String scriptName, ParsedStructure.Custom test) throws CompileException {
+        byte[] bytes = generate(scriptName, () -> {
+            if (test.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition) {
+                line = test.structure().node().line().number();
+                source = test.structure().node().line().key();
+                condition(condition);
+                Label run = new Label();
+                method.visitJumpInsn(IFNE, run);
+                method.visitMethodInsn(INVOKESTATIC, TEST_RUN, "skip", "()V", false);
+                method.visitInsn(RETURN);
+                method.visitLabel(run);
+            }
+            statements(test.body());
+        });
         return (Trigger) define(bytes);
     }
 
     CompiledFunction compileFunction(String scriptName, ParsedStructure.Function parsed) throws CompileException {
         function = parsed.signature();
-        byte[] bytes = generate(scriptName, CompiledFunction.class, "call", "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC,
-                () -> {
+        byte[] bytes = generate(scriptName, () -> {
                     parameters(parsed);
                     statements(parsed.body());
                 });
@@ -167,16 +212,25 @@ final class TriggerCompiler {
         void emit() throws CompileException;
     }
 
-    private byte[] generate(String scriptName, Class<?> type, String name, String descriptor, Body body)
-            throws CompileException {
+    /**
+     * Generates the class. A function gets {@code call(context, arguments)}. A trigger gets {@code execute}
+     * and {@code resume}, which both run a private {@code body(context, frame)}: with no frame it starts at
+     * the top; with one, it restores the frame and jumps to just after the {@code wait} it stopped at.
+     */
+    private byte[] generate(String scriptName, Body body) throws CompileException {
+        constantsScript = scriptName;
+        boolean trigger = function == null;
+        String className = PACKAGE + (trigger ? "Trigger" : "Function");
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
             @Override
             protected String getCommonSuperClass(String first, String second) {
                 return OBJECT;
             }
         };
-        writer.visit(V21, ACC_PUBLIC | ACC_FINAL | ACC_SUPER, PACKAGE + (function == null ? "Trigger" : "Function"),
-                null, OBJECT, new String[] {Type.getInternalName(type)});
+        String[] interfaces = trigger
+                ? new String[] {Type.getInternalName(Trigger.class), Type.getInternalName(Resumable.class)}
+                : new String[] {Type.getInternalName(CompiledFunction.class)};
+        writer.visit(V21, ACC_PUBLIC | ACC_FINAL | ACC_SUPER, className, null, OBJECT, interfaces);
         writer.visitSource(scriptName, null);
 
         MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
@@ -187,18 +241,47 @@ final class TriggerCompiler {
         constructor.visitMaxs(0, 0);
         constructor.visitEnd();
 
-        method = writer.visitMethod(ACC_PUBLIC, name, descriptor, null, null);
+        String bodyDescriptor = "(" + CONTEXT + FRAME_DESC + ")V";
+        if (trigger) {
+            for (boolean resume : new boolean[] {false, true}) {
+                MethodVisitor entry = writer.visitMethod(ACC_PUBLIC, resume ? "resume" : "execute",
+                        resume ? bodyDescriptor : "(" + CONTEXT + ")V", null, null);
+                entry.visitCode();
+                entry.visitVarInsn(ALOAD, 0);
+                entry.visitVarInsn(ALOAD, CONTEXT_SLOT);
+                if (resume) {
+                    entry.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
+                } else {
+                    entry.visitInsn(ACONST_NULL);
+                }
+                entry.visitMethodInsn(INVOKESPECIAL, className, "body", bodyDescriptor, false);
+                entry.visitInsn(RETURN);
+                entry.visitMaxs(0, 0);
+                entry.visitEnd();
+            }
+            method = writer.visitMethod(ACC_PRIVATE, "body", bodyDescriptor, null, null);
+        } else {
+            method = writer.visitMethod(ACC_PUBLIC, "call", "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, null, null);
+        }
         method.visitCode();
         Label start = new Label();
         Label end = new Label();
         Label handler = new Label();
+        Label dispatch = new Label();
         method.visitTryCatchBlock(start, end, handler, "java/lang/Throwable");
         pushInt(0);
         method.visitVarInsn(ISTORE, LINE_SLOT);
+        if (trigger) {
+            method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
+            method.visitJumpInsn(IFNONNULL, dispatch);
+        }
         method.visitTypeInsn(NEW, STORE);
         method.visitInsn(DUP);
         method.visitMethodInsn(INVOKESPECIAL, STORE, "<init>", "()V", false);
         method.visitVarInsn(ASTORE, LOCALS_SLOT);
+        method.visitInsn(ICONST_0);
+        method.visitTypeInsn(ANEWARRAY, OBJECT);
+        method.visitVarInsn(ASTORE, PARSE_LOGS_SLOT);
         method.visitLabel(start);
         body.emit();
         exitTrigger();
@@ -222,10 +305,129 @@ final class TriggerCompiler {
         method.visitVarInsn(ALOAD, EXCEPTION_SLOT);
         method.visitMethodInsn(INVOKESPECIAL, exception, "<init>", "(Ljava/lang/String;ILjava/lang/Throwable;)V", false);
         method.visitInsn(ATHROW);
+        if (trigger) {
+            method.visitLabel(dispatch);
+            dispatch();
+        }
         method.visitMaxs(0, 0);
         method.visitEnd();
         writer.visitEnd();
         return writer.toByteArray();
+    }
+
+    /** Restores a waiting trigger's frame and jumps to just after its {@code wait}. */
+    private void dispatch() {
+        String frame = Type.getInternalName(Frame.class);
+        method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
+        method.visitFieldInsn(GETFIELD, frame, "locals", STORE_DESC);
+        method.visitVarInsn(ASTORE, LOCALS_SLOT);
+        method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
+        method.visitFieldInsn(GETFIELD, frame, "parseLogs", OBJECT_DESC);
+        method.visitVarInsn(ASTORE, PARSE_LOGS_SLOT);
+        Label done = new Label();
+        if (waits.isEmpty()) {
+            method.visitInsn(RETURN);
+            return;
+        }
+        Label[] cases = new Label[waits.size()];
+        for (int i = 0; i < cases.length; i++) {
+            cases[i] = new Label();
+        }
+        method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
+        method.visitFieldInsn(GETFIELD, frame, "state", "I");
+        method.visitTableSwitchInsn(0, cases.length - 1, done, cases);
+        for (int i = 0; i < cases.length; i++) {
+            WaitPoint wait = waits.get(i);
+            method.visitLabel(cases[i]);
+            List<int[]> saved = wait.savedSlots();
+            for (int j = 0; j < saved.size(); j++) {
+                int slot = saved.get(j)[0];
+                method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
+                method.visitFieldInsn(GETFIELD, frame, "slots", OBJECTS);
+                pushInt(j);
+                method.visitInsn(AALOAD);
+                switch (saved.get(j)[1]) {
+                    case SAVED_VALUES -> {
+                        method.visitTypeInsn(CHECKCAST, OBJECTS);
+                        method.visitVarInsn(ASTORE, slot);
+                    }
+                    case SAVED_INDICES -> {
+                        method.visitTypeInsn(CHECKCAST, "[Ljava/lang/String;");
+                        method.visitVarInsn(ASTORE, slot);
+                    }
+                    default -> {
+                        method.visitTypeInsn(CHECKCAST, "java/lang/Integer");
+                        method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false);
+                        method.visitVarInsn(ISTORE, slot);
+                    }
+                }
+            }
+            pushInt(wait.line());
+            method.visitVarInsn(ISTORE, LINE_SLOT);
+            method.visitJumpInsn(GOTO, wait.resume());
+        }
+        method.visitLabel(done);
+        method.visitInsn(RETURN);
+    }
+
+    /**
+     * {@code wait %timespan%}: saves the frame (the state number, local variables and the loops around
+     * it), schedules the rest of the trigger, and returns. The rest starts at the label after it.
+     */
+    private void waitFor(ParsedSyntax delay) throws CompileException {
+        if (function != null) {
+            throw unsupported("waiting in a function");
+        }
+        String frame = Type.getInternalName(Frame.class);
+        List<int[]> saved = new ArrayList<>();
+        for (Block block : loops()) {
+            if (block.kind() == BlockKind.LOOP) {
+                saved.add(new int[] {block.valuesSlot(), SAVED_VALUES});
+                if (block.indicesSlot() >= 0) {
+                    saved.add(new int[] {block.indicesSlot(), SAVED_INDICES});
+                }
+                saved.add(new int[] {block.indexSlot(), SAVED_INDEX});
+            }
+        }
+        WaitPoint wait = new WaitPoint(new Label(), line, saved);
+        int state = waits.size();
+        waits.add(wait);
+
+        method.visitVarInsn(ALOAD, 0);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        method.visitTypeInsn(NEW, frame);
+        method.visitInsn(DUP);
+        method.visitMethodInsn(INVOKESPECIAL, frame, "<init>", "()V", false);
+        method.visitInsn(DUP);
+        pushInt(state);
+        method.visitFieldInsn(PUTFIELD, frame, "state", "I");
+        method.visitInsn(DUP);
+        method.visitVarInsn(ALOAD, LOCALS_SLOT);
+        method.visitFieldInsn(PUTFIELD, frame, "locals", STORE_DESC);
+        method.visitInsn(DUP);
+        method.visitVarInsn(ALOAD, PARSE_LOGS_SLOT);
+        method.visitFieldInsn(PUTFIELD, frame, "parseLogs", OBJECT_DESC);
+        method.visitInsn(DUP);
+        pushInt(saved.size());
+        method.visitTypeInsn(ANEWARRAY, OBJECT);
+        for (int i = 0; i < saved.size(); i++) {
+            method.visitInsn(DUP);
+            pushInt(i);
+            if (saved.get(i)[1] == SAVED_INDEX) {
+                method.visitVarInsn(ILOAD, saved.get(i)[0]);
+                method.visitMethodInsn(INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;", false);
+            } else {
+                method.visitVarInsn(ALOAD, saved.get(i)[0]);
+            }
+            method.visitInsn(AASTORE);
+        }
+        method.visitFieldInsn(PUTFIELD, frame, "slots", OBJECTS);
+        expression((Expr) delay.match().values().getFirst());
+        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "ticks", "(" + OBJECT_DESC + ")J", false);
+        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "schedule",
+                "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + "J)V", false);
+        method.visitInsn(RETURN);
+        method.visitLabel(wait.resume());
     }
 
     private Object define(byte[] bytes) {
@@ -297,6 +499,7 @@ final class TriggerCompiler {
     }
 
     private void lineOf(Statement statement, String text) {
+        currentLine = statement.line();
         line = statement.line().number();
         source = text;
         Label label = new Label();
@@ -325,7 +528,12 @@ final class TriggerCompiler {
             case Statement.Section section when isCore(section.header(), CoreSyntax.WHILE) -> whileLoop(section);
             case Statement.Section section -> throw unsupported("sections like '" + section.line().key() + "'");
             case Statement.Conditions conditions -> throw unsupported("'" + conditions.line().key() + "' here");
-            case Statement.Parse parse -> throw unsupported("parse sections");
+            case Statement.Parse parse -> {
+                // Skript's test-only parse section: its code is only parsed, never run. What it reported is
+                // kept for 'last parse logs'.
+                constant(parse.captured().stream().map(d -> d.message()).toArray(String[]::new), String[].class);
+                method.visitVarInsn(ASTORE, PARSE_LOGS_SLOT);
+            }
             // The parser reported it; the trigger is left out without a second error.
             case Statement.Invalid invalid -> throw new CompileException(line, null);
         }
@@ -394,6 +602,11 @@ final class TriggerCompiler {
                 block(BlockKind.CONDITIONAL, chainEnd, section.body());
                 i++;
                 break;
+            } else if (statement instanceof Statement.Section section && key.startsWith("parse if")
+                    && containsInvalid(section.body())) {
+                // 'parse if' code that doesn't parse: Skript only parses it if the condition holds while
+                // loading, so here it can't have, and the code is left out.
+                lineOf(statement, section.line().key());
             } else if (statement instanceof Statement.Section section) {
                 lineOf(statement, section.line().key());
                 if (!(section.header().match().regexValues().getFirst() instanceof ParsedSyntax condition)) {
@@ -411,6 +624,16 @@ final class TriggerCompiler {
         }
         method.visitLabel(chainEnd);
         return i;
+    }
+
+    private static boolean containsInvalid(List<Statement> statements) {
+        for (Statement statement : statements) {
+            if (statement instanceof Statement.Invalid
+                    || statement instanceof Statement.Section s && containsInvalid(s.body())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void block(BlockKind kind, Label end, List<Statement> body) throws CompileException {
@@ -517,8 +740,51 @@ final class TriggerCompiler {
                 method.visitInsn(ARETURN);
             }
             case CoreSyntax.CHANGE -> change(effect);
+            case CoreSyntax.DO_IF -> {
+                if (!(effect.match().regexValues().get(1) instanceof ParsedSyntax condition)) {
+                    throw unsupported("'" + source + "'");
+                }
+                Label skip = new Label();
+                condition(condition);
+                method.visitJumpInsn(IFEQ, skip);
+                Object inner = effect.match().regexValues().getFirst();
+                if (inner instanceof ParsedSyntax innerEffect) {
+                    effect(innerEffect);
+                } else if (inner instanceof Expr.FunctionCall call) {
+                    call(call);
+                    method.visitInsn(POP);
+                } else {
+                    throw unsupported("'" + source + "'");
+                }
+                method.visitLabel(skip);
+            }
+            case CoreSyntax.ASSERT -> assertion(effect);
+            case CoreSyntax.DELAY -> waitFor(effect);
             default -> throw unsupported(core.id());
         }
+    }
+
+    /** Skript's test {@code assert}: records a failure if the condition isn't as expected. */
+    private void assertion(ParsedSyntax effect) throws CompileException {
+        Object checked = effect.match().regexValues().getFirst();
+        if (!(checked instanceof ParsedSyntax condition)
+                || condition.syntax().kind() != co.xenastudios.neoskript.frontend.registry.SyntaxKind.CONDITION) {
+            throw unsupported("asserting that code other than a condition fails");
+        }
+        boolean expected = !effect.match().hasTag("fail");
+        Label passed = new Label();
+        condition(condition);
+        method.visitJumpInsn(expected ? IFNE : IFEQ, passed);
+        method.visitLdcInsn(constantsScript);
+        pushInt(line);
+        if (effect.match().values().getFirst() instanceof Expr message) {
+            expression(message);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "text", "(" + OBJECT_DESC + ")" + STRING_DESC, false);
+        } else {
+            method.visitLdcInsn("Assertion failed: " + source);
+        }
+        method.visitMethodInsn(INVOKESTATIC, TEST_RUN, "fail", "(" + STRING_DESC + "I" + STRING_DESC + ")V", false);
+        method.visitLabel(passed);
     }
 
     private void exit(ParsedSyntax effect) throws CompileException {
@@ -725,12 +991,50 @@ final class TriggerCompiler {
             case Expr.FunctionCall call -> call(call);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARITHMETIC) -> arithmetic(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.LOOP_VALUE) -> loopValue(syntax.syntax());
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TERNARY) -> {
+                if (!(syntax.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition)) {
+                    throw unsupported("'" + source + "'");
+                }
+                Label otherwise = new Label();
+                Label done = new Label();
+                condition(condition);
+                method.visitJumpInsn(IFEQ, otherwise);
+                expression((Expr) syntax.syntax().match().values().get(0));
+                method.visitJumpInsn(GOTO, done);
+                method.visitLabel(otherwise);
+                expression((Expr) syntax.syntax().match().values().get(1));
+                method.visitLabel(done);
+            }
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.CAST) -> {
+                expression((Expr) syntax.syntax().match().values().getFirst());
+                constant(library.javaClass(syntax.type()), Class.class);
+                method.visitMethodInsn(INVOKESTATIC, VALUES, "cast", "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECTS,
+                        false);
+            }
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.PARSE_LOGS) ->
+                    method.visitVarInsn(ALOAD, PARSE_LOGS_SLOT);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.HAS_DELAY) -> {
+                // Known while compiling: whether the trigger may have waited before this line.
+                String state = CoreSyntax.kleenean(script.delayBefore(currentLine));
+                if (state.equals("unknown")) {
+                    method.visitLdcInsn(state);
+                } else {
+                    method.visitFieldInsn(GETSTATIC, "java/lang/Boolean", state.toUpperCase(Locale.ROOT),
+                            "Ljava/lang/Boolean;");
+                }
+            }
             case Expr.Syntax syntax -> {
                 callThrough(syntax.syntax(), Expression.class);
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Expression.class), "get",
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
             }
-            case Expr.Unresolved unresolved -> throw unsupported("'" + unresolved.text() + "'");
+            case Expr.Unresolved unresolved -> {
+                Object value = library.literalValue(unresolved.text());
+                if (value == null) {
+                    throw unsupported("'" + unresolved.text() + "'");
+                }
+                constant(value, Object.class);
+            }
         }
     }
 
@@ -754,6 +1058,13 @@ final class TriggerCompiler {
                     default -> false;
                 };
                 method.visitFieldInsn(GETSTATIC, "java/lang/Boolean", value ? "TRUE" : "FALSE", "Ljava/lang/Boolean;");
+            }
+            case "timespan" -> {
+                Timespan timespan = Timespan.parse(literal.text());
+                if (timespan == null) {
+                    throw unsupported("the timespan '" + literal.text() + "'");
+                }
+                constant(timespan, Timespan.class);
             }
             default -> throw unsupported(literal.type() + " literals");
         }
@@ -838,28 +1149,31 @@ final class TriggerCompiler {
         } else {
             loop = loops.getLast();
         }
+        int offset = syntax.pattern() == 1 ? 1 : syntax.pattern() == 2 ? -1 : 0;
         switch (matcher.group(1)) {
             case "index" -> {
                 if (loop.indicesSlot() < 0) {
                     throw new CompileException(line, "'loop-index' only works when looping a list variable");
                 }
-                method.visitVarInsn(ALOAD, loop.indicesSlot());
-                method.visitVarInsn(ILOAD, loop.indexSlot());
-                method.visitInsn(AALOAD);
+                element(loop.indicesSlot(), loop.indexSlot(), offset);
             }
             case "counter", "iteration" -> {
                 method.visitVarInsn(ILOAD, loop.indexSlot());
                 method.visitInsn(I2L);
-                method.visitInsn(LCONST_1);
+                method.visitLdcInsn((long) 1 + offset);
                 method.visitInsn(LADD);
                 method.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
             }
-            default -> {
-                method.visitVarInsn(ALOAD, loop.valuesSlot());
-                method.visitVarInsn(ILOAD, loop.indexSlot());
-                method.visitInsn(AALOAD);
-            }
+            default -> element(loop.valuesSlot(), loop.indexSlot(), offset);
         }
+    }
+
+    /** Pushes {@code array[index + offset]}, or {@code null} if that's outside the array. */
+    private void element(int arraySlot, int indexSlot, int offset) {
+        method.visitVarInsn(ALOAD, arraySlot);
+        method.visitVarInsn(ILOAD, indexSlot);
+        pushInt(offset);
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "element", "(" + OBJECTS + "II)" + OBJECT_DESC, false);
     }
 
     // ---------------------------------------------------------------- arithmetic

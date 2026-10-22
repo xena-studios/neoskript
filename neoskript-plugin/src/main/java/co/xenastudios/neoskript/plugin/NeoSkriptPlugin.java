@@ -6,6 +6,7 @@ package co.xenastudios.neoskript.plugin;
 
 import co.xenastudios.neoskript.compiler.Library;
 import co.xenastudios.neoskript.paper.StandardLibrary;
+import co.xenastudios.neoskript.runtime.Waits;
 import co.xenastudios.neoskript.runtime.platform.Platform;
 import co.xenastudios.neoskript.runtime.scheduler.FoliaScheduler;
 import co.xenastudios.neoskript.runtime.scheduler.PaperScheduler;
@@ -59,10 +60,17 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
 
         Library library = new Library();
+        if (TestRunner.enabled()) {
+            library.enableTesting();
+        }
         StandardLibrary.register(library);
         Scheduler scheduler = platform == Platform.FOLIA ? new FoliaScheduler(this) : new PaperScheduler(this);
+        // Waiting triggers carry on through the scheduler; their errors can only be logged.
+        Waits.install(scheduler, e -> getSLF4JLogger().error("Error in {}, line {}: {}", e.script(), e.line(),
+                e.getCause().toString(), e.getCause()));
         try {
-            new ScriptManager(getDataPath().resolve("scripts"), library, scheduler, getSLF4JLogger()).loadAll();
+            new ScriptManager(getDataPath().resolve("scripts"), library, scheduler, getSLF4JLogger(),
+                    TestRunner.enabled() ? () -> getServer().shutdown() : null).loadAll();
         } catch (IOException e) {
             getSLF4JLogger().error("Couldn't read the scripts folder", e);
         }

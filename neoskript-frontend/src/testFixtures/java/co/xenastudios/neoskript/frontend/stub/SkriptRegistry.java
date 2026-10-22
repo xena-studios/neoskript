@@ -52,6 +52,7 @@ public final class SkriptRegistry {
             Map.entry("EffTransform", List.of(RegexRole.EXPRESSION)),
             Map.entry("ExprEntity", List.of(RegexRole.TYPE)),
             Map.entry("ExprAttacked", List.of(RegexRole.TYPE)),
+            Map.entry("ExprValueWithin", List.of(RegexRole.TYPE)),
             Map.entry("TestStructure", List.of(RegexRole.CONDITION)),
             Map.entry("TestAssert", List.of(RegexRole.CODE)));
 
@@ -59,6 +60,13 @@ public final class SkriptRegistry {
      * Patterns the docs export renders without some optional parts, added back so code Skript accepts
      * parses. Each one is backed by a script in Skript's tests that uses it.
      */
+    /**
+     * Patterns replaced outright. {@code number within {_x}} has the type it names, which needs the type
+     * name as a regex with the type role rather than a {@code %*type%} placeholder.
+     */
+    private static final Map<String, List<String>> PATTERN_REPLACEMENTS = Map.of(
+            "ExprValueWithin", List.of("[the] (<.+>|value[s]) (within|in) %~objects%"));
+
     private static final Map<String, List<String>> PATTERN_FIXES = Map.of(
             "CondIsDivisibleBy", List.of("%numbers% can [evenly] be divided by %number% [with [a] tolerance [of] %number%]",
                     "%numbers% can be [evenly] divided by %number% [with [a] tolerance [of] %number%]"));
@@ -243,7 +251,7 @@ public final class SkriptRegistry {
 
     private static void add(SyntaxRegistry.Builder builder, SyntaxKind kind, List<SkriptSyntax.Element> elements) {
         for (SkriptSyntax.Element element : elements) {
-            List<String> sources = new ArrayList<>(element.patterns());
+            List<String> sources = new ArrayList<>(PATTERN_REPLACEMENTS.getOrDefault(element.id(), element.patterns()));
             sources.addAll(PATTERN_FIXES.getOrDefault(element.id(), List.of()));
             List<CompiledPattern> patterns = sources.stream().map(PatternCompiler::compile).toList();
             builder.syntax(new SyntaxInfo(kind, element.id(), patterns, element.returns(),

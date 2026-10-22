@@ -187,4 +187,74 @@ class LanguageTest {
         assertEquals(2, e.line());
         assertInstanceOf(StackOverflowError.class, e.getCause());
     }
+
+    @Test
+    void waitsCarryOnWithLocalsAndLoopState() {
+        java.util.ArrayDeque<Runnable> later = new java.util.ArrayDeque<>();
+        List<Long> delays = new ArrayList<>();
+        co.xenastudios.neoskript.runtime.Waits.install(new co.xenastudios.neoskript.runtime.scheduler.Scheduler() {
+            @Override
+            public void runGlobal(Runnable task) {
+                later.add(task);
+            }
+
+            @Override
+            public void runGlobalLater(long ticks, Runnable task) {
+                delays.add(ticks);
+                later.add(task);
+            }
+        }, e -> {
+            throw e;
+        });
+        run("""
+                on load:
+                \tset {_x} to "kept"
+                \tsay "before"
+                \twait 1 second
+                \tsay "after %{_x}%"
+                \tset {_l::*} to "a", "b" and "c"
+                \tloop {_l::*}:
+                \t\twait 2 ticks
+                \t\tsay "%loop-index%=%loop-value%"
+                \tsay "done"
+                """);
+        assertEquals(List.of("before"), said);
+        while (!later.isEmpty()) {
+            later.poll().run();
+        }
+        assertEquals(List.of("before", "after kept", "1=a", "2=b", "3=c", "done"), said);
+        assertEquals(List.of(20L, 2L, 2L, 2L), delays);
+    }
+
+    @Test
+    void delayStateFollowsSkriptsRules() {
+        Library library = new Library();
+        library.enableTesting();
+        StandardLibrary.register(library);
+        library.effect("TestSay", info -> (context, args) -> said.add(Values.text(args[0])), "say %objects%");
+        List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk", """
+                test "delays":
+                \tsay has delay before
+                \tparse:
+                \t\tif true is true:
+                \t\t\tstop
+                \t\telse:
+                \t\t\twait 1 second
+                \tsay has delay before
+                \tparse:
+                \t\twait 1 tick
+                \tsay has delay before
+                \tparse:
+                \t\tif true is true:
+                \t\t\twait 1 second
+                \t\telse if has delay before is true failing if wrong:
+                \t\t\tstop
+                \tsay last parse logs
+                """)));
+        assertEquals(List.of(), parsed.getFirst().diagnostics());
+        CompiledScripts compiled = new ScriptCompiler(library, globals).compile(parsed);
+        assertEquals(List.of(), compiled.diagnostics());
+        compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
+        assertEquals(List.of("false", "unknown", "true", "<none>"), said);
+    }
 }

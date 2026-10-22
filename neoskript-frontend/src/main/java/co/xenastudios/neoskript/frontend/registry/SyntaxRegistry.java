@@ -40,6 +40,8 @@ public final class SyntaxRegistry {
     private final Map<String, Set<String>> supertypes;
     private final Set<String> strictTypes;
     private final Set<String> entityNames;
+    private final Set<String> delaying;
+    private final Map<String, ParseCheck> checks;
 
     private SyntaxRegistry(Builder builder) {
         this.typesById = Collections.unmodifiableMap(new LinkedHashMap<>(builder.typesById));
@@ -65,6 +67,18 @@ public final class SyntaxRegistry {
         this.supertypes = closure(builder.supertypes);
         this.strictTypes = Set.copyOf(builder.strictTypes);
         this.entityNames = Set.copyOf(builder.entityNames);
+        this.delaying = Set.copyOf(builder.delaying);
+        this.checks = Map.copyOf(builder.checks);
+    }
+
+    /** Whether the syntax element makes the trigger wait, like {@code wait 1 second}. */
+    public boolean delays(SyntaxInfo syntax) {
+        return delaying.contains(syntax.kind() + ":" + syntax.id());
+    }
+
+    /** The check the syntax element makes while it's parsed, or {@code null} if it makes none. */
+    public ParseCheck check(SyntaxInfo syntax) {
+        return checks.get(syntax.kind() + ":" + syntax.id());
     }
 
     public static Builder builder() {
@@ -164,8 +178,33 @@ public final class SyntaxRegistry {
         private final Map<String, Set<String>> supertypes = new HashMap<>();
         private final Set<String> strictTypes = new HashSet<>();
         private final Set<String> entityNames = new HashSet<>();
+        private final Set<String> delaying = new HashSet<>();
+        private final Map<String, ParseCheck> checks = new HashMap<>();
 
         private Builder() {}
+
+        /** Marks a syntax element as making the trigger wait. */
+        public Builder delays(SyntaxKind kind, String id) {
+            delaying.add(kind + ":" + id);
+            return this;
+        }
+
+        /** Adds a check the syntax element makes while it's parsed. */
+        public Builder check(SyntaxKind kind, String id, ParseCheck check) {
+            checks.put(kind + ":" + id, check);
+            return this;
+        }
+
+        /** Another name for a type: {@code alias} singular and {@code plural} for the plural. */
+        public Builder alias(String typeId, String alias, String plural) {
+            TypeInfo type = typesById.get(typeId.toLowerCase(Locale.ROOT));
+            if (type == null) {
+                throw new IllegalArgumentException("Unknown type: " + typeId);
+            }
+            typeNames.put(normalize(alias), new TypeRef(type, false));
+            typeNames.put(normalize(plural), new TypeRef(type, true));
+            return this;
+        }
 
         /**
          * Adds a type, known by its id and display name and their plurals, plus any {@code aliases} (for
