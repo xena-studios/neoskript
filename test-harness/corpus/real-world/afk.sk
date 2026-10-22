@@ -1,0 +1,66 @@
+# afk.sk: marks players AFK after five minutes without moving, and back when they move or chat.
+
+options:
+    afk-after: 300
+
+# What should happen to a player now: "away" (just went AFK), "back", or "none".
+function afk_change(last_active: number, now: number, afk: boolean) :: text:
+    set {_idle} to {_now} - {_last_active}
+    if {_afk} is true:
+        if {_idle} < {@afk-after}:
+            return "back"
+        return "none"
+    if {_idle} >= {@afk-after}:
+        return "away"
+    return "none"
+
+function set_afk(p: player, afk: boolean):
+    set {_id} to "%uuid of {_p}%"
+    if {_afk} is true:
+        set {-afk::away::%{_id}%} to true
+        set {_p}'s tab list name to "&7[AFK] %name of {_p}%"
+        broadcast "&7* %name of {_p}% is now AFK"
+    else:
+        delete {-afk::away::%{_id}%}
+        set {_p}'s tab list name to name of {_p}
+        broadcast "&7* %name of {_p}% is no longer AFK"
+
+function mark_active(p: player):
+    set {_id} to "%uuid of {_p}%"
+    set {-afk::active::%{_id}%} to now_seconds()
+    if {-afk::away::%{_id}%} is true:
+        set_afk({_p}, false)
+
+on join:
+    set {-afk::active::%uuid of player%} to now_seconds()
+
+on quit:
+    delete {-afk::active::%uuid of player%}
+    delete {-afk::away::%uuid of player%}
+
+on player move:
+    mark_active(player)
+
+on chat:
+    mark_active(player)
+
+every 30 seconds:
+    loop all players:
+        set {_id} to "%uuid of loop-player%"
+        set {_change} to afk_change({-afk::active::%{_id}%} ? now_seconds(), now_seconds(), {-afk::away::%{_id}%} ? false)
+        if {_change} is "away":
+            set_afk(loop-player, true)
+
+command /afk:
+    executable by: players
+    trigger:
+        if {-afk::away::%uuid of player%} is true:
+            mark_active(player)
+        else:
+            set_afk(player, true)
+
+function selftest_afk():
+    check("afk", "active", afk_change(1000, 1100, false), "none")
+    check("afk", "goes away", afk_change(1000, 1300, false), "away")
+    check("afk", "stays away", afk_change(1000, 2000, true), "none")
+    check("afk", "comes back", afk_change(1990, 2000, true), "back")

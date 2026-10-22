@@ -1,0 +1,93 @@
+# server-utils.sk: everyday staff and player commands.
+
+options:
+    prefix: &9&lSERVER &8» &7
+    discord: https://discord.gg/example
+
+function rules() :: texts:
+    return "Be respectful to everyone." and "No cheats or hacked clients." and "No griefing or stealing." and "Keep chat in English." and "Staff have the final say."
+
+function gamemode_for(input: text) :: gamemode:
+    set {_input} to {_input} in lower case
+    if {_input} is "0", "s" or "survival":
+        return survival
+    else if {_input} is "1", "c" or "creative":
+        return creative
+    else if {_input} is "2", "a" or "adventure":
+        return adventure
+    else if {_input} is "3", "sp" or "spectator":
+        return spectator
+
+command /gm <text> [<player>]:
+    permission: utils.gamemode
+    trigger:
+        set {_mode} to gamemode_for(arg-1)
+        if {_mode} is not set:
+            send "{@prefix}&cUnknown game mode &e%arg-1%&c." to sender
+            stop
+        set {_target} to arg-2 ? player
+        if {_target} is not set:
+            send "{@prefix}&cUsage: /gm <mode> <player>" to sender
+            stop
+        set gamemode of {_target} to {_mode}
+        send "{@prefix}Game mode set to &e%{_mode}%&7." to {_target}
+
+command /fly [<player>]:
+    permission: utils.fly
+    trigger:
+        set {_target} to arg-1 ? player
+        if {_target} is not set:
+            send "{@prefix}&cUsage: /fly <player>" to sender
+            stop
+        if {_target} can fly:
+            set flight mode of {_target} to false
+            send "{@prefix}Flight &cdisabled&7." to {_target}
+        else:
+            set flight mode of {_target} to true
+            send "{@prefix}Flight &aenabled&7." to {_target}
+
+command /heal [<player>]:
+    permission: utils.heal
+    cooldown: 1 minute
+    cooldown message: {@prefix}&cYou can heal again in %remaining time%.
+    cooldown bypass: utils.heal.bypass
+    trigger:
+        set {_target} to arg-1 ? player
+        heal {_target}
+        set food level of {_target} to 20
+        extinguish {_target}
+        send "{@prefix}You have been healed." to {_target}
+
+command /spawn:
+    executable by: players
+    trigger:
+        teleport player to spawn of world "world"
+        play sound "entity.enderman.teleport" to player
+
+command /rules:
+    trigger:
+        send "{@prefix}&lServer rules" to sender
+        loop rules():
+            send "&8 %loop-index%. &f%loop-value%" to sender
+
+command /discord:
+    trigger:
+        send "{@prefix}Join us on Discord: &9{@discord}" to sender
+
+command /broadcast <text>:
+    aliases: bc
+    permission: utils.broadcast
+    trigger:
+        broadcast "&8[&c&lALERT&8] &f%colored arg-1%"
+
+function selftest_server_utils():
+    check("server-utils", "rule count", size of rules(), 5)
+    check("server-utils", "first rule", first element out of rules(), "Be respectful to everyone.")
+    if gamemode_for("c") is not creative:
+        fail("server-utils", "gamemode c: expected creative")
+    if gamemode_for("SURVIVAL") is not survival:
+        fail("server-utils", "gamemode SURVIVAL: expected survival")
+    if gamemode_for("3") is not spectator:
+        fail("server-utils", "gamemode 3: expected spectator")
+    if gamemode_for("hard") is set:
+        fail("server-utils", "gamemode hard: expected nothing")

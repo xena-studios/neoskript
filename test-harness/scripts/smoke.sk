@@ -1,0 +1,4 @@
+# Harness smoke test: the server loads this script and prints the marker line.
+on load:
+	set {_sum} to 1 + 1
+	send "[harness] smoke ok: %{_sum}%" to console

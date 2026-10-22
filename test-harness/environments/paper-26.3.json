@@ -1,0 +1,12 @@
+{
+  "name": "paper-26.3",
+  "platform": "paper",
+  "minecraftVersion": "26.3",
+  "build": 210,
+  "javaVersion": 25,
+  "download": {
+    "url": "https://fill-data.papermc.io/v1/objects/26425ad0dbf4da06daeb0c3b3512e03c6943949db28b31fdf2ae0a73bb192204/paper-26.3-210.jar",
+    "sha256": "26425ad0dbf4da06daeb0c3b3512e03c6943949db28b31fdf2ae0a73bb192204"
+  },
+  "skriptReference": true
+}

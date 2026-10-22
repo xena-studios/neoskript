@@ -1,0 +1,12 @@
+{
+  "name": "folia-1.21.4",
+  "platform": "folia",
+  "minecraftVersion": "1.21.4",
+  "build": 6,
+  "javaVersion": 21,
+  "download": {
+    "url": "https://fill-data.papermc.io/v1/objects/dcf2333211c1468c8eddc482bc8549600818cc661a709124a79c752f8fa2ac3a/folia-1.21.4-6.jar",
+    "sha256": "dcf2333211c1468c8eddc482bc8549600818cc661a709124a79c752f8fa2ac3a"
+  },
+  "skriptReference": false
+}

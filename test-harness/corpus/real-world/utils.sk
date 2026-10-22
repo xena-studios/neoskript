@@ -1,0 +1,102 @@
+# utils.sk: shared helpers the other scripts use for money, durations, progress bars and text.
+
+options:
+    currency: $
+
+function now_seconds() :: number:
+    return floor(unix timestamp of now)
+
+# 1234567 -> "1,234,567"
+function commas(n: number) :: text:
+    set {_digits} to "%floor(abs({_n}))%"
+    set {_out} to ""
+    while length of {_digits} > 3:
+        set {_group} to last 3 characters of {_digits}
+        set {_out} to ",%{_group}%%{_out}%"
+        set {_digits} to first (length of {_digits} - 3) characters of {_digits}
+    set {_out} to "%{_digits}%%{_out}%"
+    if {_n} < 0:
+        return "-%{_out}%"
+    return {_out}
+
+# 1234.5 -> "$1,234.50"
+function format_money(amount: number) :: text:
+    set {_cents} to round(abs({_amount}) * 100)
+    set {_whole} to floor({_cents} / 100)
+    set {_rest} to mod({_cents}, 100)
+    if {_rest} < 10:
+        set {_fraction} to "0%{_rest}%"
+    else:
+        set {_fraction} to "%{_rest}%"
+    set {_text} to "{@currency}%commas({_whole})%.%{_fraction}%"
+    if {_amount} < 0:
+        return "-%{_text}%"
+    return {_text}
+
+# 93784 -> "1d 2h 3m 4s"
+function format_duration(seconds: number) :: text:
+    set {_left} to floor({_seconds})
+    set {_units::*} to "d", "h", "m" and "s"
+    set {_sizes::*} to 86400, 3600, 60 and 1
+    loop {_sizes::*}:
+        set {_amount} to floor({_left} / loop-value)
+        if {_amount} > 0:
+            add "%{_amount}%%{_units::%loop-index%}%" to {_parts::*}
+            remove {_amount} * loop-value from {_left}
+    if {_parts::*} is not set:
+        return "0s"
+    return join {_parts::*} with " "
+
+function roman(n: integer) :: text:
+    set {_values::*} to 1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4 and 1
+    set {_symbols::*} to "M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV" and "I"
+    set {_out} to ""
+    set {_left} to {_n}
+    loop {_values::*}:
+        while {_left} >= loop-value:
+            set {_out} to "%{_out}%%{_symbols::%loop-index%}%"
+            remove loop-value from {_left}
+    return {_out}
+
+function progress_bar(current: number, max: number, width: number = 10) :: text:
+    set {_ratio} to min(max({_current} / {_max}, 0), 1)
+    set {_filled} to round({_ratio} * {_width})
+    set {_empty} to {_width} - {_filled}
+    set {_bar} to "&a"
+    loop {_filled} times:
+        set {_bar} to "%{_bar}%|"
+    set {_bar} to "%{_bar}%&7"
+    loop {_empty} times:
+        set {_bar} to "%{_bar}%|"
+    return {_bar}
+
+function title_case(input: text) :: text:
+    loop {_input} split at " ":
+        set {_word} to loop-value in lower case
+        set {_head} to first character of {_word} in upper case
+        set {_tail} to last (length of {_word} - 1) characters of {_word}
+        add "%{_head}%%{_tail}%" to {_words::*}
+    return join {_words::*} with " "
+
+function plural(count: number, word: text) :: text:
+    if {_count} is 1:
+        return "%{_count}% %{_word}%"
+    return "%{_count}% %{_word}%s"
+
+function selftest_utils():
+    check("utils", "commas small", commas(999), "999")
+    check("utils", "commas large", commas(1234567), "1,234,567")
+    check("utils", "commas negative", commas(-1000), "-1,000")
+    check("utils", "money", format_money(1234.5), "$1,234.50")
+    check("utils", "money cents", format_money(0.07), "$0.07")
+    check("utils", "money negative", format_money(-12), "-$12.00")
+    check("utils", "duration", format_duration(93784), "1d 2h 3m 4s")
+    check("utils", "duration zero", format_duration(0), "0s")
+    check("utils", "duration skips empty units", format_duration(3605), "1h 5s")
+    check("utils", "roman 1994", roman(1994), "MCMXCIV")
+    check("utils", "roman 4", roman(4), "IV")
+    check("utils", "progress bar", progress_bar(5, 10, 4), "&a||&7||")
+    check("utils", "progress bar overflow", progress_bar(50, 10, 2), "&a||&7")
+    check("utils", "title case", title_case("hello wORLD"), "Hello World")
+    check("utils", "plural one", plural(1, "home"), "1 home")
+    check("utils", "plural many", plural(3, "home"), "3 homes")
