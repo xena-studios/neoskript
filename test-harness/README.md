@@ -21,6 +21,7 @@ Reports go to `build/harness/reports/`, and each run's server directory and `har
 | `neoskript-boot` | smoke | all | NeoSkript enables and detects the right platform and version |
 | `neoskript-skript-conflict` | smoke | Skript envs | With Skript installed, NeoSkript refuses to run and Skript still works (D10) |
 | `skript-smoke` | smoke | Skript envs | The reference Skript runs `scripts/smoke.sk` |
+| `skript-real-world-corpus` | smoke | Skript envs | The reference Skript loads the real-world corpus with no errors or warnings, and every self-test passes |
 | `skript-test-suite` | baseline | Skript envs | Runs Skript's own test suite in Skript's test mode and records the results |
 | `skript-load-benchmark` | baseline | Skript envs | Times Skript loading and reloading 40 generated scripts (600 structures) |
 
@@ -31,4 +32,6 @@ Reports go to `build/harness/reports/`, and each run's server directory and `har
 
 ## Corpus
 
-`./gradlew :test-harness:fetchSkriptTests` extracts Skript's own test scripts (GPL-3.0) for the pinned version into `build/corpus/skript/`, in the same layout as Skript's repo.
+**Real-world scripts** live in `corpus/real-world/`. They're written like the scripts a typical server runs, and use a wide spread of syntax: functions across files, commands with cooldowns, GUIs, list variables, timespans, `if all:` and so on. Each `<name>.sk` must define `selftest_<name>()` (with `-` as `_`) that checks its own logic with `check(suite, label, actual, expected)`, `check_true` and `fail` from `scripts/corpus-assert.sk`. The harness generates a `/corpustest` command that runs every self-test, so a new script is picked up just by adding the file. Keep scripts free of errors and warnings on the reference Skript, since the scenario fails on either.
+
+**Skript's own tests:** `./gradlew :test-harness:fetchSkriptTests` extracts Skript's own test scripts (GPL-3.0) for the pinned version into `build/corpus/skript/`, in the same layout as Skript's repo.

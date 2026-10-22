@@ -78,6 +78,7 @@ tasks.register<JavaExec>("harness") {
             "-Dharness.scripts=" + projectDir.dir("scripts").asFile.absolutePath,
             "-Dharness.referenceSkript=" + projectDir.file("reference-skript.properties").asFile.absolutePath,
             "-Dharness.corpus.skript=" + buildDir.dir("corpus/skript").get().asFile.absolutePath,
+            "-Dharness.corpus.realWorld=" + projectDir.dir("corpus/real-world").asFile.absolutePath,
             "-Dharness.output=" + buildDir.dir("harness").get().asFile.absolutePath,
             "-Dharness.cache=" + cacheDir.asFile.absolutePath,
             "-Dharness.echo=" + echo.get(),

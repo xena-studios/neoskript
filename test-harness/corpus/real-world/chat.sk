@@ -1,0 +1,69 @@
+# chat.sk: rank prefixes, a word filter, caps limiting, anti-spam and mutes (see punishments.sk).
+
+options:
+	spam-delay: 2 seconds
+	caps-min-letters: 6
+	caps-ratio: 0.7
+
+on load:
+	set {chat::filter::*} to "heck", "darn" and "frick"
+	set {chat::prefixes::owner} to "&4[Owner] "
+	set {chat::prefixes::admin} to "&c[Admin] "
+	set {chat::prefixes::mod} to "&2[Mod] "
+	set {chat::prefixes::vip} to "&6[VIP] "
+	set {chat::ranks::*} to "owner", "admin", "mod" and "vip"
+
+function censor(message: text) :: text:
+	set {_out} to {_message}
+	loop {chat::filter::*}:
+		set {_stars} to ""
+		loop length of loop-value-1 times:
+			set {_stars} to "%{_stars}%*"
+		replace all loop-value-1 in {_out} with {_stars}
+	return {_out}
+
+function too_many_caps(message: text) :: boolean:
+	set {_upper} to number of uppercase characters in {_message}
+	set {_letters} to {_upper} + number of lowercase characters in {_message}
+	if {_letters} < {@caps-min-letters}:
+		return false
+	if {_upper} / {_letters} >= {@caps-ratio}:
+		return true
+	return false
+
+function rank_of(p: player) :: text:
+	loop {chat::ranks::*}:
+		if {_p} has permission "rank.%loop-value%":
+			return loop-value
+	return "default"
+
+function prefix_for(rank: text) :: text:
+	return {chat::prefixes::%{_rank}%} ? "&7"
+
+on chat:
+	set {_id} to "%uuid of player%"
+	if is_muted({_id}) is true:
+		cancel event
+		send "&cYou're muted. Time left: %mute_remaining({_id})%." to player
+		stop
+	if player doesn't have permission "chat.bypass":
+		if {-chat::last::%{_id}%} is set:
+			if difference between {-chat::last::%{_id}%} and now < {@spam-delay}:
+				cancel event
+				send "&cPlease wait before sending another message." to player
+				stop
+		if too_many_caps(message) is true:
+			set message to message in lower case
+		set message to censor(message)
+	set {-chat::last::%{_id}%} to now
+	set chat format to "%prefix_for(rank_of(player))%&f[player]&8: &7[message]"
+
+function selftest_chat():
+	check("chat", "censor", censor("what the heck"), "what the ****")
+	check("chat", "censor several", censor("darn, frick"), "****, *****")
+	check("chat", "clean message untouched", censor("hello there"), "hello there")
+	check_true("chat", "caps", too_many_caps("HELLO EVERYONE"))
+	check("chat", "normal case", too_many_caps("Hello Everyone"), false)
+	check("chat", "short caps allowed", too_many_caps("OK"), false)
+	check("chat", "prefix", prefix_for("vip"), "&6[VIP] ")
+	check("chat", "default prefix", prefix_for("default"), "&7")

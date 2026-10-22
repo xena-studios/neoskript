@@ -1,0 +1,77 @@
+# kits.sk: /kit with per-kit cooldowns and permissions. Last use is stored as unix seconds.
+
+options:
+    prefix: &a&lKITS &8» &7
+
+on load:
+    delete {kits::items::*}
+    set {kits::names::*} to "starter", "vip" and "builder"
+    set {kits::items::starter::*} to stone sword, stone pickaxe, 16 bread and leather chestplate
+    set {kits::cooldown::starter} to 86400
+    set {kits::items::vip::*} to diamond sword of sharpness 2 named "&bVIP Blade", 32 cooked beef and 4 golden apples
+    set {kits::cooldown::vip} to 604800
+    set {kits::permission::vip} to "kits.vip"
+    add 64 stone bricks to {kits::items::builder::*}
+    add 64 oak planks to {kits::items::builder::*}
+    add 32 glass to {kits::items::builder::*}
+    add 16 lanterns to {kits::items::builder::*}
+    set {kits::cooldown::builder} to 3600
+    set {kits::permission::builder} to "kits.builder"
+
+function kit_wait(id: text, kit: text, at: number) :: number:
+    set {_last} to {kits::used::%{_id}%::%{_kit}%}
+    if {_last} is not set:
+        return 0
+    return max({_last} + {kits::cooldown::%{_kit}%} - {_at}, 0)
+
+function claim_kit(id: text, kit: text, at: number) :: text:
+    if {kits::items::%{_kit}%::*} is not set:
+        return "unknown"
+    if kit_wait({_id}, {_kit}, {_at}) > 0:
+        return "cooldown"
+    set {kits::used::%{_id}%::%{_kit}%} to {_at}
+    return "ok"
+
+function can_use_kit(p: player, kit: text) :: boolean:
+    set {_permission} to {kits::permission::%{_kit}%}
+    if {_permission} is not set:
+        return true
+    if {_p} has permission {_permission}:
+        return true
+    return false
+
+command /kit [<text>]:
+    aliases: kits
+    executable by: players
+    trigger:
+        if arg-1 is not set:
+            loop {kits::names::*}:
+                if can_use_kit(player, loop-value) is true:
+                    add "&e%loop-value%" to {_available::*}
+            set {_list} to join {_available::*} with "&7, "
+            send "{@prefix}Kits: %{_list}%" to player
+            stop
+        set {_kit} to arg-1 in lower case
+        if can_use_kit(player, {_kit}) is false:
+            send "{@prefix}&cYou don't have access to that kit." to player
+            stop
+        set {_id} to "%uuid of player%"
+        set {_result} to claim_kit({_id}, {_kit}, now_seconds())
+        if {_result} is "unknown":
+            send "{@prefix}&cThere's no kit called &e%arg-1%&c." to player
+        else if {_result} is "cooldown":
+            send "{@prefix}&cYou can use that kit again in %format_duration(kit_wait({_id}, {_kit}, now_seconds()))%." to player
+        else:
+            give {kits::items::%{_kit}%::*} to player
+            send "{@prefix}You received the &e%{_kit}% &7kit." to player
+
+function selftest_kits():
+    delete {kits::used::test::*}
+    check("kits", "items loaded", size of {kits::items::vip::*}, 3)
+    check("kits", "unknown kit", claim_kit("test", "nope", 1000), "unknown")
+    check("kits", "first claim", claim_kit("test", "starter", 1000), "ok")
+    check("kits", "on cooldown", claim_kit("test", "starter", 2000), "cooldown")
+    check("kits", "time left", kit_wait("test", "starter", 2000), 85400)
+    check("kits", "other kits unaffected", claim_kit("test", "builder", 2000), "ok")
+    check("kits", "cooldown over", claim_kit("test", "starter", 87400), "ok")
+    delete {kits::used::test::*}

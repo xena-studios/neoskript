@@ -1,0 +1,128 @@
+# economy.sk: a small player economy with /balance, /pay, /eco and /baltop.
+# Balances are kept by UUID in {economy::balance::<uuid>}.
+
+options:
+	prefix: &6&lECO &8» &7
+	starting-balance: 100
+	max-balance: 1000000000
+
+function balance(id: text) :: number:
+	return {economy::balance::%{_id}%} ? {@starting-balance}
+
+function deposit(id: text, amount: number) :: boolean:
+	if {_amount} <= 0:
+		return false
+	set {_new} to balance({_id}) + {_amount}
+	if {_new} > {@max-balance}:
+		return false
+	set {economy::balance::%{_id}%} to {_new}
+	return true
+
+function withdraw(id: text, amount: number) :: boolean:
+	if {_amount} <= 0:
+		return false
+	if balance({_id}) < {_amount}:
+		return false
+	set {economy::balance::%{_id}%} to balance({_id}) - {_amount}
+	return true
+
+function transfer(from: text, to: text, amount: number) :: boolean:
+	if {_from} is {_to}:
+		return false
+	if withdraw({_from}, {_amount}) is false:
+		return false
+	if deposit({_to}, {_amount}) is false:
+		# The receiver is at the cap, so give the money back.
+		deposit({_from}, {_amount})
+		return false
+	return true
+
+function richest(count: number) :: texts:
+	loop sorted indices of {economy::balance::*} in descending order:
+		add loop-value to {_top::*}
+		if size of {_top::*} >= {_count}:
+			exit loop
+	return {_top::*}
+
+on first join:
+	set {economy::balance::%uuid of player%} to {@starting-balance}
+
+command /balance [<offlineplayer>]:
+	aliases: bal, money
+	description: Shows your balance, or someone else's.
+	trigger:
+		if arg-1 is set:
+			set {_id} to "%uuid of arg-1%"
+			send "{@prefix}%arg-1%'s balance: &a%format_money(balance({_id}))%" to sender
+		else if sender is a player:
+			set {_id} to "%uuid of player%"
+			send "{@prefix}Your balance: &a%format_money(balance({_id}))%" to sender
+		else:
+			send "{@prefix}&cUsage: /balance <player>" to sender
+
+command /pay <offlineplayer> <number>:
+	executable by: players
+	cooldown: 3 seconds
+	cooldown message: {@prefix}&cSlow down! Try again in %remaining time%.
+	trigger:
+		if arg-1 is player:
+			send "{@prefix}&cYou can't pay yourself." to player
+			stop
+		if arg-1 has not played before:
+			send "{@prefix}&c%arg-1% has never joined this server." to player
+			stop
+		set {_amount} to round(arg-2 * 100) / 100
+		if transfer("%uuid of player%", "%uuid of arg-1%", {_amount}) is false:
+			send "{@prefix}&cYou don't have %format_money({_amount})%." to player
+			stop
+		send "{@prefix}You paid &e%arg-1% &a%format_money({_amount})%&7." to player
+		if arg-1 is online:
+			send "{@prefix}&e%player% &7paid you &a%format_money({_amount})%&7." to arg-1
+
+command /eco <text> <offlineplayer> <number>:
+	permission: economy.admin
+	usage: /eco <give|take|set> <player> <amount>
+	trigger:
+		set {_id} to "%uuid of arg-2%"
+		if arg-1 is "give":
+			deposit({_id}, arg-3)
+		else if arg-1 is "take":
+			withdraw({_id}, arg-3)
+		else if arg-1 is "set":
+			set {economy::balance::%{_id}%} to max(arg-3, 0)
+		else:
+			send "{@prefix}&cUsage: /eco <give|take|set> <player> <amount>" to sender
+			stop
+		send "{@prefix}%arg-2% now has &a%format_money(balance({_id}))%&7." to sender
+
+command /baltop:
+	aliases: balancetop
+	trigger:
+		send "{@prefix}&6Richest players" to sender
+		set {_rank} to 0
+		loop richest(10):
+			add 1 to {_rank}
+			set {_name} to name of offlineplayer(loop-value)
+			if {_name} is not set:
+				set {_name} to "Unknown"
+			send "&7%{_rank}%. &e%{_name}% &8- &a%format_money(balance(loop-value))%" to sender
+
+function selftest_economy():
+	delete {economy::balance::*}
+	check("economy", "starting balance", balance("alice"), 100)
+	check_true("economy", "deposit", deposit("alice", 50))
+	check("economy", "after deposit", balance("alice"), 150)
+	check("economy", "negative deposit rejected", deposit("alice", -5), false)
+	check("economy", "overdraw rejected", withdraw("alice", 1000), false)
+	check("economy", "balance unchanged", balance("alice"), 150)
+	check_true("economy", "transfer", transfer("alice", "bob", 25.5))
+	check("economy", "sender after transfer", balance("alice"), 124.5)
+	check("economy", "receiver after transfer", balance("bob"), 125.5)
+	check("economy", "self transfer rejected", transfer("bob", "bob", 1), false)
+	check("economy", "cap", deposit("bob", 2000000000), false)
+	deposit("carol", 1000)
+	set {_top::*} to richest(2)
+	check("economy", "richest count", size of {_top::*}, 2)
+	check("economy", "richest first", {_top::1}, "carol")
+	check("economy", "richest second", {_top::2}, "bob")
+	delete {economy::balance::*}

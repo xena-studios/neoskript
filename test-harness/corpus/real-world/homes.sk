@@ -1,0 +1,116 @@
+# homes.sk: /sethome, /home, /delhome and /homes, with a per-rank home limit and a teleport warmup.
+
+options:
+    prefix: &b&lHOMES &8» &7
+    default-limit: 3
+    warmup: 3 seconds
+
+function home_limit(p: player) :: number:
+    if {_p} has permission "homes.limit.unlimited":
+        return 1000
+    loop 20 times:
+        set {_n} to 21 - loop-number
+        if {_p} has permission "homes.limit.%{_n}%":
+            return {_n}
+    return {@default-limit}
+
+function valid_home_name(name: text) :: boolean:
+    if length of {_name} > 16:
+        return false
+    if {_name} matches "[A-Za-z0-9_-]+":
+        return true
+    return false
+
+function set_home(id: text, name: text, loc: location, limit: number) :: text:
+    set {_name} to {_name} in lower case
+    if valid_home_name({_name}) is false:
+        return "invalid"
+    if {homes::%{_id}%::%{_name}%} is not set:
+        if size of {homes::%{_id}%::*} >= {_limit}:
+            return "limit"
+    set {homes::%{_id}%::%{_name}%} to {_loc}
+    return "ok"
+
+function home(id: text, name: text) :: location:
+    return {homes::%{_id}%::%{_name} in lower case%}
+
+function home_names(id: text) :: texts:
+    return indices of {homes::%{_id}%::*}
+
+function delete_home(id: text, name: text) :: boolean:
+    set {_name} to {_name} in lower case
+    if {homes::%{_id}%::%{_name}%} is not set:
+        return false
+    delete {homes::%{_id}%::%{_name}%}
+    return true
+
+command /sethome [<text>]:
+    executable by: players
+    trigger:
+        set {_name} to arg-1 ? "home"
+        set {_result} to set_home("%uuid of player%", {_name}, location of player, home_limit(player))
+        if {_result} is "invalid":
+            send "{@prefix}&cHome names can only use letters, numbers, _ and -." to player
+        else if {_result} is "limit":
+            set {_limit} to plural(home_limit(player), "home")
+            send "{@prefix}&cYou can only have %{_limit}%." to player
+        else:
+            send "{@prefix}Home &e%{_name}% &7set." to player
+
+command /home [<text>]:
+    executable by: players
+    trigger:
+        set {_name} to arg-1 ? "home"
+        set {_loc} to home("%uuid of player%", {_name})
+        if {_loc} is not set:
+            send "{@prefix}&cYou don't have a home called &e%{_name}%&c." to player
+            stop
+        if player has permission "homes.bypass.warmup":
+            teleport player to {_loc}
+            stop
+        send "{@prefix}Teleporting in {@warmup}. Don't move!" to player
+        set {_start} to location of player
+        wait {@warmup}
+        if player is not online:
+            stop
+        if distance between {_start} and location of player > 0.5:
+            send "{@prefix}&cTeleport cancelled because you moved." to player
+            stop
+        teleport player to {_loc}
+        send "{@prefix}Welcome to &e%{_name}%&7." to player
+
+command /delhome <text>:
+    executable by: players
+    trigger:
+        if delete_home("%uuid of player%", arg-1) is true:
+            send "{@prefix}Deleted home &e%arg-1%&7." to player
+        else:
+            send "{@prefix}&cYou don't have a home called &e%arg-1%&c." to player
+
+command /homes:
+    executable by: players
+    trigger:
+        set {_names::*} to home_names("%uuid of player%")
+        if {_names::*} is not set:
+            send "{@prefix}You haven't set any homes. Use &e/sethome&7." to player
+            stop
+        set {_list} to join {_names::*} with "&7, &e"
+        send "{@prefix}Homes (%size of {_names::*}%/%home_limit(player)%): &e%{_list}%" to player
+
+function selftest_homes():
+    delete {homes::test::*}
+    set {_spawn} to location(0, 64, 0, world("world"))
+    set {_farm} to location(100, 70, -50, world("world"))
+    check("homes", "set first", set_home("test", "Base", {_spawn}, 2), "ok")
+    check("homes", "lookup ignores case", home("test", "BASE"), {_spawn})
+    check("homes", "invalid name", set_home("test", "my home!", {_spawn}, 2), "invalid")
+    check("homes", "name too long", set_home("test", "abcdefghijklmnopq", {_spawn}, 2), "invalid")
+    check("homes", "second", set_home("test", "farm", {_farm}, 2), "ok")
+    check("homes", "limit", set_home("test", "mine", {_spawn}, 2), "limit")
+    check("homes", "overwrite at limit", set_home("test", "farm", {_spawn}, 2), "ok")
+    set {_names} to join home_names("test") with ","
+    check("homes", "names", {_names}, "base,farm")
+    check_true("homes", "delete", delete_home("test", "Farm"))
+    check("homes", "delete missing", delete_home("test", "farm"), false)
+    check("homes", "count after delete", size of {homes::test::*}, 1)
+    delete {homes::test::*}

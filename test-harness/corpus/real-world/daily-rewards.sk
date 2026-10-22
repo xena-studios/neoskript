@@ -1,0 +1,57 @@
+# daily-rewards.sk: /daily pays coins (see economy.sk), with a streak bonus for claiming on consecutive days.
+
+options:
+    prefix: &e&lDAILY &8» &7
+    base-reward: 100
+    streak-bonus: 25
+    max-reward: 500
+
+function day_number(seconds: number) :: number:
+    return floor({_seconds} / 86400)
+
+# The streak after claiming today, or -1 if today's reward was already claimed.
+function next_streak(last_day: number, streak: number, today: number) :: number:
+    if {_today} is {_last_day}:
+        return -1
+    if {_today} - {_last_day} is 1:
+        return {_streak} + 1
+    return 1
+
+function daily_reward(streak: number) :: number:
+    set {_amount} to min({@base-reward} + ({_streak} - 1) * {@streak-bonus}, {@max-reward})
+    # Every seventh day in a row pays double.
+    if mod({_streak}, 7) is 0:
+        set {_amount} to {_amount} * 2
+    return {_amount}
+
+command /daily:
+    aliases: reward
+    executable by: players
+    trigger:
+        set {_id} to "%uuid of player%"
+        set {_today} to day_number(now_seconds())
+        set {_streak} to next_streak({daily::%{_id}%::day} ? -10, {daily::%{_id}%::streak} ? 0, {_today})
+        if {_streak} is -1:
+            set {_wait} to 86400 - mod(now_seconds(), 86400)
+            send "{@prefix}&cYou already claimed today's reward. Come back in %format_duration({_wait})%." to player
+            stop
+        set {daily::%{_id}%::day} to {_today}
+        set {daily::%{_id}%::streak} to {_streak}
+        set {_reward} to daily_reward({_streak})
+        deposit({_id}, {_reward})
+        set {_days} to plural({_streak}, "day")
+        send "{@prefix}You got &a%format_money({_reward})%&7! Streak: &e%{_days}%" to player
+        if mod({_streak}, 7) is 0:
+            send title "&6&lWEEKLY BONUS" with subtitle "&eDouble coins today!" to player for 3 seconds
+
+function selftest_daily_rewards():
+    check("daily-rewards", "day number", day_number(86400 * 3 + 500), 3)
+    check("daily-rewards", "first claim", next_streak(-10, 0, 100), 1)
+    check("daily-rewards", "consecutive day", next_streak(99, 4, 100), 5)
+    check("daily-rewards", "missed a day", next_streak(97, 4, 100), 1)
+    check("daily-rewards", "already claimed", next_streak(100, 4, 100), -1)
+    check("daily-rewards", "day one reward", daily_reward(1), 100)
+    check("daily-rewards", "day three reward", daily_reward(3), 150)
+    check("daily-rewards", "weekly bonus", daily_reward(7), 500)
+    check("daily-rewards", "reward cap", daily_reward(20), 500)
+    check("daily-rewards", "capped weekly bonus", daily_reward(21), 1000)

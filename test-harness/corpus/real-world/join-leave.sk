@@ -1,0 +1,85 @@
+# join-leave.sk: join and quit messages, first-join welcome, playtime tracking, /seen and rotating tips.
+
+options:
+    server-name: &bXena&fCraft
+
+on load:
+    set {tips::*} to "Use /sethome to save your base." and "Vote daily with /daily for coins." and "Found a bug? Tell a staff member."
+
+function welcome_line(name: text, number: number) :: text:
+    return "&dWelcome &e%{_name}% &dto {@server-name}&d! &7(#%commas({_number})%)"
+
+function next_tip(index: number, count: number) :: number:
+    if {_index} >= {_count}:
+        return 1
+    return {_index} + 1
+
+function add_playtime(id: text, seconds: number):
+    if {_seconds} > 0:
+        add {_seconds} to {stats::playtime::%{_id}%}
+
+function playtime(id: text) :: number:
+    set {_total} to {stats::playtime::%{_id}%} ? 0
+    if {-stats::session::%{_id}%} is set:
+        add now_seconds() - {-stats::session::%{_id}%} to {_total}
+    return {_total}
+
+on server list ping:
+    set the motd to "{@server-name} &7- &aSurvival, homes, kits%nl%&7Online since 1.21"
+
+on first join:
+    add 1 to {stats::unique-joins}
+    broadcast welcome_line(name of player, {stats::unique-joins})
+    teleport player to spawn of world "world"
+    send title "&bWelcome!" with subtitle "&7Type /help to get started" to player for 3 seconds
+
+on join:
+    set join message to "&8[&a+&8] &7%player%"
+    set {-stats::session::%uuid of player%} to now_seconds()
+
+on quit:
+    set quit message to "&8[&c-&8] &7%player%"
+    set {_id} to "%uuid of player%"
+    add_playtime({_id}, now_seconds() - {-stats::session::%{_id}%})
+    delete {-stats::session::%{_id}%}
+    set {stats::lastseen::%{_id}%} to now
+
+every 5 minutes:
+    set {-tips::index} to next_tip({-tips::index} ? 0, size of {tips::*})
+    broadcast "&6Tip &8» &7%{tips::%{-tips::index}%}%"
+
+command /playtime [<offlineplayer>]:
+    trigger:
+        if arg-1 is set:
+            set {_target} to arg-1
+        else if sender is a player:
+            set {_target} to player
+        else:
+            send "&cUsage: /playtime <player>" to sender
+            stop
+        set {_time} to format_duration(playtime("%uuid of {_target}%"))
+        send "&e%{_target}% &7has played for &e%{_time}%&7." to sender
+
+command /seen <offlineplayer>:
+    trigger:
+        if arg-1 is online:
+            send "&e%arg-1% &7is online right now." to sender
+            stop
+        set {_last} to {stats::lastseen::%uuid of arg-1%}
+        if {_last} is not set:
+            send "&e%arg-1% &7has never been seen here." to sender
+            stop
+        send "&e%arg-1% &7was last seen %difference between {_last} and now% ago." to sender
+
+function selftest_join_leave():
+    check("join-leave", "welcome", welcome_line("Steve", 1500), "&dWelcome &eSteve &dto {@server-name}&d! &7(#1,500)")
+    check("join-leave", "tip advances", next_tip(1, 3), 2)
+    check("join-leave", "tip wraps", next_tip(3, 3), 1)
+    check("join-leave", "first tip", next_tip(0, 3), 1)
+    check("join-leave", "tips loaded", size of {tips::*}, 3)
+    delete {stats::playtime::test}
+    add_playtime("test", 120)
+    add_playtime("test", -5)
+    add_playtime("test", 30)
+    check("join-leave", "playtime", playtime("test"), 150)
+    delete {stats::playtime::test}
