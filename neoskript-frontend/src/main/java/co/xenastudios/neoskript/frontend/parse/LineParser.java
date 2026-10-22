@@ -508,27 +508,26 @@ final class LineParser {
         Expected item = context.intern(expected.single());
         int n = separators.size();
         // reach[k]: the items that cover [start, separator k's start), or null if none parse. k == n is the end.
-        @SuppressWarnings("unchecked")
-        List<Expr>[] reach = new List[n + 1];
+        List<List<Expr>> reach = new ArrayList<>(java.util.Collections.nCopies(n + 1, (List<Expr>) null));
         for (int k = 0; k <= n; k++) {
             int itemEnd = k == n ? end : separators.get(k)[0];
             Expr first = expression(start, itemEnd, item);
             if (first != null && k < n) {
-                reach[k] = List.of(first);
+                reach.set(k, List.of(first));
             }
-            for (int j = 0; j < k && (reach[k] == null || k == n); j++) {
-                if (reach[j] == null) {
+            for (int j = 0; j < k && (reach.get(k) == null || k == n); j++) {
+                if (reach.get(j) == null) {
                     continue;
                 }
                 Expr next = expression(separators.get(j)[1], itemEnd, item);
-                if (next != null && (reach[k] == null || reach[j].size() + 1 > reach[k].size())) {
-                    List<Expr> items = new ArrayList<>(reach[j]);
+                if (next != null && (reach.get(k) == null || reach.get(j).size() + 1 > reach.get(k).size())) {
+                    List<Expr> items = new ArrayList<>(reach.get(j));
                     items.add(next);
-                    reach[k] = items;
+                    reach.set(k, items);
                 }
             }
         }
-        List<Expr> items = reach[n];
+        List<Expr> items = reach.get(n);
         if (items == null) {
             return null;
         }

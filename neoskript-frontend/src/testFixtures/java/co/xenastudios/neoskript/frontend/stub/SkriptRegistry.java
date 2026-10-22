@@ -158,6 +158,10 @@ public final class SkriptRegistry {
                 literals.add("at");
             }
             builder.type(new TypeInfo(id, type.name(), literals, OPEN_LITERAL_TYPES.contains(id)), aliases);
+            if (!literals.isEmpty() && !OPEN_LITERAL_TYPES.contains(id) && !id.equals("classinfo")) {
+                // A closed set like game modes: values come from its literals or expressions of the type.
+                builder.strict(id);
+            }
         }
         UNDOCUMENTED_TYPES.forEach((id, name) -> builder.type(
                 new TypeInfo(id, name, Set.of(), OPEN_LITERAL_TYPES.contains(id)),
@@ -183,6 +187,7 @@ public final class SkriptRegistry {
         builder.assignable("string", "textcomponent");
         builder.assignable("textcomponent", "string");
         builder.assignable("timeperiod", "time");
+        builder.assignable("vector", "direction");
     }
 
     /**

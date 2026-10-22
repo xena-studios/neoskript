@@ -43,17 +43,19 @@ public sealed interface PatternElement {
     record Optional(Choice choice) implements PatternElement {}
 
     /**
-     * {@code %type%}, numbered from 0 in pattern order. {@code followedBy} is the literal that comes next
-     * in the same sequence (after optional whitespace), if any. The matcher only tries ends where that
-     * literal follows, which saves parsing sub-expressions that can't lead to a match.
+     * {@code %type%}, numbered from 0 in pattern order. The matcher uses two hints to avoid parsing text
+     * that can't lead to a match: {@code followedBy}, the literals one of which comes next in the same
+     * sequence (after optional whitespace), or null if anything can; and {@code atEnd}, whether nothing can
+     * follow the placeholder, so it has to cover the rest of the input.
      */
-    record Placeholder(int index, PlaceholderSpec spec, String followedBy) implements PatternElement {}
+    record Placeholder(int index, PlaceholderSpec spec, List<String> followedBy, boolean atEnd)
+            implements PatternElement {}
 
     /**
      * {@code <regex>}, numbered from 0 in pattern order. {@code followedBy} works as for placeholders.
      * {@code matchesCode} is true for {@code <.+>}-style regexes that match a piece of code (a condition,
      * an expression): those can only end where the code is balanced, which saves trying every position.
      */
-    record Regex(int index, java.util.regex.Pattern regex, String followedBy, boolean matchesCode)
-            implements PatternElement {}
+    record Regex(int index, java.util.regex.Pattern regex, List<String> followedBy, boolean matchesCode,
+            boolean atEnd) implements PatternElement {}
 }

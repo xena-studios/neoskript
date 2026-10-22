@@ -230,8 +230,12 @@ public final class CompiledPattern {
                 case PatternElement.Placeholder placeholder -> placeholder(placeholder, pos, state, next);
                 case PatternElement.Regex regex -> {
                     java.util.regex.Matcher m = regex.regex().matcher(input);
-                    String followedBy = regex.followedBy();
-                    for (int to : regex.matchesCode() ? Spans.candidateEnds(input, pos, end) : allEnds(pos)) {
+                    List<String> followedBy = regex.followedBy();
+                    // Code-matching regexes (<.+>) are greedy, like the regex they are: longest text first.
+                    int[] ends = regex.atEnd()
+                            ? new int[] {end}
+                            : regex.matchesCode() ? reversed(Spans.candidateEnds(input, pos, end)) : allEnds(pos);
+                    for (int to : ends) {
                         if (followedBy != null && !followedAt(to, followedBy)) {
                             continue;
                         }
@@ -252,8 +256,9 @@ public final class CompiledPattern {
         }
 
         private State placeholder(PatternElement.Placeholder placeholder, int pos, State state, Continuation next) {
-            String followedBy = placeholder.followedBy();
-            for (int to : Spans.candidateEnds(input, pos, end)) {
+            List<String> followedBy = placeholder.followedBy();
+            int[] ends = placeholder.atEnd() ? endIfBalanced(pos) : Spans.candidateEnds(input, pos, end);
+            for (int to : ends) {
                 if (followedBy != null && !followedAt(to, followedBy)) {
                     continue;
                 }
@@ -268,6 +273,15 @@ public final class CompiledPattern {
             return null;
         }
 
+        private static int[] reversed(int[] ends) {
+            for (int i = 0, j = ends.length - 1; i < j; i++, j--) {
+                int swap = ends[i];
+                ends[i] = ends[j];
+                ends[j] = swap;
+            }
+            return ends;
+        }
+
         private int[] allEnds(int pos) {
             int[] ends = new int[end - pos];
             for (int i = 0; i < ends.length; i++) {
@@ -276,12 +290,23 @@ public final class CompiledPattern {
             return ends;
         }
 
-        /** Whether {@code literal} comes at {@code pos}, after any whitespace. */
-        private boolean followedAt(int pos, String literal) {
+        /** {@code [end]} if {@code input[pos, end)} is balanced text a placeholder can cover, else nothing. */
+        private int[] endIfBalanced(int pos) {
+            int[] ends = Spans.candidateEnds(input, pos, end);
+            return ends.length > 0 && ends[ends.length - 1] == end ? new int[] {end} : new int[0];
+        }
+
+        /** Whether one of {@code literals} comes at {@code pos}, after any whitespace. */
+        private boolean followedAt(int pos, List<String> literals) {
             while (pos < end && Character.isWhitespace(input.charAt(pos))) {
                 pos++;
             }
-            return pos + literal.length() <= end && input.regionMatches(true, pos, literal, 0, literal.length());
+            for (String literal : literals) {
+                if (pos + literal.length() <= end && input.regionMatches(true, pos, literal, 0, literal.length())) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private State sequence(List<PatternElement> elements, int index, int pos, State state, Continuation next) {

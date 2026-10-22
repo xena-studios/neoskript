@@ -42,6 +42,7 @@ public final class PatternCompiler {
         PatternElement element = root.mark() == 0 && root.tag() == null
                 ? root.body()
                 : new PatternElement.Choice(List.of(root));
+        element = anchorTail(element);
         return new CompiledPattern(pattern, element, compiler.placeholders, compiler.regexes);
     }
 
@@ -208,7 +209,7 @@ public final class PatternCompiler {
             throw error("Missing type in '%" + body + "%'");
         }
         return new PatternElement.Placeholder(placeholders++,
-                new PlaceholderSpec(typeNames, nullable, literalOnly, changeableOnly, time), null);
+                new PlaceholderSpec(typeNames, nullable, literalOnly, changeableOnly, time), null, false);
     }
 
     /** The index of the {@code >} closing a regex that starts at {@code pos}, or -1 if there is none. */
@@ -228,7 +229,7 @@ public final class PatternCompiler {
         String regex = source.substring(pos + 1, end);
         try {
             PatternElement element = new PatternElement.Regex(regexes++, java.util.regex.Pattern.compile(regex), null,
-                    regex.equals(".+") || regex.equals("(.+)"));
+                    regex.equals(".+") || regex.equals("(.+)"), false);
             pos = end + 1;
             return element;
         } catch (PatternSyntaxException e) {
@@ -236,29 +237,83 @@ public final class PatternCompiler {
         }
     }
 
-    /** Records the literal after each placeholder and regex in a sequence, skipping whitespace. */
+    /** Records the literals that can come after each placeholder and regex in a sequence. */
     private static void linkLookahead(List<PatternElement> elements) {
         for (int i = 0; i < elements.size(); i++) {
-            if (elements.get(i) instanceof PatternElement.Placeholder placeholder) {
-                int next = i + 1;
-                if (next < elements.size() && elements.get(next) instanceof PatternElement.Whitespace) {
-                    next++;
-                }
-                if (next < elements.size() && elements.get(next) instanceof PatternElement.Literal literal) {
-                    elements.set(i, new PatternElement.Placeholder(placeholder.index(), placeholder.spec(),
-                            literal.text()));
-                }
-            } else if (elements.get(i) instanceof PatternElement.Regex regex) {
-                int next = i + 1;
-                if (next < elements.size() && elements.get(next) instanceof PatternElement.Whitespace) {
-                    next++;
-                }
-                if (next < elements.size() && elements.get(next) instanceof PatternElement.Literal literal) {
-                    elements.set(i, new PatternElement.Regex(regex.index(), regex.regex(), literal.text(),
-                            regex.matchesCode()));
-                }
+            List<String> next = i + 1 < elements.size() ? leadingLiterals(elements, i + 1) : null;
+            if (next == null) {
+                continue;
+            }
+            if (elements.get(i) instanceof PatternElement.Placeholder p) {
+                elements.set(i, new PatternElement.Placeholder(p.index(), p.spec(), next, p.atEnd()));
+            } else if (elements.get(i) instanceof PatternElement.Regex r) {
+                elements.set(i, new PatternElement.Regex(r.index(), r.regex(), next, r.matchesCode(), r.atEnd()));
             }
         }
+    }
+
+    /**
+     * The literals one of which must come first in {@code elements[from...]}, skipping whitespace, or null
+     * if that part can start with something else or be empty.
+     */
+    private static List<String> leadingLiterals(List<PatternElement> elements, int from) {
+        int i = from;
+        while (i < elements.size() && elements.get(i) instanceof PatternElement.Whitespace) {
+            i++;
+        }
+        if (i >= elements.size()) {
+            return null;
+        }
+        return startLiterals(elements.get(i));
+    }
+
+    private static List<String> startLiterals(PatternElement element) {
+        return switch (element) {
+            case PatternElement.Literal literal -> List.of(literal.text());
+            case PatternElement.Sequence sequence -> leadingLiterals(sequence.elements(), 0);
+            case PatternElement.Choice choice -> {
+                List<String> all = new ArrayList<>();
+                for (PatternElement.Alternative alternative : choice.alternatives()) {
+                    List<String> literals = startLiterals(alternative.body());
+                    if (literals == null) {
+                        yield null;
+                    }
+                    all.addAll(literals);
+                }
+                yield all;
+            }
+            default -> null;
+        };
+    }
+
+    /**
+     * Marks the placeholders and regexes that end the pattern: nothing can follow them, so they have to
+     * cover the rest of the input. That includes one at the end of a trailing optional part.
+     */
+    private static PatternElement anchorTail(PatternElement element) {
+        return switch (element) {
+            case PatternElement.Placeholder p -> new PatternElement.Placeholder(p.index(), p.spec(), null, true);
+            case PatternElement.Regex r -> new PatternElement.Regex(r.index(), r.regex(), null, r.matchesCode(), true);
+            case PatternElement.Sequence sequence -> {
+                List<PatternElement> elements = new ArrayList<>(sequence.elements());
+                for (int i = elements.size() - 1; i >= 0; i--) {
+                    PatternElement last = elements.get(i);
+                    if (last instanceof PatternElement.Whitespace) {
+                        continue;
+                    }
+                    // Only the last element: an earlier optional part may be followed by a later one.
+                    elements.set(i, anchorTail(last));
+                    break;
+                }
+                yield new PatternElement.Sequence(elements);
+            }
+            case PatternElement.Choice choice -> new PatternElement.Choice(choice.alternatives().stream()
+                    .map(a -> new PatternElement.Alternative(anchorTail(a.body()), a.mark(), a.tag()))
+                    .toList());
+            case PatternElement.Optional optional ->
+                    new PatternElement.Optional((PatternElement.Choice) anchorTail(optional.choice()));
+            default -> element;
+        };
     }
 
     private static void flush(StringBuilder literal, List<PatternElement> elements) {

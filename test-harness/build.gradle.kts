@@ -14,6 +14,8 @@ val neoskriptPlugin = configurations.create("neoskriptPlugin") {
 
 dependencies {
     implementation(libs.gson)
+    // The frontend with the stub registry from the reference Skript's docs, for parse checks without a server.
+    implementation(testFixtures(project(":neoskript-frontend")))
     neoskriptPlugin(project(path = ":neoskript-plugin", configuration = "shadowRuntimeElements"))
 }
 

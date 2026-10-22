@@ -23,29 +23,39 @@ final class ParserContext {
 
     private final SyntaxRegistry registry;
     private final Map<String, List<FunctionInfo>> scriptFunctions;
+    /** Per registry: what each placeholder of every registered pattern accepts, built once. */
+    private static final Map<SyntaxRegistry, Map<PlaceholderSpec, Expected>> PLACEHOLDERS =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
     /** What each placeholder of every registered pattern accepts, by placeholder identity. Read-only. */
-    private final Map<PlaceholderSpec, Expected> byPlaceholder = new IdentityHashMap<>();
+    private final Map<PlaceholderSpec, Expected> byPlaceholder;
     private final Map<Expected, Expected> interned = new ConcurrentHashMap<>();
 
     ParserContext(SyntaxRegistry registry, Map<String, List<FunctionInfo>> scriptFunctions) {
         this.registry = registry;
         this.scriptFunctions = Map.copyOf(scriptFunctions);
+        this.byPlaceholder = PLACEHOLDERS.computeIfAbsent(registry, this::placeholders);
+        byPlaceholder.values().forEach(this::intern);
+    }
+
+    private Map<PlaceholderSpec, Expected> placeholders(SyntaxRegistry registry) {
+        Map<PlaceholderSpec, Expected> result = new IdentityHashMap<>();
         for (SyntaxKind kind : SyntaxKind.values()) {
             for (SyntaxInfo syntax : registry.syntaxes(kind)) {
                 for (CompiledPattern pattern : syntax.patterns()) {
-                    collect(pattern.root());
+                    collect(pattern.root(), result);
                 }
             }
         }
+        return java.util.Collections.unmodifiableMap(result);
     }
 
-    private void collect(PatternElement element) {
+    private void collect(PatternElement element, Map<PlaceholderSpec, Expected> result) {
         switch (element) {
-            case PatternElement.Placeholder placeholder ->
-                    byPlaceholder.put(placeholder.spec(), intern(resolve(placeholder.spec())));
-            case PatternElement.Sequence sequence -> sequence.elements().forEach(this::collect);
-            case PatternElement.Choice choice -> choice.alternatives().forEach(a -> collect(a.body()));
-            case PatternElement.Optional optional -> collect(optional.choice());
+            case PatternElement.Placeholder placeholder -> result.put(placeholder.spec(), resolve(placeholder.spec()));
+            case PatternElement.Sequence sequence -> sequence.elements().forEach(e -> collect(e, result));
+            case PatternElement.Choice choice -> choice.alternatives().forEach(a -> collect(a.body(), result));
+            case PatternElement.Optional optional -> collect(optional.choice(), result);
             default -> {}
         }
     }
