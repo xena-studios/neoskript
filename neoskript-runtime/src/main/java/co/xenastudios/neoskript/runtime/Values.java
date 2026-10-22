@@ -48,6 +48,13 @@ public final class Values {
         return values.toArray();
     }
 
+    /** {@code "5" parsed as integer}: the text through {@code parser}, or {@code null} if it isn't one. */
+    @SuppressWarnings("unchecked")
+    public static Object parse(Function<?, ?> parser, Object text) {
+        Object value = single(text);
+        return value == null ? null : ((Function<String, ?>) parser).apply(text(value).strip());
+    }
+
     /** The values that are instances of {@code type}, for {@code number within {_x}}. */
     public static Object[] cast(Object value, Class<?> type) {
         List<Object> values = new ArrayList<>();
@@ -120,6 +127,58 @@ public final class Values {
             return Long.toString((long) rounded);
         }
         return java.math.BigDecimal.valueOf(rounded).stripTrailingZeros().toPlainString();
+    }
+
+    private record Conversion(Class<?> from, Function<Object, Object> converter) {}
+
+    private static final Map<Class<?>, List<Conversion>> CONVERSIONS = new ConcurrentHashMap<>();
+
+    /** Registers how values of {@code from} (and its subtypes) become a {@code to}. */
+    @SuppressWarnings("unchecked")
+    public static <F, T> void registerConverter(Class<F> from, Class<T> to, Function<? super F, ? extends T> converter) {
+        CONVERSIONS.computeIfAbsent(to, k -> new java.util.concurrent.CopyOnWriteArrayList<>())
+                .add(new Conversion(from, value -> ((Function<Object, Object>) converter).apply(value)));
+    }
+
+    /** Whether anything converts to {@code to}, so placeholders of that type need {@link #convert}. */
+    public static boolean convertsTo(Class<?> to) {
+        return CONVERSIONS.containsKey(to);
+    }
+
+    /**
+     * Converts what isn't already a {@code to} into one where a converter can, as when a player is used
+     * where a location is expected. Values nothing converts are kept, for the element to deal with.
+     */
+    public static Object convert(Object value, Class<?> to) {
+        if (value instanceof Object[] array) {
+            Object[] converted = null;
+            for (int i = 0; i < array.length; i++) {
+                Object element = convertOne(array[i], to);
+                if (element != array[i]) {
+                    if (converted == null) {
+                        converted = array.clone();
+                    }
+                    converted[i] = element;
+                }
+            }
+            return converted == null ? array : converted;
+        }
+        return convertOne(value, to);
+    }
+
+    private static Object convertOne(Object value, Class<?> to) {
+        if (value == null || to.isInstance(value)) {
+            return value;
+        }
+        for (Conversion conversion : CONVERSIONS.getOrDefault(to, List.of())) {
+            if (conversion.from().isInstance(value)) {
+                Object converted = conversion.converter().apply(value);
+                if (converted != null) {
+                    return converted;
+                }
+            }
+        }
+        return value;
     }
 
     private static final Map<Class<?>, Function<Object, String>> CONVERTERS = new ConcurrentHashMap<>();

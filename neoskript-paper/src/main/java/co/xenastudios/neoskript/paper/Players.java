@@ -6,7 +6,21 @@ package co.xenastudios.neoskript.paper;
 
 import co.xenastudios.neoskript.api.registration.Patterns;
 import co.xenastudios.neoskript.api.registration.Registrar;
+import co.xenastudios.neoskript.api.registration.Parameter;
+import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.Values;
+import java.util.List;
+import java.util.UUID;
+import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.key.Key;
+import net.kyori.adventure.sound.Sound;
+import net.kyori.adventure.title.Title;
+import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.entity.LivingEntity;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Nameable;
 import org.bukkit.OfflinePlayer;
@@ -73,6 +87,178 @@ final class Players {
                 }
             }
         }, "kick %players% [(by reason of|because [of]|on account of|due to) %text%]");
+
+        registerMore(registrar);
+    }
+
+    private static void registerMore(Registrar registrar) {
+        // Skript's ExprEntities, for players only until entity types come with the world (M4 step 5).
+        registrar.expression("ExprEntities", "player", info -> (context, args) -> {
+            List<Object> players = new java.util.ArrayList<>();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (args[0] == null || List.of((Object[]) args[0]).contains(player.getWorld())) {
+                    players.add(player);
+                }
+            }
+            return players.toArray();
+        }, "[(all [[of] the]|the)] players [(in|of) world[s] %worlds%]");
+
+        registrar.function("player", List.of(Parameter.of("nameOrUUID", "string"),
+                new Parameter("getExactPlayer", "boolean", false, true)), "player", false, args -> {
+                    String text = Values.text(args[0]);
+                    try {
+                        return Bukkit.getPlayer(UUID.fromString(text));
+                    } catch (IllegalArgumentException e) {
+                        return Boolean.TRUE.equals(args[1]) ? Bukkit.getPlayerExact(text) : Bukkit.getPlayer(text);
+                    }
+                });
+        registrar.function("offlineplayer", List.of(Parameter.of("nameOrUUID", "string"),
+                new Parameter("allowLookups", "boolean", false, true)), "offlineplayer", false, args -> {
+                    String text = Values.text(args[0]);
+                    try {
+                        return Bukkit.getOfflinePlayer(UUID.fromString(text));
+                    } catch (IllegalArgumentException e) {
+                        OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(text);
+                        return cached != null || Boolean.FALSE.equals(args[1]) ? cached : Bukkit.getOfflinePlayer(text);
+                    }
+                });
+
+        registrar.condition("CondPlayedBefore", info -> {
+            boolean negated = info.pattern() == 1;
+            return (context, args) -> all((Object[]) args[0], OfflinePlayer.class,
+                    player -> player.hasPlayedBefore() != negated);
+        }, "%offlineplayers% [(has|have|did)] [already] play[ed] [on (this|the) server] (before|already)",
+                "%offlineplayers% (has not|hasn't|have not|haven't|did not|didn't) [(already|yet)] play[ed] "
+                        + "[on (this|the) server] (before|already|yet)");
+        registrar.condition("CondCanFly", info -> {
+            boolean negated = info.pattern() == 1;
+            return (context, args) -> all((Object[]) args[0], Player.class,
+                    player -> player.getAllowFlight() != negated);
+        }, "%players% can fly", "%players% (can't|cannot|can not) fly");
+
+        SettableProperty.register(registrar, "ExprFlightMode", "boolean", "fl(y[ing]|ight) (mode|state)", "players",
+                Player.class, Boolean.class, Player::getAllowFlight, Player::setAllowFlight);
+        SettableProperty.register(registrar, "ExprGameMode", "gamemode", "game[ ]mode", "players", Player.class,
+                GameMode.class, Player::getGameMode, Player::setGameMode);
+        SettableProperty.register(registrar, "ExprFoodLevel", "number", Player.class, Number.class,
+                player -> (long) player.getFoodLevel(), (player, level) -> player.setFoodLevel(
+                        Math.max(0, Math.min(20, (int) Math.round(level.doubleValue())))),
+                "[the] (food|hunger)[[ ](level|met(er|re)|bar)] [of %players%]",
+                "%players%'[s] (food|hunger)[[ ](level|met(er|re)|bar)]");
+        SettableProperty.register(registrar, "ExprPlayerListName", "string", "(player|tab)[ ]list name[s]", "players",
+                Player.class, Object.class, player -> Messages.LEGACY_SECTION.serialize(player.playerListName()),
+                (player, name) -> player.playerListName(Messages.component(name)));
+
+        registrar.effect("EffHealth", info -> (context, args) -> {
+            for (Object entity : (Object[]) args[0]) {
+                if (entity instanceof LivingEntity living) {
+                    AttributeInstance max = living.getAttribute(Attribute.MAX_HEALTH);
+                    double limit = max == null ? 20 : max.getValue();
+                    double health = args[1] instanceof Number hearts ? living.getHealth() + hearts.doubleValue() * 2 : limit;
+                    living.setHealth(Math.max(0, Math.min(limit, health)));
+                }
+            }
+        }, "heal %entities% [by %number% [heart[s]]]");
+        registrar.effect("EffIgnite", info -> {
+            boolean extinguish = info.pattern() == 2;
+            return (context, args) -> {
+                int ticks = extinguish ? 0 : args[1] instanceof Timespan time ? (int) time.ticks() : 160;
+                for (Object entity : (Object[]) args[0]) {
+                    if (entity instanceof Entity e) {
+                        e.setFireTicks(ticks);
+                    }
+                }
+            };
+        }, "(ignite|set fire to) %entities% [for %timespan%]", "(set|light) %entities% on fire [for %timespan%]",
+                "extinguish %entities%");
+
+        registrar.effect("EffSendTitle", info -> {
+            boolean subtitleOnly = info.pattern() == 1;
+            return (context, args) -> {
+                int at = subtitleOnly ? 1 : 2;
+                Component title = subtitleOnly || args[0] == null ? Component.empty() : Messages.component(args[0]);
+                Component subtitle = subtitleOnly ? Messages.component(args[0])
+                        : args[1] == null ? Component.empty() : Messages.component(args[1]);
+                Title.Times times = Title.Times.times(duration(args[at + 2], 10), duration(args[at + 1], 70),
+                        duration(args[at + 3], 20));
+                Title shown = Title.title(title, subtitle, times);
+                for (Object audience : audiences(args[at])) {
+                    if (audience instanceof Audience a) {
+                        a.showTitle(shown);
+                    }
+                }
+            };
+        }, "send title %object% [with subtitle %object%] [to %audiences%] [for %timespan%] "
+                + "[with fade[(-| )]in %timespan%] [[and] [with] fade[(-| )]out %timespan%]",
+                "send subtitle %object% [to %audiences%] [for %timespan%] [with fade[(-| )]in %timespan%] "
+                        + "[[and] [with] fade[(-| )]out %timespan%]");
+        registrar.effect("EffActionBar", info -> (context, args) -> {
+            Component bar = Messages.component(args[0]);
+            for (Object audience : audiences(args[1])) {
+                if (audience instanceof Audience a) {
+                    a.sendActionBar(bar);
+                }
+            }
+        }, "send [the] action[ ]bar [with text] %object% [to %audiences%]");
+
+        registrar.effect("EffPlaySound", info -> (context, args) -> {
+            float volume = args[1] instanceof Number v ? v.floatValue() : 1;
+            float pitch = args[2] instanceof Number p ? p.floatValue() : 1;
+            Object[] players = args[3] == null ? null : (Object[]) args[3];
+            Object[] where = args[4] == null ? null : (Object[]) args[4];
+            for (Object name : (Object[]) args[0]) {
+                Key key;
+                try {
+                    key = Key.key(Values.text(name).toLowerCase(java.util.Locale.ROOT));
+                } catch (RuntimeException e) {
+                    continue;
+                }
+                Sound sound = Sound.sound(key, Sound.Source.MASTER, volume, pitch);
+                if (where == null) {
+                    for (Object player : players == null ? new Object[0] : players) {
+                        if (player instanceof Player p) {
+                            p.playSound(sound, Sound.Emitter.self());
+                        }
+                    }
+                    continue;
+                }
+                for (Object place : where) {
+                    Location location = place instanceof Entity e ? e.getLocation() : place instanceof Location l ? l : null;
+                    if (location == null) {
+                        continue;
+                    }
+                    if (players == null) {
+                        location.getWorld().playSound(sound, location.getX(), location.getY(), location.getZ());
+                    } else {
+                        for (Object player : players) {
+                            if (player instanceof Player p) {
+                                p.playSound(sound, location.getX(), location.getY(), location.getZ());
+                            }
+                        }
+                    }
+                }
+            }
+        }, "play sound[s] %texts% [(at|with) volume %number%] [(and|at|with) pitch %number%] [(to|for) %players%] "
+                + "[(at|on|from) %locations/entities%]");
+    }
+
+    /** Whether there are values, and {@code test} holds for every one (which has to be a {@code type}). */
+    private static <T> boolean all(Object[] values, Class<T> type, java.util.function.Predicate<? super T> test) {
+        for (Object value : values) {
+            if (!type.isInstance(value) || !test.test(type.cast(value))) {
+                return false;
+            }
+        }
+        return values.length > 0;
+    }
+
+    /** Who a message goes to: the given audiences, or the console if there are none. */
+    private static Object[] audiences(Object audiences) {
+        return audiences instanceof Object[] array && array.length > 0 ? array : new Object[] {Bukkit.getConsoleSender()};
+    }
+
+    private static java.time.Duration duration(Object timespan, long ticks) {
+        return java.time.Duration.ofMillis(timespan instanceof Timespan t ? t.millis() : ticks * 50);
     }
 
     /** The name of a player, world, entity or anything else with one. */

@@ -172,6 +172,43 @@ public final class VariableStore {
         return indices.toArray(String[]::new);
     }
 
+    /**
+     * The indices of the values directly under {@code {prefix::*}}, ordered by their values:
+     * {@code sorted indices of {x::*} in descending order}.
+     */
+    public String[] sortedIndices(String prefix, boolean descending) {
+        String[] indices = indices(prefix);
+        Object[] values = new Object[indices.length];
+        for (int i = 0; i < indices.length; i++) {
+            values[i] = get(prefix + "::" + indices[i]);
+        }
+        Integer[] order = new Integer[indices.length];
+        for (int i = 0; i < order.length; i++) {
+            order[i] = i;
+        }
+        java.util.Arrays.sort(order, (x, y) -> {
+            Integer c = co.xenastudios.neoskript.runtime.Comparison.order(values[x], values[y]);
+            int result = c == null ? 0 : c;
+            return descending ? -result : result;
+        });
+        String[] sorted = new String[indices.length];
+        for (int i = 0; i < order.length; i++) {
+            sorted[i] = indices[order[i]];
+        }
+        return sorted;
+    }
+
+    /** Sorts the values directly under {@code {prefix::*}}, which end up at indices 1, 2, 3... */
+    public void sortList(String prefix, boolean descending) {
+        Object[] values = list(prefix);
+        java.util.Arrays.sort(values, (x, y) -> {
+            Integer c = co.xenastudios.neoskript.runtime.Comparison.order(x, y);
+            int result = c == null ? 0 : c;
+            return descending ? -result : result;
+        });
+        setList(prefix, values);
+    }
+
     /** Replaces {@code {prefix::*}} with {@code values}, at indices 1, 2, 3... */
     public void setList(String prefix, Object[] values) {
         changed();

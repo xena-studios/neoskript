@@ -30,10 +30,13 @@ public sealed interface Statement {
     }
 
     /** {@code if any:} or {@code if all:}, whose lines are conditions. A {@code then:} section follows. */
-    record Conditions(Line line, ParsedSyntax header, List<ParsedSyntax> conditions) implements Statement {
+    /** {@code if all:}/{@code if any:} and its conditions, each on its own line ({@code conditionLines}). */
+    record Conditions(Line line, ParsedSyntax header, List<ParsedSyntax> conditions, List<Line> conditionLines)
+            implements Statement {
 
         public Conditions {
             conditions = List.copyOf(conditions);
+            conditionLines = List.copyOf(conditionLines);
         }
     }
 

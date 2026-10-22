@@ -50,7 +50,7 @@ class VariableStorageTest {
             assertEquals(entry.type(), encoded.type(), entry.name());
             assertArrayEquals(entry.bytes(), encoded.bytes(), entry.name());
         }
-        assertEquals(35, decoded, "string, long, double, boolean and timespan values");
+        assertEquals(36, decoded, "string, long, double, boolean, timespan and date values");
     }
 
     @Test

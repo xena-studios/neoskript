@@ -75,12 +75,16 @@ public final class ScriptCompiler {
                             Object binding = library.binding(event.event().syntax());
                             if (binding instanceof ScriptEvent scriptEvent) {
                                 triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), scriptEvent, null,
-                                        null, new TriggerCompiler(library, functions, globals, script)
+                                        null, null, new TriggerCompiler(library, functions, globals, script)
                                                 .compileTrigger(name, event.body())));
                             } else if (binding instanceof Library.ServerEvent serverEvent) {
                                 triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), null,
-                                        serverEvent.classes(), null, new TriggerCompiler(library, functions, globals,
+                                        serverEvent.classes(), null, null, new TriggerCompiler(library, functions, globals,
                                                 script).compileTrigger(name, event, serverEvent)));
+                            } else if (binding instanceof Library.Core core && core.id().equals(CoreSyntax.PERIODICAL)) {
+                                triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), null, null,
+                                        period(header.number(), event), null, new TriggerCompiler(library, functions,
+                                                globals, script).compileTrigger(name, event.body())));
                             } else {
                                 throw new CompileException(header.number(), "NeoSkript can't run this event yet: '"
                                         + header.key() + "'");
@@ -90,7 +94,7 @@ public final class ScriptCompiler {
                                 functions.get(function.signature()),
                                 new TriggerCompiler(library, functions, globals, script).compileFunction(name, function)));
                         case ParsedStructure.Custom custom when testName != null -> triggers.add(
-                                new CompiledScripts.CompiledTrigger(name, header.number(), null, null, testName,
+                                new CompiledScripts.CompiledTrigger(name, header.number(), null, null, null, testName,
                                         new TriggerCompiler(library, functions, globals, script).compileTest(name, custom)));
                         case ParsedStructure.Command command -> commands.add(command(name, script, functions, command));
                         case ParsedStructure.Data data -> {}
@@ -110,6 +114,17 @@ public final class ScriptCompiler {
             }
         }
         return new CompiledScripts(triggers, bodies, diagnostics, unrunnableTests, commands);
+    }
+
+    /** How often an {@code every <timespan>} event runs: its timespan, which has to be written out. */
+    private static Timespan period(int line, ParsedStructure.Event event) throws CompileException {
+        if (event.event().match().values().getFirst() instanceof Expr.Literal literal && literal.type().equals("timespan")) {
+            Timespan period = Timespan.parse(literal.text());
+            if (period != null && period.ticks() > 0) {
+                return period;
+            }
+        }
+        throw new CompileException(line, "'every' needs a timespan of at least a tick, like 'every 5 minutes'");
     }
 
     /** Compiles a command: a trigger for each route, and its messages. */

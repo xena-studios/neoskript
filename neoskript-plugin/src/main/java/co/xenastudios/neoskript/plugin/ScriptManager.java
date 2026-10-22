@@ -60,6 +60,8 @@ final class ScriptManager {
     private final Map<FunctionInfo, FunctionHandle> functions = new ConcurrentHashMap<>();
     /** The triggers of each loaded script. */
     private final Map<String, List<CompiledScripts.CompiledTrigger>> loaded = new LinkedHashMap<>();
+    /** What stops each loaded script's periodic triggers ({@code every 5 minutes}). */
+    private final Map<String, List<Runnable>> periodic = new HashMap<>();
     /** The commands of each loaded script. */
     private final Map<String, List<CompiledCommand>> loadedCommands = new LinkedHashMap<>();
 
@@ -146,6 +148,11 @@ final class ScriptManager {
         if (only == null) {
             loaded.keySet().removeIf(name -> !byName.containsKey(name));
             loadedCommands.keySet().removeIf(name -> !byName.containsKey(name));
+            for (String name : List.copyOf(periodic.keySet())) {
+                if (!byName.containsKey(name)) {
+                    periodic.remove(name).forEach(Runnable::run);
+                }
+            }
         }
         compiled.linkFunctions(switching);
         Map<String, List<CompiledScripts.CompiledTrigger>> triggers = new LinkedHashMap<>();
@@ -169,11 +176,16 @@ final class ScriptManager {
         long millis = (System.nanoTime() - start) / 1_000_000;
 
         for (String name : switching) {
+            periodic.getOrDefault(name, List.of()).forEach(Runnable::run);
+            List<Runnable> stops = new ArrayList<>();
             for (CompiledScripts.CompiledTrigger trigger : loaded.get(name)) {
                 if (trigger.event() == ScriptEvent.LOAD) {
                     scheduler.runGlobal(() -> run(trigger));
+                } else if (trigger.period() != null) {
+                    stops.add(scheduler.runGlobalRepeating(trigger.period().ticks(), () -> run(trigger)));
                 }
             }
+            periodic.put(name, stops);
         }
         if (afterTests != null) {
             Runnable done = afterTests;

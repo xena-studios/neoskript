@@ -24,4 +24,10 @@ public final class PaperScheduler implements Scheduler {
     public void runGlobalLater(long ticks, Runnable task) {
         plugin.getServer().getScheduler().runTaskLater(plugin, task, ticks);
     }
+
+    @Override
+    public Runnable runGlobalRepeating(long ticks, Runnable task) {
+        long period = Math.max(ticks, 1);
+        return plugin.getServer().getScheduler().runTaskTimer(plugin, task, period, period)::cancel;
+    }
 }

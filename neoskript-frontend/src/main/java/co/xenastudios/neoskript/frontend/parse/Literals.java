@@ -26,7 +26,8 @@ final class Literals {
     private static final Pattern WORDS =
             Pattern.compile("(?=[^\\[]*\\p{L})[\\p{L}\\p{N}_][\\p{L}\\p{N}_'.:\\- ]*(\\[[\\p{L}\\p{N}_=,;:. ]*\\])?");
     /** {@code value (type)}: a literal whose type is spelled out. */
-    static final Pattern SPECIFIED = Pattern.compile("(.+?)\\s*\\(\\s*([\\p{L} ]+?)\\s*\\)");
+    /** {@code black (wolf variant)}. The space before the bracket keeps {@code f(player)} a function call. */
+    static final Pattern SPECIFIED = Pattern.compile("(.+?)\\s+\\(\\s*([\\p{L} ]+?)\\s*\\)");
 
     private Literals() {}
 

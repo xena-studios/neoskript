@@ -32,6 +32,19 @@ final class CoreCodecs {
                 return new Timespan(in.longField("millis"));
             }
         });
+        library.storage("date", co.xenastudios.neoskript.runtime.Date.class, new VariableCodec<>() {
+            @Override
+            public void encode(co.xenastudios.neoskript.runtime.Date value, BinaryWriter out) {
+                out.beginObject(1);
+                out.longField("timestamp", value.millis());
+            }
+
+            @Override
+            public co.xenastudios.neoskript.runtime.Date decode(BinaryReader in) {
+                in.beginObject();
+                return new co.xenastudios.neoskript.runtime.Date(in.longField("timestamp"));
+            }
+        });
     }
 
     private interface Write<T> {

@@ -15,8 +15,13 @@ public enum RegexRole {
     CONDITION,
     EFFECT,
     EXPRESSION,
-    /** A type name, as in {@code event-<.+>} or {@code loop-<.+>}. */
+    /** A type name, as in {@code event-<.+>}. */
     TYPE,
+    /**
+     * What a loop value is called, as in {@code loop-<.+>}: {@code value}, {@code index}, {@code counter},
+     * {@code iteration} or a type name, then optionally {@code -N}.
+     */
+    LOOP_VALUE,
     /** A condition, else an effect, else an expression: whatever code Skript's test {@code assert} wraps. */
     CODE
 }

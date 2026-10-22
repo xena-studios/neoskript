@@ -116,6 +116,12 @@ public interface Registrar {
      */
     void parser(String typeId, java.util.function.Function<String, ?> parser);
 
+    /**
+     * How a value of {@code from} becomes a {@code to} where a placeholder wants one: an entity where a
+     * location is expected is the entity's location. The converter returns {@code null} if it can't.
+     */
+    <F, T> void converter(Class<F> from, Class<T> to, java.util.function.Function<? super F, ? extends T> converter);
+
     /** How values of {@code type} read as text, as when embedded in a string. */
     <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText);
 }

@@ -57,6 +57,21 @@ class LanguageTest {
     }
 
     @Test
+    void loopValuesDontSwallowWhatFollows() {
+        assertEquals(List.of("world", "****", "ab"), run("""
+                on load:
+                \tloop "WORLD":
+                \t\tsay loop-value in lower case
+                \tloop "abcd":
+                \t\tset {_stars} to ""
+                \t\tloop length of loop-value-1 times:
+                \t\t\tset {_stars} to "%{_stars}%*"
+                \t\tsay {_stars}
+                \tsay first (length of "abc" - 1) characters of "abc"
+                """));
+    }
+
+    @Test
     void defaultValues() {
         assertEquals(List.of("nothing", "set", "nothing"), run("""
                 on load:
@@ -215,6 +230,11 @@ class LanguageTest {
             public void runGlobalLater(long ticks, Runnable task) {
                 delays.add(ticks);
                 later.add(task);
+            }
+
+            @Override
+            public Runnable runGlobalRepeating(long ticks, Runnable task) {
+                throw new UnsupportedOperationException();
             }
         }, e -> {
             throw e;

@@ -37,6 +37,10 @@ final class CoreSyntax {
     static final String ARGUMENT = "ExprArgument";
     static final String TYPED_ARGUMENT = "ExprTypedArgument";
     static final String CHOICE_ARGUMENT = "ExprChoiceArgument";
+    static final String INDICES = "ExprIndices";
+    static final String SORT = "EffSort";
+    static final String PERIODICAL = "EvtPeriodical";
+    static final String PARSE = "ExprParse";
 
     /** {@link #CHANGE} patterns, by index. */
     enum ChangeMode {
@@ -125,13 +129,27 @@ final class CoreSyntax {
                 "reduce %~objects% by %objects%",
                 "(delete|clear|reset:reset) %~objects%");
 
+        // 'every 5 minutes': runs on the global thread, from when the script loads.
+        library.core(SyntaxKind.EVENT, PERIODICAL, null, List.of(), "every %timespan%");
+
+        // '"5" parsed as integer': text through the type's parser, or nothing if it isn't one.
+        library.core(SyntaxKind.EXPRESSION, PARSE, "object", List.of(RegexRole.TYPE), "%text% parsed as [a[n]] <.+>");
+
+        // A list variable's indices, and sorting one: these work on the variable, not its values.
+        library.core(SyntaxKind.EXPRESSION, INDICES, "string", List.of(),
+                "[(the|all [[of] the])] (indexes|indices) of %~objects%",
+                "%~objects%'[s] (indexes|indices)",
+                "[sorted] (indices|indexes) of %~objects% in (ascending|descending:descending) order",
+                "[sorted] %~objects%'[s] (indices|indexes) in (ascending|descending:descending) order");
+        library.core(SyntaxKind.EFFECT, SORT, null, List.of(), "sort %~objects% [in (descending:descending|ascending) order]");
+
         // Pattern 1 is the next value and 2 the previous one.
         // 'number within {_x}': the values of that type. Its type comes from the type name.
         library.core(SyntaxKind.EXPRESSION, TERNARY, "object", List.of(RegexRole.CONDITION),
                 "%objects% if <.+>[,] (otherwise|else) %objects%");
         library.core(SyntaxKind.EXPRESSION, CAST, "object", List.of(RegexRole.TYPE),
                 "[the] (<.+>|value[s]) (within|in) %~objects%");
-        library.core(SyntaxKind.EXPRESSION, LOOP_VALUE, "object", List.of(),
+        library.core(SyntaxKind.EXPRESSION, LOOP_VALUE, "object", List.of(RegexRole.LOOP_VALUE),
                 "[the] [current] loop-<.+>", "[the] next loop-<.+>", "[the] previous loop-<.+>");
         // A command's arguments. Before arithmetic, so 'arg-1' isn't 'arg - 1'.
         // 'arg-1', 'the second argument', 'the last argument', 'the arguments'.
@@ -150,19 +168,16 @@ final class CoreSyntax {
                 "[the] choice arg[ument] <(\\d+)>",
                 "[the] " + ordinal + " choice arg[ument][s]",
                 "[the] [last] choice arg[ument]");
-    }
-
-    /**
-     * Syntax tried after everything else, so the library's elements win: arithmetic, as {@code %object% - %object%}
-     * fits nearly anything ({@code arg-1 ? "x"} isn't {@code arg - (1 ? "x")}), then event values.
-     */
-    static void registerLast(Library library) {
         library.core(SyntaxKind.EXPRESSION, ARITHMETIC, "object", List.of(),
                 "%object%[ ]+[ ]%object%",
                 "%object%[ ]-[ ]%object%",
                 "%object%[ ]*[ ]%object%",
                 "%object%[ ]/[ ]%object%",
                 "%object%[ ]^[ ]%object%");
+    }
+
+    /** Syntax tried after everything else, so the library's elements win: event values match any type name. */
+    static void registerLast(Library library) {
         // 'player', 'event-world': the event's value of that type. Tried last, as it matches any type name.
         library.core(SyntaxKind.EXPRESSION, EVENT_VALUE, "object", List.of(RegexRole.TYPE), "[the] [event-]<.+>");
     }
