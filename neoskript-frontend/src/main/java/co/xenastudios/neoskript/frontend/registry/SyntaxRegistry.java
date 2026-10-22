@@ -1,0 +1,231 @@
+/*
+ * Copyright (c) 2026 Xena Studios
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+package co.xenastudios.neoskript.frontend.registry;
+
+import co.xenastudios.neoskript.frontend.pattern.PatternIndex;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Everything the parser knows about: types, syntax elements and built-in functions. Bukkit-free; the
+ * standard library fills it in on a server, and the stub registry in tests fills it in from Skript's docs.
+ *
+ * <p>Immutable once built, so one registry can be shared by parsers on several threads.
+ */
+public final class SyntaxRegistry {
+
+    /** The type every value has. Expressions of unknown type are treated as this. */
+    public static final String OBJECT = "object";
+
+    /** A syntax element's pattern, filed in the index for its kind. */
+    public record Candidate(SyntaxInfo syntax, int pattern) {}
+
+    private final Map<String, TypeInfo> typesById;
+    private final Map<String, TypeRef> typeNames;
+    private final Map<SyntaxKind, List<SyntaxInfo>> syntaxes;
+    private final Map<SyntaxKind, PatternIndex<Candidate>> indexes;
+    private final Map<String, List<FunctionInfo>> functions;
+    private final Map<String, Set<String>> supertypes;
+    private final Set<String> strictTypes;
+    private final Set<String> entityNames;
+
+    private SyntaxRegistry(Builder builder) {
+        this.typesById = Collections.unmodifiableMap(new LinkedHashMap<>(builder.typesById));
+        this.typeNames = Map.copyOf(builder.typeNames);
+        Map<SyntaxKind, List<SyntaxInfo>> syntaxes = new EnumMap<>(SyntaxKind.class);
+        Map<SyntaxKind, PatternIndex<Candidate>> indexes = new EnumMap<>(SyntaxKind.class);
+        for (SyntaxKind kind : SyntaxKind.values()) {
+            List<SyntaxInfo> list = List.copyOf(builder.syntaxes.getOrDefault(kind, List.of()));
+            syntaxes.put(kind, list);
+            PatternIndex<Candidate> index = new PatternIndex<>();
+            for (SyntaxInfo syntax : list) {
+                for (int i = 0; i < syntax.patterns().size(); i++) {
+                    index.add(syntax.patterns().get(i), new Candidate(syntax, i));
+                }
+            }
+            indexes.put(kind, index);
+        }
+        this.syntaxes = Collections.unmodifiableMap(syntaxes);
+        this.indexes = Collections.unmodifiableMap(indexes);
+        Map<String, List<FunctionInfo>> functions = new HashMap<>();
+        builder.functions.forEach((name, overloads) -> functions.put(name, List.copyOf(overloads)));
+        this.functions = Map.copyOf(functions);
+        this.supertypes = closure(builder.supertypes);
+        this.strictTypes = Set.copyOf(builder.strictTypes);
+        this.entityNames = Set.copyOf(builder.entityNames);
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public TypeInfo type(String id) {
+        return typesById.get(id.toLowerCase(Locale.ROOT));
+    }
+
+    public Iterable<TypeInfo> types() {
+        return typesById.values();
+    }
+
+    /** Resolves a type as written in a pattern or script: id or display name, singular or plural. */
+    public TypeRef resolveType(String name) {
+        return typeNames.get(normalize(name));
+    }
+
+    public List<SyntaxInfo> syntaxes(SyntaxKind kind) {
+        return syntaxes.get(kind);
+    }
+
+    public PatternIndex<Candidate> index(SyntaxKind kind) {
+        return indexes.get(kind);
+    }
+
+    /** A built-in function's overloads, or an empty list if there's no such function. */
+    public List<FunctionInfo> functions(String name) {
+        return functions.getOrDefault(name, List.of());
+    }
+
+    /**
+     * Whether a value of type {@code from} can be used where {@code to} is expected: the same type, a
+     * subtype, an {@code object}, or a registered conversion. Two types with no known relation are allowed
+     * unless one of them is strict (numbers, text, booleans and the like), so missing relations between
+     * game types don't cause false errors.
+     */
+    public boolean isAssignable(String from, String to) {
+        if (from == null || to == null || from.equals(to) || from.equals(OBJECT) || to.equals(OBJECT)) {
+            return true;
+        }
+        Set<String> supers = supertypes.get(from);
+        if (supers != null && supers.contains(to)) {
+            return true;
+        }
+        return !strictTypes.contains(from) && !strictTypes.contains(to);
+    }
+
+    /** Whether {@code name} names a kind of entity, as in {@code the zombie} or {@code event-creeper}. */
+    public boolean isEntityName(String name) {
+        return entityNames.contains(normalize(name));
+    }
+
+    static String normalize(String name) {
+        String lower = name.strip().toLowerCase(Locale.ROOT);
+        if (lower.indexOf("  ") < 0 && lower.indexOf('\t') < 0) {
+            return lower;
+        }
+        return lower.replaceAll("\\s+", " ");
+    }
+
+    /** English plural of a type name, pluralizing the last word: {@code living entity} → {@code living entities}. */
+    public static String plural(String name) {
+        if (name.endsWith("y") && name.length() > 1 && "aeiou".indexOf(name.charAt(name.length() - 2)) < 0) {
+            return name.substring(0, name.length() - 1) + "ies";
+        }
+        if (name.endsWith("s") || name.endsWith("x") || name.endsWith("z") || name.endsWith("ch")
+                || name.endsWith("sh")) {
+            return name + "es";
+        }
+        return name + "s";
+    }
+
+    private static Map<String, Set<String>> closure(Map<String, Set<String>> direct) {
+        Map<String, Set<String>> result = new HashMap<>();
+        for (String type : direct.keySet()) {
+            Set<String> seen = new HashSet<>();
+            Deque<String> queue = new ArrayDeque<>(direct.get(type));
+            while (!queue.isEmpty()) {
+                String next = queue.pop();
+                if (seen.add(next)) {
+                    queue.addAll(direct.getOrDefault(next, Set.of()));
+                }
+            }
+            result.put(type, Set.copyOf(seen));
+        }
+        return Map.copyOf(result);
+    }
+
+    public static final class Builder {
+
+        private final Map<String, TypeInfo> typesById = new LinkedHashMap<>();
+        private final Map<String, TypeRef> typeNames = new HashMap<>();
+        private final Map<SyntaxKind, List<SyntaxInfo>> syntaxes = new EnumMap<>(SyntaxKind.class);
+        private final Map<String, List<FunctionInfo>> functions = new HashMap<>();
+        private final Map<String, Set<String>> supertypes = new HashMap<>();
+        private final Set<String> strictTypes = new HashSet<>();
+        private final Set<String> entityNames = new HashSet<>();
+
+        private Builder() {}
+
+        /**
+         * Adds a type, known by its id and display name and their plurals, plus any {@code aliases} (for
+         * irregular plurals, write them as {@code name/plural}).
+         */
+        public Builder type(TypeInfo type, String... aliases) {
+            String id = type.id().toLowerCase(Locale.ROOT);
+            typesById.put(id, type);
+            nameType(id, type);
+            nameType(normalize(type.name()), type);
+            nameType(normalize(type.name()).replace(" ", ""), type);
+            for (String alias : aliases) {
+                String[] forms = alias.split("/", 2);
+                typeNames.put(normalize(forms[0]), new TypeRef(type, false));
+                if (forms.length > 1) {
+                    typeNames.put(normalize(forms[1]), new TypeRef(type, true));
+                }
+            }
+            return this;
+        }
+
+        private void nameType(String name, TypeInfo type) {
+            typeNames.putIfAbsent(name, new TypeRef(type, false));
+            typeNames.putIfAbsent(plural(name), new TypeRef(type, true));
+        }
+
+        public Builder syntax(SyntaxInfo syntax) {
+            syntaxes.computeIfAbsent(syntax.kind(), k -> new ArrayList<>()).add(syntax);
+            return this;
+        }
+
+        /** Adds a built-in function, or another overload of one. */
+        public Builder function(FunctionInfo function) {
+            functions.computeIfAbsent(function.name(), k -> new ArrayList<>()).add(function);
+            return this;
+        }
+
+        /** Values of type {@code sub} can be used as any of {@code supers} (subtype or conversion). */
+        public Builder assignable(String sub, String... supers) {
+            supertypes.computeIfAbsent(sub, k -> new HashSet<>()).addAll(List.of(supers));
+            return this;
+        }
+
+        /** Types that only accept themselves and registered conversions, like numbers and text. */
+        public Builder strict(String... types) {
+            strictTypes.addAll(List.of(types));
+            return this;
+        }
+
+        /** Names of kinds of entity, singular and plural, e.g. {@code zombie} and {@code zombies}. */
+        public Builder entityNames(Iterable<String> names) {
+            for (String name : names) {
+                entityNames.add(normalize(name));
+                entityNames.add(plural(normalize(name)));
+            }
+            return this;
+        }
+
+        public SyntaxRegistry build() {
+            return new SyntaxRegistry(this);
+        }
+    }
+}

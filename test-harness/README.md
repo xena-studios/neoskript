@@ -22,6 +22,7 @@ Reports go to `build/harness/reports/`, and each run's server directory and `har
 | `neoskript-skript-conflict` | smoke | Skript envs | With Skript installed, NeoSkript refuses to run and Skript still works (D10) |
 | `skript-smoke` | smoke | Skript envs | The reference Skript runs `scripts/smoke.sk` |
 | `skript-real-world-corpus` | smoke | Skript envs | The reference Skript loads the real-world corpus with no errors or warnings, and every self-test passes |
+| `neoskript-parse-corpus` | smoke | Skript envs | NeoSkript's frontend parses Skript's tests, the real-world corpus and the benchmark scripts with zero false errors against the stub registry, and times it. No server needed |
 | `skript-test-suite` | baseline | Skript envs | Runs Skript's own test suite in Skript's test mode and records the results |
 | `skript-load-benchmark` | baseline | Skript envs | Times Skript loading and reloading 40 generated scripts (600 structures) |
 

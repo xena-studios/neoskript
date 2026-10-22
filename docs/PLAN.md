@@ -1,6 +1,6 @@
 # NeoSkript: Design & Roadmap
 
-Status: v1 (decisions locked) · M0 done · 2026-10-21
+Status: v1 (decisions locked) · M0 and M1 done · 2026-10-22
 
 ## 1. Goal
 
@@ -136,6 +136,14 @@ Gradle multi-module setup, CI, license and headers, pinning the latest stable Sk
 **M1: Frontend**
 Structure parser, pattern language + compiler + matcher, type system skeleton, AST, diagnostics, stub syntax registry imported from Skript's syntax list.
 *Exit:* the full corpus parses with zero false errors against the stub registry. Parse time is measured.
+
+> **Status: done (2026-10-22).** The frontend parses the whole corpus with **zero false errors** against the stub registry: Skript's own tests (537 files, 17,705 lines), the real-world corpus (13 files) and the generated benchmark scripts (40 files, 6,000 lines). The `neoskript-parse-corpus` harness scenario checks this on every CI run.
+> - **Parse time** (median of 5 warm runs on an Apple Silicon dev machine): the 6,000-line benchmark in **40 ms**, the real-world corpus in 17 ms, Skript's tests in about 2 s. Skript takes ~1.7 s to load the benchmark scripts at startup. That's not a like-for-like comparison yet: Skript's number covers its whole load, and NeoSkript's covers parsing only, until M2 adds compilation.
+> - **What's built:** the structure parser; the pattern compiler, matcher and index; the registry (types, syntax, functions, type relations); and the expression, statement and script parsers.
+>   - Matching is memoized by span and expected type, filtered per line by the literals a pattern needs, anchored for a pattern's final placeholder, and prefers fully resolved parses over ones that need unresolved word literals.
+>   - Language features covered: typed literals (`black (color)`), percentages, block data, expression sections, `if any`/`if all`, command subcommands and named or ranged arguments, function overloads, named arguments, `->` return types, and Skript's test-only syntax.
+> - **Stub registry:** generated from Skript's docs export (`/sk gen-docs` with `-Dskript.testing.genDocs=true`), in the frontend's test fixtures. The export's patterns are in documentation form: no parse marks or tags, display-name types. A few things it leaves out are added by hand, each backed by a corpus script: regex roles, type relations, closed literal sets, a handful of pattern fixes, and the test-only syntax.
+> - **Known gap:** Skript reports an error in 90 of the corpus's `parse:` test blocks, and NeoSkript catches 21. Most of the rest are checks Skript makes in each element's own setup (an effect that only works on living entities, local variable type hints, unreachable code, expressions limited to certain events), so they come with each element's implementation in M4. The exit criterion was zero *false* errors, and that holds.
 
 **M2: Compiler + runtime core (Paper and Folia)**
 IR, ASM backend, control flow, locals, functions, options, waits as state machines, scheduler abstraction with both implementations, reload with atomic swap.
