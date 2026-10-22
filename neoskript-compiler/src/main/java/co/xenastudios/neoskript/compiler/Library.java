@@ -66,6 +66,7 @@ public final class Library implements Registrar {
         type(SyntaxRegistry.OBJECT, "object", Object.class);
         type("timespan", "timespan", Timespan.class);
         parser("timespan", Timespan::parse);
+        type("date", "date", co.xenastudios.neoskript.runtime.Date.class);
         CoreSyntax.register(this);
         CoreCodecs.register(this);
     }
@@ -235,6 +236,12 @@ public final class Library implements Registrar {
     /** How variable values are saved, as registered with {@link #storage}. */
     public VariableCodecs codecs() {
         return codecs;
+    }
+
+    @Override
+    public <F, T> void converter(Class<F> from, Class<T> to, java.util.function.Function<? super F, ? extends T> converter) {
+        checkOpen();
+        Values.registerConverter(from, to, converter);
     }
 
     @Override

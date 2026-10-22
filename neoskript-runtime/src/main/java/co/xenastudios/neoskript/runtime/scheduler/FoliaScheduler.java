@@ -32,6 +32,13 @@ public final class FoliaScheduler implements Scheduler {
     }
 
     @Override
+    public Runnable runGlobalRepeating(long ticks, Runnable task) {
+        long period = Math.max(ticks, 1);
+        return plugin.getServer().getGlobalRegionScheduler()
+                .runAtFixedRate(plugin, scheduled -> task.run(), period, period)::cancel;
+    }
+
+    @Override
     public void runLater(Object owner, long ticks, Runnable task) {
         // Folia's delayed tasks wait at least a tick.
         long delay = Math.max(ticks, 1);

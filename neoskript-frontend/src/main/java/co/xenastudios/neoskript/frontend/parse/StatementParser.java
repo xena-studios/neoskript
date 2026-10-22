@@ -200,7 +200,9 @@ final class StatementParser {
         }
         if (MULTILINE_CONDITIONAL.matcher(key).matches() && !header.syntax().patterns().get(header.pattern())
                 .source().endsWith("<.+>")) {
-            return new Statement.Conditions(line, header, conditions(section.children()));
+            List<Line> lines = new ArrayList<>();
+            List<ParsedSyntax> conditions = conditions(section.children(), lines);
+            return new Statement.Conditions(line, header, conditions, lines);
         }
         if (PARSE_IF.matcher(key).matches()) {
             // 'parse if' only parses its code when the condition is true while loading, which can't be
@@ -227,7 +229,7 @@ final class StatementParser {
         return body;
     }
 
-    private List<ParsedSyntax> conditions(List<Node> nodes) {
+    private List<ParsedSyntax> conditions(List<Node> nodes, List<Line> lines) {
         List<ParsedSyntax> conditions = new ArrayList<>();
         for (Node node : nodes) {
             Line line = node.line();
@@ -239,6 +241,7 @@ final class StatementParser {
             } else {
                 check(line, condition);
                 conditions.add(condition);
+                lines.add(line);
             }
         }
         return conditions;

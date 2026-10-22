@@ -227,6 +227,19 @@ final class LineParser {
                 .toList());
     }
 
+    private static final java.util.regex.Pattern LOOP_VALUE_NAME =
+            java.util.regex.Pattern.compile("(.+?)(?:-\\d+)?", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    private boolean isLoopValueName(String text) {
+        java.util.regex.Matcher name = LOOP_VALUE_NAME.matcher(text.strip());
+        if (!name.matches()) {
+            return false;
+        }
+        String word = name.group(1).toLowerCase(java.util.Locale.ROOT);
+        return word.equals("value") || word.equals("index") || word.equals("counter") || word.equals("iteration")
+                || registry.resolveType(word) != null;
+    }
+
     private boolean returnTypeFits(SyntaxInfo syntax, Expected expected) {
         // Expressions whose type comes from a regex (event-<type>) are checked after matching.
         return syntax.returnType() == null || hasTypeRole(syntax) || expected.accepts(syntax.returnType(), registry);
@@ -269,6 +282,7 @@ final class LineParser {
                     }
                     case EXPRESSION -> expression(start, end, Expected.OBJECTS);
                     case TYPE -> typeName(start, end);
+                    case LOOP_VALUE -> isLoopValueName(text.substring(start, end)) ? match : null;
                     case CODE -> {
                         Object code = condition(start, end);
                         if (code == null) {

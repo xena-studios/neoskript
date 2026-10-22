@@ -49,8 +49,9 @@ public record CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunct
 
     /**
      * A trigger and what runs it: an event NeoSkript fires itself, the classes of the server events it runs
-     * for, or for a test ({@code test "name":}) its name. The others are {@code null}.
+     * for, how often it runs ({@code every 5 minutes}), or for a test ({@code test "name":}) its name. The
+     * others are {@code null}.
      */
     public record CompiledTrigger(String script, int line, ScriptEvent event, java.util.List<Class<?>> eventClasses,
-            String testName, Trigger trigger) {}
+            co.xenastudios.neoskript.runtime.Timespan period, String testName, Trigger trigger) {}
 }

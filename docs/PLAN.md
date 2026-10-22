@@ -242,8 +242,27 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - Unit tests (`CommandParserTest`, `CommandsTest`).
 >      - `neoskript-commands` on all four servers, driven by the console, including a reload that changes one command and removes the others.
 >    - **Not yet:** Skript's `StructCommand` test also needs local variable type hints and item types; `execute command` doesn't report "Failed to execute command" errors yet, as there's no `catch runtime errors`.
-> 3. **The real-world corpus:** the text, player, time and location syntax it uses, and converters between types. *Done when* all 12 real-world scripts load on NeoSkript and pass their self-tests, on all four servers.
-> 4. **Items and aliases:** item types from Paper's registries plus Skript's alias names, inventories, and item stack codecs, so M3's raw item values become real items.
+> 3. **The real-world corpus:** the text, player, time and location syntax it uses, and converters between types. *Done when* the 10 real-world scripts that don't use items load on NeoSkript and pass their self-tests, on all four servers (`kits.sk` and `warps.sk` need items and inventories, so they move to step 4).
+>
+>    **Status: done (2026-10-22).**
+>    - **Types:** `date` (saved in `variables.csv` byte for byte), `location`, `game mode`, plus parsers so text can become a value (`"5" parsed as integer`, command arguments).
+>    - **Converters:** `Registrar.converter(from, to, f)`. A placeholder whose type something converts to gets values converted at run time: an entity or block where a location is expected is its location.
+>    - **`Update` effects:** effects that set one of their placeholders, like `replace "a" in {_x} with "b"`, compiled into a `set` through the same path as `set`.
+>    - **Syntax:**
+>      - Text: case, length, join and split, parts of text, character counts, `matches`, `replace`, new lines, colors, `parsed as`.
+>      - Lists: `indices of` (sorted too) and `sort`.
+>      - Time: `now`, `difference between`, Unix timestamps.
+>      - Places: `location of`, spawn points, worlds by name, `distance between`, `teleport`, and the `location()` and `world()` functions.
+>      - Players: `player()`/`offlineplayer()`, played before, can fly, flight mode, game mode, food level, tab list name, heal, ignite/extinguish, titles, action bars, sounds, `all players`.
+>      - Events: `every <timespan>` (cancelled and rescheduled on reload), move, server list ping. Settable chat message and format, join and quit messages, and MOTD.
+>    - **Parser fixes the corpus found:**
+>      - A loop value's name has to be `value`, `index`, `counter`, `iteration` or a type, so `loop-value in lower case` isn't a loop value called "value in lower case".
+>      - `f(player)` is a function call, not the literal `f` of type player: a type in brackets needs a space before it.
+>      - Arithmetic is back before the library's expressions, so `length of {_x} - 1` is `(length of {_x}) - 1`. The rule from step 2 that a placeholder can't start inside `arg-1` still keeps `arg-1 ? "x"` right.
+>      - The conditions of `if all:`/`if any:` are compiled against their own lines; this used to crash the compiler.
+>      - `loop-index` works for any loop: values that don't come from a list variable are indexed 1, 2, 3.
+>    - **Tested by:** `neoskript-real-world-corpus` on all four servers: the 10 scripts without items load cleanly and pass. `warps` passes too, though its menu lines don't load yet; `kits` fails. Both are reported but don't fail the check until step 4. Plus regression tests in `LanguageTest`.
+> 4. **Items and aliases:** item types from Paper's registries plus Skript's alias names, inventories, and item stack codecs, so M3's raw item values become real items. *Done when* all 12 real-world scripts load on NeoSkript and pass their self-tests, on all four servers.
 > 5. **The world:** entities and spawning, blocks, locations and vectors, worlds, potions.
 > 6. **The long tail:** whatever Skript's tests still need, most-used first, then the differential runner for the 95% check.
 

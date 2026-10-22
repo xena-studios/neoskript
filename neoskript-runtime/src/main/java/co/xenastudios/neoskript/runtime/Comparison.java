@@ -27,14 +27,18 @@ public final class Comparison {
 
     /**
      * How {@code a} orders against {@code b}: negative, zero or positive, or {@code null} if they can't be
-     * ordered (only numbers and texts can).
+     * ordered (numbers, texts, and values of the same comparable type, like dates and timespans, can).
      */
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public static Integer order(Object a, Object b) {
         if (a instanceof Number x && b instanceof Number y) {
             return Double.compare(x.doubleValue(), y.doubleValue());
         }
         if (a instanceof String x && b instanceof String y) {
             return String.CASE_INSENSITIVE_ORDER.compare(x, y);
+        }
+        if (a instanceof Comparable x && b != null && a.getClass() == b.getClass()) {
+            return x.compareTo(b);
         }
         return null;
     }

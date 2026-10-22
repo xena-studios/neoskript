@@ -53,6 +53,7 @@ import co.xenastudios.neoskript.api.element.ElementInfo;
 import co.xenastudios.neoskript.api.element.Expression;
 import co.xenastudios.neoskript.api.element.Function;
 import co.xenastudios.neoskript.api.element.TriggerContext;
+import co.xenastudios.neoskript.api.element.Update;
 import co.xenastudios.neoskript.frontend.parse.CommandPattern;
 import co.xenastudios.neoskript.frontend.parse.Expr;
 import co.xenastudios.neoskript.frontend.parse.ParsedScript;
@@ -685,8 +686,12 @@ final class TriggerCompiler {
                 lineOf(statement, statement.line().key());
                 Label then = new Label();
                 boolean any = key.contains(" any") || key.contains("at least one");
-                for (ParsedSyntax condition : conditions.conditions()) {
-                    condition(condition);
+                for (int c = 0; c < conditions.conditions().size(); c++) {
+                    // Each condition's positions are in its own line.
+                    co.xenastudios.neoskript.frontend.structure.Line conditionLine = conditions.conditionLines().get(c);
+                    line = conditionLine.number();
+                    source = conditionLine.text();
+                    condition(conditions.conditions().get(c));
                     method.visitJumpInsn(any ? IFNE : IFEQ, any ? then : next);
                 }
                 if (any) {
@@ -820,6 +825,12 @@ final class TriggerCompiler {
     // ---------------------------------------------------------------- effects
 
     private void effect(ParsedSyntax effect) throws CompileException {
+        if (library.binding(effect.syntax()) instanceof ElementFactory<?> factory
+                && factory.create(new ElementInfo(effect.pattern(), effect.match().mark(), effect.match().tags()))
+                        instanceof Update update) {
+            update(effect, update);
+            return;
+        }
         if (!(library.binding(effect.syntax()) instanceof Library.Core core)) {
             callThrough(effect, Effect.class);
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Effect.class), "execute",
@@ -843,6 +854,13 @@ final class TriggerCompiler {
                 method.visitInsn(ARETURN);
             }
             case CoreSyntax.CHANGE -> change(effect);
+            case CoreSyntax.SORT -> {
+                Expr.Variable list = listVariable(effect, "Only list variables can be sorted");
+                variableStore(list);
+                variableName(list);
+                method.visitInsn(effect.match().hasTag("descending") ? ICONST_1 : ICONST_0);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "sortList", "(" + STRING_DESC + "Z)V", false);
+            }
             case CoreSyntax.DO_IF -> {
                 if (!(effect.match().regexValues().get(1) instanceof ParsedSyntax condition)) {
                     throw unsupported("'" + source + "'");
@@ -992,6 +1010,52 @@ final class TriggerCompiler {
         }
     }
 
+    /** An {@link Update}: sets its target placeholder to what it works out. */
+    private void update(ParsedSyntax effect, Update update) throws CompileException {
+        if (!(effect.match().values().get(update.target()) instanceof Expr target)) {
+            throw unsupported("'" + source + "'");
+        }
+        setTo(target, () -> {
+            constant(update, Update.class);
+            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+            arguments(effect);
+            method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Update.class), "update",
+                    "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
+        });
+    }
+
+    /** Sets {@code target}, a variable or a {@link Changeable} expression, to the value {@code value} pushes. */
+    private void setTo(Expr target, Body value) throws CompileException {
+        if (target instanceof Expr.Variable variable) {
+            variableStore(variable);
+            variableName(variable);
+            value.emit();
+            convert(variable.list());
+            method.visitMethodInsn(INVOKEVIRTUAL, STORE, variable.list() ? "setList" : "set",
+                    "(" + STRING_DESC + (variable.list() ? OBJECTS : OBJECT_DESC) + ")V", false);
+            return;
+        }
+        if (!(target instanceof Expr.Syntax syntax)
+                || !(library.binding(syntax.syntax().syntax()) instanceof ElementFactory<?> factory)) {
+            throw new CompileException(line, source.substring(target.start(), target.end()) + " can't be set to anything");
+        }
+        ParsedSyntax parsed = syntax.syntax();
+        Object element = factory.create(new ElementInfo(parsed.pattern(), parsed.match().mark(), parsed.match().tags()));
+        Class<?>[] accepted = element instanceof Changeable changeable ? changeable.acceptChange(Changeable.Mode.SET) : null;
+        if (accepted == null) {
+            throw new CompileException(line, source.substring(target.start(), target.end()) + " can't be set to anything");
+        }
+        constant(element, Changeable.class);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        arguments(parsed);
+        value.emit();
+        constant(accepted, Class[].class);
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "narrow", "(" + OBJECT_DESC + "[Ljava/lang/Class;)" + OBJECTS, false);
+        constant(Changeable.Mode.SET, Changeable.Mode.class);
+        method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Changeable.class), "change",
+                "(" + CONTEXT + OBJECTS + OBJECTS + Type.getDescriptor(Changeable.Mode.class) + ")V", true);
+    }
+
     /** {@code set name of player to "x"}: changes an expression that implements {@link Changeable}. */
     private void changeExpression(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr.Syntax target)
             throws CompileException {
@@ -1080,9 +1144,28 @@ final class TriggerCompiler {
             method.visitInsn(DUP);
             pushInt(i);
             expression(expr);
+            Class<?> target = conversionTarget(specs[i]);
+            if (target != null) {
+                constant(target, Class.class);
+                method.visitMethodInsn(INVOKESTATIC, VALUES, "convert",
+                        "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECT_DESC, false);
+            }
             convert(isPlural(specs[i]));
             method.visitInsn(AASTORE);
         }
+    }
+
+    /**
+     * The class values for a placeholder are converted to, when it has one type and something converts to
+     * it ({@code %location%} given a player), else {@code null}.
+     */
+    private Class<?> conversionTarget(PlaceholderSpec spec) {
+        if (spec.types().size() != 1) {
+            return null;
+        }
+        TypeRef ref = registry.resolveType(spec.types().getFirst());
+        Class<?> target = ref == null ? null : library.javaClass(ref.type().id());
+        return target != null && Values.convertsTo(target) ? target : null;
     }
 
     /**
@@ -1128,6 +1211,14 @@ final class TriggerCompiler {
             throw new CompileException(line, "There's no " + ref.type().name() + " in " + where);
         }
         eventValue(getter);
+    }
+
+    /** The list variable a syntax element works on, such as the {@code {x::*}} in {@code sort {x::*}}. */
+    private Expr.Variable listVariable(ParsedSyntax syntax, String problem) throws CompileException {
+        if (syntax.match().values().getFirst() instanceof Expr.Variable variable && variable.list()) {
+            return variable;
+        }
+        throw new CompileException(line, problem + ": '" + source + "'");
     }
 
     // ---------------------------------------------------------------- command arguments
@@ -1300,6 +1391,32 @@ final class TriggerCompiler {
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.LOOP_VALUE) -> loopValue(syntax.syntax());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE) -> eventValue(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.PARSE) -> {
+                if (!(syntax.syntax().match().regexValues().getFirst() instanceof TypeRef ref)) {
+                    throw unsupported("'" + source.substring(syntax.start(), syntax.end()) + "'");
+                }
+                java.util.function.Function<String, ?> parser = library.parser(ref.type().id());
+                if (parser == null) {
+                    throw new CompileException(line, "Text can't be parsed as " + article(ref.type().name()) + " "
+                            + ref.type().name());
+                }
+                constant(parser, java.util.function.Function.class);
+                expression((Expr) syntax.syntax().match().values().getFirst());
+                method.visitMethodInsn(INVOKESTATIC, VALUES, "parse",
+                        "(Ljava/util/function/Function;" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+            }
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.INDICES) -> {
+                Expr.Variable list = listVariable(syntax.syntax(), "Only list variables have indices");
+                variableStore(list);
+                variableName(list);
+                if (syntax.syntax().pattern() < 2) {
+                    method.visitMethodInsn(INVOKEVIRTUAL, STORE, "indices", "(" + STRING_DESC + ")[" + STRING_DESC, false);
+                } else {
+                    method.visitInsn(syntax.syntax().match().hasTag("descending") ? ICONST_1 : ICONST_0);
+                    method.visitMethodInsn(INVOKEVIRTUAL, STORE, "sortedIndices",
+                            "(" + STRING_DESC + "Z)[" + STRING_DESC, false);
+                }
+            }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TYPED_ARGUMENT) -> typedArgument(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.CHOICE_ARGUMENT) -> choiceArgument(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TERNARY) -> {
@@ -1463,10 +1580,16 @@ final class TriggerCompiler {
         int offset = syntax.pattern() == 1 ? 1 : syntax.pattern() == 2 ? -1 : 0;
         switch (matcher.group(1)) {
             case "index" -> {
-                if (loop.indicesSlot() < 0) {
-                    throw new CompileException(line, "'loop-index' only works when looping a list variable");
+                if (loop.indicesSlot() >= 0) {
+                    element(loop.indicesSlot(), loop.indexSlot(), offset);
+                } else {
+                    // Values that don't come from a list variable, like a function's, are indexed 1, 2, 3...
+                    method.visitVarInsn(ILOAD, loop.indexSlot());
+                    method.visitInsn(I2L);
+                    method.visitLdcInsn((long) 1 + offset);
+                    method.visitInsn(LADD);
+                    method.visitMethodInsn(INVOKESTATIC, "java/lang/String", "valueOf", "(J)Ljava/lang/String;", false);
                 }
-                element(loop.indicesSlot(), loop.indexSlot(), offset);
             }
             case "counter", "iteration" -> {
                 method.visitVarInsn(ILOAD, loop.indexSlot());
