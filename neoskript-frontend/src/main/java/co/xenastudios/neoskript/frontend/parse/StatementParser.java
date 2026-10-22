@@ -84,7 +84,7 @@ final class StatementParser {
                 return new Statement.Section(line, effect, body(section.children()));
             }
             Expr.FunctionCall call = parser.call(0, key.length());
-            if (call != null && call.arguments().stream().anyMatch(StatementParser::hasSectionExpression)) {
+            if (call != null && call.arguments().stream().anyMatch(a -> a != null && hasSectionExpression(a))) {
                 return new Statement.Section(line, null, body(section.children()));
             }
             error(line, "Can't understand this section: " + key);
@@ -162,6 +162,19 @@ final class StatementParser {
 
     private static boolean isImplicitCondition(Statement.Section section) {
         return section.header().syntax().patterns().get(section.header().pattern()).source().startsWith("implicit:");
+    }
+
+    /** Parses {@code text} on its own as a value of {@code type}, reporting it at {@code line} if it doesn't. */
+    Expr expression(Line line, String text, String type, boolean plural) {
+        co.xenastudios.neoskript.frontend.registry.TypeInfo info = context.registry().type(type);
+        Expected expected = info == null
+                ? Expected.OBJECTS
+                : context.expected(new co.xenastudios.neoskript.frontend.registry.TypeRef(info, plural));
+        Expr expr = new LineParser(context, text).expression(0, text.length(), expected);
+        if (expr == null) {
+            error(line, "Can't understand this expression: '" + text + "'");
+        }
+        return expr;
     }
 
     private void error(Line line, String message) {

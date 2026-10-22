@@ -48,7 +48,7 @@ class ScriptCompilerTest {
     private CompiledScripts compile(String text) {
         List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk", text)));
         assertEquals(List.of(), parsed.getFirst().diagnostics());
-        return new ScriptCompiler(library).compile(parsed);
+        return new ScriptCompiler(library, new co.xenastudios.neoskript.runtime.variables.VariableStore()).compile(parsed);
     }
 
     private void run(String text) {
@@ -90,7 +90,7 @@ class ScriptCompilerTest {
 
     @Test
     void reportsWhatItCantCompileYet() {
-        CompiledScripts compiled = compile("on load:\n\tsay \"a\"\n\tsay {_x}\n");
+        CompiledScripts compiled = compile("on load:\n\tsay \"a\"\n\tsay diamond sword\n");
         assertEquals(List.of(), compiled.triggers());
         assertEquals(1, compiled.diagnostics().size());
         assertTrue(compiled.diagnostics().getFirst().message().startsWith("NeoSkript can't run this yet"),

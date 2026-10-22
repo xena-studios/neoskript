@@ -20,6 +20,7 @@ Reports go to `build/harness/reports/`, and each run's server directory and `har
 |---|---|---|---|
 | `neoskript-boot` | smoke | all | NeoSkript enables and detects the right platform and version |
 | `neoskript-hello` | smoke | all | NeoSkript compiles and runs `scripts/neoskript-hello.sk` |
+| `neoskript-language` | smoke | all | NeoSkript runs `scripts/neoskript-language.sk`: variables, arithmetic, loops, conditionals and functions |
 | `neoskript-skript-migration` | smoke | all | With only `plugins/Skript/scripts`, NeoSkript copies the scripts over on first start and runs them |
 | `neoskript-skript-conflict` | smoke | Skript envs | With Skript installed, NeoSkript refuses to run and Skript still works (D10) |
 | `skript-smoke` | smoke | Skript envs | The reference Skript runs `scripts/smoke.sk` |

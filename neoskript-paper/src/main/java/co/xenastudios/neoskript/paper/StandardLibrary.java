@@ -15,5 +15,7 @@ public final class StandardLibrary {
         CoreTypes.register(registrar);
         ScriptEvents.register(registrar);
         Messages.register(registrar);
+        Logic.register(registrar);
+        MathFunctions.register(registrar);
     }
 }

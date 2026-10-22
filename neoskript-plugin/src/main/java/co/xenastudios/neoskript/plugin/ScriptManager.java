@@ -16,6 +16,7 @@ import co.xenastudios.neoskript.frontend.source.SourceFile;
 import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
 import co.xenastudios.neoskript.runtime.SimpleTriggerContext;
 import co.xenastudios.neoskript.runtime.scheduler.Scheduler;
+import co.xenastudios.neoskript.runtime.variables.VariableStore;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,6 +38,8 @@ final class ScriptManager {
     private final Library library;
     private final Scheduler scheduler;
     private final Logger logger;
+    /** Global variables. Kept in memory for now; saving them comes in M3. */
+    private final VariableStore globals = new VariableStore();
 
     ScriptManager(Path scriptsDir, Library library, Scheduler scheduler, Logger logger) {
         this.scriptsDir = scriptsDir;
@@ -50,7 +53,7 @@ final class ScriptManager {
         Files.createDirectories(scriptsDir);
         List<SourceFile> files = read();
         List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(files);
-        CompiledScripts compiled = new ScriptCompiler(library).compile(parsed);
+        CompiledScripts compiled = new ScriptCompiler(library, globals).compile(parsed);
         long elapsed = (System.nanoTime() - start) / 1_000_000;
 
         Map<String, SourceFile> byName = new HashMap<>();

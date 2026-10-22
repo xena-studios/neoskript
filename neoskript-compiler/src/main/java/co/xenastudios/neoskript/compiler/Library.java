@@ -8,13 +8,18 @@ import co.xenastudios.neoskript.api.element.Condition;
 import co.xenastudios.neoskript.api.element.Effect;
 import co.xenastudios.neoskript.api.element.ElementFactory;
 import co.xenastudios.neoskript.api.element.Expression;
+import co.xenastudios.neoskript.api.element.Function;
+import co.xenastudios.neoskript.api.registration.Parameter;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.api.registration.ScriptEvent;
 import co.xenastudios.neoskript.frontend.pattern.PatternCompiler;
+import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
+import co.xenastudios.neoskript.frontend.registry.RegexRole;
 import co.xenastudios.neoskript.frontend.registry.SyntaxInfo;
 import co.xenastudios.neoskript.frontend.registry.SyntaxKind;
 import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
 import co.xenastudios.neoskript.frontend.registry.TypeInfo;
+import co.xenastudios.neoskript.runtime.Values;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -33,13 +38,18 @@ public final class Library implements Registrar {
 
     private record Key(SyntaxKind kind, String id) {}
 
+    /** The binding of the core syntax the compiler implements itself: control flow, variables, arithmetic. */
+    record Core(String id) {}
+
     private final SyntaxRegistry.Builder builder = SyntaxRegistry.builder();
     private final Map<Key, Object> bindings = new HashMap<>();
     private final Map<String, Class<?>> javaClasses = new HashMap<>();
+    private final Map<FunctionInfo, Function> functions = new HashMap<>();
     private SyntaxRegistry registry;
 
     public Library() {
         type(SyntaxRegistry.OBJECT, "object", Object.class);
+        CoreSyntax.register(this);
     }
 
     @Override
@@ -81,13 +91,44 @@ public final class Library implements Registrar {
         add(SyntaxKind.EVENT, id, null, event, patterns);
     }
 
+    @Override
+    public void function(String name, List<Parameter> parameters, String returnType, boolean returnsPlural,
+            Function function) {
+        checkOpen();
+        FunctionInfo info = new FunctionInfo(name, parameters.stream()
+                .map(p -> new FunctionInfo.Parameter(p.name(), p.type(), p.plural(), p.optional()))
+                .toList(), returnType, returnsPlural);
+        builder.function(info);
+        functions.put(info, function);
+    }
+
+    @Override
+    public <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText) {
+        Values.registerText(type, toText);
+    }
+
+    /** Registers core syntax the compiler implements itself. */
+    void core(SyntaxKind kind, String id, String returnType, List<RegexRole> regexRoles, String... patterns) {
+        add(kind, id, returnType, new Core(id), regexRoles, patterns);
+    }
+
     private void add(SyntaxKind kind, String id, String returnType, Object binding, String... patterns) {
+        add(kind, id, returnType, binding, List.of(), patterns);
+    }
+
+    private void add(SyntaxKind kind, String id, String returnType, Object binding, List<RegexRole> regexRoles,
+            String... patterns) {
         checkOpen();
         if (bindings.putIfAbsent(new Key(kind, id), binding) != null) {
             throw new IllegalArgumentException("Duplicate " + kind.name().toLowerCase() + " id: " + id);
         }
         builder.syntax(new SyntaxInfo(kind, id, Arrays.stream(patterns).map(PatternCompiler::compile).toList(),
-                returnType, List.of()));
+                returnType, regexRoles));
+    }
+
+    /** The implementation of a built-in function, or {@code null} if {@code function} isn't one. */
+    Function builtIn(FunctionInfo function) {
+        return functions.get(function);
     }
 
     /** The syntax registry for the frontend. Nothing can be registered after this is called. */

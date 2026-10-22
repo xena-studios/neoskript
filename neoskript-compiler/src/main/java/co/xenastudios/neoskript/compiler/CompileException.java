@@ -17,4 +17,9 @@ final class CompileException extends Exception {
     int line() {
         return line;
     }
+
+    /** Whether the problem was already reported by the parser, so it shouldn't be reported again. */
+    boolean alreadyReported() {
+        return getMessage() == null;
+    }
 }

@@ -31,5 +31,11 @@ final class CoreTypes {
         registrar.subtype("commandsender", "audience");
         registrar.subtype("player", "commandsender");
         registrar.subtype("player", "offlineplayer");
+
+        // How they read in text: players and worlds by name, the console as Skript writes it.
+        registrar.text(OfflinePlayer.class, player -> String.valueOf(player.getName()));
+        registrar.text(World.class, World::getName);
+        registrar.text(CommandSender.class, sender -> sender instanceof org.bukkit.command.ConsoleCommandSender
+                ? "the console" : sender.getName());
     }
 }

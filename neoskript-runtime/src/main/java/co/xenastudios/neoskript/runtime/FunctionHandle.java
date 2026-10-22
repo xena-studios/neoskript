@@ -1,0 +1,37 @@
+/*
+ * Copyright (c) 2026 Xena Studios
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+package co.xenastudios.neoskript.runtime;
+
+/**
+ * What calls to a script function go through. Each caller holds the handle, not the function, so a
+ * reload can swap in a new version of the function without recompiling every script that calls it.
+ */
+public final class FunctionHandle {
+
+    private static final SimpleTriggerContext CONTEXT = new SimpleTriggerContext(null);
+
+    private final String name;
+    private volatile CompiledFunction target;
+
+    public FunctionHandle(String name) {
+        this.name = name;
+    }
+
+    public String name() {
+        return name;
+    }
+
+    public void target(CompiledFunction target) {
+        this.target = target;
+    }
+
+    public Object call(Object[] arguments) {
+        CompiledFunction function = target;
+        if (function == null) {
+            throw new IllegalStateException("The function " + name + " isn't loaded");
+        }
+        return function.call(CONTEXT, arguments);
+    }
+}

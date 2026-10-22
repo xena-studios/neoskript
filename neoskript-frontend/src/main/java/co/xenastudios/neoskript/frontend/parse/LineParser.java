@@ -179,7 +179,8 @@ final class LineParser {
             case Expr.Unresolved unresolved -> true;
             case Expr.Syntax syntax -> hasUnresolved(syntax.syntax());
             case Expr.ListOf list -> list.items().stream().anyMatch(LineParser::hasUnresolved);
-            case Expr.FunctionCall call -> call.arguments().stream().anyMatch(LineParser::hasUnresolved);
+            case Expr.FunctionCall call ->
+                    call.arguments().stream().anyMatch(a -> a != null && hasUnresolved(a));
             case Expr.Text text -> text.embedded().stream().anyMatch(LineParser::hasUnresolved);
             case Expr.Variable variable -> variable.embedded().stream().anyMatch(LineParser::hasUnresolved);
             case Expr.Literal literal -> false;
@@ -425,7 +426,7 @@ final class LineParser {
             List<Expr> arguments = arguments(function, pieces, inner);
             if (arguments != null) {
                 String type = function.returnType() == null ? SyntaxRegistry.OBJECT : function.returnType();
-                return new Expr.FunctionCall(start, end, name, arguments, type);
+                return new Expr.FunctionCall(start, end, function, arguments, type);
             }
         }
         return null;
@@ -472,16 +473,12 @@ final class LineParser {
             byParameter[index] = argument;
             next = index + 1;
         }
-        List<Expr> arguments = new ArrayList<>();
         for (int i = 0; i < parameters.size(); i++) {
             if (byParameter[i] == null && !parameters.get(i).optional()) {
                 return null;
             }
-            if (byParameter[i] != null) {
-                arguments.add(byParameter[i]);
-            }
         }
-        return arguments;
+        return java.util.Arrays.asList(byParameter);
     }
 
     /** The index of the {@code :} in {@code name: value} if {@code name} is one of the parameters, or -1. */

@@ -155,7 +155,19 @@ IR, ASM backend, control flow, locals, functions, options, waits as state machin
 > - **How elements run:** elements are called through. The generated code evaluates the placeholders and calls the element, and each element instance is a class-data constant (`MethodHandles.classDataAt`), so every call site is monomorphic. The JVM leaves hidden classes out of stack traces, so the generated code tracks the current script line in a local and rethrows errors as `ScriptRuntimeException(script, line)`.
 > - **New in the API:** `Effect`, `Condition`, `Expression`, `ElementFactory` and `Registrar`. The standard library has started, with real Skript patterns: the load event, `send`, `broadcast` and `console`.
 > - **Moving over from Skript (D19):** on its first start, NeoSkript copies Skript's scripts and variables. The `neoskript-skript-migration` check covers this on all four servers.
-> - **Next:** local and global variables, arithmetic and comparisons, `if`/`else`, loops, functions, and options.
+> - **Step 2 is done: the core language.** These now run on all four servers (`neoskript-language`) and in `LanguageTest`:
+>   - **Variables:** local and global, with lists and dynamic names. They're case-insensitive, and list indices sort numbers by value. Globals live in memory until M3 saves them.
+>   - **Changes:** `set`, `add`, `remove` and `delete`. Each single change is atomic.
+>   - **Arithmetic:** Skript's precedence, however the parser grouped it. Whole numbers stay whole, and `+` joins texts.
+>   - **Comparisons:** in words and with symbols, plus `is set`.
+>   - **Control flow:** `if` / `else if` / `else`, `if any`/`if all` … `then`, and conditions on their own line or ending in `:`.
+>   - **Loops:** `loop` (with `loop-value`, `loop-index`, `loop-counter` and `-N`), `while` and `do while`, `exit` / `stop` / `continue`.
+>   - **Functions:** script functions with defaults, `return`, overloads and recursion, plus built-in math functions.
+> - **How it's compiled:**
+>   - The compiler implements the core syntax itself. Everything else is called through elements.
+>   - Script functions are hidden classes behind a `FunctionHandle`, so a reload can replace a function without recompiling its callers.
+>   - A runtime error is reported once, at the script line it happened on, even through deep recursion.
+> - **Next:** Skript's test syntax, so Skript's own control-flow and function tests can run on NeoSkript; then `wait` and `/sk reload`.
 
 **M3: Variables & storage**
 Global/list variables, the concurrent store, a Yggdrasil reader/writer, CSV/SQLite/MySQL.

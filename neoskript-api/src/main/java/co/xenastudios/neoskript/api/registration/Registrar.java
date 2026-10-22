@@ -8,6 +8,8 @@ import co.xenastudios.neoskript.api.element.Condition;
 import co.xenastudios.neoskript.api.element.Effect;
 import co.xenastudios.neoskript.api.element.ElementFactory;
 import co.xenastudios.neoskript.api.element.Expression;
+import co.xenastudios.neoskript.api.element.Function;
+import java.util.List;
 
 /**
  * Registers types and syntax. NeoSkript's standard library registers through this, as addons will.
@@ -38,4 +40,16 @@ public interface Registrar {
 
     /** An event NeoSkript fires itself, like a script loading. */
     void event(String id, ScriptEvent event, String... patterns);
+
+    /**
+     * Registers a built-in function. Scripts can define their own functions with the same name, which
+     * take precedence.
+     *
+     * @param returnType the id of the type it returns, or {@code null} if it returns nothing
+     */
+    void function(String name, List<Parameter> parameters, String returnType, boolean returnsPlural,
+            Function function);
+
+    /** How values of {@code type} read as text, as when embedded in a string. */
+    <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText);
 }

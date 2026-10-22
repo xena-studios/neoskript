@@ -1,0 +1,34 @@
+# Harness check: the core language on a real server. Each line prints "[harness] lang <check>: <value>".
+options:
+	prefix: [harness] lang
+
+function fib(n: number) :: number:
+	if {_n} <= 1:
+		return {_n}
+	return fib({_n} - 1) + fib({_n} - 2)
+
+function greet(name: text, punctuation: text = "!") :: text:
+	return "Hi %{_name}%%{_punctuation}%"
+
+on load:
+	send "{@prefix} arithmetic: %1 + 2 * 3%, %8 - 2 - 1%, %(1 + 2) * 3%, %10 / 4%" to console
+	send "{@prefix} functions: %fib(15)%, %greet("Steve")%, %floor(2.7)%, %max(3, 9 and 4)%" to console
+	set {harness::count} to 5
+	add 2 to {harness::count}
+	send "{@prefix} globals: %{harness::count}%" to console
+	set {_list::*} to "c", "a" and "b"
+	add "d" to {_list::*}
+	remove "a" from {_list::*}
+	set {_joined} to ""
+	loop {_list::*}:
+		set {_joined} to "%{_joined}%%loop-index%=%loop-value% "
+	send "{@prefix} lists: %size of {_list::*}% %{_joined}%" to console
+	set {_i} to 0
+	while {_i} < 10:
+		add 1 to {_i}
+		if {_i} is 3:
+			continue
+		else if {_i} >= 6:
+			exit loop
+		add {_i} to {_seen::*}
+	send "{@prefix} while: %{_seen::*}%" to console

@@ -166,7 +166,30 @@ public final class ScriptLoader {
             return null;
         }
         boolean local = line.key().strip().toLowerCase(java.util.Locale.ROOT).startsWith("local");
-        return new ParsedStructure.Function(structure, signature, local, statements.body(structure.section().children()));
+        List<String> defaultTexts = defaultTexts(line);
+        List<Expr> defaults = new ArrayList<>();
+        for (int i = 0; i < signature.parameters().size(); i++) {
+            FunctionInfo.Parameter parameter = signature.parameters().get(i);
+            String text = defaultTexts.get(i);
+            defaults.add(text == null ? null : statements.expression(line, text, parameter.type(), parameter.plural()));
+        }
+        return new ParsedStructure.Function(structure, signature, local, defaults, defaultTexts,
+                statements.body(structure.section().children()));
+    }
+
+    /** The text of each parameter's default value in a function header, or null where there's none. */
+    private static List<String> defaultTexts(Line line) {
+        Matcher header = FUNCTION_HEADER.matcher(line.key().strip());
+        List<String> texts = new ArrayList<>();
+        if (!header.matches() || header.group(3).isBlank()) {
+            return texts;
+        }
+        String list = header.group(3).strip();
+        for (int[] piece : Scanner.split(list, 0, list.length(), ',')) {
+            Matcher parameter = PARAMETER.matcher(list.substring(piece[0], piece[1]));
+            texts.add(parameter.matches() && parameter.group(3) != null ? parameter.group(3).strip() : null);
+        }
+        return texts;
     }
 
     /** Parses a function header. Reports problems if {@code diagnostics} isn't null. */

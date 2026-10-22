@@ -6,6 +6,10 @@ package co.xenastudios.neoskript.runtime;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /** Helpers the generated code calls to convert values. */
 public final class Values {
@@ -49,7 +53,7 @@ public final class Values {
 
     /** How a value reads in text, as when embedded in a string with {@code %...%}. */
     public static String text(Object value) {
-        if (value == null) {
+        if (value == null || (value instanceof Object[] empty && empty.length == 0)) {
             return "<none>";
         }
         if (value instanceof Object[] array) {
@@ -62,9 +66,68 @@ public final class Values {
             }
             return text.toString();
         }
-        if (value instanceof Double d && d == Math.rint(d) && !Double.isInfinite(d)) {
-            return Long.toString(d.longValue());
+        if (value instanceof String string) {
+            return string;
         }
-        return value.toString();
+        if (value instanceof Double || value instanceof Float) {
+            return decimal(((Number) value).doubleValue());
+        }
+        if (value instanceof Number || value instanceof Boolean) {
+            return value.toString();
+        }
+        Function<Object, String> converter = converter(value.getClass());
+        return converter != null ? converter.apply(value) : value.toString();
+    }
+
+    /** Decimals as Skript shows them: at most two decimal places, without trailing zeros. */
+    static String decimal(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return Double.toString(value);
+        }
+        double rounded = Math.round(value * 100) / 100.0;
+        if (rounded == Math.rint(rounded) && Math.abs(rounded) < 1e15) {
+            return Long.toString((long) rounded);
+        }
+        return java.math.BigDecimal.valueOf(rounded).stripTrailingZeros().toPlainString();
+    }
+
+    private static final Map<Class<?>, Function<Object, String>> CONVERTERS = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, Optional<Function<Object, String>>> RESOLVED = new ConcurrentHashMap<>();
+
+    /** Registers how values of {@code type} (and its subtypes) read as text. */
+    @SuppressWarnings("unchecked")
+    public static <T> void registerText(Class<T> type, Function<? super T, String> toText) {
+        CONVERTERS.put(type, value -> ((Function<Object, String>) toText).apply(value));
+        RESOLVED.clear();
+    }
+
+    private static Function<Object, String> converter(Class<?> type) {
+        return RESOLVED.computeIfAbsent(type, t -> {
+            for (Class<?> c = t; c != null; c = c.getSuperclass()) {
+                if (CONVERTERS.containsKey(c)) {
+                    return Optional.of(CONVERTERS.get(c));
+                }
+                for (Class<?> i : c.getInterfaces()) {
+                    Function<Object, String> found = interfaceConverter(i);
+                    if (found != null) {
+                        return Optional.of(found);
+                    }
+                }
+            }
+            return Optional.empty();
+        }).orElse(null);
+    }
+
+    private static Function<Object, String> interfaceConverter(Class<?> type) {
+        if (CONVERTERS.containsKey(type)) {
+            return CONVERTERS.get(type);
+        }
+        for (Class<?> parent : type.getInterfaces()) {
+            Function<Object, String> found = interfaceConverter(parent);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 }
