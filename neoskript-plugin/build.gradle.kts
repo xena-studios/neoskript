@@ -7,6 +7,7 @@ plugins {
 dependencies {
     implementation(project(":neoskript-compiler"))
     implementation(project(":neoskript-paper"))
+    implementation(libs.bstats.bukkit)
     compileOnly(libs.paper.api)
 }
 
@@ -21,6 +22,8 @@ tasks.processResources {
 tasks.shadowJar {
     archiveBaseName = "NeoSkript"
     archiveClassifier = ""
+    // bStats requires relocation so each plugin reports through its own copy.
+    relocate("org.bstats", "co.xenastudios.neoskript.libs.bstats")
 }
 
 tasks.assemble {

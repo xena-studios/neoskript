@@ -56,6 +56,9 @@ public final class ServerBuilder {
         Files.createDirectories(runDir.resolve("plugins"));
         Files.writeString(runDir.resolve("eula.txt"), "eula=true\n");
         Files.writeString(runDir.resolve("server.properties"), serverProperties());
+        // Test servers must never report to bStats.
+        Files.createDirectories(runDir.resolve("plugins/bStats"));
+        Files.writeString(runDir.resolve("plugins/bStats/config.yml"), "enabled: false\n");
         for (Path plugin : plugins) {
             Files.copy(plugin, runDir.resolve("plugins").resolve(plugin.getFileName()));
         }
