@@ -24,6 +24,8 @@ tasks.shadowJar {
     archiveClassifier = ""
     // bStats requires relocation so each plugin reports through its own copy.
     relocate("org.bstats", "co.xenastudios.neoskript.libs.bstats")
+    // Our own copy of ASM, so another plugin's version can't clash with it.
+    relocate("org.objectweb.asm", "co.xenastudios.neoskript.libs.asm")
 }
 
 tasks.assemble {

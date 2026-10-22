@@ -4,7 +4,13 @@
  */
 package co.xenastudios.neoskript.plugin;
 
+import co.xenastudios.neoskript.compiler.Library;
+import co.xenastudios.neoskript.paper.StandardLibrary;
 import co.xenastudios.neoskript.runtime.platform.Platform;
+import co.xenastudios.neoskript.runtime.scheduler.FoliaScheduler;
+import co.xenastudios.neoskript.runtime.scheduler.PaperScheduler;
+import co.xenastudios.neoskript.runtime.scheduler.Scheduler;
+import java.io.IOException;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -38,5 +44,14 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 getPluginMeta().getVersion(),
                 platform.displayName(),
                 getServer().getMinecraftVersion());
+
+        Library library = new Library();
+        StandardLibrary.register(library);
+        Scheduler scheduler = platform == Platform.FOLIA ? new FoliaScheduler(this) : new PaperScheduler(this);
+        try {
+            new ScriptManager(getDataPath().resolve("scripts"), library, scheduler, getSLF4JLogger()).loadAll();
+        } catch (IOException e) {
+            getSLF4JLogger().error("Couldn't read the scripts folder", e);
+        }
     }
 }

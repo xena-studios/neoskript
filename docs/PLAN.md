@@ -149,6 +149,12 @@ Structure parser, pattern language + compiler + matcher, type system skeleton, A
 IR, ASM backend, control flow, locals, functions, options, waits as state machines, scheduler abstraction with both implementations, reload with atomic swap.
 *Exit:* the control-flow and function tests from Skript's suite pass on Paper **and** Folia.
 
+> **Progress (2026-10-22).**
+> - **Step 1 is done:** the first script runs end to end on Paper and Folia, 1.21.4 and 26.3 (`neoskript-hello`). The plugin loads `plugins/NeoSkript/scripts` (files starting with `-` are disabled), reports problems in Skript's format, compiles each trigger into a hidden class with ASM, and runs `on load` triggers through the scheduler abstraction: the main thread on Paper, the global region on Folia.
+> - **How elements run:** elements are called through. The generated code evaluates the placeholders and calls the element, and each element instance is a class-data constant (`MethodHandles.classDataAt`), so every call site is monomorphic. The JVM leaves hidden classes out of stack traces, so the generated code tracks the current script line in a local and rethrows errors as `ScriptRuntimeException(script, line)`.
+> - **New in the API:** `Effect`, `Condition`, `Expression`, `ElementFactory` and `Registrar`. The standard library has started, with real Skript patterns: the load event, `send`, `broadcast` and `console`.
+> - **Next:** local and global variables, arithmetic and comparisons, `if`/`else`, loops, functions, and options.
+
 **M3: Variables & storage**
 Global/list variables, the concurrent store, a Yggdrasil reader/writer, CSV/SQLite/MySQL.
 *Exit:* round-trips real `variables.csv`/DB files from Skript servers byte-compatibly.

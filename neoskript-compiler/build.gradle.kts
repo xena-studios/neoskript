@@ -5,4 +5,6 @@ plugins {
 dependencies {
     api(project(":neoskript-frontend"))
     api(project(":neoskript-runtime"))
+    implementation(libs.asm)
+    testImplementation(testFixtures(project(":neoskript-frontend")))
 }

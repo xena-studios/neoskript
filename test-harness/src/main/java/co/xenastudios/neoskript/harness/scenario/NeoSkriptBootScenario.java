@@ -16,8 +16,9 @@ import java.util.regex.Pattern;
 /** NeoSkript loads and enables on the server, and detects the right platform. */
 public final class NeoSkriptBootScenario implements Scenario {
 
-    private static final Pattern NEOSKRIPT_ERROR =
-            Pattern.compile("(Error occurred while enabling NeoSkript|Could not load .*NeoSkript|\\[NeoSkript\\].*(ERROR|Exception))");
+    /** NeoSkript failing to load, logging at error level, or logging an exception. */
+    static final Pattern NEOSKRIPT_ERROR = Pattern.compile(
+            "(Error occurred while enabling NeoSkript|Could not load .*NeoSkript|ERROR]: \\[NeoSkript]|\\[NeoSkript].*Exception)");
 
     @Override
     public String name() {

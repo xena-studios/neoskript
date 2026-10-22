@@ -1,0 +1,4 @@
+# Harness check: NeoSkript compiles and runs this script.
+on load:
+	send "[harness] neoskript hello: ok" to console
+	send "[harness] neoskript says %"hi"% %1 and 2.5%" to the console
