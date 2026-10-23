@@ -27,6 +27,7 @@ public final class StandardLibrary {
         Potions.register(registrar);
         PersistentData.register(registrar);
         EntitySyntax.register(registrar);
+        BlockSyntax.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
         StorageCodecs.register(registrar);
