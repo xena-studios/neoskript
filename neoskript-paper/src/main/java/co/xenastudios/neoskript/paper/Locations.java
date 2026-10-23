@@ -57,11 +57,16 @@ final class Locations {
             }
             for (Object entity : (Object[]) args[0]) {
                 if (entity instanceof Entity e) {
+                    // A location without a world is in the entity's world.
+                    Location target = location.getWorld() == null ? location.clone() : location;
+                    if (target.getWorld() == null) {
+                        target.setWorld(e.getWorld());
+                    }
                     try {
-                        e.teleport(location);
+                        e.teleport(target);
                     } catch (UnsupportedOperationException folia) {
                         // Folia only teleports asynchronously.
-                        e.teleportAsync(location);
+                        e.teleportAsync(target);
                     }
                 }
             }

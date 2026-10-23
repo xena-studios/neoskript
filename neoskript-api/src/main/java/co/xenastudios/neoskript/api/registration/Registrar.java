@@ -144,6 +144,12 @@ public interface Registrar {
     <T> void changer(Class<T> owner, co.xenastudios.neoskript.api.element.Changeable.Mode mode,
             java.util.function.BiConsumer<? super T, Object[]> change);
 
+    /**
+     * How values of {@code type}, which can be changed in place, are copied when stored in a variable, as
+     * Skript copies them: changing an item in a variable doesn't change the item it was set from.
+     */
+    <T> void cloner(Class<T> type, java.util.function.UnaryOperator<T> cloner);
+
     /** How values of {@code type} read as text, as when embedded in a string. */
     <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText);
 }

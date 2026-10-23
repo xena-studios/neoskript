@@ -121,8 +121,17 @@ final class Logic {
                 java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
                 Object[] numbers = new Object[count];
                 for (int i = 0; i < count; i++) {
-                    numbers[i] = integers ? (Object) (long) (Math.ceil(low) + random.nextLong(
-                            (long) Math.floor(high) - (long) Math.ceil(low) + 1)) : (Object) (low + random.nextDouble() * (high - low));
+                    if (integers) {
+                        long from = (long) Math.ceil(low);
+                        long to = (long) Math.floor(high);
+                        if (from > to) {
+                            // No whole number between them, like between 1.5 and 1.6.
+                            return null;
+                        }
+                        numbers[i] = from + random.nextLong(to - from + 1);
+                    } else {
+                        numbers[i] = low + random.nextDouble() * (high - low);
+                    }
                 }
                 return numbers.length == 1 ? numbers[0] : numbers;
             };
