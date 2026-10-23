@@ -28,6 +28,11 @@ public final class FunctionHandle {
     }
 
     public Object call(Object[] arguments) {
+        return KeyedValues.plain(callKeyed(arguments));
+    }
+
+    /** What the function returns, with the indices of a list it returns ({@link KeyedValues}), as {@code keyed f()} wants. */
+    public Object callKeyed(Object[] arguments) {
         CompiledFunction function = target;
         if (function == null) {
             throw new IllegalStateException("The function " + name + " isn't loaded");

@@ -65,7 +65,7 @@ public final class ItemType {
 
     /** Changes its amount in place, as when a variable's item is changed. */
     public void setAmount(int amount) {
-        stack.setAmount(Math.max(1, amount));
+        stack.setAmount(Math.max(0, amount));
         amountGiven = true;
     }
 

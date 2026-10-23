@@ -176,9 +176,6 @@ final class CoreSyntax {
         // 'whether {_x} is set': a condition as a boolean.
         library.core(SyntaxKind.EXPRESSION, WHETHER, "boolean", List.of(RegexRole.CONDITION), "whether <.+>");
 
-        // '"5" parsed as integer': text through the type's parser, or nothing if it isn't one.
-        library.core(SyntaxKind.EXPRESSION, PARSE, "object", List.of(RegexRole.TYPE), "%text% parsed as [a[n]] <.+>");
-
         // A list variable's indices, and sorting one: these work on the variable, not its values.
         library.core(SyntaxKind.EXPRESSION, INDICES, "string", List.of(),
                 "[(the|all [[of] the])] (indexes|indices) of %~objects%",
@@ -223,6 +220,10 @@ final class CoreSyntax {
 
     /** Syntax tried after everything else, so the library's elements win: event values match any type name. */
     static void registerLast(Library library) {
+        // '"5" parsed as integer': text through the type's parser, or nothing if it isn't one. After the
+        // library's expressions, as Skript tries it after most: 'difference between {_a} and "5" parsed as a
+        // number' is the difference with a parsed number.
+        library.core(SyntaxKind.EXPRESSION, PARSE, "object", List.of(RegexRole.TYPE), "%text% parsed as [a[n]] <.+>");
         // 'player', 'event-world': the event's value of that type. Tried last, as it matches any type name.
         library.core(SyntaxKind.EXPRESSION, EVENT_VALUE, "object", List.of(RegexRole.TYPE), "[the] [event-]<.+>");
         // 'the zombie', 'event-creeper': a kind of entity is the event's entity only when it says so; alone,

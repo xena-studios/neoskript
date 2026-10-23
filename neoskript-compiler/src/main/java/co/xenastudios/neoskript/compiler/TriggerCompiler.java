@@ -50,6 +50,7 @@ import co.xenastudios.neoskript.api.element.Condition;
 import co.xenastudios.neoskript.api.element.Effect;
 import co.xenastudios.neoskript.api.element.ElementFactory;
 import co.xenastudios.neoskript.api.element.ElementInfo;
+import co.xenastudios.neoskript.api.element.KeyAware;
 import co.xenastudios.neoskript.api.element.Expression;
 import co.xenastudios.neoskript.api.element.Function;
 import co.xenastudios.neoskript.api.element.SettableCondition;
@@ -72,6 +73,7 @@ import co.xenastudios.neoskript.runtime.CompiledFunction;
 import co.xenastudios.neoskript.runtime.Frame;
 import co.xenastudios.neoskript.runtime.FunctionHandle;
 import co.xenastudios.neoskript.runtime.Resumable;
+import co.xenastudios.neoskript.runtime.KeyedValues;
 import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.Waits;
 import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
@@ -115,6 +117,8 @@ final class TriggerCompiler {
     private static final String PACKAGE = HOST.substring(0, HOST.lastIndexOf('/') + 1);
     private static final String CONTEXT = Type.getDescriptor(TriggerContext.class);
     private static final String VALUES = Type.getInternalName(Values.class);
+    /** {@code keyed %objects%}: values with their indices, where something keeps them. */
+    private static final String KEYED = "ExprKeyed";
     private static final String COMMAND_EVENT = Type.getInternalName(CommandEvent.class);
     private static final String STORE = Type.getInternalName(VariableStore.class);
     private static final String OBJECT = "java/lang/Object";
@@ -231,8 +235,7 @@ final class TriggerCompiler {
                 line = event.structure().node().line().number();
                 source = key;
                 ParsedSyntax syntax = event.event();
-                Condition filter = binding.filter().create(
-                        new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags()));
+                Condition filter = binding.filter().create(info(syntax));
                 constant(filter, Condition.class);
                 method.visitVarInsn(ALOAD, CONTEXT_SLOT);
                 arguments(syntax);
@@ -605,9 +608,16 @@ final class TriggerCompiler {
             // Parameters are local variables: {_name}.
             method.visitLdcInsn("_" + parameter.name());
             method.visitVarInsn(ALOAD, slot);
+            Class<?> only = strictClass(parameter.type());
+            if (only != null) {
+                // As in Skript, values of other types never reach a text, number or boolean parameter.
+                constant(only, Class.class);
+                method.visitMethodInsn(INVOKESTATIC, VALUES, "filterKeyed",
+                        "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECT_DESC, false);
+            }
             if (parameter.plural()) {
-                convert(true);
-                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "setList", "(" + STRING_DESC + OBJECTS + ")V", false);
+                // Keyed arguments keep their indices: 'f(keyed {_a::*})'.
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "setListKeyed", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
             } else {
                 convert(false);
                 method.visitMethodInsn(INVOKEVIRTUAL, STORE, "set", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
@@ -795,15 +805,17 @@ final class TriggerCompiler {
         int valuesSlot = nextSlot++;
         int indicesSlot = -1;
         int indexSlot = nextSlot++;
-        if (looped instanceof Expr.Variable variable && variable.list()) {
+        if (isKeyed(looped, true)) {
+            // A list variable, or anything keeping indices: loop-index is each value's index.
             indicesSlot = nextSlot++;
-            variableStore(variable);
-            variableName(variable);
-            method.visitMethodInsn(INVOKEVIRTUAL, STORE, "list", "(" + STRING_DESC + ")" + OBJECTS, false);
+            keyed(looped, true);
+            method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "of",
+                    "(" + OBJECT_DESC + ")" + Type.getDescriptor(KeyedValues.class), false);
+            method.visitInsn(DUP);
+            method.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(KeyedValues.class), "values", "()" + OBJECTS, false);
             method.visitVarInsn(ASTORE, valuesSlot);
-            variableStore(variable);
-            variableName(variable);
-            method.visitMethodInsn(INVOKEVIRTUAL, STORE, "indices", "(" + STRING_DESC + ")[Ljava/lang/String;", false);
+            method.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(KeyedValues.class), "keys",
+                    "()[Ljava/lang/String;", false);
             method.visitVarInsn(ASTORE, indicesSlot);
         } else {
             expression(looped);
@@ -908,7 +920,7 @@ final class TriggerCompiler {
 
     private void effect(ParsedSyntax effect) throws CompileException {
         if (library.binding(effect.syntax()) instanceof ElementFactory<?> factory
-                && factory.create(new ElementInfo(effect.pattern(), effect.match().mark(), effect.match().tags()))
+                && factory.create(info(effect))
                         instanceof Update update) {
             update(effect, update);
             return;
@@ -931,8 +943,14 @@ final class TriggerCompiler {
                             ? "'return' can only be used in a function"
                             : "The function " + function.name() + " doesn't return anything");
                 }
-                expression((Expr) effect.match().values().getFirst());
-                convert(function.returnsPlural());
+                Expr returned = (Expr) effect.match().values().getFirst();
+                if (function.returnsPlural() && (returned instanceof Expr.Variable list && list.list() || isKeyed(returned))) {
+                    // A list keeps its indices, for 'keyed f()'; other callers get the values alone.
+                    keyed(returned);
+                } else {
+                    expression(returned);
+                    convert(function.returnsPlural());
+                }
                 method.visitInsn(ARETURN);
             }
             case CoreSyntax.CHANGE -> change(effect);
@@ -1073,6 +1091,17 @@ final class TriggerCompiler {
     private void change(ParsedSyntax effect) throws CompileException {
         CoreSyntax.ChangeMode mode = CoreSyntax.ChangeMode.values()[effect.pattern()];
         Object target = effect.match().values().get(mode.target);
+        // 'add 1 to {_a::*} and {_b::*}': each variable is changed.
+        if (target instanceof Expr.ListOf list && list.items().stream().allMatch(Expr.Variable.class::isInstance)) {
+            for (Expr item : list.items()) {
+                change(effect, mode, item);
+            }
+            return;
+        }
+        change(effect, mode, target);
+    }
+
+    private void change(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Object target) throws CompileException {
         if (mode == CoreSyntax.ChangeMode.SET && target instanceof Expr.Syntax whether
                 && isCore(whether.syntax(), CoreSyntax.WHETHER)) {
             setCondition(effect, whether);
@@ -1091,6 +1120,12 @@ final class TriggerCompiler {
         }
         variableStore(variable);
         variableName(variable);
+        if (mode == CoreSyntax.ChangeMode.SET && variable.list() && isKeyed((Expr) effect.match().values().get(mode.value))) {
+            // 'set {_b::*} to keyed {_a::*}': the values keep their indices.
+            keyed((Expr) effect.match().values().get(mode.value));
+            method.visitMethodInsn(INVOKEVIRTUAL, STORE, "setListKeyed", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
+            return;
+        }
         if (mode != CoreSyntax.ChangeMode.DELETE) {
             expression((Expr) effect.match().values().get(mode.value));
         }
@@ -1157,7 +1192,7 @@ final class TriggerCompiler {
             throw new CompileException(line, source.substring(target.start(), target.end()) + " can't be set to anything");
         }
         ParsedSyntax parsed = syntax.syntax();
-        Object element = factory.create(new ElementInfo(parsed.pattern(), parsed.match().mark(), parsed.match().tags()));
+        Object element = factory.create(info(parsed));
         Class<?>[] accepted = element instanceof Changeable changeable ? changeable.acceptChange(Changeable.Mode.SET) : null;
         if (accepted == null) {
             throw new CompileException(line, source.substring(target.start(), target.end()) + " can't be set to anything");
@@ -1179,7 +1214,7 @@ final class TriggerCompiler {
                 || !(library.binding(condition.syntax()) instanceof ElementFactory<?> factory)) {
             throw new CompileException(line, "'" + source.substring(whether.start(), whether.end()) + "' can't be set");
         }
-        Object element = factory.create(new ElementInfo(condition.pattern(), condition.match().mark(), condition.match().tags()));
+        Object element = factory.create(info(condition));
         if (!(element instanceof SettableCondition)) {
             throw new CompileException(line, "'" + source.substring(whether.start(), whether.end()) + "' can't be set");
         }
@@ -1224,7 +1259,7 @@ final class TriggerCompiler {
         Changeable.Mode changeMode = changeMode(effect, mode);
         ParsedSyntax syntax = target.syntax();
         Object element = library.binding(syntax.syntax()) instanceof ElementFactory<?> factory
-                ? factory.create(new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags()))
+                ? factory.create(info(syntax))
                 : null;
         Class<?>[] accepted = element instanceof Changeable changeable ? changeable.acceptChange(changeMode) : null;
         if (accepted == null && !(element instanceof Changeable) && Values.hasChanger(changeMode)) {
@@ -1266,16 +1301,41 @@ final class TriggerCompiler {
                 "(" + CONTEXT + OBJECTS + ")Z", true);
     }
 
+    /** How the element was matched, for its factory: its pattern, marks, tags and which arguments are lists. */
+    private static ElementInfo info(ParsedSyntax syntax) {
+        long or = 0;
+        long lists = 0;
+        List<Object> values = syntax.match().values();
+        for (int i = 0; i < values.size() && i < 64; i++) {
+            if (values.get(i) instanceof Expr.ListOf list) {
+                lists |= 1L << i;
+                if (!list.and()) {
+                    or |= 1L << i;
+                }
+            } else if (values.get(i) instanceof Expr.Variable variable && variable.list()) {
+                lists |= 1L << i;
+            }
+        }
+        return new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags(), or, lists);
+    }
+
     /** Pushes the element, the trigger context and the element's arguments, ready to call it. */
     private void callThrough(ParsedSyntax syntax, Class<?> type) throws CompileException {
+        callThrough(syntax, type, false, false);
+    }
+
+    /**
+     * {@link #callThrough(ParsedSyntax, Class)}; with {@code keyed}, arguments with indices are passed with
+     * them ({@link KeyedValues}), and with {@code implicit} too, list variables are.
+     */
+    private void callThrough(ParsedSyntax syntax, Class<?> type, boolean keyed, boolean implicit) throws CompileException {
         if (!(library.binding(syntax.syntax()) instanceof ElementFactory<?> factory)) {
             throw unsupported(syntax.syntax().id());
         }
-        Object element = factory.create(
-                new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags()));
+        Object element = factory.create(info(syntax));
         constant(element, type);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
-        arguments(syntax);
+        arguments(syntax, keyed, implicit);
     }
 
     /** Pushes {@code value} as a constant of the class, typed as {@code type}. */
@@ -1285,6 +1345,10 @@ final class TriggerCompiler {
     }
 
     private void arguments(ParsedSyntax syntax) throws CompileException {
+        arguments(syntax, false, false);
+    }
+
+    private void arguments(ParsedSyntax syntax, boolean keyed, boolean implicit) throws CompileException {
         CompiledPattern pattern = syntax.syntax().patterns().get(syntax.pattern());
         List<Object> values = syntax.match().values();
         PlaceholderSpec[] specs = placeholderSpecs(pattern);
@@ -1304,6 +1368,11 @@ final class TriggerCompiler {
             }
             method.visitInsn(DUP);
             pushInt(i);
+            if (keyed && isKeyed(expr, implicit)) {
+                keyed(expr, implicit);
+                method.visitInsn(AASTORE);
+                continue;
+            }
             List<String> outerLiteralTypes = literalTypes;
             literalTypes = specs[i].types();
             try {
@@ -1331,10 +1400,12 @@ final class TriggerCompiler {
 
     /** For a placeholder of one strict type (text, numbers, booleans, timespans, dates), its values' class. */
     private Class<?> strictClass(PlaceholderSpec spec) {
-        if (spec.types().size() != 1) {
-            return null;
-        }
-        TypeRef ref = registry.resolveType(spec.types().getFirst());
+        return spec.types().size() == 1 ? strictClass(spec.types().getFirst()) : null;
+    }
+
+    /** The class values of a type must already be, for a text, number, boolean, timespan or date, else {@code null}. */
+    private Class<?> strictClass(String type) {
+        TypeRef ref = registry.resolveType(type);
         if (ref == null) {
             return null;
         }
@@ -1421,15 +1492,22 @@ final class TriggerCompiler {
     private int[] listValues(Expr list) throws CompileException {
         int valuesSlot = nextSlot++;
         int indicesSlot = -1;
-        expression(list);
-        convert(true);
-        method.visitVarInsn(ASTORE, valuesSlot);
-        if (list instanceof Expr.Variable variable && variable.list()) {
+        if (isKeyed(list, true)) {
+            // Values with their indices, lined up: a list variable's, or a sorted one's.
             indicesSlot = nextSlot++;
-            variableStore(variable);
-            variableName(variable);
-            method.visitMethodInsn(INVOKEVIRTUAL, STORE, "indices", "(" + STRING_DESC + ")[" + STRING_DESC, false);
+            keyed(list, true);
+            method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "of",
+                    "(" + OBJECT_DESC + ")" + Type.getDescriptor(KeyedValues.class), false);
+            method.visitInsn(DUP);
+            method.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(KeyedValues.class), "values", "()" + OBJECTS, false);
+            method.visitVarInsn(ASTORE, valuesSlot);
+            method.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(KeyedValues.class), "keys",
+                    "()[Ljava/lang/String;", false);
             method.visitVarInsn(ASTORE, indicesSlot);
+        } else {
+            expression(list);
+            convert(true);
+            method.visitVarInsn(ASTORE, valuesSlot);
         }
         return new int[] {valuesSlot, indicesSlot};
     }
@@ -1886,9 +1964,14 @@ final class TriggerCompiler {
                 }
             }
             case Expr.Syntax syntax -> {
-                callThrough(syntax.syntax(), Expression.class);
+                boolean keyAware = keyAware(syntax);
+                callThrough(syntax.syntax(), Expression.class, keyAware, false);
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Expression.class), "get",
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
+                if (keyAware) {
+                    method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "plain",
+                            "(" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+                }
             }
             case Expr.Unresolved unresolved -> {
                 // Words are first tried as the placeholder's own types: 'armor stand' is an entity type in
@@ -2150,6 +2233,11 @@ final class TriggerCompiler {
 
     /** Calls a function, leaving what it returns (or {@code null}) on the stack. */
     private void call(Expr.FunctionCall call) throws CompileException {
+        call(call, false);
+    }
+
+    /** Calls a function; {@code keyed} keeps the indices of a list it returns ({@link KeyedValues}). */
+    private void call(Expr.FunctionCall call, boolean keyed) throws CompileException {
         FunctionInfo info = call.function();
         Function builtIn = library.builtIn(info);
         if (builtIn != null) {
@@ -2175,19 +2263,101 @@ final class TriggerCompiler {
             List<String> outerLiteralTypes = literalTypes;
             literalTypes = List.of(parameters.get(i).type());
             try {
-                expression(argument);
+                if (parameters.get(i).plural() && isKeyed(argument)) {
+                    keyed(argument);
+                } else {
+                    expression(argument);
+                    convert(parameters.get(i).plural());
+                }
             } finally {
                 literalTypes = outerLiteralTypes;
             }
-            convert(parameters.get(i).plural());
             method.visitInsn(AASTORE);
         }
         if (builtIn != null) {
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Function.class), "call",
                     "(" + OBJECTS + ")" + OBJECT_DESC, true);
         } else {
-            method.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(FunctionHandle.class), "call",
+            method.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(FunctionHandle.class), keyed ? "callKeyed" : "call",
                     "(" + OBJECTS + ")" + OBJECT_DESC, false);
+        }
+    }
+
+    // ---------------------------------------------------------------- keyed values
+
+    /** Whether {@code expr} gives values with their indices: {@code keyed X}, or a list with such a part. */
+    private boolean isKeyed(Expr expr) {
+        return isKeyed(expr, false);
+    }
+
+    /**
+     * Whether {@code expr} gives values with their indices: {@code keyed X}, a list with such a part, or a
+     * key-aware expression of one. With {@code implicit}, as inside {@code keyed} or a loop, list variables and
+     * the lists functions return count too.
+     */
+    private boolean isKeyed(Expr expr, boolean implicit) {
+        return switch (expr) {
+            case Expr.Syntax syntax when syntax.syntax().syntax().id().equals(KEYED) -> true;
+            case Expr.Syntax syntax when keyAware(syntax) -> syntax.syntax().match().values().stream()
+                    .anyMatch(value -> value instanceof Expr argument && isKeyed(argument, implicit));
+            case Expr.ListOf list -> list.items().stream().anyMatch(item -> isKeyed(item, implicit));
+            case Expr.Variable variable -> implicit && variable.list();
+            case Expr.FunctionCall call -> implicit && library.builtIn(call.function()) == null
+                    && call.function().returnsPlural();
+            default -> false;
+        };
+    }
+
+    /** Whether the expression's element keeps its values' indices ({@link KeyAware}). */
+    private boolean keyAware(Expr.Syntax syntax) {
+        return !(library.binding(syntax.syntax().syntax()) instanceof Library.Core)
+                && library.binding(syntax.syntax().syntax()) instanceof ElementFactory<?> factory
+                && factory.create(info(syntax.syntax())) instanceof KeyAware;
+    }
+
+    private void keyed(Expr expr) throws CompileException {
+        keyed(expr, false);
+    }
+
+    /**
+     * Pushes {@code expr}'s values with their indices where it has them ({@link KeyedValues}): a list
+     * variable's, a function's returned list's, a key-aware expression's, or each keyed part of a list's;
+     * else its plain values. {@code implicit} is as for {@link #isKeyed(Expr, boolean)}.
+     */
+    private void keyed(Expr expr, boolean implicit) throws CompileException {
+        switch (expr) {
+            case Expr.Syntax syntax when syntax.syntax().syntax().id().equals(KEYED) ->
+                keyed((Expr) syntax.syntax().match().values().getFirst(), true);
+            case Expr.Syntax syntax when keyAware(syntax) -> {
+                callThrough(syntax.syntax(), Expression.class, true, implicit);
+                method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Expression.class), "get",
+                        "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
+            }
+            case Expr.Variable variable when variable.list() -> {
+                variableStore(variable);
+                variableName(variable);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "keyedList",
+                        "(" + STRING_DESC + ")" + Type.getDescriptor(KeyedValues.class), false);
+            }
+            case Expr.FunctionCall call -> call(call, true);
+            case Expr.ListOf list -> {
+                pushInt(list.items().size());
+                method.visitTypeInsn(ANEWARRAY, OBJECT);
+                for (int i = 0; i < list.items().size(); i++) {
+                    method.visitInsn(DUP);
+                    pushInt(i);
+                    Expr item = list.items().get(i);
+                    if (isKeyed(item, implicit)) {
+                        keyed(item, implicit);
+                    } else {
+                        expression(item);
+                    }
+                    method.visitInsn(AASTORE);
+                }
+                method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "merge",
+                        "(" + OBJECTS + ")" + Type.getDescriptor(KeyedValues.class), false);
+            }
+            default -> expression(expr);
         }
     }
 

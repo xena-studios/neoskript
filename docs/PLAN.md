@@ -427,6 +427,19 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - Words of named types like equipment slots now compile as literals (`boots of X`).
 >      - Age words work on categories (`a baby entity`).
 >      - Attribute names are looked up when a script uses them, so nothing touches the server's registries while syntax registers.
+>
+>    **Batch 10 (2026-10-23): 256 → 282 tests pass.**
+>    - **And/or lists:** conditions see whether a list was written with `or`, and check it as Skript does: `"hey" doesn't start with "hey" and "e"` is true. This covers contains (texts, inventories, other values), starts/ends with, matches and the left side of comparisons.
+>    - **Arithmetic for other types:** timespans (saturating, as in Skript), dates plus or minus timespans, and vectors. Addons can register their own (`Registrar.arithmetic`).
+>    - **Keyed values:** `keyed {_list::*}` keeps indices when setting a list, passing function arguments and returning lists. `first 2 elements of` and `sorted` keep them too, and so does looping a sorted list. Loops over list variables now line indices up with values.
+>    - **Changing in place:** `add` on a variable holding a queue or inventory changes that value. The x/y/z of vectors and locations can be set, added to and removed from, and so can vector length. Vectors and locations are copied into variables and functions.
+>    - **Fixes:**
+>      - Timespans parse word by word as Skript does (`30m and 20s`, `1mo 2w`, `1:30`).
+>      - `add ... to {_a::*} and {_b::*}` changes both lists.
+>      - Sorted indices skip entries without a value.
+>      - `elements from 2 to 1`, `10 random elements` (repeats allowed unless `distinct`), and `amount of` an item.
+>      - `parsed as` is tried after other expressions, and `size of` before elements, matching Skript's order.
+>      - A bare `chest` is the item, not the equipment slot.
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.

@@ -5,6 +5,7 @@
 package co.xenastudios.neoskript.paper;
 
 import co.xenastudios.neoskript.api.element.Update;
+import co.xenastudios.neoskript.api.element.Condition;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
@@ -125,28 +126,17 @@ final class Texts {
         registrar.condition("CondMatches", info -> {
             boolean negated = info.hasTag("not");
             boolean partial = info.pattern() == 1;
-            return (context, args) -> {
-                Object[] texts = (Object[]) args[0];
-                Object[] regexes = (Object[]) args[1];
-                if (texts.length == 0 || regexes.length == 0) {
-                    return false;
-                }
-                // Every text matches every pattern; 'doesn't match' is the opposite of that.
-                boolean all = true;
-                for (Object text : texts) {
-                    for (Object regex : regexes) {
-                        boolean matches;
+            boolean textsAnd = info.and(0);
+            boolean regexesAnd = info.and(1);
+            return (context, args) -> negated != Condition.check((Object[]) args[0], textsAnd, text ->
+                    Condition.check((Object[]) args[1], regexesAnd, regex -> {
                         try {
                             Matcher matcher = Pattern.compile(Values.text(regex)).matcher(Values.text(text));
-                            matches = partial ? matcher.find() : matcher.matches();
+                            return partial ? matcher.find() : matcher.matches();
                         } catch (PatternSyntaxException e) {
-                            matches = false;
+                            return false;
                         }
-                        all &= matches;
-                    }
-                }
-                return all != negated;
-            };
+                    }));
         }, "%texts% (match[es]|not:do[es](n't| not) match) %texts%",
                 "%texts% (partially match[es]|not:do[es](n't| not) partially match) %texts%");
 

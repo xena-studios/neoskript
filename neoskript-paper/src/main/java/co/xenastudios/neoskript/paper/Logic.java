@@ -4,8 +4,14 @@
  */
 package co.xenastudios.neoskript.paper;
 
+import co.xenastudios.neoskript.api.element.Condition;
+import co.xenastudios.neoskript.api.element.Expression;
+import co.xenastudios.neoskript.api.element.KeyAware;
+import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.api.registration.Registrar;
+import org.bukkit.inventory.Inventory;
 import co.xenastudios.neoskript.runtime.Comparison;
+import co.xenastudios.neoskript.runtime.KeyedValues;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.List;
 
@@ -53,7 +59,8 @@ final class Logic {
         registrar.condition("CondCompare", info -> {
             Relation relation = relation(info.tags());
             boolean negated = info.hasTag("not");
-            return (context, args) -> negated != holds((Object[]) args[0], (Object[]) args[1], relation);
+            boolean leftAnd = info.and(0);
+            return (context, args) -> negated != holds((Object[]) args[0], leftAnd, (Object[]) args[1], relation);
         }, "%objects% (is|are)[(not:n't|not: not)] (ge:(greater|more|higher|bigger|larger) than or (equal to|the same as)"
                 + "|gt:(greater|more|higher|bigger|larger) than|gt:above"
                 + "|le:(less|smaller|lower) than or (equal to|the same as)|lt:(less|smaller|lower) than|lt:below"
@@ -93,70 +100,33 @@ final class Logic {
 
         registrar.condition("CondContains", info -> {
             boolean negated = info.hasTag("not");
-            return (context, args) -> negated != contains((Object[]) args[0], (Object[]) args[1]);
+            boolean containersAnd = info.and(0);
+            boolean valuesAnd = info.and(1);
+            return (context, args) -> negated != contains((Object[]) args[0], containersAnd, (Object[]) args[1], valuesAnd);
         }, "%objects% contain[s] %objects%", "%objects% (not:(doesn't|does not|do not|don't) contain) %objects%");
 
-        registrar.expression("ExprElement", "object", info -> {
-            int pattern = info.pattern();
-            boolean last = info.hasTag("last");
+        // Before elements, as in Skript: 'size of 10 random elements of X' is the size of the elements.
+        registrar.expression("ExprAmount", "integer", info -> {
+            boolean list = info.isList(0);
             return (context, args) -> {
-                Object source = args[args.length - 1];
-                Object[] values = Values.array(source);
-                // A queue gives its elements up: the first element of a queue is taken out of it.
-                Collections.ScriptQueue queue = values.length == 1 && values[0] instanceof Collections.ScriptQueue q ? q : null;
-                if (queue != null) {
-                    values = queue.toArray();
+                Object[] values = (Object[]) args[0];
+                // The size of a queue is how many elements it has; the amount of one item, how many of it.
+                if (values.length == 1 && values[0] instanceof java.util.Collection<?> collection) {
+                    return (long) collection.size();
                 }
-                int count = values.length;
-                switch (pattern) {
-                    case 0 -> {
-                        if (count == 0) {
-                            return null;
-                        }
-                        if (queue != null) {
-                            return last ? queue.pollLast() : queue.pollFirst();
-                        }
-                        return last ? values[count - 1] : values[0];
-                    }
-                    case 1 -> {
-                        int n = Math.min(count, Math.max(0, number(args[0])));
-                        Object[] picked = last ? java.util.Arrays.copyOfRange(values, count - n, count)
-                                : java.util.Arrays.copyOfRange(values, 0, n);
-                        if (queue != null) {
-                            for (int i = 0; i < n; i++) {
-                                if (last) {
-                                    queue.pollLast();
-                                } else {
-                                    queue.pollFirst();
-                                }
-                            }
-                        }
-                        return picked;
-                    }
-                    case 2 -> {
-                        return count == 0 ? null : values[java.util.concurrent.ThreadLocalRandom.current().nextInt(count)];
-                    }
-                    case 3 -> {
-                        List<Object> shuffled = new java.util.ArrayList<>(List.of(values));
-                        java.util.Collections.shuffle(shuffled);
-                        return shuffled.subList(0, Math.min(count, Math.max(0, number(args[0])))).toArray();
-                    }
-                    case 4 -> {
-                        int n = number(args[0]);
-                        int index = info.hasTag("tolast") ? count - n : n - 1;
-                        return index >= 0 && index < count ? values[index] : null;
-                    }
-                    default -> {
-                        int from = Math.max(1, number(args[0]));
-                        int to = Math.min(count, number(args[1]));
-                        return from > to ? new Object[0] : java.util.Arrays.copyOfRange(values, from - 1, to);
-                    }
+                if (!list && values.length == 1 && values[0] instanceof ItemType item) {
+                    return (long) item.amount();
                 }
+                return (long) values.length;
             };
-        }, "[the] (first|last:last) element [out] (of|in) %objects%",
+        },
+                "[the] (amount|number|size) of %objects%");
+        registrar.expression("ExprElement", "object", info -> new Element(info.pattern(), info.hasTag("last"),
+                info.hasTag("tolast"), info.hasTag("distinct")),
+                "[the] (first|last:last) element [out] (of|in) %objects%",
                 "[the] (first|last:last) %integer% elements [out] (of|in) %objects%",
                 "[a] random element [out] (of|in) %objects%",
-                "%integer% random [distinct] elements [out] (of|in) %objects%",
+                "%integer% random [distinct:distinct] elements [out] (of|in) %objects%",
                 "[the] %integer%(st|nd|rd|th) [tolast:[to] last] element [out] (of|in) %objects%",
                 "[the] elements (from|between) %integer% (to|and) %integer% [out] (of|in) %objects%");
 
@@ -205,24 +175,12 @@ final class Logic {
         registrar.condition("CondStartsEndsWith", info -> {
             boolean negated = info.pattern() == 1;
             boolean ends = info.hasTag("end");
-            return (context, args) -> {
-                Object[] texts = (Object[]) args[0];
-                Object[] affixes = (Object[]) args[1];
-                if (texts.length == 0 || affixes.length == 0) {
-                    return false;
-                }
-                boolean all = true;
-                for (Object text : texts) {
-                    boolean any = false;
-                    for (Object affix : affixes) {
-                        String t = Values.text(text);
-                        String a = Values.text(affix);
-                        any |= ends ? t.endsWith(a) : t.startsWith(a);
-                    }
-                    all &= any;
-                }
-                return all != negated;
-            };
+            boolean textsAnd = info.and(0);
+            boolean affixesAnd = info.and(1);
+            return (context, args) -> negated != Condition.check((Object[]) args[0], textsAnd, text ->
+                    Condition.check((Object[]) args[1], affixesAnd, affix -> ends
+                            ? Values.text(text).endsWith(Values.text(affix))
+                            : Values.text(text).startsWith(Values.text(affix))));
         }, "%texts% (start|end:end)[s] with %texts%", "%texts% (doesn't|does not|do not|don't) (start|end:end) with %texts%");
         registrar.condition("CondIsDivisibleBy", info -> {
             boolean negated = info.pattern() % 2 == 1;
@@ -276,49 +234,38 @@ final class Logic {
                 return angles.size() == 1 ? angles.getFirst() : angles.toArray();
             };
         }, "%number% [in] deg[ree][s]", "%number% [in] rad:rad[ian][s]", "%numbers% in deg[ree][s]", "%numbers% in rad:rad[ian][s]");
-        registrar.expression("ExprSortedList", "object", info -> (context, args) -> {
-            Object[] values = ((Object[]) args[0]).clone();
-            java.util.Arrays.sort(values, (a, b) -> {
-                Integer order = Comparison.order(a, b);
-                return order == null ? 0 : order;
-            });
-            return values;
-        }, "sorted %objects%");
+        registrar.expression("ExprSortedList", "object", info -> new SortedList(), "sorted %objects%");
         // 'keyed {_list::*}': the list's values, which keep their indices where that matters.
         registrar.expression("ExprKeyed", "object", info -> (context, args) -> args[0], "keyed %~objects%");
-        registrar.expression("ExprAmount", "integer", info -> (context, args) -> {
-            Object[] values = (Object[]) args[0];
-            // The size of a queue is how many elements it has.
-            return values.length == 1 && values[0] instanceof java.util.Collection<?> collection
-                    ? (long) collection.size() : (long) values.length;
-        },
-                "[the] (amount|number|size) of %objects%");
     }
 
     /**
-     * Texts contain text (ignoring case); anything else contains a value when one of its values equals it.
-     * Every value on the right has to be contained.
+     * Whether the containers contain the values, as Skript checks it: inventories hold the items; texts
+     * contain the texts (or, failing that, the values are among them); anything else, the values are among
+     * the containers' values.
      */
-    private static boolean contains(Object[] containers, Object[] values) {
-        if (containers.length == 0 || values.length == 0) {
+    private static boolean contains(Object[] containers, boolean containersAnd, Object[] values, boolean valuesAnd) {
+        if (containers.length == 0) {
             return false;
         }
-        boolean texts = java.util.Arrays.stream(containers).allMatch(String.class::isInstance);
-        for (Object value : values) {
-            boolean found = false;
+        if (java.util.Arrays.stream(containers).allMatch(Inventory.class::isInstance)) {
+            return Condition.check(containers, containersAnd, inventory -> Condition.check(values, valuesAnd,
+                    item -> Items.contains((Inventory) inventory, item)));
+        }
+        if (java.util.Arrays.stream(containers).allMatch(String.class::isInstance)
+                && Condition.check(containers, containersAnd, container -> Condition.check(values, valuesAnd,
+                        value -> value instanceof String text && ((String) container).toLowerCase(java.util.Locale.ROOT)
+                                .contains(text.toLowerCase(java.util.Locale.ROOT))))) {
+            return true;
+        }
+        return Condition.check(values, valuesAnd, value -> {
             for (Object container : containers) {
-                if (texts && value instanceof String text
-                        ? ((String) container).toLowerCase(java.util.Locale.ROOT).contains(text.toLowerCase(java.util.Locale.ROOT))
-                        : Comparison.equal(container, value)) {
-                    found = true;
-                    break;
+                if (Comparison.equal(value, container)) {
+                    return true;
                 }
             }
-            if (!found) {
-                return false;
-            }
-        }
-        return true;
+            return false;
+        });
     }
 
     /**
@@ -355,23 +302,18 @@ final class Logic {
     }
 
     /** Every value on the left relates to at least one on the right. Nothing on either side is false. */
-    private static boolean holds(Object[] left, Object[] right, Relation relation) {
-        if (left.length == 0 || right.length == 0) {
+    private static boolean holds(Object[] left, boolean leftAnd, Object[] right, Relation relation) {
+        if (right.length == 0) {
             return false;
         }
-        for (Object a : left) {
-            boolean any = false;
+        return Condition.check(left, leftAnd, a -> {
             for (Object b : right) {
                 if (holds(a, b, relation)) {
-                    any = true;
-                    break;
+                    return true;
                 }
             }
-            if (!any) {
-                return false;
-            }
-        }
-        return true;
+            return false;
+        });
     }
 
     private static boolean holds(Object a, Object b, Relation relation) {
@@ -391,5 +333,129 @@ final class Logic {
             case LESS -> order < 0;
             default -> order <= 0;
         };
+    }
+
+    /**
+     * {@code first 2 elements of %objects%} and the like. Elements of a queue are taken out of it; elements of
+     * keyed values keep their indices.
+     */
+    private record Element(int pattern, boolean last, boolean toLast, boolean distinct) implements Expression, KeyAware {
+        @Override
+        public Object get(TriggerContext context, Object[] args) {
+            Object source = args[args.length - 1];
+            KeyedValues keyed = source instanceof KeyedValues k ? k : null;
+            Object[] values = keyed != null ? keyed.values() : Values.array(source);
+            // A queue gives its elements up: the first element of a queue is taken out of it.
+            Collections.ScriptQueue queue = values.length == 1 && values[0] instanceof Collections.ScriptQueue q ? q : null;
+            if (queue != null) {
+                values = queue.toArray();
+            }
+            int count = values.length;
+            java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+            switch (pattern) {
+                case 0 -> {
+                    if (count == 0) {
+                        return null;
+                    }
+                    if (queue != null) {
+                        return last ? queue.pollLast() : queue.pollFirst();
+                    }
+                    return last ? values[count - 1] : values[0];
+                }
+                case 1 -> {
+                    int n = Math.min(count, Math.max(0, number(args[0])));
+                    if (queue != null) {
+                        for (int i = 0; i < n; i++) {
+                            if (last) {
+                                queue.pollLast();
+                            } else {
+                                queue.pollFirst();
+                            }
+                        }
+                    }
+                    return last ? range(keyed, values, count - n, count) : range(keyed, values, 0, n);
+                }
+                case 2 -> {
+                    return count == 0 ? null : values[random.nextInt(count)];
+                }
+                case 3 -> {
+                    int n = Math.max(0, number(args[0]));
+                    if (count == 0) {
+                        return new Object[0];
+                    }
+                    if (!distinct) {
+                        // Any element each time, so the same one can come up more than once.
+                        Object[] picked = new Object[n];
+                        for (int i = 0; i < n; i++) {
+                            picked[i] = values[random.nextInt(count)];
+                        }
+                        return picked;
+                    }
+                    List<Integer> order = new java.util.ArrayList<>(count);
+                    for (int i = 0; i < count; i++) {
+                        order.add(i);
+                    }
+                    java.util.Collections.shuffle(order, random);
+                    List<Integer> chosen = order.subList(0, Math.min(count, n));
+                    Object[] picked = new Object[chosen.size()];
+                    String[] keys = new String[chosen.size()];
+                    for (int i = 0; i < picked.length; i++) {
+                        picked[i] = values[chosen.get(i)];
+                        keys[i] = keyed == null ? null : keyed.keys()[chosen.get(i)];
+                    }
+                    return keyed == null ? picked : new KeyedValues(picked, keys);
+                }
+                case 4 -> {
+                    int n = number(args[0]);
+                    int index = toLast ? count - n : n - 1;
+                    return index >= 0 && index < count ? values[index] : null;
+                }
+                default -> {
+                    // 'elements from 2 to 1' are those from 1 to 2.
+                    int a = number(args[0]);
+                    int b = number(args[1]);
+                    int from = Math.max(1, Math.min(a, b));
+                    int to = Math.min(count, Math.max(a, b));
+                    return from > to ? new Object[0] : range(keyed, values, from - 1, to);
+                }
+            }
+        }
+
+        private static Object range(KeyedValues keyed, Object[] values, int from, int to) {
+            Object[] picked = java.util.Arrays.copyOfRange(values, from, to);
+            return keyed == null ? picked : new KeyedValues(picked, java.util.Arrays.copyOfRange(keyed.keys(), from, to));
+        }
+    }
+
+    /** {@code sorted %objects%}: in order, keeping indices; nothing if they can't all be ordered. */
+    private static final class SortedList implements Expression, KeyAware {
+        @Override
+        public Object get(TriggerContext context, Object[] args) {
+            KeyedValues keyed = args[0] instanceof KeyedValues k ? k : null;
+            Object[] values = keyed != null ? keyed.values() : (Object[]) args[0];
+            Integer[] order = new Integer[values.length];
+            for (int i = 0; i < order.length; i++) {
+                order[i] = i;
+            }
+            boolean[] incomparable = new boolean[1];
+            java.util.Arrays.sort(order, (x, y) -> {
+                Integer result = Comparison.order(values[x], values[y]);
+                if (result == null) {
+                    incomparable[0] = true;
+                    return 0;
+                }
+                return result;
+            });
+            if (incomparable[0]) {
+                return null;
+            }
+            Object[] sorted = new Object[values.length];
+            String[] keys = new String[values.length];
+            for (int i = 0; i < order.length; i++) {
+                sorted[i] = values[order[i]];
+                keys[i] = keyed == null ? null : keyed.keys()[order[i]];
+            }
+            return keyed == null ? sorted : new KeyedValues(sorted, keys);
+        }
     }
 }
