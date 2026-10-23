@@ -57,6 +57,11 @@ public final class ItemType {
         return stack.getAmount();
     }
 
+    /** Whether the item was written with an amount, like {@code 32 cooked beef}. */
+    public boolean amountGiven() {
+        return amountGiven;
+    }
+
     /** A copy with its meta changed by {@code change}. */
     public ItemType withMeta(Consumer<ItemMeta> change) {
         ItemStack copy = stack.clone();

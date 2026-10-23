@@ -1,4 +1,5 @@
 # Harness: the reference Skript reads the variables NeoSkript saved.
 on load:
+	broadcast "[harness] skript items: %name of {n::item}% | %item amount of {n::block}% | %item amount of {n::stack}% | %{n::mode}%"
 	broadcast "[harness] skript read: %{n::text}% | %{n::long}% | %{n::double}% | %{n::bool}% | %{n::timespan}% | %{n::list::*}%"
 	set {-harness::touched} to true

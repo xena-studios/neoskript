@@ -38,6 +38,13 @@ public final class VariableCodecs {
         }
         Registration registration = registration(value.getClass());
         if (registration == null) {
+            // A value without a codec is saved as what it converts to, if that has one: a slot as its item.
+            for (Registration candidate : byName.values()) {
+                Object converted = co.xenastudios.neoskript.runtime.Values.convert(value, candidate.type());
+                if (converted != value && candidate.type().isInstance(converted)) {
+                    return encode(converted);
+                }
+            }
             return null;
         }
         SkriptBinaryWriter out = new SkriptBinaryWriter(registration.name());
@@ -49,13 +56,20 @@ public final class VariableCodecs {
      * Decodes a saved value. Types without a codec, and values the codec can't read, come back as a
      * {@link RawValue} with the original bytes.
      */
+    private boolean reencodes(Object value, String type, byte[] bytes) {
+        Encoded encoded = encode(value);
+        return encoded != null && encoded.type().equals(type) && java.util.Arrays.equals(encoded.bytes(), bytes);
+    }
+
     public Object decode(String type, byte[] bytes) {
         Registration registration = byName.get(type);
         if (registration != null) {
             try {
                 SkriptBinaryReader in = new SkriptBinaryReader(type, bytes);
                 Object value = registration.codec().decode(in);
-                if (value != null && in.atEnd()) {
+                // Only values that encode back to the same bytes are decoded, so a value with parts
+                // NeoSkript doesn't model (an item that's several items) is kept as Skript saved it.
+                if (value != null && in.atEnd() && reencodes(value, type, bytes)) {
                     return value;
                 }
             } catch (RuntimeException e) {

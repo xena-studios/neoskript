@@ -26,6 +26,14 @@ on load:
 	set {t::world} to world "world"
 	set {t::offline} to "Notch" parsed as offline player
 	set {t::item} to diamond sword named "x"
+	set {t::item plain} to diamond sword
+	set {t::item block} to stone
+	set {t::item amount} to 32 cooked beef
+	set {t::item enchanted} to diamond sword of sharpness 2
+	set {t::item lore} to stone with lore "a"
+	set {_inv} to chest inventory with 1 row
+	set slot 0 of {_inv} to 3 diamonds
+	set {t::stack} to slot 0 of {_inv}
 	set {t::vector} to vector(1, 2, 3)
 	set {t::gamemode} to creative
 	set {-t::memory} to 1

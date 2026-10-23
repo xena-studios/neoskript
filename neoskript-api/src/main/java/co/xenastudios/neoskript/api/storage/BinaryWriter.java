@@ -38,4 +38,16 @@ public interface BinaryWriter {
 
     /** A field holding an object of {@code type}: follow with {@link #beginObject} and its fields. */
     void objectField(String name, String type);
+
+    /** A field holding nothing ({@code null}). */
+    void nullField(String name);
+
+    /**
+     * A field holding an array of {@code length} objects whose declared element type is
+     * {@code componentType}: follow with {@link #arrayElement} and an object for each element.
+     */
+    void objectArrayField(String name, String componentType, int length);
+
+    /** An element of an object array, an object of {@code type}: follow with {@link #beginObject}. */
+    void arrayElement(String type);
 }
