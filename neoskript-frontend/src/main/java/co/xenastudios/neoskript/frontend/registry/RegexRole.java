@@ -17,6 +17,8 @@ public enum RegexRole {
     EXPRESSION,
     /** A type name, as in {@code event-<.+>}. */
     TYPE,
+    /** A type name or a kind of entity, as in {@code the zombie} or {@code event-creeper}: the event's entity. */
+    TYPE_OR_ENTITY,
     /**
      * What a loop value is called, as in {@code loop-<.+>}: {@code value}, {@code index}, {@code counter},
      * {@code iteration} or a type name, then optionally {@code -N}.

@@ -150,6 +150,12 @@ public interface Registrar {
      */
     <T> void cloner(Class<T> type, java.util.function.UnaryOperator<T> cloner);
 
+    /**
+     * What {@code is} means between a value of {@code left} and one of {@code right} (checked either way
+     * round, with the {@code left} value first): {@code {_entity} is a pig}, {@code lucy axolotl is axolotl}.
+     */
+    <A, B> void comparison(Class<A> left, Class<B> right, java.util.function.BiPredicate<? super A, ? super B> test);
+
     /** How values of {@code type} read as text, as when embedded in a string. */
     <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText);
 }

@@ -246,7 +246,7 @@ final class LineParser {
     }
 
     private static boolean hasTypeRole(SyntaxInfo syntax) {
-        return syntax.regexRoles().contains(RegexRole.TYPE);
+        return syntax.regexRoles().contains(RegexRole.TYPE) || syntax.regexRoles().contains(RegexRole.TYPE_OR_ENTITY);
     }
 
     private static String returnType(ParsedSyntax parsed) {
@@ -282,6 +282,12 @@ final class LineParser {
                     }
                     case EXPRESSION -> expression(start, end, Expected.OBJECTS);
                     case TYPE -> typeName(start, end);
+                    case TYPE_OR_ENTITY -> {
+                        TypeRef ref = typeName(start, end);
+                        TypeInfo entity = registry.type("entity");
+                        yield ref != null || entity == null || !registry.isEntityTypeLiteral(input.substring(start, end))
+                                ? ref : new TypeRef(entity, false);
+                    }
                     case LOOP_VALUE -> isLoopValueName(text.substring(start, end)) ? match : null;
                     case CODE -> {
                         Object code = condition(start, end);
@@ -705,7 +711,9 @@ final class LineParser {
             return null;
         }
         boolean open = expected.anything() || expected.types().stream()
-                .anyMatch(type -> type.openLiterals() && registry.mightBeLiteral(type, text));
+                .anyMatch(type -> type.openLiterals() && registry.mightBeLiteral(type, text))
+                || registry.isConvertibleLiteral(text, id -> expected.types().stream()
+                        .anyMatch(type -> !type.id().equals(id) && registry.isConvertible(id, type.id())));
         return open ? new Expr.Unresolved(start, end, text) : null;
     }
 

@@ -138,6 +138,11 @@ public final class SyntaxRegistry {
         return !strictTypes.contains(from) && !strictTypes.contains(to);
     }
 
+    /** Whether {@code from} converts directly to {@code to}. */
+    public boolean isConvertible(String from, String to) {
+        return convertsTo(from, to);
+    }
+
     private boolean convertsTo(String from, String to) {
         Set<String> targets = conversions.get(from);
         return targets != null && targets.contains(to);
@@ -163,22 +168,43 @@ public final class SyntaxRegistry {
         }
         try {
             return check.test(words);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             // The check needs something that isn't there (a server, in tests): don't rule the words out.
             return true;
         }
     }
 
+    /**
+     * Whether {@code words} are a literal of some type whose values can be used as {@code expected}, like a
+     * potion effect type where a potion effect is expected. Checks are strict here.
+     */
+    public boolean isConvertibleLiteral(String words, java.util.function.Predicate<String> expected) {
+        for (Map.Entry<String, java.util.function.Predicate<String>> check : literalChecks.entrySet()) {
+            if (!expected.test(check.getKey())) {
+                continue;
+            }
+            try {
+                if (check.getValue().test(words)) {
+                    return true;
+                }
+            } catch (RuntimeException | LinkageError e) {
+                // Not without a server.
+            }
+        }
+        return false;
+    }
+
     /** Whether {@code name} names a kind of entity, as in {@code the zombie} or {@code event-creeper}. */
     public boolean isEntityName(String name) {
-        if (entityNames.contains(normalize(name))) {
-            return true;
-        }
-        // Or what the entity type's literals accept, where it has a check.
+        return entityNames.contains(normalize(name));
+    }
+
+    /** Whether {@code words} name an entity type, by what the entity type's literals accept. */
+    public boolean isEntityTypeLiteral(String words) {
         java.util.function.Predicate<String> check = literalChecks.get("entitytype");
         try {
-            return check != null && check.test(name);
-        } catch (RuntimeException e) {
+            return check != null && check.test(words);
+        } catch (RuntimeException | LinkageError e) {
             return false;
         }
     }

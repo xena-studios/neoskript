@@ -647,6 +647,14 @@ final class TriggerCompiler {
             }
             case Statement.Section section when isCore(section.header(), CoreSyntax.LOOP) -> loop(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.WHILE) -> whileLoop(section);
+            case Statement.Section section when isCore(section.header(), CoreSyntax.CATCH_ERRORS) -> {
+                String errors = Type.getInternalName(co.xenastudios.neoskript.runtime.RuntimeErrors.class);
+                Label end = new Label();
+                method.visitMethodInsn(INVOKESTATIC, errors, "begin", "()V", false);
+                block(BlockKind.CONDITIONAL, end, section.body());
+                method.visitLabel(end);
+                method.visitMethodInsn(INVOKESTATIC, errors, "end", "()V", false);
+            }
             case Statement.Section section when library.sectionType(section.header() == null ? null
                     : section.header().syntax().id()) != null -> librarySection(section);
             case Statement.Section section -> throw unsupported("sections like '" + section.line().key() + "'");
@@ -1494,8 +1502,12 @@ final class TriggerCompiler {
             case Expr.FunctionCall call -> call(call);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARITHMETIC) -> arithmetic(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.LOOP_VALUE) -> loopValue(syntax.syntax());
-            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE) -> eventValue(syntax);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE)
+                    || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY) -> eventValue(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.CAUGHT_ERRORS) -> method.visitMethodInsn(
+                    INVOKESTATIC, Type.getInternalName(co.xenastudios.neoskript.runtime.RuntimeErrors.class), "lastCaught",
+                    "()" + OBJECTS, false);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.WHETHER) -> {
                 if (!(syntax.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition)) {
                     throw unsupported("'" + source.substring(syntax.start(), syntax.end()) + "'");
@@ -1845,7 +1857,14 @@ final class TriggerCompiler {
             }
             method.visitInsn(DUP);
             pushInt(i);
-            expression(argument);
+            // Words are first tried as the parameter's type: 'chicken' is an entity type for 'data: entity type'.
+            List<String> outerLiteralTypes = literalTypes;
+            literalTypes = List.of(parameters.get(i).type());
+            try {
+                expression(argument);
+            } finally {
+                literalTypes = outerLiteralTypes;
+            }
             convert(parameters.get(i).plural());
             method.visitInsn(AASTORE);
         }
