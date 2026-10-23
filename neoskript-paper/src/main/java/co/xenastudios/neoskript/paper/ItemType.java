@@ -23,8 +23,9 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 /**
  * Skript's {@code item type}: an item, with an amount if one was given, as scripts write it:
- * {@code 32 cooked beef}, {@code diamond sword of sharpness 2}. Values are never changed; syntax that
- * changes an item makes a new one.
+ * {@code 32 cooked beef}, {@code diamond sword of sharpness 2}. Syntax like {@code named} makes a new item;
+ * changing an item in a variable ({@code set persistent data tag "x" of {_item}}) changes it in place,
+ * which is safe because variables store copies.
  */
 public final class ItemType {
 
@@ -60,6 +61,16 @@ public final class ItemType {
     /** Whether the item was written with an amount, like {@code 32 cooked beef}. */
     public boolean amountGiven() {
         return amountGiven;
+    }
+
+    /** Changes its meta in place, as when a variable's item is changed. */
+    public void editMeta(Consumer<ItemMeta> change) {
+        stack.editMeta(change);
+    }
+
+    /** A copy, as stored in a variable. */
+    public ItemType copy() {
+        return new ItemType(stack, amountGiven);
     }
 
     /** A copy with its meta changed by {@code change}. */
@@ -150,7 +161,9 @@ public final class ItemType {
         if (known == null) {
             known = new HashMap<>();
             for (Material material : Material.values()) {
-                if (material.isLegacy() || !material.isItem() || material.isAir()) {
+                // Air counts, as in Skript ('set block at X to air'), but not the other airs.
+                if (material.isLegacy() || !material.isItem() && material != Material.AIR
+                        || material.isAir() && material != Material.AIR) {
                     continue;
                 }
                 String singular = name(material);

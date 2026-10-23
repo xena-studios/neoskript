@@ -306,6 +306,25 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - A bug that throws while compiling one structure now only leaves that structure out, with an error asking for a report. It used to stop NeoSkript loading.
 >      - Integer literals too big for a whole number become decimals, as in Skript.
 >    - **Next, in 5b:** potions, world borders, entity data, persistent data, block data, chunks.
+>
+>    **5b status: done (2026-10-23).**
+>    - **World borders:** a world's or player's border, its size (diameter or radius), center, damage buffer and amount, warning distance and time, all settable, and expanding or shrinking it, optionally over time.
+>    - **Potions:**
+>      - Potion effect types, by name or Skript's old names (`confusion`, `fast digging`...).
+>      - Potion effects (`potion effect of speed of tier 2 for 10 seconds`, infinite ones, ones based on another), applying them.
+>      - An entity's effects, amplifier and duration, `has potion effect`, `is instant`.
+>      - A type alone converts to its effect (`apply speed to player`).
+>    - **Persistent data:**
+>      - Tags on items, entities, block entities, worlds and chunks: reading, setting, deleting, `has data tag`, all keys.
+>      - Values are stored as text, whole numbers, decimals or booleans.
+>    - **Copies in variables (`Registrar.cloner`):** values that can change in place, like items, are copied when stored in a variable, as in Skript. Changing a variable's item doesn't change the item it came from, and items in variables can be changed in place.
+>    - **Also:** chunks (`chunk at`, loaded chunks), midpoints of locations and vectors, `air` as an item.
+>    - **Fixes:**
+>      - `teleport` to a location without a world uses the entity's world.
+>      - The block at a worldless location is nothing, not a crash.
+>      - A random integer with no whole number in its range is nothing, not a crash.
+>    - **Skript's tests:** 127 pass, up from 95 after 5a.
+>    - **Left for step 6:** Skript's entity data (`baby axolotl`, `lucy axolotl`), block data, `catch runtime errors`, changeable conditions (`set whether X can age`), typed and list data tags.
 > 6. **The long tail:** whatever Skript's tests still need, most-used first, then the differential runner for the 95% check.
 
 **M5: Folia hardening + tooling**

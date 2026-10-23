@@ -181,6 +181,31 @@ public final class Values {
         return value;
     }
 
+    private static final Map<Class<?>, java.util.function.UnaryOperator<Object>> CLONERS = new ConcurrentHashMap<>();
+
+    /** Registers how values of {@code type} are copied when they're stored in a variable. */
+    @SuppressWarnings("unchecked")
+    public static <T> void registerCloner(Class<T> type, java.util.function.UnaryOperator<T> cloner) {
+        CLONERS.put(type, value -> ((java.util.function.UnaryOperator<Object>) (Object) cloner).apply(value));
+    }
+
+    /**
+     * The value to store in a variable: a copy of values that can be changed in place, like items, so
+     * changing a variable's item doesn't change the item it was set from, as in Skript.
+     */
+    public static Object copy(Object value) {
+        if (value == null || CLONERS.isEmpty()) {
+            return value;
+        }
+        for (Class<?> type = value.getClass(); type != null; type = type.getSuperclass()) {
+            java.util.function.UnaryOperator<Object> cloner = CLONERS.get(type);
+            if (cloner != null) {
+                return cloner.apply(value);
+            }
+        }
+        return value;
+    }
+
     private record Changer(Class<?> owner, co.xenastudios.neoskript.api.element.Changeable.Mode mode,
             java.util.function.BiConsumer<Object, Object[]> change) {}
 

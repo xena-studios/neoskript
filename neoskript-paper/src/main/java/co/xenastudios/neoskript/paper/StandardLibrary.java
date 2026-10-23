@@ -23,6 +23,9 @@ public final class StandardLibrary {
         Locations.register(registrar);
         Items.register(registrar);
         WorldSyntax.register(registrar);
+        Borders.register(registrar);
+        Potions.register(registrar);
+        PersistentData.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
         StorageCodecs.register(registrar);

@@ -317,6 +317,12 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public <T> void cloner(Class<T> type, java.util.function.UnaryOperator<T> cloner) {
+        checkOpen();
+        Values.registerCloner(type, cloner);
+    }
+
+    @Override
     public <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText) {
         Values.registerText(type, toText);
     }

@@ -46,6 +46,8 @@ final class Items {
         registrar.subtype("player", "inventoryholder");
 
         registrar.literalParser("itemtype", ItemType::parse);
+        registrar.cloner(ItemType.class, ItemType::copy);
+        registrar.cloner(ItemStack.class, ItemStack::clone);
         registrar.parser("itemtype", ItemType::parse);
         registrar.converter(ItemType.class, ItemStack.class, ItemType::stack);
         registrar.converter(ItemStack.class, ItemType.class, stack -> new ItemType(stack, true));

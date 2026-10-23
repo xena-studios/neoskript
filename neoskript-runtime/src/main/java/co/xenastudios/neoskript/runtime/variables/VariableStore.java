@@ -5,6 +5,7 @@
 package co.xenastudios.neoskript.runtime.variables;
 
 import co.xenastudios.neoskript.runtime.Arithmetic;
+import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -114,7 +115,7 @@ public final class VariableStore {
             }
             return;
         }
-        create(name).value.set(value);
+        create(name).value.set(Values.copy(value));
     }
 
     /** Atomically replaces {@code {name}} with {@code change} applied to its current value. */
@@ -217,7 +218,7 @@ public final class VariableStore {
         int index = 1;
         for (Object value : values) {
             if (value != null) {
-                node.children().computeIfAbsent(Integer.toString(index++), k -> new Node()).value.set(value);
+                node.children().computeIfAbsent(Integer.toString(index++), k -> new Node()).value.set(Values.copy(value));
             }
         }
     }
@@ -236,7 +237,7 @@ public final class VariableStore {
                 while (children.containsKey(Integer.toString(index)) && children.get(Integer.toString(index)).value.get() != null) {
                     index++;
                 }
-                children.computeIfAbsent(Integer.toString(index), k -> new Node()).value.set(value);
+                children.computeIfAbsent(Integer.toString(index), k -> new Node()).value.set(Values.copy(value));
             }
         }
     }

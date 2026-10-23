@@ -48,7 +48,7 @@ final class WorldSyntax {
         registrar.text(Block.class, block -> ItemType.name(block.getType()));
         registrar.text(Vector.class, vector -> "x: " + Values.decimal(vector.getX()) + ", y: "
                 + Values.decimal(vector.getY()) + ", z: " + Values.decimal(vector.getZ()));
-        registrar.converter(Location.class, Block.class, Location::getBlock);
+        registrar.converter(Location.class, Block.class, location -> location.getWorld() == null ? null : location.getBlock());
         registrar.converter(Block.class, ItemType.class, block -> new ItemType(new org.bukkit.inventory.ItemStack(
                 block.getType().isItem() ? block.getType() : Material.AIR), false));
 
@@ -67,6 +67,35 @@ final class WorldSyntax {
                 return new Vector(in.doubleField("x"), in.doubleField("y"), in.doubleField("z"));
             }
         });
+
+        registrar.type("chunk", "chunk", org.bukkit.Chunk.class);
+        registrar.text(org.bukkit.Chunk.class, chunk -> "chunk (" + chunk.getX() + ", " + chunk.getZ() + ") of "
+                + chunk.getWorld().getName());
+        registrar.expression("ExprChunk", "chunk", info -> {
+            boolean loaded = info.pattern() == 2;
+            return (context, args) -> {
+                List<Object> chunks = new ArrayList<>();
+                for (Object value : (Object[]) args[0]) {
+                    if (loaded && value instanceof org.bukkit.World world) {
+                        chunks.addAll(List.of(world.getLoadedChunks()));
+                    } else if (!loaded && value instanceof Location location && location.getWorld() != null) {
+                        chunks.add(location.getChunk());
+                    }
+                }
+                return chunks.size() == 1 ? chunks.getFirst() : chunks.toArray();
+            };
+        }, "[(all [[of] the]|the)] chunk[s] (of|at) %locations%", "%locations%'[s] chunk[s]",
+                "[(all [[of] the]|the)] loaded chunks (of|in) %worlds%");
+        registrar.expression("ExprMidpoint", "object", info -> (context, args) -> {
+            if (args[0] instanceof Location a && args[1] instanceof Location b) {
+                return a.getWorld() != b.getWorld() ? null : new Location(a.getWorld(), (a.getX() + b.getX()) / 2,
+                        (a.getY() + b.getY()) / 2, (a.getZ() + b.getZ()) / 2);
+            }
+            if (args[0] instanceof Vector a && args[1] instanceof Vector b) {
+                return a.getMidpoint(b);
+            }
+            return null;
+        }, "[the] mid[-]point (of|between) %location/vector% and %location/vector%");
 
         registerEntities(registrar);
         registerBlocks(registrar);
@@ -159,7 +188,7 @@ final class WorldSyntax {
         registrar.expression("ExprBlock-2", "block", info -> {
             int pattern = info.pattern();
             return (context, args) -> {
-                if (!(args[0] instanceof Location location)) {
+                if (!(args[0] instanceof Location location) || location.getWorld() == null) {
                     return null;
                 }
                 return switch (pattern) {
