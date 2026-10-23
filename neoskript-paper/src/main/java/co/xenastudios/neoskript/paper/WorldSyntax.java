@@ -56,6 +56,17 @@ final class WorldSyntax {
         registrar.type("livingentity", "living entity", LivingEntity.class);
         registrar.type("block", "block", Block.class);
         registrar.type("vector", "vector", Vector.class);
+        registrar.arithmetic('+', Vector.class, Vector.class, (x, y) -> x.clone().add(y));
+        registrar.arithmetic('-', Vector.class, Vector.class, (x, y) -> x.clone().subtract(y));
+        registrar.arithmetic('*', Vector.class, Vector.class, (x, y) -> x.clone().multiply(y));
+        registrar.arithmetic('/', Vector.class, Vector.class, (x, y) -> x.clone().divide(y));
+        registrar.arithmetic('*', Vector.class, Number.class, (x, y) -> x.clone().multiply(y.doubleValue()));
+        registrar.arithmetic('*', Number.class, Vector.class, (x, y) -> y.clone().multiply(x.doubleValue()));
+        registrar.arithmetic('/', Vector.class, Number.class, (x, y) -> x.clone().multiply(1 / y.doubleValue()));
+        registrar.arithmeticDefault(Vector.class, Vector::new);
+        // Vectors and locations change in place ('set x of {_v} to 1'), so variables and functions get copies.
+        registrar.cloner(Vector.class, Vector::clone);
+        registrar.cloner(Location.class, Location::clone);
         registrar.subtype("livingentity", "entity");
         registrar.subtype("player", "livingentity");
         registrar.literalParser("entitytype", EntityKind::parse);
@@ -336,24 +347,8 @@ final class WorldSyntax {
         registrar.function("vector", List.of(Parameter.of("x", "number"), Parameter.of("y", "number"),
                 Parameter.of("z", "number")), "vector", false, args -> new Vector(number(args[0]), number(args[1]),
                 number(args[2])));
-        registrar.expression("PropExprWXYZ", "number", info -> {
-            char axis = info.hasTag("x") ? 'x' : info.hasTag("y") ? 'y' : 'z';
-            return (context, args) -> {
-                List<Object> values = new ArrayList<>();
-                for (Object value : (Object[]) args[0]) {
-                    Vector vector = switch (value) {
-                        case Location location -> location.toVector();
-                        case Vector v -> v;
-                        case Block block -> block.getLocation().toVector();
-                        default -> null;
-                    };
-                    if (vector != null) {
-                        values.add(axis == 'x' ? vector.getX() : axis == 'y' ? vector.getY() : vector.getZ());
-                    }
-                }
-                return values.size() == 1 ? values.getFirst() : values.toArray();
-            };
-        }, "[the] (x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])] of %objects%",
+        registrar.expression("PropExprWXYZ", "number", info -> new Axis(info.hasTag("x") ? 0 : info.hasTag("y") ? 1 : 2),
+                "[the] (x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])] of %objects%",
                 "%objects%'[s] (x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])]");
         registrar.expression("ExprLocationVectorOffset", "location", info -> (context, args) -> {
             if (!(args[0] instanceof Location location)) {
@@ -367,15 +362,13 @@ final class WorldSyntax {
             }
             return offset;
         }, "%location% offset by [[the] vectors] %vectors%", "%location%[ ]~[~][ ]%vectors%");
-        registrar.expression("ExprVectorLength", "number", info -> (context, args) -> {
-            List<Object> lengths = new ArrayList<>();
-            for (Object vector : (Object[]) args[0]) {
-                if (vector instanceof Vector v) {
-                    lengths.add(v.length());
-                }
-            }
-            return lengths.size() == 1 ? lengths.getFirst() : lengths.toArray();
-        }, "[the] (vector|standard|normal) length[s] of %vectors%", "%vectors%'[s] (vector|standard|normal) length[s]");
+        SettableProperty.register(registrar, "ExprVectorLength", "number", Vector.class, Number.class, Vector::length,
+                (vector, length) -> {
+                    double current = vector.length();
+                    if (current != 0) {
+                        vector.multiply(length.doubleValue() / current);
+                    }
+                }, "[the] (vector|standard|normal) length[s] of %vectors%", "%vectors%'[s] (vector|standard|normal) length[s]");
     }
 
     /** Values Skript's test environment provides: the test world, a location in it, and the block there. */
@@ -435,4 +428,62 @@ final class WorldSyntax {
         return value instanceof Number number ? number.doubleValue() : 0;
     }
 
+
+    /**
+     * {@code the x component of %vectors%}, {@code the y-coordinate of %locations%}: one axis of each, which
+     * can be set, added to and taken from. Vectors and locations change in place, as when in a variable.
+     */
+    private record Axis(int axis) implements Expression, Changeable {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            List<Object> values = new ArrayList<>();
+            for (Object value : (Object[]) arguments[0]) {
+                Vector vector = switch (value) {
+                    case Location location -> location.toVector();
+                    case Vector v -> v;
+                    case Block block -> block.getLocation().toVector();
+                    default -> null;
+                };
+                if (vector != null) {
+                    values.add(axis == 0 ? vector.getX() : axis == 1 ? vector.getY() : vector.getZ());
+                }
+            }
+            return values.size() == 1 ? values.getFirst() : values.toArray();
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return mode == Mode.SET || mode == Mode.ADD || mode == Mode.REMOVE ? new Class<?>[] {Number.class} : null;
+        }
+
+        @Override
+        public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
+            if (delta == null || delta.length == 0 || !(delta[0] instanceof Number number)) {
+                return;
+            }
+            double by = mode == Mode.REMOVE ? -number.doubleValue() : number.doubleValue();
+            for (Object value : (Object[]) arguments[0]) {
+                switch (value) {
+                    case Vector vector -> vector.copy(changed(vector, by, mode));
+                    case Location location -> {
+                        Vector moved = changed(location.toVector(), by, mode);
+                        location.set(moved.getX(), moved.getY(), moved.getZ());
+                    }
+                    default -> {}
+                }
+            }
+        }
+
+        private Vector changed(Vector vector, double by, Mode mode) {
+            double current = axis == 0 ? vector.getX() : axis == 1 ? vector.getY() : vector.getZ();
+            double next = mode == Mode.SET ? by : current + by;
+            Vector result = vector.clone();
+            switch (axis) {
+                case 0 -> result.setX(next);
+                case 1 -> result.setY(next);
+                default -> result.setZ(next);
+            }
+            return result;
+        }
+    }
 }

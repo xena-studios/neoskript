@@ -330,6 +330,19 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public <A, B> void arithmetic(char operator, Class<A> left, Class<B> right,
+            java.util.function.BiFunction<? super A, ? super B, ?> apply) {
+        checkOpen();
+        co.xenastudios.neoskript.runtime.Arithmetic.register(operator, left, right, apply);
+    }
+
+    @Override
+    public <T> void arithmeticDefault(Class<T> type, java.util.function.Supplier<? extends T> value) {
+        checkOpen();
+        co.xenastudios.neoskript.runtime.Arithmetic.registerDefault(type, value);
+    }
+
+    @Override
     public <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText) {
         Values.registerText(type, toText);
     }

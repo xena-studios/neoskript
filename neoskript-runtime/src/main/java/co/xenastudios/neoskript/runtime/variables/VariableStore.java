@@ -4,7 +4,9 @@
  */
 package co.xenastudios.neoskript.runtime.variables;
 
+import co.xenastudios.neoskript.api.element.Changeable;
 import co.xenastudios.neoskript.runtime.Arithmetic;
+import co.xenastudios.neoskript.runtime.KeyedValues;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -126,6 +128,12 @@ public final class VariableStore {
 
     /** Adds {@code values} to the number in {@code {name}} (an unset variable counts as nothing yet). */
     public void add(String name, Object[] values) {
+        // A value with its own way of being added to, like a queue, changes in place.
+        Object current = get(name);
+        if (current != null && Values.changeValue(current, values, Changeable.Mode.ADD)) {
+            changed();
+            return;
+        }
         update(name, old -> {
             Object result = old;
             for (Object value : values) {
@@ -137,6 +145,11 @@ public final class VariableStore {
 
     /** Subtracts {@code values} from the number in {@code {name}}. */
     public void subtract(String name, Object[] values) {
+        Object current = get(name);
+        if (current != null && Values.changeValue(current, values, Changeable.Mode.REMOVE)) {
+            changed();
+            return;
+        }
         update(name, old -> {
             Object result = old == null ? 0L : old;
             for (Object value : values) {
@@ -180,11 +193,18 @@ public final class VariableStore {
      * {@code sorted indices of {x::*} in descending order}.
      */
     public String[] sortedIndices(String prefix, boolean descending) {
-        String[] indices = indices(prefix);
-        Object[] values = new Object[indices.length];
-        for (int i = 0; i < indices.length; i++) {
-            values[i] = get(prefix + "::" + indices[i]);
+        // Only indices with a value of their own are sorted, as in Skript: a list under an index has none.
+        List<String> valued = new ArrayList<>();
+        List<Object> found = new ArrayList<>();
+        for (String index : indices(prefix)) {
+            Object value = get(prefix + "::" + index);
+            if (value != null) {
+                valued.add(index);
+                found.add(value);
+            }
         }
+        String[] indices = valued.toArray(String[]::new);
+        Object[] values = found.toArray();
         Integer[] order = new Integer[indices.length];
         for (int i = 0; i < order.length; i++) {
             order[i] = i;
@@ -223,6 +243,43 @@ public final class VariableStore {
                 node.children().computeIfAbsent(Integer.toString(index++), k -> new Node()).value.set(Values.copy(value));
             }
         }
+    }
+
+    /**
+     * Sets {@code {prefix::*}} to {@code values}: keyed values ({@link KeyedValues}) at their own indices,
+     * anything else numbered from 1 as {@link #setList} does.
+     */
+    public void setListKeyed(String prefix, Object values) {
+        if (!(values instanceof KeyedValues keyed)) {
+            setList(prefix, values instanceof Object[] array ? array : values == null ? new Object[0] : new Object[] {values});
+            return;
+        }
+        changed();
+        deleteList(prefix);
+        Node node = create(prefix);
+        for (int i = 0; i < keyed.values().length; i++) {
+            if (keyed.values()[i] != null) {
+                node.children().computeIfAbsent(keyed.keys()[i], k -> new Node()).value.set(Values.copy(keyed.values()[i]));
+            }
+        }
+    }
+
+    /** The values directly under {@code {prefix::*}} with their indices, in index order. */
+    public KeyedValues keyedList(String prefix) {
+        Node node = find(prefix);
+        if (node == null || node.children == null) {
+            return new KeyedValues(new Object[0], new String[0]);
+        }
+        List<Object> values = new ArrayList<>();
+        List<String> keys = new ArrayList<>();
+        for (Map.Entry<String, Node> entry : node.children.entrySet()) {
+            Object value = entry.getValue().value.get();
+            if (value != null) {
+                values.add(value);
+                keys.add(entry.getKey());
+            }
+        }
+        return new KeyedValues(values.toArray(), keys.toArray(String[]::new));
     }
 
     /** Adds {@code values} to {@code {prefix::*}}, each at the lowest free index from the list's size + 1. */

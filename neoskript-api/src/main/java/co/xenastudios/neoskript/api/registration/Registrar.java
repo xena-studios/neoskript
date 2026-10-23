@@ -156,6 +156,16 @@ public interface Registrar {
      */
     <A, B> void comparison(Class<A> left, Class<B> right, java.util.function.BiPredicate<? super A, ? super B> test);
 
+    /**
+     * What {@code operator} ({@code + - * / ^}) gives between a value of {@code left} and one of
+     * {@code right}, in that order: {@code {_vector} * 2}. Returning {@code null} gives nothing.
+     */
+    <A, B> void arithmetic(char operator, Class<A> left, Class<B> right,
+            java.util.function.BiFunction<? super A, ? super B, ?> apply);
+
+    /** What a missing operand counts as in arithmetic next to a value of {@code type}, as 0 does for numbers. */
+    <T> void arithmeticDefault(Class<T> type, java.util.function.Supplier<? extends T> value);
+
     /** How values of {@code type} read as text, as when embedded in a string. */
     <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText);
 }

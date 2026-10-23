@@ -68,6 +68,11 @@ public final class Values {
         return type.isInstance(value) ? value : null;
     }
 
+    /** {@link #filter}, keeping the indices of keyed values ({@link KeyedValues}). */
+    public static Object filterKeyed(Object value, Class<?> type) {
+        return value instanceof KeyedValues keyed ? keyed.only(type) : filter(value, type);
+    }
+
     /** Whether a value counts as true for {@code set whether X to ...}: the boolean true. */
     public static boolean isTrue(Object value) {
         return Boolean.TRUE.equals(single(value));
@@ -283,6 +288,20 @@ public final class Values {
                 }
             }
         }
+    }
+
+    /**
+     * Changes {@code target} in place with the first changer registered for its class and {@code mode}, as
+     * {@code add "x" to {queue}} changes the queue in the variable. Whether there was one.
+     */
+    public static boolean changeValue(Object target, Object[] values, co.xenastudios.neoskript.api.element.Changeable.Mode mode) {
+        for (Changer changer : CHANGERS) {
+            if (changer.mode() == mode && changer.owner().isInstance(target)) {
+                changer.change().accept(target, values);
+                return true;
+            }
+        }
+        return false;
     }
 
     private static final Map<Class<?>, Function<Object, String>> CONVERTERS = new ConcurrentHashMap<>();

@@ -21,6 +21,8 @@ final class Time {
             case Timespan a when args[1] instanceof Timespan b -> new Timespan(Math.abs(a.millis() - b.millis()));
             case Long a when args[1] instanceof Long b -> Math.abs(a - b);
             case Number a when args[1] instanceof Number b -> Math.abs(a.doubleValue() - b.doubleValue());
+            case org.bukkit.util.Vector a when args[1] instanceof org.bukkit.util.Vector b -> new org.bukkit.util.Vector(
+                    Math.abs(a.getX() - b.getX()), Math.abs(a.getY() - b.getY()), Math.abs(a.getZ() - b.getZ()));
             case null, default -> null;
         }, "difference (between|of) %object% and %object%");
 

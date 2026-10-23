@@ -142,7 +142,7 @@ final class Items {
         slots.put("helmet", EquipmentSlot.HEAD);
         slots.put("head", EquipmentSlot.HEAD);
         slots.put("chestplate", EquipmentSlot.CHEST);
-        slots.put("chest", EquipmentSlot.CHEST);
+        // Not 'chest', which Skript reads as the chest item where both would do: 'set block at X to chest'.
         slots.put("leggings", EquipmentSlot.LEGS);
         slots.put("legs", EquipmentSlot.LEGS);
         slots.put("boots", EquipmentSlot.FEET);
@@ -263,6 +263,29 @@ final class Items {
             };
         }, "%inventoryholders/inventories% (has|have) %itemtypes% [in [(the[ir]|his|her|its)] inventory]",
                 "%inventoryholders/inventories% (doesn't|does not|do not|don't) have %itemtypes% [in [(the[ir]|his|her|its)] inventory]");
+    }
+
+    /**
+     * Whether {@code inventory} holds at least as many of {@code item} as it has, as Skript counts them: a plain
+     * item ({@code stone}) counts stacks of it whatever their name; one with a name or enchantments counts only
+     * stacks like it.
+     */
+    static boolean contains(Inventory inventory, Object item) {
+        ItemStack wanted = stack(item);
+        if (wanted == null) {
+            return false;
+        }
+        boolean plain = !wanted.hasItemMeta();
+        int count = 0;
+        for (ItemStack held : inventory.getStorageContents()) {
+            if (held != null && held.getType() == wanted.getType() && (plain || held.isSimilar(wanted))) {
+                count += held.getAmount();
+                if (count >= wanted.getAmount()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** The item stack {@code owner} is or holds, or {@code null}. */
