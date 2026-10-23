@@ -181,6 +181,36 @@ public final class Values {
         return value;
     }
 
+    private record Changer(Class<?> owner, co.xenastudios.neoskript.api.element.Changeable.Mode mode,
+            java.util.function.BiConsumer<Object, Object[]> change) {}
+
+    private static final List<Changer> CHANGERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Registers how {@code mode} changes a value of {@code owner} that's itself the target. */
+    @SuppressWarnings("unchecked")
+    public static <T> void registerChanger(Class<T> owner, co.xenastudios.neoskript.api.element.Changeable.Mode mode,
+            java.util.function.BiConsumer<? super T, Object[]> change) {
+        CHANGERS.add(new Changer(owner, mode, (java.util.function.BiConsumer<Object, Object[]>) change));
+    }
+
+    /** Whether anything can change values this way, so {@code give X to player} compiles. */
+    public static boolean hasChanger(co.xenastudios.neoskript.api.element.Changeable.Mode mode) {
+        return CHANGERS.stream().anyMatch(c -> c.mode() == mode);
+    }
+
+    /** Changes each target value with the first changer registered for its class and {@code mode}. */
+    public static void changeValues(Object targets, Object delta, co.xenastudios.neoskript.api.element.Changeable.Mode mode) {
+        Object[] values = array(delta);
+        for (Object target : array(targets)) {
+            for (Changer changer : CHANGERS) {
+                if (changer.mode() == mode && changer.owner().isInstance(target)) {
+                    changer.change().accept(target, values);
+                    break;
+                }
+            }
+        }
+    }
+
     private static final Map<Class<?>, Function<Object, String>> CONVERTERS = new ConcurrentHashMap<>();
     private static final Map<Class<?>, Optional<Function<Object, String>>> RESOLVED = new ConcurrentHashMap<>();
 

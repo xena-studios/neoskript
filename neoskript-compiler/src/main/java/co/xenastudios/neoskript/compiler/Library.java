@@ -60,6 +60,7 @@ public final class Library implements Registrar {
     private final List<EventValue> eventValues = new ArrayList<>();
     private final Set<String> eventDefaults = new HashSet<>();
     private final Map<String, java.util.function.Function<String, ?>> parsers = new HashMap<>();
+    private final Map<String, java.util.function.Function<String, ?>> literalParsers = new java.util.LinkedHashMap<>();
     private SyntaxRegistry registry;
 
     public Library() {
@@ -153,6 +154,39 @@ public final class Library implements Registrar {
         parsers.put(typeId, parser);
     }
 
+    @Override
+    public void literalParser(String typeId, java.util.function.Function<String, ?> parser) {
+        checkOpen();
+        if (!javaClasses.containsKey(typeId)) {
+            throw new IllegalArgumentException("Literals of unknown type '" + typeId + "'");
+        }
+        literalParsers.put(typeId, parser);
+        builder.openLiterals(typeId);
+    }
+
+    /**
+     * The value of words written where a value was expected, like {@code stone sword}: a named value
+     * ({@code creative}), or the first type whose literal parser accepts them. {@code null} if none does.
+     */
+    Object literal(String words) {
+        Object named = literalValue(words);
+        if (named != null) {
+            return named;
+        }
+        for (java.util.function.Function<String, ?> parser : literalParsers.values()) {
+            Object value = parser.apply(words.strip());
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    /** The literal parser of {@code typeId}, or {@code null}. */
+    java.util.function.Function<String, ?> literalParser(String typeId) {
+        return literalParsers.get(typeId);
+    }
+
     /** How text becomes a value of {@code typeId}, or {@code null} if it can't. */
     java.util.function.Function<String, ?> parser(String typeId) {
         return parsers.get(typeId);
@@ -242,6 +276,13 @@ public final class Library implements Registrar {
     public <F, T> void converter(Class<F> from, Class<T> to, java.util.function.Function<? super F, ? extends T> converter) {
         checkOpen();
         Values.registerConverter(from, to, converter);
+    }
+
+    @Override
+    public <T> void changer(Class<T> owner, co.xenastudios.neoskript.api.element.Changeable.Mode mode,
+            java.util.function.BiConsumer<? super T, Object[]> change) {
+        checkOpen();
+        Values.registerChanger(owner, mode, change);
     }
 
     @Override

@@ -111,6 +111,13 @@ public interface Registrar {
     <T> void storage(String name, Class<T> type, co.xenastudios.neoskript.api.storage.VariableCodec<T> codec);
 
     /**
+     * Words scripts can write as values of {@code typeId}, like item names ({@code 2 stone swords}). The
+     * parser returns the value, or {@code null} for text that isn't one. Literals are compiled once and
+     * shared, so values should be immutable or copied by the syntax that changes them.
+     */
+    void literalParser(String typeId, java.util.function.Function<String, ?> parser);
+
+    /**
      * How text people type, such as a command's arguments, becomes a value of {@code typeId}. The parser
      * returns {@code null} for text that isn't one.
      */
@@ -121,6 +128,14 @@ public interface Registrar {
      * location is expected is the entity's location. The converter returns {@code null} if it can't.
      */
     <F, T> void converter(Class<F> from, Class<T> to, java.util.function.Function<? super F, ? extends T> converter);
+
+    /**
+     * How {@code set}/{@code add}/{@code remove}... change a value of {@code owner} that's the target
+     * itself, rather than a variable or a changeable expression: {@code give a diamond to player} adds it to
+     * the player's inventory. {@code change} gets the owner and the values given.
+     */
+    <T> void changer(Class<T> owner, co.xenastudios.neoskript.api.element.Changeable.Mode mode,
+            java.util.function.BiConsumer<? super T, Object[]> change);
 
     /** How values of {@code type} read as text, as when embedded in a string. */
     <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText);
