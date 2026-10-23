@@ -30,6 +30,11 @@ final class Locations {
                 + ", yaw: " + Values.decimal(location.getYaw()) + ", pitch: " + Values.decimal(location.getPitch())
                 + (location.getWorld() == null ? "" : " in '" + location.getWorld().getName() + "'"));
         registrar.converter(Entity.class, Location.class, Entity::getLocation);
+        // Locations are equal with their yaw and pitch normalized, and 0 equal to -0.
+        registrar.comparison(Location.class, Location.class, (a, b) -> a.getWorld() == b.getWorld()
+                && a.getX() + 0.0 == b.getX() + 0.0 && a.getY() + 0.0 == b.getY() + 0.0 && a.getZ() + 0.0 == b.getZ() + 0.0
+                && Location.normalizeYaw(a.getYaw()) + 0.0f == Location.normalizeYaw(b.getYaw()) + 0.0f
+                && Location.normalizePitch(a.getPitch()) + 0.0f == Location.normalizePitch(b.getPitch()) + 0.0f);
         registrar.converter(Block.class, Location.class, Block::getLocation);
         registrar.converter(Location.class, World.class, Location::getWorld);
         registrar.converter(Entity.class, World.class, Entity::getWorld);

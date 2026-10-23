@@ -360,6 +360,19 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - `type of`, Minecraft/Bukkit/Skript versions, `is a baby`, `leash`.
 >      - Text converts to a world (`spawn of "world"`).
 >      - Entity plurals (`all entities`).
+>
+>    **Batch 3 (2026-10-23): 166 → 177 tests pass.**
+>    - **Language:**
+>      - Decimals within 1e-10 of each other are equal, as in Skript.
+>      - Locations compare with their yaw and pitch normalized.
+>      - `round` with negative places rounds to a whole number first, as Skript does (1044.5 to 1045 to 1050).
+>      - Timespans can be written short (`1d`, `2h`, `30m`).
+>    - **Syntax:**
+>      - Names of entities and items can be set.
+>      - Item amounts can be set, added to and removed from, on items, item stacks and slots.
+>      - Blocks with inventories (chests) are their inventory.
+>      - Panda states, eating, valid, persistent, shivering, conditional command blocks, spawner types.
+>      - `is between`, `is a block`, the last dropped item, `primed tnt`.
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.

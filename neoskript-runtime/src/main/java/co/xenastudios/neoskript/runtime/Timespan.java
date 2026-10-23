@@ -17,6 +17,7 @@ public record Timespan(long millis) implements Comparable<Timespan> {
             "(\\d+(?:\\.\\d+)?|an?|one|two|three|four|five|six|seven|eight|nine|ten) ?((?:real|rl|irl|minecraft|mc) )?"
                     + "(tick|second|minute|hour|day|week|month|year)s?",
             Pattern.CASE_INSENSITIVE);
+    private static final Pattern COMPACT = Pattern.compile("(\\d+(?:\\.\\d+)?) ?([tsmhdw])", Pattern.CASE_INSENSITIVE);
     private static final String[] WORDS = {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"};
     private static final long[] UNIT_MILLIS = {50, 1000, 60_000, 3_600_000, 86_400_000L, 604_800_000L, 2_592_000_000L,
         31_536_000_000L};
@@ -24,6 +25,12 @@ public record Timespan(long millis) implements Comparable<Timespan> {
 
     /** Parses a timespan literal like {@code 1 minute and 30 seconds}, or returns {@code null}. */
     public static Timespan parse(String text) {
+        Matcher compact = COMPACT.matcher(text.strip());
+        if (compact.matches()) {
+            // '1d', '2h', '30m', '10s', '5t': a number and a unit letter.
+            int unit = "tsmhdw".indexOf(Character.toLowerCase(compact.group(2).charAt(0)));
+            return new Timespan(Math.round(Double.parseDouble(compact.group(1)) * UNIT_MILLIS[unit]));
+        }
         Matcher matcher = PART.matcher(text);
         double millis = 0;
         int end = 0;

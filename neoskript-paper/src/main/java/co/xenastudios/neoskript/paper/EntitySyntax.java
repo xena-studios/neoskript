@@ -27,6 +27,9 @@ import org.bukkit.util.Vector;
 /** More about entities (max health, AI, being leashed, charged, alive), dropping items, and a few values. */
 final class EntitySyntax {
 
+    /** The item dropped last on each thread, for {@code the last dropped item}. */
+    private static final ThreadLocal<org.bukkit.entity.Item> LAST_DROPPED = new ThreadLocal<>();
+
     private EntitySyntax() {}
 
     static void register(Registrar registrar) {
@@ -52,6 +55,63 @@ final class EntitySyntax {
         condition(registrar, "CondIsInvulnerable", "entities", "(invulnerable|invincible)", Entity.class,
                 Entity::isInvulnerable);
 
+        condition(registrar, "CondPandaIsRolling", "livingentities", "rolling", org.bukkit.entity.Panda.class,
+                org.bukkit.entity.Panda::isRolling);
+        condition(registrar, "CondPandaIsSneezing", "livingentities", "sneezing", org.bukkit.entity.Panda.class,
+                org.bukkit.entity.Panda::isSneezing);
+        condition(registrar, "CondPandaIsOnBack", "livingentities", "on (its|their) back[s]", org.bukkit.entity.Panda.class,
+                org.bukkit.entity.Panda::isOnBack);
+        condition(registrar, "CondPandaIsScared", "livingentities", "scared", org.bukkit.entity.Panda.class,
+                org.bukkit.entity.Panda::isScared);
+        condition(registrar, "CondIsEating", "livingentities", "eating", LivingEntity.class,
+                entity -> entity instanceof org.bukkit.entity.Panda panda ? panda.isEating()
+                        : entity instanceof org.bukkit.entity.AbstractHorse horse && horse.isEating());
+        condition(registrar, "CondIsValid", "entities", "valid", Entity.class, Entity::isValid);
+        condition(registrar, "CondIsPersistent", "entities/blocks", "persistent", Object.class,
+                value -> value instanceof Entity entity ? entity.isPersistent()
+                        : value instanceof org.bukkit.block.Block block
+                                && block.getBlockData() instanceof org.bukkit.block.data.type.Leaves leaves && leaves.isPersistent());
+        condition(registrar, "CondIsShivering", "livingentities", "shivering", org.bukkit.entity.Strider.class,
+                org.bukkit.entity.Strider::isShivering);
+        condition(registrar, "CondIsCommandBlockConditional", "blocks", "[un:un]conditional", org.bukkit.block.Block.class,
+                block -> block.getBlockData() instanceof org.bukkit.block.data.type.CommandBlock command
+                        && command.isConditional());
+
+        SettableProperty.register(registrar, "ExprSpawnerType", "entitytype", org.bukkit.block.Block.class, EntityKind.class,
+                block -> block.getState() instanceof org.bukkit.block.CreatureSpawner spawner && spawner.getSpawnedType() != null
+                        ? EntityKind.of(spawner.getSpawnedType()) : null,
+                (block, kind) -> {
+                    if (block.getState() instanceof org.bukkit.block.CreatureSpawner spawner && kind.type() != null) {
+                        spawner.setSpawnedType(kind.type());
+                        spawner.update();
+                    }
+                },
+                "[the] (spawner|entity|creature) type[s] of %blocks%", "%blocks%'[s] (spawner|entity|creature) type[s]");
+
+        registrar.expression("ExprLastDroppedItem", "entity", info -> (context, args) -> LAST_DROPPED.get(),
+                "[the] [last[ly]] dropped item");
+
+        registrar.condition("CondIsBetween", info -> {
+            boolean negated = info.hasTag("not");
+            return (context, args) -> {
+                Object[] values = (Object[]) args[0];
+                if (values.length == 0 || args[1] == null || args[2] == null) {
+                    return false;
+                }
+                for (Object value : values) {
+                    Integer first = co.xenastudios.neoskript.runtime.Comparison.order(value, args[1]);
+                    Integer second = co.xenastudios.neoskript.runtime.Comparison.order(value, args[2]);
+                    // Between, whichever bound is the lower one.
+                    boolean between = first != null && second != null
+                            && ((first >= 0 && second <= 0) || (first <= 0 && second >= 0));
+                    if (between == negated) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+        }, "%objects% (is|are)[not:(n't| not)] between %object% and %object%");
+
         registrar.effect("EffDrop", info -> (context, args) -> {
             Object[] places = args[1] == null ? new Object[0] : (Object[]) args[1];
             for (Object place : places) {
@@ -59,11 +119,12 @@ final class EntitySyntax {
                     continue;
                 }
                 for (ItemStack stack : Items.stacks((Object[]) args[0])) {
+                    org.bukkit.entity.Item item = info.hasTag("still") ? location.getWorld().dropItem(location, stack)
+                            : location.getWorld().dropItemNaturally(location, stack);
                     if (info.hasTag("still")) {
-                        location.getWorld().dropItem(location, stack).setVelocity(new Vector());
-                    } else {
-                        location.getWorld().dropItemNaturally(location, stack);
+                        item.setVelocity(new Vector());
                     }
+                    LAST_DROPPED.set(item);
                 }
             }
         }, "drop %itemtypes% [(at|on) %locations%] [still:without velocity]");
@@ -91,12 +152,12 @@ final class EntitySyntax {
 
     /**
      * A condition {@code %owners% (is|are) <property>} and its negation, true when {@code test} holds for
-     * every owner. A {@code dead} tag flips it, for {@code is alive}/{@code is dead}.
+     * every owner. A {@code dead} or {@code un} tag flips it, for {@code is dead} and {@code is unconditional}.
      */
     private static <T> void condition(Registrar registrar, String id, String owners, String property, Class<T> type,
             Predicate<? super T> test) {
         registrar.condition(id, info -> {
-            boolean negated = (info.pattern() == 1) != info.hasTag("dead");
+            boolean negated = (info.pattern() == 1) != (info.hasTag("dead") || info.hasTag("un"));
             return (context, args) -> {
                 Object[] values = (Object[]) args[0];
                 for (Object value : values) {

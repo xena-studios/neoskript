@@ -76,20 +76,24 @@ final class Items {
             }
             return item.withMeta(meta -> meta.lore(lore));
         }, "%itemtype% with [a|the] lore %texts%");
-        registrar.expression("ExprItemAmount", "integer", info -> (context, args) -> {
-            List<Object> amounts = new ArrayList<>();
-            for (Object value : (Object[]) args[0]) {
-                ItemStack stack = switch (value) {
-                    case ItemType item -> item.stack();
-                    case ItemStack s -> s;
-                    case Slot slot -> slot.item();
-                    default -> null;
-                };
-                amounts.add(stack == null ? 0L : (long) stack.getAmount());
-            }
-            return amounts.size() == 1 ? amounts.getFirst() : amounts.toArray();
-        }, "[the] item[[ ]stack] (amount|size|number) of %slots/itemtypes/itemstacks%",
+        registrar.expression("ExprItemAmount", "integer", info -> new ItemAmount(),
+                "[the] item[[ ]stack] (amount|size|number) of %slots/itemtypes/itemstacks%",
                 "%slots/itemtypes/itemstacks%'[s] item[[ ]stack] (amount|size|number)");
+        registrar.condition("CondIsBlock", info -> {
+            boolean negated = info.pattern() == 1;
+            return (context, args) -> {
+                Object[] items = (Object[]) args[0];
+                for (Object item : items) {
+                    if (!(item instanceof ItemType type) || type.material().isBlock() == negated) {
+                        return false;
+                    }
+                }
+                return items.length > 0;
+            };
+        }, "%itemtypes% (is|are) ([a] block|blocks)", "%itemtypes% (isn't|is not|aren't|are not) ([a] block|blocks)");
+        // A block with an inventory, like a chest, is its inventory.
+        registrar.converter(org.bukkit.block.Block.class, Inventory.class, block ->
+                block.getState() instanceof InventoryHolder holder ? holder.getInventory() : null);
 
         // 'give X to player' and 'remove X from player': items go in and out of inventories.
         registrar.changer(InventoryHolder.class, Changeable.Mode.ADD, (holder, items) -> holder.getInventory()
@@ -128,10 +132,13 @@ final class Items {
             for (Object holder : (Object[]) args[0]) {
                 if (holder instanceof InventoryHolder h) {
                     inventories.add(h.getInventory());
+                } else if (holder instanceof org.bukkit.block.Block block
+                        && block.getState() instanceof InventoryHolder h) {
+                    inventories.add(h.getInventory());
                 }
             }
             return inventories.size() == 1 ? inventories.getFirst() : inventories.toArray();
-        }, "[the] inventor(y|ies) of %inventoryholders%", "%inventoryholders%'[s] inventor(y|ies)");
+        }, "[the] inventor(y|ies) of %inventoryholders/blocks%", "%inventoryholders/blocks%'[s] inventor(y|ies)");
 
         registrar.effect("EffOpenInventory", info -> {
             int pattern = info.pattern();
@@ -188,6 +195,57 @@ final class Items {
             }
         }
         return stacks.toArray(ItemStack[]::new);
+    }
+
+    /** {@code the item amount of %items%}, which can be set, added to and removed from. */
+    private static final class ItemAmount implements Expression, Changeable {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            List<Object> amounts = new ArrayList<>();
+            for (Object value : (Object[]) arguments[0]) {
+                ItemStack stack = switch (value) {
+                    case ItemType item -> item.stack();
+                    case ItemStack s -> s;
+                    case Slot slot -> slot.item();
+                    default -> null;
+                };
+                amounts.add(stack == null ? 0L : (long) stack.getAmount());
+            }
+            return amounts.size() == 1 ? amounts.getFirst() : amounts.toArray();
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return mode == Mode.SET || mode == Mode.ADD || mode == Mode.REMOVE ? new Class<?>[] {Number.class} : null;
+        }
+
+        @Override
+        public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
+            if (delta == null || delta.length == 0 || !(delta[0] instanceof Number number)) {
+                return;
+            }
+            int by = (int) Math.round(number.doubleValue());
+            for (Object value : (Object[]) arguments[0]) {
+                switch (value) {
+                    case ItemType item -> item.setAmount(amount(item.amount(), by, mode));
+                    case ItemStack stack -> stack.setAmount(amount(stack.getAmount(), by, mode));
+                    case Slot slot when slot.item() != null -> {
+                        ItemStack stack = slot.item();
+                        stack.setAmount(amount(stack.getAmount(), by, mode));
+                        slot.inventory().setItem(slot.index(), stack.getAmount() <= 0 ? null : stack);
+                    }
+                    default -> {}
+                }
+            }
+        }
+
+        private static int amount(int current, int by, Mode mode) {
+            return Math.max(0, switch (mode) {
+                case ADD -> current + by;
+                case REMOVE -> current - by;
+                default -> by;
+            });
+        }
     }
 
     /** {@code slot 3 of {_menu}}, which can be set to an item. */

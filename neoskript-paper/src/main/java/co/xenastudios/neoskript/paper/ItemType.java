@@ -38,7 +38,7 @@ public final class ItemType {
     private static volatile Map<String, Material> aliases;
 
     private final ItemStack stack;
-    private final boolean amountGiven;
+    private boolean amountGiven;
 
     public ItemType(ItemStack stack, boolean amountGiven) {
         this.stack = stack.clone();
@@ -56,6 +56,12 @@ public final class ItemType {
 
     public int amount() {
         return stack.getAmount();
+    }
+
+    /** Changes its amount in place, as when a variable's item is changed. */
+    public void setAmount(int amount) {
+        stack.setAmount(Math.max(1, amount));
+        amountGiven = true;
     }
 
     /** Whether the item was written with an amount, like {@code 32 cooked beef}. */

@@ -29,7 +29,12 @@ final class MathFunctions {
                         return value;
                     }
                     // Halves round away from zero, as in Skript: round(-11.535, 2) is -11.54.
-                    java.math.BigDecimal rounded = java.math.BigDecimal.valueOf(value).setScale(places, java.math.RoundingMode.HALF_UP);
+                    java.math.BigDecimal rounded = java.math.BigDecimal.valueOf(value);
+                    if (places < 0) {
+                        // To a whole number first, then to tens or hundreds, as Skript does: 1044.5 to 1045 to 1050.
+                        rounded = rounded.setScale(0, java.math.RoundingMode.HALF_UP);
+                    }
+                    rounded = rounded.setScale(places, java.math.RoundingMode.HALF_UP);
                     return places <= 0 ? (Object) rounded.longValue() : (Object) rounded.doubleValue();
                 });
         registrar.function("mod", List.of(Parameter.of("d", "number"), Parameter.of("m", "number")), "number", false,
