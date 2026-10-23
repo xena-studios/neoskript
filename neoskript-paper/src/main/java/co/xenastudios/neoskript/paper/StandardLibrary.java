@@ -28,6 +28,7 @@ public final class StandardLibrary {
         PersistentData.register(registrar);
         EntitySyntax.register(registrar);
         BlockSyntax.register(registrar);
+        Scripts.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
         StorageCodecs.register(registrar);
@@ -37,5 +38,6 @@ public final class StandardLibrary {
     /** Syntax Skript's test environment provides, for running Skript's own tests: {@code test-location}... */
     public static void registerTesting(Registrar registrar) {
         WorldSyntax.registerTesting(registrar);
+        Scripts.registerTesting(registrar);
     }
 }

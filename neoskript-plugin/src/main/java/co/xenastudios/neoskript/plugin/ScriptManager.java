@@ -206,11 +206,65 @@ final class ScriptManager {
         List<SourceFile> files = new ArrayList<>();
         try (Stream<Path> paths = Files.walk(scriptsDir)) {
             for (Path path : paths.filter(ScriptManager::isEnabledScript).sorted().toList()) {
-                String name = scriptsDir.relativize(path).toString().replace('\\', '/');
-                files.add(new SourceFile(name, Files.readString(path)));
+                files.add(new SourceFile(name(path), Files.readString(path)));
             }
         }
         return files;
+    }
+
+    /**
+     * A script's name: its path relative to the scripts folder. Skript's test runner loads its tests from
+     * outside the scripts folder, so in test mode names can start with what that path would be
+     * ({@code neoskript.testing.scriptsRoot}), as Skript's tests expect.
+     */
+    private String name(Path path) {
+        String relative = scriptsDir.relativize(path).toString().replace('\\', '/');
+        return NAME_ROOT.isEmpty() ? relative : NAME_ROOT + "/" + relative;
+    }
+
+    private static final String NAME_ROOT = System.getProperty("neoskript.testing.scriptsRoot", "");
+
+    /** The scripts folder's files, for {@link co.xenastudios.neoskript.runtime.ScriptCatalog}. */
+    co.xenastudios.neoskript.runtime.ScriptCatalog catalog() {
+        return new co.xenastudios.neoskript.runtime.ScriptCatalog() {
+            @Override
+            public co.xenastudios.neoskript.runtime.ScriptRef find(String name) {
+                String relative = name.replace('\\', '/');
+                if (!NAME_ROOT.isEmpty() && relative.startsWith(NAME_ROOT + "/")) {
+                    relative = relative.substring(NAME_ROOT.length() + 1);
+                }
+                for (String candidate : List.of(relative, relative + ".sk")) {
+                    Path path = scriptsDir.resolve(candidate).normalize();
+                    if (path.startsWith(scriptsDir) && Files.isRegularFile(path) && candidate.endsWith(".sk")) {
+                        return new co.xenastudios.neoskript.runtime.ScriptRef(name(path));
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            public boolean loaded(co.xenastudios.neoskript.runtime.ScriptRef script) {
+                synchronized (ScriptManager.this) {
+                    return loaded.containsKey(script.name());
+                }
+            }
+
+            @Override
+            public List<co.xenastudios.neoskript.runtime.ScriptRef> scripts(boolean wantLoaded, boolean disabled) {
+                List<co.xenastudios.neoskript.runtime.ScriptRef> scripts = new ArrayList<>();
+                try (Stream<Path> paths = Files.walk(scriptsDir)) {
+                    for (Path path : paths.filter(p -> p.toString().endsWith(".sk") && Files.isRegularFile(p)).sorted().toList()) {
+                        boolean enabled = isEnabledScript(path);
+                        if ((enabled && wantLoaded) || (!enabled && disabled)) {
+                            scripts.add(new co.xenastudios.neoskript.runtime.ScriptRef(name(path)));
+                        }
+                    }
+                } catch (IOException e) {
+                    logger.warn("Couldn't list the scripts folder", e);
+                }
+                return scripts;
+            }
+        };
     }
 
     private static boolean isEnabledScript(Path path) {

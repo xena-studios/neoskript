@@ -129,6 +129,8 @@ final class WorldSyntax {
                         case Location location -> location.getWorld() != null && location.isChunkLoaded();
                         case org.bukkit.Chunk chunk -> chunk.isLoaded();
                         case org.bukkit.World world -> Bukkit.getWorld(world.getUID()) != null;
+                        case co.xenastudios.neoskript.runtime.ScriptRef script ->
+                                co.xenastudios.neoskript.runtime.ScriptCatalog.get().loaded(script);
                         default -> false;
                     };
                     if (loaded == negated) {

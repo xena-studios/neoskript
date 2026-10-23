@@ -265,6 +265,7 @@ final class Players {
     static String name(Object owner) {
         return switch (owner) {
             case OfflinePlayer player -> player.getName();
+            case co.xenastudios.neoskript.runtime.ScriptRef script -> Scripts.name(script);
             case World world -> world.getName();
             case CommandSender sender -> sender.getName();
             case Nameable nameable when nameable.customName() != null ->

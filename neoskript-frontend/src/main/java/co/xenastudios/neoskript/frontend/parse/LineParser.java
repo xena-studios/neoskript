@@ -154,6 +154,9 @@ final class LineParser {
                 continue;
             }
             ParsedSyntax parsed = new ParsedSyntax(syntax, candidate.pattern(), match);
+            if (syntax.id().equals("ExprArithmetic") && !arithmeticOperands(parsed)) {
+                continue;
+            }
             Object result = parsed;
             if (expected != null) {
                 String type = returnType(parsed);
@@ -181,6 +184,21 @@ final class LineParser {
     private boolean splitsToken(int position) {
         return position >= 2 && position < input.length() && Character.isDigit(input.charAt(position))
                 && input.charAt(position - 1) == '-' && Character.isLetter(input.charAt(position - 2));
+    }
+
+    /** Types arithmetic works on; an operand of another known type rules arithmetic out, as in Skript. */
+    private static final java.util.Set<String> ARITHMETIC_TYPES = java.util.Set.of(SyntaxRegistry.OBJECT, "number",
+            "integer", "long", "timespan", "date", "time", "timeperiod", "string", "vector", "location", "experience");
+
+    /** Whether arithmetic's operands could be added: {@code the script named X + "y"} isn't arithmetic. */
+    private boolean arithmeticOperands(ParsedSyntax parsed) {
+        for (Object value : parsed.match().values()) {
+            if (value instanceof Expr expr && expr.type() != null && !ARITHMETIC_TYPES.contains(expr.type())
+                    && registry.type(expr.type()) != null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean hasUnresolved(ParsedSyntax parsed) {

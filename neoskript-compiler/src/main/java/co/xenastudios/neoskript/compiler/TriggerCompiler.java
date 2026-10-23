@@ -1757,6 +1757,8 @@ final class TriggerCompiler {
                     || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY) -> eventValue(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.FILTER) -> filter(syntax.syntax());
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.CURRENT_SCRIPT) ->
+                    constant(new co.xenastudios.neoskript.runtime.ScriptRef(constantsScript), Object.class);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TRANSFORM) -> transform(
                     (Expr) syntax.syntax().match().values().getFirst(), (Expr) syntax.syntax().match().regexValues().getFirst());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.REDUCE) -> reduce(syntax.syntax());

@@ -69,6 +69,7 @@ public final class Library implements Registrar {
         type("timespan", "timespan", Timespan.class);
         parser("timespan", Timespan::parse);
         type("date", "date", co.xenastudios.neoskript.runtime.Date.class);
+        type("script", "script", co.xenastudios.neoskript.runtime.ScriptRef.class);
         CoreSyntax.register(this);
         CoreCodecs.register(this);
     }
