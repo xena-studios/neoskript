@@ -23,6 +23,10 @@ final class Logic {
 
     private Logic() {}
 
+    private static int number(Object value) {
+        return value instanceof Number n ? (int) Math.round(n.doubleValue()) : 0;
+    }
+
     /** Compares versions like {@code 1.21.4} and {@code 26.3} part by part. */
     static int compareVersions(String a, String b) {
         String[] x = a.split("[.\\-]");
@@ -92,15 +96,69 @@ final class Logic {
             return (context, args) -> negated != contains((Object[]) args[0], (Object[]) args[1]);
         }, "%objects% contain[s] %objects%", "%objects% (not:(doesn't|does not|do not|don't) contain) %objects%");
 
-        registrar.expression("ExprElement", "object", info -> (context, args) -> {
-            Object[] values = (Object[]) args[0];
-            if (values.length == 0) {
-                return null;
-            }
-            return info.hasTag("last") ? values[values.length - 1]
-                    : info.hasTag("random") ? values[java.util.concurrent.ThreadLocalRandom.current().nextInt(values.length)]
-                    : values[0];
-        }, "[the] (first|last:last|random:random) element [out] of %objects%");
+        registrar.expression("ExprElement", "object", info -> {
+            int pattern = info.pattern();
+            boolean last = info.hasTag("last");
+            return (context, args) -> {
+                Object source = args[args.length - 1];
+                Object[] values = Values.array(source);
+                // A queue gives its elements up: the first element of a queue is taken out of it.
+                Collections.ScriptQueue queue = values.length == 1 && values[0] instanceof Collections.ScriptQueue q ? q : null;
+                if (queue != null) {
+                    values = queue.toArray();
+                }
+                int count = values.length;
+                switch (pattern) {
+                    case 0 -> {
+                        if (count == 0) {
+                            return null;
+                        }
+                        if (queue != null) {
+                            return last ? queue.pollLast() : queue.pollFirst();
+                        }
+                        return last ? values[count - 1] : values[0];
+                    }
+                    case 1 -> {
+                        int n = Math.min(count, Math.max(0, number(args[0])));
+                        Object[] picked = last ? java.util.Arrays.copyOfRange(values, count - n, count)
+                                : java.util.Arrays.copyOfRange(values, 0, n);
+                        if (queue != null) {
+                            for (int i = 0; i < n; i++) {
+                                if (last) {
+                                    queue.pollLast();
+                                } else {
+                                    queue.pollFirst();
+                                }
+                            }
+                        }
+                        return picked;
+                    }
+                    case 2 -> {
+                        return count == 0 ? null : values[java.util.concurrent.ThreadLocalRandom.current().nextInt(count)];
+                    }
+                    case 3 -> {
+                        List<Object> shuffled = new java.util.ArrayList<>(List.of(values));
+                        java.util.Collections.shuffle(shuffled);
+                        return shuffled.subList(0, Math.min(count, Math.max(0, number(args[0])))).toArray();
+                    }
+                    case 4 -> {
+                        int n = number(args[0]);
+                        int index = info.hasTag("tolast") ? count - n : n - 1;
+                        return index >= 0 && index < count ? values[index] : null;
+                    }
+                    default -> {
+                        int from = Math.max(1, number(args[0]));
+                        int to = Math.min(count, number(args[1]));
+                        return from > to ? new Object[0] : java.util.Arrays.copyOfRange(values, from - 1, to);
+                    }
+                }
+            };
+        }, "[the] (first|last:last) element [out] (of|in) %objects%",
+                "[the] (first|last:last) %integer% elements [out] (of|in) %objects%",
+                "[a] random element [out] (of|in) %objects%",
+                "%integer% random [distinct] elements [out] (of|in) %objects%",
+                "[the] %integer%(st|nd|rd|th) [tolast:[to] last] element [out] (of|in) %objects%",
+                "[the] elements (from|between) %integer% (to|and) %integer% [out] (of|in) %objects%");
 
         // 'arg-1 ? "home"': the first values, or the others if there are none.
         registrar.expression("ExprDefaultValue", "object", info -> (context, args) ->
@@ -228,7 +286,12 @@ final class Logic {
         }, "sorted %objects%");
         // 'keyed {_list::*}': the list's values, which keep their indices where that matters.
         registrar.expression("ExprKeyed", "object", info -> (context, args) -> args[0], "keyed %~objects%");
-        registrar.expression("ExprAmount", "integer", info -> (context, args) -> (long) ((Object[]) args[0]).length,
+        registrar.expression("ExprAmount", "integer", info -> (context, args) -> {
+            Object[] values = (Object[]) args[0];
+            // The size of a queue is how many elements it has.
+            return values.length == 1 && values[0] instanceof java.util.Collection<?> collection
+                    ? (long) collection.size() : (long) values.length;
+        },
                 "[the] (amount|number|size) of %objects%");
     }
 

@@ -29,6 +29,7 @@ public final class StandardLibrary {
         EntitySyntax.register(registrar);
         BlockSyntax.register(registrar);
         Scripts.register(registrar);
+        Collections.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
         StorageCodecs.register(registrar);

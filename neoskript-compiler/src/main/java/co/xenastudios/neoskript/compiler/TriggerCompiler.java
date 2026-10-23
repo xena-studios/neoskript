@@ -950,6 +950,20 @@ final class TriggerCompiler {
                     method.visitMethodInsn(INVOKEVIRTUAL, STORE, "sortList", "(" + STRING_DESC + "Z)V", false);
                 }
             }
+            case CoreSyntax.COPY -> {
+                Expr from = (Expr) effect.match().values().get(0);
+                Expr to = (Expr) effect.match().values().get(1);
+                if (from instanceof Expr.Variable source && source.list() && to instanceof Expr.Variable target && target.list()
+                        && source.local() == target.local()) {
+                    // Within one store: the whole list, nested lists and indices included.
+                    variableStore(target);
+                    variableName(source);
+                    variableName(target);
+                    method.visitMethodInsn(INVOKEVIRTUAL, STORE, "copyList", "(" + STRING_DESC + STRING_DESC + ")V", false);
+                } else {
+                    setTo(to, () -> expression(from));
+                }
+            }
             case CoreSyntax.TRANSFORM_EFFECT -> {
                 Expr target = (Expr) effect.match().values().getFirst();
                 Expr mapping = (Expr) effect.match().regexValues().getFirst();
@@ -1782,6 +1796,12 @@ final class TriggerCompiler {
                     || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY) -> eventValue(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.FILTER) -> filter(syntax.syntax());
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RECURSIVE) -> {
+                Expr.Variable list = listVariable(syntax.syntax(), "Only list variables can be recursive");
+                variableStore(list);
+                variableName(list);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "recursiveList", "(" + STRING_DESC + ")" + OBJECTS, false);
+            }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.CURRENT_SCRIPT) ->
                     constant(new co.xenastudios.neoskript.runtime.ScriptRef(constantsScript), Object.class);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TRANSFORM) -> transform(
