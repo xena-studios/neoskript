@@ -326,6 +326,26 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >    - **Skript's tests:** 127 pass, up from 95 after 5a.
 >    - **Left for step 6:** Skript's entity data (`baby axolotl`, `lucy axolotl`), block data, `catch runtime errors`, changeable conditions (`set whether X can age`), typed and list data tags.
 > 6. **The long tail:** whatever Skript's tests still need, most-used first, then the differential runner for the 95% check.
+>
+>    Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the most tests, fix it, repeat. Tests NeoSkript deliberately doesn't match get listed here with the reason.
+>
+>    **Batch 1 (2026-10-23): 127 → 159 tests pass.**
+>    - **Entity variants, as Skript names them:**
+>      - Age (`baby`, `adult`, `kid`, and babies' names like `kitten`, `calf`, `pup`).
+>      - Variants from Paper's registries: axolotls, cats, foxes, frogs, wolves, parrots, llamas, rabbits, mooshrooms, salmon, villager and zombie villager professions, tropical fish patterns and colors, sheep and shulker colors.
+>      - States: angry/happy bees with or without nectar, powered creepers, angry/peaceful wolves with collar colors, screaming goats, shivering striders, saddled pigs and striders, panda genes (`lazy-aggressive panda`).
+>      - `dropped <item>`, `falling <block>`, `enderman holding <block>`, displays `of <block or item>`, minecart kinds.
+>      - Spawning a variant makes it, and `is` follows Skript: `lucy axolotl is axolotl`, `{_entity} is {_data}`.
+>    - **API:**
+>      - `Registrar.comparison`: what `is` means between two types.
+>      - `RuntimeErrors`: non-fatal errors syntax reports, collected by `catch runtime errors:` for `last caught runtime errors`, otherwise logged. `execute command` reports failed script commands as Skript does.
+>    - **Parser:**
+>      - A kind of entity is the event's entity only after `the` or `event-` (`the zombie`). Alone, `baby chicken` is an entity type.
+>      - `all <entity types>` needs `all` or `the`.
+>      - A word can stand for a type that converts to the expected one (`apply speed`).
+>      - Function arguments try words as the parameter's type first.
+>    - **Syntax:** max health, AI, leashed, charged, alive/dead, invulnerable, `drop`, random UUIDs and vectors, hashing.
+>    - **Not yet:** the 1.21.5+ animal variants (cow, chicken and pig temperatures) need a newer Paper API than NeoSkript's 1.21.4 floor; baby frogs (tadpoles).
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.

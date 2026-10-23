@@ -76,6 +76,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
         Scheduler scheduler = platform == Platform.FOLIA ? new FoliaScheduler(this) : new PaperScheduler(this);
         // Waiting triggers carry on through the scheduler; their errors can only be logged.
+        co.xenastudios.neoskript.runtime.RuntimeErrors.install(message -> getSLF4JLogger().warn("Runtime error: {}", message));
         Waits.install(scheduler, e -> getSLF4JLogger().error("Error in {}, line {}: {}", e.script(), e.line(),
                 e.getCause().toString(), e.getCause()));
         EventDispatcher events = new EventDispatcher(this, getSLF4JLogger(), eventPriority(),

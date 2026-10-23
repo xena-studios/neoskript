@@ -48,6 +48,21 @@ final class WorldSyntax {
         registrar.text(Block.class, block -> ItemType.name(block.getType()));
         registrar.text(Vector.class, vector -> "x: " + Values.decimal(vector.getX()) + ", y: "
                 + Values.decimal(vector.getY()) + ", z: " + Values.decimal(vector.getZ()));
+        // '{_entity} is a pig', 'lucy axolotl is axolotl'.
+        registrar.comparison(Entity.class, EntityKind.class, (entity, kind) -> kind.matches(entity));
+        registrar.comparison(EntityKind.class, EntityKind.class, (kind, other) -> other.includes(kind));
+        registrar.condition("CondIsSpawnable", info -> {
+            boolean negated = info.pattern() == 1;
+            return (context, args) -> {
+                Object[] kinds = (Object[]) args[0];
+                for (Object kind : kinds) {
+                    if (!(kind instanceof EntityKind k) || k.spawnable() == negated) {
+                        return false;
+                    }
+                }
+                return kinds.length > 0;
+            };
+        }, "%entitytypes% (is|are) spawnable [in %world%]", "%entitytypes% (isn't|is not|aren't|are not) spawnable [in %world%]");
         registrar.converter(Location.class, Block.class, location -> location.getWorld() == null ? null : location.getBlock());
         registrar.converter(Block.class, ItemType.class, block -> new ItemType(new org.bukkit.inventory.ItemStack(
                 block.getType().isItem() ? block.getType() : Material.AIR), false));
@@ -116,14 +131,15 @@ final class WorldSyntax {
                     }
                     for (Object type : types) {
                         // Categories like 'monster' can't be spawned, only kinds that are one entity type.
-                        if (!(type instanceof EntityKind kind) || kind.type() == null || !kind.type().isSpawnable()) {
+                        if (!(type instanceof EntityKind kind) || !kind.spawnable()) {
                             continue;
                         }
-                        EntityType entityType = kind.type();
                         for (int i = 0; i < amount; i++) {
-                            Entity entity = location.getWorld().spawnEntity(location, entityType);
-                            LAST_SPAWNED.set(entity);
-                            spawned.add(entity);
+                            Entity entity = kind.spawn(location);
+                            if (entity != null) {
+                                LAST_SPAWNED.set(entity);
+                                spawned.add(entity);
+                            }
                         }
                     }
                 }
@@ -163,7 +179,8 @@ final class WorldSyntax {
                 }
             }
             return found.toArray();
-        }, "[(all [[of] the]|the)] %*entitytypes% [(in|of) world[s] %worlds%]");
+        // 'all' or 'the' is needed: 'baby chicken' alone is the entity type.
+        }, "(all [[of] the]|the) %*entitytypes% [(in|of) world[s] %worlds%]");
 
         registrar.expression("ExprHealth", "number", info -> new Health(), "[the] health of %livingentities%",
                 "%livingentities%'[s] health");

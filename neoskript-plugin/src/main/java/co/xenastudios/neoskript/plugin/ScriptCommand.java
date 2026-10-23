@@ -121,6 +121,9 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
         } else {
             sender.sendMessage(Messages.component("Usage: " + getUsage().replace("\n", "\n       ")));
         }
+        // 'execute command' reports this as a runtime error.
+        ScriptCommandInfo.FAILED.set(wrongExecutor ? "it can't be used by this sender"
+                : noPermission ? "no permission" : "invalid arguments");
         return true;
     }
 

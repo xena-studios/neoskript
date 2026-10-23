@@ -323,6 +323,12 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public <A, B> void comparison(Class<A> left, Class<B> right, java.util.function.BiPredicate<? super A, ? super B> test) {
+        checkOpen();
+        co.xenastudios.neoskript.runtime.Comparison.registerEquality(left, right, test);
+    }
+
+    @Override
     public <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText) {
         Values.registerText(type, toText);
     }

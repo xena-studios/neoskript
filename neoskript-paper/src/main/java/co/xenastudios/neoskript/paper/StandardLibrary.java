@@ -26,6 +26,7 @@ public final class StandardLibrary {
         Borders.register(registrar);
         Potions.register(registrar);
         PersistentData.register(registrar);
+        EntitySyntax.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
         StorageCodecs.register(registrar);

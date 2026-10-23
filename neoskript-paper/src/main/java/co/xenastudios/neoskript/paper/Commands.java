@@ -45,7 +45,14 @@ final class Commands {
                     }
                     for (Object command : commands) {
                         String line = Values.text(command);
+                        ScriptCommandInfo.FAILED.remove();
                         Bukkit.dispatchCommand(s, line.startsWith("/") ? line.substring(1) : line);
+                        String failed = ScriptCommandInfo.FAILED.get();
+                        if (failed != null) {
+                            ScriptCommandInfo.FAILED.remove();
+                            co.xenastudios.neoskript.runtime.RuntimeErrors.report("Failed to execute command: " + line
+                                    + " (" + failed + ")");
+                        }
                     }
                 }
             };

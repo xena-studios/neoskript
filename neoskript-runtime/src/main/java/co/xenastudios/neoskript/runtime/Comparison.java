@@ -12,9 +12,30 @@ public final class Comparison {
 
     private Comparison() {}
 
+    private record Equality(Class<?> left, Class<?> right, java.util.function.BiPredicate<Object, Object> test) {}
+
+    private static final java.util.List<Equality> EQUALITIES = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /**
+     * Registers what {@code is} means between a value of {@code left} and one of {@code right}, either way
+     * round: {@code test} gets the {@code left} value first.
+     */
+    @SuppressWarnings("unchecked")
+    public static <A, B> void registerEquality(Class<A> left, Class<B> right, java.util.function.BiPredicate<? super A, ? super B> test) {
+        EQUALITIES.add(new Equality(left, right, (java.util.function.BiPredicate<Object, Object>) test));
+    }
+
     public static boolean equal(Object a, Object b) {
         if (a == null || b == null) {
             return a == b;
+        }
+        for (Equality equality : EQUALITIES) {
+            if (equality.left().isInstance(a) && equality.right().isInstance(b)) {
+                return equality.test().test(a, b);
+            }
+            if (equality.left().isInstance(b) && equality.right().isInstance(a)) {
+                return equality.test().test(b, a);
+            }
         }
         if (a instanceof Number x && b instanceof Number y) {
             return Double.compare(x.doubleValue(), y.doubleValue()) == 0 || x.equals(y);

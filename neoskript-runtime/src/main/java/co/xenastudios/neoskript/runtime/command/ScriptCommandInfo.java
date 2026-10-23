@@ -10,6 +10,12 @@ package co.xenastudios.neoskript.runtime.command;
  */
 public interface ScriptCommandInfo {
 
+    /**
+     * Why the last script command run on this thread didn't run, or {@code null} if it did: {@code execute
+     * command} reports it as a runtime error.
+     */
+    ThreadLocal<String> FAILED = new ThreadLocal<>();
+
     /** What people without the command's permission are told, or {@code null} for the server's message. */
     String scriptPermissionMessage();
 }
