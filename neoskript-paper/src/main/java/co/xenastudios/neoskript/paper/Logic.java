@@ -218,6 +218,16 @@ final class Logic {
                 return angles.size() == 1 ? angles.getFirst() : angles.toArray();
             };
         }, "%number% [in] deg[ree][s]", "%number% [in] rad:rad[ian][s]", "%numbers% in deg[ree][s]", "%numbers% in rad:rad[ian][s]");
+        registrar.expression("ExprSortedList", "object", info -> (context, args) -> {
+            Object[] values = ((Object[]) args[0]).clone();
+            java.util.Arrays.sort(values, (a, b) -> {
+                Integer order = Comparison.order(a, b);
+                return order == null ? 0 : order;
+            });
+            return values;
+        }, "sorted %objects%");
+        // 'keyed {_list::*}': the list's values, which keep their indices where that matters.
+        registrar.expression("ExprKeyed", "object", info -> (context, args) -> args[0], "keyed %~objects%");
         registrar.expression("ExprAmount", "integer", info -> (context, args) -> (long) ((Object[]) args[0]).length,
                 "[the] (amount|number|size) of %objects%");
     }

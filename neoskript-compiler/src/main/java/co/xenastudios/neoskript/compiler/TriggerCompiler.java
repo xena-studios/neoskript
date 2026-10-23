@@ -186,6 +186,14 @@ final class TriggerCompiler {
     private String constantsScript;
     /** The classes of the event a trigger runs for, or {@code null} outside server events. */
     private List<Class<?>> eventClasses;
+    /**
+     * An inline function's loop over a list ({@code where [...]}): the slots of the current value, its
+     * position, the list's indices (or -1), and the reduced value so far (or -1).
+     */
+    private record InputFrame(int valueSlot, int indexSlot, int indicesSlot, int reducedSlot) {}
+
+    private final Deque<InputFrame> inputs = new ArrayDeque<>();
+
     /** The types of the placeholder whose value is being compiled, which words are first tried as. */
     private List<String> literalTypes = List.of();
     /** The event's name, for errors: {@code join} in {@code on join:}. */
@@ -647,6 +655,7 @@ final class TriggerCompiler {
             }
             case Statement.Section section when isCore(section.header(), CoreSyntax.LOOP) -> loop(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.WHILE) -> whileLoop(section);
+            case Statement.Section section when isCore(section.header(), CoreSyntax.FILTER_SECTION) -> filterSection(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.CATCH_ERRORS) -> {
                 String errors = Type.getInternalName(co.xenastudios.neoskript.runtime.RuntimeErrors.class);
                 Label end = new Label();
@@ -928,10 +937,22 @@ final class TriggerCompiler {
             case CoreSyntax.CHANGE -> change(effect);
             case CoreSyntax.SORT -> {
                 Expr.Variable list = listVariable(effect, "Only list variables can be sorted");
-                variableStore(list);
-                variableName(list);
-                method.visitInsn(effect.match().hasTag("descending") ? ICONST_1 : ICONST_0);
-                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "sortList", "(" + STRING_DESC + "Z)V", false);
+                Object key = effect.match().regexValues().isEmpty() ? null : effect.match().regexValues().getFirst();
+                if (key instanceof Expr keyExpr) {
+                    // 'sort {_x::*} by {_levels::%input%}': by each value's key.
+                    boolean descending = effect.match().hasTag("descending");
+                    setTo(list, () -> sortedByKeys(list, keyExpr, descending));
+                } else {
+                    variableStore(list);
+                    variableName(list);
+                    method.visitInsn(effect.match().hasTag("descending") ? ICONST_1 : ICONST_0);
+                    method.visitMethodInsn(INVOKEVIRTUAL, STORE, "sortList", "(" + STRING_DESC + "Z)V", false);
+                }
+            }
+            case CoreSyntax.TRANSFORM_EFFECT -> {
+                Expr target = (Expr) effect.match().values().getFirst();
+                Expr mapping = (Expr) effect.match().regexValues().getFirst();
+                setTo(target, () -> transform(target, mapping));
             }
             case CoreSyntax.DO_IF -> {
                 if (!(effect.match().regexValues().get(1) instanceof ParsedSyntax condition)) {
@@ -1352,6 +1373,210 @@ final class TriggerCompiler {
         eventValue(getter);
     }
 
+    // ---------------------------------------------------------------- inline functions
+
+    /**
+     * Evaluates a list for an inline function into a values slot, and for a list variable its indices into
+     * another (else -1). Returns {@code {valuesSlot, indicesSlot}}.
+     */
+    private int[] listValues(Expr list) throws CompileException {
+        int valuesSlot = nextSlot++;
+        int indicesSlot = -1;
+        expression(list);
+        convert(true);
+        method.visitVarInsn(ASTORE, valuesSlot);
+        if (list instanceof Expr.Variable variable && variable.list()) {
+            indicesSlot = nextSlot++;
+            variableStore(variable);
+            variableName(variable);
+            method.visitMethodInsn(INVOKEVIRTUAL, STORE, "indices", "(" + STRING_DESC + ")[" + STRING_DESC, false);
+            method.visitVarInsn(ASTORE, indicesSlot);
+        }
+        return new int[] {valuesSlot, indicesSlot};
+    }
+
+    @FunctionalInterface
+    private interface PerInput {
+        void emit(InputFrame frame, Label next) throws CompileException;
+    }
+
+    /** Loops over a list's values from {@code start}, with each as {@code input}, running {@code body}. */
+    private void forEachInput(int[] list, int start, int reducedSlot, PerInput body) throws CompileException {
+        int indexSlot = nextSlot++;
+        int inputSlot = nextSlot++;
+        pushInt(start);
+        method.visitVarInsn(ISTORE, indexSlot);
+        Label top = new Label();
+        Label next = new Label();
+        Label end = new Label();
+        method.visitLabel(top);
+        method.visitVarInsn(ILOAD, indexSlot);
+        method.visitVarInsn(ALOAD, list[0]);
+        method.visitInsn(ARRAYLENGTH);
+        method.visitJumpInsn(IF_ICMPGE, end);
+        method.visitVarInsn(ALOAD, list[0]);
+        method.visitVarInsn(ILOAD, indexSlot);
+        method.visitInsn(AALOAD);
+        method.visitVarInsn(ASTORE, inputSlot);
+        InputFrame frame = new InputFrame(inputSlot, indexSlot, list[1], reducedSlot);
+        inputs.push(frame);
+        try {
+            body.emit(frame, next);
+        } finally {
+            inputs.pop();
+        }
+        method.visitLabel(next);
+        method.visitIincInsn(indexSlot, 1);
+        method.visitJumpInsn(GOTO, top);
+        method.visitLabel(end);
+    }
+
+    private int newList() {
+        int slot = nextSlot++;
+        method.visitTypeInsn(NEW, "java/util/ArrayList");
+        method.visitInsn(DUP);
+        method.visitMethodInsn(INVOKESPECIAL, "java/util/ArrayList", "<init>", "()V", false);
+        method.visitVarInsn(ASTORE, slot);
+        return slot;
+    }
+
+    private void listToArray(int slot) {
+        method.visitVarInsn(ALOAD, slot);
+        method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "toArray", "()" + OBJECTS, true);
+    }
+
+    /** {@code %objects% where [condition]}: the values the condition holds for. */
+    private void filter(ParsedSyntax syntax) throws CompileException {
+        if (!(syntax.match().regexValues().getFirst() instanceof ParsedSyntax condition)) {
+            throw unsupported("'" + source + "'");
+        }
+        int[] list = listValues((Expr) syntax.match().values().getFirst());
+        int result = newList();
+        forEachInput(list, 0, -1, (frame, next) -> {
+            condition(condition);
+            method.visitJumpInsn(IFEQ, next);
+            method.visitVarInsn(ALOAD, result);
+            method.visitVarInsn(ALOAD, frame.valueSlot());
+            method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "add", "(" + OBJECT_DESC + ")Z", true);
+            method.visitInsn(POP);
+        });
+        listToArray(result);
+    }
+
+    /** {@code %objects% transformed using [expression]}: every value the expression gives, for each value. */
+    private void transform(Expr values, Expr mapping) throws CompileException {
+        int[] list = listValues(values);
+        int result = newList();
+        forEachInput(list, 0, -1, (frame, next) -> {
+            method.visitVarInsn(ALOAD, result);
+            expression(mapping);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "addAll", "(Ljava/util/List;" + OBJECT_DESC + ")V", false);
+        });
+        listToArray(result);
+    }
+
+    /** {@code %objects% reduced with [expression]}: the values folded into one, starting from the first. */
+    private void reduce(ParsedSyntax syntax) throws CompileException {
+        Expr folding = (Expr) syntax.match().regexValues().getFirst();
+        int[] list = listValues((Expr) syntax.match().values().getFirst());
+        int reduced = nextSlot++;
+        method.visitVarInsn(ALOAD, list[0]);
+        pushInt(0);
+        pushInt(0);
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "element", "(" + OBJECTS + "II)" + OBJECT_DESC, false);
+        method.visitVarInsn(ASTORE, reduced);
+        forEachInput(list, 1, reduced, (frame, next) -> {
+            expression(folding);
+            convert(false);
+            method.visitVarInsn(ASTORE, reduced);
+        });
+        method.visitVarInsn(ALOAD, reduced);
+    }
+
+    /** The values of a list variable sorted by a key worked out for each: {@code sort {_x::*} by [...]}. */
+    private void sortedByKeys(Expr.Variable list, Expr key, boolean descending) throws CompileException {
+        int[] values = listValues(list);
+        int keys = nextSlot++;
+        method.visitVarInsn(ALOAD, values[0]);
+        method.visitInsn(ARRAYLENGTH);
+        method.visitTypeInsn(ANEWARRAY, OBJECT);
+        method.visitVarInsn(ASTORE, keys);
+        forEachInput(values, 0, -1, (frame, next) -> {
+            method.visitVarInsn(ALOAD, keys);
+            method.visitVarInsn(ILOAD, frame.indexSlot());
+            expression(key);
+            convert(false);
+            method.visitInsn(AASTORE);
+        });
+        method.visitVarInsn(ALOAD, values[0]);
+        method.visitVarInsn(ALOAD, keys);
+        method.visitInsn(descending ? ICONST_1 : ICONST_0);
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "sortByKeys", "(" + OBJECTS + OBJECTS + "Z)" + OBJECTS, false);
+    }
+
+    /** {@code filter %~objects% to match [any|all]:} with conditions: keeps the values they hold for. */
+    private void filterSection(Statement.Section section) throws CompileException {
+        Expr target = (Expr) section.header().match().values().getFirst();
+        boolean any = section.header().match().hasTag("any");
+        List<ParsedSyntax> conditions = new ArrayList<>();
+        for (Statement statement : section.body()) {
+            if (!(statement instanceof Statement.Condition condition)) {
+                throw new CompileException(statement.line().number(), "A filter section can only contain conditions");
+            }
+            conditions.add(condition.condition());
+        }
+        setTo(target, () -> {
+            int[] list = listValues(target);
+            int result = newList();
+            forEachInput(list, 0, -1, (frame, next) -> {
+                Label keep = new Label();
+                for (ParsedSyntax condition : conditions) {
+                    condition(condition);
+                    method.visitJumpInsn(any ? IFNE : IFEQ, any ? keep : next);
+                }
+                if (any) {
+                    method.visitJumpInsn(GOTO, next);
+                }
+                method.visitLabel(keep);
+                method.visitVarInsn(ALOAD, result);
+                method.visitVarInsn(ALOAD, frame.valueSlot());
+                method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "add", "(" + OBJECT_DESC + ")Z", true);
+                method.visitInsn(POP);
+            });
+            listToArray(result);
+        });
+    }
+
+    /** {@code input}, {@code string input}, {@code input index}: the value an inline function is looking at. */
+    private void input(Expr.Syntax syntax) throws CompileException {
+        InputFrame frame = inputs.peek();
+        if (frame == null) {
+            throw new CompileException(line, "'" + source.substring(syntax.start(), syntax.end())
+                    + "' can only be used in 'where [...]', 'transformed using [...]' and the like");
+        }
+        switch (syntax.syntax().pattern()) {
+            case 2 -> {
+                if (frame.indicesSlot() >= 0) {
+                    element(frame.indicesSlot(), frame.indexSlot(), 0);
+                } else {
+                    method.visitVarInsn(ILOAD, frame.indexSlot());
+                    method.visitInsn(I2L);
+                    method.visitInsn(LCONST_1);
+                    method.visitInsn(LADD);
+                    method.visitMethodInsn(INVOKESTATIC, "java/lang/String", "valueOf", "(J)Ljava/lang/String;", false);
+                }
+            }
+            case 1 -> {
+                method.visitVarInsn(ALOAD, frame.valueSlot());
+                if (syntax.syntax().match().regexValues().getFirst() instanceof TypeRef ref) {
+                    constant(library.javaClass(ref.type().id()), Class.class);
+                    method.visitMethodInsn(INVOKESTATIC, VALUES, "filter", "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECT_DESC, false);
+                }
+            }
+            default -> method.visitVarInsn(ALOAD, frame.valueSlot());
+        }
+    }
+
     /** The list variable a syntax element works on, such as the {@code {x::*}} in {@code sort {x::*}}. */
     private Expr.Variable listVariable(ParsedSyntax syntax, String problem) throws CompileException {
         if (syntax.match().values().getFirst() instanceof Expr.Variable variable && variable.list()) {
@@ -1531,6 +1756,18 @@ final class TriggerCompiler {
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE)
                     || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY) -> eventValue(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.FILTER) -> filter(syntax.syntax());
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TRANSFORM) -> transform(
+                    (Expr) syntax.syntax().match().values().getFirst(), (Expr) syntax.syntax().match().regexValues().getFirst());
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.REDUCE) -> reduce(syntax.syntax());
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.INPUT) -> input(syntax);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.REDUCED_VALUE) -> {
+                InputFrame frame = inputs.peek();
+                if (frame == null || frame.reducedSlot() < 0) {
+                    throw new CompileException(line, "'reduced value' can only be used in 'reduced with [...]'");
+                }
+                method.visitVarInsn(ALOAD, frame.reducedSlot());
+            }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.CAUGHT_ERRORS) -> method.visitMethodInsn(
                     INVOKESTATIC, Type.getInternalName(co.xenastudios.neoskript.runtime.RuntimeErrors.class), "lastCaught",
                     "()" + OBJECTS, false);

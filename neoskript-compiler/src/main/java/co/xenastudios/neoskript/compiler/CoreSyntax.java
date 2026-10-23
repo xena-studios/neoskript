@@ -44,6 +44,13 @@ final class CoreSyntax {
     static final String PARSE = "ExprParse";
     static final String WHETHER = "ExprWhether";
     static final String CATCH_ERRORS = "SecCatchErrors";
+    static final String FILTER = "ExprFilter";
+    static final String TRANSFORM = "ExprTransform";
+    static final String REDUCE = "ExprReduce";
+    static final String INPUT = "ExprInput";
+    static final String REDUCED_VALUE = "ExprReducedValue";
+    static final String TRANSFORM_EFFECT = "EffTransform";
+    static final String FILTER_SECTION = "SecFilter";
     static final String CAUGHT_ERRORS = "ExprCaughtErrors";
 
     /** {@link #CHANGE} patterns, by index. */
@@ -136,6 +143,22 @@ final class CoreSyntax {
         // 'every 5 minutes': runs on the global thread, from when the script loads.
         library.core(SyntaxKind.EVENT, PERIODICAL, null, List.of(), "every %timespan%");
 
+        // Inline functions over a list's values: 'where [input is "a"]', 'transformed using [input + 1]',
+        // 'reduced with [reduced value + input]'. 'input' is the value being looked at.
+        library.core(SyntaxKind.EXPRESSION, FILTER, "object", List.of(RegexRole.CONDITION),
+                "%objects% (where|that match) \\[<.+>\\]", "%objects% (where|that match) \\(<.+>\\)");
+        library.core(SyntaxKind.EXPRESSION, TRANSFORM, "object", List.of(RegexRole.EXPRESSION),
+                "%objects% (transformed|mapped) (using|with) \\[<.+>\\]", "%objects% (transformed|mapped) (using|with) \\(<.+>\\)");
+        library.core(SyntaxKind.EXPRESSION, REDUCE, "object", List.of(RegexRole.EXPRESSION),
+                "%objects% (reduced|folded) (to|with|by) \\[<.+>\\]", "%objects% (reduced|folded) (to|with|by) \\(<.+>\\)");
+        library.core(SyntaxKind.EXPRESSION, INPUT, "object", List.of(RegexRole.TYPE),
+                "input", "<.+> input", "input index");
+        library.core(SyntaxKind.EXPRESSION, REDUCED_VALUE, "object", List.of(),
+                "[the] reduced value", "[the] (accumulator|accumulated) [value]", "[the] folded value");
+        library.core(SyntaxKind.EFFECT, TRANSFORM_EFFECT, null, List.of(RegexRole.EXPRESSION),
+                "(transform|map) %~objects% (using|with) <.+>");
+        library.core(SyntaxKind.SECTION, FILTER_SECTION, null, List.of(), "filter %~objects% to match [any:any|all]");
+
         // Runtime errors reported inside are collected for 'last caught runtime errors', not logged.
         library.core(SyntaxKind.SECTION, CATCH_ERRORS, null, List.of(), "catch [run[ ]time] error[s]");
         library.core(SyntaxKind.EXPRESSION, CAUGHT_ERRORS, "string", List.of(), "[the] last caught [run[ ]time] errors");
@@ -152,7 +175,8 @@ final class CoreSyntax {
                 "%~objects%'[s] (indexes|indices)",
                 "[sorted] (indices|indexes) of %~objects% in (ascending|descending:descending) order",
                 "[sorted] %~objects%'[s] (indices|indexes) in (ascending|descending:descending) order");
-        library.core(SyntaxKind.EFFECT, SORT, null, List.of(), "sort %~objects% [in (descending:descending|ascending) order]");
+        library.core(SyntaxKind.EFFECT, SORT, null, List.of(RegexRole.EXPRESSION),
+                "sort %~objects% [in (descending:descending|ascending) order] [(by|based on) <.+>]");
 
         // Pattern 1 is the next value and 2 the previous one.
         // 'number within {_x}': the values of that type. Its type comes from the type name.

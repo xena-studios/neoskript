@@ -68,6 +68,37 @@ public final class Values {
         return type.isInstance(value) ? value : null;
     }
 
+    /** Adds a value, or every value of an array, to {@code list}: what an inline function collects. */
+    public static void addAll(List<Object> list, Object value) {
+        if (value instanceof Object[] array) {
+            for (Object element : array) {
+                if (element != null) {
+                    list.add(element);
+                }
+            }
+        } else if (value != null) {
+            list.add(value);
+        }
+    }
+
+    /** {@code values} sorted by {@code keys} (one per value), keeping equal keys in order. */
+    public static Object[] sortByKeys(Object[] values, Object[] keys, boolean descending) {
+        Integer[] order = new Integer[values.length];
+        for (int i = 0; i < order.length; i++) {
+            order[i] = i;
+        }
+        java.util.Arrays.sort(order, (x, y) -> {
+            Integer c = Comparison.order(keys[x], keys[y]);
+            int result = c == null ? 0 : c;
+            return descending ? -result : result;
+        });
+        Object[] sorted = new Object[values.length];
+        for (int i = 0; i < order.length; i++) {
+            sorted[i] = values[order[i]];
+        }
+        return sorted;
+    }
+
     /** The values that are instances of {@code type}, for {@code number within {_x}}. */
     public static Object[] cast(Object value, Class<?> type) {
         List<Object> values = new ArrayList<>();
