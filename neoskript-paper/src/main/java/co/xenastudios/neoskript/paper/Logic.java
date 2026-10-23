@@ -30,7 +30,7 @@ final class Logic {
     private Logic() {}
 
     private static int number(Object value) {
-        return value instanceof Number n ? (int) Math.round(n.doubleValue()) : 0;
+        return value instanceof Number n ? co.xenastudios.neoskript.runtime.Values.toInt(n.doubleValue()) : 0;
     }
 
     /** Compares versions like {@code 1.21.4} and {@code 26.3} part by part. */
@@ -73,14 +73,6 @@ final class Logic {
         }, "%~objects% (exist[s]|(is|are) set)",
                 "%~objects% (not:do[es](n't| not) exist|not:(is|are)(n't| not) set)");
 
-        registrar.expression("ExprTimes", "integer", info -> (context, args) -> {
-            long count = Math.max(0, ((Number) args[0]).longValue());
-            Object[] numbers = new Object[(int) Math.min(count, Integer.MAX_VALUE)];
-            for (int i = 0; i < numbers.length; i++) {
-                numbers[i] = (long) i + 1;
-            }
-            return numbers;
-        }, "%number% times");
 
         registrar.expression("ExprNumbers", "number", info -> (context, args) ->
                 range(((Number) args[0]).doubleValue(), ((Number) args[1]).doubleValue(), info.hasTag("integers")),
@@ -137,6 +129,16 @@ final class Logic {
                 "positive (infinity|\u221e) [value]", "\u221e [value]", "infinity value", "value of [positive] (infinity|\u221e)");
         registrar.expression("LitNegativeInfinity", "number", info -> (context, args) -> Double.NEGATIVE_INFINITY,
                 "negative (infinity|\u221e) [value]", "-(infinity|\u221e) [value]", "value of negative (infinity|\u221e)");
+        registrar.expression("LitMaxMinValue", "number", info -> {
+            boolean min = info.hasTag("min");
+            Object value = switch (info.tags().stream().filter(t -> t.startsWith("t_")).findFirst().orElse("t_integer")) {
+                case "t_long" -> min ? Long.MIN_VALUE : Long.MAX_VALUE;
+                case "t_float" -> min ? (double) -Float.MAX_VALUE : (double) Float.MAX_VALUE;
+                case "t_double" -> min ? -Double.MAX_VALUE : Double.MAX_VALUE;
+                default -> (long) (min ? Integer.MIN_VALUE : Integer.MAX_VALUE);
+            };
+            return (context, args) -> value;
+        }, "[the] (max[imum]|min:min[imum]) (t_integer:integer|t_long:long|t_float:float|t_double:double) value");
         registrar.expression("LitNaN", "number", info -> (context, args) -> Double.NaN, "NaN [value]", "value of NaN");
         registrar.expression("ExprRandomNumber", "number", info -> {
             boolean integers = info.hasTag("integer");
@@ -184,25 +186,22 @@ final class Logic {
         }, "%texts% (start|end:end)[s] with %texts%", "%texts% (doesn't|does not|do not|don't) (start|end:end) with %texts%");
         registrar.condition("CondIsDivisibleBy", info -> {
             boolean negated = info.pattern() % 2 == 1;
+            boolean and = info.and(0);
             return (context, args) -> {
-                Object[] numbers = (Object[]) args[0];
-                if (numbers.length == 0 || !(args[1] instanceof Number divisor)) {
+                if (!(args[1] instanceof Number divisor)) {
                     return false;
                 }
                 double tolerance = args[2] instanceof Number t ? t.doubleValue() : 1e-10;
-                for (Object number : numbers) {
-                    if (!(number instanceof Number n)) {
-                        return false;
-                    }
-                    double remainder = Math.abs(Math.IEEEremainder(n.doubleValue(), divisor.doubleValue()));
-                    if ((remainder <= tolerance) == negated) {
-                        return false;
-                    }
-                }
-                return true;
+                // Past half the divisor, a tolerance lets everything through, so nothing is divisible.
+                boolean meaningful = Math.abs(divisor.doubleValue()) >= 2 * tolerance;
+                return Condition.check((Object[]) args[0], and, number -> number instanceof Number n
+                        && (meaningful && Math.abs(Math.IEEEremainder(n.doubleValue(), divisor.doubleValue())) <= tolerance)
+                                != negated);
             };
         }, "%numbers% (is|are) evenly divisible by %number% [with [a] tolerance [of] %number%]",
                 "%numbers% (isn't|is not|aren't|are not) evenly divisible by %number% [with [a] tolerance [of] %number%]",
+                "%numbers% can be [evenly] divided by %number% [with [a] tolerance [of] %number%]",
+                "%numbers% (can't|cannot|can not) be [evenly] divided by %number% [with [a] tolerance [of] %number%]",
                 "%numbers% can be evenly divided by %number% [with [a] tolerance [of] %number%]",
                 "%numbers% (can't|can[ ]not) be evenly divided by %number% [with [a] tolerance [of] %number%]");
         registrar.expression("ExprExcept", "object", info -> (context, args) -> {
@@ -229,8 +228,92 @@ final class Logic {
                 }
                 return angles.size() == 1 ? angles.getFirst() : angles.toArray();
             };
-        }, "%number% [in] deg[ree][s]", "%number% [in] rad:rad[ian][s]", "%numbers% in deg[ree][s]", "%numbers% in rad:rad[ian][s]");
+        }, "%number% [in] deg[ree][s]", "%number% [in] (rad:rad[ian][s])", "%numbers% in deg[ree][s]",
+                "%numbers% in (rad:rad[ian][s])");
         registrar.expression("ExprSortedList", "object", info -> new SortedList(), "sorted %objects%");
+        registrar.expression("ExprAlphabetList", "string", info -> new SortedList(true), "alphabetically sorted %strings%");
+        registrar.expression("ExprReversedList", "object", info -> {
+            if (info.isSingle(0)) {
+                throw new co.xenastudios.neoskript.api.element.SyntaxError("A single object cannot be reversed.");
+            }
+            return new Reordered(false);
+        }, "reversed %objects%");
+        // After the lists, as in Skript: 'reversed 5 times' is 5 times, reversed.
+        registrar.expression("ExprTimes", "integer", info -> (context, args) -> {
+            // Rounded, so floating point error doesn't lose one: 10 - 1.05 / 0.15 times is 3 times.
+            long count = info.hasTag("once") ? 1 : info.hasTag("twice") ? 2 : info.hasTag("thrice") ? 3
+                    : args[0] instanceof Number n ? Math.max(0, Math.round(n.doubleValue())) : 0;
+            Object[] numbers = new Object[(int) Math.min(count, Integer.MAX_VALUE)];
+            for (int i = 0; i < numbers.length; i++) {
+                numbers[i] = (long) i + 1;
+            }
+            return numbers;
+        }, "%number% times", "(once:once|twice:twice|thrice:thrice)");
+        registrar.expression("ExprPi", "number", info -> (context, args) -> Math.PI, "(pi|\u03c0)");
+        registrar.expression("ExprRound", "integer", info -> {
+            int mode = info.hasTag("down") ? -1 : info.hasTag("up") ? 1 : 0;
+            return (context, args) -> {
+                List<Object> rounded = new java.util.ArrayList<>();
+                for (Object value : Values.array(args[0])) {
+                    if (value instanceof Number number) {
+                        rounded.add(round(number.doubleValue(), mode));
+                    }
+                }
+                return rounded.size() == 1 ? rounded.getFirst() : rounded.toArray();
+            };
+        }, "(a|the|) round[ed] (down:down|up:up) %numbers%", "(a|the|) round[ed] %numbers%",
+                "(down:floor[ed]|up:ceil[ed]|up:ceiling) %numbers%", "%numbers% (down:floor[ed]|rounded|up:ceil[ed])");
+        registrar.expression("ExprIndicesOfValue", "object", info -> new IndicesOfValue(info.pattern(),
+                info.hasTag("first") ? 1 : info.hasTag("last") ? 2 : info.hasTag("all") ? 0
+                        : info.hasTag("plural") ? 0 : 1),
+                "[the] [first:first|last:last|all:all] (position|plural:positions) of [[the] value] %strings% in %string%",
+                "[the] [first:first|last:last|all:all] (position|plural:positions) of [[the] value] %objects% in %~objects%",
+                "[the] [first:first|last:last|all:all] (index|plural:indices|plural:indexes) of [[the] value] %objects% in %~objects%");
+
+        // 'toggle {_flag}': booleans flip, and blocks that open (doors, trapdoors...) open or close; others stay.
+        registrar.effect("EffToggle", info -> {
+            int mode = info.hasTag("open") ? 1 : info.hasTag("close") ? 2 : 0;
+            return co.xenastudios.neoskript.api.element.Update.of(0, (context, args) -> {
+                Object[] values = Values.array(args[0]);
+                Object[] toggled = new Object[values.length];
+                for (int i = 0; i < values.length; i++) {
+                    Object value = values[i];
+                    if (value instanceof Boolean flag && mode == 0) {
+                        toggled[i] = !flag;
+                        continue;
+                    }
+                    if (value instanceof org.bukkit.block.Block block
+                            && block.getBlockData() instanceof org.bukkit.block.data.Openable openable) {
+                        openable.setOpen(mode == 0 ? !openable.isOpen() : mode == 1);
+                        block.setBlockData(openable);
+                    }
+                    toggled[i] = value;
+                }
+                return toggled;
+            });
+        }, "(open:open|close:close|toggle) %~objects%");
+        registrar.expression("ExprInverse", "boolean", info -> (context, args) -> {
+            Object[] values = Values.array(args[0]);
+            Object[] inverse = new Object[values.length];
+            for (int i = 0; i < values.length; i++) {
+                inverse[i] = values[i] instanceof Boolean b ? !b : null;
+            }
+            return inverse.length == 1 ? inverse[0] : inverse;
+        }, "[the] (inverse|opposite)[s] of %booleans%");
+        registrar.expression("ExprShuffledList", "object", info -> new Reordered(true), "shuffled %objects%");
+        registrar.expression("ExprPercent", "number", info -> (context, args) -> {
+            if (!(args[0] instanceof Number percent)) {
+                return null;
+            }
+            List<Object> results = new java.util.ArrayList<>();
+            for (Object value : (Object[]) args[1]) {
+                if (value instanceof Number number) {
+                    results.add(percent.doubleValue() / 100 * number.doubleValue());
+                }
+            }
+            return results.size() == 1 ? results.getFirst() : results.toArray();
+        }, "%number%(\\%| percent) of %numbers%");
+
         // 'keyed {_list::*}': the list's values, which keep their indices where that matters.
         registrar.expression("ExprKeyed", "object", info -> (context, args) -> args[0], "keyed %~objects%");
     }
@@ -425,6 +508,17 @@ final class Logic {
 
     /** {@code sorted %objects%}: in order, keeping indices; nothing if they can't all be ordered. */
     private static final class SortedList implements Expression, KeyAware {
+        /** Whether it's {@code alphabetically sorted}: texts by their characters, case and all. */
+        private final boolean alphabetical;
+
+        SortedList() {
+            this(false);
+        }
+
+        SortedList(boolean alphabetical) {
+            this.alphabetical = alphabetical;
+        }
+
         @Override
         public Object get(TriggerContext context, Object[] args) {
             KeyedValues keyed = args[0] instanceof KeyedValues k ? k : null;
@@ -435,7 +529,8 @@ final class Logic {
             }
             boolean[] incomparable = new boolean[1];
             java.util.Arrays.sort(order, (x, y) -> {
-                Integer result = Comparison.order(values[x], values[y]);
+                Integer result = alphabetical ? (Integer) Values.text(values[x]).compareTo(Values.text(values[y]))
+                        : Comparison.order(values[x], values[y]);
                 if (result == null) {
                     incomparable[0] = true;
                     return 0;
@@ -452,6 +547,96 @@ final class Logic {
                 keys[i] = keyed == null ? null : keyed.keys()[order[i]];
             }
             return keyed == null ? sorted : new KeyedValues(sorted, keys);
+        }
+    }
+
+    /** {@code reversed %objects%} or {@code shuffled %objects%}, keeping indices. */
+    private record Reordered(boolean shuffle) implements Expression, KeyAware {
+        @Override
+        public Object get(TriggerContext context, Object[] args) {
+            KeyedValues keyed = args[0] instanceof KeyedValues k ? k : null;
+            Object[] values = keyed != null ? keyed.values() : (Object[]) args[0];
+            List<Integer> order = new java.util.ArrayList<>(values.length);
+            for (int i = 0; i < values.length; i++) {
+                order.add(i);
+            }
+            if (shuffle) {
+                java.util.Collections.shuffle(order, java.util.concurrent.ThreadLocalRandom.current());
+            } else {
+                java.util.Collections.reverse(order);
+            }
+            Object[] reordered = new Object[values.length];
+            String[] keys = new String[values.length];
+            for (int i = 0; i < reordered.length; i++) {
+                reordered[i] = values[order.get(i)];
+                keys[i] = keyed == null ? null : keyed.keys()[order.get(i)];
+            }
+            return keyed == null ? reordered : new KeyedValues(reordered, keys);
+        }
+    }
+
+    /** Rounds as Skript does, allowing for floating point error: 100 lots of 0.1 floor to 10. */
+    static long round(double value, int mode) {
+        return switch (mode) {
+            case -1 -> (long) Math.floor(value + 1e-10);
+            case 1 -> (long) Math.ceil(value - 1e-10);
+            default -> (long) Math.floor(value + 0.5);
+        };
+    }
+
+    /**
+     * {@code [first|last|all] indices of the value X in {_list::*}}: where values are in a list (its indices, or
+     * positions counting from 1), or where texts are in a text (positions counting from 1). {@code which} is all
+     * (0), the first (1) or the last (2) for each value looked for.
+     */
+    private record IndicesOfValue(int pattern, int which) implements Expression, KeyAware {
+        @Override
+        public boolean implicitKeys() {
+            return true;
+        }
+
+        @Override
+        public Object get(TriggerContext context, Object[] args) {
+            List<Object> found = new java.util.ArrayList<>();
+            Object[] wanted = Values.array(KeyedValues.plain(args[0]));
+            if (pattern == 0) {
+                if (!(args[1] instanceof String text)) {
+                    return null;
+                }
+                for (Object value : wanted) {
+                    if (!(value instanceof String part) || part.isEmpty()) {
+                        continue;
+                    }
+                    List<Long> positions = new java.util.ArrayList<>();
+                    for (int at = text.indexOf(part); at >= 0; at = text.indexOf(part, at + 1)) {
+                        positions.add((long) at + 1);
+                    }
+                    pick(positions, found);
+                }
+                return found.size() == 1 && which != 0 ? found.getFirst() : found.toArray();
+            }
+            KeyedValues list = KeyedValues.of(args[1]);
+            for (Object value : wanted) {
+                List<Object> matches = new java.util.ArrayList<>();
+                for (int i = 0; i < list.values().length; i++) {
+                    if (Comparison.equal(list.values()[i], value)) {
+                        matches.add(pattern == 1 ? (Object) (long) (i + 1) : list.keys()[i]);
+                    }
+                }
+                pick(matches, found);
+            }
+            return found.size() == 1 && which != 0 ? found.getFirst() : found.toArray();
+        }
+
+        private void pick(List<?> matches, List<Object> into) {
+            if (matches.isEmpty()) {
+                return;
+            }
+            switch (which) {
+                case 1 -> into.add(matches.getFirst());
+                case 2 -> into.add(matches.getLast());
+                default -> into.addAll(matches);
+            }
         }
     }
 }

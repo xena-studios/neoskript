@@ -10,6 +10,10 @@ import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.api.registration.Patterns;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Values;
+import co.xenastudios.neoskript.runtime.variables.storage.VariableCodecs;
+import co.xenastudios.neoskript.runtime.Arithmetic;
+import co.xenastudios.neoskript.runtime.Comparison;
+import co.xenastudios.neoskript.runtime.RuntimeErrors;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -40,9 +44,12 @@ final class PersistentData {
 
     static void register(Registrar registrar) {
         String holders = "chunks/worlds/entities/blocks/itemtypes/offlineplayers";
-        registrar.expression("ExprPersistentData", "object", info -> new Tag(),
-                "[the] [persistent] data (value|tag) %text% of %" + holders + "%",
-                "%" + holders + "%'[s] [persistent] data (value|tag) %text%");
+        // 'persistent data tag "x" of Y', 'string data tag', 'strings data tag', 'list data tag': a value, or a list,
+        // stored on Y, read as a type if one is named.
+        registrar.typedExpression("ExprPersistentData", "object", info -> new Tag(info.types().isEmpty() ? null
+                        : info.types().getFirst(), info.hasTag("list") || !info.types().isEmpty() && info.types().getFirst().plural()),
+                "[the] [persistent] [<.+> ][list:list ]data (value|tag) %text% of %" + holders + "%",
+                "%" + holders + "%'[s] [persistent] [<.+> ][list:list ]data (value|tag) %text%");
         registrar.condition("CondHasPersistentDataTag", info -> {
             boolean negated = info.pattern() == 1;
             return (context, args) -> {
@@ -79,30 +86,68 @@ final class PersistentData {
         }, "[all [[of] the]] [persistent] data [tag] keys of %objects%", "[all of] %objects%'[s] [persistent] data [tag] keys");
     }
 
-    /** {@code persistent data tag "skript:x" of %holders%}, which can be set and deleted. */
-    private static final class Tag implements Expression, Changeable {
+    private static final NamespacedKey TYPE = new NamespacedKey("neoskript", "type");
+    private static final NamespacedKey DATA = new NamespacedKey("neoskript", "data");
+    private static final NamespacedKey VALUE = new NamespacedKey("neoskript", "value");
+    private static final PersistentDataType<java.util.List<PersistentDataContainer>, java.util.List<PersistentDataContainer>> LIST =
+            PersistentDataType.LIST.dataContainers();
+
+    /**
+     * {@code [type] [list] data tag "skript:x" of %holders%}: a single value, or with {@code list} (or a plural
+     * type) a list, which can be set, added to, taken from and deleted. Values other than texts, numbers and
+     * booleans are stored with their storage codec.
+     */
+    private record Tag(co.xenastudios.neoskript.api.element.ElementInfo.TypeArgument type, boolean list)
+            implements Expression, Changeable {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
             NamespacedKey key = key(arguments[0]);
             List<Object> values = new ArrayList<>();
             for (Object owner : owners(arguments[1])) {
                 PersistentDataContainer container = read(owner);
-                if (key == null || container == null) {
+                if (key == null || container == null || !container.has(key)) {
                     continue;
                 }
-                for (PersistentDataType<?, ?> type : TYPES) {
-                    if (container.has(key, type)) {
-                        values.add(container.get(key, type));
-                        break;
+                boolean storedList = container.has(key, LIST);
+                if (storedList != list) {
+                    RuntimeErrors.report(mismatch(key, storedList));
+                    continue;
+                }
+                if (list) {
+                    for (PersistentDataContainer element : container.get(key, LIST)) {
+                        Object value = decode(element, VALUE);
+                        if (value != null && (type == null || matches(value))) {
+                            values.add(value);
+                        }
                     }
+                    continue;
+                }
+                Object value = decode(container, key);
+                if (value != null && type != null && !matches(value)) {
+                    RuntimeErrors.report("The data in tag '" + key + "' was of type " + typeName(value)
+                            + ", not the expected type " + type.name() + ".");
+                    continue;
+                }
+                if (value != null) {
+                    values.add(value);
                 }
             }
-            return values.size() == 1 ? values.getFirst() : values.toArray();
+            return values.size() == 1 && !list ? values.getFirst() : values.toArray();
+        }
+
+        private boolean matches(Object value) {
+            Class<?> wanted = type.javaClass();
+            return wanted.isInstance(value) || Number.class.isAssignableFrom(wanted) && value instanceof Number
+                    && (!type.id().equals("integer") || value instanceof Long || value instanceof Integer);
         }
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
-            return mode == Mode.SET ? new Class<?>[] {Object.class} : mode == Mode.DELETE ? new Class<?>[0] : null;
+            return switch (mode) {
+                case SET, ADD, REMOVE -> new Class<?>[] {Object.class};
+                case DELETE -> new Class<?>[0];
+                default -> null;
+            };
         }
 
         @Override
@@ -111,27 +156,160 @@ final class PersistentData {
             if (key == null) {
                 return;
             }
-            Object value = delta == null || delta.length == 0 ? null : delta[0];
-            for (Object owner : owners(arguments[1])) {
-                write(owner, container -> {
-                    if (value == null) {
-                        container.remove(key);
-                    } else {
-                        set(container, key, value);
-                    }
-                });
+            Object[] given = delta == null ? new Object[0] : delta;
+            for (Object value : given) {
+                if (!storable(value)) {
+                    RuntimeErrors.report("Skript cannot serialize " + plural(value) + " as persistent data!");
+                    return;
+                }
             }
+            for (Object owner : owners(arguments[1])) {
+                PersistentDataContainer current = read(owner);
+                write(owner, container -> change(container, current, key, given, mode));
+            }
+        }
+
+        private void change(PersistentDataContainer container, PersistentDataContainer current, NamespacedKey key,
+                Object[] given, Mode mode) {
+            if (mode == Mode.DELETE) {
+                container.remove(key);
+                return;
+            }
+            boolean exists = current != null && current.has(key);
+            boolean storedList = exists && current.has(key, LIST);
+            if (mode == Mode.SET) {
+                if (list) {
+                    setList(container, key, java.util.Arrays.asList(given));
+                } else if (given.length > 0) {
+                    encode(container, key, given[0]);
+                }
+                return;
+            }
+            if (exists && storedList != list) {
+                RuntimeErrors.report(mismatch(key, storedList));
+                return;
+            }
+            if (list) {
+                List<Object> values = new ArrayList<>();
+                if (exists) {
+                    for (PersistentDataContainer element : current.get(key, LIST)) {
+                        Object value = decode(element, VALUE);
+                        if (value != null) {
+                            values.add(value);
+                        }
+                    }
+                }
+                for (Object value : given) {
+                    if (mode == Mode.ADD) {
+                        values.add(value);
+                    } else {
+                        values.removeIf(stored -> Comparison.equal(stored, value));
+                    }
+                }
+                setList(container, key, values);
+                return;
+            }
+            Object value = exists ? decode(current, key) : null;
+            for (Object by : given) {
+                // Only what arithmetic allows: a number plus a number, a date plus a timespan.
+                Object next = mode == Mode.ADD ? Arithmetic.add(value, by) : Arithmetic.subtract(value, by);
+                if (next != null) {
+                    value = next;
+                }
+            }
+            if (value != null) {
+                encode(container, key, value);
+            }
+        }
+
+        private static void setList(PersistentDataContainer container, NamespacedKey key, List<Object> values) {
+            List<PersistentDataContainer> elements = new ArrayList<>();
+            for (Object value : values) {
+                PersistentDataContainer element = container.getAdapterContext().newPersistentDataContainer();
+                encode(element, VALUE, value);
+                elements.add(element);
+            }
+            container.set(key, LIST, elements);
+        }
+
+        private static String mismatch(NamespacedKey key, boolean storedList) {
+            return storedList
+                    ? "The data in tag '" + key + "' is a list, not a single value. Use 'list data tag' instead of 'data tag'."
+                    : "The data in tag '" + key + "' is a single value, not a list. Use 'data tag' instead of 'list data tag'.";
         }
     }
 
-    private static void set(PersistentDataContainer container, NamespacedKey key, Object value) {
+    /** Stores {@code value} under {@code key}: texts, numbers and booleans as such, anything else with its codec. */
+    private static void encode(PersistentDataContainer container, NamespacedKey key, Object value) {
         switch (value) {
             case Boolean b -> container.set(key, PersistentDataType.BOOLEAN, b);
             case Long l -> container.set(key, PersistentDataType.LONG, l);
             case Integer i -> container.set(key, PersistentDataType.LONG, (long) i);
             case Number n -> container.set(key, PersistentDataType.DOUBLE, n.doubleValue());
-            default -> container.set(key, PersistentDataType.STRING, Values.text(value));
+            case String text -> container.set(key, PersistentDataType.STRING, text);
+            default -> {
+                VariableCodecs.Encoded encoded = VariableCodecs.current().encode(value);
+                PersistentDataContainer compound = container.getAdapterContext().newPersistentDataContainer();
+                compound.set(TYPE, PersistentDataType.STRING, encoded.type());
+                compound.set(DATA, PersistentDataType.BYTE_ARRAY, encoded.bytes());
+                container.set(key, PersistentDataType.TAG_CONTAINER, compound);
+            }
         }
+    }
+
+    /** The value stored under {@code key}, or {@code null}. */
+    private static Object decode(PersistentDataContainer container, NamespacedKey key) {
+        if (container.has(key, PersistentDataType.TAG_CONTAINER)) {
+            PersistentDataContainer compound = container.get(key, PersistentDataType.TAG_CONTAINER);
+            String type = compound.get(TYPE, PersistentDataType.STRING);
+            byte[] data = compound.get(DATA, PersistentDataType.BYTE_ARRAY);
+            return type == null || data == null ? null : VariableCodecs.current().decode(type, data);
+        }
+        for (PersistentDataType<?, ?> type : TYPES) {
+            if (container.has(key, type)) {
+                return container.get(key, type);
+            }
+        }
+        return null;
+    }
+
+    /** Whether {@code value} can be stored: a text, number or boolean, or something with a storage codec. */
+    private static boolean storable(Object value) {
+        if (value instanceof String || value instanceof Number || value instanceof Boolean) {
+            return true;
+        }
+        try {
+            return VariableCodecs.current() != null && VariableCodecs.current().encode(value) != null;
+        } catch (RuntimeException unknown) {
+            return false;
+        }
+    }
+
+    /** How Skript names a value's type in messages: text, integer, number, boolean, or its storage name. */
+    private static String typeName(Object value) {
+        return switch (value) {
+            case String text -> "text";
+            case Long l -> "integer";
+            case Integer i -> "integer";
+            case Number n -> "number";
+            case Boolean b -> "boolean";
+            default -> {
+                try {
+                    yield VariableCodecs.current().encode(value).type();
+                } catch (RuntimeException unknown) {
+                    yield value.getClass().getSimpleName().toLowerCase(java.util.Locale.ROOT);
+                }
+            }
+        };
+    }
+
+    /** A value's type in the plural, for messages: inventories. */
+    private static String plural(Object value) {
+        if (value instanceof org.bukkit.inventory.Inventory) {
+            return "inventories";
+        }
+        String name = value.getClass().getSimpleName().toLowerCase(java.util.Locale.ROOT).replaceFirst("^craft", "");
+        return name.endsWith("y") ? name.substring(0, name.length() - 1) + "ies" : name + "s";
     }
 
     private static Object[] owners(Object value) {

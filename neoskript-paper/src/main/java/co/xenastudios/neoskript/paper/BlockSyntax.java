@@ -28,12 +28,78 @@ final class BlockSyntax {
     static void register(Registrar registrar) {
         registrar.type("blockdata", "block data", BlockData.class);
         registrar.literalParser("blockdata", BlockSyntax::blockData);
+        // How far suspicious sand or gravel has been brushed, from 0 to its maximum.
+        registrar.expression("ExprDustedStage", "integer", info -> {
+            boolean max = info.hasTag("max");
+            return new SettableProperty<>(Object.class, Number.class, owner -> {
+                BlockData data = owner instanceof Block block ? block.getBlockData() : owner instanceof BlockData given ? given : null;
+                return data instanceof org.bukkit.block.data.Brushable brushable
+                        ? (Object) (long) (max ? brushable.getMaximumDusted() : brushable.getDusted()) : null;
+            }, (owner, stage) -> {
+                if (max) {
+                    return;
+                }
+                BlockData data = owner instanceof Block block ? block.getBlockData() : owner instanceof BlockData given ? given : null;
+                if (data instanceof org.bukkit.block.data.Brushable brushable) {
+                    brushable.setDusted((int) Math.max(0, Math.min(brushable.getMaximumDusted(), stage.doubleValue())));
+                    if (owner instanceof Block block) {
+                        block.setBlockData(brushable);
+                    }
+                }
+            }).resettingTo(0L);
+        }, "[the] [max:max[imum]] (dusted stage|dusting progress) of %blocks/blockdatas%",
+                "%blocks/blockdatas%'[s] [max:max[imum]] (dusted stage|dusting progress)");
+        // The item buried in suspicious sand or gravel; air if there's none.
+        registrar.expression("ExprBrushableItem", "itemtype", info -> new SettableProperty<>(Block.class, ItemType.class,
+                block -> block.getState() instanceof org.bukkit.block.BrushableBlock brushable
+                        ? new ItemType(brushable.getItem().getType().isAir() ? new org.bukkit.inventory.ItemStack(org.bukkit.Material.AIR)
+                                : brushable.getItem(), !brushable.getItem().getType().isAir()) : null,
+                (block, item) -> {
+                    if (block.getState() instanceof org.bukkit.block.BrushableBlock brushable) {
+                        brushable.setItem(item == null || item.material().isAir() ? null : item.stack());
+                        brushable.update(true, false);
+                    }
+                }), "[the] brushable item of %blocks%", "%blocks%'[s] brushable item");
+        // Chests, ender chests, barrels and shulker boxes, opened and closed as a player would.
+        registrar.effect("EffLidState", info -> {
+            boolean open = info.hasTag("open");
+            return (context, args) -> {
+                for (Object value : (Object[]) args[0]) {
+                    if (value instanceof Block block && block.getState() instanceof org.bukkit.block.Lidded lidded) {
+                        if (open) {
+                            lidded.open();
+                        } else {
+                            lidded.close();
+                        }
+                    }
+                }
+            };
+        }, "(open:open|close) [the] lid[s] (of|for) %blocks%", "(open:open|close) %blocks%'[s] lid[s]");
+        EntitySyntax.conditionPatterns(registrar, "CondLidState", Block.class,
+                block -> block.getState() instanceof org.bukkit.block.Lidded lidded && lidded.isOpen(), null,
+                "[the] lid[s] of %blocks% (is|are) (open[ed]|flip:closed)",
+                "%blocks%'[s] lid[s] (is|are) (open[ed]|flip:closed)",
+                "[the] lid[s] of %blocks% (isn't|is not|aren't|are not) (open[ed]|flip:closed)",
+                "%blocks%'[s] lid[s] (isn't|is not|aren't|are not) (open[ed]|flip:closed)");
+        // The block an enderman holds; an item that isn't a block makes it hold nothing.
+        registrar.expression("ExprCarryingBlockData", "blockdata", info -> new SettableProperty<>(
+                org.bukkit.entity.Enderman.class, Object.class, org.bukkit.entity.Enderman::getCarriedBlock, (enderman, block) -> {
+                    org.bukkit.block.data.BlockData data = block instanceof org.bukkit.block.data.BlockData given ? given
+                            : block instanceof ItemType item && item.material().isBlock() ? item.material().createBlockData()
+                            : null;
+                    enderman.setCarriedBlock(data);
+                }).deleting(enderman -> enderman.setCarriedBlock(null)),
+                "[the] carr(ied|ying) block[ ]data of %livingentities%", "%livingentities%'[s] carr(ied|ying) block[ ]data");
         registrar.parser("blockdata", BlockSyntax::blockData);
         registrar.text(BlockData.class, data -> data.getAsString().replaceFirst("^minecraft:", ""));
         registrar.converter(Block.class, BlockData.class, Block::getBlockData);
         registrar.converter(ItemType.class, BlockData.class, item -> item.material().isBlock()
                 ? item.material().createBlockData() : null);
         registrar.comparison(BlockData.class, BlockData.class, (a, b) -> a.matches(b) || b.matches(a));
+        registrar.comparison(BlockData.class, ItemType.class, (data, item) -> data.getMaterial() == item.material());
+        // 'block at X is stone': a block is an item if it's that item's block.
+        registrar.comparison(org.bukkit.block.Block.class, ItemType.class, (block, item) -> block.getType() == item.material());
+        registrar.comparison(org.bukkit.block.Block.class, BlockData.class, (block, data) -> block.getBlockData().matches(data));
 
         registrar.expression("ExprBlockData", "blockdata", info -> new DataOf(),
                 "[the] block[ ]data of %blocks/entities%", "%blocks/entities%'[s] block[ ]data");
@@ -44,10 +110,15 @@ final class BlockSyntax {
                 Object type = switch (value) {
                     case ItemType item -> new ItemType(new org.bukkit.inventory.ItemStack(item.material()), false);
                     case BlockData data -> data.getMaterial().createBlockData();
+                    // A block's type is its item, or its block data if it has no item, like water.
+                    case org.bukkit.block.Block block -> block.getType().isItem()
+                            ? new ItemType(new org.bukkit.inventory.ItemStack(block.getType()), false)
+                            : block.getType().createBlockData();
                     case EntityKind kind -> kind.type() == null ? kind : EntityKind.of(kind.type());
                     case Entity entity -> EntityKind.of(entity.getType());
-                    case org.bukkit.potion.PotionEffect effect -> effect.getType();
+                    case Potions.Effect effect -> effect.type;
                     case org.bukkit.inventory.Inventory inventory -> new Items.InventoryKind(inventory.getType().name());
+                    case Enchantments.Levelled levelled -> levelled.enchantment();
                     default -> null;
                 };
                 if (type != null) {
@@ -55,8 +126,8 @@ final class BlockSyntax {
                 }
             }
             return types.size() == 1 ? types.getFirst() : types.toArray();
-        }, "[the] type of %entitytypes/itemtypes/skriptpotioneffects/blockdatas/entities%",
-                "%entitytypes/itemtypes/skriptpotioneffects/blockdatas/entities%'[s] type");
+        }, "[the] type of %entitytypes/itemtypes/skriptpotioneffects/blockdatas/entities/blocks%",
+                "%entitytypes/itemtypes/skriptpotioneffects/blockdatas/entities/blocks%'[s] type");
 
         registrar.expression("ExprVersion", "string", info -> {
             boolean skript = info.hasTag("skript");
@@ -82,12 +153,13 @@ final class BlockSyntax {
 
     /** Block data written as {@code campfire[lit=false]} or {@code minecraft:stone[]}, or {@code null}. */
     static BlockData blockData(String text) {
-        String words = text.strip().toLowerCase(Locale.ROOT);
+        String words = text.strip().toLowerCase(Locale.ROOT).replaceFirst("^(?:an?|the) ", "");
         if (words.isEmpty() || words.contains(" ") && !words.contains("[")) {
             return null;
         }
         int bracket = words.indexOf('[');
-        String name = (bracket < 0 ? words : words.substring(0, bracket)).strip().replace(' ', '_');
+        String written = (bracket < 0 ? words : words.substring(0, bracket)).strip();
+        String name = written.replace(' ', '_');
         String states = bracket < 0 ? "" : words.substring(bracket);
         if (!states.isEmpty()) {
             states = states.replace(';', ',');
@@ -95,7 +167,16 @@ final class BlockSyntax {
         try {
             return Bukkit.createBlockData((name.contains(":") ? name : "minecraft:" + name) + states);
         } catch (IllegalArgumentException e) {
-            return null;
+            // An item's name, like 'oak log[]', for its block.
+            org.bukkit.Material material = ItemType.alias(written);
+            if (material == null || !material.isBlock()) {
+                return null;
+            }
+            try {
+                return Bukkit.createBlockData(material, states.isEmpty() ? null : states);
+            } catch (IllegalArgumentException invalid) {
+                return null;
+            }
         }
     }
 

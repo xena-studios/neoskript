@@ -16,9 +16,10 @@ final class MathFunctions {
 
     static void register(Registrar registrar) {
         List<Parameter> n = List.of(Parameter.of("n", "number"));
-        registrar.function("floor", n, "integer", false, args -> (long) Math.floor(number(args[0])));
-        registrar.function("ceil", n, "integer", false, args -> (long) Math.ceil(number(args[0])));
-        registrar.function("ceiling", n, "integer", false, args -> (long) Math.ceil(number(args[0])));
+        // Allowing for floating point error, as Skript does: 100 lots of 0.1 floor to 10.
+        registrar.function("floor", n, "integer", false, args -> Logic.round(number(args[0]), -1));
+        registrar.function("ceil", n, "integer", false, args -> Logic.round(number(args[0]), 1));
+        registrar.function("ceiling", n, "integer", false, args -> Logic.round(number(args[0]), 1));
         registrar.function("abs", n, "number", false, args -> args[0] instanceof Long l ? (Object) Math.abs(l)
                 : (Object) Math.abs(number(args[0])));
         registrar.function("sqrt", n, "number", false, args -> Math.sqrt(number(args[0])));

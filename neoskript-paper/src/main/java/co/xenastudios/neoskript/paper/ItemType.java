@@ -110,6 +110,19 @@ public final class ItemType {
             words = counted.group(2);
         }
         words = words.replaceFirst("^(?:an?|all|every) ", "");
+        // 'potion of swiftness', 'splash potion of water', 'plain potion of mundane': a potion of that kind.
+        Matcher potion = POTION.matcher(words);
+        if (potion.matches()) {
+            org.bukkit.potion.PotionType kind = potionType(potion.group(3));
+            if (kind == null) {
+                return null;
+            }
+            Material bottle = potion.group(2) == null ? Material.POTION
+                    : potion.group(2).startsWith("splash") ? Material.SPLASH_POTION : Material.LINGERING_POTION;
+            ItemStack stack = new ItemStack(bottle, Math.max(amount, 1));
+            stack.editMeta(org.bukkit.inventory.meta.PotionMeta.class, meta -> meta.setBasePotionType(kind));
+            return new ItemType(stack, amountGiven);
+        }
         Material material = alias(words);
         Map<Enchantment, Integer> enchantments = Map.of();
         if (material == null) {
@@ -135,6 +148,14 @@ public final class ItemType {
             stack.editMeta(meta -> chosen.forEach((enchantment, level) -> meta.addEnchant(enchantment, level, true)));
         }
         return new ItemType(stack, amountGiven);
+    }
+
+    private static final Pattern POTION = Pattern.compile("(plain )?(splash |lingering )?potion of (.+)");
+
+    /** The kind of potion {@code name} names: {@code swiftness}, {@code long swiftness}, {@code water}. */
+    private static org.bukkit.potion.PotionType potionType(String name) {
+        NamespacedKey key = NamespacedKey.fromString(name.strip().replace(' ', '_'));
+        return key == null ? null : org.bukkit.Registry.POTION.get(key);
     }
 
     private static Map<Enchantment, Integer> enchantments(String text) {
@@ -187,7 +208,15 @@ public final class ItemType {
             }
             aliases = known;
         }
-        return known.get(name);
+        Material found = known.get(name);
+        // 'dirt block' is dirt, as Skript names blocks.
+        if (found == null && name.endsWith(" block")) {
+            Material block = known.get(name.substring(0, name.length() - 6));
+            if (block != null && block.isBlock()) {
+                return block;
+            }
+        }
+        return found;
     }
 
     /** How an item reads: its material's name in lower case, with spaces. */

@@ -39,7 +39,8 @@ public final class Library implements Registrar {
 
     /** Types that only accept themselves and registered subtypes, rather than any unrelated game type. */
     private static final Set<String> STRICT_TYPES =
-            Set.of("number", "integer", "long", "string", "boolean", "timespan", "date", "time", "entitytype", "itemtype");
+            Set.of("number", "integer", "long", "string", "boolean", "timespan", "date", "time", "entitytype", "itemtype",
+                    "skriptpotioneffect", "hiddenpotioneffect", "damagecause");
 
     private record Key(SyntaxKind kind, String id) {}
 
@@ -56,10 +57,15 @@ public final class Library implements Registrar {
     private final Map<String, Class<?>> javaClasses = new HashMap<>();
     private final Map<FunctionInfo, Function> functions = new HashMap<>();
     private final Map<String, Object> literalValues = new HashMap<>();
+    /** Each named type's values, in the order registered, without repeats: what 'all colours' gives. */
+    private final Map<String, List<Object>> namedValues = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Each built-in function's parameters' values when left out, as declared. */
+    private final Map<FunctionInfo, List<java.util.function.Supplier<?>>> functionDefaults = new HashMap<>();
     private final VariableCodecs codecs = new VariableCodecs();
     private final List<EventValue> eventValues = new ArrayList<>();
     private final Set<String> eventDefaults = new HashSet<>();
     private final Map<String, String> sectionTypes = new HashMap<>();
+    private final Map<String, String> sectionExpressions = new HashMap<>();
     private final Map<String, java.util.function.Function<String, ?>> parsers = new HashMap<>();
     private final Map<String, java.util.function.Function<String, ?>> literalParsers = new java.util.LinkedHashMap<>();
     private SyntaxRegistry registry;
@@ -69,6 +75,9 @@ public final class Library implements Registrar {
         type("timespan", "timespan", Timespan.class);
         parser("timespan", Timespan::parse);
         type("date", "date", co.xenastudios.neoskript.runtime.Date.class);
+        type("time", "time", co.xenastudios.neoskript.runtime.TimeOfDay.class);
+        parser("time", co.xenastudios.neoskript.runtime.TimeOfDay::parse);
+        literalParser("time", co.xenastudios.neoskript.runtime.TimeOfDay::parse);
         type("script", "script", co.xenastudios.neoskript.runtime.ScriptRef.class);
         CoreSyntax.register(this);
         CoreCodecs.register(this);
@@ -88,10 +97,20 @@ public final class Library implements Registrar {
     public <T> void namedType(String id, String name, Class<T> javaClass, Map<String, ? extends T> values) {
         checkOpen();
         builder.type(new TypeInfo(id, name, values.keySet(), false));
+        if (STRICT_TYPES.contains(id)) {
+            builder.strict(id);
+        }
         javaClasses.put(id, javaClass);
-        literalValues.putAll(values);
+        // A word several types have is the first's where nothing says which.
+        values.forEach(literalValues::putIfAbsent);
+        namedValues.put(id, List.copyOf(new java.util.LinkedHashSet<>(values.values())));
         Map<String, T> copy = Map.copyOf(values);
         parsers.put(id, text -> copy.get(text.strip().toLowerCase(java.util.Locale.ROOT)));
+    }
+
+    /** Every value of the named type {@code id}, or {@code null} if it isn't a named type. */
+    public List<Object> namedValues(String id) {
+        return namedValues.get(id);
     }
 
     @Override
@@ -104,6 +123,26 @@ public final class Library implements Registrar {
     public void subtype(String sub, String supertype) {
         checkOpen();
         builder.assignable(sub, supertype);
+    }
+
+    @Override
+    public void typedExpression(String id, String returnType, ElementFactory<Expression> factory, String... patterns) {
+        int groups = 0;
+        for (String pattern : patterns) {
+            groups = Math.max(groups, (int) pattern.chars().filter(c -> c == '<').count());
+        }
+        add(SyntaxKind.EXPRESSION, id, returnType, factory, java.util.Collections.nCopies(groups, RegexRole.TYPE), patterns);
+    }
+
+    @Override
+    public void sectionExpression(String expressionId, String valueType) {
+        checkOpen();
+        sectionExpressions.put(expressionId, valueType);
+    }
+
+    /** The type of value expression {@code id} runs a section for, or {@code null} if it doesn't take one. */
+    String sectionExpressionType(String id) {
+        return sectionExpressions.get(id);
     }
 
     @Override
@@ -279,6 +318,7 @@ public final class Library implements Registrar {
         FunctionInfo info = new FunctionInfo(name, parameters.stream()
                 .map(p -> new FunctionInfo.Parameter(p.name(), p.type(), p.plural(), p.optional()))
                 .toList(), returnType, returnsPlural);
+        functionDefaults.put(info, parameters.stream().map(Parameter::defaultValue).toList());
         builder.function(info);
         functions.put(info, function);
     }
@@ -402,14 +442,41 @@ public final class Library implements Registrar {
                 returnType, regexRoles));
     }
 
+    /** The ids of the types whose values are of one of {@code classes}, most specific first: for reading words. */
+    public List<String> typesOf(Class<?>[] classes) {
+        List<String> ids = new ArrayList<>();
+        for (Class<?> wanted : classes) {
+            if (wanted == Object.class) {
+                continue;
+            }
+            javaClasses.forEach((id, type) -> {
+                if (wanted.isAssignableFrom(type) && !ids.contains(id)) {
+                    ids.add(id);
+                }
+            });
+        }
+        return ids;
+    }
+
     /** The class values of a type have, or {@code Object} if the type is unknown. */
-    Class<?> javaClass(String typeId) {
+    public Class<?> javaClass(String typeId) {
         return javaClasses.getOrDefault(typeId, Object.class);
     }
 
     /** The implementation of a built-in function, or {@code null} if {@code function} isn't one. */
     Function builtIn(FunctionInfo function) {
         return functions.get(function);
+    }
+
+    /** What a built-in function's parameter {@code index} is when left out, or {@code null} for nothing. */
+    java.util.function.Supplier<?> functionDefault(FunctionInfo function, int index) {
+        List<java.util.function.Supplier<?>> defaults = functionDefaults.get(function);
+        return defaults == null || index >= defaults.size() ? null : defaults.get(index);
+    }
+
+    /** Every built-in function, as registered. */
+    public Map<FunctionInfo, Function> builtIns() {
+        return java.util.Collections.unmodifiableMap(functions);
     }
 
     /** The syntax registry for the frontend. Nothing can be registered after this is called. */

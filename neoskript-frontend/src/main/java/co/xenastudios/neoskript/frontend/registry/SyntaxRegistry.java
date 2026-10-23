@@ -33,6 +33,7 @@ public final class SyntaxRegistry {
     public record Candidate(SyntaxInfo syntax, int pattern) {}
 
     private final Map<String, TypeInfo> typesById;
+    private final Map<String, Integer> typeOrders;
     private final Map<String, TypeRef> typeNames;
     private final Map<SyntaxKind, List<SyntaxInfo>> syntaxes;
     private final Map<SyntaxKind, PatternIndex<Candidate>> indexes;
@@ -48,6 +49,11 @@ public final class SyntaxRegistry {
 
     private SyntaxRegistry(Builder builder) {
         this.typesById = Collections.unmodifiableMap(new LinkedHashMap<>(builder.typesById));
+        Map<String, Integer> orders = new java.util.HashMap<>();
+        for (String id : typesById.keySet()) {
+            orders.put(id, orders.size());
+        }
+        this.typeOrders = Map.copyOf(orders);
         this.typeNames = Map.copyOf(builder.typeNames);
         Map<SyntaxKind, List<SyntaxInfo>> syntaxes = new EnumMap<>(SyntaxKind.class);
         Map<SyntaxKind, PatternIndex<Candidate>> indexes = new EnumMap<>(SyntaxKind.class);
@@ -94,6 +100,12 @@ public final class SyntaxRegistry {
 
     public TypeInfo type(String id) {
         return typesById.get(id.toLowerCase(Locale.ROOT));
+    }
+
+    /** Where type {@code id} was registered among the types, earliest first, or a large number if it wasn't. */
+    public int typeOrder(String id) {
+        Integer order = typeOrders.get(id);
+        return order == null ? Integer.MAX_VALUE : order;
     }
 
     public Iterable<TypeInfo> types() {
@@ -171,6 +183,16 @@ public final class SyntaxRegistry {
         } catch (RuntimeException | LinkageError e) {
             // The check needs something that isn't there (a server, in tests): don't rule the words out.
             return true;
+        }
+    }
+
+    /** Whether {@code words} are certainly a literal of {@code type}: its check, which needs a server, says so. */
+    public boolean isLiteral(TypeInfo type, String words) {
+        java.util.function.Predicate<String> check = literalChecks.get(type.id());
+        try {
+            return check != null && check.test(words);
+        } catch (RuntimeException | LinkageError e) {
+            return false;
         }
     }
 

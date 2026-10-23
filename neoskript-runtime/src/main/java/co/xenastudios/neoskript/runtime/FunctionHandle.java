@@ -14,6 +14,7 @@ public final class FunctionHandle {
 
     private final String name;
     private volatile CompiledFunction target;
+    private volatile String script;
 
     public FunctionHandle(String name) {
         this.name = name;
@@ -21,6 +22,20 @@ public final class FunctionHandle {
 
     public String name() {
         return name;
+    }
+
+    /** The script that defines it, or {@code null} if it hasn't been compiled yet. */
+    public String script() {
+        return script;
+    }
+
+    public void script(String definedIn) {
+        this.script = definedIn;
+    }
+
+    /** Whether it's loaded, so it can be called. */
+    public boolean loaded() {
+        return target != null;
     }
 
     public void target(CompiledFunction target) {

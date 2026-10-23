@@ -47,6 +47,10 @@ public final class Comparison {
             if (isWhole(x) && isWhole(y)) {
                 return x.longValue() == y.longValue();
             }
+            // A float (a quaternion's part) is compared as a float, as Skript reads the other side as one.
+            if (x instanceof Float || y instanceof Float) {
+                return x.floatValue() == y.floatValue();
+            }
             // As in Skript, decimals within 1e-10 of each other are equal, and NaN equals nothing, not even NaN.
             double dx = x.doubleValue();
             double dy = y.doubleValue();

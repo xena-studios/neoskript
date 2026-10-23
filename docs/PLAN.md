@@ -453,6 +453,65 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - `3 of stone` and `number within X` are tried late, matching Skript's order, so `y coordinate of spawn of {_w}` and `items in X` parse as Skript parses them.
 >      - Inventory kinds and attribute names are only looked up when a script runs, so registration never touches the server.
 >      - `X is stone` holds for any stone, named or not; `X is stone named "a"` only for that name.
+>
+>    **Batch 12 (2026-10-23): 343 → 529 tests pass.**
+>    - **Language:**
+>      - `for {_key}, {_value} in X` loops.
+>      - Function references: `function "x" [from script]`, `run`, `result of`, `all functions from`.
+>      - `load`/`reload`/`unload`/`disable` scripts while running.
+>      - `assert … to fail` now parses as Skript does: a condition doesn't lean on unresolved words when anything else fits.
+>    - **Types:**
+>      - Colours: the sixteen named ones, `rgb()`, red/green/blue/alpha values and hex codes.
+>      - Time of day: `12:30` and `5pm`, and the settable time of worlds.
+>      - Enchantments and enchantments with levels: `enchant`, `disenchant`, enchantment levels, `is enchanted with … or greater`.
+>      - `forever`, which stays forever through arithmetic.
+>      - Types as values (`X is a color`) and `all colours`.
+>    - **Persistent data:** list tags, typed reads (`string data tag`, `strings data tag`, `persistent location data tag`) with Skript's errors, any storable value via the storage codecs, and add/remove for both lists and single values.
+>    - **Other syntax:**
+>      - Text: string cases, `repeated`, codepoints, random characters, `percent of`, `toggle`/`inverse`.
+>      - Lists: reversed and shuffled lists (keeping indices), `indices of the value`, `dequeued`.
+>      - Rounding, `pi`, unix dates, formatted dates, time since/until, past/future dates.
+>      - Entities: line of sight, highest/lowest solid block, velocity, `is within`, PvP, taming, tooltips, panda/strider/axolotl/sleep states, silence, breeding, ageing, charging, whitelist enforcement.
+>      - Entity names: bamboo boats, `regular minecart`, `zombie farmer`, `stone block display`, `tamed ocelot`, `wild`/`sheared` variants.
+>    - **Displays:** size, shadow, view range, interpolation and teleport durations, brightness, glow colour, billboard, item transform, and text displays' text, alignment, line width, opacity, shadow and see-through, each kept in Minecraft's limits and resettable.
+>    - **World borders:** every property can be added to, taken from and reset, kept in Minecraft's limits, with Skript's errors for NaN and infinity.
+>    - **More syntax:**
+>      - Entities: damaging and healing (items by durability too), making one attack or damage another, last damage, villager types and professions, zombifying, remaining air, view and simulation distance, world environments.
+>      - Items: enchantment glint, fire resistance and tooltips (`diamond with fire resistance`), custom max durability and stack size, item flags, custom model data, item model, rarity, `unbreakable X`, `dirt block` names, replacing items in inventories, dropped items' lifetime.
+>      - Tags: `item tag "slabs"`, Paper's (`paper:helmets`) and scripts' own (`register an item tag named …`), `is tagged as`, `tag contents of`, `tags of`, `all tags`.
+>      - Built-in functions can have defaults for arguments left out (`location(1, 2, 3)` is in the main world; given as nothing, it has none).
+>      - Equipment: `equip X with Y` and `unequip`, horse armour and saddles, `is wearing`, `has a saddle`.
+>      - Text: tags as well as colour codes (`<red>`, `<bold>`, `<#ff0000>`, `<unicode:00A7>`), parsed only when there's a tag; `uncolored` strips them repeatedly; lore reads back with its tags; `string colours of X` and their codes.
+>      - Books: title, author, pages and single pages.
+>      - Expression sections: `set {_border} to a worldborder:` runs its code for the new value (`event-worldborder`, or left out).
+>      - Blocks compare with items and block data (`block at X is bookshelf`).
+>      - Other: the whitelist, `characters between`, `ticks of X`, `max integer value`, named times (`night`), `spawn 2 cows`.
+>    - **Fixes:**
+>      - List indices sort exactly as Skript's (numbers by value, with signs, decimals and leading zeros) and are kept in lower case.
+>      - A block's location is its centre.
+>      - Test location and test block are where Skript puts them.
+>      - Updates like `replace` and `enchant` keep a list's indices.
+>      - Plain items remove any stack of that item, named or not.
+>      - Expression order follows Skript where they compete: block before offset before spawn.
+>      - Property conditions are false for things they don't apply to, so their negation holds, as in Skript.
+>      - Words in a comparison or a `set` are read as the type the other side takes (`bill-boarding of X is fixed`).
+>      - `damage value` (damage taken) and `durability` (what's left) are told apart.
+>
+>    **Batch 13 (2026-10-23): 529 → 692 tests pass.**
+>    - **Potion module:** potion effects that can be changed (tier, length, ambient, infinite, particles, icon), entities' active and hidden effects (Minecraft's weaker effects kept under a stronger one), potions' effects, effect type categories and colours. Changing an entity's effect re-applies it with its hidden ones; hidden effects can't be changed, as Skript says when parsing.
+>    - **Quaternions:** `quaternion()`, `axisAngle()`, their w/x/y/z parts, rotation angle and axis, rotating around global and local axes and by x/y/z angles, and displays' rotations, scale and translation, all with Skript's float results.
+>    - **Language:**
+>      - Elements can refuse a match with an error while parsing (`SyntaxError`), as Skript's do, and `parse:` sections see those errors.
+>      - Elements see the types of their arguments when they're known.
+>      - Words several types have (`normal`, `cod`) are read as the type the other side wants, else the type Skript tries first; entity types come before items, unless they have an amount (`32 ender pearls` are items).
+>      - Of several parses leaning on unknown words, the one leaning on the least wins, and words a type's parser accepted count as known.
+>      - `any of X` is an or-list; empty values make negated conditions hold, as in Skript.
+>    - **Entities:** amounts (`spawn 5 villagers`), entities in chunks, within a radius or between corners, `zombies` on its own, farm animal variants (`warm cow`), professions as kinds, the plurals Skript uses (wolves, calves, endermen), fireballs as a category, panda genes, riding, passengers, owners, tools, entity size, allay duplication, enderman blocks, warden anger, metadata, persistence, creeper ignition, display entity kinds.
+>    - **Blocks and items:** furnaces, brewing stands and beehives, suspicious sand, command blocks, lids, skull owners, spawner types (trial spawners too), first empty slots, adding to and taking from slots, slots compared as their items, inventory holders, lore of slots, `potion of X` items, `type of` a block.
+>    - **Other syntax:** experience (`5 xp`), relative directions and pushing, block lines traced as Skript does, vectors (cylindrical, spherical, normalized), angles, `world of X`, chunks by coordinates, UUIDs of and from things, time played, display names, test players, alphabetical sorting.
+>    - **Errors as Skript gives them:** `parse:` sections and blocks compile their code apart to catch what compiling finds (cancelling events that can't be cancelled, functions that return nothing used as values, literals of types that can't be written, invalid regular expressions written out, reversing one value); `assert … to fail` holds when its condition can't be set up; function arguments: mixing named and unnamed ones, lists of lists.
+>    - **More:** `connect` and `swim toggle` events, damage causes, `is burning`, `item of` entities, transform keeping indices, script names by `using script reflection`, reduce reporting skipped values, or-lists setting one of their variables, literals with `and` in them read whole, lists in lists (`1, (2, 3)`), boats compared with their items, tropical fish colours (`red-blue kob`), display entities of enchanted items, item rarity defaults, display brightness from infinity.
+>    - **Fixes:** location equality allows for float error; Paper's rewriting of `Cow` for older plugins is handled; tags written mid-alternative are fixed; numbers too big for a whole number are kept in range everywhere instead of wrapping round; the harness stops at once when the plugin fails to start.
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.

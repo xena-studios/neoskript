@@ -36,6 +36,10 @@ final class ServerEvents {
                 "first (join|login)");
         registrar.event("EvtQuit", List.of(PlayerQuitEvent.class), null,
                 "(quit[ting]|disconnect[ing]|log[ ]out|logging out|leav(e|ing))");
+        // Before the player is in the world; it can't be cancelled, but the player can be kicked.
+        registrar.event("EvtConnect", List.of(org.bukkit.event.player.PlayerLoginEvent.class), null, "[player] connect[ing]");
+        registrar.event("EvtSwimToggle", List.of(org.bukkit.event.entity.EntityToggleSwimEvent.class), null,
+                "[entity] (swim toggl(e|ing)|toggl(e|ing) swim[ming])");
         registrar.event("EvtChat", List.of(AsyncChatEvent.class), null, "chat");
         // Commands typed by players or the console, before they run: 'on command "home"'.
         registrar.event("EvtCommand", List.of(PlayerCommandPreprocessEvent.class, ServerCommandEvent.class),
@@ -61,12 +65,32 @@ final class ServerEvents {
                 "[the] [command['s]] sender");
         registrar.effect("EffCancelEvent", info -> {
             boolean cancel = info.pattern() == 0;
+            cancellable(info);
             return (context, args) -> {
                 if (context.event() instanceof Cancellable cancellable) {
                     cancellable.setCancelled(cancel);
                 }
             };
         }, "cancel [the] event", "uncancel [the] event");
+    }
+
+    /** Fails parsing where cancelling does nothing, with Skript's errors. */
+    private static void cancellable(co.xenastudios.neoskript.api.element.ElementInfo info) {
+        if (info.eventName() == null || info.eventClasses().isEmpty()) {
+            return;
+        }
+        boolean swimming = info.eventClasses().stream().anyMatch(c -> c.getSimpleName().equals("EntityToggleSwimEvent"));
+        if (swimming) {
+            throw new co.xenastudios.neoskript.api.element.SyntaxError("Cancelling a toggle swim event has no effect");
+        }
+        if (info.eventClasses().stream().anyMatch(Cancellable.class::isAssignableFrom)) {
+            return;
+        }
+        if (info.eventClasses().stream().anyMatch(c -> c.getSimpleName().equals("PlayerLoginEvent"))) {
+            throw new co.xenastudios.neoskript.api.element.SyntaxError("A connect event cannot be cancelled, but the "
+                    + "player may be kicked ('kick player by reason of \"...\"')");
+        }
+        throw new co.xenastudios.neoskript.api.element.SyntaxError("An on " + info.eventName() + " event cannot be cancelled");
     }
 
     /** The messages events show, which triggers can change: chat, join and quit messages, the MOTD. */

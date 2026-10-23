@@ -81,6 +81,13 @@ final class Items {
         registrar.cloner(ItemStack.class, ItemStack::clone);
         registrar.parser("itemtype", ItemType::parse);
         // 'X is stone' holds for any stone, named or not; 'X is stone named "a"' only for one with that name.
+        // An entity is the item it comes from: a boat is a boat item, a dropped item the item it is.
+        registrar.comparison(org.bukkit.entity.Entity.class, ItemType.class, (entity, item) -> {
+            if (entity instanceof org.bukkit.entity.Item dropped) {
+                return co.xenastudios.neoskript.runtime.Comparison.equal(new ItemType(dropped.getItemStack(), true), item);
+            }
+            return item.material() == org.bukkit.Material.matchMaterial(entity.getType().getKey().getKey());
+        });
         registrar.comparison(ItemType.class, ItemType.class, (item, pattern) -> item.material() == pattern.material()
                 && (!pattern.stack().hasItemMeta() || item.stack().isSimilar(pattern.stack()))
                 && (!pattern.amountGiven() || item.amount() == pattern.amount()));
@@ -88,6 +95,12 @@ final class Items {
         registrar.converter(ItemStack.class, ItemType.class, stack -> new ItemType(stack, true));
         registrar.converter(Slot.class, ItemStack.class, Slot::item);
         registrar.converter(Slot.class, ItemType.class, slot -> slot.item() == null ? null : new ItemType(slot.item(), true));
+        // A slot compares as the item in it, air if it's empty: 'slot 0 of {_inv} is a stone'.
+        registrar.comparison(Slot.class, ItemType.class, (slot, item) -> co.xenastudios.neoskript.runtime.Comparison.equal(
+                slot.item() == null ? new ItemType(new ItemStack(org.bukkit.Material.AIR), false) : new ItemType(slot.item(), true), item));
+        registrar.comparison(Slot.class, ItemStack.class, (slot, stack) -> co.xenastudios.neoskript.runtime.Comparison.equal(
+                slot.item() == null ? new ItemType(new ItemStack(org.bukkit.Material.AIR), false) : new ItemType(slot.item(), true),
+                new ItemType(stack, true)));
         registrar.converter(InventoryHolder.class, Inventory.class, InventoryHolder::getInventory);
         registrar.text(ItemStack.class, stack -> ItemType.text(stack, true));
         registrar.text(Slot.class, slot -> slot.item() == null ? "<none>" : ItemType.text(slot.item(), true));
@@ -136,9 +149,8 @@ final class Items {
         registrar.changer(InventoryHolder.class, Changeable.Mode.ADD, (holder, items) -> holder.getInventory()
                 .addItem(stacks(items)));
         registrar.changer(Inventory.class, Changeable.Mode.ADD, (inventory, items) -> inventory.addItem(stacks(items)));
-        registrar.changer(InventoryHolder.class, Changeable.Mode.REMOVE, (holder, items) -> holder.getInventory()
-                .removeItem(stacks(items)));
-        registrar.changer(Inventory.class, Changeable.Mode.REMOVE, (inventory, items) -> inventory.removeItem(stacks(items)));
+        registrar.changer(InventoryHolder.class, Changeable.Mode.REMOVE, (holder, items) -> remove(holder.getInventory(), items));
+        registrar.changer(Inventory.class, Changeable.Mode.REMOVE, Items::remove);
     }
 
     private static void registerMore(Registrar registrar) {
@@ -171,34 +183,120 @@ final class Items {
             slot.set(stacks.length == 0 ? null : stacks[0]);
         });
         registrar.changer(Slot.class, Changeable.Mode.DELETE, (slot, values) -> slot.set(null));
+        // 'add 3 diamonds to the tool of X': more of the same item, or the item if the slot is empty.
+        registrar.changer(Slot.class, Changeable.Mode.ADD, (slot, values) -> {
+            for (ItemStack added : stacks(values)) {
+                ItemStack held = slot.item();
+                if (added == null || added.getType().isAir()) {
+                    continue;
+                }
+                if (held == null || held.getType().isAir()) {
+                    slot.set(added.clone());
+                } else if (held.isSimilar(added)) {
+                    held.setAmount(Math.min(held.getMaxStackSize(), held.getAmount() + added.getAmount()));
+                    slot.set(held);
+                }
+            }
+        });
+        // 'remove 2 stone from slot 0 of X': takes that many of the item out, if it's that item.
+        registrar.changer(Slot.class, Changeable.Mode.REMOVE, (slot, values) -> {
+            for (ItemStack removed : stacks(values)) {
+                ItemStack held = slot.item();
+                if (held == null || held.getType().isAir() || removed == null || !held.isSimilar(removed)) {
+                    continue;
+                }
+                int left = held.getAmount() - removed.getAmount();
+                if (left <= 0) {
+                    slot.set(null);
+                } else {
+                    held.setAmount(left);
+                    slot.set(held);
+                }
+            }
+        });
 
 
         registrar.expression("ExprLore", "string", info -> new Lore(info.pattern() >= 2),
-                "[the] lore of %itemtype%", "%itemtype%'[s] lore",
-                "[the] line %number% of [the] lore of %itemtype%", "[the] line %number% of %itemtype%'[s] lore",
-                "[the] %number%(st|nd|rd|th) line of [the] lore of %itemtype%", "[the] %number%(st|nd|rd|th) line of %itemtype%'[s] lore");
+                "[the] lore of %itemtype/slot%", "%itemtype/slot%'[s] lore",
+                "[the] line %number% of [the] lore of %itemtype/slot%", "[the] line %number% of %itemtype/slot%'[s] lore",
+                "[the] %number%(st|nd|rd|th) line of [the] lore of %itemtype/slot%",
+                "[the] %number%(st|nd|rd|th) line of %itemtype/slot%'[s] lore");
 
-        SettableProperty.register(registrar, "ExprDurability", "integer", "(damage[s] [value[s]]|durabilit(y|ies))",
-                "itemtypes/itemstacks/slots", Object.class, Number.class, owner -> {
-                    ItemStack stack = stack(owner);
-                    return stack != null && stack.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable damage
-                            ? (long) (stack.getType().getMaxDurability() - damage.getDamage()) : null;
-                }, (owner, value) -> editStack(owner, stack -> stack.editMeta(meta -> {
-                    if (meta instanceof org.bukkit.inventory.meta.Damageable damage) {
-                        damage.setDamage(Math.max(0, stack.getType().getMaxDurability() - (int) Math.round(value.doubleValue())));
+        // 'the damage value of X' is the damage taken; 'the durability of X' is what's left.
+        registrar.expression("ExprDurability", "integer", info -> {
+            boolean damage = info.hasTag("damage");
+            return new SettableProperty<>(Object.class, Number.class, owner -> {
+                ItemStack stack = stack(owner);
+                if (stack == null || !(stack.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable meta)) {
+                    return null;
+                }
+                return (long) (damage ? meta.getDamage() : maxDurability(stack, meta) - meta.getDamage());
+            }, (owner, value) -> editStack(owner, stack -> stack.editMeta(meta -> {
+                if (meta instanceof org.bukkit.inventory.meta.Damageable damageable) {
+                    int amount = co.xenastudios.neoskript.runtime.Values.toInt(value.doubleValue());
+                    damageable.setDamage(Math.max(0, damage ? amount : maxDurability(stack, damageable) - amount));
+                }
+            })));
+        }, co.xenastudios.neoskript.api.registration.Patterns.property("(damage:damage[s] [value[s]]|durabilit(y|ies))",
+                "itemtypes/itemstacks/slots"));
+        // The player a head belongs to, on a placed head or a head item.
+        registrar.expression("ExprSkullOwner", "offlineplayer", info -> new SettableProperty<>(Object.class,
+                org.bukkit.OfflinePlayer.class, owner -> {
+                    if (owner instanceof org.bukkit.block.Block block) {
+                        return block.getState() instanceof org.bukkit.block.Skull skull ? skull.getOwningPlayer() : null;
                     }
-                })));
+                    ItemStack stack = stack(owner);
+                    return stack != null && stack.getItemMeta() instanceof org.bukkit.inventory.meta.SkullMeta meta
+                            ? meta.getOwningPlayer() : null;
+                }, (owner, player) -> {
+                    if (owner instanceof org.bukkit.block.Block block) {
+                        if (block.getState() instanceof org.bukkit.block.Skull skull) {
+                            skull.setOwningPlayer(player);
+                            skull.update(true, false);
+                        }
+                        return;
+                    }
+                    editStack(owner, stack -> stack.editMeta(meta -> {
+                        if (meta instanceof org.bukkit.inventory.meta.SkullMeta skull) {
+                            skull.setOwningPlayer(player);
+                        }
+                    }));
+                }), co.xenastudios.neoskript.api.registration.Patterns.property("(head|skull) owner",
+                "slots/itemtypes/itemstacks/blocks"));
+        // An item's own maximum durability and stack size where it has one, else its material's; resetting
+        // takes the item's own away.
         SettableProperty.register(registrar, "ExprMaxDurability", "integer", "max[imum] (durabilit(y|ies)|damage)",
                 "itemtypes/itemstacks/slots", Object.class, Number.class, owner -> {
                     ItemStack stack = stack(owner);
-                    return stack == null ? null : (long) stack.getType().getMaxDurability();
-                }, (owner, value) -> {});
+                    if (stack == null) {
+                        return null;
+                    }
+                    return stack.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable meta
+                            ? (long) maxDurability(stack, meta) : (long) stack.getType().getMaxDurability();
+                }, (owner, value) -> editStack(owner, stack -> stack.editMeta(meta -> {
+                    if (meta instanceof org.bukkit.inventory.meta.Damageable damageable) {
+                        damageable.setMaxDamage((int) Math.max(1, Math.round(value.doubleValue())));
+                    }
+                })), (java.util.function.Consumer<Object>) owner -> editStack(owner, stack -> stack.editMeta(meta -> {
+                    if (meta instanceof org.bukkit.inventory.meta.Damageable damageable) {
+                        damageable.setMaxDamage(null);
+                    }
+                })));
         SettableProperty.register(registrar, "ExprMaxStack", "integer", "max[imum] stack[[ ]size]", "itemtypes/inventories",
                 Object.class, Number.class, owner -> owner instanceof Inventory inventory ? (long) inventory.getMaxStackSize()
                         : stack(owner) == null ? null : (long) stack(owner).getMaxStackSize(),
                 (owner, value) -> {
+                    int size = (int) Math.max(1, Math.min(99, Math.round(value.doubleValue())));
                     if (owner instanceof Inventory inventory) {
-                        inventory.setMaxStackSize((int) Math.round(value.doubleValue()));
+                        inventory.setMaxStackSize((int) Math.max(1, Math.round(value.doubleValue())));
+                    } else {
+                        editStack(owner, stack -> stack.editMeta(meta -> meta.setMaxStackSize(size)));
+                    }
+                }, (java.util.function.Consumer<Object>) owner -> {
+                    if (owner instanceof Inventory inventory) {
+                        inventory.setMaxStackSize(org.bukkit.Bukkit.createInventory(null, 9).getMaxStackSize());
+                    } else {
+                        editStack(owner, stack -> stack.editMeta(meta -> meta.setMaxStackSize(null)));
                     }
                 });
 
@@ -250,6 +348,35 @@ final class Items {
     }
 
     /**
+     * Takes {@code items} out of {@code inventory} as Skript does: a plain item ({@code stone}) takes any stacks of
+     * it, named or not; one with a name or enchantments takes only stacks like it.
+     */
+    static void remove(Inventory inventory, Object[] items) {
+        for (Object item : items) {
+            ItemStack wanted = stack(item);
+            if (wanted == null) {
+                continue;
+            }
+            if (wanted.hasItemMeta()) {
+                inventory.removeItem(wanted);
+                continue;
+            }
+            int left = wanted.getAmount();
+            ItemStack[] contents = inventory.getStorageContents();
+            for (int slot = 0; slot < contents.length && left > 0; slot++) {
+                ItemStack held = contents[slot];
+                if (held == null || held.getType() != wanted.getType()) {
+                    continue;
+                }
+                int taken = Math.min(left, held.getAmount());
+                left -= taken;
+                held.setAmount(held.getAmount() - taken);
+                inventory.setItem(slot, held.getAmount() <= 0 ? null : held);
+            }
+        }
+    }
+
+    /**
      * Whether {@code inventory} holds at least as many of {@code item} as it has, as Skript counts them: a plain
      * item ({@code stone}) counts stacks of it whatever their name; one with a name or enchantments counts only
      * stacks like it.
@@ -272,6 +399,11 @@ final class Items {
         return false;
     }
 
+    /** How much durability an item has in all: its own maximum if it has one, else its material's. */
+    private static int maxDurability(ItemStack stack, org.bukkit.inventory.meta.Damageable meta) {
+        return meta.hasMaxDamage() ? meta.getMaxDamage() : stack.getType().getMaxDurability();
+    }
+
     /** The item stack {@code owner} is or holds, or {@code null}. */
     private static ItemStack stack(Object owner) {
         return switch (owner) {
@@ -283,6 +415,11 @@ final class Items {
     }
 
     /** Changes the item {@code owner} is or holds, in place. */
+    /** Changes the meta of the item {@code owner} is or holds, in place. */
+    static void editMeta(Object owner, java.util.function.Consumer<org.bukkit.inventory.meta.ItemMeta> change) {
+        editStack(owner, stack -> stack.editMeta(change));
+    }
+
     private static void editStack(Object owner, java.util.function.Consumer<ItemStack> change) {
         switch (owner) {
             case ItemType item -> {
@@ -330,18 +467,18 @@ final class Items {
     private record Lore(boolean line) implements Expression, Changeable {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
-            ItemType item = (ItemType) (line ? arguments[1] : arguments[0]);
-            if (item == null || item.stack().getItemMeta() == null || item.stack().getItemMeta().lore() == null) {
+            ItemStack stack = stack(line ? arguments[1] : arguments[0]);
+            if (stack == null || stack.getItemMeta() == null || stack.getItemMeta().lore() == null) {
                 return null;
             }
             List<String> lines = new ArrayList<>();
-            for (Component component : item.stack().getItemMeta().lore()) {
-                lines.add(Messages.LEGACY_SECTION.serialize(component));
+            for (Component component : stack.getItemMeta().lore()) {
+                lines.add(Messages.tagged(component));
             }
             if (!line) {
                 return String.join("\n", lines);
             }
-            int n = arguments[0] instanceof Number number ? (int) Math.round(number.doubleValue()) : 0;
+            int n = arguments[0] instanceof Number number ? co.xenastudios.neoskript.runtime.Values.toInt(number.doubleValue()) : 0;
             return n >= 1 && n <= lines.size() ? lines.get(n - 1) : null;
         }
 
@@ -352,14 +489,11 @@ final class Items {
 
         @Override
         public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
-            if (!((line ? arguments[1] : arguments[0]) instanceof ItemType item)) {
-                return;
-            }
-            item.editMeta(meta -> {
+            editStack(line ? arguments[1] : arguments[0], stack -> stack.editMeta(meta -> {
                 List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
                 String text = delta == null || delta.length == 0 ? null : Values.text(delta[0]);
                 if (line) {
-                    int n = arguments[0] instanceof Number number ? (int) Math.round(number.doubleValue()) : 0;
+                    int n = arguments[0] instanceof Number number ? co.xenastudios.neoskript.runtime.Values.toInt(number.doubleValue()) : 0;
                     while (lore.size() < n) {
                         lore.add(Component.empty());
                     }
@@ -377,7 +511,7 @@ final class Items {
                     }
                 }
                 meta.lore(lore.isEmpty() ? null : lore);
-            });
+            }));
         }
     }
 
@@ -409,7 +543,7 @@ final class Items {
      */
     static void registerLate(Registrar registrar) {
         registrar.expression("ExprXOf", "object", info -> (context, args) -> {
-            int amount = args[0] instanceof Number n ? (int) Math.round(n.doubleValue()) : 1;
+            int amount = args[0] instanceof Number n ? co.xenastudios.neoskript.runtime.Values.toInt(n.doubleValue()) : 1;
             List<Object> values = new ArrayList<>();
             for (Object value : (Object[]) args[1]) {
                 switch (value) {
@@ -423,11 +557,14 @@ final class Items {
                         copy.setAmount(amount);
                         values.add(copy);
                     }
-                    default -> values.add(value);
+                    case EntityKind kind -> values.add(new EntityKind(amount + " " + EntityKind.withoutAmount(kind.name()),
+                            kind.type(), kind.entityClass(), kind.variants(), amount));
+                    // Anything else has no amount: 1 of 5 is nothing.
+                    default -> {}
                 }
             }
             return values.size() == 1 ? values.getFirst() : values.toArray();
-        }, "%number% of %itemstacks/itemtypes%");
+        }, "%number% of %itemstacks/itemtypes/entitytypes%");
     }
 
     private static void registerInventories(Registrar registrar) {
@@ -436,12 +573,127 @@ final class Items {
             return (context, args) -> {
                 Object name = args[nameFirst ? 0 : 1];
                 Object rows = args[nameFirst ? 1 : 0];
-                int size = 9 * Math.max(1, Math.min(6, rows instanceof Number n ? (int) Math.round(n.doubleValue()) : 3));
+                int size = 9 * Math.max(1, Math.min(6, rows instanceof Number n ? co.xenastudios.neoskript.runtime.Values.toInt(n.doubleValue()) : 3));
                 return name == null ? Bukkit.createInventory(null, size)
                         : Bukkit.createInventory(null, size, Messages.component(name));
             };
         }, "[a] [new] chest inventory (named|with name) %text% [with %number% row[s]]",
                 "[a] [new] chest inventory with %number% row[s] [(named|with name) %text%]");
+        registrar.expression("ExprAmountOfItems", "integer", info -> (context, args) -> {
+            long count = 0;
+            for (Object value : (Object[]) args[1]) {
+                if (!(value instanceof Inventory inventory)) {
+                    continue;
+                }
+                for (ItemStack stack : inventory.getContents()) {
+                    if (stack == null) {
+                        continue;
+                    }
+                    for (Object item : (Object[]) args[0]) {
+                        if (item instanceof ItemType type && type.material() == stack.getType()
+                                && (!type.stack().hasItemMeta() || type.stack().isSimilar(stack))) {
+                            count += stack.getAmount();
+                            break;
+                        }
+                    }
+                }
+            }
+            return count;
+        }, "[the] (amount|number) of %itemtypes% (in|of) %inventories%");
+        registrar.effect("EffItemLifetime", info -> {
+            boolean prevent = info.pattern() == 0;
+            return (context, args) -> {
+                for (Object value : (Object[]) args[0]) {
+                    if (value instanceof org.bukkit.entity.Item item) {
+                        item.setUnlimitedLifetime(prevent);
+                    }
+                }
+            };
+        }, "(prevent|disallow) %entities% from (naturally despawning|despawning naturally)",
+                "(allow|enable) %entities% to (naturally despawn|despawn naturally)");
+        // Item flags, by name: 'hide enchants'.
+        Map<String, org.bukkit.inventory.ItemFlag> flags = new LinkedHashMap<>();
+        for (org.bukkit.inventory.ItemFlag flag : org.bukkit.inventory.ItemFlag.values()) {
+            flags.put(flag.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' '), flag);
+        }
+        registrar.namedType("itemflag", "item flag", org.bukkit.inventory.ItemFlag.class, flags);
+        registrar.expression("ExprItemFlags", "itemflag", info -> new Flags(), "[the] item flags of %itemtypes%",
+                "%itemtypes%'[s] item flags");
+        registrar.expression("ExprItemWithItemFlags", "itemtype", info -> {
+            boolean all = info.pattern() == 1;
+            return (context, args) -> mapItems(args[0], item -> item.withMeta(meta -> {
+                if (all) {
+                    meta.addItemFlags(org.bukkit.inventory.ItemFlag.values());
+                } else {
+                    for (Object flag : (Object[]) args[1]) {
+                        if (flag instanceof org.bukkit.inventory.ItemFlag f) {
+                            meta.addItemFlags(f);
+                        }
+                    }
+                }
+            }));
+        }, "%itemtypes% with item flag[s] %itemflags%", "%itemtypes% with all item flags");
+        registrar.expression("ExprItemUnbreakable", "itemtype", info -> {
+            boolean unbreakable = info.pattern() == 0;
+            return (context, args) -> mapItems(args[0], item -> item.withMeta(meta -> meta.setUnbreakable(unbreakable)));
+        }, "unbreakable %itemtypes%", "breakable %itemtypes%");
+        registrar.expression("ExprCustomModelData", "integer", info -> new SettableProperty<>(ItemType.class, Number.class,
+                item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().hasCustomModelData()
+                        ? (long) item.stack().getItemMeta().getCustomModelData() : 0L,
+                (item, data) -> item.editMeta(meta -> meta.setCustomModelData((int) data.doubleValue())))
+                .resettingTo((java.util.function.Consumer<Object>) item -> ((ItemType) item).editMeta(meta -> meta.setCustomModelData(null)))
+                .deleting(item -> item.editMeta(meta -> meta.setCustomModelData(null))),
+                "[the] [custom] model data of %itemtypes%", "%itemtypes%'[s] [custom] model data");
+        EntitySyntax.conditionPatterns(registrar, "CondHasCustomModelData", ItemType.class,
+                item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().hasCustomModelData(), null,
+                "%itemtypes% (has|have) [custom] model data",
+                "%itemtypes% (doesn't|does not|do not|don't) have [custom] model data");
+        registrar.expression("ExprItemWithCustomModelData", "itemtype", info -> (context, args) -> mapItems(args[0], item ->
+                args[1] instanceof Number data ? item.withMeta(meta -> meta.setCustomModelData((int) data.doubleValue())) : item),
+                "%itemtypes% with [custom] model data %number%");
+        registrar.expression("ExprItemModel", "string", info -> new SettableProperty<>(Object.class, String.class, owner -> {
+            ItemStack stack = stack(owner);
+            return stack == null || stack.getItemMeta() == null || !stack.getItemMeta().hasItemModel() ? null
+                    : stack.getItemMeta().getItemModel().toString();
+        }, (owner, model) -> {
+            org.bukkit.NamespacedKey key = org.bukkit.NamespacedKey.fromString(model.toLowerCase(java.util.Locale.ROOT));
+            if (key == null) {
+                co.xenastudios.neoskript.runtime.RuntimeErrors.report("'" + model + "' is not a valid item model key");
+                return;
+            }
+            editStack(owner, stack -> stack.editMeta(meta -> meta.setItemModel(key)));
+        }).resettingTo((java.util.function.Consumer<Object>) owner -> editStack(owner, stack -> stack.editMeta(meta -> meta.setItemModel(null))))
+                .deleting(owner -> editStack(owner, stack -> stack.editMeta(meta -> meta.setItemModel(null)))),
+                "[the] item model of %itemtypes/slots%", "%itemtypes/slots%'[s] item model");
+        registrar.expression("ExprItemWithItemModel", "itemtype", info -> (context, args) -> mapItems(args[0], item -> {
+            if (args[1] == null) {
+                return item;
+            }
+            String model = co.xenastudios.neoskript.runtime.Values.text(args[1]);
+            org.bukkit.NamespacedKey key = org.bukkit.NamespacedKey.fromString(model.toLowerCase(java.util.Locale.ROOT));
+            if (key == null) {
+                co.xenastudios.neoskript.runtime.RuntimeErrors.report("'" + model + "' is not a valid item model key");
+                return item;
+            }
+            return item.withMeta(meta -> meta.setItemModel(key));
+        }), "%itemtypes% with [an] [item] model %text%");
+        Map<String, org.bukkit.inventory.ItemRarity> rarities = new LinkedHashMap<>();
+        for (org.bukkit.inventory.ItemRarity rarity : org.bukkit.inventory.ItemRarity.values()) {
+            rarities.put(rarity.name().toLowerCase(java.util.Locale.ROOT), rarity);
+        }
+        registrar.namedType("itemrarity", "item rarity", org.bukkit.inventory.ItemRarity.class, rarities);
+        registrar.expression("ExprItemRarity", "itemrarity", info -> new SettableProperty<>(Object.class,
+                org.bukkit.inventory.ItemRarity.class, owner -> {
+                    ItemStack stack = stack(owner);
+                    if (stack == null) {
+                        return null;
+                    }
+                    // Without one of its own, an item has its kind's.
+                    return stack.getItemMeta() != null && stack.getItemMeta().hasRarity() ? stack.getItemMeta().getRarity()
+                            : stack.getData(io.papermc.paper.datacomponent.DataComponentTypes.RARITY);
+                }, (owner, rarity) -> editStack(owner, stack -> stack.editMeta(meta -> meta.setRarity(rarity))))
+                .resettingTo((java.util.function.Consumer<Object>) owner -> editStack(owner, stack -> stack.editMeta(meta -> meta.setRarity(null)))),
+                "[the] item rarity of %itemtypes/slots%", "%itemtypes/slots%'[s] item rarity");
         // 'items in {_inventory}': each stack in it, in slot order; 'all stone in X' only those of the items given.
         registrar.expression("ExprItemsIn", "itemtype", info -> {
             boolean filtered = info.pattern() == 1;
@@ -491,6 +743,78 @@ final class Items {
         }, "[a] [new] %*inventorytype% (named|with name) %text%", "[a] new %*inventorytype%");
         registrar.expression("ExprInventorySlot", "slot", info -> new SlotsOf(),
                 "[the] slot[s] %numbers% of %inventory%", "%inventory%'[s] slot[s] %numbers%");
+        // The hand slots of entities: what they hold.
+        registrar.expression("ExprTool", "slot", info -> {
+            EquipmentSlot hand = info.hasTag("off") ? EquipmentSlot.OFF_HAND : EquipmentSlot.HAND;
+            return (context, args) -> {
+                List<Object> slots = new ArrayList<>();
+                for (Object value : (Object[]) args[0]) {
+                    if (value instanceof LivingEntity entity) {
+                        slots.add(Slot.of(entity, hand));
+                    }
+                }
+                return slots.size() == 1 ? slots.getFirst() : slots.toArray();
+            };
+        }, "[the] (tool|held item|weapon|off:off[ ]hand (tool|item)) of %livingentities%",
+                "%livingentities%'[s] (tool|held item|weapon|off:off[ ]hand (tool|item))");
+        registrar.expression("ExprInventoryHolder", "inventoryholder", info -> (context, args) -> {
+            List<Object> holders = new ArrayList<>();
+            for (Object value : (Object[]) args[0]) {
+                if (value instanceof Inventory inventory && inventory.getHolder() != null) {
+                    holders.add(inventory.getHolder());
+                }
+            }
+            return holders.size() == 1 ? holders.getFirst() : holders.toArray();
+        }, "[the] holder[s] of %inventories%", "%inventories%'[s] holder[s]");
+        // Where an inventory's holder is: a block's centre, as for blocks; a double chest's left half.
+        registrar.converter(InventoryHolder.class, org.bukkit.Location.class, holder -> switch (holder) {
+            case org.bukkit.block.BlockState state -> state.getLocation().add(0.5, 0.5, 0.5);
+            case org.bukkit.block.DoubleChest chest when chest.getLeftSide() instanceof org.bukkit.block.BlockState left ->
+                    left.getLocation().add(0.5, 0.5, 0.5);
+            case org.bukkit.entity.Entity entity -> entity.getLocation();
+            default -> null;
+        });
+        // The item a dropped item, item frame or item display is or shows.
+        registrar.expression("ExprItemOfEntity", "itemtype", info -> new SettableProperty<>(org.bukkit.entity.Entity.class,
+                ItemType.class, entity -> {
+                    ItemStack stack = switch (entity) {
+                        case org.bukkit.entity.Item dropped -> dropped.getItemStack();
+                        case org.bukkit.entity.ItemFrame frame -> frame.getItem();
+                        case org.bukkit.entity.ItemDisplay display -> display.getItemStack();
+                        case org.bukkit.entity.ThrowableProjectile thrown -> thrown.getItem();
+                        default -> null;
+                    };
+                    return stack == null ? null : new ItemType(stack, true);
+                }, (entity, item) -> {
+                    ItemStack stack = item == null ? null : item.stack();
+                    switch (entity) {
+                        case org.bukkit.entity.Item dropped -> {
+                            if (stack != null) {
+                                dropped.setItemStack(stack);
+                            }
+                        }
+                        case org.bukkit.entity.ItemFrame frame -> frame.setItem(stack);
+                        case org.bukkit.entity.ItemDisplay display -> display.setItemStack(stack);
+                        case org.bukkit.entity.ThrowableProjectile thrown -> {
+                            if (stack != null) {
+                                thrown.setItem(stack);
+                            }
+                        }
+                        default -> {}
+                    }
+                }), "[the] item of %entities%", "%entities%'[s] item");
+        registrar.expression("ExprFirstEmptySlot", "slot", info -> (context, args) -> {
+            List<Object> slots = new ArrayList<>();
+            for (Object value : (Object[]) args[0]) {
+                if (value instanceof Inventory inventory) {
+                    int first = inventory.firstEmpty();
+                    if (first >= 0) {
+                        slots.add(new Slot(inventory, first));
+                    }
+                }
+            }
+            return slots.size() == 1 ? slots.getFirst() : slots.toArray();
+        }, "[the] first empty slot[s] (in|of) %inventories%", "%inventories%'[s] first empty slot[s]");
         registrar.expression("ExprSlotIndex", "integer", info -> (context, args) -> {
             List<Object> indices = new ArrayList<>();
             for (Object slot : (Object[]) args[0]) {
@@ -597,7 +921,7 @@ final class Items {
             if (delta == null || delta.length == 0 || !(delta[0] instanceof Number number)) {
                 return;
             }
-            int by = (int) Math.round(number.doubleValue());
+            int by = co.xenastudios.neoskript.runtime.Values.toInt(number.doubleValue());
             for (Object value : (Object[]) arguments[0]) {
                 switch (value) {
                     case ItemType item -> item.setAmount(amount(item.amount(), by, mode));
@@ -629,7 +953,7 @@ final class Items {
             if (arguments[1] instanceof Inventory inventory) {
                 for (Object index : (Object[]) arguments[0]) {
                     if (index instanceof Number n) {
-                        slots.add(new Slot(inventory, (int) Math.round(n.doubleValue())));
+                        slots.add(new Slot(inventory, co.xenastudios.neoskript.runtime.Values.toInt(n.doubleValue())));
                     }
                 }
             }
@@ -638,8 +962,11 @@ final class Items {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
-            return mode == Mode.SET ? new Class<?>[] {ItemType.class, ItemStack.class}
-                    : mode == Mode.DELETE ? new Class<?>[0] : null;
+            return switch (mode) {
+                case SET, ADD, REMOVE -> new Class<?>[] {ItemType.class, ItemStack.class};
+                case DELETE -> new Class<?>[0];
+                default -> null;
+            };
         }
 
         @Override
@@ -650,11 +977,95 @@ final class Items {
             ItemStack[] items = delta == null ? new ItemStack[0] : stacks(delta);
             ItemStack item = items.length == 0 ? null : items[0];
             for (Object index : (Object[]) arguments[0]) {
-                if (index instanceof Number n) {
-                    int i = (int) Math.round(n.doubleValue());
-                    if (i >= 0 && i < inventory.getSize()) {
-                        inventory.setItem(i, item);
+                if (!(index instanceof Number n)) {
+                    continue;
+                }
+                int i = co.xenastudios.neoskript.runtime.Values.toInt(n.doubleValue());
+                if (i < 0 || i >= inventory.getSize()) {
+                    continue;
+                }
+                if (mode == Mode.SET || mode == Mode.DELETE) {
+                    inventory.setItem(i, item);
+                    continue;
+                }
+                // Adding or removing the same item changes how many there are.
+                for (ItemStack change : items) {
+                    ItemStack held = inventory.getItem(i);
+                    if (change == null || change.getType().isAir()) {
+                        continue;
                     }
+                    if (held == null || held.getType().isAir()) {
+                        if (mode == Mode.ADD) {
+                            inventory.setItem(i, change.clone());
+                        }
+                    } else if (held.isSimilar(change)) {
+                        int amount = held.getAmount() + (mode == Mode.ADD ? change.getAmount() : -change.getAmount());
+                        if (amount <= 0) {
+                            inventory.setItem(i, null);
+                        } else {
+                            held.setAmount(Math.min(amount, held.getMaxStackSize()));
+                            inventory.setItem(i, held);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Each item through {@code change}; one value alone if there's one. */
+    private static Object mapItems(Object items, java.util.function.Function<ItemType, Object> change) {
+        List<Object> changed = new ArrayList<>();
+        for (Object value : items instanceof Object[] array ? array : new Object[] {items}) {
+            if (value instanceof ItemType item) {
+                changed.add(change.apply(item));
+            }
+        }
+        return changed.size() == 1 ? changed.getFirst() : changed.toArray();
+    }
+
+    /** {@code the item flags of %itemtypes%}: settable, added to, taken from, and reset to none. */
+    private static final class Flags implements Expression, Changeable {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            List<Object> flags = new ArrayList<>();
+            for (Object value : (Object[]) arguments[0]) {
+                if (value instanceof ItemType item && item.stack().getItemMeta() != null) {
+                    flags.addAll(item.stack().getItemMeta().getItemFlags());
+                }
+            }
+            return flags.toArray();
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return switch (mode) {
+                case SET, ADD, REMOVE -> new Class<?>[] {org.bukkit.inventory.ItemFlag.class};
+                case RESET, DELETE -> new Class<?>[0];
+                default -> null;
+            };
+        }
+
+        @Override
+        public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
+            List<org.bukkit.inventory.ItemFlag> given = new ArrayList<>();
+            for (Object value : delta == null ? new Object[0] : delta) {
+                if (value instanceof org.bukkit.inventory.ItemFlag flag) {
+                    given.add(flag);
+                }
+            }
+            org.bukkit.inventory.ItemFlag[] flags = given.toArray(org.bukkit.inventory.ItemFlag[]::new);
+            for (Object value : (Object[]) arguments[0]) {
+                if (value instanceof ItemType item) {
+                    item.editMeta(meta -> {
+                        if (mode != Mode.ADD && mode != Mode.REMOVE) {
+                            meta.removeItemFlags(org.bukkit.inventory.ItemFlag.values());
+                        }
+                        if (mode == Mode.REMOVE) {
+                            meta.removeItemFlags(flags);
+                        } else if (mode == Mode.SET || mode == Mode.ADD) {
+                            meta.addItemFlags(flags);
+                        }
+                    });
                 }
             }
         }

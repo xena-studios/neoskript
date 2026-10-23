@@ -67,8 +67,10 @@ import org.bukkit.inventory.ItemStack;
  *
  * @param type the one entity type it is, or {@code null} for a category
  * @param entityClass the class entities of the kind have
+ * @param amount how many entities it stands for, as in {@code spawn 5 villagers}
  */
-public record EntityKind(String name, EntityType type, Class<? extends Entity> entityClass, List<Variant> variants) {
+public record EntityKind(String name, EntityType type, Class<? extends Entity> entityClass, List<Variant> variants,
+        int amount) {
 
     /**
      * Something that narrows a kind down, like being a baby or a lucy axolotl.
@@ -92,10 +94,19 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
         variants = List.copyOf(variants);
     }
 
+    public EntityKind(String name, EntityType type, Class<? extends Entity> entityClass, List<Variant> variants) {
+        this(name, type, entityClass, variants, 1);
+    }
+
     private static volatile Map<String, EntityKind> bases;
 
+    private static final java.util.regex.Pattern DISPLAY_OF = java.util.regex.Pattern.compile("displays?(?: entity)? of ");
+
+    /** An amount before a kind's name: {@code 5 villagers}. */
+    private static final java.util.regex.Pattern AMOUNT = java.util.regex.Pattern.compile("(\\d{1,9}) (.+)");
+
     /** Types whose kinds include their subtypes' entities, as in Skript: a trader llama is a llama. */
-    private static final java.util.Set<EntityType> INCLUDES_SUBTYPES = java.util.Set.of(EntityType.LLAMA);
+    private static final java.util.Set<EntityType> INCLUDES_SUBTYPES = java.util.Set.of(EntityType.LLAMA, EntityType.FIREBALL);
 
     /** Whether {@code entity} is of this kind. */
     public boolean matches(Entity entity) {
@@ -132,7 +143,9 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
         if (type == EntityType.ITEM) {
             entity = location.getWorld().dropItem(location, new ItemStack(Material.STONE));
         } else if (type == EntityType.FALLING_BLOCK) {
-            entity = location.getWorld().spawn(location, FallingBlock.class, falling -> {});
+            // Stone unless it says otherwise, as in Skript.
+            entity = location.getWorld().spawn(location, FallingBlock.class,
+                    falling -> falling.setBlockData(Material.STONE.createBlockData()));
         } else {
             entity = location.getWorld().spawnEntity(location, type);
         }
@@ -149,11 +162,30 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
 
     // ---------------------------------------------------------------- parsing
 
+    /** Whether {@code text} starts with an amount: {@code 5 villagers}. */
+    static boolean counted(String text) {
+        return AMOUNT.matcher(text.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ")
+                .replaceFirst("^(?:an?|the|any) ", "")).matches();
+    }
+
+    /** {@code name} without an amount before it: {@code villagers} for {@code 5 villagers}. */
+    static String withoutAmount(String name) {
+        java.util.regex.Matcher counted = AMOUNT.matcher(name);
+        return counted.matches() ? counted.group(2) : name;
+    }
+
     /** The kind {@code text} names, or {@code null}. */
     public static EntityKind parse(String text) {
         String words = text.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").replaceFirst("^(?:an?|the|any) ", "");
         if (words.isEmpty()) {
             return null;
+        }
+        java.util.regex.Matcher counted = AMOUNT.matcher(words);
+        if (counted.matches()) {
+            EntityKind kind = parse(counted.group(2));
+            int amount = Integer.parseInt(counted.group(1));
+            return kind == null || amount < 1 ? null
+                    : new EntityKind(words, kind.type, kind.entityClass, kind.variants, amount);
         }
         List<Variant> variants = new ArrayList<>();
         String name = words;
@@ -169,7 +201,9 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
                     e -> ((Item) e).setItemStack(new ItemStack(material)))));
         }
         if (words.startsWith("falling ") && !words.startsWith("falling block")) {
-            Material material = ItemType.alias(words.substring(8));
+            Material named = ItemType.alias(words.substring(8));
+            // A block that isn't an item, like powder snow.
+            Material material = named != null ? named : Material.matchMaterial(words.substring(8).replace(' ', '_'));
             if (material == null || !material.isBlock()) {
                 return null;
             }
@@ -206,21 +240,54 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
                     e -> ((Enderman) e).setCarriedBlock(material.createBlockData())));
             words = words.substring(0, holding);
         }
-        int of = words.lastIndexOf(" of ");
-        if (of >= 0 && words.substring(0, of).replaceFirst(" entity$", "").endsWith("display")) {
-            Material material = ItemType.alias(words.substring(of + 4));
+        // The 'of' right after 'display': what's after it may have its own ('of sharpness').
+        java.util.regex.Matcher displayOf = DISPLAY_OF.matcher(words);
+        int of = displayOf.find() ? displayOf.end() - 4 : words.lastIndexOf(" of ");
+        if (of >= 0 && words.substring(0, of).replaceFirst(" entity$", "").matches(".*displays?")) {
+            String display = words.substring(0, of).replaceFirst(" entity$", "");
+            // An item display's item may have more to it: 'item display of a diamond sword of sharpness'.
+            ItemType shown = display.startsWith("block") ? null : ItemType.parse(words.substring(of + 4));
+            Material material = shown != null ? shown.material()
+                    : ItemType.alias(words.substring(of + 4).replaceFirst("^(?:an?|the) ", ""));
             if (material == null) {
                 return null;
             }
-            String display = words.substring(0, of).replaceFirst(" entity$", "");
+            ItemStack stack = shown != null ? shown.stack().clone() : new ItemStack(material);
             variants.add(display.startsWith("block")
                     ? new Variant("display=" + material, e -> e instanceof BlockDisplay block
                             && block.getBlock().getMaterial() == material,
                             e -> ((BlockDisplay) e).setBlock(material.createBlockData()))
                     : new Variant("display=" + material, e -> e instanceof ItemDisplay item
                             && item.getItemStack() != null && item.getItemStack().getType() == material,
-                            e -> ((ItemDisplay) e).setItemStack(new ItemStack(material))));
+                            e -> ((ItemDisplay) e).setItemStack(stack.clone())));
             words = words.substring(0, of);
+        }
+        // 'tamed ocelot' is Skript's old name for a cat.
+        if (words.startsWith("tamed ") && words.endsWith(" ocelot")) {
+            words = words.substring(0, words.length() - 6) + "cat";
+        }
+        // 'stone block display' is a block display of stone, 'diamond item display' an item display of a diamond;
+        // 'red bed block displays' are several.
+        // 'sand block display entity' too.
+        String named = words.endsWith(" display entity") ? words.substring(0, words.length() - 7) : words;
+        for (String suffix : new String[] {" block displays", " block display", " item displays", " item display"}) {
+            if (!named.endsWith(suffix) || named.length() <= suffix.length()) {
+                continue;
+            }
+            Material material = ItemType.alias(named.substring(0, named.length() - suffix.length())
+                    .replaceFirst("^(?:an?|the) ", ""));
+            boolean block = suffix.startsWith(" block");
+            if (material != null && (!block || material.isBlock())) {
+                variants.add(block
+                        ? new Variant("display=" + material, e -> e instanceof BlockDisplay display
+                                && display.getBlock().getMaterial() == material,
+                                e -> ((BlockDisplay) e).setBlock(material.createBlockData()))
+                        : new Variant("display=" + material, e -> e instanceof ItemDisplay display
+                                && display.getItemStack() != null && display.getItemStack().getType() == material,
+                                e -> ((ItemDisplay) e).setItemStack(new ItemStack(material))));
+                words = suffix.strip();
+            }
+            break;
         }
         if (words.endsWith(" entity") && bases().containsKey(words.substring(0, words.length() - 7))) {
             words = words.substring(0, words.length() - 7);
@@ -259,7 +326,10 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
 
     /** Parses the words before an entity's name into its variants, or returns {@code false}. */
     private static boolean prefixes(String[] words, EntityKind base, List<Variant> into) {
-        Map<String, Variant> vocabulary = vocabulary(base);
+        if (words.length == 0) {
+            return true;
+        }
+        Map<String, Variant> vocabulary = VOCABULARIES.computeIfAbsent(base.entityClass, c -> vocabulary(base));
         int i = 0;
         while (i < words.length) {
             Variant found = null;
@@ -268,8 +338,21 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
             for (int end = words.length; end > i; end--) {
                 String phrase = String.join(" ", java.util.Arrays.copyOfRange(words, i, end));
                 Variant variant = vocabulary.get(phrase);
-                if (variant == null && phrase.contains("-") && base.entityClass == Panda.class) {
-                    variant = pandaGenes(phrase);
+                // 'lazy-aggressive panda' or 'brown playful panda': the main gene, then the hidden one.
+                if (variant == null && base.entityClass == Panda.class && (phrase.contains("-") || end - i == 2)) {
+                    variant = pandaGenes(phrase.replace(' ', '-'));
+                }
+                // 'red-blue kob': a red fish with a blue pattern.
+                if (variant == null && base.entityClass == TropicalFish.class && phrase.contains("-") && end - i == 1) {
+                    String[] dyes = phrase.split("-", 2);
+                    DyeColor body = dye(dyes[0]);
+                    DyeColor pattern = dye(dyes[1]);
+                    if (body != null && pattern != null) {
+                        into.add(new Variant("fish color=" + body, e -> ((TropicalFish) e).getBodyColor() == body,
+                                e -> ((TropicalFish) e).setBodyColor(body)));
+                        variant = new Variant("pattern color=" + pattern, e -> ((TropicalFish) e).getPatternColor() == pattern,
+                                e -> ((TropicalFish) e).setPatternColor(pattern));
+                    }
                 }
                 if (variant != null) {
                     found = variant;
@@ -286,6 +369,9 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
         return true;
     }
 
+    /** Each entity class's vocabulary, worked out once. */
+    private static final Map<Class<?>, Map<String, Variant>> VOCABULARIES = new java.util.concurrent.ConcurrentHashMap<>();
+
     /** The words that can come before {@code base}'s name, and what they mean. */
     private static Map<String, Variant> vocabulary(EntityKind base) {
         Map<String, Variant> words = new HashMap<>();
@@ -296,6 +382,28 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
         }
         if (Tameable.class.isAssignableFrom(c)) {
             words.put("tamed", new Variant("tamed=true", e -> ((Tameable) e).isTamed(), e -> ((Tameable) e).setTamed(true)));
+            words.put("wild", new Variant("tamed=false", e -> !((Tameable) e).isTamed(), e -> ((Tameable) e).setTamed(false)));
+        }
+        if (c == Villager.class || c == org.bukkit.entity.ZombieVillager.class) {
+            // 'librarian villager', 'unemployed zombie villager'.
+            for (Villager.Profession profession : Registry.VILLAGER_PROFESSION) {
+                String key = profession.getKey().getKey();
+                String word = key.equals("none") ? "unemployed" : key.replace('_', ' ');
+                words.put(word, new Variant("profession=" + key, e -> e instanceof Villager v ? v.getProfession() == profession
+                        : ((org.bukkit.entity.ZombieVillager) e).getVillagerProfession() == profession, e -> {
+                            if (e instanceof Villager v) {
+                                v.setProfession(profession);
+                            } else {
+                                ((org.bukkit.entity.ZombieVillager) e).setVillagerProfession(profession);
+                            }
+                        }));
+            }
+        }
+        if (c == org.bukkit.entity.Sheep.class) {
+            words.put("sheared", new Variant("sheared=true", e -> ((org.bukkit.entity.Sheep) e).isSheared(),
+                    e -> ((org.bukkit.entity.Sheep) e).setSheared(true)));
+            words.put("unsheared", new Variant("sheared=false", e -> !((org.bukkit.entity.Sheep) e).isSheared(),
+                    e -> ((org.bukkit.entity.Sheep) e).setSheared(false)));
         }
         if (c == Axolotl.class) {
             for (Axolotl.Variant variant : Axolotl.Variant.values()) {
@@ -323,7 +431,7 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
             for (Rabbit.Type type : Rabbit.Type.values()) {
                 String word = switch (type) {
                     case BLACK_AND_WHITE -> "black white";
-                    case SALT_AND_PEPPER -> "salt and pepper";
+                    case SALT_AND_PEPPER -> "salt pepper";
                     case THE_KILLER_BUNNY -> "killer";
                     default -> lower(type.name());
                 };
@@ -394,12 +502,71 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
                 }
             }
         }
+        // By name: Paper rewrites references to Cow in plugins built for older versions.
+        if (FARM_ANIMALS.contains(c.getName())) {
+            farmVariants(c, words);
+        }
         if (Steerable.class.isAssignableFrom(c)) {
             words.put("saddled", new Variant("saddled=true", e -> ((Steerable) e).hasSaddle(), e -> ((Steerable) e).setSaddle(true)));
             words.put("unsaddled", new Variant("saddled=false", e -> !((Steerable) e).hasSaddle(),
                     e -> ((Steerable) e).setSaddle(false)));
         }
         return words;
+    }
+
+    /**
+     * {@code warm chicken}, {@code cold cow}, {@code temperate pig}: the climate variants farm animals have
+     * from Minecraft 1.21.5, looked up by reflection so older servers simply don't have them.
+     */
+    private static final java.util.Set<String> FARM_ANIMALS =
+            java.util.Set.of("org.bukkit.entity.Chicken", "org.bukkit.entity.Cow", "org.bukkit.entity.Pig");
+
+    private static void farmVariants(Class<? extends Entity> entityClass, Map<String, Variant> words) {
+        try {
+            Class<?> variantClass = Class.forName(entityClass.getName() + "$Variant");
+            if (!Keyed.class.isAssignableFrom(variantClass)) {
+                return;
+            }
+            Registry<? extends Keyed> registry = variantRegistry(entityClass, variantClass);
+            if (registry == null) {
+                return;
+            }
+            java.lang.invoke.MethodHandles.Lookup lookup = java.lang.invoke.MethodHandles.publicLookup();
+            java.lang.invoke.MethodHandle get = lookup.unreflect(entityClass.getMethod("getVariant"));
+            java.lang.invoke.MethodHandle set = lookup.unreflect(entityClass.getMethod("setVariant", variantClass));
+            String animal = entityClass.getSimpleName().toLowerCase(Locale.ROOT);
+            for (Keyed variant : registry) {
+                String word = variant.getKey().getKey().replace('_', ' ');
+                words.put(word, new Variant(animal + "=" + word, e -> {
+                    try {
+                        return get.invoke(e) == variant;
+                    } catch (Throwable failed) {
+                        return false;
+                    }
+                }, e -> {
+                    try {
+                        set.invoke(e, variant);
+                    } catch (Throwable failed) {
+                        // Left as it spawned.
+                    }
+                }));
+            }
+        } catch (ReflectiveOperationException | RuntimeException notThere) {
+            // An older server: no climate variants.
+        }
+    }
+
+    /** Paper's registry of an animal's variants ({@code RegistryKey.COW_VARIANT}), or Bukkit's, or {@code null}. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Registry<? extends Keyed> variantRegistry(Class<? extends Entity> entityClass, Class<?> variantClass) {
+        try {
+            Object key = io.papermc.paper.registry.RegistryKey.class
+                    .getField(entityClass.getSimpleName().toUpperCase(Locale.ROOT) + "_VARIANT").get(null);
+            return io.papermc.paper.registry.RegistryAccess.registryAccess()
+                    .getRegistry((io.papermc.paper.registry.RegistryKey) key);
+        } catch (ReflectiveOperationException | RuntimeException notPaper) {
+            return org.bukkit.Bukkit.getRegistry((Class) variantClass);
+        }
     }
 
     private static Villager.Profession profession(Entity entity) {
@@ -503,6 +670,12 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
             add(known, baby(EntityType.TRADER_LLAMA), "trader llama cria");
             add(known, baby(EntityType.SHEEP), "lamb");
             add(known, baby(EntityType.HORSE), "foal");
+            for (EntityType type : EntityType.values()) {
+                // Happy ghasts came after the API this is built against.
+                if (type.name().equals("HAPPY_GHAST")) {
+                    add(known, baby(type), "ghastling");
+                }
+            }
             EntityKind tamedWolf = new EntityKind("dog", EntityType.WOLF, Wolf.class,
                     List.of(new Variant("tamed=true", e -> ((Tameable) e).isTamed(), e -> ((Tameable) e).setTamed(true))));
             add(known, tamedWolf, "dog");
@@ -534,6 +707,37 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
             add(known, category("minecart", Minecart.class), "minecart");
             add(known, category("boat", Boat.class), "boat");
             add(known, category("chest boat", ChestBoat.class), "chest boat");
+            // Skript's names: the plain minecart, bamboo rafts as boats, a thrown potion, zombies of professions.
+            add(known, of(EntityType.MINECART), "regular minecart");
+            add(known, of(EntityType.FIREBALL), "large fireball");
+            // 'fireball' is any fireball, small, dragon or wither skull too; spawned, it's a large one.
+            add(known, new EntityKind("fireball", EntityType.FIREBALL, org.bukkit.entity.Fireball.class, List.of()), "fireball");
+            add(known, of(EntityType.PUFFERFISH), "puffer fish", "blowfish");
+            add(known, of(EntityType.ENDER_PEARL), "enderpearl");
+            add(known, of(EntityType.BAMBOO_RAFT), "bamboo boat");
+            add(known, of(EntityType.BAMBOO_CHEST_RAFT), "bamboo chest boat");
+            // The thrown potion's entity type is named differently across versions.
+            for (EntityType type : EntityType.values()) {
+                if (type.name().equals("SPLASH_POTION") || type.name().equals("POTION")) {
+                    known.putIfAbsent("thrown potion", of(type));
+                }
+            }
+            for (Villager.Profession profession : Registry.VILLAGER_PROFESSION) {
+                String word = profession.getKey().getKey().replace('_', ' ');
+                if (!word.equals("none")) {
+                    // 'armorer' is a villager with that profession, 'zombie armorer' a zombie villager.
+                    Variant variant = new Variant("profession=" + word, e -> profession(e) == profession, e -> {
+                        if (e instanceof Villager villager) {
+                            villager.setProfession(profession);
+                        } else {
+                            ((ZombieVillager) e).setVillagerProfession(profession);
+                        }
+                    });
+                    addAbsent(known, new EntityKind(word, EntityType.VILLAGER, Villager.class, List.of(variant)), word);
+                    addAbsent(known, new EntityKind("zombie " + word, EntityType.ZOMBIE_VILLAGER, ZombieVillager.class,
+                            List.of(variant)), "zombie " + word);
+                }
+            }
             bases = known;
         }
         return known;
@@ -550,14 +754,62 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
     private static void add(Map<String, EntityKind> known, EntityKind kind, String... aliases) {
         for (String alias : aliases) {
             known.put(alias, kind);
-            known.putIfAbsent(plural(alias), kind);
+            addPlural(known, kind, alias);
         }
+    }
+
+    private static void addAbsent(Map<String, EntityKind> known, EntityKind kind, String alias) {
+        known.putIfAbsent(alias, kind);
+        addPlural(known, kind, alias);
+    }
+
+    private static void addPlural(Map<String, EntityKind> known, EntityKind kind, String alias) {
+        String plural = plural(alias);
+        known.putIfAbsent(plural, kind);
+        if (!plural.equals(alias)) {
+            PLURALS.add(plural);
+        }
+    }
+
+    /** The names that are plural: {@code zombies}, {@code block displays}. */
+    private static final java.util.Set<String> PLURALS = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Whether {@code text} names entities in the plural, like {@code zombies} or {@code red bed block displays}:
+     * the name it ends with is a plural one.
+     */
+    static boolean isPlural(String text) {
+        bases();
+        String written = text.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        // 'block displays of a spruce log': the name is before what it's of.
+        int of = written.indexOf(" of ");
+        if (of > 0 && isPlural(written.substring(0, of))) {
+            return true;
+        }
+        String[] words = written.split(" ");
+        for (int start = 0; start < words.length; start++) {
+            String name = String.join(" ", java.util.Arrays.copyOfRange(words, start, words.length));
+            if (PLURALS.contains(name)) {
+                return true;
+            }
+            if (bases().containsKey(name)) {
+                return false;
+            }
+        }
+        return false;
     }
 
     /** {@code entity} to {@code entities}, {@code fox} to {@code foxes}, {@code pig} to {@code pigs}. */
     private static String plural(String name) {
-        if (name.endsWith("s")) {
+        if (name.endsWith("s") || name.endsWith("fish") || name.endsWith("sheep")) {
             return name;
+        }
+        if (name.endsWith("man")) {
+            return name.substring(0, name.length() - 3) + "men";
+        }
+        if (name.endsWith("lf")) {
+            // wolf, calf
+            return name.substring(0, name.length() - 1) + "ves";
         }
         if (name.endsWith("y") && name.length() > 1 && "aeiou".indexOf(name.charAt(name.length() - 2)) < 0) {
             return name.substring(0, name.length() - 1) + "ies";

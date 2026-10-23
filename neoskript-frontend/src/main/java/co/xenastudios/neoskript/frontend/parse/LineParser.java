@@ -43,8 +43,14 @@ final class LineParser {
     private final String input;
     private final String lowerInput;
     private final Map<Key, Object> memo = new HashMap<>();
+    /** What was parsed while code had to stand without unresolved words, kept apart from the rest. */
+    private final Map<Key, Object> strictMemo = new HashMap<>();
+    /** Whether an outer parse is in its first, strict pass: nested ones then stay strict too. */
+    private boolean strictOuter;
     /** How many times a placeholder was refused for starting inside a token like {@code arg-1}. */
     private int tokenSplits;
+    /** How many times code in a regex part was turned down for leaning on unresolved words. */
+    private int unresolvedCode;
     private String functionProblem;
     /** Per kind, the unindexed patterns whose required literals all occur somewhere in the line. */
     private final Map<SyntaxKind, List<PatternIndex.Entry<SyntaxRegistry.Candidate>>> viableUnindexed =
@@ -122,17 +128,33 @@ final class LineParser {
             return null;
         }
         int rejected = tokenSplits;
-        Object result = matchSyntax(kind, start, end, literalOnly, expected, false);
+        int leaning = unresolvedCode;
+        // First, conditions and code inside the syntax may not lean on unresolved words, so 'assert X is 2 to
+        // fail' is the assertion of 'X is 2' failing, not of 'X is <2 to fail>'; only if nothing else works may they.
+        // Inside an outer strict pass, nested syntax stays strict, so a split like 'set whether X is going to explode
+        // to true' isn't taken with its code leaning on unresolved words when another split needs none.
+        boolean outer = strictOuter;
+        strictOuter = true;
+        Object result;
+        try {
+            result = matchSyntax(kind, start, end, literalOnly, expected, false, true);
+        } finally {
+            strictOuter = outer;
+        }
+        if (result == null && unresolvedCode != leaning && !outer) {
+            result = matchSyntax(kind, start, end, literalOnly, expected, false, false);
+        }
         return result != null || tokenSplits == rejected ? result
-                : matchSyntax(kind, start, end, literalOnly, expected, true);
+                : matchSyntax(kind, start, end, literalOnly, expected, true, false);
     }
 
     private Object matchSyntax(SyntaxKind kind, int start, int end, boolean literalOnly, Expected expected,
-            boolean splitTokens) {
+            boolean splitTokens, boolean strictCode) {
         String text = input.substring(start, end);
         String lower = lowerInput.substring(start, end);
         PatternIndex<SyntaxRegistry.Candidate> index = registry.index(kind);
         Object fallback = null;
+        int fallbackUnresolved = Integer.MAX_VALUE;
         List<PatternIndex.Entry<SyntaxRegistry.Candidate>> indexed = new ArrayList<>();
         for (PatternIndex.Entry<SyntaxRegistry.Candidate> entry : index.indexed(text)) {
             if (isViable(kind, entry)) {
@@ -149,12 +171,17 @@ final class LineParser {
             if (!pattern.couldMatch(lower)) {
                 continue;
             }
-            MatchResult match = pattern.match(input, start, end, resolver(syntax, literalOnly, splitTokens));
+            MatchResult match = pattern.match(input, start, end, resolver(syntax, literalOnly, splitTokens, strictCode));
             if (match == null) {
                 continue;
             }
             ParsedSyntax parsed = new ParsedSyntax(syntax, candidate.pattern(), match);
             if (syntax.id().equals("ExprArithmetic") && !arithmeticOperands(parsed)) {
+                continue;
+            }
+            // 'all colours' only for types with a fixed set of values; 'all players' is something else's.
+            if (syntax.id().equals("ExprSets") && !parsed.match().regexValues().isEmpty()
+                    && !(parsed.match().regexValues().getFirst() instanceof TypeRef ref && !ref.type().literals().isEmpty())) {
                 continue;
             }
             Object result = parsed;
@@ -170,8 +197,11 @@ final class LineParser {
             if (!hasUnresolved(parsed)) {
                 return result;
             }
-            if (fallback == null) {
+            // Of those, the one leaning on the least text: 'last spawned firework is set' isn't a comparison with 'set'.
+            int unresolved = countUnresolved(parsed);
+            if (unresolved < fallbackUnresolved) {
                 fallback = result;
+                fallbackUnresolved = unresolved;
             }
         }
         return fallback;
@@ -197,8 +227,34 @@ final class LineParser {
                     && registry.type(expr.type()) != null) {
                 return false;
             }
+            // A word only types without arithmetic have, like 'red': 'red-blue kob' isn't a subtraction.
+            if (value instanceof Expr.Unresolved unresolved && onlyNonArithmetic(Literals.normalize(unresolved.text()))) {
+                return false;
+            }
         }
         return true;
+    }
+
+    private boolean onlyNonArithmetic(String word) {
+        boolean named = false;
+        for (TypeInfo type : registry.types()) {
+            if (type.literals().contains(word)) {
+                if (ARITHMETIC_TYPES.contains(type.id())) {
+                    return false;
+                }
+                named = true;
+            }
+        }
+        return named;
+    }
+
+    /** {@code code}, unless {@code strict} and it leans on unresolved words; counts each one turned down. */
+    private ParsedSyntax strict(ParsedSyntax code, boolean strict) {
+        if (strict && code != null && hasUnresolved(code)) {
+            unresolvedCode++;
+            return null;
+        }
+        return code;
     }
 
     private static boolean hasUnresolved(ParsedSyntax parsed) {
@@ -214,6 +270,38 @@ final class LineParser {
             }
         }
         return false;
+    }
+
+    /** How much of the line {@code parsed} leaves to unresolved words. */
+    private static int countUnresolved(ParsedSyntax parsed) {
+        int count = 0;
+        for (Object value : parsed.match().values()) {
+            if (value instanceof Expr expr) {
+                count += countUnresolved(expr);
+            }
+        }
+        for (Object value : parsed.match().regexValues()) {
+            if (value instanceof Expr expr) {
+                count += countUnresolved(expr);
+            } else if (value instanceof ParsedSyntax inner) {
+                count += countUnresolved(inner);
+            }
+        }
+        return count;
+    }
+
+    private static int countUnresolved(Expr expr) {
+        return switch (expr) {
+            // Words a type's parser has accepted are as good as resolved.
+            case Expr.Unresolved unresolved -> unresolved.verified() ? 0 : unresolved.end() - unresolved.start();
+            case Expr.Syntax syntax -> countUnresolved(syntax.syntax());
+            case Expr.ListOf list -> list.items().stream().mapToInt(LineParser::countUnresolved).sum();
+            case Expr.FunctionCall call -> call.arguments().stream().filter(a -> a != null)
+                    .mapToInt(LineParser::countUnresolved).sum();
+            case Expr.Text text -> text.embedded().stream().mapToInt(LineParser::countUnresolved).sum();
+            case Expr.Variable variable -> variable.embedded().stream().mapToInt(LineParser::countUnresolved).sum();
+            case Expr.Literal literal -> 0;
+        };
     }
 
     private static boolean hasUnresolved(Expr expr) {
@@ -277,7 +365,7 @@ final class LineParser {
         return type == null ? SyntaxRegistry.OBJECT : type;
     }
 
-    private PlaceholderResolver resolver(SyntaxInfo syntax, boolean literalOnly, boolean splitTokens) {
+    private PlaceholderResolver resolver(SyntaxInfo syntax, boolean literalOnly, boolean splitTokens, boolean strictCode) {
         return new PlaceholderResolver() {
             @Override
             public Object resolve(String text, int start, int end, PlaceholderSpec spec) {
@@ -293,10 +381,10 @@ final class LineParser {
             public Object resolveRegex(String text, int start, int end, int index, java.util.regex.MatchResult match) {
                 return switch (syntax.regexRole(index)) {
                     case ANY -> match;
-                    case CONDITION -> condition(start, end);
+                    case CONDITION -> strict(condition(start, end), strictCode);
                     case EFFECT -> {
                         ParsedSyntax effect = effect(start, end);
-                        yield effect != null ? effect : call(start, end);
+                        yield effect != null ? strict(effect, strictCode) : call(start, end);
                     }
                     case EXPRESSION -> expression(start, end, Expected.OBJECTS);
                     case TYPE -> typeName(start, end);
@@ -312,7 +400,7 @@ final class LineParser {
                         if (code == null) {
                             code = effect(start, end);
                         }
-                        yield code != null ? code : expression(start, end, Expected.OBJECTS);
+                        yield code != null ? strict((ParsedSyntax) code, strictCode) : expression(start, end, Expected.OBJECTS);
                     }
                 };
             }
@@ -344,6 +432,11 @@ final class LineParser {
             return null;
         }
         Expr expr = single(start, end, expected);
+        if (expr == null && expected.plural()) {
+            // A literal that has 'and' in it, like 'diamond sword of unbreaking 3 and sharpness 10', is one value
+            // if a type's parser takes all of it, as in Skript.
+            expr = wholeLiteral(start, end, expected);
+        }
         if (expr == null && expected.plural()) {
             expr = list(start, end, expected);
         }
@@ -428,10 +521,19 @@ final class LineParser {
             return new Expr.Literal(start, end, "time", text);
         }
         String normalized = Literals.normalize(text);
+        TypeInfo named = null;
         for (TypeInfo type : expected.types()) {
             if (type.literals().contains(normalized)) {
-                return new Expr.Literal(start, end, type.id(), text);
+                if (named != null) {
+                    // A word several types have, like 'normal' (an environment and a panda gene): what it is
+                    // depends on what it's used with, so the compiler decides.
+                    return null;
+                }
+                named = type;
             }
+        }
+        if (named != null) {
+            return new Expr.Literal(start, end, named.id(), text);
         }
         return specifiedLiteral(start, end, text, expected);
     }
@@ -448,8 +550,9 @@ final class LineParser {
         }
         String value = Literals.normalize(matcher.group(1));
         TypeInfo type = ref.type();
+        // Open types check the words with the type's own parser: 'size of all chickens (entity type)' isn't one.
         boolean valid = type.literals().contains(value) || ((type.openLiterals() || type.literals().isEmpty())
-                && Literals.isWords(value));
+                && Literals.isWords(value) && registry.mightBeLiteral(type, value));
         return valid ? new Expr.Literal(start, end, type.id(), text) : null;
     }
 
@@ -519,6 +622,15 @@ final class LineParser {
                 }
             }
         }
+        if (needsValue && matches.isEmpty()) {
+            // A function that returns nothing, used for a value: what uses it says why that can't work, as in
+            // Skript ('a slot can't be set to foo()').
+            for (FunctionInfo function : overloads) {
+                if (function.returnType() == null && arguments(function, pieces, inner, false) instanceof List<?> arguments) {
+                    return call(start, end, function, arguments);
+                }
+            }
+        }
         boolean onlyUnknownNames = pieces.stream().anyMatch(piece -> argumentName(piece) != null)
                 && pieces.stream().map(this::argumentName).noneMatch(n -> n != null
                         && overloads.stream().anyMatch(f -> parameterIndex(f.parameters(), n) >= 0));
@@ -582,6 +694,11 @@ final class LineParser {
             Expected expected = ref == null ? Expected.OBJECTS : context.expected(new TypeRef(ref.type(), true));
             Expr argument = expression(valueStart, piece[1], expected);
             if (argument == null) {
+                String written = input.substring(valueStart, piece[1]).strip();
+                if (written.startsWith("(") && written.indexOf('(', 1) > 0) {
+                    // A list with a list in it: no function takes that, so there's no such function.
+                    return null;
+                }
                 Expr anything = expression(valueStart, piece[1], Expected.OBJECTS);
                 if (anything != null && !(anything instanceof Expr.Unresolved)) {
                     // It's a value, just not of this parameter's type: no such overload.
@@ -590,6 +707,10 @@ final class LineParser {
                 String typeName = ref == null ? parameter.type() : ref.type().name().toLowerCase(java.util.Locale.ROOT);
                 return "Can't understand the argument for the parameter '" + parameter.name() + "' with type '"
                         + typeName + "': " + input.substring(valueStart, piece[1]).strip() + ".";
+            }
+            if (argument instanceof Expr.ListOf list && list.items().stream().anyMatch(Expr.ListOf.class::isInstance)) {
+                // A list of lists isn't an argument: 'f(ns: (1, (2, 3)))'.
+                return null;
             }
             byParameter[index] = argument;
             next = index + 1;
@@ -625,6 +746,11 @@ final class LineParser {
                 continue;
             }
             if (index < p || index < last) {
+                return true;
+            }
+            // An unnamed argument after the last parameter, named: 'location(..., pitch: 4, 5)'.
+            if (index != p && index == parameters.size() - 1 && p + 1 < pieces.size()
+                    && argumentName(pieces.get(p + 1)) == null) {
                 return true;
             }
             last = index;
@@ -699,7 +825,7 @@ final class LineParser {
         List<List<Expr>> reach = new ArrayList<>(java.util.Collections.nCopies(n + 1, (List<Expr>) null));
         for (int k = 0; k <= n; k++) {
             int itemEnd = k == n ? end : separators.get(k)[0];
-            Expr first = expression(start, itemEnd, item);
+            Expr first = listItem(start, itemEnd, item, expected);
             if (first != null && k < n) {
                 reach.set(k, List.of(first));
             }
@@ -707,7 +833,7 @@ final class LineParser {
                 if (reach.get(j) == null) {
                     continue;
                 }
-                Expr next = expression(separators.get(j)[1], itemEnd, item);
+                Expr next = listItem(separators.get(j)[1], itemEnd, item, expected);
                 if (next != null && (reach.get(k) == null || reach.get(j).size() + 1 > reach.get(k).size())) {
                     List<Expr> items = new ArrayList<>(reach.get(j));
                     items.add(next);
@@ -723,6 +849,34 @@ final class LineParser {
         return new Expr.ListOf(start, end, items, and[0], type);
     }
 
+    /** An item of a list: one value, or, in brackets, a list of its own, as in {@code 1, (2, 3)}. */
+    private Expr listItem(int start, int end, Expected item, Expected list) {
+        int[] span = trim(start, end);
+        if (span[0] < span[1] && input.charAt(span[0]) == '(' && Scanner.parenEnd(input, span[0], span[1]) == span[1]) {
+            Expr inner = expression(span[0], span[1], list);
+            if (inner != null) {
+                return inner;
+            }
+        }
+        return expression(start, end, item);
+    }
+
+    /** {@code [start, end)} as one verified literal of an open type, if it looks like a list but a parser takes it whole. */
+    private Expr wholeLiteral(int start, int end, Expected expected) {
+        String text = input.substring(start, end);
+        String lower = text.toLowerCase(Locale.ROOT);
+        if (!Literals.isWords(text) || (!lower.contains(" and ") && !lower.contains(",") && !lower.contains(" or "))) {
+            return null;
+        }
+        Iterable<TypeInfo> types = expected.anything() ? registry.types() : expected.types();
+        for (TypeInfo type : types) {
+            if (type.openLiterals() && registry.isLiteral(type, text)) {
+                return new Expr.Unresolved(start, end, text, true);
+            }
+        }
+        return null;
+    }
+
     private Expr unresolved(int start, int end, Expected expected) {
         String text = input.substring(start, end);
         if (!Literals.isWords(text)) {
@@ -732,13 +886,18 @@ final class LineParser {
                 .anyMatch(type -> type.openLiterals() && registry.mightBeLiteral(type, text))
                 || registry.isConvertibleLiteral(text, id -> expected.types().stream()
                         .anyMatch(type -> !type.id().equals(id) && registry.isConvertible(id, type.id())));
-        return open ? new Expr.Unresolved(start, end, text) : null;
+        if (!open) {
+            return null;
+        }
+        boolean verified = expected.types().stream().anyMatch(type -> type.openLiterals() && registry.isLiteral(type, text));
+        return new Expr.Unresolved(start, end, text, verified);
     }
 
     private static boolean isChangeable(Expr expr) {
         return switch (expr) {
             case Expr.Literal literal -> false;
-            case Expr.Text text -> false;
+            // Text is an expression in Skript, not a literal: 'assert "x" is set' parses.
+            case Expr.Text text -> true;
             case Expr.Unresolved unresolved -> false;
             case Expr.ListOf list -> list.items().stream().allMatch(LineParser::isChangeable);
             default -> true;
@@ -748,6 +907,7 @@ final class LineParser {
     // ---------------------------------------------------------------- helpers
 
     private Object memoized(int start, int end, Object what, java.util.function.Supplier<Object> compute) {
+        Map<Key, Object> memo = strictOuter ? strictMemo : this.memo;
         Key key = new Key(start, end, what);
         Object cached = memo.get(key);
         if (cached != null) {
