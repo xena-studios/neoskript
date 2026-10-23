@@ -66,9 +66,15 @@ public final class NeoSkriptVariablesScenario implements Scenario {
                 .file("plugins/Skript/scripts/read.sk", context.script("variables-neoskript-read.sk"));
         List<String> read = stopAfter(neoskript, Pattern.compile("\\[harness] read loc: .*"));
         String values = read.stream().filter(line -> line.contains("[harness] read: ")).findFirst().orElse("");
-        String expected = "hello | héllo ✓ 日本 | say \"hi\" | 42 | 2.5 | true | 5 minutes | a, b and ten | <itemtype>";
+        String expected = "hello | héllo ✓ 日本 | say \"hi\" | 42 | 2.5 | true | 5 minutes | a, b and ten | diamond sword named \"x\"";
         if (!values.endsWith(expected)) {
             throw new HarnessFailure("NeoSkript read: '" + values + "', expected it to end with '" + expected + "'");
+        }
+        String items = read.stream().filter(line -> line.contains("[harness] read items: ")).findFirst().orElse("");
+        String expectedItems = "diamond sword named \"x\" | diamond sword | stone | 32 | diamond sword of sharpness 2"
+                + " | 3 diamonds | creative";
+        if (!items.endsWith(expectedItems)) {
+            throw new HarnessFailure("NeoSkript read items: '" + items + "', expected it to end with '" + expectedItems + "'");
         }
         if (read.stream().anyMatch(line -> line.contains("read loc: <location>"))) {
             throw new HarnessFailure("NeoSkript didn't decode the location");
@@ -95,6 +101,11 @@ public final class NeoSkriptVariablesScenario implements Scenario {
                 .file("plugins/Skript/variables.csv", new String(neoskriptFile, StandardCharsets.UTF_8))
                 .file("plugins/Skript/scripts/read.sk", context.script("variables-skript-read.sk"));
         List<String> skriptRead = stopAfter(skriptReads, Pattern.compile("\\[harness] skript read: .*"));
+        String skriptItems = skriptRead.stream().filter(line -> line.contains("[harness] skript items: ")).findFirst()
+                .orElse("");
+        if (!skriptItems.endsWith("y | 5 | 2 | creative")) {
+            throw new HarnessFailure("Skript read NeoSkript's items as: '" + skriptItems + "', expected 'y | 5 | 2 | creative'");
+        }
         String skriptValues = skriptRead.stream().filter(line -> line.contains("[harness] skript read: ")).findFirst()
                 .orElse("");
         String skriptExpected = "from neoskript ✓ | 7 | 0.25 | false | 2 hours and 3 seconds | x, y and z";

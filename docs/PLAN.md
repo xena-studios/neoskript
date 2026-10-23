@@ -277,6 +277,13 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - Skript's own tests: 34 pass now (one more test can run).
 >    - **Not yet:** items in `variables.csv` (step 4b). Items saved by Skript are still kept as raw bytes, and items set by scripts aren't saved yet.
 > 4b. **Item codecs:** `itemtype` and `itemstack` in `variables.csv`, byte for byte with Skript (its item type format nests the item meta as YAML), so items survive restarts and M3's raw item values become real items.
+>
+>    **Status: done (2026-10-22).**
+>    - **Codecs:** `itemtype`, `itemstack` and `gamemode`. Item meta and item stacks are YAML from Bukkit's own serializer, as in Skript.
+>    - **Format:** the binary format gained null fields and object arrays (an item type is a list of item datas).
+>    - **Safety net:** a saved value is only decoded if it encodes back to the same bytes. So an item NeoSkript doesn't model, like Skript's `any sword` (several items in one), stays as Skript saved it.
+>    - **Conversion on save:** a value without a codec is saved as what it converts to, if that has one: a slot as its item, as in Skript.
+>    - **Tested by:** `neoskript-variables`. NeoSkript decodes the plain, named, enchanted, lore, block and counted items and the item stack the reference Skript saved, and rewrites the file byte for byte. Skript reads the items NeoSkript saves and rewrites them identically. Only `vector` is still kept raw, until vectors come with the world (step 5).
 > 5. **The world:** entities and spawning, blocks, locations and vectors, worlds, potions.
 > 6. **The long tail:** whatever Skript's tests still need, most-used first, then the differential runner for the 95% check.
 

@@ -56,14 +56,8 @@ public final class SkriptBinaryWriter implements BinaryWriter {
     @Override
     public void rawString(String value) {
         byte[] utf8 = value.getBytes(StandardCharsets.UTF_8);
-        io(() -> {
-            if (utf8.length < 0x8000) {
-                out.writeShort(0x8000 | utf8.length);
-            } else {
-                out.writeInt(utf8.length);
-            }
-            out.write(utf8);
-        });
+        length(utf8.length);
+        io(() -> out.write(utf8));
     }
 
     @Override
@@ -133,6 +127,36 @@ public final class SkriptBinaryWriter implements BinaryWriter {
     public void objectField(String name, String type) {
         field(name, Tags.OBJECT);
         rawName(type);
+    }
+
+    @Override
+    public void nullField(String name) {
+        field(name, Tags.NULL);
+    }
+
+    @Override
+    public void objectArrayField(String name, String componentType, int length) {
+        field(name, Tags.ARRAY);
+        io(() -> out.writeByte(Tags.OBJECT));
+        rawName(componentType);
+        length(length);
+    }
+
+    @Override
+    public void arrayElement(String type) {
+        io(() -> out.writeByte(Tags.OBJECT));
+        rawName(type);
+    }
+
+    /** A length, as strings and arrays write theirs: two bytes with the top bit set, or four. */
+    private void length(int length) {
+        io(() -> {
+            if (length < 0x8000) {
+                out.writeShort(0x8000 | length);
+            } else {
+                out.writeInt(length);
+            }
+        });
     }
 
     private void field(String name, int tag) {

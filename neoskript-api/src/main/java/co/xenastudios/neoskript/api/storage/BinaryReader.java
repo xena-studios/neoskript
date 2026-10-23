@@ -34,4 +34,16 @@ public interface BinaryReader {
 
     /** Reads a field holding an object; returns its type. Follow with {@link #beginObject}. */
     String objectField(String name);
+
+    /**
+     * Reads a field holding an object or nothing: returns the object's type (follow with
+     * {@link #beginObject}), or {@code null} if the field holds nothing.
+     */
+    String objectOrNullField(String name);
+
+    /** Reads a field holding an array of objects of {@code componentType}; returns its length. */
+    int objectArrayField(String name, String componentType);
+
+    /** Reads an element of an object array; returns its type. Follow with {@link #beginObject}. */
+    String arrayElement();
 }

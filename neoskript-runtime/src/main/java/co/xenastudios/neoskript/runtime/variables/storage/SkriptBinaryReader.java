@@ -46,9 +46,7 @@ public final class SkriptBinaryReader implements BinaryReader {
 
     @Override
     public String rawString() {
-        int first = in.get(in.position()) & 0xFF;
-        int length = (first & 0x80) != 0 ? in.getShort() & 0x7FFF : in.getInt();
-        byte[] utf8 = new byte[length];
+        byte[] utf8 = new byte[length()];
         in.get(utf8);
         return new String(utf8, StandardCharsets.UTF_8);
     }
@@ -119,6 +117,38 @@ public final class SkriptBinaryReader implements BinaryReader {
     public String objectField(String name) {
         field(name, Tags.OBJECT);
         return rawName();
+    }
+
+    @Override
+    public String objectOrNullField(String name) {
+        String actual = rawName();
+        int tag = in.get() & 0xFF;
+        if (!actual.equals(name) || (tag != Tags.OBJECT && tag != Tags.NULL)) {
+            throw new IllegalStateException("Expected field " + name + ", found " + actual + " (" + tag + ")");
+        }
+        return tag == Tags.NULL ? null : rawName();
+    }
+
+    @Override
+    public int objectArrayField(String name, String componentType) {
+        field(name, Tags.ARRAY);
+        if ((in.get() & 0xFF) != Tags.OBJECT || !rawName().equals(componentType)) {
+            throw new IllegalStateException("Expected an array of " + componentType);
+        }
+        return length();
+    }
+
+    @Override
+    public String arrayElement() {
+        if ((in.get() & 0xFF) != Tags.OBJECT) {
+            throw new IllegalStateException("Expected an object in the array");
+        }
+        return rawName();
+    }
+
+    private int length() {
+        int first = in.get(in.position()) & 0xFF;
+        return (first & 0x80) != 0 ? in.getShort() & 0x7FFF : in.getInt();
     }
 
     private void field(String name, int tag) {

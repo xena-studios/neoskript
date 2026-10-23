@@ -25,5 +25,6 @@ public final class StandardLibrary {
         Logic.register(registrar);
         MathFunctions.register(registrar);
         StorageCodecs.register(registrar);
+        ItemCodecs.register(registrar);
     }
 }

@@ -7,3 +7,9 @@ on load:
 	set {n::timespan} to 2 hours and 3 seconds
 	set {n::list::*} to "x", "y" and "z"
 	set {n::Quoted "name"} to 1
+	set {n::item} to diamond sword of sharpness 2 named "y"
+	set {n::block} to 5 stone
+	set {_inv} to chest inventory with 1 row
+	set slot 0 of {_inv} to 2 diamonds
+	set {n::stack} to slot 0 of {_inv}
+	set {n::mode} to creative
