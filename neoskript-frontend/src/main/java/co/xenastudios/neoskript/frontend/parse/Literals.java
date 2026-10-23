@@ -11,7 +11,9 @@ import java.util.regex.Pattern;
 final class Literals {
 
     private static final Pattern INTEGER = Pattern.compile("[-+]?\\d+(_\\d+)*");
-    private static final Pattern DECIMAL = Pattern.compile("[-+]?(\\d+(_\\d+)*)?\\.\\d+(_\\d+)*|[-+]?\\d+(_\\d+)*(\\.\\d+(_\\d+)*)?%");
+    /** Decimals, percentages, and scientific notation ({@code 1.23e+4}). */
+    private static final Pattern DECIMAL = Pattern.compile("[-+]?(\\d+(_\\d+)*)?\\.\\d+(_\\d+)*|[-+]?\\d+(_\\d+)*(\\.\\d+(_\\d+)*)?%"
+            + "|[-+]?(\\d+(_\\d+)*(\\.\\d+(_\\d+)*)?|\\.\\d+(_\\d+)*)[eE][-+]?\\d+");
     private static final Pattern BOOLEAN = Pattern.compile("true|false|yes|no|on|off", Pattern.CASE_INSENSITIVE);
 
     private static final String AMOUNT = "(?:\\d+(?:\\.\\d+)?|an?|one|two|three|four|five|six|seven|eight|nine|ten)";

@@ -66,7 +66,9 @@ final class EntitySyntax {
         condition(registrar, "CondIsEating", "livingentities", "eating", LivingEntity.class,
                 entity -> entity instanceof org.bukkit.entity.Panda panda ? panda.isEating()
                         : entity instanceof org.bukkit.entity.AbstractHorse horse && horse.isEating());
-        condition(registrar, "CondIsValid", "entities", "valid", Entity.class, Entity::isValid);
+        condition(registrar, "CondIsValid", "entities/scripts", "valid", Object.class, value -> value instanceof Entity entity
+                ? entity.isValid() : value instanceof co.xenastudios.neoskript.runtime.ScriptRef script
+                        && co.xenastudios.neoskript.runtime.ScriptCatalog.get().find(script.name()) != null);
         condition(registrar, "CondIsPersistent", "entities/blocks", "persistent", Object.class,
                 value -> value instanceof Entity entity ? entity.isPersistent()
                         : value instanceof org.bukkit.block.Block block

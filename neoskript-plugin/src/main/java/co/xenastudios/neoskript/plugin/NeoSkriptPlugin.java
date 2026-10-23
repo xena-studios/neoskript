@@ -84,6 +84,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         commands = new ScriptCommands(this, getSLF4JLogger(), scheduler);
         ScriptManager scripts = new ScriptManager(getDataPath().resolve("scripts"), library, scheduler, events,
                 commands, getSLF4JLogger(), TestRunner.enabled() ? () -> getServer().shutdown() : null);
+        co.xenastudios.neoskript.runtime.ScriptCatalog.install(scripts.catalog());
         storage = new VariableStorage(scripts.globals(), library.codecs(),
                 getDataPath().resolve(getConfig().getString("variables.file", "variables.csv")));
         loadVariables();

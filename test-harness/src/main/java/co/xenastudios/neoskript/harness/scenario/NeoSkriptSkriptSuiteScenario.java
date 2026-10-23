@@ -49,7 +49,9 @@ public final class NeoSkriptSkriptSuiteScenario implements Scenario {
         ServerBuilder builder = context.server()
                 .plugin(context.neoskriptJar())
                 .jvmArg("-Dneoskript.testing.enabled=true")
-                .jvmArg("-Dneoskript.testing.results=test_results.json");
+                .jvmArg("-Dneoskript.testing.results=test_results.json")
+                // Script names as Skript's test runner has them: it loads the tests from its source folder.
+                .jvmArg("-Dneoskript.testing.scriptsRoot=../../../../../../src/test/skript/tests");
         int files = 0;
         try (Stream<Path> paths = Files.walk(tests)) {
             for (Path file : paths.filter(p -> p.toString().endsWith(".sk")).sorted().toList()) {

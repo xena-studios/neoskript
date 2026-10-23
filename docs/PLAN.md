@@ -390,7 +390,14 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - `%objects% where [condition]`, `%objects% transformed using [expression]`, `%objects% reduced with [expression]`, with `input`, `<type> input`, `input index` and `reduced value`.
 >      - `transform %list% using ...`, `sort %list% by ...`, and the `filter %list% to match [any|all]:` section change the list in place.
 >      - `sorted %objects%`, `keyed %objects%`.
->    - **Script objects (`the current script`, `script named ...`) are deferred.** Skript's tests for them expect the paths of Skript's own test runner layout (`../../../src/test/skript/tests/...`), which NeoSkript's harness doesn't use. They need a decision on matching that layout first.
+>
+>    **Batch 6 (2026-10-23): 201 → 208 tests pass.**
+>    - **Script objects:**
+>      - `the current script`, `script named ...`, `scripts in folder ...`, `all/loaded/disabled scripts`.
+>      - Script names, and `is loaded` and `is valid` for scripts.
+>      - In test mode, scripts are named by the paths Skript's test runner gives them (`neoskript.testing.scriptsRoot`), so Skript's script tests see what they expect.
+>    - **Parser:** arithmetic is ruled out when an operand has a type it can't work on, as in Skript, so `the script named {@path} + "x.sk"` is the script named the joined text.
+>    - **Literals:** scientific notation (`1.23e+4`).
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
