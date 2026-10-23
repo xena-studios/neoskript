@@ -23,15 +23,10 @@ import java.util.regex.Pattern;
 
 /**
  * NeoSkript loads the real-world corpus and runs every script's self-test, as the reference Skript does
- * in {@code skript-real-world-corpus}.
- *
- * <p>The scripts in {@link #NEEDS_ITEMS} use items and inventories, which come in M4 step 4: their load
- * problems and failures are reported but don't fail the check yet. Every other script has to load
- * cleanly and pass.
+ * in {@code skript-real-world-corpus}: every script has to load cleanly and pass.
  */
 public final class NeoSkriptCorpusScenario implements Scenario {
 
-    private static final Set<String> NEEDS_ITEMS = Set.of("kits", "warps");
     private static final Pattern RESULT = Pattern.compile("\\[corpus] ([\\w-]+): (.*)$");
     private static final Pattern DONE = Pattern.compile("\\[corpus] done$");
     private static final Pattern PROBLEM = Pattern.compile("\\[NeoSkript] Line \\d+: \\(corpus/([\\w-]+)\\.sk\\)");
@@ -70,16 +65,11 @@ public final class NeoSkriptCorpusScenario implements Scenario {
             server.await(LOADED, WAIT);
             server.await(ServerProcess.DONE, WAIT);
             Set<String> withProblems = new java.util.TreeSet<>();
-            List<String> unexpectedProblems = new ArrayList<>();
-            for (String line : server.linesMatching(ANY_PROBLEM)) {
+            List<String> problems = server.linesMatching(ANY_PROBLEM);
+            for (String line : problems) {
                 Matcher corpus = PROBLEM.matcher(line);
                 if (corpus.find()) {
                     withProblems.add(corpus.group(1));
-                    if (!NEEDS_ITEMS.contains(corpus.group(1))) {
-                        unexpectedProblems.add(line);
-                    }
-                } else {
-                    unexpectedProblems.add(line);
                 }
             }
 
@@ -111,18 +101,13 @@ public final class NeoSkriptCorpusScenario implements Scenario {
             report.put("failed", failures);
             report.put("missing", missing);
             report.put("loadProblems", withProblems);
-            report.put("waitingForItems", NEEDS_ITEMS);
             context.writeReport(name(), report);
             context.summary("scripts", suites.size());
             context.summary("passed", passed.size());
 
-            List<String> unexpected = new ArrayList<>(unexpectedProblems);
-            failures.forEach((suite, lines) -> {
-                if (!NEEDS_ITEMS.contains(suite)) {
-                    unexpected.add(suite + ": " + lines);
-                }
-            });
-            missing.stream().filter(suite -> !NEEDS_ITEMS.contains(suite)).forEach(suite -> unexpected.add(suite + ": no result"));
+            List<String> unexpected = new ArrayList<>(problems);
+            failures.forEach((suite, lines) -> unexpected.add(suite + ": " + lines));
+            missing.forEach(suite -> unexpected.add(suite + ": no result"));
             if (!unexpected.isEmpty()) {
                 throw new HarnessFailure("The corpus didn't load or pass on NeoSkript: " + unexpected + ". See "
                         + server.logFile());

@@ -235,6 +235,21 @@ public final class SyntaxRegistry {
             return this;
         }
 
+        /**
+         * Marks a type's literals as open: any words might be one (item names), so the parser leaves words
+         * where a value of the type is expected for the compiler to resolve.
+         */
+        public Builder openLiterals(String id) {
+            TypeInfo old = typesById.get(id.toLowerCase(Locale.ROOT));
+            if (old == null || old.openLiterals()) {
+                return this;
+            }
+            TypeInfo open = new TypeInfo(old.id(), old.name(), old.literals(), true);
+            typesById.put(id.toLowerCase(Locale.ROOT), open);
+            typeNames.replaceAll((name, ref) -> ref.type().id().equals(old.id()) ? new TypeRef(open, ref.plural()) : ref);
+            return this;
+        }
+
         private void nameType(String name, TypeInfo type) {
             typeNames.putIfAbsent(name, new TypeRef(type, false));
             typeNames.putIfAbsent(plural(name), new TypeRef(type, true));

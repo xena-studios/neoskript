@@ -262,7 +262,21 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - The conditions of `if all:`/`if any:` are compiled against their own lines; this used to crash the compiler.
 >      - `loop-index` works for any loop: values that don't come from a list variable are indexed 1, 2, 3.
 >    - **Tested by:** `neoskript-real-world-corpus` on all four servers: the 10 scripts without items load cleanly and pass. `warps` passes too, though its menu lines don't load yet; `kits` fails. Both are reported but don't fail the check until step 4. Plus regression tests in `LanguageTest`.
-> 4. **Items and aliases:** item types from Paper's registries plus Skript's alias names, inventories, and item stack codecs, so M3's raw item values become real items. *Done when* all 12 real-world scripts load on NeoSkript and pass their self-tests, on all four servers.
+> 4. **Items and inventories:** item types from Paper's registries, inventories and slots. *Done when* all 12 real-world scripts load on NeoSkript and pass their self-tests, on all four servers.
+>
+>    **Status: done (2026-10-22).**
+>    - **Types:** `item type` (NeoSkript's `ItemType`: an item stack and whether an amount was written), `item`, `inventory`, `inventory holder`, `slot`, with converters between them (a slot is its item, a player is its inventory).
+>    - **Item literals:** `[<amount> [of]] [a|an|all|every] <name> [of <enchantment> [<level>], ...]`, with levels in digits or Roman numerals. Names come from Paper's material registry, singular and plural. Skript's alias files (`any sword`, block states) aren't used yet.
+>    - **API:**
+>      - `Registrar.literalParser(type, f)`: words a script writes become values of the type. The parser leaves them to the compiler, which resolves them once into constants.
+>      - `Registrar.changer(class, mode, f)`: how `add`/`remove`... change a value itself. `give X to player` adds to the player's inventory.
+>    - **Syntax:** `named`, `with lore`, item amount, chest inventories, `slot N of`, slot index, `inventory of`, open and close inventories, and inventory click/open/close events with `event-slot`.
+>    - **Tested by:**
+>      - `neoskript-real-world-corpus`: now 12 of 12, and strict.
+>      - `neoskript-items` on all four servers: literals, names and lore, parsing items from text, chest inventory slots.
+>      - Skript's own tests: 34 pass now (one more test can run).
+>    - **Not yet:** items in `variables.csv` (step 4b). Items saved by Skript are still kept as raw bytes, and items set by scripts aren't saved yet.
+> 4b. **Item codecs:** `itemtype` and `itemstack` in `variables.csv`, byte for byte with Skript (its item type format nests the item meta as YAML), so items survive restarts and M3's raw item values become real items.
 > 5. **The world:** entities and spawning, blocks, locations and vectors, worlds, potions.
 > 6. **The long tail:** whatever Skript's tests still need, most-used first, then the differential runner for the 95% check.
 

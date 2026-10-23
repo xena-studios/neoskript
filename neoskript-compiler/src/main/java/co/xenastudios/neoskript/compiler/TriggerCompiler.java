@@ -127,6 +127,7 @@ final class TriggerCompiler {
             "classDataAt", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;I)Ljava/lang/Object;",
             false);
     private static final Pattern LOOP_VALUE = Pattern.compile("(.+?)(?:-(\\d+))?");
+    private static final Pattern SPECIFIED_LITERAL = Pattern.compile("(.+?)\\s+\\(\\s*[\\p{L} ]+?\\s*\\)");
 
     /** Local variable slots: 0 is this, 1 the trigger context, 2 a function's arguments. */
     private static final int CONTEXT_SLOT = 1;
@@ -970,6 +971,10 @@ final class TriggerCompiler {
             return;
         }
         if (!(target instanceof Expr.Variable variable)) {
+            if (target instanceof Expr expr && Values.hasChanger(changeMode(effect, mode))) {
+                changeValues(effect, mode, expr);
+                return;
+            }
             throw unsupported("changing anything but variables");
         }
         variableStore(variable);
@@ -1056,21 +1061,46 @@ final class TriggerCompiler {
                 "(" + CONTEXT + OBJECTS + OBJECTS + Type.getDescriptor(Changeable.Mode.class) + ")V", true);
     }
 
-    /** {@code set name of player to "x"}: changes an expression that implements {@link Changeable}. */
-    private void changeExpression(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr.Syntax target)
-            throws CompileException {
-        Changeable.Mode changeMode = switch (mode) {
+    private static Changeable.Mode changeMode(ParsedSyntax effect, CoreSyntax.ChangeMode mode) {
+        return switch (mode) {
             case SET -> Changeable.Mode.SET;
             case ADD, INCREASE -> Changeable.Mode.ADD;
             case REMOVE, REDUCE -> Changeable.Mode.REMOVE;
             case REMOVE_ALL -> Changeable.Mode.REMOVE_ALL;
             case DELETE -> effect.match().hasTag("reset") ? Changeable.Mode.RESET : Changeable.Mode.DELETE;
         };
+    }
+
+    /**
+     * {@code give a diamond to player}: changes the target's values themselves, with the changers
+     * registered for their classes.
+     */
+    private void changeValues(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr target) throws CompileException {
+        expression(target);
+        if (mode.value >= 0) {
+            expression((Expr) effect.match().values().get(mode.value));
+        } else {
+            method.visitInsn(ACONST_NULL);
+        }
+        constant(changeMode(effect, mode), Changeable.Mode.class);
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "changeValues",
+                "(" + OBJECT_DESC + OBJECT_DESC + Type.getDescriptor(Changeable.Mode.class) + ")V", false);
+    }
+
+    /** {@code set name of player to "x"}: changes an expression that implements {@link Changeable}. */
+    private void changeExpression(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr.Syntax target)
+            throws CompileException {
+        Changeable.Mode changeMode = changeMode(effect, mode);
         ParsedSyntax syntax = target.syntax();
         Object element = library.binding(syntax.syntax()) instanceof ElementFactory<?> factory
                 ? factory.create(new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags()))
                 : null;
         Class<?>[] accepted = element instanceof Changeable changeable ? changeable.acceptChange(changeMode) : null;
+        if (accepted == null && !(element instanceof Changeable) && Values.hasChanger(changeMode)) {
+            // An expression that can't be changed itself, but whose values can be: 'give X to all players'.
+            changeValues(effect, mode, target);
+            return;
+        }
         if (accepted == null) {
             String text = source.substring(target.start(), target.end());
             throw new CompileException(line, text + switch (changeMode) {
@@ -1457,7 +1487,7 @@ final class TriggerCompiler {
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
             }
             case Expr.Unresolved unresolved -> {
-                Object value = library.literalValue(unresolved.text());
+                Object value = library.literal(unresolved.text());
                 if (value == null) {
                     throw unsupported("'" + unresolved.text() + "'");
                 }
@@ -1494,7 +1524,17 @@ final class TriggerCompiler {
                 }
                 constant(timespan, Timespan.class);
             }
-            default -> throw unsupported(literal.type() + " literals");
+            default -> {
+                // 'diamond (item type)': the type's own literal parser, given the words before the bracket.
+                java.util.function.Function<String, ?> parser = library.literalParser(literal.type());
+                java.util.regex.Matcher specified = SPECIFIED_LITERAL.matcher(literal.text());
+                Object value = parser == null ? null
+                        : parser.apply(specified.matches() ? specified.group(1).strip() : literal.text().strip());
+                if (value == null) {
+                    throw unsupported(literal.type() + " literals");
+                }
+                constant(value, Object.class);
+            }
         }
     }
 

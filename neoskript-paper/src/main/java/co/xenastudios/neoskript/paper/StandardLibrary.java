@@ -21,6 +21,7 @@ public final class StandardLibrary {
         Texts.register(registrar);
         Time.register(registrar);
         Locations.register(registrar);
+        Items.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
         StorageCodecs.register(registrar);

@@ -25,7 +25,8 @@ Reports go to `build/harness/reports/`, and each run's server directory and `har
 | `neoskript-reload` | smoke | all | `/sk reload`: changed scripts switch over, a script with errors keeps its last version (D12), and one script can be reloaded on its own |
 | `neoskript-events` | smoke | all | Server events, driven by console commands: triggers and their filters run for the right events, `cancel event` stops the command, a message without `to` goes to the event's sender, and a trigger that waits carries on |
 | `neoskript-commands` | smoke | all | Script commands, run from the console: arguments, aliases, subcommands, choices, default values, named arguments, `executable by`, usage messages, `execute command`, and a reload that changes one command and removes the others |
-| `neoskript-real-world-corpus` | smoke | all | NeoSkript loads the real-world corpus and every script's self-test passes. `kits` and `warps` need items (M4 step 4): their results are reported but don't fail the check yet |
+| `neoskript-real-world-corpus` | smoke | all | NeoSkript loads the real-world corpus without problems and every script's self-test passes |
+| `neoskript-items` | smoke | all | Items and inventories, with the server's registries: item literals with amounts, plurals and enchantments, names and lore, items parsed from text, and chest inventory slots |
 | `neoskript-variables` | smoke | Skript envs | M3's exit check: Skript's `variables.csv` round-trips through NeoSkript byte for byte, and Skript reads and rewrites NeoSkript's file byte for byte |
 | `neoskript-skript-migration` | smoke | all | With only `plugins/Skript/scripts`, NeoSkript copies the scripts over on first start and runs them |
 | `neoskript-skript-conflict` | smoke | Skript envs | With Skript installed, NeoSkript refuses to run and Skript still works (D10) |

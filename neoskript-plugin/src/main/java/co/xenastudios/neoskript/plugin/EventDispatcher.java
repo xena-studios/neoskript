@@ -19,6 +19,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockEvent;
 import org.bukkit.event.entity.EntityEvent;
+import org.bukkit.event.inventory.InventoryEvent;
 import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.plugin.Plugin;
 import org.slf4j.Logger;
@@ -86,6 +87,7 @@ final class EventDispatcher implements Listener {
             case PlayerEvent player -> player.getPlayer();
             case EntityEvent entity -> entity.getEntity();
             case BlockEvent block -> block.getBlock().getLocation();
+            case InventoryEvent inventory -> inventory.getView().getPlayer();
             default -> null;
         };
     }
