@@ -290,7 +290,7 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
     private static Map<String, Variant> vocabulary(EntityKind base) {
         Map<String, Variant> words = new HashMap<>();
         Class<? extends Entity> c = base.entityClass;
-        if (Ageable.class.isAssignableFrom(c)) {
+        if (Ageable.class.isAssignableFrom(c) || c.isAssignableFrom(Ageable.class)) {
             words.put("baby", age(true));
             words.put("adult", age(false));
         }

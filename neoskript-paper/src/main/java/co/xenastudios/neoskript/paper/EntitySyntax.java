@@ -92,6 +92,7 @@ final class EntitySyntax {
         }, "%objects% (is|are)[not:(n't| not)] between %object% and %object%");
 
         registerSettableConditions(registrar);
+        registerProperties(registrar);
 
         registrar.effect("EffDetonate", info -> (context, args) -> {
             for (Object entity : (Object[]) args[0]) {
@@ -231,6 +232,252 @@ final class EntitySyntax {
                 return hashes.size() == 1 ? hashes.getFirst() : hashes.toArray();
             };
         }, "%texts% hash[ed] with (md5:MD5|SHA-256|384:SHA-384|512:SHA-512)");
+    }
+
+    private static void registerProperties(Registrar registrar) {
+        registrar.effect("EffVehicle", info -> {
+            int pattern = info.pattern();
+            return (context, args) -> {
+                for (Object value : (Object[]) args[0]) {
+                    if (!(value instanceof Entity entity)) {
+                        continue;
+                    }
+                    switch (pattern) {
+                        case 0 -> {
+                            if (args[1] instanceof Entity vehicle) {
+                                vehicle.addPassenger(entity);
+                            }
+                        }
+                        case 1 -> entity.leaveVehicle();
+                        default -> entity.eject();
+                    }
+                }
+            };
+        }, "(make|let|force) %entities% [to] (ride|mount) [(in|on)] %entity%",
+                "(make|let|force) %entities% [to] (dismount|(dismount|leave) [(from|of)] [(any|the[ir]|his|her)] vehicle[s])",
+                "(eject|dismount) [(any|the)] passenger[s] (of|from) %entities%");
+        registrar.expression("ExprVehicle", "entity", info -> (context, args) -> {
+            List<Object> vehicles = new ArrayList<>();
+            for (Object value : (Object[]) args[0]) {
+                if (value instanceof Entity entity && entity.getVehicle() != null) {
+                    vehicles.add(entity.getVehicle());
+                }
+            }
+            return vehicles.size() == 1 ? vehicles.getFirst() : vehicles.toArray();
+        }, "[the] vehicle[s] of %entities%", "%entities%'[s] vehicle[s]");
+
+        registrar.effect("EffPoison", info -> {
+            boolean cure = info.pattern() == 1;
+            return (context, args) -> {
+                int ticks = !cure && args[1] instanceof co.xenastudios.neoskript.runtime.Timespan time ? (int) time.ticks() : 15 * 20;
+                for (Object value : (Object[]) args[0]) {
+                    if (value instanceof LivingEntity living) {
+                        if (cure) {
+                            living.removePotionEffect(org.bukkit.potion.PotionEffectType.POISON);
+                        } else {
+                            living.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.POISON, ticks, 0));
+                        }
+                    }
+                }
+            };
+        }, "poison %livingentities% [for %timespan%]", "(cure|unpoison) %livingentities% [(from|of) poison]");
+        condition(registrar, "CondIsPoisoned", "livingentities", "poisoned", LivingEntity.class,
+                living -> living.hasPotionEffect(org.bukkit.potion.PotionEffectType.POISON));
+        registrar.effect("EffHandedness", info -> {
+            boolean left = info.hasTag("left");
+            return (context, args) -> {
+                for (Object value : (Object[]) args[0]) {
+                    if (value instanceof org.bukkit.entity.Mob mob) {
+                        mob.setLeftHanded(left);
+                    }
+                }
+            };
+        }, "make %livingentities% (left:left|right)( |-)handed");
+        registrar.effect("EffInvisible", info -> {
+            boolean invisible = info.pattern() == 0;
+            return (context, args) -> {
+                for (Object value : (Object[]) args[0]) {
+                    if (value instanceof LivingEntity living) {
+                        living.setInvisible(invisible);
+                    }
+                }
+            };
+        }, "make %livingentities% (invisible|not visible)", "make %livingentities% (visible|not invisible)");
+        registrar.effect("EffToggleCanPickUpItems", info -> {
+            boolean allow = info.pattern() == 0;
+            return (context, args) -> {
+                for (Object value : (Object[]) args[0]) {
+                    if (value instanceof LivingEntity living) {
+                        living.setCanPickupItems(allow);
+                    }
+                }
+            };
+        }, "allow %livingentities% to pick([ ]up items| items up)",
+                "(forbid|disallow) %livingentities% (from|to) pick([ing | ]up items|[ing] items up)");
+        condition(registrar, "CondIsTameable", "livingentities", "tameable", LivingEntity.class,
+                living -> living instanceof org.bukkit.entity.Tameable);
+        condition(registrar, "CondIsLootable", "blocks/entities", "lootable", Object.class,
+                value -> value instanceof org.bukkit.loot.Lootable || value instanceof org.bukkit.block.Block block
+                        && block.getState() instanceof org.bukkit.loot.Lootable);
+
+        SettableProperty.register(registrar, "ExprFireTicks", "timespan", "[max[imum]] (burn[ing]|fire) (time|duration)",
+                "entities", Entity.class, co.xenastudios.neoskript.runtime.Timespan.class,
+                entity -> new co.xenastudios.neoskript.runtime.Timespan(Math.max(0, entity.getFireTicks()) * 50L),
+                (entity, time) -> entity.setFireTicks((int) time.ticks()));
+        SettableProperty.register(registrar, "ExprFreezeTicks", "timespan", "freeze time", "entities", Entity.class,
+                co.xenastudios.neoskript.runtime.Timespan.class,
+                entity -> new co.xenastudios.neoskript.runtime.Timespan(entity.getFreezeTicks() * 50L),
+                (entity, time) -> entity.setFreezeTicks((int) Math.min(entity.getMaxFreezeTicks(), time.ticks())));
+        SettableProperty.register(registrar, "ExprPortalCooldown", "timespan", "portal cooldown", "entities", Entity.class,
+                co.xenastudios.neoskript.runtime.Timespan.class,
+                entity -> new co.xenastudios.neoskript.runtime.Timespan(entity.getPortalCooldown() * 50L),
+                (entity, time) -> entity.setPortalCooldown((int) time.ticks()));
+        SettableProperty.register(registrar, "ExprNoDamageTicks", "integer", LivingEntity.class, Number.class,
+                living -> (long) living.getNoDamageTicks(), (living, ticks) -> living.setNoDamageTicks(ticks.intValue()),
+                "[the] (invulnerability|invincibility|no damage) tick[s] [of %livingentities%]",
+                "%livingentities%'[s] (invulnerability|invincibility|no damage) tick[s]");
+        SettableProperty.register(registrar, "ExprNoDamageTimespan", "timespan", LivingEntity.class,
+                co.xenastudios.neoskript.runtime.Timespan.class,
+                living -> new co.xenastudios.neoskript.runtime.Timespan(living.getNoDamageTicks() * 50L),
+                (living, time) -> living.setNoDamageTicks((int) time.ticks()),
+                "[the] (invulnerability|invincibility|no damage) (time[span]|duration) [of %livingentities%]",
+                "%livingentities%'[s] (invulnerability|invincibility|no damage) (time[span]|duration)");
+        SettableProperty.register(registrar, "ExprArrowsStuck", "integer", LivingEntity.class, Number.class,
+                living -> (long) living.getArrowsInBody(), (living, count) -> living.setArrowsInBody(Math.max(0, count.intValue())),
+                "[number of] arrow[s] stuck in %livingentities%");
+        registrar.expression("ExprVillagerLevel", "integer", info -> new SettableVillager(info.hasTag("experience")),
+                "[the] villager (level|experience:experience) of %livingentities%",
+                "%livingentities%'[s] villager (level|experience:experience)");
+        registrar.expression("ExprInteractionDimensions", "number", info -> new SettableInteraction(info.hasTag("height")),
+                "[the] interaction (height:height|width)[s] of %entities%", "%entities%'[s] interaction (height:height|width)[s]");
+
+        registrar.type("attributetype", "attribute type", org.bukkit.attribute.Attribute.class);
+        registrar.literalParser("attributetype", EntitySyntax::attribute);
+        registrar.parser("attributetype", EntitySyntax::attribute);
+        registrar.text(org.bukkit.attribute.Attribute.class, attribute -> attribute.getKey().getKey().replace('_', ' '));
+        registrar.expression("ExprEntityAttribute", "number", info -> new AttributeValue(info.hasTag("total")),
+                "[the] %attributetype% [total:(total|final|modified)] attribute [value] of %entities%",
+                "%entities%'[s] %attributetype% [total:(total|final|modified)] attribute [value]");
+    }
+
+    /** The attribute {@code text} names ({@code movement speed}, {@code generic armour}), looked up when needed. */
+    static org.bukkit.attribute.Attribute attribute(String text) {
+        String name = text.strip().toLowerCase(java.util.Locale.ROOT).replaceFirst("^(generic|player) ", "")
+                .replace("armour", "armor").replace(' ', '_');
+        org.bukkit.NamespacedKey key = org.bukkit.NamespacedKey.fromString(name);
+        return key == null ? null : org.bukkit.Registry.ATTRIBUTE.get(key);
+    }
+
+    /** {@code the villager level of %livingentities%} and its experience, which can be set. */
+    private record SettableVillager(boolean experience) implements co.xenastudios.neoskript.api.element.Expression,
+            co.xenastudios.neoskript.api.element.Changeable {
+        @Override
+        public Object get(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments) {
+            List<Object> values = new ArrayList<>();
+            for (Object owner : owners(arguments[0])) {
+                if (owner instanceof org.bukkit.entity.Villager villager) {
+                    values.add((long) (experience ? villager.getVillagerExperience() : villager.getVillagerLevel()));
+                }
+            }
+            return values.size() == 1 ? values.getFirst() : values.toArray();
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return mode == Mode.SET || mode == Mode.ADD || mode == Mode.REMOVE ? new Class<?>[] {Number.class} : null;
+        }
+
+        @Override
+        public void change(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments, Object[] delta,
+                Mode mode) {
+            int by = delta.length > 0 && delta[0] instanceof Number n ? n.intValue() : 0;
+            for (Object owner : owners(arguments[0])) {
+                if (owner instanceof org.bukkit.entity.Villager villager) {
+                    int current = experience ? villager.getVillagerExperience() : villager.getVillagerLevel();
+                    int value = mode == Mode.ADD ? current + by : mode == Mode.REMOVE ? current - by : by;
+                    if (experience) {
+                        villager.setVillagerExperience(Math.max(0, value));
+                    } else {
+                        villager.setVillagerLevel(Math.max(1, Math.min(5, value)));
+                    }
+                }
+            }
+        }
+    }
+
+    /** {@code the interaction width of %entities%} and height, which can be set. */
+    private record SettableInteraction(boolean height) implements co.xenastudios.neoskript.api.element.Expression,
+            co.xenastudios.neoskript.api.element.Changeable {
+        @Override
+        public Object get(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments) {
+            List<Object> values = new ArrayList<>();
+            for (Object owner : owners(arguments[0])) {
+                if (owner instanceof org.bukkit.entity.Interaction interaction) {
+                    values.add((double) (height ? interaction.getInteractionHeight() : interaction.getInteractionWidth()));
+                }
+            }
+            return values.size() == 1 ? values.getFirst() : values.toArray();
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return mode == Mode.SET ? new Class<?>[] {Number.class} : null;
+        }
+
+        @Override
+        public void change(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments, Object[] delta,
+                Mode mode) {
+            float value = delta.length > 0 && delta[0] instanceof Number n ? n.floatValue() : 0;
+            for (Object owner : owners(arguments[0])) {
+                if (owner instanceof org.bukkit.entity.Interaction interaction) {
+                    if (height) {
+                        interaction.setInteractionHeight(value);
+                    } else {
+                        interaction.setInteractionWidth(value);
+                    }
+                }
+            }
+        }
+    }
+
+    /** {@code the movement speed attribute of %entities%}: the base value, or with {@code total} the final one. */
+    private record AttributeValue(boolean total) implements co.xenastudios.neoskript.api.element.Expression,
+            co.xenastudios.neoskript.api.element.Changeable {
+        @Override
+        public Object get(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments) {
+            List<Object> values = new ArrayList<>();
+            for (Object owner : owners(arguments[1])) {
+                if (owner instanceof org.bukkit.attribute.Attributable attributable
+                        && arguments[0] instanceof org.bukkit.attribute.Attribute attribute) {
+                    org.bukkit.attribute.AttributeInstance instance = attributable.getAttribute(attribute);
+                    if (instance != null) {
+                        values.add(total ? instance.getValue() : instance.getBaseValue());
+                    }
+                }
+            }
+            return values.size() == 1 ? values.getFirst() : values.toArray();
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return !total && (mode == Mode.SET || mode == Mode.ADD || mode == Mode.REMOVE) ? new Class<?>[] {Number.class} : null;
+        }
+
+        @Override
+        public void change(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments, Object[] delta,
+                Mode mode) {
+            double by = delta.length > 0 && delta[0] instanceof Number n ? n.doubleValue() : 0;
+            for (Object owner : owners(arguments[1])) {
+                if (owner instanceof org.bukkit.attribute.Attributable attributable
+                        && arguments[0] instanceof org.bukkit.attribute.Attribute attribute) {
+                    org.bukkit.attribute.AttributeInstance instance = attributable.getAttribute(attribute);
+                    if (instance != null) {
+                        double current = instance.getBaseValue();
+                        instance.setBaseValue(mode == Mode.ADD ? current + by : mode == Mode.REMOVE ? current - by : by);
+                    }
+                }
+            }
+        }
     }
 
     private static void registerSettableConditions(Registrar registrar) {
