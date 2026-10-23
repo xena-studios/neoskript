@@ -42,7 +42,18 @@ final class Players {
                     case Entity entity -> entity.getUniqueId();
                     default -> null;
                 });
-        registrar.property("PropExprName", "string", "name[s]", "objects", Object.class, Players::name);
+        // Settable for entities and items: their custom name.
+        SettableProperty.register(registrar, "PropExprName", "string", "name[s]", "objects", Object.class, Object.class,
+                Players::name, (owner, name) -> {
+                    Component component = name == null ? null : Messages.component(name);
+                    switch (owner) {
+                        case org.bukkit.entity.Player player -> player.displayName(component);
+                        case Entity entity -> entity.customName(component);
+                        case ItemType item -> item.editMeta(meta -> meta.displayName(component));
+                        case org.bukkit.inventory.ItemStack stack -> stack.editMeta(meta -> meta.displayName(component));
+                        default -> {}
+                    }
+                });
 
         registrar.condition("CondIsOnline", info -> {
             // 'offline' means not online; the negated pattern flips it again.
@@ -258,6 +269,10 @@ final class Players {
             case CommandSender sender -> sender.getName();
             case Nameable nameable when nameable.customName() != null ->
                     Messages.LEGACY_SECTION.serialize(nameable.customName());
+            case ItemType item when item.stack().getItemMeta() != null && item.stack().getItemMeta().displayName() != null ->
+                    Messages.LEGACY_SECTION.serialize(item.stack().getItemMeta().displayName());
+            case org.bukkit.inventory.ItemStack stack when stack.getItemMeta() != null && stack.getItemMeta().displayName() != null ->
+                    Messages.LEGACY_SECTION.serialize(stack.getItemMeta().displayName());
             default -> null;
         };
     }

@@ -484,6 +484,7 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
             }
             add(known, of(EntityType.FIREWORK_ROCKET), "firework");
             add(known, of(EntityType.LIGHTNING_BOLT), "lightning");
+            add(known, of(EntityType.TNT), "primed tnt");
             add(known, of(EntityType.ITEM), "dropped item");
             add(known, of(EntityType.EXPERIENCE_ORB), "xp orb", "experience orb");
             add(known, of(EntityType.CHEST_MINECART), "minecart with chest", "storage minecart");

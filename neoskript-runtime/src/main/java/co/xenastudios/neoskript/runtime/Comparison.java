@@ -12,6 +12,8 @@ public final class Comparison {
 
     private Comparison() {}
 
+    private static final double EPSILON = 1e-10;
+
     private record Equality(Class<?> left, Class<?> right, java.util.function.BiPredicate<Object, Object> test) {}
 
     private static final java.util.List<Equality> EQUALITIES = new java.util.concurrent.CopyOnWriteArrayList<>();
@@ -38,7 +40,9 @@ public final class Comparison {
             }
         }
         if (a instanceof Number x && b instanceof Number y) {
-            return Double.compare(x.doubleValue(), y.doubleValue()) == 0 || x.equals(y);
+            // As in Skript, decimals within 1e-10 of each other are equal.
+            return x.equals(y) || Math.abs(x.doubleValue() - y.doubleValue()) < EPSILON
+                    || Double.compare(x.doubleValue(), y.doubleValue()) == 0;
         }
         if (a instanceof String x && b instanceof String y) {
             return x.equalsIgnoreCase(y);
