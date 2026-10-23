@@ -73,6 +73,11 @@ public final class Values {
         return value instanceof KeyedValues keyed ? keyed.only(type) : filter(value, type);
     }
 
+    /** One of {@code values} at random, or {@code null} if there are none. */
+    public static Object random(Object[] values) {
+        return values.length == 0 ? null : values[java.util.concurrent.ThreadLocalRandom.current().nextInt(values.length)];
+    }
+
     /** Whether a value counts as true for {@code set whether X to ...}: the boolean true. */
     public static boolean isTrue(Object value) {
         return Boolean.TRUE.equals(single(value));

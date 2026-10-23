@@ -440,6 +440,19 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - `elements from 2 to 1`, `10 random elements` (repeats allowed unless `distinct`), and `amount of` an item.
 >      - `parsed as` is tried after other expressions, and `size of` before elements, matching Skript's order.
 >      - A bare `chest` is the item, not the equipment slot.
+>
+>    **Batch 11 (2026-10-23): 282 → 343 tests pass.**
+>    - **Default functions:** isNaN, root, factorial, permutations, combinations (rounding exactly as Skript's do), mean, median, clamp (keeps indices when keyed), toBase/fromBase, formatNumber, concat, case_equals, and `vector(n)`.
+>    - **Properties:** numeric and timespan properties can be added to, removed from and deleted. Yaw and pitch of entities and locations are settable. Explosive yield covers creepers and ghasts.
+>    - **Settable conditions:** creeper ignition, ghast charging, allay dancing, camel dashing, jumping, despawning when far away, item despawning, goat horns, PvP, tooltips, and server whitelist mode and enforcement.
+>    - **Vectors:** between locations, of a location, location from a vector, normalized, squared length, dot and cross products, angle between, from yaw and pitch, rotation around another vector.
+>    - **Other syntax:** `recursive size of`, `random number out of X` (keeps only that type), inventories of any type (`a hopper inventory named "x"`), `items in`, `type of` an inventory, `-infinity value`.
+>    - **Fixes:**
+>      - NaN never equals anything, as in Skript.
+>      - Invisible/visible and left/right-handed conditions had their tags reversed.
+>      - `3 of stone` and `number within X` are tried late, matching Skript's order, so `y coordinate of spawn of {_w}` and `items in X` parse as Skript parses them.
+>      - Inventory kinds and attribute names are only looked up when a script runs, so registration never touches the server.
+>      - `X is stone` holds for any stone, named or not; `X is stone named "a"` only for that name.
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.

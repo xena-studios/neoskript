@@ -27,6 +27,10 @@ public final class Comparison {
         EQUALITIES.add(new Equality(left, right, (java.util.function.BiPredicate<Object, Object>) test));
     }
 
+    private static boolean isWhole(Number value) {
+        return value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte;
+    }
+
     public static boolean equal(Object a, Object b) {
         if (a == null || b == null) {
             return a == b;
@@ -40,9 +44,13 @@ public final class Comparison {
             }
         }
         if (a instanceof Number x && b instanceof Number y) {
-            // As in Skript, decimals within 1e-10 of each other are equal.
-            return x.equals(y) || Math.abs(x.doubleValue() - y.doubleValue()) < EPSILON
-                    || Double.compare(x.doubleValue(), y.doubleValue()) == 0;
+            if (isWhole(x) && isWhole(y)) {
+                return x.longValue() == y.longValue();
+            }
+            // As in Skript, decimals within 1e-10 of each other are equal, and NaN equals nothing, not even NaN.
+            double dx = x.doubleValue();
+            double dy = y.doubleValue();
+            return dx == dy || Math.abs(dx - dy) < EPSILON;
         }
         if (a instanceof String x && b instanceof String y) {
             return x.equalsIgnoreCase(y);

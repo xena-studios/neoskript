@@ -48,6 +48,9 @@ final class CoreSyntax {
     static final String CURRENT_SCRIPT = "ExprScript";
     static final String COPY = "EffCopy";
     static final String RECURSIVE = "ExprRecursive";
+    static final String RANDOM = "ExprRandom";
+    /** Skript's {@code ExprAmount} counting a list variable's values at every depth. */
+    static final String RECURSIVE_SIZE = "ExprAmount-recursive";
     static final String TRANSFORM = "ExprTransform";
     static final String REDUCE = "ExprReduce";
     static final String INPUT = "ExprInput";
@@ -148,6 +151,8 @@ final class CoreSyntax {
 
         // 'copy {_a::*} into {_b::*}': lists with their indices and nested lists; 'recursive {_a::*}'.
         library.core(SyntaxKind.EFFECT, COPY, null, List.of(), "copy %~objects% [in]to %~objects%");
+        library.core(SyntaxKind.EXPRESSION, RECURSIVE_SIZE, "integer", List.of(),
+                "[the] recursive (amount|number|size) of %~objects%");
         library.core(SyntaxKind.EXPRESSION, RECURSIVE, "object", List.of(), "recursive %~objects%");
 
         // The script being compiled.
@@ -186,11 +191,11 @@ final class CoreSyntax {
                 "sort %~objects% [in (descending:descending|ascending) order] [(by|based on) <.+>]");
 
         // Pattern 1 is the next value and 2 the previous one.
-        // 'number within {_x}': the values of that type. Its type comes from the type name.
         library.core(SyntaxKind.EXPRESSION, TERNARY, "object", List.of(RegexRole.CONDITION),
                 "%objects% if <.+>[,] (otherwise|else) %objects%");
-        library.core(SyntaxKind.EXPRESSION, CAST, "object", List.of(RegexRole.TYPE),
-                "[the] (<.+>|value[s]) (within|in) %~objects%");
+        // 'a random number out of {_list::*}': one of the values of that type, or nothing.
+        library.core(SyntaxKind.EXPRESSION, RANDOM, "object", List.of(RegexRole.TYPE),
+                "[a] random <.+> [out] (of|from) %objects%");
         library.core(SyntaxKind.EXPRESSION, LOOP_VALUE, "object", List.of(RegexRole.LOOP_VALUE),
                 "[the] [current] loop-<.+>", "[the] next loop-<.+>", "[the] previous loop-<.+>");
         // A command's arguments. Before arithmetic, so 'arg-1' isn't 'arg - 1'.
@@ -220,6 +225,10 @@ final class CoreSyntax {
 
     /** Syntax tried after everything else, so the library's elements win: event values match any type name. */
     static void registerLast(Library library) {
+        // 'number within {_x}': the values of that type. Its type comes from the type name. Late, as in Skript,
+        // so 'items in {_inventory}' is the inventory's items.
+        library.core(SyntaxKind.EXPRESSION, CAST, "object", List.of(RegexRole.TYPE),
+                "[the] (<.+>|value[s]) (within|in) %~objects%");
         // '"5" parsed as integer': text through the type's parser, or nothing if it isn't one. After the
         // library's expressions, as Skript tries it after most: 'difference between {_a} and "5" parsed as a
         // number' is the difference with a parsed number.

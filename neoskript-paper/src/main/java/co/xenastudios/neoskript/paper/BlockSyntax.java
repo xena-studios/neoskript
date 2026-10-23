@@ -47,6 +47,7 @@ final class BlockSyntax {
                     case EntityKind kind -> kind.type() == null ? kind : EntityKind.of(kind.type());
                     case Entity entity -> EntityKind.of(entity.getType());
                     case org.bukkit.potion.PotionEffect effect -> effect.getType();
+                    case org.bukkit.inventory.Inventory inventory -> new Items.InventoryKind(inventory.getType().name());
                     default -> null;
                 };
                 if (type != null) {
