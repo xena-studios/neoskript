@@ -72,6 +72,30 @@ class LanguageTest {
     }
 
     @Test
+    void inlineFunctions() {
+        assertEquals(List.of("foo", "1", "15", "Hello World", "3, 4 and 5", "2 and 4", "1", "c, a and b"), run("""
+                on load:
+                \tset {_list::*} to "foo", "bar" and "foobar"
+                \tsay first element of ({_list::*} where [input is "foo"])
+                \tsay size of ({_list::*} where [input is "bar"])
+                \tset {_n::*} to 1, 2, 3, 4 and 5
+                \tsay {_n::*} reduced with [reduced value + input]
+                \tsay ("Hello", " " and "World") reduced with ["%reduced value%%input%"]
+                \tsay (1, 2 and 3) transformed using [input + 2]
+                \tfilter {_n::*} to match:
+                \t\tmod(input, 2) = 0
+                \tsay {_n::*}
+                \tsay {_list::*} where [input index is "1"] transformed using [length of input - 2]
+                \tset {_s::a} to 2
+                \tset {_s::b} to 3
+                \tset {_s::c} to 1
+                \tset {_k::*} to "a", "b" and "c"
+                \tsort {_k::*} by {_s::%input%}
+                \tsay {_k::*}
+                """));
+    }
+
+    @Test
     void defaultValues() {
         assertEquals(List.of("nothing", "set", "nothing"), run("""
                 on load:

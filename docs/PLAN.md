@@ -384,6 +384,13 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >    - **World:** `all worlds`, `vector from x, y, z`, `is loaded` for chunks and worlds.
 >    - **Time:** `ago`/`later`, before or after a date.
 >    - **Potions:** `speed 5` as a potion effect.
+>
+>    **Batch 5 (2026-10-23): 192 → 201 tests pass.**
+>    - **Inline functions:** compiled as loops inside the expression.
+>      - `%objects% where [condition]`, `%objects% transformed using [expression]`, `%objects% reduced with [expression]`, with `input`, `<type> input`, `input index` and `reduced value`.
+>      - `transform %list% using ...`, `sort %list% by ...`, and the `filter %list% to match [any|all]:` section change the list in place.
+>      - `sorted %objects%`, `keyed %objects%`.
+>    - **Script objects (`the current script`, `script named ...`) are deferred.** Skript's tests for them expect the paths of Skript's own test runner layout (`../../../src/test/skript/tests/...`), which NeoSkript's harness doesn't use. They need a decision on matching that layout first.
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
