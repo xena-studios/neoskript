@@ -68,6 +68,20 @@ public interface Registrar {
     void expression(String id, String returnType, ElementFactory<Expression> factory, String... patterns);
 
     /**
+     * An expression whose patterns name a type in each {@code <...>} part, like Skript's classinfo placeholders:
+     * {@code [the] [<.+>] data tag %text% of %objects%}. The types matched reach the factory in
+     * {@link co.xenastudios.neoskript.api.element.ElementInfo#types()}.
+     */
+    void typedExpression(String id, String returnType, ElementFactory<Expression> factory, String... patterns);
+
+    /**
+     * Lets expression {@code expressionId} take a section, as Skript's expression sections do:
+     * {@code set {_border} to a worldborder:} runs the code under it for the value made, whose type is
+     * {@code valueType} ({@code event-worldborder}, or left out where a world border goes), before setting it.
+     */
+    void sectionExpression(String expressionId, String valueType);
+
+    /**
      * A property expression, {@code [the] <property> of %owners%} and {@code %owners%'[s] <property>}: the
      * value of {@code getter} for each owner of {@code ownerClass}. Owners of other classes, and
      * {@code null} results, are left out.

@@ -22,32 +22,51 @@ public final class Arithmetic {
             new java.util.concurrent.ConcurrentHashMap<>();
 
     static {
+        // Timespans saturate at forever, which stays forever, as in Skript.
         register('+', Timespan.class, Timespan.class, (x, y) -> {
             try {
                 return new Timespan(Math.addExact(x.millis(), y.millis()));
             } catch (ArithmeticException overflow) {
-                return new Timespan(Long.MAX_VALUE);
+                return Timespan.FOREVER;
             }
         });
-        register('-', Timespan.class, Timespan.class, (x, y) -> new Timespan(Math.max(0, x.millis() - y.millis())));
+        register('-', Timespan.class, Timespan.class, (x, y) -> x.isInfinite() ? x
+                : y.isInfinite() ? new Timespan(0) : new Timespan(Math.max(0, x.millis() - y.millis())));
         register('*', Timespan.class, Number.class, Arithmetic::scale);
         register('*', Number.class, Timespan.class, (x, y) -> scale(y, x));
         register('/', Timespan.class, Number.class, (x, y) -> {
             double scalar = y.doubleValue();
-            return scalar <= 0 || !Double.isFinite(scalar) ? null : new Timespan((long) (x.millis() / scalar));
+            if (scalar <= 0 || Double.isNaN(scalar)) {
+                return null;
+            }
+            return x.isInfinite() ? x : new Timespan((long) (x.millis() / scalar));
         });
-        register('/', Timespan.class, Timespan.class, (x, y) -> (double) x.millis() / y.millis());
+        register('/', Timespan.class, Timespan.class, (x, y) -> {
+            if (x.isInfinite() || y.isInfinite()) {
+                return x.isInfinite() && y.isInfinite() ? Double.NaN : x.isInfinite() ? Double.POSITIVE_INFINITY : 0.0;
+            }
+            return (double) x.millis() / y.millis();
+        });
         register('+', Date.class, Timespan.class, (x, y) -> new Date(x.millis() + y.millis()));
         register('-', Date.class, Timespan.class, (x, y) -> new Date(x.millis() - y.millis()));
+        // A time plus a timespan moves on by its game ticks; plus another time, by how long after midnight that is.
+        register('+', TimeOfDay.class, Timespan.class, (x, y) -> new TimeOfDay((int) ((x.ticks() + y.ticks()) % 24000)));
+        register('-', TimeOfDay.class, Timespan.class, (x, y) -> new TimeOfDay((int) ((x.ticks() - y.ticks()) % 24000)));
+        register('+', TimeOfDay.class, TimeOfDay.class, (x, y) -> new TimeOfDay(x.ticks() + y.ticksAfterMidnight()));
+        register('-', TimeOfDay.class, TimeOfDay.class, (x, y) -> new TimeOfDay(x.ticks() - y.ticksAfterMidnight()));
         registerDefault(Timespan.class, () -> new Timespan(0));
     }
 
     private static Timespan scale(Timespan timespan, Number by) {
         double scalar = by.doubleValue();
-        if (scalar < 0 || !Double.isFinite(scalar)) {
+        if (scalar < 0 || Double.isNaN(scalar)) {
             return null;
         }
-        return new Timespan((long) Math.min(timespan.millis() * scalar, Long.MAX_VALUE));
+        if (timespan.isInfinite() || Double.isInfinite(scalar)) {
+            return scalar == 0 || timespan.millis() == 0 ? new Timespan(0) : Timespan.FOREVER;
+        }
+        double millis = timespan.millis() * scalar;
+        return millis >= Long.MAX_VALUE ? Timespan.FOREVER : new Timespan((long) millis);
     }
 
     /**

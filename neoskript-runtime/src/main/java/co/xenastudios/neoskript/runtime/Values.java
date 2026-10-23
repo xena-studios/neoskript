@@ -73,6 +73,18 @@ public final class Values {
         return value instanceof KeyedValues keyed ? keyed.only(type) : filter(value, type);
     }
 
+    /** What a loop goes through: the values, or a queue's elements, which looping takes out of it. */
+    public static Object[] loopValues(Object[] values) {
+        if (values.length == 1 && values[0] instanceof java.util.Queue<?> queue) {
+            List<Object> taken = new ArrayList<>(queue.size());
+            for (Object element = queue.poll(); element != null; element = queue.poll()) {
+                taken.add(element);
+            }
+            return taken.toArray();
+        }
+        return values;
+    }
+
     /** One of {@code values} at random, or {@code null} if there are none. */
     public static Object random(Object[] values) {
         return values.length == 0 ? null : values[java.util.concurrent.ThreadLocalRandom.current().nextInt(values.length)];
@@ -129,6 +141,39 @@ public final class Values {
     public static Object element(Object[] array, int index, int offset) {
         int i = index + offset;
         return i >= 0 && i < array.length ? array[i] : null;
+    }
+
+    /**
+     * What {@code transform} gives a list: if each value became exactly one, those at the same indices;
+     * otherwise all of them, numbered from 1.
+     *
+     * @param results the values each value became, in order
+     * @param keys the list's indices, or {@code null}
+     */
+    public static Object transformed(java.util.List<Object[]> results, String[] keys) {
+        boolean oneEach = keys != null && keys.length == results.size();
+        java.util.List<Object> all = new java.util.ArrayList<>();
+        for (Object[] result : results) {
+            oneEach &= result.length == 1;
+            java.util.Collections.addAll(all, result);
+        }
+        return oneEach ? new KeyedValues(all.toArray(), keys) : all.toArray();
+    }
+
+    /**
+     * {@code value} rounded to a whole number, kept within an {@code int}: infinity is the largest, and
+     * not-a-number is 0, where a plain cast would wrap round to nonsense.
+     */
+    public static int toInt(double value) {
+        if (Double.isNaN(value)) {
+            return 0;
+        }
+        return (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, Math.round(value)));
+    }
+
+    /** A random index below {@code size}: which of an or-list is meant. */
+    public static int randomIndex(int size) {
+        return java.util.concurrent.ThreadLocalRandom.current().nextInt(size);
     }
 
     /** The values of a list expression, with nested lists flattened. */

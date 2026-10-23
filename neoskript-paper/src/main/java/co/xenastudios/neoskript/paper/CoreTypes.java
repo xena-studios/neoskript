@@ -23,6 +23,30 @@ import org.bukkit.entity.Player;
 final class CoreTypes {
 
     private static final Pattern NUMBER = Pattern.compile("[-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)");
+
+    /** An angle: {@code 90 degrees}, or {@code 3.14 radians}, which is in degrees. */
+    private static final Pattern ANGLE = Pattern.compile("(.+?) *(deg(?:ree)?s?|rad(?:ian)?s?)", Pattern.CASE_INSENSITIVE);
+
+    /** A number parsed from text: {@code 5}, {@code -2.5}, or an angle in degrees. */
+    static Object number(String text) {
+        java.util.regex.Matcher angle = ANGLE.matcher(text);
+        if (angle.matches()) {
+            Object value = number(angle.group(1));
+            return value instanceof Number n && Character.toLowerCase(angle.group(2).charAt(0)) == 'r'
+                    ? Math.toDegrees(n.doubleValue()) : value;
+        }
+        if (!NUMBER.matcher(text).matches()) {
+            return null;
+        }
+        if (text.indexOf('.') < 0) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException e) {
+                // Too big for a whole number.
+            }
+        }
+        return Double.parseDouble(text);
+    }
     private static final Pattern INTEGER = Pattern.compile("[-+]?\\d{1,18}");
     private static final Pattern PLAYER_NAME = Pattern.compile("[A-Za-z0-9_]{1,16}");
 
@@ -80,6 +104,17 @@ final class CoreTypes {
         registrar.subtype("commandsender", "audience");
         registrar.subtype("player", "commandsender");
         registrar.subtype("player", "offlineplayer");
+        // A UUID is the text of it: '{_uuid} is "a0789aeb-..."'.
+        registrar.comparison(UUID.class, String.class, (uuid, text) -> uuid.toString().equalsIgnoreCase(text.strip()));
+        // Where text is wanted, a UUID is its text.
+        registrar.converter(UUID.class, String.class, UUID::toString);
+        // A UUID is what it identifies: '{_uuid} is the player'.
+        registrar.comparison(UUID.class, OfflinePlayer.class, (uuid, player) -> uuid.equals(player.getUniqueId()));
+        registrar.comparison(UUID.class, org.bukkit.entity.Entity.class, (uuid, entity) -> uuid.equals(entity.getUniqueId()));
+        registrar.comparison(UUID.class, org.bukkit.World.class, (uuid, world) -> uuid.equals(world.getUID()));
+        // 'player is "Notch"': a player is the text of their name.
+        registrar.comparison(OfflinePlayer.class, String.class, (player, name) -> player.getName() != null
+                && player.getName().equalsIgnoreCase(name));
         registrar.subtype("player", "entity");
 
         Map<String, GameMode> gameModes = new LinkedHashMap<>();
@@ -91,8 +126,7 @@ final class CoreTypes {
 
         // How text typed in commands becomes values.
         registrar.parser("string", text -> text);
-        registrar.parser("number", text -> NUMBER.matcher(text).matches()
-                ? (text.indexOf('.') < 0 ? (Object) Long.parseLong(text) : (Object) Double.parseDouble(text)) : null);
+        registrar.parser("number", CoreTypes::number);
         registrar.parser("integer", text -> INTEGER.matcher(text).matches() ? Long.parseLong(text) : null);
         registrar.parser("boolean", text -> switch (text.toLowerCase(Locale.ROOT)) {
             case "true", "yes", "on" -> Boolean.TRUE;
@@ -101,6 +135,14 @@ final class CoreTypes {
         });
         registrar.parser("player", CoreTypes::player);
         registrar.parser("offlineplayer", CoreTypes::offlinePlayer);
+        // An entity by its UUID: '{_uuid} parsed as entity'.
+        registrar.parser("entity", text -> {
+            try {
+                return Bukkit.getEntity(UUID.fromString(text.strip()));
+            } catch (IllegalArgumentException notUuid) {
+                return null;
+            }
+        });
         registrar.parser("world", Bukkit::getWorld);
         registrar.parser("uuid", text -> {
             try {

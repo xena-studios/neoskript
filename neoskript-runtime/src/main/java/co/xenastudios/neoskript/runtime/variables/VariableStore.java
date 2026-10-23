@@ -28,22 +28,89 @@ import java.util.function.UnaryOperator;
  */
 public final class VariableStore {
 
-    /** How list indices sort: numbers by value, then text ignoring case. */
-    public static final Comparator<String> INDEX_ORDER = (a, b) -> {
-        Double x = number(a);
-        Double y = number(b);
-        if (x != null && y != null) {
-            int byValue = Double.compare(x, y);
-            if (byValue != 0) {
-                return byValue;
+    /**
+     * The order of a list's indices, as Skript sorts them: runs of digits as numbers (so 2 comes before 10,
+     * and after a {@code -} in reverse, so -2 comes before -1), decimals digit by digit, more leading zeros
+     * after fewer, and anything else character by character, ignoring case.
+     */
+    public static final Comparator<String> INDEX_ORDER = VariableStore::compareIndices;
+
+    private static int compareIndices(String s1, String s2) {
+        int i = 0;
+        int j = 0;
+        boolean lastNegative = false;
+        boolean afterDecimal = false;
+        while (i < s1.length() && j < s2.length()) {
+            char c1 = s1.charAt(i);
+            char c2 = s2.charAt(j);
+            if (isDigit(c1) && isDigit(c2)) {
+                int end1 = digitsEnd(s1, i);
+                int end2 = digitsEnd(s2, j);
+                int zeros1 = 0;
+                int zeros2 = 0;
+                if (!afterDecimal) {
+                    while (i < end1 - 1 && s1.charAt(i) == '0') {
+                        i++;
+                        zeros1++;
+                    }
+                    while (j < end2 - 1 && s2.charAt(j) == '0') {
+                        j++;
+                        zeros2++;
+                    }
+                }
+                boolean previousNegative = lastNegative;
+                lastNegative = i - zeros1 > 0 && s1.charAt(i - zeros1 - 1) == '-';
+                int sign = lastNegative || previousNegative ? -1 : 1;
+                if (!afterDecimal && end1 - i != end2 - j) {
+                    return ((end1 - i) - (end2 - j)) * sign;
+                }
+                while (i < end1 && j < end2) {
+                    char d1 = s1.charAt(i);
+                    char d2 = s2.charAt(j);
+                    if (d1 != d2) {
+                        return (d1 - d2) * sign;
+                    }
+                    i++;
+                    j++;
+                }
+                if (afterDecimal && end1 - i != end2 - j) {
+                    return ((end1 - i) - (end2 - j)) * sign;
+                }
+                if (zeros1 != zeros2) {
+                    return (zeros1 - zeros2) * sign;
+                }
+                afterDecimal = false;
+            } else {
+                char l1 = Character.toLowerCase(c1);
+                char l2 = Character.toLowerCase(c2);
+                if (l1 != l2) {
+                    return l1 - l2;
+                }
+                afterDecimal = c1 == '.';
+                i++;
+                j++;
             }
-        } else if (x != null) {
-            return -1;
-        } else if (y != null) {
-            return 1;
         }
-        return String.CASE_INSENSITIVE_ORDER.compare(a, b);
-    };
+        if (i < s1.length()) {
+            return lastNegative ? -1 : 1;
+        }
+        if (j < s2.length()) {
+            return lastNegative ? 1 : -1;
+        }
+        return 0;
+    }
+
+    private static boolean isDigit(char c) {
+        return c >= '0' && c <= '9';
+    }
+
+    private static int digitsEnd(String s, int from) {
+        int i = from;
+        while (i < s.length() && isDigit(s.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
 
     private static final String SEPARATOR = "::";
 
@@ -258,9 +325,39 @@ public final class VariableStore {
         deleteList(prefix);
         Node node = create(prefix);
         for (int i = 0; i < keyed.values().length; i++) {
-            if (keyed.values()[i] != null) {
-                node.children().computeIfAbsent(keyed.keys()[i], k -> new Node()).value.set(Values.copy(keyed.values()[i]));
+            if (keyed.values()[i] == null) {
+                continue;
             }
+            String key = keyed.keys()[i].toLowerCase(java.util.Locale.ROOT);
+            // A path ('a::b::c', from a recursive list) goes into the lists under the index.
+            Node target = key.contains(SEPARATOR) ? create(prefix + SEPARATOR + key)
+                    : node.children().computeIfAbsent(key, k -> new Node());
+            target.value.set(Values.copy(keyed.values()[i]));
+        }
+    }
+
+    /**
+     * Puts an update's results back into {@code {prefix::*}} at the indices they came from, as Skript does:
+     * {@code replace "a" in {_list::*} with "b"} keeps the list's indices. {@code keys} are the list's indices
+     * when it was read; values that weren't given to the update (not of type {@code only}) stay as they are.
+     * If the results don't line up with the values given, the list is set to them, numbered from 1.
+     */
+    public void updateList(String prefix, String[] keys, Object result, Class<?> only) {
+        Object[] results = result instanceof Object[] array ? array : result == null ? new Object[0] : new Object[] {result};
+        List<String> given = new ArrayList<>(keys.length);
+        for (String key : keys) {
+            Object value = get(prefix + SEPARATOR + key);
+            if (value != null && (only == null || only.isInstance(value))) {
+                given.add(key);
+            }
+        }
+        if (given.size() != results.length) {
+            setList(prefix, results);
+            return;
+        }
+        changed();
+        for (int i = 0; i < results.length; i++) {
+            set(prefix + SEPARATOR + given.get(i), results[i]);
         }
     }
 
@@ -330,14 +427,41 @@ public final class VariableStore {
         return values.toArray();
     }
 
+    /** Every value under {@code node}: each child's own list before the child's value, as Skript lists them. */
     private static void collect(Node node, List<Object> into) {
         for (Node child : node.children.values()) {
+            if (child.children != null) {
+                collect(child, into);
+            }
             Object value = child.value.get();
             if (value != null) {
                 into.add(value);
             }
+        }
+    }
+
+    /** Every value under {@code {prefix::*}} with its path below it ({@code a::b::c}), in {@link #recursiveList} order. */
+    public KeyedValues recursiveKeyedList(String prefix) {
+        List<Object> values = new ArrayList<>();
+        List<String> keys = new ArrayList<>();
+        Node node = find(prefix);
+        if (node != null && node.children != null) {
+            collectKeyed(node, "", values, keys);
+        }
+        return new KeyedValues(values.toArray(), keys.toArray(String[]::new));
+    }
+
+    private static void collectKeyed(Node node, String path, List<Object> values, List<String> keys) {
+        for (Map.Entry<String, Node> entry : node.children.entrySet()) {
+            String key = path.isEmpty() ? entry.getKey() : path + SEPARATOR + entry.getKey();
+            Node child = entry.getValue();
             if (child.children != null) {
-                collect(child, into);
+                collectKeyed(child, key, values, keys);
+            }
+            Object value = child.value.get();
+            if (value != null) {
+                values.add(value);
+                keys.add(key);
             }
         }
     }
@@ -392,19 +516,9 @@ public final class VariableStore {
     private Node create(String name) {
         Node node = root;
         for (String part : name.split(SEPARATOR, -1)) {
-            node = node.children().computeIfAbsent(part, k -> new Node());
+            // Names are kept in lower case, as Skript keeps them: {_list::Hello} is at index "hello".
+            node = node.children().computeIfAbsent(part.toLowerCase(java.util.Locale.ROOT), k -> new Node());
         }
         return node;
-    }
-
-    private static Double number(String text) {
-        if (text.isEmpty() || !(Character.isDigit(text.charAt(0)) || text.charAt(0) == '-')) {
-            return null;
-        }
-        try {
-            return Double.parseDouble(text);
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 }

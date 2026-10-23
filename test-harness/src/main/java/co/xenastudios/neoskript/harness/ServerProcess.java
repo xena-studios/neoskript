@@ -137,10 +137,23 @@ public final class ServerProcess implements AutoCloseable {
         console.flush();
     }
 
-    /** Waits for the server to exit by itself. */
+    /** Waits for the server to exit by itself, giving up early if a plugin fails to load or enable. */
     public int awaitExit(Duration timeout) throws InterruptedException {
-        if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-            throw new HarnessFailure("Server didn't exit within " + timeout.toMinutes() + " minutes. See " + logFile);
+        long deadline = System.nanoTime() + timeout.toNanos();
+        int checked = 0;
+        while (!process.waitFor(1, TimeUnit.SECONDS)) {
+            synchronized (lines) {
+                for (; checked < lines.size(); checked++) {
+                    if (PLUGIN_FAILED.matcher(lines.get(checked)).find()) {
+                        process.destroyForcibly().waitFor(30, TimeUnit.SECONDS);
+                        throw new HarnessFailure("A plugin failed, so the server won't finish: " + lines.get(checked)
+                                + ". See " + logFile);
+                    }
+                }
+            }
+            if (System.nanoTime() > deadline) {
+                throw new HarnessFailure("Server didn't exit within " + timeout.toMinutes() + " minutes. See " + logFile);
+            }
         }
         reader.join(Duration.ofSeconds(10));
         return process.exitValue();

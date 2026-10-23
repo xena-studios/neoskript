@@ -13,6 +13,14 @@ import java.util.regex.Pattern;
 /** A length of time, like {@code 2 minutes and 30 seconds}. */
 public record Timespan(long millis) implements Comparable<Timespan> {
 
+    /** An eternity, Skript's {@code forever}: the longest timespan, which stays forever through arithmetic. */
+    public static final Timespan FOREVER = new Timespan(Long.MAX_VALUE);
+
+    /** Whether this is {@link #FOREVER}. */
+    public boolean isInfinite() {
+        return millis == Long.MAX_VALUE;
+    }
+
     private static final Pattern COMPACT = Pattern.compile("(\\d+(?:\\.\\d+)?)(mo|[tsmhdwy])");
     private static final Pattern NUMBER = Pattern.compile("\\d+(?:\\.\\d+)?");
     private static final Pattern CLOCK = Pattern.compile("(\\d+):(\\d\\d)((?::\\d\\d){0,2})(\\.\\d{1,4})?");
@@ -126,6 +134,9 @@ public record Timespan(long millis) implements Comparable<Timespan> {
     /** As Skript writes it: {@code 2 minutes and 30 seconds}. */
     @Override
     public String toString() {
+        if (isInfinite()) {
+            return "forever";
+        }
         if (millis == 0) {
             return "0 seconds";
         }

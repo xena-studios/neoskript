@@ -25,6 +25,8 @@ final class SettableProperty<T, V> implements Expression, Changeable {
     private final Class<V> valueClass;
     private final Function<? super T, ?> getter;
     private final BiConsumer<? super T, ? super V> setter;
+    private Object reset;
+    private java.util.function.Consumer<? super T> clear;
 
     SettableProperty(Class<T> ownerClass, Class<V> valueClass, Function<? super T, ?> getter,
             BiConsumer<? super T, ? super V> setter) {
@@ -34,12 +36,35 @@ final class SettableProperty<T, V> implements Expression, Changeable {
         this.setter = setter;
     }
 
+    /**
+     * This property, which {@code reset} sets back to {@code value}; or, if {@code value} is a
+     * {@code Consumer}, resets each owner by passing it to that.
+     */
+    SettableProperty<T, V> resettingTo(Object value) {
+        this.reset = value;
+        return this;
+    }
+
+    /** This property, which {@code delete} clears by passing each owner to {@code clear}. */
+    SettableProperty<T, V> deleting(java.util.function.Consumer<? super T> clear) {
+        this.clear = clear;
+        return this;
+    }
+
     /** Registers {@code [the] <property> of %owners%} and {@code %owners%'[s] <property>}. */
     static <T, V> void register(Registrar registrar, String id, String returnType, String property, String owners,
             Class<T> ownerClass, Class<V> valueClass, Function<? super T, ?> getter,
             BiConsumer<? super T, ? super V> setter) {
         registrar.expression(id, returnType, info -> new SettableProperty<>(ownerClass, valueClass, getter, setter),
                 Patterns.property(property, owners));
+    }
+
+    /** {@link #register(Registrar, String, String, String, String, Class, Class, Function, BiConsumer)}, resettable. */
+    static <T, V> void register(Registrar registrar, String id, String returnType, String property, String owners,
+            Class<T> ownerClass, Class<V> valueClass, Function<? super T, ?> getter, BiConsumer<? super T, ? super V> setter,
+            Object reset) {
+        registrar.expression(id, returnType, info -> new SettableProperty<>(ownerClass, valueClass, getter, setter)
+                .resettingTo(reset), Patterns.property(property, owners));
     }
 
     /** Registers it with its own patterns, whose first placeholder is the owners. */
@@ -71,12 +96,38 @@ final class SettableProperty<T, V> implements Expression, Changeable {
             // Any number will do for a number property; it's converted to the property's kind.
             return new Class<?>[] {Number.class.isAssignableFrom(valueClass) ? Number.class : valueClass};
         }
+        if (mode == Mode.RESET && reset != null || mode == Mode.DELETE && clear != null) {
+            return new Class<?>[0];
+        }
         // Deleting an amount makes it nothing: 0, or no time.
         return amount && mode == Mode.DELETE ? new Class<?>[0] : null;
     }
 
     @Override
     public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
+        if (mode == Mode.RESET) {
+            for (Object owner : owners(context, arguments)) {
+                if (!ownerClass.isInstance(owner)) {
+                    continue;
+                }
+                if (reset instanceof java.util.function.Consumer<?> resetter) {
+                    @SuppressWarnings("unchecked")
+                    java.util.function.Consumer<Object> each = (java.util.function.Consumer<Object>) resetter;
+                    each.accept(owner);
+                } else {
+                    setter.accept(ownerClass.cast(owner), valueClass.cast(reset));
+                }
+            }
+            return;
+        }
+        if (mode == Mode.DELETE && clear != null) {
+            for (Object owner : owners(context, arguments)) {
+                if (ownerClass.isInstance(owner)) {
+                    clear.accept(ownerClass.cast(owner));
+                }
+            }
+            return;
+        }
         if (mode == Mode.DELETE) {
             V zero = valueClass.cast(valueClass == Timespan.class ? new Timespan(0) : amount(0));
             for (Object owner : owners(context, arguments)) {
@@ -87,6 +138,10 @@ final class SettableProperty<T, V> implements Expression, Changeable {
             return;
         }
         if (delta == null || delta.length == 0) {
+            // Set to nothing, a property that can be cleared is: 'set item model of X to {_none}'.
+            if (mode == Mode.SET && clear != null) {
+                change(context, arguments, null, Mode.DELETE);
+            }
             return;
         }
         if (mode != Mode.SET) {

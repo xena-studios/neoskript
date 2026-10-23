@@ -79,8 +79,14 @@ public sealed interface Expr {
     /**
      * Word-like text that might be a literal of a type whose values the frontend can't list, like item or
      * entity names. The standard library resolves or rejects it later.
+     *
+     * @param verified whether a type's literal parser accepted it while parsing, so it's a real literal
      */
-    record Unresolved(int start, int end, String text) implements Expr {
+    record Unresolved(int start, int end, String text, boolean verified) implements Expr {
+
+        public Unresolved(int start, int end, String text) {
+            this(start, end, text, false);
+        }
 
         @Override
         public String type() {

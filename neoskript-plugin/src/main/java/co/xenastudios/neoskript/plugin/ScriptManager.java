@@ -77,6 +77,55 @@ final class ScriptManager {
         this.commands = commands;
         this.logger = logger;
         this.afterTests = afterTests;
+        co.xenastudios.neoskript.runtime.FunctionLookup.install(new FunctionSource());
+    }
+
+    /** Finds the loaded scripts' functions, and the built-in ones, for {@code function "name"}. */
+    private final class FunctionSource implements co.xenastudios.neoskript.runtime.FunctionLookup.Source {
+        @Override
+        public co.xenastudios.neoskript.runtime.FunctionRef find(String name, String script) {
+            co.xenastudios.neoskript.runtime.FunctionRef global = null;
+            for (Map.Entry<FunctionInfo, FunctionHandle> entry : functions.entrySet()) {
+                FunctionInfo info = entry.getKey();
+                if (!info.name().equals(name) || !entry.getValue().loaded()) {
+                    continue;
+                }
+                if (info.localTo() == null) {
+                    global = ref(info, entry.getValue());
+                } else if (info.localTo().equals(script)) {
+                    return ref(info, entry.getValue());
+                }
+            }
+            if (global != null) {
+                return global;
+            }
+            for (Map.Entry<FunctionInfo, co.xenastudios.neoskript.api.element.Function> entry : library.builtIns().entrySet()) {
+                if (entry.getKey().name().equals(name)) {
+                    co.xenastudios.neoskript.api.element.Function function = entry.getValue();
+                    return new co.xenastudios.neoskript.runtime.FunctionRef(name, null, plurals(entry.getKey()), function::call);
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public List<co.xenastudios.neoskript.runtime.FunctionRef> definedIn(String script) {
+            List<co.xenastudios.neoskript.runtime.FunctionRef> defined = new ArrayList<>();
+            for (Map.Entry<FunctionInfo, FunctionHandle> entry : functions.entrySet()) {
+                if (script.equals(entry.getValue().script()) && entry.getValue().loaded()) {
+                    defined.add(ref(entry.getKey(), entry.getValue()));
+                }
+            }
+            return defined;
+        }
+
+        private co.xenastudios.neoskript.runtime.FunctionRef ref(FunctionInfo info, FunctionHandle handle) {
+            return new co.xenastudios.neoskript.runtime.FunctionRef(info.name(), info.localTo(), plurals(info), handle::callKeyed);
+        }
+
+        private List<Boolean> plurals(FunctionInfo info) {
+            return info.parameters().stream().map(FunctionInfo.Parameter::plural).toList();
+        }
     }
 
     /** Loads every script when the server starts. */
@@ -111,6 +160,11 @@ final class ScriptManager {
     }
 
     private Outcome load(String only, Consumer<String> problems) throws IOException {
+        return load(only, problems, false);
+    }
+
+    /** With {@code now}, load events run straight away rather than on the next tick: for loads a script asks for. */
+    private Outcome load(String only, Consumer<String> problems, boolean now) throws IOException {
         long start = System.nanoTime();
         Files.createDirectories(scriptsDir);
         // Everything is parsed and compiled, even for one script, so calls between scripts resolve.
@@ -180,7 +234,11 @@ final class ScriptManager {
             List<Runnable> stops = new ArrayList<>();
             for (CompiledScripts.CompiledTrigger trigger : loaded.get(name)) {
                 if (trigger.event() == ScriptEvent.LOAD) {
-                    scheduler.runGlobal(() -> run(trigger));
+                    if (now) {
+                        run(trigger);
+                    } else {
+                        scheduler.runGlobal(() -> run(trigger));
+                    }
                 } else if (trigger.period() != null) {
                     stops.add(scheduler.runGlobalRepeating(trigger.period().ticks(), () -> run(trigger)));
                 }
@@ -250,6 +308,58 @@ final class ScriptManager {
             }
 
             @Override
+            public co.xenastudios.neoskript.runtime.ScriptRef load(co.xenastudios.neoskript.runtime.ScriptRef script) {
+                synchronized (ScriptManager.this) {
+                    Path path = path(script);
+                    if (path == null) {
+                        return null;
+                    }
+                    if (path.getFileName().toString().startsWith("-")) {
+                        path = rename(path, path.getFileName().toString().substring(1));
+                        if (path == null) {
+                            return null;
+                        }
+                    }
+                    String name = name(path);
+                    if (loaded.containsKey(name)) {
+                        return null;
+                    }
+                    reloadNow(name);
+                    return new co.xenastudios.neoskript.runtime.ScriptRef(name);
+                }
+            }
+
+            @Override
+            public void reload(co.xenastudios.neoskript.runtime.ScriptRef script) {
+                synchronized (ScriptManager.this) {
+                    Path path = path(script);
+                    if (path != null && isEnabledScript(path)) {
+                        reloadNow(name(path));
+                    }
+                }
+            }
+
+            @Override
+            public void unload(co.xenastudios.neoskript.runtime.ScriptRef script) {
+                synchronized (ScriptManager.this) {
+                    stop(script.name());
+                }
+            }
+
+            @Override
+            public co.xenastudios.neoskript.runtime.ScriptRef disable(co.xenastudios.neoskript.runtime.ScriptRef script) {
+                synchronized (ScriptManager.this) {
+                    Path path = path(script);
+                    if (path == null || path.getFileName().toString().startsWith("-")) {
+                        return null;
+                    }
+                    stop(script.name());
+                    Path disabled = rename(path, "-" + path.getFileName());
+                    return disabled == null ? null : new co.xenastudios.neoskript.runtime.ScriptRef(name(disabled));
+                }
+            }
+
+            @Override
             public List<co.xenastudios.neoskript.runtime.ScriptRef> scripts(boolean wantLoaded, boolean disabled) {
                 List<co.xenastudios.neoskript.runtime.ScriptRef> scripts = new ArrayList<>();
                 try (Stream<Path> paths = Files.walk(scriptsDir)) {
@@ -265,6 +375,47 @@ final class ScriptManager {
                 return scripts;
             }
         };
+    }
+
+    /** The file of {@code script} in the scripts folder, or {@code null} if there isn't one. */
+    private Path path(co.xenastudios.neoskript.runtime.ScriptRef script) {
+        String relative = script.name();
+        if (!NAME_ROOT.isEmpty() && relative.startsWith(NAME_ROOT + "/")) {
+            relative = relative.substring(NAME_ROOT.length() + 1);
+        }
+        Path path = scriptsDir.resolve(relative).normalize();
+        return path.startsWith(scriptsDir) && Files.isRegularFile(path) ? path : null;
+    }
+
+    /** Renames a script file in its folder, returning its new path, or {@code null} if it couldn't be. */
+    private Path rename(Path path, String newName) {
+        try {
+            return Files.move(path, path.resolveSibling(newName));
+        } catch (IOException e) {
+            logger.warn("Couldn't rename {}", path, e);
+            return null;
+        }
+    }
+
+    /** Loads (or reloads) one script, running its load events straight away. */
+    private void reloadNow(String name) {
+        try {
+            load(name, logger::error, true);
+        } catch (IOException e) {
+            logger.error("Couldn't load {}", name, e);
+        }
+    }
+
+    /** Stops a loaded script's triggers, commands and periodic events. */
+    private void stop(String name) {
+        loaded.remove(name);
+        loadedCommands.remove(name);
+        List<Runnable> stops = periodic.remove(name);
+        if (stops != null) {
+            stops.forEach(Runnable::run);
+        }
+        events.update(loaded.values().stream().flatMap(List::stream).toList());
+        commands.update(loadedCommands.values().stream().flatMap(List::stream).toList());
     }
 
     private static boolean isEnabledScript(Path path) {

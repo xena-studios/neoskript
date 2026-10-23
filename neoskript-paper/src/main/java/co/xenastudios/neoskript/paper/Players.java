@@ -43,18 +43,51 @@ final class Players {
                     default -> null;
                 });
         // Settable for entities and items: their custom name.
-        SettableProperty.register(registrar, "PropExprName", "string", "name[s]", "objects", Object.class, Object.class,
-                Players::name, (owner, name) -> {
-                    Component component = name == null ? null : Messages.component(name);
-                    switch (owner) {
-                        case org.bukkit.entity.Player player -> player.displayName(component);
-                        case Entity entity -> entity.customName(component);
-                        case ItemType item -> item.editMeta(meta -> meta.displayName(component));
-                        case org.bukkit.inventory.ItemStack stack -> stack.editMeta(meta -> meta.displayName(component));
-                        default -> {}
+        java.util.function.BiConsumer<Object, Object> rename = (owner, name) -> {
+            Component component = name == null ? null : Messages.component(name);
+            switch (owner) {
+                case org.bukkit.entity.Player player -> player.displayName(component);
+                case Entity entity -> entity.customName(component);
+                case ItemType item -> item.editMeta(meta -> meta.displayName(component));
+                case org.bukkit.inventory.ItemStack stack -> stack.editMeta(meta -> meta.displayName(component));
+                case org.bukkit.block.Block block -> {
+                    if (block.getState() instanceof Nameable nameable) {
+                        nameable.customName(component);
+                        ((org.bukkit.block.BlockState) nameable).update(true, false);
                     }
-                });
+                }
+                default -> {}
+            }
+        };
+        // 'display name', 'nick name', 'chat name', 'custom name': a player's display name, or anything else's
+        // custom name. Giving an entity a display name shows it, as in Skript.
+        registrar.expression("PropExprName-display", "string", info -> {
+            boolean display = info.hasTag("display");
+            java.util.function.BiConsumer<Object, Object> setter = (owner, name) -> {
+                rename.accept(owner, name);
+                if (display && owner instanceof Entity entity && !(owner instanceof org.bukkit.entity.Player)) {
+                    entity.setCustomNameVisible(name != null);
+                }
+            };
+            return new SettableProperty<>(Object.class, Object.class, owner -> owner instanceof org.bukkit.entity.Player player
+                    ? Messages.LEGACY_SECTION.serialize(player.displayName()) : name(owner), setter)
+                    .resettingTo((java.util.function.Consumer<Object>) owner -> setter.accept(owner, null))
+                    .deleting(owner -> setter.accept(owner, null));
+        }, Patterns.property("(display:display|nick|chat|custom)[ ]name[s]", "objects"));
+        // Resetting or deleting a name takes the custom name away.
+        registrar.expression("PropExprName", "string", info -> new SettableProperty<>(Object.class, Object.class,
+                Players::name, rename).resettingTo((java.util.function.Consumer<Object>) owner -> rename.accept(owner, null))
+                .deleting(owner -> rename.accept(owner, null)), Patterns.property("name[s]", "objects"));
 
+        // How long a player has played; players who aren't online count as none, as in Skript.
+        registrar.expression("ExprTimePlayed", "timespan", info -> new SettableProperty<>(OfflinePlayer.class, Timespan.class,
+                player -> new Timespan(player instanceof Player online
+                        ? online.getStatistic(org.bukkit.Statistic.PLAY_ONE_MINUTE) * 50L : 0),
+                (player, time) -> {
+                    if (player instanceof Player online) {
+                        online.setStatistic(org.bukkit.Statistic.PLAY_ONE_MINUTE, (int) Math.max(0, Math.min(Integer.MAX_VALUE, time.ticks())));
+                    }
+                }), "[the] time played of %offlineplayers%", "%offlineplayers%'[s] time played");
         registrar.condition("CondIsOnline", info -> {
             // 'offline' means not online; the negated pattern flips it again.
             boolean online = !info.hasTag("offline") ^ info.pattern() == 1;
@@ -142,23 +175,74 @@ final class Players {
                 GameMode.class, Player::getGameMode, Player::setGameMode);
         SettableProperty.register(registrar, "ExprFoodLevel", "number", Player.class, Number.class,
                 player -> (long) player.getFoodLevel(), (player, level) -> player.setFoodLevel(
-                        Math.max(0, Math.min(20, (int) Math.round(level.doubleValue())))),
+                        Math.max(0, Math.min(20, co.xenastudios.neoskript.runtime.Values.toInt(level.doubleValue())))),
                 "[the] (food|hunger)[[ ](level|met(er|re)|bar)] [of %players%]",
                 "%players%'[s] (food|hunger)[[ ](level|met(er|re)|bar)]");
         SettableProperty.register(registrar, "ExprPlayerListName", "string", "(player|tab)[ ]list name[s]", "players",
                 Player.class, Object.class, player -> Messages.LEGACY_SECTION.serialize(player.playerListName()),
                 (player, name) -> player.playerListName(Messages.component(name)));
 
-        registrar.effect("EffHealth", info -> (context, args) -> {
-            for (Object entity : (Object[]) args[0]) {
-                if (entity instanceof LivingEntity living) {
-                    AttributeInstance max = living.getAttribute(Attribute.MAX_HEALTH);
-                    double limit = max == null ? 20 : max.getValue();
-                    double health = args[1] instanceof Number hearts ? living.getHealth() + hearts.doubleValue() * 2 : limit;
-                    living.setHealth(Math.max(0, Math.min(limit, health)));
+        // 'damage X by 2', 'heal X', 'repair X by 5': entities by hearts, items by durability.
+        registrar.effect("EffHealth", info -> {
+            int mode = info.pattern();
+            return (context, args) -> {
+                double amount = args[1] instanceof Number n ? n.doubleValue() : Double.NaN;
+                for (Object value : (Object[]) args[0]) {
+                    switch (value) {
+                        case LivingEntity living when mode == 0 -> {
+                            if (!Double.isNaN(amount)) {
+                                living.damage(amount * 2);
+                            }
+                        }
+                        case LivingEntity living when mode == 1 -> {
+                            AttributeInstance max = living.getAttribute(Attribute.MAX_HEALTH);
+                            double limit = max == null ? 20 : max.getValue();
+                            double health = Double.isNaN(amount) ? limit : living.getHealth() + amount * 2;
+                            living.setHealth(Math.max(0, Math.min(limit, health)));
+                        }
+                        case ItemType item when mode != 1 -> item.editMeta(meta -> {
+                            if (meta instanceof org.bukkit.inventory.meta.Damageable damageable) {
+                                int by = Double.isNaN(amount) ? (mode == 2 ? damageable.getDamage() : 0) : (int) amount;
+                                damageable.setDamage(Math.max(0, damageable.getDamage() + (mode == 0 ? by : -by)));
+                            }
+                        });
+                        default -> {}
+                    }
+                }
+            };
+        }, "damage %livingentities/itemtypes% by %number% [heart[s]]", "heal %livingentities% [by %number% [heart[s]]]",
+                "repair %itemtypes% [by %number%]");
+        registrar.effect("EffDamage", info -> (context, args) -> {
+            if (!(args[0] instanceof LivingEntity attacker) || !(args[2] instanceof Number amount)) {
+                return;
+            }
+            if (Double.isNaN(amount.doubleValue()) || amount.doubleValue() <= 0) {
+                co.xenastudios.neoskript.runtime.RuntimeErrors.report("Cannot damage an entity by 0 or less. Consider healing instead.");
+                return;
+            }
+            if (Double.isInfinite(amount.doubleValue())) {
+                co.xenastudios.neoskript.runtime.RuntimeErrors.report("Cannot damage an entity by an infinite amount.");
+                return;
+            }
+            for (Object victim : (Object[]) args[1]) {
+                if (victim instanceof LivingEntity living) {
+                    living.damage(amount.doubleValue() * 2, attacker);
                 }
             }
-        }, "heal %entities% [by %number% [heart[s]]]");
+        }, "make %livingentity% damage %livingentities% by %number% [heart[s]]");
+        registrar.effect("EffForceAttack", info -> (context, args) -> {
+            if (!(args[1] instanceof org.bukkit.entity.Entity target)) {
+                return;
+            }
+            for (Object attacker : (Object[]) args[0]) {
+                if (attacker instanceof LivingEntity living) {
+                    living.attack(target);
+                }
+            }
+        }, "make %livingentities% attack %entity%", "force %livingentities% to attack %entity%");
+        registrar.expression("ExprLastDamage", "number", info -> new SettableProperty<>(LivingEntity.class, Number.class,
+                living -> living.getLastDamage() / 2, (living, damage) -> living.setLastDamage(damage.doubleValue() * 2)),
+                "[the] last damage [taken] (of|by) %livingentities%", "%livingentities%'[s] last damage [taken]");
         registrar.effect("EffIgnite", info -> {
             boolean extinguish = info.pattern() == 2;
             return (context, args) -> {
@@ -266,9 +350,13 @@ final class Players {
         return switch (owner) {
             case OfflinePlayer player -> player.getName();
             case co.xenastudios.neoskript.runtime.ScriptRef script -> Scripts.name(script);
+            case co.xenastudios.neoskript.runtime.FunctionRef function -> function.name();
             case World world -> world.getName();
             case CommandSender sender -> sender.getName();
             case Nameable nameable when nameable.customName() != null ->
+                    Messages.LEGACY_SECTION.serialize(nameable.customName());
+            // A named block, like a chest: its state has the name.
+            case org.bukkit.block.Block block when block.getState() instanceof Nameable nameable && nameable.customName() != null ->
                     Messages.LEGACY_SECTION.serialize(nameable.customName());
             case ItemType item when item.stack().getItemMeta() != null && item.stack().getItemMeta().displayName() != null ->
                     Messages.LEGACY_SECTION.serialize(item.stack().getItemMeta().displayName());

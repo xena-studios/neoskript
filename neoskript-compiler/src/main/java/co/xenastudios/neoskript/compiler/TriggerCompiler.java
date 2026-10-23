@@ -6,6 +6,8 @@ package co.xenastudios.neoskript.compiler;
 
 import static org.objectweb.asm.Opcodes.AALOAD;
 import static org.objectweb.asm.Opcodes.AASTORE;
+import static org.objectweb.asm.Opcodes.IADD;
+import static org.objectweb.asm.Opcodes.IFNULL;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
@@ -198,6 +200,8 @@ final class TriggerCompiler {
     private record InputFrame(int valueSlot, int indexSlot, int indicesSlot, int reducedSlot) {}
 
     private final Deque<InputFrame> inputs = new ArrayDeque<>();
+    /** Expressions already worked out into a slot, as an expression section's value is before its effect runs. */
+    private final Map<Expr, Integer> precomputed = new java.util.IdentityHashMap<>();
 
     /** The types of the placeholder whose value is being compiled, which words are first tried as. */
     private List<String> literalTypes = List.of();
@@ -630,11 +634,107 @@ final class TriggerCompiler {
     private void statements(List<Statement> statements) throws CompileException {
         for (int i = 0; i < statements.size(); i++) {
             Statement statement = statements.get(i);
-            if (startsConditional(statement)) {
-                i = conditional(statements, i) - 1;
-            } else {
-                statement(statement);
+            try {
+                if (startsConditional(statement)) {
+                    i = conditional(statements, i) - 1;
+                } else {
+                    statement(statement);
+                }
+            } catch (co.xenastudios.neoskript.api.element.SyntaxError error) {
+                // An element that matched but can't be used as written.
+                throw new CompileException(line, error.getMessage());
             }
+        }
+    }
+
+    /**
+     * The first error compiling {@code statements} on their own gives, if it's the script's fault, for a
+     * {@code parse:} section: the code is compiled apart and thrown away.
+     */
+    private String compileError(List<Statement> statements) {
+        if (statements.isEmpty() || parsedHasInvalid(statements)) {
+            return null;
+        }
+        try {
+            TriggerCompiler apart = new TriggerCompiler(library, functions, globals, script);
+            apart.eventClasses = eventClasses;
+            apart.eventName = eventName;
+            apart.compileTrigger(constantsScript, statements);
+            return null;
+        } catch (CompileException e) {
+            return e.alreadyReported() || e.getMessage() == null || e.getMessage().startsWith("NeoSkript can't")
+                    ? null : e.getMessage();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static boolean parsedHasInvalid(List<Statement> statements) {
+        for (Statement statement : statements) {
+            if (statement instanceof Statement.Invalid
+                    || statement instanceof Statement.Section section && parsedHasInvalid(section.body())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The errors elements in {@code statements} give as they're set up, for a {@code parse:} section, whose
+     * code is never compiled.
+     */
+    private List<String> setupErrors(List<Statement> statements) {
+        List<String> errors = new ArrayList<>();
+        String outer = source;
+        for (Statement statement : statements) {
+            // Positions in what was parsed are in the statement's own line.
+            source = statement instanceof Statement.Section section ? section.line().key() : statement.line().text();
+            switch (statement) {
+                case Statement.Effect effect -> setupErrors(effect.effect(), errors);
+                case Statement.Condition condition -> setupErrors(condition.condition(), errors);
+                case Statement.Call call -> call.call().arguments().forEach(a -> setupErrors(a, errors));
+                case Statement.Section section -> {
+                    setupErrors(section.header(), errors);
+                    errors.addAll(setupErrors(section.body()));
+                }
+                case Statement.Conditions conditions -> conditions.conditions().forEach(c -> setupErrors(c, errors));
+                case Statement.Parse parse -> errors.addAll(setupErrors(parse.body()));
+                case Statement.Invalid invalid -> {}
+            }
+        }
+        source = outer;
+        return errors;
+    }
+
+    private void setupErrors(ParsedSyntax syntax, List<String> errors) {
+        if (syntax == null) {
+            return;
+        }
+        syntax.match().values().forEach(value -> setupErrors(value, errors));
+        for (Object value : syntax.match().regexValues()) {
+            if (value instanceof ParsedSyntax inner) {
+                setupErrors(inner, errors);
+            } else {
+                setupErrors(value, errors);
+            }
+        }
+        if (library.binding(syntax.syntax()) instanceof ElementFactory<?> factory) {
+            try {
+                factory.create(info(syntax));
+            } catch (co.xenastudios.neoskript.api.element.SyntaxError error) {
+                errors.add(error.getMessage());
+            } catch (RuntimeException ignored) {
+                // Only syntax errors are reported here; anything else shows when the code is compiled.
+            }
+        }
+    }
+
+    private void setupErrors(Object value, List<String> errors) {
+        switch (value) {
+            case Expr.Syntax syntax -> setupErrors(syntax.syntax(), errors);
+            case Expr.ListOf list -> list.items().forEach(item -> setupErrors(item, errors));
+            case Expr.FunctionCall call -> call.arguments().forEach(a -> setupErrors(a, errors));
+            case null, default -> {}
         }
     }
 
@@ -665,6 +765,7 @@ final class TriggerCompiler {
                 method.visitInsn(POP);
             }
             case Statement.Section section when isCore(section.header(), CoreSyntax.LOOP) -> loop(section);
+            case Statement.Section section when isCore(section.header(), CoreSyntax.FOR) -> forLoop(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.WHILE) -> whileLoop(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.FILTER_SECTION) -> filterSection(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.CATCH_ERRORS) -> {
@@ -677,12 +778,20 @@ final class TriggerCompiler {
             }
             case Statement.Section section when library.sectionType(section.header() == null ? null
                     : section.header().syntax().id()) != null -> librarySection(section);
+            case Statement.Section section when sectionExpression(section) != null -> expressionSection(section);
             case Statement.Section section -> throw unsupported("sections like '" + section.line().key() + "'");
             case Statement.Conditions conditions -> throw unsupported("'" + conditions.line().key() + "' here");
             case Statement.Parse parse -> {
                 // Skript's test-only parse section: its code is only parsed, never run. What it reported is
                 // kept for 'last parse logs'.
-                constant(parse.captured().stream().map(d -> d.message()).toArray(String[]::new), String[].class);
+                List<String> logs = new ArrayList<>(parse.captured().stream().map(d -> d.message()).toList());
+                logs.addAll(setupErrors(parse.body()));
+                // Compiling the code on its own finds what the parser couldn't, without running it.
+                String compiled = compileError(parse.body());
+                if (compiled != null && !logs.contains(compiled)) {
+                    logs.add(compiled);
+                }
+                constant(logs.toArray(String[]::new), String[].class);
                 method.visitVarInsn(ASTORE, PARSE_LOGS_SLOT);
             }
             // The parser reported it; the trigger is left out without a second error.
@@ -800,8 +909,29 @@ final class TriggerCompiler {
     // ---------------------------------------------------------------- loops
 
     /** {@code loop %objects%:} over a list variable (with indices) or any values. */
+    /** {@code for {_key}, {_value} in X}: a loop over X's values (with their indices), set into the variables. */
+    private void forLoop(Statement.Section section) throws CompileException {
+        List<Object> values = section.header().match().values();
+        Expr looped = (Expr) values.getLast();
+        Expr.Variable key = section.header().pattern() == 0 ? null : forVariable(values.get(0));
+        Expr.Variable value = forVariable(values.get(section.header().pattern() == 0 ? 0 : 1));
+        loop(section, looped, key, value);
+    }
+
+    private Expr.Variable forVariable(Object placeholder) throws CompileException {
+        if (placeholder instanceof Expr.Variable variable && !variable.list()) {
+            return variable;
+        }
+        throw new CompileException(line, "A 'for' loop puts its values into single variables, like {_value}");
+    }
+
     private void loop(Statement.Section section) throws CompileException {
-        Expr looped = (Expr) section.header().match().values().getFirst();
+        loop(section, (Expr) section.header().match().values().getFirst(), null, null);
+    }
+
+    /** A loop over {@code looped}; with {@code key} and {@code value}, each index and value is put in them first. */
+    private void loop(Statement.Section section, Expr looped, Expr.Variable key, Expr.Variable value)
+            throws CompileException {
         int valuesSlot = nextSlot++;
         int indicesSlot = -1;
         int indexSlot = nextSlot++;
@@ -820,6 +950,7 @@ final class TriggerCompiler {
         } else {
             expression(looped);
             convert(true);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "loopValues", "(" + OBJECTS + ")" + OBJECTS, false);
             method.visitVarInsn(ASTORE, valuesSlot);
         }
         method.visitInsn(ICONST_0);
@@ -834,6 +965,26 @@ final class TriggerCompiler {
         method.visitInsn(ARRAYLENGTH);
         method.visitJumpInsn(IF_ICMPGE, end);
         blocks.push(new Block(BlockKind.LOOP, end, next, valuesSlot, indicesSlot, indexSlot));
+        if (value != null) {
+            variableStore(value);
+            variableName(value);
+            element(valuesSlot, indexSlot, 0);
+            method.visitMethodInsn(INVOKEVIRTUAL, STORE, "set", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
+        }
+        if (key != null) {
+            variableStore(key);
+            variableName(key);
+            if (indicesSlot >= 0) {
+                element(indicesSlot, indexSlot, 0);
+            } else {
+                // Values that don't come from a list are indexed 1, 2, 3...
+                method.visitVarInsn(ILOAD, indexSlot);
+                pushInt(1);
+                method.visitInsn(IADD);
+                method.visitMethodInsn(INVOKESTATIC, "java/lang/String", "valueOf", "(I)" + STRING_DESC, false);
+            }
+            method.visitMethodInsn(INVOKEVIRTUAL, STORE, "set", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
+        }
         statements(section.body());
         blocks.pop();
         method.visitLabel(next);
@@ -874,6 +1025,80 @@ final class TriggerCompiler {
         method.visitIincInsn(indexSlot, 1);
         method.visitJumpInsn(GOTO, top);
         method.visitLabel(end);
+    }
+
+    /** The expression in an effect's header that takes the section under it ({@code set X to a worldborder:}). */
+    private Expr.Syntax sectionExpression(Statement.Section section) {
+        if (section.header() == null || section.header().syntax().kind() != co.xenastudios.neoskript.frontend.registry.SyntaxKind.EFFECT) {
+            return null;
+        }
+        for (Object value : section.header().match().values()) {
+            if (value instanceof Expr.Syntax syntax && library.sectionExpressionType(syntax.syntax().syntax().id()) != null) {
+                return syntax;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * An effect whose expression takes a section: the expression is worked out, the section runs for its
+     * value (which is the section's value, as {@code event-<type>}), then the effect runs with that value.
+     */
+    private void expressionSection(Statement.Section section) throws CompileException {
+        Expr.Syntax made = sectionExpression(section);
+        int valuesSlot = nextSlot++;
+        int indexSlot = nextSlot++;
+        expression(made);
+        convert(true);
+        method.visitVarInsn(ASTORE, valuesSlot);
+        method.visitInsn(ICONST_0);
+        method.visitVarInsn(ISTORE, indexSlot);
+        Label top = new Label();
+        Label next = new Label();
+        Label end = new Label();
+        method.visitLabel(top);
+        method.visitVarInsn(ILOAD, indexSlot);
+        method.visitVarInsn(ALOAD, valuesSlot);
+        method.visitInsn(ARRAYLENGTH);
+        method.visitJumpInsn(IF_ICMPGE, end);
+        blocks.push(new Block(BlockKind.SECTION, end, next, valuesSlot, -1, indexSlot,
+                library.sectionExpressionType(made.syntax().syntax().id())));
+        statements(section.body());
+        blocks.pop();
+        method.visitLabel(next);
+        method.visitIincInsn(indexSlot, 1);
+        method.visitJumpInsn(GOTO, top);
+        method.visitLabel(end);
+        lineOf(section, section.line().key());
+        precomputed.put(made, valuesSlot);
+        try {
+            effect(section.header());
+        } finally {
+            precomputed.remove(made);
+        }
+    }
+
+    /** The innermost section whose value a left-out placeholder of these types takes, or {@code null}. */
+    private Block sectionDefault(PlaceholderSpec spec) {
+        for (String type : spec.types()) {
+            TypeRef ref = registry.resolveType(type);
+            Block section = ref == null ? null : sectionFor(ref.type().id());
+            if (section != null && !ref.type().id().equals(SyntaxRegistry.OBJECT)) {
+                return section;
+            }
+        }
+        return null;
+    }
+
+    /** The innermost library section whose values are of a type {@code typeId} is a kind of, or {@code null}. */
+    private Block widerSection(String typeId) {
+        for (Block block : blocks) {
+            if (block.kind() == BlockKind.SECTION && block.valueType() != null && !block.valueType().equals(SyntaxRegistry.OBJECT)
+                    && registry.isSubtype(typeId, block.valueType())) {
+                return block;
+            }
+        }
+        return null;
     }
 
     /** The innermost library section whose values are of type {@code typeId}, or {@code null}. */
@@ -944,9 +1169,9 @@ final class TriggerCompiler {
                             : "The function " + function.name() + " doesn't return anything");
                 }
                 Expr returned = (Expr) effect.match().values().getFirst();
-                if (function.returnsPlural() && (returned instanceof Expr.Variable list && list.list() || isKeyed(returned))) {
+                if (function.returnsPlural() && isKeyed(returned, true)) {
                     // A list keeps its indices, for 'keyed f()'; other callers get the values alone.
-                    keyed(returned);
+                    keyed(returned, true);
                 } else {
                     expression(returned);
                     convert(function.returnsPlural());
@@ -985,6 +1210,30 @@ final class TriggerCompiler {
             case CoreSyntax.TRANSFORM_EFFECT -> {
                 Expr target = (Expr) effect.match().values().getFirst();
                 Expr mapping = (Expr) effect.match().regexValues().getFirst();
+                if (target instanceof Expr.Variable variable && variable.list()) {
+                    // Each value to one keeps the indices; to several, they're numbered again.
+                    int[] list = listValues(target);
+                    int results = newList();
+                    forEachInput(list, 0, -1, (frame, next) -> {
+                        method.visitVarInsn(ALOAD, results);
+                        expression(mapping);
+                        convert(true);
+                        method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "add", "(" + OBJECT_DESC + ")Z", true);
+                        method.visitInsn(POP);
+                    });
+                    variableStore(variable);
+                    variableName(variable);
+                    method.visitVarInsn(ALOAD, results);
+                    if (list[1] >= 0) {
+                        method.visitVarInsn(ALOAD, list[1]);
+                    } else {
+                        method.visitInsn(ACONST_NULL);
+                    }
+                    method.visitMethodInsn(INVOKESTATIC, VALUES, "transformed", "(Ljava/util/List;[" + STRING_DESC + ")"
+                            + OBJECT_DESC, false);
+                    method.visitMethodInsn(INVOKEVIRTUAL, STORE, "setListKeyed", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
+                    break;
+                }
                 setTo(target, () -> transform(target, mapping));
             }
             case CoreSyntax.DO_IF -> {
@@ -1019,6 +1268,10 @@ final class TriggerCompiler {
             throw unsupported("asserting that code other than a condition fails");
         }
         boolean expected = !effect.match().hasTag("fail");
+        if (!expected && !compiles(condition)) {
+            // As in Skript, a condition expected to fail that can't even be set up has failed.
+            return;
+        }
         Label passed = new Label();
         condition(condition);
         method.visitJumpInsn(expected ? IFNE : IFEQ, passed);
@@ -1032,6 +1285,22 @@ final class TriggerCompiler {
         }
         method.visitMethodInsn(INVOKESTATIC, TEST_RUN, "fail", "(" + STRING_DESC + "I" + STRING_DESC + ")V", false);
         method.visitLabel(passed);
+    }
+
+    /** Whether {@code condition} compiles, tried without writing anything. */
+    private boolean compiles(ParsedSyntax condition) {
+        org.objectweb.asm.MethodVisitor real = method;
+        int slots = nextSlot;
+        method = new org.objectweb.asm.MethodVisitor(org.objectweb.asm.Opcodes.ASM9) {};
+        try {
+            condition(condition);
+            return true;
+        } catch (CompileException | co.xenastudios.neoskript.api.element.SyntaxError e) {
+            return false;
+        } finally {
+            method = real;
+            nextSlot = slots;
+        }
     }
 
     private void exit(ParsedSyntax effect) throws CompileException {
@@ -1093,6 +1362,24 @@ final class TriggerCompiler {
         Object target = effect.match().values().get(mode.target);
         // 'add 1 to {_a::*} and {_b::*}': each variable is changed.
         if (target instanceof Expr.ListOf list && list.items().stream().allMatch(Expr.Variable.class::isInstance)) {
+            if (!list.and() && list.items().size() > 1) {
+                // 'set {_a} or {_b} to 1': one of them, chosen at random, as in Skript.
+                Label end = new Label();
+                Label[] cases = new Label[list.items().size()];
+                for (int i = 0; i < cases.length; i++) {
+                    cases[i] = new Label();
+                }
+                pushInt(cases.length);
+                method.visitMethodInsn(INVOKESTATIC, VALUES, "randomIndex", "(I)I", false);
+                method.visitTableSwitchInsn(0, cases.length - 1, end, cases);
+                for (int i = 0; i < cases.length; i++) {
+                    method.visitLabel(cases[i]);
+                    change(effect, mode, list.items().get(i));
+                    method.visitJumpInsn(GOTO, end);
+                }
+                method.visitLabel(end);
+                return;
+            }
             for (Expr item : list.items()) {
                 change(effect, mode, item);
             }
@@ -1166,6 +1453,55 @@ final class TriggerCompiler {
     private void update(ParsedSyntax effect, Update update) throws CompileException {
         if (!(effect.match().values().get(update.target()) instanceof Expr target)) {
             throw unsupported("'" + source + "'");
+        }
+        if (target instanceof Expr.Variable list && list.list()) {
+            // The results go back at the indices they came from: 'replace "a" in {_x::*} with "b"' keeps them.
+            int keys = nextSlot++;
+            variableStore(list);
+            variableName(list);
+            method.visitMethodInsn(INVOKEVIRTUAL, STORE, "indices", "(" + STRING_DESC + ")[" + STRING_DESC, false);
+            method.visitVarInsn(ASTORE, keys);
+            variableStore(list);
+            variableName(list);
+            method.visitVarInsn(ALOAD, keys);
+            constant(update, Update.class);
+            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+            arguments(effect);
+            method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Update.class), "update",
+                    "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
+            PlaceholderSpec spec = placeholderSpecs(effect.syntax().patterns().get(effect.pattern()))[update.target()];
+            Class<?> only = strictClass(spec);
+            if (only == null) {
+                method.visitInsn(ACONST_NULL);
+            } else {
+                constant(only, Class.class);
+            }
+            method.visitMethodInsn(INVOKEVIRTUAL, STORE, "updateList",
+                    "(" + STRING_DESC + "[" + STRING_DESC + OBJECT_DESC + "Ljava/lang/Class;)V", false);
+            return;
+        }
+        if (target instanceof Expr.ListOf list
+                && list.items().stream().allMatch(item -> item instanceof Expr.Variable variable && !variable.list())) {
+            // 'replace "1" in {_a}, {_b} and {_c} with "x"': each result goes back to the variable it came from.
+            int results = nextSlot++;
+            constant(update, Update.class);
+            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+            arguments(effect);
+            method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Update.class), "update",
+                    "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "array", "(" + OBJECT_DESC + ")" + OBJECTS, false);
+            method.visitVarInsn(ASTORE, results);
+            for (int i = 0; i < list.items().size(); i++) {
+                Expr.Variable variable = (Expr.Variable) list.items().get(i);
+                variableStore(variable);
+                variableName(variable);
+                method.visitVarInsn(ALOAD, results);
+                pushInt(i);
+                pushInt(0);
+                method.visitMethodInsn(INVOKESTATIC, VALUES, "element", "(" + OBJECTS + "II)" + OBJECT_DESC, false);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "set", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
+            }
+            return;
         }
         setTo(target, () -> {
             constant(update, Update.class);
@@ -1258,6 +1594,16 @@ final class TriggerCompiler {
             throws CompileException {
         Changeable.Mode changeMode = changeMode(effect, mode);
         ParsedSyntax syntax = target.syntax();
+        if (mode.value >= 0 && mode.value < effect.match().values().size()
+                && effect.match().values().get(mode.value) instanceof Expr.FunctionCall call
+                && call.function().returnType() == null) {
+            // A function that returns nothing can't give anything a value.
+            TypeRef ref = target.type() == null ? null : registry.resolveType(target.type());
+            String name = ref == null ? "value" : ref.type().name();
+            throw new CompileException(line, ("aeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name + " can't be "
+                    + (mode == CoreSyntax.ChangeMode.SET ? "set to " : mode == CoreSyntax.ChangeMode.ADD ? "added to " : "changed by ")
+                    + source.substring(call.start(), call.end()) + " because the function doesn't return anything");
+        }
         Object element = library.binding(syntax.syntax()) instanceof ElementFactory<?> factory
                 ? factory.create(info(syntax))
                 : null;
@@ -1281,7 +1627,14 @@ final class TriggerCompiler {
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(syntax);
         if (mode.value >= 0) {
-            expression((Expr) effect.match().values().get(mode.value));
+            // Words are first tried as what the target takes: 'set item transform of X to fixed' is the transform.
+            List<String> outerLiteralTypes = literalTypes;
+            literalTypes = library.typesOf(accepted);
+            try {
+                expression((Expr) effect.match().values().get(mode.value));
+            } finally {
+                literalTypes = outerLiteralTypes;
+            }
             constant(accepted, Class[].class);
             method.visitMethodInsn(INVOKESTATIC, VALUES, "narrow",
                     "(" + OBJECT_DESC + "[Ljava/lang/Class;)" + OBJECTS, false);
@@ -1302,7 +1655,7 @@ final class TriggerCompiler {
     }
 
     /** How the element was matched, for its factory: its pattern, marks, tags and which arguments are lists. */
-    private static ElementInfo info(ParsedSyntax syntax) {
+    private ElementInfo info(ParsedSyntax syntax) {
         long or = 0;
         long lists = 0;
         List<Object> values = syntax.match().values();
@@ -1314,9 +1667,48 @@ final class TriggerCompiler {
                 }
             } else if (values.get(i) instanceof Expr.Variable variable && variable.list()) {
                 lists |= 1L << i;
+            } else if (values.get(i) instanceof Expr.Syntax inner && isCore(inner.syntax(), CoreSyntax.ANY_OF)) {
+                lists |= 1L << i;
+                or |= 1L << i;
             }
         }
-        return new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags(), or, lists);
+        List<ElementInfo.TypeArgument> types = new ArrayList<>();
+        for (Object value : syntax.match().regexValues()) {
+            if (value instanceof TypeRef ref) {
+                types.add(new ElementInfo.TypeArgument(ref.type().id(), ref.type().name(), ref.plural(),
+                        library.javaClass(ref.type().id())));
+            }
+        }
+        List<String> argumentTypes = new ArrayList<>(values.size());
+        List<String> literals = new ArrayList<>(values.size());
+        long single = 0;
+        for (int i = 0; i < values.size(); i++) {
+            Object value = values.get(i);
+            String type = value instanceof Expr expr && !(expr instanceof Expr.Variable) ? expr.type() : null;
+            argumentTypes.add(type == null || type.equals(SyntaxRegistry.OBJECT) ? null : type);
+            String literal = null;
+            boolean one = false;
+            switch (value) {
+                case Expr.Literal written -> {
+                    literal = written.text();
+                    one = true;
+                }
+                case Expr.Text text -> {
+                    one = true;
+                    if (text.embedded().isEmpty() && text.end() <= source.length()) {
+                        literal = unescape(source.substring(text.start() + 1, text.end() - 1));
+                    }
+                }
+                case Expr.Variable variable -> one = !variable.list();
+                case null, default -> {}
+            }
+            literals.add(literal);
+            if (one && i < 64) {
+                single |= 1L << i;
+            }
+        }
+        return new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags(), or, lists, types,
+                argumentTypes, single, literals, eventName, eventClasses == null ? List.of() : eventClasses);
     }
 
     /** Pushes the element, the trigger context and the element's arguments, ready to call it. */
@@ -1344,6 +1736,29 @@ final class TriggerCompiler {
         method.visitLdcInsn(new ConstantDynamic("_", Type.getDescriptor(type), CLASS_DATA_AT, constants.size() - 1));
     }
 
+    /**
+     * The types words in argument {@code i} are first tried as: its placeholder's, or in a comparison, what the
+     * other side gives, as Skript reads them: 'bill-boarding of X is fixed' is the billboard.
+     */
+    private List<String> literalTypesFor(ParsedSyntax syntax, List<Object> values, int i, PlaceholderSpec spec) {
+        if (syntax.syntax().id().equals("CondCompare") && values.size() >= 2 && values.get(i) instanceof Expr.Unresolved
+                && values.get(1 - Math.min(i, 1)) instanceof Expr.Syntax other && other.type() != null
+                && !other.type().equals(SyntaxRegistry.OBJECT)) {
+            return List.of(other.type());
+        }
+        if (spec.types().size() < 2) {
+            return spec.types();
+        }
+        // Words that could be several of the types are the one registered first, as Skript tries its types in
+        // order: 'armor stand' is the entity type in '%itemtypes/entitytypes%'.
+        List<String> ordered = new ArrayList<>(spec.types());
+        ordered.sort(java.util.Comparator.comparingInt(name -> {
+            TypeRef ref = registry.resolveType(name);
+            return ref == null ? Integer.MAX_VALUE : registry.typeOrder(ref.type().id());
+        }));
+        return ordered;
+    }
+
     private void arguments(ParsedSyntax syntax) throws CompileException {
         arguments(syntax, false, false);
     }
@@ -1356,6 +1771,24 @@ final class TriggerCompiler {
         method.visitTypeInsn(ANEWARRAY, OBJECT);
         for (int i = 0; i < values.size(); i++) {
             if (!(values.get(i) instanceof Expr expr)) {
+                Block section = sectionDefault(specs[i]);
+                if (section != null) {
+                    // Left out inside a section for one: 'set worldborder size to 15' in 'a worldborder:'.
+                    method.visitInsn(DUP);
+                    pushInt(i);
+                    element(section.valuesSlot(), section.indexSlot(), 0);
+                    convert(isPlural(specs[i]));
+                    method.visitInsn(AASTORE);
+                    continue;
+                }
+                if (specs[i].types().contains("script")) {
+                    // A script left out is the one running: 'function "heal"' finds this script's functions.
+                    method.visitInsn(DUP);
+                    pushInt(i);
+                    constant(new co.xenastudios.neoskript.runtime.ScriptRef(constantsScript), Object.class);
+                    method.visitInsn(AASTORE);
+                    continue;
+                }
                 java.util.function.Function<Object, Object> fallback = eventDefault(specs[i]);
                 if (fallback != null) {
                     method.visitInsn(DUP);
@@ -1374,7 +1807,7 @@ final class TriggerCompiler {
                 continue;
             }
             List<String> outerLiteralTypes = literalTypes;
-            literalTypes = specs[i].types();
+            literalTypes = literalTypesFor(syntax, values, i, specs[i]);
             try {
                 expression(expr);
             } finally {
@@ -1471,6 +1904,15 @@ final class TriggerCompiler {
         if (section != null) {
             // 'entity' in 'spawn a pig:' is the pig.
             element(section.valuesSlot(), section.indexSlot(), 0);
+            return;
+        }
+        Block wider = widerSection(ref.type().id());
+        if (wider != null) {
+            // 'event-display' in 'spawn a text display:' is the entity, if it's a display.
+            element(wider.valuesSlot(), wider.indexSlot(), 0);
+            constant(library.javaClass(ref.type().id()), Class.class);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "filter", "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECT_DESC,
+                    false);
             return;
         }
         java.util.function.Function<Object, Object> getter =
@@ -1602,11 +2044,32 @@ final class TriggerCompiler {
         pushInt(0);
         method.visitMethodInsn(INVOKESTATIC, VALUES, "element", "(" + OBJECTS + "II)" + OBJECT_DESC, false);
         method.visitVarInsn(ASTORE, reduced);
+        // A step giving nothing is skipped, and reported once at the end, as in Skript.
+        int skipped = nextSlot++;
+        method.visitInsn(ICONST_0);
+        method.visitVarInsn(ISTORE, skipped);
         forEachInput(list, 1, reduced, (frame, next) -> {
             expression(folding);
             convert(false);
+            Label nothing = new Label();
+            Label done = new Label();
+            method.visitInsn(DUP);
+            method.visitJumpInsn(IFNULL, nothing);
             method.visitVarInsn(ASTORE, reduced);
+            method.visitJumpInsn(GOTO, done);
+            method.visitLabel(nothing);
+            method.visitInsn(POP);
+            method.visitInsn(ICONST_1);
+            method.visitVarInsn(ISTORE, skipped);
+            method.visitLabel(done);
         });
+        Label fine = new Label();
+        method.visitVarInsn(ILOAD, skipped);
+        method.visitJumpInsn(IFEQ, fine);
+        method.visitLdcInsn("The reduce expression returned null for one or more elements, which were skipped.");
+        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(co.xenastudios.neoskript.runtime.RuntimeErrors.class),
+                "report", "(" + STRING_DESC + ")V", false);
+        method.visitLabel(fine);
         method.visitVarInsn(ALOAD, reduced);
     }
 
@@ -1696,10 +2159,21 @@ final class TriggerCompiler {
 
     /** The list variable a syntax element works on, such as the {@code {x::*}} in {@code sort {x::*}}. */
     private Expr.Variable listVariable(ParsedSyntax syntax, String problem) throws CompileException {
-        if (syntax.match().values().getFirst() instanceof Expr.Variable variable && variable.list()) {
+        Object value = syntax.match().values().getFirst();
+        // 'recursive keyed {_x::*}' is the list itself, with its indices.
+        if (value instanceof Expr.Syntax keyed && keyed.syntax().syntax().id().equals(KEYED)) {
+            value = keyed.syntax().match().values().getFirst();
+        }
+        if (value instanceof Expr.Variable variable && variable.list()) {
             return variable;
         }
         throw new CompileException(line, problem + ": '" + source + "'");
+    }
+
+    /** Whether {@code syntax} is {@code recursive} written around {@code keyed}: {@code recursive keyed {_x::*}}. */
+    private static boolean recursiveOfKeyed(ParsedSyntax syntax) {
+        return syntax.match().values().getFirst() instanceof Expr.Syntax keyed
+                && keyed.syntax().syntax().id().equals(KEYED);
     }
 
     // ---------------------------------------------------------------- command arguments
@@ -1844,6 +2318,11 @@ final class TriggerCompiler {
 
     /** Pushes the expression's value as an {@code Object} (an {@code Object[]} for several values). */
     private void expression(Expr expr) throws CompileException {
+        Integer worked = precomputed.get(expr);
+        if (worked != null) {
+            method.visitVarInsn(ALOAD, worked);
+            return;
+        }
         switch (expr) {
             case Expr.Literal literal -> literal(literal);
             case Expr.Text text -> text(text.start(), text.end(), text.embedded());
@@ -1874,6 +2353,8 @@ final class TriggerCompiler {
                     || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY) -> eventValue(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.FILTER) -> filter(syntax.syntax());
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ANY_OF) ->
+                    expression((Expr) syntax.syntax().match().values().getFirst());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RECURSIVE_SIZE) -> {
                 Expr.Variable list = listVariable(syntax.syntax(), "Only list variables have a recursive size");
                 variableStore(list);
@@ -1954,6 +2435,22 @@ final class TriggerCompiler {
                 expression((Expr) syntax.syntax().match().values().get(1));
                 method.visitLabel(done);
             }
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TYPE_VALUE) -> {
+                Class<?> type = library.javaClass(syntax.type());
+                if (type == null) {
+                    throw unsupported("the type " + syntax.type());
+                }
+                constant(new co.xenastudios.neoskript.runtime.TypeValue(syntax.type(), type), Object.class);
+            }
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.SETS) -> {
+                List<Object> all = library.namedValues(syntax.type());
+                if (all == null) {
+                    throw unsupported("all " + syntax.type() + "s");
+                }
+                // A copy each time, so nothing can change the type's values.
+                constant(all.toArray(), Object[].class);
+                method.visitMethodInsn(INVOKEVIRTUAL, OBJECTS, "clone", "()" + OBJECT_DESC, false);
+            }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RANDOM) -> {
                 expression((Expr) syntax.syntax().match().values().getFirst());
                 Class<?> type = library.javaClass(syntax.type());
@@ -1982,7 +2479,7 @@ final class TriggerCompiler {
             }
             case Expr.Syntax syntax -> {
                 boolean keyAware = keyAware(syntax);
-                callThrough(syntax.syntax(), Expression.class, keyAware, false);
+                callThrough(syntax.syntax(), Expression.class, keyAware, keyAware && implicitKeys(syntax));
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Expression.class), "get",
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
                 if (keyAware) {
@@ -1997,6 +2494,10 @@ final class TriggerCompiler {
                 for (String name : literalTypes) {
                     TypeRef ref = registry.resolveType(name);
                     java.util.function.Function<String, ?> parser = ref == null ? null : library.literalParser(ref.type().id());
+                    if (parser == null && ref != null && library.namedValues(ref.type().id()) != null) {
+                        // A named type's words: 'normal' is the environment where an environment is compared.
+                        parser = library.parser(ref.type().id());
+                    }
                     value = parser == null ? null : parser.apply(unresolved.text().strip());
                     if (value != null) {
                         break;
@@ -2041,6 +2542,13 @@ final class TriggerCompiler {
                 };
                 method.visitFieldInsn(GETSTATIC, "java/lang/Boolean", value ? "TRUE" : "FALSE", "Ljava/lang/Boolean;");
             }
+            case "time" -> {
+                co.xenastudios.neoskript.runtime.TimeOfDay time = co.xenastudios.neoskript.runtime.TimeOfDay.parse(literal.text());
+                if (time == null) {
+                    throw unsupported("the time '" + literal.text() + "'");
+                }
+                constant(time, Object.class);
+            }
             case "timespan" -> {
                 Timespan timespan = Timespan.parse(literal.text());
                 if (timespan == null) {
@@ -2059,6 +2567,13 @@ final class TriggerCompiler {
                 Object value = parser == null ? null
                         : parser.apply(specified.matches() ? specified.group(1).strip() : literal.text().strip());
                 if (value == null) {
+                    if (parser == null && specified.matches()) {
+                        // 'oak log (block)': a type that can't be written as a literal at all.
+                        TypeRef ref = registry.resolveType(literal.type());
+                        String name = ref == null ? literal.type() : ref.type().name();
+                        throw new CompileException(line, ("aeiou".indexOf(Character.toLowerCase(name.charAt(0))) >= 0 ? "An "
+                                : "A ") + name + " cannot be parsed.");
+                    }
                     throw unsupported(literal.type() + " literals");
                 }
                 constant(value, Object.class);
@@ -2272,6 +2787,15 @@ final class TriggerCompiler {
         for (int i = 0; i < parameters.size(); i++) {
             Expr argument = i < call.arguments().size() ? call.arguments().get(i) : null;
             if (argument == null) {
+                java.util.function.Supplier<?> fallback = builtIn == null ? null : library.functionDefault(info, i);
+                if (fallback != null) {
+                    // Left out, so the built-in's own default, worked out when called.
+                    method.visitInsn(DUP);
+                    pushInt(i);
+                    constant(fallback, java.util.function.Supplier.class);
+                    method.visitMethodInsn(INVOKEINTERFACE, "java/util/function/Supplier", "get", "()" + OBJECT_DESC, true);
+                    method.visitInsn(AASTORE);
+                }
                 continue;
             }
             method.visitInsn(DUP);
@@ -2280,7 +2804,14 @@ final class TriggerCompiler {
             List<String> outerLiteralTypes = literalTypes;
             literalTypes = List.of(parameters.get(i).type());
             try {
-                if (parameters.get(i).plural() && isKeyed(argument)) {
+                if (parameters.get(i).plural() && keyedList(argument) != null) {
+                    // A list passed keyed takes everything under it along, as Skript copies it into the parameter.
+                    Expr.Variable list = keyedList(argument);
+                    variableStore(list);
+                    variableName(list);
+                    method.visitMethodInsn(INVOKEVIRTUAL, STORE, "recursiveKeyedList",
+                            "(" + STRING_DESC + ")" + Type.getDescriptor(KeyedValues.class), false);
+                } else if (parameters.get(i).plural() && isKeyed(argument)) {
                     keyed(argument);
                 } else {
                     expression(argument);
@@ -2319,6 +2850,7 @@ final class TriggerCompiler {
     private boolean isKeyed(Expr expr, boolean implicit) {
         return switch (expr) {
             case Expr.Syntax syntax when syntax.syntax().syntax().id().equals(KEYED) -> true;
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RECURSIVE) -> implicit || recursiveOfKeyed(syntax.syntax());
             case Expr.Syntax syntax when keyAware(syntax) -> syntax.syntax().match().values().stream()
                     .anyMatch(value -> value instanceof Expr argument && isKeyed(argument, implicit));
             case Expr.ListOf list -> list.items().stream().anyMatch(item -> isKeyed(item, implicit));
@@ -2327,6 +2859,18 @@ final class TriggerCompiler {
                     && call.function().returnsPlural();
             default -> false;
         };
+    }
+
+    /** The list variable in {@code keyed {_x::*}}, or {@code null} if {@code expr} isn't that. */
+    private static Expr.Variable keyedList(Expr expr) {
+        return expr instanceof Expr.Syntax syntax && syntax.syntax().syntax().id().equals(KEYED)
+                && syntax.syntax().match().values().getFirst() instanceof Expr.Variable list && list.list() ? list : null;
+    }
+
+    /** Whether the key-aware element wants list variables' indices even when they aren't written keyed. */
+    private boolean implicitKeys(Expr.Syntax syntax) {
+        return library.binding(syntax.syntax().syntax()) instanceof ElementFactory<?> factory
+                && factory.create(info(syntax.syntax())) instanceof KeyAware aware && aware.implicitKeys();
     }
 
     /** Whether the expression's element keeps its values' indices ({@link KeyAware}). */
@@ -2349,8 +2893,16 @@ final class TriggerCompiler {
         switch (expr) {
             case Expr.Syntax syntax when syntax.syntax().syntax().id().equals(KEYED) ->
                 keyed((Expr) syntax.syntax().match().values().getFirst(), true);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RECURSIVE) -> {
+                // Every value under the list, each with its path: {_x::a::b} is at 'a::b'.
+                Expr.Variable list = listVariable(syntax.syntax(), "Only list variables can be recursive");
+                variableStore(list);
+                variableName(list);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "recursiveKeyedList",
+                        "(" + STRING_DESC + ")" + Type.getDescriptor(KeyedValues.class), false);
+            }
             case Expr.Syntax syntax when keyAware(syntax) -> {
-                callThrough(syntax.syntax(), Expression.class, true, implicit);
+                callThrough(syntax.syntax(), Expression.class, true, implicit || implicitKeys(syntax));
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Expression.class), "get",
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
             }

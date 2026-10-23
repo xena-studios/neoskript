@@ -17,6 +17,7 @@ final class CoreSyntax {
 
     static final String CONDITIONAL = "SecConditional";
     static final String LOOP = "SecLoop";
+    static final String FOR = "SecFor";
     static final String WHILE = "SecWhile";
     static final String EXIT = "EffExit";
     static final String CONTINUE = "EffContinue";
@@ -49,8 +50,11 @@ final class CoreSyntax {
     static final String COPY = "EffCopy";
     static final String RECURSIVE = "ExprRecursive";
     static final String RANDOM = "ExprRandom";
+    static final String SETS = "ExprSets";
+    static final String TYPE_VALUE = "LitClassInfo";
     /** Skript's {@code ExprAmount} counting a list variable's values at every depth. */
     static final String RECURSIVE_SIZE = "ExprAmount-recursive";
+    static final String ANY_OF = "ExprAnyOf";
     static final String TRANSFORM = "ExprTransform";
     static final String REDUCE = "ExprReduce";
     static final String INPUT = "ExprInput";
@@ -123,6 +127,10 @@ final class CoreSyntax {
                 "[parse] if <.+>",
                 "then [run]",
                 "implicit:<.+>");
+        // 'for {_value} in X', 'for {_key}, {_value} in X': a loop that puts each value (and index) in variables.
+        library.core(SyntaxKind.SECTION, FOR, null, List.of(), "for [each] [value] %~object% in %objects%",
+                "for [each] [(key|index)] %~object%(,| and) [value] %~object% in %objects%",
+                "loop %~object%(,| and) %~object% in %objects%");
         library.core(SyntaxKind.SECTION, LOOP, null, List.of(), "loop %objects%");
         library.core(SyntaxKind.SECTION, WHILE, null, condition, "[do:do] while <.+>");
 
@@ -154,6 +162,8 @@ final class CoreSyntax {
         library.core(SyntaxKind.EXPRESSION, RECURSIVE_SIZE, "integer", List.of(),
                 "[the] recursive (amount|number|size) of %~objects%");
         library.core(SyntaxKind.EXPRESSION, RECURSIVE, "object", List.of(), "recursive %~objects%");
+        // 'any of 1, 2 and 3' is the values as an or-list: '1 is any of {_a::*}'.
+        library.core(SyntaxKind.EXPRESSION, ANY_OF, "object", List.of(), "(any [one]|one) of [the] %objects%");
 
         // The script being compiled.
         library.core(SyntaxKind.EXPRESSION, CURRENT_SCRIPT, "script", List.of(), "[the] [current] script");
@@ -225,6 +235,10 @@ final class CoreSyntax {
 
     /** Syntax tried after everything else, so the library's elements win: event values match any type name. */
     static void registerLast(Library library) {
+        // 'all colours': every value of a type that has a fixed set of them.
+        library.core(SyntaxKind.EXPRESSION, SETS, "object", List.of(RegexRole.TYPE), "(all [[of] the]|every) <.+>");
+        // 'X is a color': a type as a value, which a value is if it's of that type.
+        library.core(SyntaxKind.EXPRESSION, TYPE_VALUE, "object", List.of(RegexRole.TYPE), "(a|an) <.+>");
         // 'number within {_x}': the values of that type. Its type comes from the type name. Late, as in Skript,
         // so 'items in {_inventory}' is the inventory's items.
         library.core(SyntaxKind.EXPRESSION, CAST, "object", List.of(RegexRole.TYPE),

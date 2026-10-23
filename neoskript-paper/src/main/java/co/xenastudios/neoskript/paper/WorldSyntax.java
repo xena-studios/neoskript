@@ -5,6 +5,7 @@
 package co.xenastudios.neoskript.paper;
 
 import co.xenastudios.neoskript.api.element.Changeable;
+import co.xenastudios.neoskript.api.element.Condition;
 import co.xenastudios.neoskript.api.element.Expression;
 import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.api.registration.Parameter;
@@ -15,6 +16,8 @@ import co.xenastudios.neoskript.api.storage.VariableCodec;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
+import java.util.Map;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -41,7 +44,20 @@ final class WorldSyntax {
      *
      * @param explicit whether a distance was written ({@code 5 below}), which {@code blocks below} uses
      */
-    record Direction(Vector offset, boolean explicit) {
+    record Direction(Vector offset, boolean explicit, java.util.function.Function<Location, Vector> relative) {
+
+        Direction(Vector offset, boolean explicit) {
+            this(offset, explicit, null);
+        }
+
+        /** The offset from {@code origin}: relative directions, like {@code left}, depend on where it faces. */
+        Vector from(Location origin) {
+            Vector total = offset.clone();
+            if (relative != null && origin != null) {
+                total.add(relative.apply(origin));
+            }
+            return total;
+        }
 
         @Override
         public String toString() {
@@ -52,8 +68,31 @@ final class WorldSyntax {
     /** The entities spawned last on each thread, for {@code the last spawned pig}. */
     private static final ThreadLocal<Entity> LAST_SPAWNED = new ThreadLocal<>();
 
-    static void register(Registrar registrar) {
+    /**
+     * Entity types, registered before item types: words naming both, like {@code cod}, are the entity type
+     * where nothing says which, as in Skript.
+     */
+    static void registerEntityTypes(Registrar registrar) {
         registrar.type("entitytype", "entity type", EntityKind.class);
+        // Before items, kinds without an amount: 'cod' is the fish. With one, after them: '32 ender pearls' are
+        // items, though '5 villagers' are still villagers.
+        registrar.literalParser("entitytype", text -> EntityKind.counted(text) ? null : EntityKind.parse(text));
+        registrar.parser("entitytype", EntityKind::parse);
+        // Entity types written in the plural, which are all of those entities: 'size of zombies'.
+        registrar.type("pluralentitytype", "plural entity type", EntityKind.class);
+        // Never with an amount: '32 ender pearls' are items.
+        registrar.literalParser("pluralentitytype", text -> !EntityKind.counted(text) && EntityKind.isPlural(text)
+                ? EntityKind.parse(text) : null);
+    }
+
+    /** Entity types with an amount, tried after items: '5 villagers', '2 zombie'. */
+    static void registerCountedEntityTypes(Registrar registrar) {
+        registrar.type("countedentitytype", "entity type", EntityKind.class);
+        registrar.subtype("countedentitytype", "entitytype");
+        registrar.literalParser("countedentitytype", text -> EntityKind.counted(text) ? EntityKind.parse(text) : null);
+    }
+
+    static void register(Registrar registrar) {
         registrar.type("livingentity", "living entity", LivingEntity.class);
         registrar.type("block", "block", Block.class);
         registrar.type("vector", "vector", Vector.class);
@@ -70,8 +109,6 @@ final class WorldSyntax {
         registrar.cloner(Location.class, Location::clone);
         registrar.subtype("livingentity", "entity");
         registrar.subtype("player", "livingentity");
-        registrar.literalParser("entitytype", EntityKind::parse);
-        registrar.parser("entitytype", EntityKind::parse);
         registrar.text(Entity.class, entity -> entity.customName() != null
                 ? Messages.LEGACY_SECTION.serialize(entity.customName()) : EntityKind.name(entity.getType()));
         registrar.text(Block.class, block -> ItemType.name(block.getType()));
@@ -117,6 +154,12 @@ final class WorldSyntax {
                 + chunk.getWorld().getName());
         registrar.expression("ExprChunk", "chunk", info -> {
             boolean loaded = info.pattern() == 2;
+            if (info.pattern() == 3) {
+                // By chunk coordinates, without loading it: 'chunk at 1000, 1000 in world "world" is not loaded'.
+                return (context, args) -> args[0] instanceof Number x && args[1] instanceof Number z
+                        && args[2] instanceof org.bukkit.World world
+                        ? world.getChunkAt((int) Math.floor(x.doubleValue()), (int) Math.floor(z.doubleValue()), false) : null;
+            }
             return (context, args) -> {
                 List<Object> chunks = new ArrayList<>();
                 for (Object value : (Object[]) args[0]) {
@@ -129,16 +172,34 @@ final class WorldSyntax {
                 return chunks.size() == 1 ? chunks.getFirst() : chunks.toArray();
             };
         }, "[(all [[of] the]|the)] chunk[s] (of|at) %locations%", "%locations%'[s] chunk[s]",
-                "[(all [[of] the]|the)] loaded chunks (of|in) %worlds%");
-        registrar.expression("ExprMidpoint", "object", info -> (context, args) -> {
+                "[(all [[of] the]|the)] loaded chunks (of|in) %worlds%",
+                "[the] chunk [at] %number%, %number% (in|of) %world%");
+        registrar.expression("ExprMidpoint", "object", info -> {
+            String first = info.argumentType(0);
+            String second = info.argumentType(1);
+            if (first != null && second != null && !first.equals(second)) {
+                throw new co.xenastudios.neoskript.api.element.SyntaxError(
+                        "You can only get the midpoint between two locations or two vectors.");
+            }
+            return (context, args) -> {
             if (args[0] instanceof Location a && args[1] instanceof Location b) {
-                return a.getWorld() != b.getWorld() ? null : new Location(a.getWorld(), (a.getX() + b.getX()) / 2,
-                        (a.getY() + b.getY()) / 2, (a.getZ() + b.getZ()) / 2);
+                if (a.getWorld() != b.getWorld()) {
+                    co.xenastudios.neoskript.runtime.RuntimeErrors.report(
+                            "Cannot get the midpoint of two locations in different worlds.");
+                    return null;
+                }
+                return new Location(a.getWorld(), (a.getX() + b.getX()) / 2, (a.getY() + b.getY()) / 2,
+                        (a.getZ() + b.getZ()) / 2);
             }
             if (args[0] instanceof Vector a && args[1] instanceof Vector b) {
                 return a.getMidpoint(b);
             }
+            if (args[0] != null && args[1] != null) {
+                co.xenastudios.neoskript.runtime.RuntimeErrors.report(
+                        "You can only get the midpoint between two locations or two vectors.");
+            }
             return null;
+            };
         }, "[the] mid[-]point (of|between) %location/vector% and %location/vector%");
 
         registrar.expression("ExprWorlds", "world", info -> (context, args) -> Bukkit.getWorlds().toArray(),
@@ -150,8 +211,9 @@ final class WorldSyntax {
             int pattern = info.pattern();
             return (context, args) -> {
                 Object[] values = (Object[]) args[0];
+                // Nothing isn't loaded: 'world("fake-world") is not loaded' holds.
                 if (values.length == 0) {
-                    return false;
+                    return negated;
                 }
                 for (Object value : values) {
                     boolean loaded = switch (value) {
@@ -178,9 +240,27 @@ final class WorldSyntax {
 
     private static void registerEntities(Registrar registrar) {
         registrar.section("EffSecSpawn", "entity", info -> {
-            boolean counted = info.pattern() == 1;
+            if (info.pattern() == 3) {
+                // 'spawn 10 xp at X': an experience orb with that many points.
+                return (context, args) -> {
+                    List<Object> spawned = new ArrayList<>();
+                    if (!(args[0] instanceof Experience experience) || args[1] == null) {
+                        return spawned.toArray();
+                    }
+                    for (Object place : (Object[]) args[1]) {
+                        if (place instanceof Location location && location.getWorld() != null) {
+                            Entity orb = location.getWorld().spawn(location, org.bukkit.entity.ExperienceOrb.class,
+                                    created -> created.setExperience(experience.xp()));
+                            LAST_SPAWNED.set(orb);
+                            spawned.add(orb);
+                        }
+                    }
+                    return spawned.toArray();
+                };
+            }
+            boolean counted = info.pattern() >= 1;
             return (context, args) -> {
-                int amount = counted && args[0] instanceof Number n ? (int) Math.round(n.doubleValue()) : 1;
+                int amount = counted && args[0] instanceof Number n ? co.xenastudios.neoskript.runtime.Values.toInt(n.doubleValue()) : 1;
                 Object[] types = (Object[]) args[counted ? 1 : 0];
                 Object[] locations = args[counted ? 2 : 1] == null ? new Object[0] : (Object[]) args[counted ? 2 : 1];
                 List<Object> spawned = new ArrayList<>();
@@ -193,7 +273,7 @@ final class WorldSyntax {
                         if (!(type instanceof EntityKind kind) || !kind.spawnable()) {
                             continue;
                         }
-                        for (int i = 0; i < amount; i++) {
+                        for (int i = 0, n = amount * kind.amount(); i < n; i++) {
                             Entity entity = kind.spawn(location);
                             if (entity != null) {
                                 LAST_SPAWNED.set(entity);
@@ -205,41 +285,96 @@ final class WorldSyntax {
                 return spawned.toArray();
             };
         }, "(spawn|summon) %entitytypes% [(at|on) %locations%]",
-                "(spawn|summon) %number% of %entitytypes% [(at|on) %locations%]");
+                "(spawn|summon) %number% of %entitytypes% [(at|on) %locations%]",
+                "(spawn|summon) %number% %entitytypes% [(at|on) %locations%]",
+                "(spawn|summon) %experience% [(at|on) %locations%]");
         registrar.expression("ExprLastSpawnedEntity", "entity", info -> (context, args) -> {
             Entity last = LAST_SPAWNED.get();
             return last != null && (args[0] == null || (args[0] instanceof EntityKind kind && kind.matches(last))) ? last : null;
         }, "[the] [last[ly]] (spawned|shot) %*entitytype%");
 
         // Replaces the players-only version from step 4: 'all players', 'all zombies in world "world"'.
-        registrar.expression("ExprEntities", "entity", info -> (context, args) -> {
-            List<Object> found = new ArrayList<>();
-            List<Object> types = List.of((Object[]) args[0]);
-            List<org.bukkit.World> worlds = new ArrayList<>();
-            if (args[1] == null) {
-                worlds.addAll(Bukkit.getWorlds());
-            } else {
-                for (Object world : (Object[]) args[1]) {
-                    if (world instanceof org.bukkit.World w) {
-                        worlds.add(w);
-                    }
-                }
-            }
-            boolean onlyPlayers = types.size() == 1 && types.getFirst() instanceof EntityKind kind
-                    && kind.type() == EntityType.PLAYER;
-            for (org.bukkit.World world : worlds) {
-                for (Entity entity : onlyPlayers ? new ArrayList<Entity>(world.getPlayers()) : world.getEntities()) {
+        registrar.expression("ExprEntities", "entity", info -> {
+            // 'zombies' on its own is all zombies, everywhere.
+            int pattern = info.pattern() == 5 ? 0 : info.pattern();
+            boolean bare = info.pattern() == 5;
+            return (context, given) -> {
+                Object[] args = bare ? new Object[] {given[0], null, null} : given;
+                List<Object> types = List.of((Object[]) args[0]);
+                Predicate<Entity> wanted = entity -> {
                     for (Object type : types) {
                         if (type instanceof EntityKind kind && kind.matches(entity)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+                List<Object> found = new ArrayList<>();
+                if (pattern >= 2) {
+                    // Around a location, or within the box between two corners.
+                    if (!(args[2] instanceof Location center) || center.getWorld() == null) {
+                        return found.toArray();
+                    }
+                    if (pattern == 4) {
+                        if (!(args[1] instanceof Location corner) || corner.getWorld() != center.getWorld()) {
+                            return found.toArray();
+                        }
+                        org.bukkit.util.BoundingBox box = org.bukkit.util.BoundingBox.of(corner, center);
+                        found.addAll(center.getWorld().getNearbyEntities(box, wanted));
+                        return found.toArray();
+                    }
+                    double radius = args[1] instanceof Number n ? n.doubleValue() : 0;
+                    if (!(radius > 0)) {
+                        return found.toArray();
+                    }
+                    double square = radius * radius;
+                    for (Entity entity : center.getWorld().getNearbyEntities(center, radius, radius, radius, wanted)) {
+                        if (entity.getLocation().distanceSquared(center) <= square) {
                             found.add(entity);
-                            break;
+                        }
+                    }
+                    return found.toArray();
+                }
+                if (args[2] != null) {
+                    for (Object chunk : (Object[]) args[2]) {
+                        if (chunk instanceof org.bukkit.Chunk c) {
+                            for (Entity entity : c.getEntities()) {
+                                if (wanted.test(entity)) {
+                                    found.add(entity);
+                                }
+                            }
+                        }
+                    }
+                    return found.toArray();
+                }
+                List<org.bukkit.World> worlds = new ArrayList<>();
+                if (args[1] == null) {
+                    worlds.addAll(Bukkit.getWorlds());
+                } else {
+                    for (Object world : (Object[]) args[1]) {
+                        if (world instanceof org.bukkit.World w) {
+                            worlds.add(w);
                         }
                     }
                 }
-            }
-            return found.toArray();
+                boolean onlyPlayers = types.size() == 1 && types.getFirst() instanceof EntityKind kind
+                        && kind.type() == EntityType.PLAYER;
+                for (org.bukkit.World world : worlds) {
+                    for (Entity entity : onlyPlayers ? new ArrayList<Entity>(world.getPlayers()) : world.getEntities()) {
+                        if (wanted.test(entity)) {
+                            found.add(entity);
+                        }
+                    }
+                }
+                return found.toArray();
+            };
         // 'all' or 'the' is needed: 'baby chicken' alone is the entity type.
-        }, "(all [[of] the]|the) %*entitytypes% [(in|of) world[s] %worlds%]");
+        }, "(all [[of] the]|the) %*entitytypes% [(in|of) (world[s] %-worlds%|%-chunks%)]",
+                "(all [[of] the]|the) entities of type[s] %entitytypes% [(in|of) (world[s] %-worlds%|%-chunks%)]",
+                "(all [[of] the]|the) %*entitytypes% (within|[with]in radius) %number% [(block[s]|met(er|re)[s])] (of|around) %location%",
+                "(all [[of] the]|the) entities of type[s] %entitytypes% in radius %number% (of|around) %location%",
+                "(all [[of] the]|the) %*entitytypes% within %location% and %location%",
+                "%*pluralentitytypes%");
 
         registrar.expression("ExprHealth", "number", info -> new Health(), "[the] health of %livingentities%",
                 "%livingentities%'[s] health");
@@ -260,9 +395,11 @@ final class WorldSyntax {
         });
     }
 
-    private static void registerBlocks(Registrar registrar) {
-        registrar.type("direction", "direction", Direction.class);
-        registrar.text(Direction.class, Direction::toString);
+    /**
+     * Directions, tried after the rest of the library, as Skript's come after its amounts: 'size of blocks above
+     * X' is the size of the blocks above X, not '(size of blocks) above X'.
+     */
+    static void registerLate(Registrar registrar) {
         registrar.expression("ExprDirection", "direction", info -> (context, args) -> {
             Vector unit = switch (info.tags().stream().filter(DIRECTION_TAGS::containsKey).findFirst().orElse("up")) {
                 case "north" -> new Vector(0, 0, -1);
@@ -282,21 +419,79 @@ final class WorldSyntax {
             return new Direction(offset, explicit);
         }, "[%number% [(block|met(er|re))[s]] [to the]] (north:north|south:south|east:east|west:west|up:above|up:over"
                 + "|up:up[ward[s]]|down:down[ward[s]]|down:below|down:under[neath]|down:beneath) [of] [%direction%]");
+        // Directions that depend on where something faces or is: 'left', 'forwards', 'towards {_loc}', 'along {_v}'.
+        registrar.expression("ExprDirection-relative", "direction", info -> {
+            int pattern = info.pattern();
+            boolean flip = info.hasTag("right") || info.hasTag("backward") || info.hasTag("away");
+            return (context, args) -> {
+                double amount = pattern < 3 && args[0] instanceof Number n ? n.doubleValue() : 1;
+                java.util.function.Function<Location, Vector> relative = switch (pattern) {
+                    case 0 -> origin -> {
+                        // Facing south (yaw 0), left is east.
+                        double yaw = Math.toRadians(origin.getYaw());
+                        return new Vector(Math.cos(yaw), 0, Math.sin(yaw)).multiply(flip ? -amount : amount);
+                    };
+                    case 1 -> origin -> origin.getDirection().multiply(flip ? -amount : amount);
+                    case 2 -> {
+                        if (!(args[1] instanceof Location target)) {
+                            yield null;
+                        }
+                        // The whole way there: 'towards' a point 3 blocks away is 3 blocks.
+                        yield origin -> target.toVector().subtract(origin.toVector()).multiply(flip ? -amount : amount);
+                    }
+                    default -> args[0] instanceof Vector along ? origin -> along.clone() : null;
+                };
+                return relative == null ? null : new Direction(new Vector(), pattern < 3 && args[0] instanceof Number, relative);
+            };
+        }, "[%number% [(block|met(er|re))[s]]] [to the] (left|right:right)",
+                "[%number% [(block|met(er|re))[s]]] (forward[s]|in front|backward:(backward[s]|behind))",
+                "[%number% [(block|met(er|re))[s]]] (towards|away:away from) %location%",
+                "along %vector%");
+    }
+
+    private static void registerBlocks(Registrar registrar) {
+        registrar.type("direction", "direction", Direction.class);
+        registrar.text(Direction.class, Direction::toString);
+        // A vector is a direction: 'blocks vector(1, 0, 0) {_loc}'.
+        registrar.converter(Vector.class, Direction.class, vector -> new Direction(vector.clone(), false));
+        registrar.effect("EffPush", info -> (context, args) -> {
+            if (!(args[1] instanceof Direction direction)) {
+                return;
+            }
+            for (Object value : (Object[]) args[0]) {
+                if (value instanceof Entity entity) {
+                    Vector push = direction.from(entity.getLocation());
+                    // A speed sets how hard, in the direction's direction.
+                    if (args[2] instanceof Number speed && push.lengthSquared() > 0) {
+                        push.normalize().multiply(speed.doubleValue());
+                    }
+                    entity.setVelocity(entity.getVelocity().add(push));
+                }
+            }
+        }, "(push|thrust|pull) %entities% %direction% [(at|with) (speed|velocity|force) %number%]");
         registrar.expression("ExprBlock-2", "block", info -> {
             int pattern = info.pattern();
             return (context, args) -> {
-                Location location = pattern == 0 ? (args[0] instanceof Location l ? l : null)
-                        : args[1] instanceof Location l ? l : null;
+                if (pattern == 0) {
+                    // 'block at X' or 'blocks at {_locations::*}'.
+                    List<Object> blocks = new ArrayList<>();
+                    for (Object value : args[0] instanceof Object[] values ? values : new Object[] {args[0]}) {
+                        if (value instanceof Location location && location.getWorld() != null) {
+                            blocks.add(location.getBlock());
+                        }
+                    }
+                    return blocks.size() == 1 ? blocks.getFirst() : blocks.toArray();
+                }
+                Location location = args[1] instanceof Location l ? l : null;
                 if (location == null || location.getWorld() == null) {
                     return null;
                 }
-                return pattern == 0 ? location.getBlock()
-                        : args[0] instanceof Direction direction ? location.clone().add(direction.offset()).getBlock() : null;
+                return args[0] instanceof Direction direction ? location.clone().add(direction.from(location)).getBlock() : null;
             };
-        }, "[the] block (at|of) %location%", "[the] block %direction% %location%");
+        }, "[the] block[s] (at|of) %locations%", "[the] block %direction% %location%");
         registrar.expression("ExprRelativeLocation", "location", info -> (context, args) ->
                 args[0] instanceof Direction direction && args[1] instanceof Location location
-                        ? location.clone().add(direction.offset()) : null, "[the] location %direction% %location%");
+                        ? location.clone().add(direction.from(location)) : null, "[the] location %direction% %location%");
         registrar.expression("ExprBlocks", "block", info -> {
             int pattern = info.pattern();
             return (context, args) -> {
@@ -307,12 +502,18 @@ final class WorldSyntax {
                     }
                     for (Object place : args[1] == null ? new Object[0] : (Object[]) args[1]) {
                         if (place instanceof Location location && location.getWorld() != null) {
-                            // The starting block and as many more as the direction says, or 100 without a number.
-                            int count = direction.explicit() ? (int) Math.floor(direction.offset().length()) + 1 : 100;
-                            Vector step = direction.offset().clone().normalize();
-                            Location at = location.getBlock().getLocation();
-                            for (int i = 0; i < count; i++) {
-                                blocks.add(at.clone().add(step.clone().multiply(i)).getBlock());
+                            // The blocks a line from the location passes through, as far as the direction says, or
+                            // 100 blocks without a number.
+                            Vector offset = direction.from(location);
+                            if (offset.lengthSquared() == 0) {
+                                continue;
+                            }
+                            double distance = direction.explicit() ? offset.length() : 100;
+                            int limit = direction.explicit() ? (int) Math.floor(distance) + 1 : 100;
+                            org.bukkit.util.BlockIterator line = new org.bukkit.util.BlockIterator(location.getWorld(),
+                                    location.toVector(), offset, 0, (int) Math.ceil(distance));
+                            while (line.hasNext() && blocks.size() < limit) {
+                                blocks.add(line.next());
                             }
                         }
                     }
@@ -333,6 +534,10 @@ final class WorldSyntax {
         // 'set block at X to stone': blocks become the item's block.
         registrar.changer(Block.class, Changeable.Mode.SET, (block, values) -> {
             for (Object value : values) {
+                if (value instanceof org.bukkit.block.data.BlockData data) {
+                    block.setBlockData(data);
+                    return;
+                }
                 Material material = value instanceof ItemType item ? item.material()
                         : value instanceof org.bukkit.inventory.ItemStack stack ? stack.getType() : null;
                 if (material != null && material.isBlock()) {
@@ -368,7 +573,26 @@ final class WorldSyntax {
         registrar.expression("ExprVectorNormalize", "vector", info -> (context, args) -> map(args[0],
                 value -> value instanceof Vector vector ? (vector.lengthSquared() == 0 ? vector.clone() : vector.clone().normalize())
                         : null),
-                "normalize[d] %vectors%", "%vectors% normalized");
+                "normali(z|s)e[d] %vectors%", "%vectors% normali(z|s)ed");
+        EntitySyntax.conditionPatterns(registrar, "CondIsVectorNormalized", Vector.class, Vector::isNormalized, null,
+                "%vectors% (is|are) normali(z|s)ed", "%vectors% (isn't|is not|aren't|are not) normali(z|s)ed");
+        registrar.expression("ExprVectorCylindrical", "vector", info -> (context, args) -> {
+            if (!(args[0] instanceof Number radius) || !(args[1] instanceof Number yaw) || !(args[2] instanceof Number height)) {
+                return null;
+            }
+            // Skript's yaw 0 points along z, so it's 90 degrees round from the x axis.
+            double phi = Math.toRadians(yaw.doubleValue() + 90);
+            return new Vector(radius.doubleValue() * Math.cos(phi), height.doubleValue(), radius.doubleValue() * Math.sin(phi));
+        }, "[a] [new] cylindrical vector [(from|with)] [radius] %number%, [yaw] %number%(,|[,] and) [height] %number%");
+        registrar.expression("ExprVectorSpherical", "vector", info -> (context, args) -> {
+            if (!(args[0] instanceof Number radius) || !(args[1] instanceof Number yaw) || !(args[2] instanceof Number pitch)) {
+                return null;
+            }
+            double y = Math.toRadians(yaw.doubleValue());
+            double p = Math.toRadians(pitch.doubleValue());
+            double r = radius.doubleValue();
+            return new Vector(-Math.sin(y) * Math.cos(p) * r, -Math.sin(p) * r, Math.cos(y) * Math.cos(p) * r);
+        }, "[a] [new] spherical vector [(from|with)] [radius] %number%, [yaw] %number%(,|[,] and) [pitch] %number%");
         registrar.expression("ExprVectorSquaredLength", "number", info -> (context, args) -> map(args[0],
                 value -> value instanceof Vector vector ? vector.lengthSquared() : null),
                 "[the] squared length[s] of %vectors%", "%vectors%'[s] squared length[s]");
@@ -401,21 +625,116 @@ final class WorldSyntax {
         }, "rotate %vectors% around %vector% by %number% [degrees]");
         registrar.expression("ExprYawPitch", "number", info -> new YawPitch(info.hasTag("pitch")),
                 "[the] (yaw|pitch:pitch)[s] of %entities/locations%", "%entities/locations%'[s] (yaw|pitch:pitch)[s]");
-        registrar.expression("PropExprWXYZ", "number", info -> new Axis(info.hasTag("x") ? 0 : info.hasTag("y") ? 1 : 2),
-                "[the] (x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])] of %objects%",
-                "%objects%'[s] (x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])]");
-        registrar.expression("ExprLocationVectorOffset", "location", info -> (context, args) -> {
-            if (!(args[0] instanceof Location location)) {
-                return null;
-            }
-            Location offset = location.clone();
-            for (Object vector : (Object[]) args[1]) {
-                if (vector instanceof Vector v) {
-                    offset.add(v);
+        registrar.expression("ExprVelocity", "vector", info -> new SettableProperty<>(Entity.class, Vector.class,
+                Entity::getVelocity, Entity::setVelocity), "[the] velocit(y|ies) of %entities%", "%entities%'[s] velocit(y|ies)");
+        registrar.condition("CondHasLineOfSight", info -> {
+            boolean negated = info.pattern() >= 1;
+            return (context, args) -> {
+                Object[] viewers = (Object[]) args[0];
+                Object[] targets = (Object[]) args[1];
+                if (viewers.length == 0 || targets.length == 0) {
+                    return negated;
                 }
-            }
-            return offset;
-        }, "%location% offset by [[the] vectors] %vectors%", "%location%[ ]~[~][ ]%vectors%");
+                for (Object viewer : viewers) {
+                    for (Object target : targets) {
+                        if (!(viewer instanceof LivingEntity living)) {
+                            return false;
+                        }
+                        boolean sees = switch (target) {
+                            case Entity entity -> living.hasLineOfSight(entity);
+                            case Location location -> living.hasLineOfSight(location);
+                            default -> false;
+                        };
+                        if (sees == negated) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            };
+        }, "%livingentities% (has|have) [a] [direct] line of sight to %entities/locations%",
+                "%livingentities% (doesn't|does not|do not|don't) have [a] [direct] line of sight to %entities/locations%",
+                "%livingentities% (has|have) no [direct] line of sight to %entities/locations%");
+        registrar.expression("ExprLowestHighestSolidBlock", "block", info -> {
+            boolean highest = !info.hasTag("lowest");
+            return (context, args) -> map(args[0], value -> {
+                if (!(value instanceof Location location) || location.getWorld() == null) {
+                    return null;
+                }
+                World world = location.getWorld();
+                if (highest) {
+                    return world.getHighestBlockAt(location);
+                }
+                for (int y = world.getMinHeight(); y < world.getMaxHeight(); y++) {
+                    Block block = world.getBlockAt(location.getBlockX(), y, location.getBlockZ());
+                    if (block.getType().isSolid()) {
+                        return block;
+                    }
+                }
+                return null;
+            });
+        }, "[the] (highest|lowest:lowest) [solid] block[s] (at|of) %locations%");
+        registrar.condition("CondIsWithin", info -> {
+            boolean negated = info.pattern() % 2 == 1;
+            boolean between = info.pattern() < 2;
+            boolean subjectsAnd = info.and(0);
+            boolean containersAnd = info.and(1);
+            return (context, args) -> negated != Condition.check((Object[]) args[0], subjectsAnd, subject -> {
+                Location location = subject instanceof Entity entity ? entity.getLocation()
+                        : subject instanceof Block block ? block.getLocation().add(0.5, 0.5, 0.5)
+                        : subject instanceof Location l ? l : null;
+                if (location == null) {
+                    return false;
+                }
+                if (between && args[1] instanceof Location a && args[2] instanceof Location b) {
+                    return a.getWorld() == location.getWorld() && org.bukkit.util.BoundingBox.of(a, b).contains(location.toVector());
+                }
+                Object[] containers = between ? new Object[] {args[1], args[2]} : (Object[]) args[1];
+                return Condition.check(containers, between || containersAnd, container -> within(location, container));
+            });
+        }, "%locations/entities/blocks% (is|are) within %object% and %object%",
+                "%locations/entities/blocks% (isn't|is not|aren't|are not) within %object% and %object%",
+                "%locations/entities/blocks% (is|are) (within|inside [of]) %entities/chunks/worlds/worldborders/blocks%",
+                "%locations/entities/blocks% (isn't|is not|aren't|are not) (within|inside [of]) %entities/chunks/worlds/worldborders/blocks%");
+        Map<String, World.Environment> environments = new java.util.LinkedHashMap<>();
+        environments.put("normal", World.Environment.NORMAL);
+        environments.put("overworld", World.Environment.NORMAL);
+        environments.put("the overworld", World.Environment.NORMAL);
+        environments.put("nether", World.Environment.NETHER);
+        environments.put("the nether", World.Environment.NETHER);
+        environments.put("end", World.Environment.THE_END);
+        environments.put("the end", World.Environment.THE_END);
+        environments.put("custom", World.Environment.CUSTOM);
+        registrar.namedType("environment", "environment", World.Environment.class, environments);
+        registrar.expression("ExprWorldEnvironment", "environment", info -> (context, args) -> map(args[0],
+                value -> value instanceof World world ? world.getEnvironment() : null),
+                "[the] [world] environment[s] of %worlds%", "%worlds%'[s] [world] environment[s]");
+        // A world's view and simulation distances, between 2 and 32 chunks; clearing them sets 2.
+        registrar.expression("ExprWorldViewDistance", "integer", info -> {
+            boolean simulation = info.hasTag("simulation");
+            return new SettableProperty<>(World.class, Number.class,
+                    world -> (long) (simulation ? world.getSimulationDistance() : world.getViewDistance()), (world, chunks) -> {
+                        int distance = (int) Math.max(2, Math.min(32, Math.round(chunks.doubleValue())));
+                        if (simulation) {
+                            world.setSimulationDistance(distance);
+                        } else {
+                            world.setViewDistance(distance);
+                        }
+                    }).resettingTo((java.util.function.Consumer<Object>) owner -> {
+                        // Back to the server's own setting.
+                        World world = (World) owner;
+                        if (simulation) {
+                            world.setSimulationDistance(Bukkit.getSimulationDistance());
+                        } else {
+                            world.setViewDistance(Bukkit.getViewDistance());
+                        }
+                    });
+        }, "[the] (view|simulation:simulation) distance[s] of %worlds%", "%worlds%'[s] (view|simulation:simulation) distance[s]");
+        registrar.expression("PropExprWXYZ", "number", info -> new Axis(info.hasTag("x") ? 0 : info.hasTag("y") ? 1
+                : info.hasTag("w") ? 3 : 2),
+                "[the] (w:w|x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])] of %objects%",
+                "%objects%'[s] (w:w|x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])]");
+        Locations.registerOffsetAndSpawn(registrar);
         SettableProperty.register(registrar, "ExprVectorLength", "number", Vector.class, Number.class, Vector::length,
                 (vector, length) -> {
                     double current = vector.length();
@@ -428,18 +747,24 @@ final class WorldSyntax {
     /** Values Skript's test environment provides: the test world, a location in it, and the block there. */
     static void registerTesting(Registrar registrar) {
         registrar.expression("TestWorld", "world", info -> (context, args) -> Bukkit.getWorlds().getFirst(),
-                "[the] test-world");
-        registrar.expression("TestLocation", "location", info -> (context, args) -> testLocation(), "[the] test-location");
-        registrar.expression("TestBlock", "block", info -> (context, args) -> testLocation().getBlock(), "[the] test-block");
+                "[the] test(-| )world");
+        // A player who has never joined; the test server is in offline mode, so the name isn't looked up online.
+        registrar.expression("TestOfflinePlayer", "offlineplayer", info -> (context, args) -> Bukkit.getOfflinePlayer("Njol"),
+                "[the] test(-| )offline(-| )player");
+        registrar.expression("TestLocation", "location", info -> (context, args) -> testLocation(), "[the] test(-| )location");
+        // Skript's test block: ten blocks east of the test location, out of the way of what's tested there.
+        registrar.expression("TestBlock", "block", info -> (context, args) -> testLocation().add(10, 0, 0).getBlock(),
+                "[the] test(-| )block");
         // A test's event values are the test environment's: event-location is the test location.
         Class<co.xenastudios.neoskript.runtime.testing.TestEvent> test = co.xenastudios.neoskript.runtime.testing.TestEvent.class;
         registrar.eventValue(test, "location", event -> testLocation());
-        registrar.eventValue(test, "block", event -> testLocation().getBlock());
+        registrar.eventValue(test, "block", event -> testLocation().add(10, 0, 0).getBlock());
         registrar.eventValue(test, "world", event -> Bukkit.getWorlds().getFirst());
     }
 
+    /** Skript's test location: a block above the test world's spawn. */
     private static Location testLocation() {
-        return Bukkit.getWorlds().getFirst().getSpawnLocation().toBlockLocation();
+        return Bukkit.getWorlds().getFirst().getSpawnLocation().add(0, 1, 0);
     }
 
     /** {@code the health of %livingentities%}, in hearts as in Skript, which can be set. */
@@ -492,7 +817,12 @@ final class WorldSyntax {
         public Object get(TriggerContext context, Object[] arguments) {
             List<Object> values = new ArrayList<>();
             for (Object value : (Object[]) arguments[0]) {
-                Vector vector = switch (value) {
+                if (value instanceof org.joml.Quaternionf q) {
+                    // A quaternion's parts are floats, and compared as floats.
+                    values.add(axis == 0 ? q.x : axis == 1 ? q.y : axis == 2 ? q.z : q.w);
+                    continue;
+                }
+                Vector vector = axis == 3 ? null : switch (value) {
                     case Location location -> location.toVector();
                     case Vector v -> v;
                     case Block block -> block.getLocation().toVector();
@@ -518,6 +848,18 @@ final class WorldSyntax {
             double by = mode == Mode.REMOVE ? -number.doubleValue() : number.doubleValue();
             for (Object value : (Object[]) arguments[0]) {
                 switch (value) {
+                    case org.joml.Quaternionf q -> {
+                        float current = axis == 0 ? q.x : axis == 1 ? q.y : axis == 2 ? q.z : q.w;
+                        float next = (float) (mode == Mode.SET ? by : current + by);
+                        switch (axis) {
+                            case 0 -> q.x = next;
+                            case 1 -> q.y = next;
+                            case 2 -> q.z = next;
+                            default -> q.w = next;
+                        }
+                    }
+                    case Vector vector when axis == 3 -> {}
+                    case Location location when axis == 3 -> {}
                     case Vector vector -> vector.copy(changed(vector, by, mode));
                     case Location location -> {
                         Vector moved = changed(location.toVector(), by, mode);
@@ -608,5 +950,31 @@ final class WorldSyntax {
                 default -> by;
             };
         }
+    }
+
+    /** Whether {@code location} is within {@code container}: an entity's or block's shape, a chunk, a world or a border. */
+    private static boolean within(Location location, Object container) {
+        return switch (container) {
+            case Entity entity -> entity.getWorld() == location.getWorld()
+                    && entity.getBoundingBox().contains(location.toVector());
+            case Block block -> {
+                if (block.getWorld() != location.getWorld()) {
+                    yield false;
+                }
+                // Against the block's real shape, as for stairs or carpet.
+                Vector inside = location.toVector().subtract(block.getLocation().toVector());
+                for (org.bukkit.util.BoundingBox box : block.getCollisionShape().getBoundingBoxes()) {
+                    if (box.contains(inside)) {
+                        yield true;
+                    }
+                }
+                yield false;
+            }
+            case org.bukkit.Chunk chunk -> chunk.getWorld() == location.getWorld()
+                    && chunk.getX() == location.getBlockX() >> 4 && chunk.getZ() == location.getBlockZ() >> 4;
+            case World world -> world == location.getWorld();
+            case org.bukkit.WorldBorder border -> border.isInside(location);
+            case null, default -> false;
+        };
     }
 }

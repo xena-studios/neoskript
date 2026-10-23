@@ -14,6 +14,17 @@ import java.util.concurrent.ConcurrentHashMap;
 /** The codecs for each savable type, by Skript type name and by Java class. */
 public final class VariableCodecs {
 
+    private static volatile VariableCodecs current;
+
+    /** The codecs most recently set up, for storing values elsewhere too, like in persistent data. */
+    public static VariableCodecs current() {
+        return current;
+    }
+
+    public VariableCodecs() {
+        current = this;
+    }
+
     /** A value as saved: Skript's type name and the encoded bytes. */
     public record Encoded(String type, byte[] bytes) {}
 

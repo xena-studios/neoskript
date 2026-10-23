@@ -19,6 +19,53 @@ final class Scripts {
     private Scripts() {}
 
     static void register(Registrar registrar) {
+        // Functions as values: 'function "heal" from {_script}', which can be run, or their result got.
+        registrar.type("function", "function", co.xenastudios.neoskript.runtime.FunctionRef.class);
+        registrar.parser("function", Scripts::function);
+        registrar.expression("ExprFunction", "function", info -> (context, args) -> {
+            String script = args[1] instanceof ScriptRef ref ? ref.name() : null;
+            java.util.List<Object> found = new java.util.ArrayList<>();
+            for (Object name : (Object[]) args[0]) {
+                co.xenastudios.neoskript.runtime.FunctionRef function = co.xenastudios.neoskript.runtime.FunctionLookup.find(
+                        functionName(Values.text(name)), script);
+                if (function != null) {
+                    found.add(function);
+                }
+            }
+            return found.size() == 1 ? found.getFirst() : found.toArray();
+        }, "[the] function[s] [named] %strings% [(from|in) %script%]");
+        registrar.expression("ExprAllFunctions", "function", info -> (context, args) ->
+                args[0] instanceof ScriptRef script
+                        ? co.xenastudios.neoskript.runtime.FunctionLookup.definedIn(script.name()).toArray() : new Object[0],
+                "[all [[of] the]|the] functions (from|in) %script%");
+        // 'load script named X', 'disable X': scripts loaded, reloaded, unloaded or disabled while running.
+        registrar.effect("EffScriptFile", info -> {
+            String action = info.hasTag("reload") ? "reload" : info.hasTag("unload") ? "unload"
+                    : info.hasTag("disable") ? "disable" : "load";
+            return (context, args) -> {
+                for (Object value : (Object[]) args[0]) {
+                    ScriptRef script = value instanceof ScriptRef ref ? ref : ScriptCatalog.get().find(Values.text(value));
+                    if (script == null) {
+                        continue;
+                    }
+                    switch (action) {
+                        case "reload" -> ScriptCatalog.get().reload(script);
+                        case "unload" -> ScriptCatalog.get().unload(script);
+                        case "disable" -> ScriptCatalog.get().disable(script);
+                        default -> ScriptCatalog.get().load(script);
+                    }
+                }
+            };
+        }, "(enable|load|reload:reload|unload:unload|disable:disable) [script] [file] [named] %scripts/strings%");
+        registrar.effect("EffRun", info -> (context, args) -> {
+            if (args[0] instanceof co.xenastudios.neoskript.runtime.FunctionRef function) {
+                function.call(args[1] == null ? new Object[0] : (Object[]) args[1]);
+            }
+        }, "run %function% [with arg[ument]s %objects%]");
+        registrar.expression("ExprResult", "object", info -> (context, args) ->
+                args[0] instanceof co.xenastudios.neoskript.runtime.FunctionRef function
+                        ? function.call(args[1] == null ? new Object[0] : (Object[]) args[1]) : null,
+                "[the] result[s] of [running|executing] %function% [with arg[ument]s %objects%]");
         registrar.expression("ExprScriptNamed", "script", info -> {
             boolean folder = info.pattern() == 1;
             return (context, args) -> {
@@ -66,9 +113,29 @@ final class Scripts {
         registrar.function("file_separator", List.<Parameter>of(), "string", false, args -> File.separator);
     }
 
-    /** A script's name without {@code .sk}, as {@code the name of the script} is. */
+    /**
+     * A script's name without {@code .sk}, as {@code the name of the script} is: with its folders, or, for a
+     * script using script reflection, without them.
+     */
     static String name(ScriptRef script) {
         String name = script.name();
+        if (co.xenastudios.neoskript.runtime.ScriptFeatures.uses(name, "script reflection")) {
+            name = name.substring(Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\')) + 1);
+        }
         return name.endsWith(".sk") ? name.substring(0, name.length() - 3) : name;
+    }
+
+    /** A function's name as written in {@code function "heal()"}: without the brackets. */
+    private static String functionName(String text) {
+        String name = text.strip();
+        return name.endsWith("()") ? name.substring(0, name.length() - 2).strip() : name;
+    }
+
+    /** The function a reference's text names: {@code heal}, or {@code heal from script.sk} for a local one. */
+    private static co.xenastudios.neoskript.runtime.FunctionRef function(String text) {
+        int from = text.indexOf(" from ");
+        String name = functionName(from < 0 ? text : text.substring(0, from));
+        String script = from < 0 ? null : text.substring(from + 6).strip();
+        return co.xenastudios.neoskript.runtime.FunctionLookup.find(name, script);
     }
 }
