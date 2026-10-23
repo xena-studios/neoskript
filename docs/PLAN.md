@@ -418,6 +418,15 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >    - **Elements:** `first/last N elements`, `N random elements`, `the Nth [to last] element`, `elements from N to M`.
 >    - **Lists:** `copy {_a::*} into {_b::*}` with nested lists and indices, `recursive {_a::*}`.
 >    - **`is empty`** for text, queues, inventories and slots.
+>
+>    **Batch 9 (2026-10-23): 250 → 256 tests pass.**
+>    - **Entity effects:** ride/dismount/eject, poison/cure, left/right handed, (in)visible, allow/forbid picking up items.
+>    - **Entity properties, settable:** burning time, freeze time, portal cooldown, invulnerability ticks and time, arrows stuck, villager level and experience, interaction width and height, attributes (`the movement speed attribute of`).
+>    - **Other syntax:** vehicles, is poisoned, tameable, lootable.
+>    - **Fixes:**
+>      - Words of named types like equipment slots now compile as literals (`boots of X`).
+>      - Age words work on categories (`a baby entity`).
+>      - Attribute names are looked up when a script uses them, so nothing touches the server's registries while syntax registers.
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.

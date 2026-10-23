@@ -1951,6 +1951,10 @@ final class TriggerCompiler {
             default -> {
                 // 'diamond (item type)': the type's own literal parser, given the words before the bracket.
                 java.util.function.Function<String, ?> parser = library.literalParser(literal.type());
+                if (parser == null) {
+                    // Named types ('boots', 'creative') parse their words with their parser.
+                    parser = library.parser(literal.type());
+                }
                 java.util.regex.Matcher specified = SPECIFIED_LITERAL.matcher(literal.text());
                 Object value = parser == null ? null
                         : parser.apply(specified.matches() ? specified.group(1).strip() : literal.text().strip());
