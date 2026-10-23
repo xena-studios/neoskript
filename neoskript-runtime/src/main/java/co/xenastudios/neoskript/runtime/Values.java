@@ -55,6 +55,19 @@ public final class Values {
         return value == null ? null : ((Function<String, ?>) parser).apply(text(value).strip());
     }
 
+    /** Keeps only values of {@code type}: a single value or {@code null}, or an array of the ones that are. */
+    public static Object filter(Object value, Class<?> type) {
+        if (value instanceof Object[] array) {
+            for (Object element : array) {
+                if (element != null && !type.isInstance(element)) {
+                    return cast(array, type);
+                }
+            }
+            return array;
+        }
+        return type.isInstance(value) ? value : null;
+    }
+
     /** The values that are instances of {@code type}, for {@code number within {_x}}. */
     public static Object[] cast(Object value, Class<?> type) {
         List<Object> values = new ArrayList<>();

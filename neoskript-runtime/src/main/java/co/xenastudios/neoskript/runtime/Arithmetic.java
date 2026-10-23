@@ -16,6 +16,12 @@ public final class Arithmetic {
     public static Object add(Object a, Object b) {
         a = Values.single(a);
         b = Values.single(b);
+        // A missing number is 0, as in Skript: {_x} + 1 is 1 when {_x} isn't set.
+        if (a == null && b instanceof Number) {
+            a = 0L;
+        } else if (b == null && a instanceof Number) {
+            b = 0L;
+        }
         if (a instanceof String x && b instanceof String y) {
             return x + y;
         }
@@ -33,6 +39,12 @@ public final class Arithmetic {
     public static Object subtract(Object a, Object b) {
         a = Values.single(a);
         b = Values.single(b);
+        // A missing number is 0, as in Skript: {_x} + 1 is 1 when {_x} isn't set.
+        if (a == null && b instanceof Number) {
+            a = 0L;
+        } else if (b == null && a instanceof Number) {
+            b = 0L;
+        }
         if (isWhole(a) && isWhole(b)) {
             long x = ((Number) a).longValue();
             long y = ((Number) b).longValue();
@@ -47,6 +59,12 @@ public final class Arithmetic {
     public static Object multiply(Object a, Object b) {
         a = Values.single(a);
         b = Values.single(b);
+        // A missing number is 0, as in Skript: {_x} + 1 is 1 when {_x} isn't set.
+        if (a == null && b instanceof Number) {
+            a = 0L;
+        } else if (b == null && a instanceof Number) {
+            b = 0L;
+        }
         if (isWhole(a) && isWhole(b)) {
             try {
                 return Math.multiplyExact(((Number) a).longValue(), ((Number) b).longValue());
@@ -60,12 +78,24 @@ public final class Arithmetic {
     public static Object divide(Object a, Object b) {
         a = Values.single(a);
         b = Values.single(b);
+        // A missing number is 0, as in Skript: {_x} + 1 is 1 when {_x} isn't set.
+        if (a == null && b instanceof Number) {
+            a = 0L;
+        } else if (b == null && a instanceof Number) {
+            b = 0L;
+        }
         return a instanceof Number x && b instanceof Number y ? (Object) (x.doubleValue() / y.doubleValue()) : null;
     }
 
     public static Object power(Object a, Object b) {
         a = Values.single(a);
         b = Values.single(b);
+        // A missing number is 0, as in Skript: {_x} + 1 is 1 when {_x} isn't set.
+        if (a == null && b instanceof Number) {
+            a = 0L;
+        } else if (b == null && a instanceof Number) {
+            b = 0L;
+        }
         return a instanceof Number x && b instanceof Number y ? (Object) Math.pow(x.doubleValue(), y.doubleValue()) : null;
     }
 

@@ -549,8 +549,22 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
     private static void add(Map<String, EntityKind> known, EntityKind kind, String... aliases) {
         for (String alias : aliases) {
             known.put(alias, kind);
-            known.putIfAbsent(alias.endsWith("s") ? alias : alias + "s", kind);
+            known.putIfAbsent(plural(alias), kind);
         }
+    }
+
+    /** {@code entity} to {@code entities}, {@code fox} to {@code foxes}, {@code pig} to {@code pigs}. */
+    private static String plural(String name) {
+        if (name.endsWith("s")) {
+            return name;
+        }
+        if (name.endsWith("y") && name.length() > 1 && "aeiou".indexOf(name.charAt(name.length() - 2)) < 0) {
+            return name.substring(0, name.length() - 1) + "ies";
+        }
+        if (name.endsWith("x") || name.endsWith("ch") || name.endsWith("sh")) {
+            return name + "es";
+        }
+        return name + "s";
     }
 
     static String name(EntityType type) {

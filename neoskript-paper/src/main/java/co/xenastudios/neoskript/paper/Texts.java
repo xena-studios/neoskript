@@ -131,6 +131,8 @@ final class Texts {
                 if (texts.length == 0 || regexes.length == 0) {
                     return false;
                 }
+                // Every text matches every pattern; 'doesn't match' is the opposite of that.
+                boolean all = true;
                 for (Object text : texts) {
                     for (Object regex : regexes) {
                         boolean matches;
@@ -140,12 +142,10 @@ final class Texts {
                         } catch (PatternSyntaxException e) {
                             matches = false;
                         }
-                        if (matches == negated) {
-                            return false;
-                        }
+                        all &= matches;
                     }
                 }
-                return true;
+                return all != negated;
             };
         }, "%texts% (match[es]|not:do[es](n't| not) match) %texts%",
                 "%texts% (partially match[es]|not:do[es](n't| not) partially match) %texts%");

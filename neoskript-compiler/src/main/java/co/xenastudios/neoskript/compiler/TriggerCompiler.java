@@ -1257,9 +1257,35 @@ final class TriggerCompiler {
                 method.visitMethodInsn(INVOKESTATIC, VALUES, "convert",
                         "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECT_DESC, false);
             }
+            Class<?> only = strictClass(specs[i]);
+            if (only != null) {
+                // As in Skript, values of other types never reach a text, number or boolean placeholder.
+                constant(only, Class.class);
+                method.visitMethodInsn(INVOKESTATIC, VALUES, "filter",
+                        "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECT_DESC, false);
+            }
             convert(isPlural(specs[i]));
             method.visitInsn(AASTORE);
         }
+    }
+
+    /** For a placeholder of one strict type (text, numbers, booleans, timespans, dates), its values' class. */
+    private Class<?> strictClass(PlaceholderSpec spec) {
+        if (spec.types().size() != 1) {
+            return null;
+        }
+        TypeRef ref = registry.resolveType(spec.types().getFirst());
+        if (ref == null) {
+            return null;
+        }
+        return switch (ref.type().id()) {
+            case "string" -> String.class;
+            case "number", "integer", "long" -> Number.class;
+            case "boolean" -> Boolean.class;
+            case "timespan" -> Timespan.class;
+            case "date" -> co.xenastudios.neoskript.runtime.Date.class;
+            default -> null;
+        };
     }
 
     /**

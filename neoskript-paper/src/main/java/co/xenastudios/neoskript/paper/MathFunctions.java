@@ -23,12 +23,14 @@ final class MathFunctions {
         registrar.function("sqrt", n, "number", false, args -> Math.sqrt(number(args[0])));
         registrar.function("round", List.of(Parameter.of("n", "number"), new Parameter("d", "number", false, true)),
                 "number", false, args -> {
-                    double places = args[1] == null ? 0 : number(args[1]);
-                    if (places <= 0) {
-                        return Math.round(number(args[0]));
+                    double value = number(args[0]);
+                    int places = args[1] == null ? 0 : (int) number(args[1]);
+                    if (Double.isNaN(value) || Double.isInfinite(value)) {
+                        return value;
                     }
-                    double scale = Math.pow(10, places);
-                    return Math.round(number(args[0]) * scale) / scale;
+                    // Halves round away from zero, as in Skript: round(-11.535, 2) is -11.54.
+                    java.math.BigDecimal rounded = java.math.BigDecimal.valueOf(value).setScale(places, java.math.RoundingMode.HALF_UP);
+                    return places <= 0 ? (Object) rounded.longValue() : (Object) rounded.doubleValue();
                 });
         registrar.function("mod", List.of(Parameter.of("d", "number"), Parameter.of("m", "number")), "number", false,
                 args -> {

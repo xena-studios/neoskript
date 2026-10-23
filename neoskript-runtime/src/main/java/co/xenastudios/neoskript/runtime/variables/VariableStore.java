@@ -165,8 +165,10 @@ public final class VariableStore {
             return new String[0];
         }
         List<String> indices = new ArrayList<>();
+        // Indices with a value or a list under them, as in Skript: {_list::c::e} makes c an index of {_list::*}.
         for (Map.Entry<String, Node> entry : node.children.entrySet()) {
-            if (entry.getValue().value.get() != null) {
+            Node child = entry.getValue();
+            if (child.value.get() != null || (child.children != null && !child.children.isEmpty())) {
                 indices.add(entry.getKey());
             }
         }

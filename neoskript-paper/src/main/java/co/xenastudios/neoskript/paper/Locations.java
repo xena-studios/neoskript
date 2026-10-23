@@ -33,6 +33,8 @@ final class Locations {
         registrar.converter(Block.class, Location.class, Block::getLocation);
         registrar.converter(Location.class, World.class, Location::getWorld);
         registrar.converter(Entity.class, World.class, Entity::getWorld);
+        // 'spawn of "world"': a world by its name.
+        registrar.converter(String.class, World.class, Bukkit::getWorld);
 
         registrar.expression("ExprLocationOf", "location", info -> (context, args) ->
                         args[0] instanceof Location location ? location.clone() : null,

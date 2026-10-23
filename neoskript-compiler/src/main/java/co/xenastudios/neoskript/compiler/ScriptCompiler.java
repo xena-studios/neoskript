@@ -97,7 +97,7 @@ public final class ScriptCompiler {
                                 new CompiledScripts.CompiledTrigger(name, header.number(), null, null, null, testName,
                                         new TriggerCompiler(library, functions, globals, script).compileTest(name, custom)));
                         case ParsedStructure.Command command -> commands.add(command(name, script, functions, command));
-                        case ParsedStructure.Data data -> {}
+                        case ParsedStructure.Data data -> defaultVariables(data);
                         case ParsedStructure.Parse parse -> parseResults(parse);
                         default -> throw new CompileException(header.number(),
                                 "NeoSkript can't run this yet: '" + header.key() + "'");
@@ -132,6 +132,52 @@ public final class ScriptCompiler {
             }
         }
         throw new CompileException(line, "'every' needs a timespan of at least a tick, like 'every 5 minutes'");
+    }
+
+    /**
+     * {@code variables:}: each {@code {name} = value} sets the global variable if it isn't set yet, as in
+     * Skript. Values are literals: text, numbers, booleans, or words like items.
+     */
+    private void defaultVariables(ParsedStructure.Data data) {
+        if (!data.structure().node().line().key().strip().equalsIgnoreCase("variables")) {
+            return;
+        }
+        for (co.xenastudios.neoskript.frontend.structure.Node child : data.structure().section().children()) {
+            String line = child.line().text().strip();
+            int equals = line.indexOf('=');
+            if (!line.startsWith("{") || equals < 0) {
+                continue;
+            }
+            String name = line.substring(0, equals).strip();
+            if (!name.endsWith("}") || name.contains("%")) {
+                continue;
+            }
+            name = name.substring(1, name.length() - 1);
+            Object value = literal(line.substring(equals + 1).strip());
+            if (value != null && globals.get(name) == null) {
+                globals.set(name, value);
+            }
+        }
+    }
+
+    private Object literal(String text) {
+        if (text.length() >= 2 && text.startsWith("\"") && text.endsWith("\"")) {
+            return text.substring(1, text.length() - 1).replace("\"\"", "\"");
+        }
+        switch (text.toLowerCase(java.util.Locale.ROOT)) {
+            case "true", "yes", "on" -> {
+                return Boolean.TRUE;
+            }
+            case "false", "no", "off" -> {
+                return Boolean.FALSE;
+            }
+            default -> {}
+        }
+        try {
+            return text.contains(".") ? (Object) Double.parseDouble(text) : (Object) Long.parseLong(text);
+        } catch (NumberFormatException e) {
+            return library.literal(text);
+        }
     }
 
     /** Compiles a command: a trigger for each route, and its messages. */

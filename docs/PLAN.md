@@ -346,6 +346,20 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - Function arguments try words as the parameter's type first.
 >    - **Syntax:** max health, AI, leashed, charged, alive/dead, invulnerable, `drop`, random UUIDs and vectors, hashing.
 >    - **Not yet:** the 1.21.5+ animal variants (cow, chicken and pig temperatures) need a newer Paper API than NeoSkript's 1.21.4 floor; baby frogs (tadpoles).
+>
+>    **Batch 2 (2026-10-23): 159 → 166 tests pass, and 10 more run.**
+>    - **Language fixes from Skript's tests:**
+>      - Values of other types never reach a text, number, boolean, timespan or date placeholder, as in Skript: `length of 5` is nothing.
+>      - A missing number in arithmetic is 0: `{_x} + 1` is 1 when `{_x}` isn't set.
+>      - `doesn't match` is the opposite of every text matching every pattern.
+>      - `round` rounds halves away from zero and takes negative places.
+>      - `indices of` includes indices that only have lists under them.
+>      - `variables:` sets global variables that aren't set yet.
+>    - **Syntax:**
+>      - Block data (`campfire[lit=false]`), settable on blocks, falling blocks and block displays.
+>      - `type of`, Minecraft/Bukkit/Skript versions, `is a baby`, `leash`.
+>      - Text converts to a world (`spawn of "world"`).
+>      - Entity plurals (`all entities`).
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
