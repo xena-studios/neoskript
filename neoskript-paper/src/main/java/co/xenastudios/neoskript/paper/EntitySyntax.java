@@ -112,6 +112,121 @@ final class EntitySyntax {
             };
         }, "%objects% (is|are)[not:(n't| not)] between %object% and %object%");
 
+        registrar.effect("EffDetonate", info -> (context, args) -> {
+            for (Object entity : (Object[]) args[0]) {
+                switch (entity) {
+                    case Creeper creeper -> creeper.explode();
+                    case org.bukkit.entity.TNTPrimed tnt -> tnt.setFuseTicks(0);
+                    case org.bukkit.entity.Firework firework -> firework.detonate();
+                    case org.bukkit.entity.minecart.ExplosiveMinecart cart -> cart.explode();
+                    case org.bukkit.entity.WindCharge charge -> charge.explode();
+                    default -> {}
+                }
+            }
+        }, "detonate %entities%");
+        registrar.effect("EffInvulnerability", info -> {
+            boolean invulnerable = info.pattern() == 0;
+            return (context, args) -> {
+                for (Object entity : (Object[]) args[0]) {
+                    if (entity instanceof Entity e) {
+                        e.setInvulnerable(invulnerable);
+                    }
+                }
+            };
+        }, "make %entities% (invulnerable|invincible)", "make %entities% (not (invulnerable|invincible)|vulnerable|vincible)");
+        registrar.effect("EffMakeAdultOrBaby", info -> {
+            boolean adult = info.hasTag("adult");
+            return (context, args) -> {
+                for (Object entity : (Object[]) args[0]) {
+                    if (entity instanceof org.bukkit.entity.Ageable ageable) {
+                        if (adult) {
+                            ageable.setAdult();
+                        } else {
+                            ageable.setBaby();
+                        }
+                    }
+                }
+            };
+        }, "make %livingentities% [a[n]] (adult:adult|baby|child)", "force %livingentities% to be[come] a[n] (adult:adult|baby|child)");
+        registrar.effect("EffScreaming", info -> {
+            boolean scream = info.pattern() < 2;
+            return (context, args) -> {
+                for (Object entity : (Object[]) args[0]) {
+                    if (entity instanceof org.bukkit.entity.Goat goat) {
+                        goat.setScreaming(scream);
+                    } else if (entity instanceof org.bukkit.entity.Enderman enderman) {
+                        enderman.setScreaming(scream);
+                    }
+                }
+            };
+        }, "make %livingentities% (start screaming|scream)", "force %livingentities% to (start screaming|scream)",
+                "make %livingentities% stop screaming", "force %livingentities% to stop screaming");
+        registrar.effect("EffEating", info -> {
+            boolean start = info.hasTag("start");
+            return (context, args) -> {
+                for (Object entity : (Object[]) args[0]) {
+                    if (entity instanceof org.bukkit.entity.Panda panda) {
+                        panda.setEating(start);
+                    } else if (entity instanceof org.bukkit.entity.AbstractHorse horse) {
+                        horse.setEating(start);
+                    }
+                }
+            };
+        }, "make %livingentities% (start:start|stop) eating", "force %livingentities% to (start:start|stop) eating");
+        registrar.expression("ExprLeashHolder", "entity", info -> (context, args) -> {
+            List<Object> holders = new ArrayList<>();
+            for (Object entity : (Object[]) args[0]) {
+                if (entity instanceof LivingEntity living && living.isLeashed()) {
+                    holders.add(living.getLeashHolder());
+                }
+            }
+            return holders.size() == 1 ? holders.getFirst() : holders.toArray();
+        }, "[the] leash holder[s] of %entities%", "%entities%'[s] leash holder[s]");
+        registrar.condition("CondIsCustomNameVisible", info -> {
+            boolean negated = info.pattern() % 2 == 1;
+            return (context, args) -> {
+                Object[] entities = (Object[]) args[0];
+                for (Object entity : entities) {
+                    if (!(entity instanceof Entity e) || e.isCustomNameVisible() == negated) {
+                        return false;
+                    }
+                }
+                return entities.length > 0;
+            };
+        }, "%entities%'[s] custom name[s] (is|are) visible", "%entities%'[s] custom name[s] (isn't|is not|are not|aren't) visible",
+                "custom name of %entities% (is|are) visible", "custom name of %entities% (isn't|is not|are not|aren't) visible");
+        SettableProperty.register(registrar, "ExprExplosiveYield", "number", "explosive (yield|radius|size|power)", "entities",
+                org.bukkit.entity.Explosive.class, Number.class, explosive -> (double) explosive.getYield(),
+                (explosive, yield) -> explosive.setYield(yield.floatValue()));
+        SettableProperty.register(registrar, "ExprLoveTime", "timespan", "love[d] time", "livingentities",
+                org.bukkit.entity.Animals.class, co.xenastudios.neoskript.runtime.Timespan.class,
+                animal -> new co.xenastudios.neoskript.runtime.Timespan(animal.getLoveModeTicks() * 50L),
+                (animal, time) -> animal.setLoveModeTicks((int) time.ticks()));
+        registrar.expression("ExprNearestEntity", "entity", info -> (context, args) -> {
+            Location from = args[1] instanceof Location location ? location : args[1] instanceof Entity e ? e.getLocation() : null;
+            if (from == null || from.getWorld() == null) {
+                return null;
+            }
+            Entity nearest = null;
+            double best = Double.MAX_VALUE;
+            for (Entity entity : from.getWorld().getEntities()) {
+                if (entity == args[1]) {
+                    continue;
+                }
+                for (Object kind : (Object[]) args[0]) {
+                    if (kind instanceof EntityKind k && k.matches(entity)) {
+                        double distance = entity.getLocation().distanceSquared(from);
+                        if (distance < best) {
+                            best = distance;
+                            nearest = entity;
+                        }
+                    }
+                }
+            }
+            return nearest;
+        }, "[the] (nearest|closest) %*entitytypes% [[relative] to %entity/location%]",
+                "[the] %*entitytypes% (nearest|closest) [to %entity/location%]");
+
         registrar.effect("EffDrop", info -> (context, args) -> {
             Object[] places = args[1] == null ? new Object[0] : (Object[]) args[1];
             for (Object place : places) {

@@ -24,6 +24,17 @@ final class Time {
             case null, default -> null;
         }, "difference (between|of) %object% and %object%");
 
+        registrar.expression("ExprDateAgoLater", "date", info -> {
+            boolean later = info.pattern() == 1;
+            return (context, args) -> {
+                if (!(args[0] instanceof Timespan span)) {
+                    return null;
+                }
+                long from = args[1] instanceof Date date ? date.millis() : System.currentTimeMillis();
+                return new Date(later ? from + span.millis() : from - span.millis());
+            };
+        }, "%timespan% (ago|in the past|before [the] [date] %date%)", "%timespan% (later|(from|after) [the] [date] %date%)");
+
         registrar.expression("ExprUnixTicks", "number", info -> (context, args) -> {
             Object[] dates = (Object[]) args[0];
             Object[] seconds = new Object[dates.length];

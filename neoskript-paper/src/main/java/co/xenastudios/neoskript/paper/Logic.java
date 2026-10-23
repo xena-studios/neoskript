@@ -7,6 +7,7 @@ package co.xenastudios.neoskript.paper;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Comparison;
 import co.xenastudios.neoskript.runtime.Values;
+import java.util.List;
 
 /** Comparisons, whether something is set, and counting. */
 final class Logic {
@@ -143,6 +144,80 @@ final class Logic {
                 return below ? order < 0 : order >= 0;
             };
         }, "running [below:below] minecraft %text%");
+        registrar.condition("CondStartsEndsWith", info -> {
+            boolean negated = info.pattern() == 1;
+            boolean ends = info.hasTag("end");
+            return (context, args) -> {
+                Object[] texts = (Object[]) args[0];
+                Object[] affixes = (Object[]) args[1];
+                if (texts.length == 0 || affixes.length == 0) {
+                    return false;
+                }
+                boolean all = true;
+                for (Object text : texts) {
+                    boolean any = false;
+                    for (Object affix : affixes) {
+                        String t = Values.text(text);
+                        String a = Values.text(affix);
+                        any |= ends ? t.endsWith(a) : t.startsWith(a);
+                    }
+                    all &= any;
+                }
+                return all != negated;
+            };
+        }, "%texts% (start|end:end)[s] with %texts%", "%texts% (doesn't|does not|do not|don't) (start|end:end) with %texts%");
+        registrar.condition("CondIsDivisibleBy", info -> {
+            boolean negated = info.pattern() % 2 == 1;
+            return (context, args) -> {
+                Object[] numbers = (Object[]) args[0];
+                if (numbers.length == 0 || !(args[1] instanceof Number divisor)) {
+                    return false;
+                }
+                double tolerance = args[2] instanceof Number t ? t.doubleValue() : 1e-10;
+                for (Object number : numbers) {
+                    if (!(number instanceof Number n)) {
+                        return false;
+                    }
+                    double remainder = Math.abs(Math.IEEEremainder(n.doubleValue(), divisor.doubleValue()));
+                    if ((remainder <= tolerance) == negated) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+        }, "%numbers% (is|are) evenly divisible by %number% [with [a] tolerance [of] %number%]",
+                "%numbers% (isn't|is not|aren't|are not) evenly divisible by %number% [with [a] tolerance [of] %number%]",
+                "%numbers% can be evenly divided by %number% [with [a] tolerance [of] %number%]",
+                "%numbers% (can't|can[ ]not) be evenly divided by %number% [with [a] tolerance [of] %number%]");
+        registrar.expression("ExprExcept", "object", info -> (context, args) -> {
+            List<Object> kept = new java.util.ArrayList<>();
+            for (Object value : (Object[]) args[0]) {
+                boolean excluded = false;
+                for (Object other : (Object[]) args[1]) {
+                    excluded |= Comparison.equal(value, other);
+                }
+                if (!excluded) {
+                    kept.add(value);
+                }
+            }
+            return kept.toArray();
+        }, "%objects% (except|excluding|not including) %objects%");
+        registrar.expression("ExprRandom", "object", info -> (context, args) -> {
+            Object[] values = (Object[]) args[0];
+            return values.length == 0 ? null : values[java.util.concurrent.ThreadLocalRandom.current().nextInt(values.length)];
+        }, "[a] random <[\\p{L} ]+> [out] of %objects%");
+        registrar.expression("ExprAngle", "number", info -> {
+            boolean radians = info.hasTag("rad");
+            return (context, args) -> {
+                List<Object> angles = new java.util.ArrayList<>();
+                for (Object value : Values.array(args[0])) {
+                    if (value instanceof Number n) {
+                        angles.add(radians ? Math.toDegrees(n.doubleValue()) : n.doubleValue());
+                    }
+                }
+                return angles.size() == 1 ? angles.getFirst() : angles.toArray();
+            };
+        }, "%number% [in] deg[ree][s]", "%number% [in] rad:rad[ian][s]", "%numbers% in deg[ree][s]", "%numbers% in rad:rad[ian][s]");
         registrar.expression("ExprAmount", "integer", info -> (context, args) -> (long) ((Object[]) args[0]).length,
                 "[the] (amount|number|size) of %objects%");
     }

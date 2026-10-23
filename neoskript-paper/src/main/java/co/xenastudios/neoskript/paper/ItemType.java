@@ -37,7 +37,7 @@ public final class ItemType {
     /** Every item's names, singular and plural, built the first time an item is written. */
     private static volatile Map<String, Material> aliases;
 
-    private final ItemStack stack;
+    private ItemStack stack;
     private boolean amountGiven;
 
     public ItemType(ItemStack stack, boolean amountGiven) {
@@ -56,6 +56,11 @@ public final class ItemType {
 
     public int amount() {
         return stack.getAmount();
+    }
+
+    /** Replaces its item in place, keeping whether an amount was given. */
+    void replace(ItemStack replacement) {
+        stack = replacement.clone();
     }
 
     /** Changes its amount in place, as when a variable's item is changed. */

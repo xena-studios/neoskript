@@ -75,6 +75,12 @@ final class Potions {
                 "[an] (infinite|permanent) [ambient:ambient] %potioneffecttype% [[of tier] %number%] [potion [effect]]",
                 "[a] potion effect [of %potioneffecttype%] (from|using|based on) %skriptpotioneffect%");
 
+        // 'speed 5': an effect of that tier, for the default time.
+        registrar.expression("ExprSecPotionEffect-2", "skriptpotioneffect", info -> (context, args) ->
+                args[0] instanceof PotionEffectType type && args[1] instanceof Number tier
+                        ? new PotionEffect(type, DEFAULT_TICKS, Math.max(0, (int) Math.round(tier.doubleValue()) - 1)) : null,
+                "%*potioneffecttype% %*integer%");
+
         registrar.effect("EffApplyPotionEffect", info -> {
             boolean entitiesFirst = info.pattern() == 1;
             return (context, args) -> {

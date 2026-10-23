@@ -112,6 +112,34 @@ final class WorldSyntax {
             return null;
         }, "[the] mid[-]point (of|between) %location/vector% and %location/vector%");
 
+        registrar.expression("ExprWorlds", "world", info -> (context, args) -> Bukkit.getWorlds().toArray(),
+                "[(all [[of] the]|the)] worlds");
+        registrar.expression("ExprVectorFromXYZ", "vector", info -> (context, args) -> new Vector(number(args[0]),
+                number(args[1]), number(args[2])), "[a] [new] vector [(from|at|to)] %number%,[ ]%number%(,[ ]| and )%number%");
+        registrar.condition("CondIsLoaded", info -> {
+            boolean negated = info.hasTag("not");
+            int pattern = info.pattern();
+            return (context, args) -> {
+                Object[] values = (Object[]) args[0];
+                if (values.length == 0) {
+                    return false;
+                }
+                for (Object value : values) {
+                    boolean loaded = switch (value) {
+                        case Location location -> location.getWorld() != null && location.isChunkLoaded();
+                        case org.bukkit.Chunk chunk -> chunk.isLoaded();
+                        case org.bukkit.World world -> Bukkit.getWorld(world.getUID()) != null;
+                        default -> false;
+                    };
+                    if (loaded == negated) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+        }, "chunk[s] (at|of) %locations% (is|are)[not:(n't| not)] loaded", "%chunks/worlds% (is|are)[not:(n't| not)] loaded",
+                "world[s] %worlds% (is|are)[not:(n't| not)] loaded");
+
         registerEntities(registrar);
         registerBlocks(registrar);
         registerVectors(registrar);
