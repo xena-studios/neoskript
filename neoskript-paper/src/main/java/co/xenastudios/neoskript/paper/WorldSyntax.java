@@ -31,6 +31,23 @@ final class WorldSyntax {
 
     private WorldSyntax() {}
 
+    /** The tags of {@code ExprDirection}'s directions. */
+    private static final java.util.Map<String, Boolean> DIRECTION_TAGS = java.util.Map.of("north", true, "south", true,
+            "east", true, "west", true, "up", true, "down", true);
+
+    /**
+     * Skript's {@code direction}: an offset, like {@code 5 below}.
+     *
+     * @param explicit whether a distance was written ({@code 5 below}), which {@code blocks below} uses
+     */
+    record Direction(Vector offset, boolean explicit) {
+
+        @Override
+        public String toString() {
+            return Values.text(offset);
+        }
+    }
+
     /** The entities spawned last on each thread, for {@code the last spawned pig}. */
     private static final ThreadLocal<Entity> LAST_SPAWNED = new ThreadLocal<>();
 
@@ -232,19 +249,75 @@ final class WorldSyntax {
     }
 
     private static void registerBlocks(Registrar registrar) {
+        registrar.type("direction", "direction", Direction.class);
+        registrar.text(Direction.class, Direction::toString);
+        registrar.expression("ExprDirection", "direction", info -> (context, args) -> {
+            Vector unit = switch (info.tags().stream().filter(DIRECTION_TAGS::containsKey).findFirst().orElse("up")) {
+                case "north" -> new Vector(0, 0, -1);
+                case "south" -> new Vector(0, 0, 1);
+                case "east" -> new Vector(1, 0, 0);
+                case "west" -> new Vector(-1, 0, 0);
+                case "down" -> new Vector(0, -1, 0);
+                default -> new Vector(0, 1, 0);
+            };
+            boolean explicit = args[0] instanceof Number;
+            double amount = explicit ? ((Number) args[0]).doubleValue() : 1;
+            Vector offset = unit.multiply(amount);
+            if (args[1] instanceof Direction then) {
+                offset.add(then.offset());
+                explicit |= then.explicit();
+            }
+            return new Direction(offset, explicit);
+        }, "[%number% [(block|met(er|re))[s]] [to the]] (north:north|south:south|east:east|west:west|up:above|up:over"
+                + "|up:up[ward[s]]|down:down[ward[s]]|down:below|down:under[neath]|down:beneath) [of] [%direction%]");
         registrar.expression("ExprBlock-2", "block", info -> {
             int pattern = info.pattern();
             return (context, args) -> {
-                if (!(args[0] instanceof Location location) || location.getWorld() == null) {
+                Location location = pattern == 0 ? (args[0] instanceof Location l ? l : null)
+                        : args[1] instanceof Location l ? l : null;
+                if (location == null || location.getWorld() == null) {
                     return null;
                 }
-                return switch (pattern) {
-                    case 1 -> location.getBlock().getRelative(0, 1, 0);
-                    case 2 -> location.getBlock().getRelative(0, -1, 0);
-                    default -> location.getBlock();
-                };
+                return pattern == 0 ? location.getBlock()
+                        : args[0] instanceof Direction direction ? location.clone().add(direction.offset()).getBlock() : null;
             };
-        }, "[the] block (at|of) %location%", "[the] block above %location%", "[the] block below %location%");
+        }, "[the] block (at|of) %location%", "[the] block %direction% %location%");
+        registrar.expression("ExprRelativeLocation", "location", info -> (context, args) ->
+                args[0] instanceof Direction direction && args[1] instanceof Location location
+                        ? location.clone().add(direction.offset()) : null, "[the] location %direction% %location%");
+        registrar.expression("ExprBlocks", "block", info -> {
+            int pattern = info.pattern();
+            return (context, args) -> {
+                List<Object> blocks = new ArrayList<>();
+                if (pattern == 0) {
+                    if (!(args[0] instanceof Direction direction)) {
+                        return new Object[0];
+                    }
+                    for (Object place : args[1] == null ? new Object[0] : (Object[]) args[1]) {
+                        if (place instanceof Location location && location.getWorld() != null) {
+                            // The starting block and as many more as the direction says, or 100 without a number.
+                            int count = direction.explicit() ? (int) Math.floor(direction.offset().length()) + 1 : 100;
+                            Vector step = direction.offset().clone().normalize();
+                            Location at = location.getBlock().getLocation();
+                            for (int i = 0; i < count; i++) {
+                                blocks.add(at.clone().add(step.clone().multiply(i)).getBlock());
+                            }
+                        }
+                    }
+                } else if (args[0] instanceof Location a && args[1] instanceof Location b && a.getWorld() == b.getWorld()
+                        && a.getWorld() != null) {
+                    for (int x = Math.min(a.getBlockX(), b.getBlockX()); x <= Math.max(a.getBlockX(), b.getBlockX()); x++) {
+                        for (int y = Math.min(a.getBlockY(), b.getBlockY()); y <= Math.max(a.getBlockY(), b.getBlockY()); y++) {
+                            for (int z = Math.min(a.getBlockZ(), b.getBlockZ()); z <= Math.max(a.getBlockZ(), b.getBlockZ()); z++) {
+                                blocks.add(a.getWorld().getBlockAt(x, y, z));
+                            }
+                        }
+                    }
+                }
+                return blocks.toArray();
+            };
+        }, "[(all [[of] the]|the)] blocks %direction% [%locations%]",
+                "[(all [[of] the]|the)] blocks (between|within|from) %location% (and|to) %location%");
         // 'set block at X to stone': blocks become the item's block.
         registrar.changer(Block.class, Changeable.Mode.SET, (block, values) -> {
             for (Object value : values) {

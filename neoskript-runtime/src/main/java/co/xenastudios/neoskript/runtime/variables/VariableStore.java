@@ -263,6 +263,50 @@ public final class VariableStore {
     }
 
     /** Deletes everything under {@code {prefix::*}}. */
+    /** Every value under {@code {prefix::*}}, nested lists included, in index order: {@code recursive {x::*}}. */
+    public Object[] recursiveList(String prefix) {
+        List<Object> values = new ArrayList<>();
+        Node node = find(prefix);
+        if (node != null && node.children != null) {
+            collect(node, values);
+        }
+        return values.toArray();
+    }
+
+    private static void collect(Node node, List<Object> into) {
+        for (Node child : node.children.values()) {
+            Object value = child.value.get();
+            if (value != null) {
+                into.add(value);
+            }
+            if (child.children != null) {
+                collect(child, into);
+            }
+        }
+    }
+
+    /** Replaces {@code {to::*}} with a copy of {@code {from::*}}, nested lists and indices included. */
+    public void copyList(String from, String to) {
+        changed();
+        Node source = find(from);
+        deleteList(to);
+        if (source == null || source.children == null) {
+            return;
+        }
+        copy(source, create(to));
+    }
+
+    private static void copy(Node from, Node to) {
+        for (Map.Entry<String, Node> entry : from.children.entrySet()) {
+            Node target = to.children().computeIfAbsent(entry.getKey(), k -> new Node());
+            Object value = entry.getValue().value.get();
+            target.value.set(Values.copy(value));
+            if (entry.getValue().children != null) {
+                copy(entry.getValue(), target);
+            }
+        }
+    }
+
     public void deleteList(String prefix) {
         changed();
         Node node = find(prefix);

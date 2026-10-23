@@ -46,6 +46,8 @@ final class CoreSyntax {
     static final String CATCH_ERRORS = "SecCatchErrors";
     static final String FILTER = "ExprFilter";
     static final String CURRENT_SCRIPT = "ExprScript";
+    static final String COPY = "EffCopy";
+    static final String RECURSIVE = "ExprRecursive";
     static final String TRANSFORM = "ExprTransform";
     static final String REDUCE = "ExprReduce";
     static final String INPUT = "ExprInput";
@@ -143,6 +145,10 @@ final class CoreSyntax {
 
         // 'every 5 minutes': runs on the global thread, from when the script loads.
         library.core(SyntaxKind.EVENT, PERIODICAL, null, List.of(), "every %timespan%");
+
+        // 'copy {_a::*} into {_b::*}': lists with their indices and nested lists; 'recursive {_a::*}'.
+        library.core(SyntaxKind.EFFECT, COPY, null, List.of(), "copy %~objects% [in]to %~objects%");
+        library.core(SyntaxKind.EXPRESSION, RECURSIVE, "object", List.of(), "recursive %~objects%");
 
         // The script being compiled.
         library.core(SyntaxKind.EXPRESSION, CURRENT_SCRIPT, "script", List.of(), "[the] [current] script");

@@ -408,6 +408,16 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - is silent, sheared, saddled, invisible/visible, left/right handed, tamed, gliding, swimming, riptiding, in love, playing dead, responsive, frozen, whitelisted.
 >      - Items: unbreakable, fire resistant, enchantment glint overridden.
 >      - Setters added to the existing charged, invulnerable, panda, eating, persistent, shivering, conditional and custom name visibility conditions.
+>
+>    **Batch 8 (2026-10-23): 241 → 250 tests pass.**
+>    - **Directions:** `5 below`, `north of`, `above`..., chainable.
+>      - `the block <direction> X` and `the location <direction> X`.
+>      - `blocks <direction> X`: the starting block plus as many as the direction says, or 100 without a number, as in Skript.
+>      - `blocks between X and Y`.
+>    - **Queues:** `a queue of ...`. `first/last element of` a queue takes it out, `start/end of` only looks. Adding to the start or end, removing, clearing, `is empty`, and a queue's size.
+>    - **Elements:** `first/last N elements`, `N random elements`, `the Nth [to last] element`, `elements from N to M`.
+>    - **Lists:** `copy {_a::*} into {_b::*}` with nested lists and indices, `recursive {_a::*}`.
+>    - **`is empty`** for text, queues, inventories and slots.
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
