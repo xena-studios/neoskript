@@ -63,18 +63,6 @@ final class BlockSyntax {
             return (context, args) -> skript ? "2.17.0" : minecraft ? Bukkit.getMinecraftVersion() : Bukkit.getVersion();
         }, "(bukkit:[craft]bukkit|minecraft:minecraft|skript:skript)( |-)version");
 
-        registrar.condition("CondIsBaby", info -> {
-            boolean negated = info.pattern() == 1;
-            return (context, args) -> {
-                Object[] entities = (Object[]) args[0];
-                for (Object entity : entities) {
-                    if (!(entity instanceof Ageable ageable) || ageable.isAdult() != negated) {
-                        return false;
-                    }
-                }
-                return entities.length > 0;
-            };
-        }, "%livingentities% (is|are) a (child|baby)", "%livingentities% (isn't|is not|aren't|are not) a (child|baby)");
 
         registrar.effect("EffLeash", info -> {
             int pattern = info.pattern();

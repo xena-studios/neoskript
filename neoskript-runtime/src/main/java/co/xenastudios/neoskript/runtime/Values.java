@@ -68,6 +68,11 @@ public final class Values {
         return type.isInstance(value) ? value : null;
     }
 
+    /** Whether a value counts as true for {@code set whether X to ...}: the boolean true. */
+    public static boolean isTrue(Object value) {
+        return Boolean.TRUE.equals(single(value));
+    }
+
     /** Adds a value, or every value of an array, to {@code list}: what an inline function collects. */
     public static void addAll(List<Object> list, Object value) {
         if (value instanceof Object[] array) {
