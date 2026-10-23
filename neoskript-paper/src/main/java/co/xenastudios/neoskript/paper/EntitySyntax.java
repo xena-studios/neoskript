@@ -48,36 +48,13 @@ final class EntitySyntax {
 
         condition(registrar, "CondLeashed", "entities", "leashed", Entity.class,
                 entity -> entity instanceof LivingEntity living && living.isLeashed());
-        condition(registrar, "CondIsCharged", "entities", "(charged|powered)", Entity.class,
-                entity -> entity instanceof Creeper creeper ? creeper.isPowered()
-                        : entity instanceof WitherSkull skull && skull.isCharged());
-        condition(registrar, "CondIsAlive", "entities", "(alive|dead:dead)", Entity.class, entity -> !entity.isDead());
-        condition(registrar, "CondIsInvulnerable", "entities", "(invulnerable|invincible)", Entity.class,
-                Entity::isInvulnerable);
+                condition(registrar, "CondIsAlive", "entities", "(alive|dead:dead)", Entity.class, entity -> !entity.isDead());
 
-        condition(registrar, "CondPandaIsRolling", "livingentities", "rolling", org.bukkit.entity.Panda.class,
-                org.bukkit.entity.Panda::isRolling);
-        condition(registrar, "CondPandaIsSneezing", "livingentities", "sneezing", org.bukkit.entity.Panda.class,
-                org.bukkit.entity.Panda::isSneezing);
-        condition(registrar, "CondPandaIsOnBack", "livingentities", "on (its|their) back[s]", org.bukkit.entity.Panda.class,
-                org.bukkit.entity.Panda::isOnBack);
-        condition(registrar, "CondPandaIsScared", "livingentities", "scared", org.bukkit.entity.Panda.class,
+                                condition(registrar, "CondPandaIsScared", "livingentities", "scared", org.bukkit.entity.Panda.class,
                 org.bukkit.entity.Panda::isScared);
-        condition(registrar, "CondIsEating", "livingentities", "eating", LivingEntity.class,
-                entity -> entity instanceof org.bukkit.entity.Panda panda ? panda.isEating()
-                        : entity instanceof org.bukkit.entity.AbstractHorse horse && horse.isEating());
-        condition(registrar, "CondIsValid", "entities/scripts", "valid", Object.class, value -> value instanceof Entity entity
+                condition(registrar, "CondIsValid", "entities/scripts", "valid", Object.class, value -> value instanceof Entity entity
                 ? entity.isValid() : value instanceof co.xenastudios.neoskript.runtime.ScriptRef script
                         && co.xenastudios.neoskript.runtime.ScriptCatalog.get().find(script.name()) != null);
-        condition(registrar, "CondIsPersistent", "entities/blocks", "persistent", Object.class,
-                value -> value instanceof Entity entity ? entity.isPersistent()
-                        : value instanceof org.bukkit.block.Block block
-                                && block.getBlockData() instanceof org.bukkit.block.data.type.Leaves leaves && leaves.isPersistent());
-        condition(registrar, "CondIsShivering", "livingentities", "shivering", org.bukkit.entity.Strider.class,
-                org.bukkit.entity.Strider::isShivering);
-        condition(registrar, "CondIsCommandBlockConditional", "blocks", "[un:un]conditional", org.bukkit.block.Block.class,
-                block -> block.getBlockData() instanceof org.bukkit.block.data.type.CommandBlock command
-                        && command.isConditional());
 
         SettableProperty.register(registrar, "ExprSpawnerType", "entitytype", org.bukkit.block.Block.class, EntityKind.class,
                 block -> block.getState() instanceof org.bukkit.block.CreatureSpawner spawner && spawner.getSpawnedType() != null
@@ -113,6 +90,8 @@ final class EntitySyntax {
                 return true;
             };
         }, "%objects% (is|are)[not:(n't| not)] between %object% and %object%");
+
+        registerSettableConditions(registrar);
 
         registrar.effect("EffDetonate", info -> (context, args) -> {
             for (Object entity : (Object[]) args[0]) {
@@ -184,20 +163,7 @@ final class EntitySyntax {
             }
             return holders.size() == 1 ? holders.getFirst() : holders.toArray();
         }, "[the] leash holder[s] of %entities%", "%entities%'[s] leash holder[s]");
-        registrar.condition("CondIsCustomNameVisible", info -> {
-            boolean negated = info.pattern() % 2 == 1;
-            return (context, args) -> {
-                Object[] entities = (Object[]) args[0];
-                for (Object entity : entities) {
-                    if (!(entity instanceof Entity e) || e.isCustomNameVisible() == negated) {
-                        return false;
-                    }
-                }
-                return entities.length > 0;
-            };
-        }, "%entities%'[s] custom name[s] (is|are) visible", "%entities%'[s] custom name[s] (isn't|is not|are not|aren't) visible",
-                "custom name of %entities% (is|are) visible", "custom name of %entities% (isn't|is not|are not|aren't) visible");
-        SettableProperty.register(registrar, "ExprExplosiveYield", "number", "explosive (yield|radius|size|power)", "entities",
+                SettableProperty.register(registrar, "ExprExplosiveYield", "number", "explosive (yield|radius|size|power)", "entities",
                 org.bukkit.entity.Explosive.class, Number.class, explosive -> (double) explosive.getYield(),
                 (explosive, yield) -> explosive.setYield(yield.floatValue()));
         SettableProperty.register(registrar, "ExprLoveTime", "timespan", "love[d] time", "livingentities",
@@ -267,16 +233,179 @@ final class EntitySyntax {
         }, "%texts% hash[ed] with (md5:MD5|SHA-256|384:SHA-384|512:SHA-512)");
     }
 
+    private static void registerSettableConditions(Registrar registrar) {
+        condition(registrar, "CondIsCharged", "entities", "(charged|powered)", Entity.class,
+                entity -> entity instanceof Creeper creeper ? creeper.isPowered()
+                        : entity instanceof WitherSkull skull && skull.isCharged(), (entity, value) -> {
+                    if (entity instanceof Creeper creeper) {
+                        creeper.setPowered(value);
+                    } else if (entity instanceof WitherSkull skull) {
+                        skull.setCharged(value);
+                    }
+                });
+        condition(registrar, "CondIsInvulnerable", "entities", "(invulnerable|invincible)", Entity.class,
+                Entity::isInvulnerable, Entity::setInvulnerable);
+        condition(registrar, "CondPandaIsRolling", "livingentities", "rolling", org.bukkit.entity.Panda.class,
+                org.bukkit.entity.Panda::isRolling, org.bukkit.entity.Panda::setRolling);
+        condition(registrar, "CondPandaIsSneezing", "livingentities", "sneezing", org.bukkit.entity.Panda.class,
+                org.bukkit.entity.Panda::isSneezing, org.bukkit.entity.Panda::setSneezing);
+        condition(registrar, "CondPandaIsOnBack", "livingentities", "on (its|their) back[s]", org.bukkit.entity.Panda.class,
+                org.bukkit.entity.Panda::isOnBack, org.bukkit.entity.Panda::setOnBack);
+        condition(registrar, "CondIsEating", "livingentities", "eating", LivingEntity.class,
+                entity -> entity instanceof org.bukkit.entity.Panda panda ? panda.isEating()
+                        : entity instanceof org.bukkit.entity.AbstractHorse horse && horse.isEating(), (entity, value) -> {
+                    if (entity instanceof org.bukkit.entity.Panda panda) {
+                        panda.setEating(value);
+                    } else if (entity instanceof org.bukkit.entity.AbstractHorse horse) {
+                        horse.setEating(value);
+                    }
+                });
+        condition(registrar, "CondIsPersistent", "entities/blocks", "persistent", Object.class,
+                value -> value instanceof Entity entity ? entity.isPersistent()
+                        : value instanceof org.bukkit.block.Block block
+                                && block.getBlockData() instanceof org.bukkit.block.data.type.Leaves leaves && leaves.isPersistent(),
+                (value, persistent) -> {
+                    if (value instanceof Entity entity) {
+                        entity.setPersistent(persistent);
+                    } else if (value instanceof org.bukkit.block.Block block
+                            && block.getBlockData() instanceof org.bukkit.block.data.type.Leaves leaves) {
+                        leaves.setPersistent(persistent);
+                        block.setBlockData(leaves);
+                    }
+                });
+        condition(registrar, "CondIsShivering", "livingentities", "shivering", org.bukkit.entity.Strider.class,
+                org.bukkit.entity.Strider::isShivering, org.bukkit.entity.Strider::setShivering);
+        condition(registrar, "CondIsCommandBlockConditional", "blocks", "[un:un]conditional", org.bukkit.block.Block.class,
+                block -> block.getBlockData() instanceof org.bukkit.block.data.type.CommandBlock command && command.isConditional(),
+                (block, value) -> {
+                    if (block.getBlockData() instanceof org.bukkit.block.data.type.CommandBlock command) {
+                        command.setConditional(value);
+                        block.setBlockData(command);
+                    }
+                });
+        conditionPatterns(registrar, "CondIsCustomNameVisible", Entity.class, Entity::isCustomNameVisible,
+                Entity::setCustomNameVisible, "%entities%'[s] custom name[s] (is|are) visible",
+                "custom name of %entities% (is|are) visible", "%entities%'[s] custom name[s] (isn't|is not|are not|aren't) visible",
+                "custom name of %entities% (isn't|is not|are not|aren't) visible");
+        conditionPatterns(registrar, "CondCanAge", org.bukkit.entity.Breedable.class, breedable -> !breedable.getAgeLock(),
+                (breedable, value) -> breedable.setAgeLock(!value), "%livingentities% can (age|grow (up|old[er]))",
+                "%livingentities% (can't|cannot|can not) (age|grow (up|old[er]))");
+        conditionPatterns(registrar, "CondCanBreed", org.bukkit.entity.Breedable.class, org.bukkit.entity.Breedable::canBreed,
+                org.bukkit.entity.Breedable::setBreed, "%livingentities% can (breed|be bred)",
+                "%livingentities% (can't|cannot|can not) (breed|be bred)");
+        condition(registrar, "CondIsAdult", "livingentities", "[an] adult", org.bukkit.entity.Ageable.class,
+                org.bukkit.entity.Ageable::isAdult, (ageable, adult) -> {
+                    if (adult) {
+                        ageable.setAdult();
+                    } else {
+                        ageable.setBaby();
+                    }
+                });
+        condition(registrar, "CondIsBaby", "livingentities", "a (child|baby)", org.bukkit.entity.Ageable.class,
+                ageable -> !ageable.isAdult(), (ageable, baby) -> {
+                    if (baby) {
+                        ageable.setBaby();
+                    } else {
+                        ageable.setAdult();
+                    }
+                });
+        condition(registrar, "CondIsScreaming", "livingentities", "screaming", LivingEntity.class,
+                entity -> entity instanceof org.bukkit.entity.Goat goat ? goat.isScreaming()
+                        : entity instanceof org.bukkit.entity.Enderman enderman && enderman.isScreaming(), (entity, value) -> {
+                    if (entity instanceof org.bukkit.entity.Goat goat) {
+                        goat.setScreaming(value);
+                    } else if (entity instanceof org.bukkit.entity.Enderman enderman) {
+                        enderman.setScreaming(value);
+                    }
+                });
+        conditionPatterns(registrar, "CondIncendiary", org.bukkit.entity.Explosive.class,
+                org.bukkit.entity.Explosive::isIncendiary, org.bukkit.entity.Explosive::setIsIncendiary,
+                "%entities% ((is|are) incendiary|cause[s] a[n] (incendiary|fiery) explosion)",
+                "%entities% ((is not|are not|isn't|aren't) incendiary|(does not|do not|doesn't|don't) cause[s] a[n] (incendiary|fiery) explosion)");
+        conditionPatterns(registrar, "CondTextDisplayHasDropShadow", org.bukkit.entity.TextDisplay.class,
+                org.bukkit.entity.TextDisplay::isShadowed, org.bukkit.entity.TextDisplay::setShadowed,
+                "[[the] text of] %entities% (has|have) [a] (drop|text) shadow", "%entities%'[s] text (has|have) [a] (drop|text) shadow",
+                "[[the] text of] %entities% (doesn't|does not|do not|don't) have [a] (drop|text) shadow",
+                "%entities%'[s] text (doesn't|does not|do not|don't) have [a] (drop|text) shadow");
+        condition(registrar, "CondTextDisplaySeeThroughBlocks", "entities", "visible through (blocks|walls)",
+                org.bukkit.entity.TextDisplay.class, org.bukkit.entity.TextDisplay::isSeeThrough,
+                org.bukkit.entity.TextDisplay::setSeeThrough);
+        conditionPatterns(registrar, "CondAllayCanDuplicate", org.bukkit.entity.Allay.class,
+                org.bukkit.entity.Allay::canDuplicate, org.bukkit.entity.Allay::setCanDuplicate,
+                "%livingentities% can (duplicate|clone)", "%livingentities% (can't|cannot|can not) (duplicate|clone)");
+        conditionPatterns(registrar, "CondCanPickUpItems", LivingEntity.class, LivingEntity::getCanPickupItems,
+                LivingEntity::setCanPickupItems, "%livingentities% can pick([ ]up items| items up)",
+                "%livingentities% (can't|cannot|can not) pick([ ]up items| items up)");
+        conditionPatterns(registrar, "CondEndermanStaredAt", org.bukkit.entity.Enderman.class,
+                org.bukkit.entity.Enderman::hasBeenStaredAt, org.bukkit.entity.Enderman::setHasBeenStaredAt,
+                "%livingentities% (has|have) been stared at", "%livingentities% (doesn't|does not|do not|don't) have been stared at");
+        condition(registrar, "CondIsSilent", "entities", "silent", Entity.class, Entity::isSilent, Entity::setSilent);
+        condition(registrar, "CondIsSheared", "livingentities", "(sheared|shorn)", org.bukkit.entity.Sheep.class,
+                org.bukkit.entity.Sheep::isSheared, org.bukkit.entity.Sheep::setSheared);
+        condition(registrar, "CondIsSaddled", "livingentities", "[properly] saddled", org.bukkit.entity.Steerable.class,
+                org.bukkit.entity.Steerable::hasSaddle, org.bukkit.entity.Steerable::setSaddle);
+        condition(registrar, "CondIsInvisible", "livingentities", "(invisible|visible:flip)", LivingEntity.class,
+                LivingEntity::isInvisible, LivingEntity::setInvisible);
+        condition(registrar, "CondIsLeftHanded", "livingentities", "(left|right:flip)( |-)handed", org.bukkit.entity.Mob.class,
+                org.bukkit.entity.Mob::isLeftHanded, org.bukkit.entity.Mob::setLeftHanded);
+        condition(registrar, "CondIsTamed", "entities", "(tamed|domesticated)", org.bukkit.entity.Tameable.class,
+                org.bukkit.entity.Tameable::isTamed, org.bukkit.entity.Tameable::setTamed);
+        condition(registrar, "CondIsGliding", "livingentities", "gliding", LivingEntity.class, LivingEntity::isGliding,
+                LivingEntity::setGliding);
+        condition(registrar, "CondIsSwimming", "livingentities", "swimming", LivingEntity.class, LivingEntity::isSwimming,
+                LivingEntity::setSwimming);
+        condition(registrar, "CondIsRiptiding", "livingentities", "riptiding", LivingEntity.class, LivingEntity::isRiptiding,
+                LivingEntity::setRiptiding);
+        condition(registrar, "CondIsSleeping", "livingentities", "sleeping", LivingEntity.class, LivingEntity::isSleeping);
+        condition(registrar, "CondIsInLove", "livingentities", "in lov(e|ing) [state|mode]", org.bukkit.entity.Animals.class,
+                org.bukkit.entity.Animals::isLoveMode, (animal, love) -> animal.setLoveModeTicks(love ? 600 : 0));
+        condition(registrar, "CondIsPlayingDead", "livingentities", "playing dead", org.bukkit.entity.Axolotl.class,
+                org.bukkit.entity.Axolotl::isPlayingDead, org.bukkit.entity.Axolotl::setPlayingDead);
+        condition(registrar, "CondIsResponsive", "entities", "responsive", org.bukkit.entity.Interaction.class,
+                org.bukkit.entity.Interaction::isResponsive, org.bukkit.entity.Interaction::setResponsive);
+        condition(registrar, "CondIsFrozen", "entities", "frozen", Entity.class, Entity::isFrozen,
+                (entity, frozen) -> entity.setFreezeTicks(frozen ? entity.getMaxFreezeTicks() : 0));
+        condition(registrar, "CondIsWhitelisted", "offlineplayers", "whitelisted", org.bukkit.OfflinePlayer.class,
+                org.bukkit.OfflinePlayer::isWhitelisted, org.bukkit.OfflinePlayer::setWhitelisted);
+        condition(registrar, "CondIsUnbreakable", "itemtypes", "[un:un]breakable", ItemType.class,
+                item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().isUnbreakable(),
+                (item, value) -> item.editMeta(meta -> meta.setUnbreakable(value)));
+        condition(registrar, "CondIsFireResistant", "itemtypes", "(fire resistant|resistant to fire)", ItemType.class,
+                item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().isFireResistant(),
+                (item, value) -> item.editMeta(meta -> meta.setFireResistant(value)));
+        conditionPatterns(registrar, "CondItemEnchantmentGlint", ItemType.class,
+                item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().hasEnchantmentGlintOverride(),
+                (item, value) -> item.editMeta(meta -> meta.setEnchantmentGlintOverride(value ? Boolean.TRUE : null)),
+                "%itemtypes% (has|have) enchantment glint overrid(den|e)",
+                "%itemtypes% (doesn't|does not|do not|don't) have enchantment glint overrid(den|e)");
+    }
+
     /**
      * A condition {@code %owners% (is|are) <property>} and its negation, true when {@code test} holds for
      * every owner. A {@code dead} or {@code un} tag flips it, for {@code is dead} and {@code is unconditional}.
      */
     private static <T> void condition(Registrar registrar, String id, String owners, String property, Class<T> type,
             Predicate<? super T> test) {
+        condition(registrar, id, owners, property, type, test, null);
+    }
+
+    /** The same, settable with {@code setter}: {@code set whether {_pig} is saddled to true}. */
+    private static <T> void condition(Registrar registrar, String id, String owners, String property, Class<T> type,
+            Predicate<? super T> test, java.util.function.BiConsumer<? super T, Boolean> setter) {
+        conditionPatterns(registrar, id, type, test, setter, "%" + owners + "% (is|are) " + property,
+                "%" + owners + "% (isn't|is not|aren't|are not) " + property);
+    }
+
+    /**
+     * A condition with its own positive and negative patterns (any number of each, positive first), true
+     * when {@code test} holds for every owner, and settable if {@code setter} isn't {@code null}.
+     */
+    static <T> void conditionPatterns(Registrar registrar, String id, Class<T> type, Predicate<? super T> test,
+            java.util.function.BiConsumer<? super T, Boolean> setter, String... patterns) {
+        int half = patterns.length / 2;
         registrar.condition(id, info -> {
-            boolean negated = (info.pattern() == 1) != (info.hasTag("dead") || info.hasTag("un"));
-            return (context, args) -> {
-                Object[] values = (Object[]) args[0];
+            boolean negated = (info.pattern() >= half) != (info.hasTag("dead") || info.hasTag("un") || info.hasTag("flip"));
+            Predicate<Object[]> holds = values -> {
                 for (Object value : values) {
                     if (!type.isInstance(value) || test.test(type.cast(value)) == negated) {
                         return false;
@@ -284,6 +413,28 @@ final class EntitySyntax {
                 }
                 return values.length > 0;
             };
-        }, "%" + owners + "% (is|are) " + property, "%" + owners + "% (isn't|is not|aren't|are not) " + property);
+            if (setter == null) {
+                return (context, args) -> holds.test(owners(args[0]));
+            }
+            return new co.xenastudios.neoskript.api.element.SettableCondition() {
+                @Override
+                public boolean check(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] args) {
+                    return holds.test(owners(args[0]));
+                }
+
+                @Override
+                public void set(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] args, boolean value) {
+                    for (Object owner : owners(args[0])) {
+                        if (type.isInstance(owner)) {
+                            setter.accept(type.cast(owner), value != negated);
+                        }
+                    }
+                }
+            };
+        }, patterns);
+    }
+
+    private static Object[] owners(Object value) {
+        return value instanceof Object[] array ? array : value == null ? new Object[0] : new Object[] {value};
     }
 }

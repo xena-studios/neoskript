@@ -52,6 +52,7 @@ import co.xenastudios.neoskript.api.element.ElementFactory;
 import co.xenastudios.neoskript.api.element.ElementInfo;
 import co.xenastudios.neoskript.api.element.Expression;
 import co.xenastudios.neoskript.api.element.Function;
+import co.xenastudios.neoskript.api.element.SettableCondition;
 import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.api.element.Update;
 import co.xenastudios.neoskript.frontend.parse.CommandPattern;
@@ -1058,6 +1059,11 @@ final class TriggerCompiler {
     private void change(ParsedSyntax effect) throws CompileException {
         CoreSyntax.ChangeMode mode = CoreSyntax.ChangeMode.values()[effect.pattern()];
         Object target = effect.match().values().get(mode.target);
+        if (mode == CoreSyntax.ChangeMode.SET && target instanceof Expr.Syntax whether
+                && isCore(whether.syntax(), CoreSyntax.WHETHER)) {
+            setCondition(effect, whether);
+            return;
+        }
         if (target instanceof Expr.Syntax syntax && !(library.binding(syntax.syntax().syntax()) instanceof Library.Core)) {
             changeExpression(effect, mode, syntax);
             return;
@@ -1151,6 +1157,25 @@ final class TriggerCompiler {
         constant(Changeable.Mode.SET, Changeable.Mode.class);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Changeable.class), "change",
                 "(" + CONTEXT + OBJECTS + OBJECTS + Type.getDescriptor(Changeable.Mode.class) + ")V", true);
+    }
+
+    /** {@code set whether {_pig} can breed to true}: makes a {@link SettableCondition} true or false. */
+    private void setCondition(ParsedSyntax effect, Expr.Syntax whether) throws CompileException {
+        if (!(whether.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition)
+                || !(library.binding(condition.syntax()) instanceof ElementFactory<?> factory)) {
+            throw new CompileException(line, "'" + source.substring(whether.start(), whether.end()) + "' can't be set");
+        }
+        Object element = factory.create(new ElementInfo(condition.pattern(), condition.match().mark(), condition.match().tags()));
+        if (!(element instanceof SettableCondition)) {
+            throw new CompileException(line, "'" + source.substring(whether.start(), whether.end()) + "' can't be set");
+        }
+        constant(element, SettableCondition.class);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        arguments(condition);
+        expression((Expr) effect.match().values().get(1));
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "isTrue", "(" + OBJECT_DESC + ")Z", false);
+        method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(SettableCondition.class), "set",
+                "(" + CONTEXT + OBJECTS + "Z)V", true);
     }
 
     private static Changeable.Mode changeMode(ParsedSyntax effect, CoreSyntax.ChangeMode mode) {

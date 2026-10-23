@@ -398,6 +398,16 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - In test mode, scripts are named by the paths Skript's test runner gives them (`neoskript.testing.scriptsRoot`), so Skript's script tests see what they expect.
 >    - **Parser:** arithmetic is ruled out when an operand has a type it can't work on, as in Skript, so `the script named {@path} + "x.sk"` is the script named the joined text.
 >    - **Literals:** scientific notation (`1.23e+4`).
+>
+>    **Batch 7 (2026-10-23): 208 → 241 tests pass.**
+>    - **Settable conditions (`SettableCondition` in the API):** `set whether {_pig} can breed to true` makes a condition true or false, as in Skript.
+>    - **Conditions, all settable where Minecraft allows:**
+>      - can age, can breed, is adult, is a baby, is screaming, is incendiary.
+>      - Text displays' drop shadow and see-through.
+>      - can duplicate, can pick up items, has been stared at.
+>      - is silent, sheared, saddled, invisible/visible, left/right handed, tamed, gliding, swimming, riptiding, in love, playing dead, responsive, frozen, whitelisted.
+>      - Items: unbreakable, fire resistant, enchantment glint overridden.
+>      - Setters added to the existing charged, invulnerable, panda, eating, persistent, shivering, conditional and custom name visibility conditions.
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
