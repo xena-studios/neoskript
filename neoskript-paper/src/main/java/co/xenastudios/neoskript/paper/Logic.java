@@ -6,6 +6,7 @@ package co.xenastudios.neoskript.paper;
 
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Comparison;
+import co.xenastudios.neoskript.runtime.Values;
 
 /** Comparisons, whether something is set, and counting. */
 final class Logic {
@@ -20,6 +21,28 @@ final class Logic {
     }
 
     private Logic() {}
+
+    /** Compares versions like {@code 1.21.4} and {@code 26.3} part by part. */
+    static int compareVersions(String a, String b) {
+        String[] x = a.split("[.\\-]");
+        String[] y = b.split("[.\\-]");
+        for (int i = 0; i < Math.max(x.length, y.length); i++) {
+            int p = i < x.length ? number(x[i]) : 0;
+            int q = i < y.length ? number(y[i]) : 0;
+            if (p != q) {
+                return Integer.compare(p, q);
+            }
+        }
+        return 0;
+    }
+
+    private static int number(String part) {
+        try {
+            return Integer.parseInt(part.replaceAll("\\D.*", ""));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
 
     static void register(Registrar registrar) {
         registrar.condition("CondCompare", info -> {
@@ -81,6 +104,36 @@ final class Logic {
         // 'arg-1 ? "home"': the first values, or the others if there are none.
         registrar.expression("ExprDefaultValue", "object", info -> (context, args) ->
                 ((Object[]) args[0]).length > 0 ? args[0] : args[1], "%objects% (otherwise|?) %objects%");
+        registrar.expression("LitInfinity", "number", info -> (context, args) -> Double.POSITIVE_INFINITY,
+                "positive (infinity|\u221e) [value]", "\u221e [value]", "infinity value", "value of [positive] (infinity|\u221e)");
+        registrar.expression("LitNegativeInfinity", "number", info -> (context, args) -> Double.NEGATIVE_INFINITY,
+                "negative (infinity|\u221e) [value]", "-\u221e [value]", "value of negative (infinity|\u221e)");
+        registrar.expression("LitNaN", "number", info -> (context, args) -> Double.NaN, "NaN [value]", "value of NaN");
+        registrar.expression("ExprRandomNumber", "number", info -> {
+            boolean integers = info.hasTag("integer");
+            return (context, args) -> {
+                if (!(args[1] instanceof Number a) || !(args[2] instanceof Number b)) {
+                    return null;
+                }
+                int count = args[0] instanceof Number n ? (int) Math.max(0, Math.round(n.doubleValue())) : 1;
+                double low = Math.min(a.doubleValue(), b.doubleValue());
+                double high = Math.max(a.doubleValue(), b.doubleValue());
+                java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+                Object[] numbers = new Object[count];
+                for (int i = 0; i < count; i++) {
+                    numbers[i] = integers ? (Object) (long) (Math.ceil(low) + random.nextLong(
+                            (long) Math.floor(high) - (long) Math.ceil(low) + 1)) : (Object) (low + random.nextDouble() * (high - low));
+                }
+                return numbers.length == 1 ? numbers[0] : numbers;
+            };
+        }, "[a|%integer%] random (integer:integer|number)[s] (from|between) %number% (to|and) %number%");
+        registrar.condition("CondMinecraftVersion", info -> {
+            boolean below = info.hasTag("below");
+            return (context, args) -> {
+                int order = compareVersions(org.bukkit.Bukkit.getMinecraftVersion(), Values.text(args[0]));
+                return below ? order < 0 : order >= 0;
+            };
+        }, "running [below:below] minecraft %text%");
         registrar.expression("ExprAmount", "integer", info -> (context, args) -> (long) ((Object[]) args[0]).length,
                 "[the] (amount|number|size) of %objects%");
     }

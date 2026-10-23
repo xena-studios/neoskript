@@ -71,6 +71,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             library.enableTesting();
         }
         StandardLibrary.register(library);
+        if (TestRunner.enabled()) {
+            StandardLibrary.registerTesting(library);
+        }
         Scheduler scheduler = platform == Platform.FOLIA ? new FoliaScheduler(this) : new PaperScheduler(this);
         // Waiting triggers carry on through the scheduler; their errors can only be logged.
         Waits.install(scheduler, e -> getSLF4JLogger().error("Error in {}, line {}: {}", e.script(), e.line(),

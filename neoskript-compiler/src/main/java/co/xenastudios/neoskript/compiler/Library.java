@@ -39,7 +39,7 @@ public final class Library implements Registrar {
 
     /** Types that only accept themselves and registered subtypes, rather than any unrelated game type. */
     private static final Set<String> STRICT_TYPES =
-            Set.of("number", "integer", "long", "string", "boolean", "timespan", "date", "time");
+            Set.of("number", "integer", "long", "string", "boolean", "timespan", "date", "time", "entitytype", "itemtype");
 
     private record Key(SyntaxKind kind, String id) {}
 
@@ -59,6 +59,7 @@ public final class Library implements Registrar {
     private final VariableCodecs codecs = new VariableCodecs();
     private final List<EventValue> eventValues = new ArrayList<>();
     private final Set<String> eventDefaults = new HashSet<>();
+    private final Map<String, String> sectionTypes = new HashMap<>();
     private final Map<String, java.util.function.Function<String, ?>> parsers = new HashMap<>();
     private final Map<String, java.util.function.Function<String, ?>> literalParsers = new java.util.LinkedHashMap<>();
     private SyntaxRegistry registry;
@@ -115,6 +116,25 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public void section(String id, String valueType, ElementFactory<co.xenastudios.neoskript.api.element.Section> factory,
+            String... patterns) {
+        if (!javaClasses.containsKey(valueType)) {
+            throw new IllegalArgumentException("Section " + id + " runs for unknown type '" + valueType + "'");
+        }
+        sectionTypes.put(id, valueType);
+        add(SyntaxKind.SECTION, id, null, factory, patterns);
+        add(SyntaxKind.EFFECT, id, null, (ElementFactory<Effect>) info -> {
+            co.xenastudios.neoskript.api.element.Section section = factory.create(info);
+            return (context, arguments) -> section.run(context, arguments);
+        }, patterns);
+    }
+
+    /** The type of the values a library section's code runs for, or {@code null} if {@code id} isn't one. */
+    String sectionType(String id) {
+        return sectionTypes.get(id);
+    }
+
+    @Override
     public void expression(String id, String returnType, ElementFactory<Expression> factory, String... patterns) {
         if (!javaClasses.containsKey(returnType)) {
             throw new IllegalArgumentException("Expression " + id + " returns unknown type '" + returnType + "'");
@@ -161,7 +181,7 @@ public final class Library implements Registrar {
             throw new IllegalArgumentException("Literals of unknown type '" + typeId + "'");
         }
         literalParsers.put(typeId, parser);
-        builder.openLiterals(typeId);
+        builder.openLiterals(typeId, words -> parser.apply(words.strip()) != null);
     }
 
     /**
@@ -276,6 +296,17 @@ public final class Library implements Registrar {
     public <F, T> void converter(Class<F> from, Class<T> to, java.util.function.Function<? super F, ? extends T> converter) {
         checkOpen();
         Values.registerConverter(from, to, converter);
+        // What converts can be used where the other type is expected, even for strict types.
+        for (Map.Entry<String, Class<?>> source : javaClasses.entrySet()) {
+            if (source.getValue() != from) {
+                continue;
+            }
+            for (Map.Entry<String, Class<?>> target : javaClasses.entrySet()) {
+                if (target.getValue() == to) {
+                    builder.convertible(source.getKey(), target.getKey());
+                }
+            }
+        }
     }
 
     @Override

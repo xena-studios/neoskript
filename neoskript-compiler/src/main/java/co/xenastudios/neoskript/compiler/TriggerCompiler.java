@@ -141,11 +141,23 @@ final class TriggerCompiler {
     private enum BlockKind {
         CONDITIONAL,
         LOOP,
-        WHILE
+        WHILE,
+        /** A library section's code, like {@code spawn a pig:}: run once for each value the section returns. */
+        SECTION
     }
 
-    /** A section being compiled, for exit, continue and loop values. */
-    private record Block(BlockKind kind, Label end, Label next, int valuesSlot, int indicesSlot, int indexSlot) {}
+    /**
+     * A section being compiled, for exit, continue and loop values.
+     *
+     * @param valueType for a library section, the type of the values its code runs for
+     */
+    private record Block(BlockKind kind, Label end, Label next, int valuesSlot, int indicesSlot, int indexSlot,
+            String valueType) {
+
+        Block(BlockKind kind, Label end, Label next, int valuesSlot, int indicesSlot, int indexSlot) {
+            this(kind, end, next, valuesSlot, indicesSlot, indexSlot, null);
+        }
+    }
 
     /** A {@code wait}: where the trigger carries on, and the loop state it saves. */
     private record WaitPoint(Label resume, int line, List<int[]> savedSlots) {}
@@ -174,6 +186,8 @@ final class TriggerCompiler {
     private String constantsScript;
     /** The classes of the event a trigger runs for, or {@code null} outside server events. */
     private List<Class<?>> eventClasses;
+    /** The types of the placeholder whose value is being compiled, which words are first tried as. */
+    private List<String> literalTypes = List.of();
     /** The event's name, for errors: {@code join} in {@code on join:}. */
     private String eventName;
     /** A command trigger's arguments, by number, or {@code null} outside commands. */
@@ -287,6 +301,8 @@ final class TriggerCompiler {
 
     /** A Skript test ({@code test "name" [when <condition>]:}): skipped if its condition is false. */
     Trigger compileTest(String scriptName, ParsedStructure.Custom test) throws CompileException {
+        eventClasses = List.of(co.xenastudios.neoskript.runtime.testing.TestEvent.class);
+        eventName = "test";
         byte[] bytes = generate(scriptName, () -> {
             if (test.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition) {
                 line = test.structure().node().line().number();
@@ -486,7 +502,7 @@ final class TriggerCompiler {
         String frame = Type.getInternalName(Frame.class);
         List<int[]> saved = new ArrayList<>();
         for (Block block : loops()) {
-            if (block.kind() == BlockKind.LOOP) {
+            if (block.kind() == BlockKind.LOOP || block.kind() == BlockKind.SECTION) {
                 saved.add(new int[] {block.valuesSlot(), SAVED_VALUES});
                 if (block.indicesSlot() >= 0) {
                     saved.add(new int[] {block.indicesSlot(), SAVED_INDICES});
@@ -631,6 +647,8 @@ final class TriggerCompiler {
             }
             case Statement.Section section when isCore(section.header(), CoreSyntax.LOOP) -> loop(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.WHILE) -> whileLoop(section);
+            case Statement.Section section when library.sectionType(section.header() == null ? null
+                    : section.header().syntax().id()) != null -> librarySection(section);
             case Statement.Section section -> throw unsupported("sections like '" + section.line().key() + "'");
             case Statement.Conditions conditions -> throw unsupported("'" + conditions.line().key() + "' here");
             case Statement.Parse parse -> {
@@ -792,6 +810,51 @@ final class TriggerCompiler {
         method.visitIincInsn(indexSlot, 1);
         method.visitJumpInsn(GOTO, top);
         method.visitLabel(end);
+    }
+
+    /**
+     * A library section, like {@code spawn a pig at test-location:}: the section runs, then its code runs
+     * once for each value it returned, as that section's event value.
+     */
+    private void librarySection(Statement.Section section) throws CompileException {
+        ParsedSyntax header = section.header();
+        int valuesSlot = nextSlot++;
+        int indexSlot = nextSlot++;
+        callThrough(header, co.xenastudios.neoskript.api.element.Section.class);
+        method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(co.xenastudios.neoskript.api.element.Section.class),
+                "run", "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
+        convert(true);
+        method.visitVarInsn(ASTORE, valuesSlot);
+        method.visitInsn(ICONST_0);
+        method.visitVarInsn(ISTORE, indexSlot);
+
+        Label top = new Label();
+        Label next = new Label();
+        Label end = new Label();
+        method.visitLabel(top);
+        method.visitVarInsn(ILOAD, indexSlot);
+        method.visitVarInsn(ALOAD, valuesSlot);
+        method.visitInsn(ARRAYLENGTH);
+        method.visitJumpInsn(IF_ICMPGE, end);
+        blocks.push(new Block(BlockKind.SECTION, end, next, valuesSlot, -1, indexSlot,
+                library.sectionType(header.syntax().id())));
+        statements(section.body());
+        blocks.pop();
+        method.visitLabel(next);
+        method.visitIincInsn(indexSlot, 1);
+        method.visitJumpInsn(GOTO, top);
+        method.visitLabel(end);
+    }
+
+    /** The innermost library section whose values are of type {@code typeId}, or {@code null}. */
+    private Block sectionFor(String typeId) {
+        for (Block block : blocks) {
+            if (block.kind() == BlockKind.SECTION
+                    && (block.valueType().equals(typeId) || registry.isSubtype(block.valueType(), typeId))) {
+                return block;
+            }
+        }
+        return null;
     }
 
     /** {@code [do] while <condition>:}. */
@@ -1173,7 +1236,13 @@ final class TriggerCompiler {
             }
             method.visitInsn(DUP);
             pushInt(i);
-            expression(expr);
+            List<String> outerLiteralTypes = literalTypes;
+            literalTypes = specs[i].types();
+            try {
+                expression(expr);
+            } finally {
+                literalTypes = outerLiteralTypes;
+            }
             Class<?> target = conversionTarget(specs[i]);
             if (target != null) {
                 constant(target, Class.class);
@@ -1232,6 +1301,12 @@ final class TriggerCompiler {
     private void eventValue(Expr.Syntax syntax) throws CompileException {
         if (!(syntax.syntax().match().regexValues().getFirst() instanceof TypeRef ref)) {
             throw unsupported("'" + source.substring(syntax.start(), syntax.end()) + "'");
+        }
+        Block section = sectionFor(ref.type().id());
+        if (section != null) {
+            // 'entity' in 'spawn a pig:' is the pig.
+            element(section.valuesSlot(), section.indexSlot(), 0);
+            return;
         }
         java.util.function.Function<Object, Object> getter =
                 eventClasses == null ? null : library.eventValue(eventClasses, ref.type().id());
@@ -1421,6 +1496,13 @@ final class TriggerCompiler {
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.LOOP_VALUE) -> loopValue(syntax.syntax());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE) -> eventValue(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.WHETHER) -> {
+                if (!(syntax.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition)) {
+                    throw unsupported("'" + source.substring(syntax.start(), syntax.end()) + "'");
+                }
+                condition(condition);
+                method.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;", false);
+            }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.PARSE) -> {
                 if (!(syntax.syntax().match().regexValues().getFirst() instanceof TypeRef ref)) {
                     throw unsupported("'" + source.substring(syntax.start(), syntax.end()) + "'");
@@ -1487,7 +1569,20 @@ final class TriggerCompiler {
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
             }
             case Expr.Unresolved unresolved -> {
-                Object value = library.literal(unresolved.text());
+                // Words are first tried as the placeholder's own types: 'armor stand' is an entity type in
+                // 'spawn an armor stand', though it names an item too.
+                Object value = null;
+                for (String name : literalTypes) {
+                    TypeRef ref = registry.resolveType(name);
+                    java.util.function.Function<String, ?> parser = ref == null ? null : library.literalParser(ref.type().id());
+                    value = parser == null ? null : parser.apply(unresolved.text().strip());
+                    if (value != null) {
+                        break;
+                    }
+                }
+                if (value == null) {
+                    value = library.literal(unresolved.text());
+                }
                 if (value == null) {
                     throw unsupported("'" + unresolved.text() + "'");
                 }
@@ -1500,8 +1595,15 @@ final class TriggerCompiler {
         String text = literal.text().replace("_", "");
         switch (literal.type()) {
             case "integer" -> {
-                method.visitLdcInsn(Long.parseLong(text.startsWith("+") ? text.substring(1) : text));
-                method.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
+                String digits = text.startsWith("+") ? text.substring(1) : text;
+                try {
+                    method.visitLdcInsn(Long.parseLong(digits));
+                    method.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
+                } catch (NumberFormatException e) {
+                    // Too big for a whole number: a decimal one, as in Skript.
+                    method.visitLdcInsn(Double.parseDouble(digits));
+                    method.visitMethodInsn(INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false);
+                }
             }
             case "number" -> {
                 double value = text.endsWith("%")
