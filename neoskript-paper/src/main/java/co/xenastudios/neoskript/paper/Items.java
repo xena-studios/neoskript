@@ -10,7 +10,9 @@ import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.HumanEntity;
@@ -21,6 +23,9 @@ import org.bukkit.event.inventory.InventoryEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.inventory.EntityEquipment;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 /** Items and inventories: item types and stacks, names and lore, slots, menus, and giving items. */
@@ -28,11 +33,37 @@ final class Items {
 
     private Items() {}
 
-    /** A slot of an inventory, Skript's {@code slot}: what's in it can be read and set. */
-    record Slot(Inventory inventory, int index) {
+    /**
+     * Skript's {@code slot}: a slot of an inventory, or an entity's equipment slot (its helmet...). What's in
+     * it can be read and set.
+     */
+    record Slot(Inventory inventory, int index, LivingEntity entity, EquipmentSlot equipment) {
+
+        Slot(Inventory inventory, int index) {
+            this(inventory, index, null, null);
+        }
+
+        static Slot of(LivingEntity entity, EquipmentSlot equipment) {
+            return new Slot(null, -1, entity, equipment);
+        }
 
         ItemStack item() {
+            if (equipment != null) {
+                EntityEquipment gear = entity.getEquipment();
+                return gear == null ? null : gear.getItem(equipment);
+            }
             return index >= 0 && index < inventory.getSize() ? inventory.getItem(index) : null;
+        }
+
+        void set(ItemStack item) {
+            if (equipment != null) {
+                EntityEquipment gear = entity.getEquipment();
+                if (gear != null) {
+                    gear.setItem(equipment, item);
+                }
+            } else if (index >= 0 && index < inventory.getSize()) {
+                inventory.setItem(index, item);
+            }
         }
     }
 
@@ -95,6 +126,8 @@ final class Items {
         registrar.converter(org.bukkit.block.Block.class, Inventory.class, block ->
                 block.getState() instanceof InventoryHolder holder ? holder.getInventory() : null);
 
+        registerMore(registrar);
+
         // 'give X to player' and 'remove X from player': items go in and out of inventories.
         registrar.changer(InventoryHolder.class, Changeable.Mode.ADD, (holder, items) -> holder.getInventory()
                 .addItem(stacks(items)));
@@ -102,6 +135,243 @@ final class Items {
         registrar.changer(InventoryHolder.class, Changeable.Mode.REMOVE, (holder, items) -> holder.getInventory()
                 .removeItem(stacks(items)));
         registrar.changer(Inventory.class, Changeable.Mode.REMOVE, (inventory, items) -> inventory.removeItem(stacks(items)));
+    }
+
+    private static void registerMore(Registrar registrar) {
+        Map<String, EquipmentSlot> slots = new LinkedHashMap<>();
+        slots.put("helmet", EquipmentSlot.HEAD);
+        slots.put("head", EquipmentSlot.HEAD);
+        slots.put("chestplate", EquipmentSlot.CHEST);
+        slots.put("chest", EquipmentSlot.CHEST);
+        slots.put("leggings", EquipmentSlot.LEGS);
+        slots.put("legs", EquipmentSlot.LEGS);
+        slots.put("boots", EquipmentSlot.FEET);
+        slots.put("shoes", EquipmentSlot.FEET);
+        slots.put("feet", EquipmentSlot.FEET);
+        slots.put("tool", EquipmentSlot.HAND);
+        slots.put("main hand", EquipmentSlot.HAND);
+        slots.put("off hand", EquipmentSlot.OFF_HAND);
+        slots.put("offhand", EquipmentSlot.OFF_HAND);
+        slots.put("body", EquipmentSlot.BODY);
+        registrar.namedType("equipmentslot", "equipment slot", EquipmentSlot.class, slots);
+        registrar.text(EquipmentSlot.class, slot -> slot.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' '));
+        registrar.expression("ExprArmorSlot", "slot", info -> {
+            boolean armor = info.hasTag("armor");
+            return new SlotsOfEntities(armor);
+        }, "[the] (%*equipmentslots%|armor:[the] armo[u]r[s]) [item[s]] of %livingentities%",
+                "%livingentities%'[s] (%*equipmentslots%|armor:[the] armo[u]r[s]) [item[s]]");
+
+        // 'set helmet of player to diamond helmet', 'delete slot 3 of {_menu}'.
+        registrar.changer(Slot.class, Changeable.Mode.SET, (slot, values) -> {
+            ItemStack[] stacks = stacks(values);
+            slot.set(stacks.length == 0 ? null : stacks[0]);
+        });
+        registrar.changer(Slot.class, Changeable.Mode.DELETE, (slot, values) -> slot.set(null));
+
+        registrar.expression("ExprXOf", "object", info -> (context, args) -> {
+            int amount = args[0] instanceof Number n ? (int) Math.round(n.doubleValue()) : 1;
+            List<Object> values = new ArrayList<>();
+            for (Object value : (Object[]) args[1]) {
+                switch (value) {
+                    case ItemType item -> {
+                        ItemType copy = item.copy();
+                        copy.setAmount(amount);
+                        values.add(copy);
+                    }
+                    case ItemStack stack -> {
+                        ItemStack copy = stack.clone();
+                        copy.setAmount(amount);
+                        values.add(copy);
+                    }
+                    default -> values.add(value);
+                }
+            }
+            return values.size() == 1 ? values.getFirst() : values.toArray();
+        }, "%number% of %itemstacks/itemtypes%");
+
+        registrar.expression("ExprLore", "string", info -> new Lore(info.pattern() >= 2),
+                "[the] lore of %itemtype%", "%itemtype%'[s] lore",
+                "[the] line %number% of [the] lore of %itemtype%", "[the] line %number% of %itemtype%'[s] lore",
+                "[the] %number%(st|nd|rd|th) line of [the] lore of %itemtype%", "[the] %number%(st|nd|rd|th) line of %itemtype%'[s] lore");
+
+        SettableProperty.register(registrar, "ExprDurability", "integer", "(damage[s] [value[s]]|durabilit(y|ies))",
+                "itemtypes/itemstacks/slots", Object.class, Number.class, owner -> {
+                    ItemStack stack = stack(owner);
+                    return stack != null && stack.getItemMeta() instanceof org.bukkit.inventory.meta.Damageable damage
+                            ? (long) (stack.getType().getMaxDurability() - damage.getDamage()) : null;
+                }, (owner, value) -> editStack(owner, stack -> stack.editMeta(meta -> {
+                    if (meta instanceof org.bukkit.inventory.meta.Damageable damage) {
+                        damage.setDamage(Math.max(0, stack.getType().getMaxDurability() - (int) Math.round(value.doubleValue())));
+                    }
+                })));
+        SettableProperty.register(registrar, "ExprMaxDurability", "integer", "max[imum] (durabilit(y|ies)|damage)",
+                "itemtypes/itemstacks/slots", Object.class, Number.class, owner -> {
+                    ItemStack stack = stack(owner);
+                    return stack == null ? null : (long) stack.getType().getMaxDurability();
+                }, (owner, value) -> {});
+        SettableProperty.register(registrar, "ExprMaxStack", "integer", "max[imum] stack[[ ]size]", "itemtypes/inventories",
+                Object.class, Number.class, owner -> owner instanceof Inventory inventory ? (long) inventory.getMaxStackSize()
+                        : stack(owner) == null ? null : (long) stack(owner).getMaxStackSize(),
+                (owner, value) -> {
+                    if (owner instanceof Inventory inventory) {
+                        inventory.setMaxStackSize((int) Math.round(value.doubleValue()));
+                    }
+                });
+
+        registrar.condition("CondIsOfType", info -> {
+            boolean negated = info.pattern() == 1;
+            return (context, args) -> {
+                Object[] values = (Object[]) args[0];
+                for (Object value : values) {
+                    boolean any = false;
+                    for (Object type : (Object[]) args[1]) {
+                        any |= switch (value) {
+                            case ItemStack stack -> type instanceof ItemType item && stack.getType() == item.material();
+                            case org.bukkit.entity.Entity entity -> type instanceof EntityKind kind && kind.matches(entity);
+                            default -> false;
+                        };
+                    }
+                    if (any == negated) {
+                        return false;
+                    }
+                }
+                return values.length > 0;
+            };
+        }, "%itemstacks/entities% (is|are) of type[s] %itemtypes/entitytypes%",
+                "%itemstacks/entities% (isn't|is not|aren't|are not) of type[s] %itemtypes/entitytypes%");
+
+        // 'player has 5 diamonds': an inventory holds the items.
+        registrar.condition("CondHasItems", info -> {
+            boolean negated = info.pattern() == 1;
+            return (context, args) -> {
+                Object[] inventories = (Object[]) args[0];
+                for (Object value : inventories) {
+                    Inventory inventory = value instanceof Inventory i ? i
+                            : value instanceof InventoryHolder holder ? holder.getInventory() : null;
+                    if (inventory == null) {
+                        return false;
+                    }
+                    boolean has = true;
+                    for (ItemStack stack : stacks((Object[]) args[1])) {
+                        has &= inventory.containsAtLeast(stack, stack.getAmount());
+                    }
+                    if (has == negated) {
+                        return false;
+                    }
+                }
+                return inventories.length > 0;
+            };
+        }, "%inventoryholders/inventories% (has|have) %itemtypes% [in [(the[ir]|his|her|its)] inventory]",
+                "%inventoryholders/inventories% (doesn't|does not|do not|don't) have %itemtypes% [in [(the[ir]|his|her|its)] inventory]");
+    }
+
+    /** The item stack {@code owner} is or holds, or {@code null}. */
+    private static ItemStack stack(Object owner) {
+        return switch (owner) {
+            case ItemType item -> item.stack();
+            case ItemStack stack -> stack;
+            case Slot slot -> slot.item();
+            default -> null;
+        };
+    }
+
+    /** Changes the item {@code owner} is or holds, in place. */
+    private static void editStack(Object owner, java.util.function.Consumer<ItemStack> change) {
+        switch (owner) {
+            case ItemType item -> {
+                ItemStack stack = item.stack();
+                change.accept(stack);
+                item.replace(stack);
+            }
+            case ItemStack stack -> change.accept(stack);
+            case Slot slot when slot.item() != null -> {
+                ItemStack stack = slot.item();
+                change.accept(stack);
+                slot.set(stack);
+            }
+            default -> {}
+        }
+    }
+
+    /** {@code the helmet of %livingentities%}, {@code the armor of ...}: their equipment slots. */
+    private record SlotsOfEntities(boolean armor) implements Expression {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            List<Object> slots = new ArrayList<>();
+            Object[] entities = (Object[]) arguments[1];
+            for (Object entity : entities) {
+                if (!(entity instanceof LivingEntity living)) {
+                    continue;
+                }
+                if (armor) {
+                    for (EquipmentSlot slot : List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET)) {
+                        slots.add(Slot.of(living, slot));
+                    }
+                } else if (arguments[0] != null) {
+                    for (Object slot : (Object[]) arguments[0]) {
+                        if (slot instanceof EquipmentSlot equipment) {
+                            slots.add(Slot.of(living, equipment));
+                        }
+                    }
+                }
+            }
+            return slots.size() == 1 ? slots.getFirst() : slots.toArray();
+        }
+    }
+
+    /** {@code the lore of %itemtype%} and its lines, which can be set. */
+    private record Lore(boolean line) implements Expression, Changeable {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            ItemType item = (ItemType) (line ? arguments[1] : arguments[0]);
+            if (item == null || item.stack().getItemMeta() == null || item.stack().getItemMeta().lore() == null) {
+                return null;
+            }
+            List<String> lines = new ArrayList<>();
+            for (Component component : item.stack().getItemMeta().lore()) {
+                lines.add(Messages.LEGACY_SECTION.serialize(component));
+            }
+            if (!line) {
+                return String.join("\n", lines);
+            }
+            int n = arguments[0] instanceof Number number ? (int) Math.round(number.doubleValue()) : 0;
+            return n >= 1 && n <= lines.size() ? lines.get(n - 1) : null;
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return mode == Mode.SET || mode == Mode.ADD || mode == Mode.DELETE ? new Class<?>[] {String.class} : null;
+        }
+
+        @Override
+        public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
+            if (!((line ? arguments[1] : arguments[0]) instanceof ItemType item)) {
+                return;
+            }
+            item.editMeta(meta -> {
+                List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
+                String text = delta == null || delta.length == 0 ? null : Values.text(delta[0]);
+                if (line) {
+                    int n = arguments[0] instanceof Number number ? (int) Math.round(number.doubleValue()) : 0;
+                    while (lore.size() < n) {
+                        lore.add(Component.empty());
+                    }
+                    if (n >= 1) {
+                        lore.set(n - 1, text == null ? Component.empty() : Messages.component(text));
+                    }
+                } else if (mode == Mode.DELETE) {
+                    lore.clear();
+                } else if (mode == Mode.ADD && text != null) {
+                    lore.add(Messages.component(text));
+                } else if (text != null) {
+                    lore.clear();
+                    for (String part : text.split("\n", -1)) {
+                        lore.add(Messages.component(part));
+                    }
+                }
+                meta.lore(lore.isEmpty() ? null : lore);
+            });
+        }
     }
 
     private static void registerInventories(Registrar registrar) {
@@ -232,7 +502,7 @@ final class Items {
                     case Slot slot when slot.item() != null -> {
                         ItemStack stack = slot.item();
                         stack.setAmount(amount(stack.getAmount(), by, mode));
-                        slot.inventory().setItem(slot.index(), stack.getAmount() <= 0 ? null : stack);
+                        slot.set(stack.getAmount() <= 0 ? null : stack);
                     }
                     default -> {}
                 }

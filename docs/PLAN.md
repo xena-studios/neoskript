@@ -373,6 +373,17 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >      - Blocks with inventories (chests) are their inventory.
 >      - Panda states, eating, valid, persistent, shivering, conditional command blocks, spawner types.
 >      - `is between`, `is a block`, the last dropped item, `primed tnt`.
+>
+>    **Batch 4 (2026-10-23): 177 → 192 tests pass, and 29 more run.** Picked by parsing each blocked test's failing line with Skript's registry and counting the Skript elements NeoSkript lacks.
+>    - **Items:**
+>      - Slots can be equipment slots: `the helmet of`, `the armor of`.
+>      - `X of <item>`, settable lore and lore lines, durability and max durability, max stack size.
+>      - `has <items>` for inventories, `is of type`.
+>    - **Entities:** detonate, make (in)vulnerable, make adult or baby, scream, eat, leash holder, custom name visibility, explosive yield, love time, the nearest entity of a type.
+>    - **Logic:** `starts with`/`ends with`, `is divisible by`, `except`, `random X out of`, angles in degrees and radians.
+>    - **World:** `all worlds`, `vector from x, y, z`, `is loaded` for chunks and worlds.
+>    - **Time:** `ago`/`later`, before or after a date.
+>    - **Potions:** `speed 5` as a potion effect.
 
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
