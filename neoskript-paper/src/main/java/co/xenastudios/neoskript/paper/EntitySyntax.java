@@ -165,8 +165,24 @@ final class EntitySyntax {
             return holders.size() == 1 ? holders.getFirst() : holders.toArray();
         }, "[the] leash holder[s] of %entities%", "%entities%'[s] leash holder[s]");
                 SettableProperty.register(registrar, "ExprExplosiveYield", "number", "explosive (yield|radius|size|power)", "entities",
-                org.bukkit.entity.Explosive.class, Number.class, explosive -> (double) explosive.getYield(),
-                (explosive, yield) -> explosive.setYield(yield.floatValue()));
+                Entity.class, Number.class, entity -> switch (entity) {
+                    case org.bukkit.entity.Explosive explosive -> (double) explosive.getYield();
+                    case org.bukkit.entity.Creeper creeper -> (double) creeper.getExplosionRadius();
+                    case org.bukkit.entity.Ghast ghast -> (double) ghast.getExplosionPower();
+                    default -> null;
+                }, (entity, yield) -> {
+                    double value = yield.doubleValue();
+                    if (Double.isNaN(value)) {
+                        return;
+                    }
+                    switch (entity) {
+                        case org.bukkit.entity.Explosive explosive -> explosive.setYield((float) Math.max(0, value));
+                        case org.bukkit.entity.Creeper creeper -> creeper.setExplosionRadius((int) Math.max(0, Math.min(value, Integer.MAX_VALUE)));
+                        // A ghast's fireballs are between 0 and 127 strong.
+                        case org.bukkit.entity.Ghast ghast -> ghast.setExplosionPower((int) Math.max(0, Math.min(value, 127)));
+                        default -> {}
+                    }
+                });
         SettableProperty.register(registrar, "ExprLoveTime", "timespan", "love[d] time", "livingentities",
                 org.bukkit.entity.Animals.class, co.xenastudios.neoskript.runtime.Timespan.class,
                 animal -> new co.xenastudios.neoskript.runtime.Timespan(animal.getLoveModeTicks() * 50L),
@@ -327,19 +343,19 @@ final class EntitySyntax {
         SettableProperty.register(registrar, "ExprFreezeTicks", "timespan", "freeze time", "entities", Entity.class,
                 co.xenastudios.neoskript.runtime.Timespan.class,
                 entity -> new co.xenastudios.neoskript.runtime.Timespan(entity.getFreezeTicks() * 50L),
-                (entity, time) -> entity.setFreezeTicks((int) Math.min(entity.getMaxFreezeTicks(), time.ticks())));
+                (entity, time) -> entity.setFreezeTicks((int) Math.max(0, Math.min(Integer.MAX_VALUE, time.ticks()))));
         SettableProperty.register(registrar, "ExprPortalCooldown", "timespan", "portal cooldown", "entities", Entity.class,
                 co.xenastudios.neoskript.runtime.Timespan.class,
                 entity -> new co.xenastudios.neoskript.runtime.Timespan(entity.getPortalCooldown() * 50L),
                 (entity, time) -> entity.setPortalCooldown((int) time.ticks()));
         SettableProperty.register(registrar, "ExprNoDamageTicks", "integer", LivingEntity.class, Number.class,
-                living -> (long) living.getNoDamageTicks(), (living, ticks) -> living.setNoDamageTicks(ticks.intValue()),
+                living -> (long) living.getNoDamageTicks(), (living, ticks) -> living.setNoDamageTicks(Math.max(0, ticks.intValue())),
                 "[the] (invulnerability|invincibility|no damage) tick[s] [of %livingentities%]",
                 "%livingentities%'[s] (invulnerability|invincibility|no damage) tick[s]");
         SettableProperty.register(registrar, "ExprNoDamageTimespan", "timespan", LivingEntity.class,
                 co.xenastudios.neoskript.runtime.Timespan.class,
                 living -> new co.xenastudios.neoskript.runtime.Timespan(living.getNoDamageTicks() * 50L),
-                (living, time) -> living.setNoDamageTicks((int) time.ticks()),
+                (living, time) -> living.setNoDamageTicks((int) Math.max(0, time.ticks())),
                 "[the] (invulnerability|invincibility|no damage) (time[span]|duration) [of %livingentities%]",
                 "%livingentities%'[s] (invulnerability|invincibility|no damage) (time[span]|duration)");
         SettableProperty.register(registrar, "ExprArrowsStuck", "integer", LivingEntity.class, Number.class,
@@ -348,7 +364,18 @@ final class EntitySyntax {
         registrar.expression("ExprVillagerLevel", "integer", info -> new SettableVillager(info.hasTag("experience")),
                 "[the] villager (level|experience:experience) of %livingentities%",
                 "%livingentities%'[s] villager (level|experience:experience)");
-        registrar.expression("ExprInteractionDimensions", "number", info -> new SettableInteraction(info.hasTag("height")),
+        registrar.expression("ExprInteractionDimensions", "number", info -> {
+            boolean height = info.hasTag("height");
+            return new SettableProperty<>(org.bukkit.entity.Interaction.class, Number.class,
+                    interaction -> (double) (height ? interaction.getInteractionHeight() : interaction.getInteractionWidth()),
+                    (interaction, value) -> {
+                        if (height) {
+                            interaction.setInteractionHeight(value.floatValue());
+                        } else {
+                            interaction.setInteractionWidth(value.floatValue());
+                        }
+                    });
+        },
                 "[the] interaction (height:height|width)[s] of %entities%", "%entities%'[s] interaction (height:height|width)[s]");
 
         registrar.type("attributetype", "attribute type", org.bukkit.attribute.Attribute.class);
@@ -406,40 +433,6 @@ final class EntitySyntax {
     }
 
     /** {@code the interaction width of %entities%} and height, which can be set. */
-    private record SettableInteraction(boolean height) implements co.xenastudios.neoskript.api.element.Expression,
-            co.xenastudios.neoskript.api.element.Changeable {
-        @Override
-        public Object get(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments) {
-            List<Object> values = new ArrayList<>();
-            for (Object owner : owners(arguments[0])) {
-                if (owner instanceof org.bukkit.entity.Interaction interaction) {
-                    values.add((double) (height ? interaction.getInteractionHeight() : interaction.getInteractionWidth()));
-                }
-            }
-            return values.size() == 1 ? values.getFirst() : values.toArray();
-        }
-
-        @Override
-        public Class<?>[] acceptChange(Mode mode) {
-            return mode == Mode.SET ? new Class<?>[] {Number.class} : null;
-        }
-
-        @Override
-        public void change(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments, Object[] delta,
-                Mode mode) {
-            float value = delta.length > 0 && delta[0] instanceof Number n ? n.floatValue() : 0;
-            for (Object owner : owners(arguments[0])) {
-                if (owner instanceof org.bukkit.entity.Interaction interaction) {
-                    if (height) {
-                        interaction.setInteractionHeight(value);
-                    } else {
-                        interaction.setInteractionWidth(value);
-                    }
-                }
-            }
-        }
-    }
-
     /** {@code the movement speed attribute of %entities%}: the base value, or with {@code total} the final one. */
     private record AttributeValue(boolean total) implements co.xenastudios.neoskript.api.element.Expression,
             co.xenastudios.neoskript.api.element.Changeable {
@@ -591,9 +584,9 @@ final class EntitySyntax {
                 org.bukkit.entity.Sheep::isSheared, org.bukkit.entity.Sheep::setSheared);
         condition(registrar, "CondIsSaddled", "livingentities", "[properly] saddled", org.bukkit.entity.Steerable.class,
                 org.bukkit.entity.Steerable::hasSaddle, org.bukkit.entity.Steerable::setSaddle);
-        condition(registrar, "CondIsInvisible", "livingentities", "(invisible|visible:flip)", LivingEntity.class,
+        condition(registrar, "CondIsInvisible", "livingentities", "(invisible|flip:visible)", LivingEntity.class,
                 LivingEntity::isInvisible, LivingEntity::setInvisible);
-        condition(registrar, "CondIsLeftHanded", "livingentities", "(left|right:flip)( |-)handed", org.bukkit.entity.Mob.class,
+        condition(registrar, "CondIsLeftHanded", "livingentities", "(left|flip:right)( |-)handed", org.bukkit.entity.Mob.class,
                 org.bukkit.entity.Mob::isLeftHanded, org.bukkit.entity.Mob::setLeftHanded);
         condition(registrar, "CondIsTamed", "entities", "(tamed|domesticated)", org.bukkit.entity.Tameable.class,
                 org.bukkit.entity.Tameable::isTamed, org.bukkit.entity.Tameable::setTamed);
@@ -612,8 +605,46 @@ final class EntitySyntax {
                 org.bukkit.entity.Interaction::isResponsive, org.bukkit.entity.Interaction::setResponsive);
         condition(registrar, "CondIsFrozen", "entities", "frozen", Entity.class, Entity::isFrozen,
                 (entity, frozen) -> entity.setFreezeTicks(frozen ? entity.getMaxFreezeTicks() : 0));
-        condition(registrar, "CondIsWhitelisted", "offlineplayers", "whitelisted", org.bukkit.OfflinePlayer.class,
-                org.bukkit.OfflinePlayer::isWhitelisted, org.bukkit.OfflinePlayer::setWhitelisted);
+        registrar.condition("CondIsWhitelisted", info -> new Whitelisted(info.pattern()),
+                "[the] server (is|is in) (white[ ]list mode|white[ ]listed)",
+                "[the] server (isn't|is not) (in white[ ]list mode|white[ ]listed)",
+                "[the] server white[ ]list (is|is being) enforced", "[the] server white[ ]list (isn't|is not) enforced",
+                "%offlineplayers% (is|are) white[ ]listed", "%offlineplayers% (isn't|is not|aren't|are not) white[ ]listed");
+        condition(registrar, "CondIgnitionProcess", "livingentities",
+                "(going to explode|in the (process|middle) of exploding)", org.bukkit.entity.Creeper.class,
+                org.bukkit.entity.Creeper::isIgnited, org.bukkit.entity.Creeper::setIgnited);
+        condition(registrar, "CondIsChargingFireball", "livingentities", "charging [a] fireball", org.bukkit.entity.Ghast.class,
+                org.bukkit.entity.Ghast::isCharging, org.bukkit.entity.Ghast::setCharging);
+        condition(registrar, "CondIsDancing", "livingentities", "dancing", org.bukkit.entity.Allay.class,
+                org.bukkit.entity.Allay::isDancing, (allay, dancing) -> {
+                    if (dancing) {
+                        allay.startDancing();
+                    } else {
+                        allay.stopDancing();
+                    }
+                });
+        condition(registrar, "CondIsDashing", "livingentities", "dashing", org.bukkit.entity.Camel.class,
+                org.bukkit.entity.Camel::isDashing, org.bukkit.entity.Camel::setDashing);
+        condition(registrar, "CondIsJumping", "livingentities", "jumping", LivingEntity.class, LivingEntity::isJumping,
+                LivingEntity::setJumping);
+        conditionPatterns(registrar, "CondEntityUnload", LivingEntity.class, LivingEntity::getRemoveWhenFarAway,
+                LivingEntity::setRemoveWhenFarAway, "%livingentities% can despawn (on chunk unload|when far away)",
+                "%livingentities% (can't|cannot|can not) despawn (on chunk unload|when far away)");
+        conditionPatterns(registrar, "CondItemDespawn", org.bukkit.entity.Item.class, item -> !item.isUnlimitedLifetime(),
+                (item, despawns) -> item.setUnlimitedLifetime(!despawns), "%entities% can (despawn naturally|naturally despawn)",
+                "%entities% (can't|cannot|can not) (despawn naturally|naturally despawn)");
+        conditionPatterns(registrar, "CondPvP", org.bukkit.World.class, org.bukkit.World::getPVP, org.bukkit.World::setPVP,
+                "(is PvP|PvP is) enabled [in %worlds%]", "(is PvP|PvP is) disabled [in %worlds%]");
+        registrar.condition("CondGoatHasHorns", info -> new GoatHorns(info.pattern() == 1,
+                info.hasTag("left") ? 1 : info.hasTag("right") ? 2 : info.hasTag("both") ? 3 : 0),
+                "%livingentities% (has|have) ((any|a) horn|left:[a] left horn|right:[a] right horn|both:both horns)",
+                "%livingentities% (doesn't|does not|do not|don't) have ((any|a) horn|left:[a] left horn|right:[a] right horn|both:both horns)");
+        registrar.condition("CondTooltip", info -> new Tooltip(info.pattern() % 2 == 1 != info.hasTag("shown"),
+                info.hasTag("additional")),
+                "[the] [entire|additional:additional] tool[ ]tip[s] of %itemtypes% (is|are) (shown:shown|hidden)",
+                "[the] [entire|additional:additional] tool[ ]tip[s] of %itemtypes% (isn't|is not|aren't|are not) (shown:shown|hidden)",
+                "%itemtypes%'[s] [entire|additional:additional] tool[ ]tip[s] (is|are) (shown:shown|hidden)",
+                "%itemtypes%'[s] [entire|additional:additional] tool[ ]tip[s] (isn't|is not|aren't|are not) (shown:shown|hidden)");
         condition(registrar, "CondIsUnbreakable", "itemtypes", "[un:un]breakable", ItemType.class,
                 item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().isUnbreakable(),
                 (item, value) -> item.editMeta(meta -> meta.setUnbreakable(value)));
@@ -683,5 +714,116 @@ final class EntitySyntax {
 
     private static Object[] owners(Object value) {
         return value instanceof Object[] array ? array : value == null ? new Object[0] : new Object[] {value};
+    }
+
+    /** Whether the server is in whitelist mode, its whitelist is enforced, or players are whitelisted; settable. */
+    private record Whitelisted(int pattern) implements co.xenastudios.neoskript.api.element.SettableCondition {
+        @Override
+        public boolean check(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] args) {
+            boolean negated = pattern % 2 == 1;
+            if (pattern < 4) {
+                return (pattern >= 2 ? org.bukkit.Bukkit.isWhitelistEnforced() : org.bukkit.Bukkit.hasWhitelist()) != negated;
+            }
+            Object[] players = owners(args[0]);
+            for (Object player : players) {
+                if (!(player instanceof org.bukkit.OfflinePlayer offline) || offline.isWhitelisted() == negated) {
+                    return false;
+                }
+            }
+            return players.length > 0;
+        }
+
+        @Override
+        public void set(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] args, boolean value) {
+            boolean to = value != (pattern % 2 == 1);
+            if (pattern >= 2 && pattern < 4) {
+                org.bukkit.Bukkit.setWhitelistEnforced(to);
+            } else if (pattern < 2) {
+                org.bukkit.Bukkit.setWhitelist(to);
+            } else {
+                for (Object player : owners(args[0])) {
+                    if (player instanceof org.bukkit.OfflinePlayer offline) {
+                        offline.setWhitelisted(to);
+                    }
+                }
+            }
+        }
+    }
+
+    /** Whether goats have a horn: any (0), the left (1), the right (2) or both (3); settable. */
+    private record GoatHorns(boolean negated, int which) implements co.xenastudios.neoskript.api.element.SettableCondition {
+        @Override
+        public boolean check(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] args) {
+            Object[] goats = owners(args[0]);
+            for (Object value : goats) {
+                if (!(value instanceof org.bukkit.entity.Goat goat)) {
+                    return false;
+                }
+                boolean has = switch (which) {
+                    case 1 -> goat.hasLeftHorn();
+                    case 2 -> goat.hasRightHorn();
+                    case 3 -> goat.hasLeftHorn() && goat.hasRightHorn();
+                    default -> goat.hasLeftHorn() || goat.hasRightHorn();
+                };
+                if (has == negated) {
+                    return false;
+                }
+            }
+            return goats.length > 0;
+        }
+
+        @Override
+        public void set(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] args, boolean value) {
+            boolean to = value != negated;
+            for (Object goat : owners(args[0])) {
+                if (goat instanceof org.bukkit.entity.Goat g) {
+                    if (which != 2) {
+                        g.setLeftHorn(to);
+                    }
+                    if (which != 1) {
+                        g.setRightHorn(to);
+                    }
+                }
+            }
+        }
+    }
+
+    /** Whether items' entire (or additional) tooltip is hidden; settable. */
+    private record Tooltip(boolean shown, boolean additional) implements co.xenastudios.neoskript.api.element.SettableCondition {
+        @Override
+        public boolean check(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] args) {
+            Object[] items = owners(args[0]);
+            for (Object value : items) {
+                if (!(value instanceof ItemType item) || hidden(item.stack().getItemMeta()) == shown) {
+                    return false;
+                }
+            }
+            return items.length > 0;
+        }
+
+        private boolean hidden(org.bukkit.inventory.meta.ItemMeta meta) {
+            if (meta == null) {
+                return false;
+            }
+            return additional ? meta.hasItemFlag(org.bukkit.inventory.ItemFlag.HIDE_ADDITIONAL_TOOLTIP) : meta.isHideTooltip();
+        }
+
+        @Override
+        public void set(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] args, boolean value) {
+            boolean hide = value != shown;
+            for (Object owner : owners(args[0])) {
+                if (owner instanceof ItemType item) {
+                    item.editMeta(meta -> {
+                        if (!additional) {
+                            meta.setHideTooltip(hide);
+                        } else if (hide) {
+                            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+                        } else {
+                            meta.removeItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+                        }
+                    });
+                }
+            }
+        }
     }
 }

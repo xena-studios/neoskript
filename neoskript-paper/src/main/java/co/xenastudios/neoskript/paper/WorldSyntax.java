@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -344,9 +345,62 @@ final class WorldSyntax {
     }
 
     private static void registerVectors(Registrar registrar) {
-        registrar.function("vector", List.of(Parameter.of("x", "number"), Parameter.of("y", "number"),
-                Parameter.of("z", "number")), "vector", false, args -> new Vector(number(args[0]), number(args[1]),
-                number(args[2])));
+        // 'vector(5)' is vector(5, 5, 5).
+        registrar.function("vector", List.of(Parameter.of("x", "number"), new Parameter("y", "number", false, true),
+                new Parameter("z", "number", false, true)), "vector", false, args -> new Vector(number(args[0]),
+                number(args[1] == null ? args[0] : args[1]), number(args[2] == null ? args[0] : args[2])));
+        registrar.expression("ExprVectorBetweenLocations", "vector", info -> (context, args) ->
+                args[0] instanceof Location from && args[1] instanceof Location to
+                        ? to.toVector().subtract(from.toVector()) : null,
+                "[the] vector (from|between) %location% (to|and) %location%");
+        registrar.expression("ExprVectorOfLocation", "vector", info -> (context, args) -> map(args[0],
+                value -> value instanceof Location location ? location.toVector() : null),
+                "[the] vector (of|from|to) %locations%", "%locations%'[s] vector");
+        registrar.expression("ExprLocationFromVector", "location", info -> (context, args) -> {
+            if (!(args[0] instanceof Vector vector) || !(args[1] instanceof World world)) {
+                return null;
+            }
+            float yaw = args[2] instanceof Number n ? n.floatValue() : 0;
+            float pitch = args[3] instanceof Number n ? n.floatValue() : 0;
+            return new Location(world, vector.getX(), vector.getY(), vector.getZ(), yaw, pitch);
+        }, "[the] location (from|of) %vector% (in|within|from) %world% [with yaw %number% and pitch %number%]",
+                "%vector% to location in %world% [with yaw %number% and pitch %number%]");
+        registrar.expression("ExprVectorNormalize", "vector", info -> (context, args) -> map(args[0],
+                value -> value instanceof Vector vector ? (vector.lengthSquared() == 0 ? vector.clone() : vector.clone().normalize())
+                        : null),
+                "normalize[d] %vectors%", "%vectors% normalized");
+        registrar.expression("ExprVectorSquaredLength", "number", info -> (context, args) -> map(args[0],
+                value -> value instanceof Vector vector ? vector.lengthSquared() : null),
+                "[the] squared length[s] of %vectors%", "%vectors%'[s] squared length[s]");
+        registrar.expression("ExprVectorDotProduct", "number", info -> (context, args) ->
+                args[0] instanceof Vector a && args[1] instanceof Vector b ? a.dot(b) : null, "%vector% dot %vector%");
+        registrar.expression("ExprVectorCrossProduct", "vector", info -> (context, args) ->
+                args[0] instanceof Vector a && args[1] instanceof Vector b ? a.getCrossProduct(b) : null,
+                "%vector% cross %vector%");
+        registrar.expression("ExprVectorAngleBetween", "number", info -> (context, args) ->
+                args[0] instanceof Vector a && args[1] instanceof Vector b ? angle(a, b) : null,
+                "[the] angle between [[the] vectors] %vector% and %vector%");
+        registrar.expression("ExprVectorFromYawAndPitch", "vector", info -> (context, args) -> {
+            if (!(args[0] instanceof Number yaw) || !(args[1] instanceof Number pitch)) {
+                return null;
+            }
+            double y = Math.toRadians(yaw.doubleValue());
+            double p = Math.toRadians(pitch.doubleValue());
+            return new Vector(-Math.sin(y) * Math.cos(p), -Math.sin(p), Math.cos(y) * Math.cos(p));
+        }, "[a] [new] vector (from|with) yaw %number% and pitch %number%");
+        registrar.expression("ExprVectorRotateAroundAnother", "vector", info -> (context, args) -> map(args[0],
+                value -> value instanceof Vector vector && args[1] instanceof Vector axis && args[2] instanceof Number by
+                        ? vector.clone().rotateAroundAxis(axis, Math.toRadians(by.doubleValue())) : null),
+                "%vectors% rotated around %vector% by %number% [degrees]");
+        registrar.effect("EffVectorRotateAroundAnother", info -> (context, args) -> {
+            for (Object value : (Object[]) args[0]) {
+                if (value instanceof Vector vector && args[1] instanceof Vector axis && args[2] instanceof Number by) {
+                    vector.rotateAroundAxis(axis, Math.toRadians(by.doubleValue()));
+                }
+            }
+        }, "rotate %vectors% around %vector% by %number% [degrees]");
+        registrar.expression("ExprYawPitch", "number", info -> new YawPitch(info.hasTag("pitch")),
+                "[the] (yaw|pitch:pitch)[s] of %entities/locations%", "%entities/locations%'[s] (yaw|pitch:pitch)[s]");
         registrar.expression("PropExprWXYZ", "number", info -> new Axis(info.hasTag("x") ? 0 : info.hasTag("y") ? 1 : 2),
                 "[the] (x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])] of %objects%",
                 "%objects%'[s] (x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])]");
@@ -484,6 +538,75 @@ final class WorldSyntax {
                 default -> result.setZ(next);
             }
             return result;
+        }
+    }
+
+    /** The angle between two vectors in degrees, worked out in doubles: NaN if either has no length. */
+    private static double angle(Vector a, Vector b) {
+        double cosine = a.dot(b) / Math.sqrt(a.lengthSquared() * b.lengthSquared());
+        return Math.toDegrees(Math.acos(Math.max(-1, Math.min(1, cosine))));
+    }
+
+    /** Each value through {@code function}, dropping nothing results; one value alone if there's one. */
+    private static Object map(Object values, java.util.function.Function<Object, Object> function) {
+        List<Object> results = new ArrayList<>();
+        for (Object value : values instanceof Object[] array ? array : new Object[] {values}) {
+            Object result = value == null ? null : function.apply(value);
+            if (result != null) {
+                results.add(result);
+            }
+        }
+        return results.size() == 1 ? results.getFirst() : results.toArray();
+    }
+
+    /** {@code the yaw of %entities/locations%}: settable, and locations change in place. */
+    private record YawPitch(boolean pitch) implements Expression, Changeable {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            return map(arguments[0], value -> switch (value) {
+                case Entity entity -> (double) (pitch ? entity.getLocation().getPitch() : entity.getLocation().getYaw());
+                case Location location -> (double) (pitch ? location.getPitch() : location.getYaw());
+                default -> null;
+            });
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return mode == Mode.SET || mode == Mode.ADD || mode == Mode.REMOVE || mode == Mode.RESET
+                    ? new Class<?>[] {Number.class} : null;
+        }
+
+        @Override
+        public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
+            float by = delta != null && delta.length > 0 && delta[0] instanceof Number n ? n.floatValue() : 0;
+            for (Object value : (Object[]) arguments[0]) {
+                switch (value) {
+                    case Location location -> {
+                        float next = next(pitch ? location.getPitch() : location.getYaw(), by, mode);
+                        if (pitch) {
+                            location.setPitch(next);
+                        } else {
+                            location.setYaw(next);
+                        }
+                    }
+                    case Entity entity -> {
+                        Location at = entity.getLocation();
+                        float yaw = pitch ? at.getYaw() : next(at.getYaw(), by, mode);
+                        float pitchValue = pitch ? next(at.getPitch(), by, mode) : at.getPitch();
+                        entity.setRotation(yaw, pitchValue);
+                    }
+                    default -> {}
+                }
+            }
+        }
+
+        private static float next(float current, float by, Mode mode) {
+            return switch (mode) {
+                case ADD -> current + by;
+                case REMOVE -> current - by;
+                case RESET -> 0;
+                default -> by;
+            };
         }
     }
 }

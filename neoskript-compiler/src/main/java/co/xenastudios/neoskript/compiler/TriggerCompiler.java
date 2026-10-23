@@ -1874,6 +1874,15 @@ final class TriggerCompiler {
                     || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY) -> eventValue(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.FILTER) -> filter(syntax.syntax());
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RECURSIVE_SIZE) -> {
+                Expr.Variable list = listVariable(syntax.syntax(), "Only list variables have a recursive size");
+                variableStore(list);
+                variableName(list);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "recursiveList", "(" + STRING_DESC + ")" + OBJECTS, false);
+                method.visitInsn(ARRAYLENGTH);
+                method.visitInsn(I2L);
+                method.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
+            }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RECURSIVE) -> {
                 Expr.Variable list = listVariable(syntax.syntax(), "Only list variables can be recursive");
                 variableStore(list);
@@ -1944,6 +1953,14 @@ final class TriggerCompiler {
                 method.visitLabel(otherwise);
                 expression((Expr) syntax.syntax().match().values().get(1));
                 method.visitLabel(done);
+            }
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RANDOM) -> {
+                expression((Expr) syntax.syntax().match().values().getFirst());
+                Class<?> type = library.javaClass(syntax.type());
+                constant(type == null ? Object.class : type, Class.class);
+                method.visitMethodInsn(INVOKESTATIC, VALUES, "cast", "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECTS,
+                        false);
+                method.visitMethodInsn(INVOKESTATIC, VALUES, "random", "(" + OBJECTS + ")" + OBJECT_DESC, false);
             }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.CAST) -> {
                 expression((Expr) syntax.syntax().match().values().getFirst());
@@ -2277,6 +2294,10 @@ final class TriggerCompiler {
         if (builtIn != null) {
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Function.class), "call",
                     "(" + OBJECTS + ")" + OBJECT_DESC, true);
+            if (!keyed) {
+                method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "plain",
+                        "(" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+            }
         } else {
             method.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(FunctionHandle.class), keyed ? "callKeyed" : "call",
                     "(" + OBJECTS + ")" + OBJECT_DESC, false);

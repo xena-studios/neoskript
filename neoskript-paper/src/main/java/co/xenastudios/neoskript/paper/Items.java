@@ -80,6 +80,10 @@ final class Items {
         registrar.cloner(ItemType.class, ItemType::copy);
         registrar.cloner(ItemStack.class, ItemStack::clone);
         registrar.parser("itemtype", ItemType::parse);
+        // 'X is stone' holds for any stone, named or not; 'X is stone named "a"' only for one with that name.
+        registrar.comparison(ItemType.class, ItemType.class, (item, pattern) -> item.material() == pattern.material()
+                && (!pattern.stack().hasItemMeta() || item.stack().isSimilar(pattern.stack()))
+                && (!pattern.amountGiven() || item.amount() == pattern.amount()));
         registrar.converter(ItemType.class, ItemStack.class, ItemType::stack);
         registrar.converter(ItemStack.class, ItemType.class, stack -> new ItemType(stack, true));
         registrar.converter(Slot.class, ItemStack.class, Slot::item);
@@ -168,26 +172,6 @@ final class Items {
         });
         registrar.changer(Slot.class, Changeable.Mode.DELETE, (slot, values) -> slot.set(null));
 
-        registrar.expression("ExprXOf", "object", info -> (context, args) -> {
-            int amount = args[0] instanceof Number n ? (int) Math.round(n.doubleValue()) : 1;
-            List<Object> values = new ArrayList<>();
-            for (Object value : (Object[]) args[1]) {
-                switch (value) {
-                    case ItemType item -> {
-                        ItemType copy = item.copy();
-                        copy.setAmount(amount);
-                        values.add(copy);
-                    }
-                    case ItemStack stack -> {
-                        ItemStack copy = stack.clone();
-                        copy.setAmount(amount);
-                        values.add(copy);
-                    }
-                    default -> values.add(value);
-                }
-            }
-            return values.size() == 1 ? values.getFirst() : values.toArray();
-        }, "%number% of %itemstacks/itemtypes%");
 
         registrar.expression("ExprLore", "string", info -> new Lore(info.pattern() >= 2),
                 "[the] lore of %itemtype%", "%itemtype%'[s] lore",
@@ -397,6 +381,55 @@ final class Items {
         }
     }
 
+    /** Bukkit's inventory types, by name, so registering them doesn't load the enum. */
+    private static final List<String> INVENTORY_KINDS = List.of("CHEST", "DISPENSER", "DROPPER", "FURNACE", "WORKBENCH",
+            "CRAFTING", "ENCHANTING", "BREWING", "PLAYER", "CREATIVE", "MERCHANT", "ENDER_CHEST", "ANVIL", "SMITHING",
+            "BEACON", "HOPPER", "SHULKER_BOX", "BARREL", "BLAST_FURNACE", "LECTERN", "SMOKER", "LOOM", "CARTOGRAPHY",
+            "GRINDSTONE", "STONECUTTER", "COMPOSTER", "CHISELED_BOOKSHELF", "JUKEBOX", "DECORATED_POT", "CRAFTER");
+
+    /** A kind of inventory, Skript's {@code inventory type}: {@code hopper inventory}. */
+    record InventoryKind(String name) {
+        org.bukkit.event.inventory.InventoryType type() {
+            try {
+                return org.bukkit.event.inventory.InventoryType.valueOf(name);
+            } catch (IllegalArgumentException missing) {
+                return null;
+            }
+        }
+
+        @Override
+        public String toString() {
+            return name.toLowerCase(java.util.Locale.ROOT).replace('_', ' ') + " inventory";
+        }
+    }
+
+    /**
+     * Item syntax tried after the rest of the library: {@code 3 of stone}, which would otherwise take
+     * {@code y coordinate of spawn of {_world}} as {@code (y coordinate of spawn) of {_world}}.
+     */
+    static void registerLate(Registrar registrar) {
+        registrar.expression("ExprXOf", "object", info -> (context, args) -> {
+            int amount = args[0] instanceof Number n ? (int) Math.round(n.doubleValue()) : 1;
+            List<Object> values = new ArrayList<>();
+            for (Object value : (Object[]) args[1]) {
+                switch (value) {
+                    case ItemType item -> {
+                        ItemType copy = item.copy();
+                        copy.setAmount(amount);
+                        values.add(copy);
+                    }
+                    case ItemStack stack -> {
+                        ItemStack copy = stack.clone();
+                        copy.setAmount(amount);
+                        values.add(copy);
+                    }
+                    default -> values.add(value);
+                }
+            }
+            return values.size() == 1 ? values.getFirst() : values.toArray();
+        }, "%number% of %itemstacks/itemtypes%");
+    }
+
     private static void registerInventories(Registrar registrar) {
         registrar.expression("ExprChestInventory", "inventory", info -> {
             boolean nameFirst = info.pattern() == 0;
@@ -409,6 +442,53 @@ final class Items {
             };
         }, "[a] [new] chest inventory (named|with name) %text% [with %number% row[s]]",
                 "[a] [new] chest inventory with %number% row[s] [(named|with name) %text%]");
+        // 'items in {_inventory}': each stack in it, in slot order; 'all stone in X' only those of the items given.
+        registrar.expression("ExprItemsIn", "itemtype", info -> {
+            boolean filtered = info.pattern() == 1;
+            return (context, args) -> {
+                List<Object> found = new ArrayList<>();
+                Object[] wanted = filtered ? (Object[]) args[0] : null;
+                for (Object value : (Object[]) args[filtered ? 1 : 0]) {
+                    if (!(value instanceof Inventory inventory)) {
+                        continue;
+                    }
+                    for (ItemStack stack : inventory.getContents()) {
+                        if (stack == null || stack.getType().isAir()) {
+                            continue;
+                        }
+                        if (wanted != null && java.util.Arrays.stream(wanted).noneMatch(item ->
+                                item instanceof ItemType type && type.material() == stack.getType()
+                                        && (!type.stack().hasItemMeta() || type.stack().isSimilar(stack)))) {
+                            continue;
+                        }
+                        found.add(new ItemType(stack, true));
+                    }
+                }
+                return found.toArray();
+            };
+        }, "[all [[of] the]] items ([inside]|in [[the] inventory of]) %inventories%",
+                "all [[of] the] %itemtypes% ([inside]|in [[the] inventory of]) %inventories%");
+        // 'a hopper inventory named "x"': any kind of inventory that can be made on its own. The kinds are
+        // looked up when used, as Bukkit's inventory types touch the server's registries.
+        Map<String, InventoryKind> kinds = new LinkedHashMap<>();
+        for (String kind : INVENTORY_KINDS) {
+            kinds.put(kind.toLowerCase(java.util.Locale.ROOT).replace('_', ' ') + " inventory", new InventoryKind(kind));
+        }
+        kinds.put("crafting table inventory", new InventoryKind("WORKBENCH"));
+        registrar.namedType("inventorytype", "inventory type", InventoryKind.class, kinds);
+        registrar.expression("ExprInventoryOfType", "inventory", info -> (context, args) -> {
+            org.bukkit.event.inventory.InventoryType kind = args[0] instanceof InventoryKind k ? k.type() : null;
+            if (kind == null || !kind.isCreatable()) {
+                return null;
+            }
+            try {
+                return args.length < 2 || args[1] == null ? Bukkit.createInventory(null, kind)
+                        : Bukkit.createInventory(null, kind, Messages.component(args[1]));
+            } catch (IllegalArgumentException cannotMake) {
+                return null;
+            }
+            // A name or 'new' is needed, as for chest inventories: 'hopper inventory' alone is the kind.
+        }, "[a] [new] %*inventorytype% (named|with name) %text%", "[a] new %*inventorytype%");
         registrar.expression("ExprInventorySlot", "slot", info -> new SlotsOf(),
                 "[the] slot[s] %numbers% of %inventory%", "%inventory%'[s] slot[s] %numbers%");
         registrar.expression("ExprSlotIndex", "integer", info -> (context, args) -> {

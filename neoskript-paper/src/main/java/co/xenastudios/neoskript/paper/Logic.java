@@ -136,7 +136,7 @@ final class Logic {
         registrar.expression("LitInfinity", "number", info -> (context, args) -> Double.POSITIVE_INFINITY,
                 "positive (infinity|\u221e) [value]", "\u221e [value]", "infinity value", "value of [positive] (infinity|\u221e)");
         registrar.expression("LitNegativeInfinity", "number", info -> (context, args) -> Double.NEGATIVE_INFINITY,
-                "negative (infinity|\u221e) [value]", "-\u221e [value]", "value of negative (infinity|\u221e)");
+                "negative (infinity|\u221e) [value]", "-(infinity|\u221e) [value]", "value of negative (infinity|\u221e)");
         registrar.expression("LitNaN", "number", info -> (context, args) -> Double.NaN, "NaN [value]", "value of NaN");
         registrar.expression("ExprRandomNumber", "number", info -> {
             boolean integers = info.hasTag("integer");
@@ -218,10 +218,6 @@ final class Logic {
             }
             return kept.toArray();
         }, "%objects% (except|excluding|not including) %objects%");
-        registrar.expression("ExprRandom", "object", info -> (context, args) -> {
-            Object[] values = (Object[]) args[0];
-            return values.length == 0 ? null : values[java.util.concurrent.ThreadLocalRandom.current().nextInt(values.length)];
-        }, "[a] random <[\\p{L} ]+> [out] of %objects%");
         registrar.expression("ExprAngle", "number", info -> {
             boolean radians = info.hasTag("rad");
             return (context, args) -> {

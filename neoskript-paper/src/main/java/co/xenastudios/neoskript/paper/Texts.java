@@ -6,6 +6,7 @@ package co.xenastudios.neoskript.paper;
 
 import co.xenastudios.neoskript.api.element.Update;
 import co.xenastudios.neoskript.api.element.Condition;
+import co.xenastudios.neoskript.api.registration.Parameter;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
@@ -22,6 +23,23 @@ final class Texts {
     private Texts() {}
 
     static void register(Registrar registrar) {
+        // 'concat("a", 1)' joins anything as text; 'case_equals(...)' compares texts with case.
+        registrar.function("concat", List.of(new Parameter("texts", "object", true, false)), "string", false, args -> {
+            StringBuilder joined = new StringBuilder();
+            for (Object value : (Object[]) args[0]) {
+                joined.append(Values.text(value));
+            }
+            return joined.toString();
+        });
+        registrar.function("case_equals", List.of(new Parameter("strs", "string", true, false)), "boolean", false, args -> {
+            Object[] texts = (Object[]) args[0];
+            for (int i = 1; i < texts.length; i++) {
+                if (!texts[i].equals(texts[0])) {
+                    return false;
+                }
+            }
+            return true;
+        });
         registrar.expression("ExprStringCase", "string", info -> {
             UnaryOperator<String> change = switch (info.pattern()) {
                 case 0, 1 -> info.hasTag("upper") ? s -> s.toUpperCase(Locale.ROOT) : s -> s.toLowerCase(Locale.ROOT);
