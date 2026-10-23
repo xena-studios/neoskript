@@ -44,7 +44,7 @@ final class TestRunner {
             }
             TestRun.begin();
             try {
-                test.trigger().execute(new SimpleTriggerContext(null));
+                test.trigger().execute(new SimpleTriggerContext(new co.xenastudios.neoskript.runtime.testing.TestEvent()));
             } catch (ScriptRuntimeException e) {
                 TestRun.error(e);
             }

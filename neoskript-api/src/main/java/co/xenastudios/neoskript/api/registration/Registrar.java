@@ -47,6 +47,13 @@ public interface Registrar {
     void condition(String id, ElementFactory<Condition> factory, String... patterns);
 
     /**
+     * A section, which can also be written as an effect without code. In its code, the values it returns
+     * are the event values of {@code valueType}, like {@code entity} in {@code spawn a pig:}.
+     */
+    void section(String id, String valueType, ElementFactory<co.xenastudios.neoskript.api.element.Section> factory,
+            String... patterns);
+
+    /**
      * A property condition, {@code %owners% (is|are) <property>} and its negation (see
      * {@link Patterns#isProperty}). It's true when {@code test} holds for every owner, or for none when
      * negated.

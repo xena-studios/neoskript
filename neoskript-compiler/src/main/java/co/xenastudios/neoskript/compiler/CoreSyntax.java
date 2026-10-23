@@ -41,6 +41,7 @@ final class CoreSyntax {
     static final String SORT = "EffSort";
     static final String PERIODICAL = "EvtPeriodical";
     static final String PARSE = "ExprParse";
+    static final String WHETHER = "ExprWhether";
 
     /** {@link #CHANGE} patterns, by index. */
     enum ChangeMode {
@@ -131,6 +132,9 @@ final class CoreSyntax {
 
         // 'every 5 minutes': runs on the global thread, from when the script loads.
         library.core(SyntaxKind.EVENT, PERIODICAL, null, List.of(), "every %timespan%");
+
+        // 'whether {_x} is set': a condition as a boolean.
+        library.core(SyntaxKind.EXPRESSION, WHETHER, "boolean", List.of(RegexRole.CONDITION), "whether <.+>");
 
         // '"5" parsed as integer': text through the type's parser, or nothing if it isn't one.
         library.core(SyntaxKind.EXPRESSION, PARSE, "object", List.of(RegexRole.TYPE), "%text% parsed as [a[n]] <.+>");

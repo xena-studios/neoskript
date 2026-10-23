@@ -12,6 +12,7 @@ import co.xenastudios.neoskript.harness.scenario.NeoSkriptParseScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptCommandsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptCorpusScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptItemsScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptSkriptSuiteScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptReloadScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptRunScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptSkriptTestsScenario;
@@ -44,6 +45,7 @@ public final class HarnessMain {
             new NeoSkriptCommandsScenario(),
             new NeoSkriptCorpusScenario(),
             new NeoSkriptItemsScenario(),
+            new NeoSkriptSkriptSuiteScenario(),
             new NeoSkriptVariablesScenario(),
             new NeoSkriptMigrationScenario(),
             new SkriptConflictScenario(),

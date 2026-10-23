@@ -92,17 +92,6 @@ final class Players {
     }
 
     private static void registerMore(Registrar registrar) {
-        // Skript's ExprEntities, for players only until entity types come with the world (M4 step 5).
-        registrar.expression("ExprEntities", "player", info -> (context, args) -> {
-            List<Object> players = new java.util.ArrayList<>();
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                if (args[0] == null || List.of((Object[]) args[0]).contains(player.getWorld())) {
-                    players.add(player);
-                }
-            }
-            return players.toArray();
-        }, "[(all [[of] the]|the)] players [(in|of) world[s] %worlds%]");
-
         registrar.function("player", List.of(Parameter.of("nameOrUUID", "string"),
                 new Parameter("getExactPlayer", "boolean", false, true)), "player", false, args -> {
                     String text = Values.text(args[0]);

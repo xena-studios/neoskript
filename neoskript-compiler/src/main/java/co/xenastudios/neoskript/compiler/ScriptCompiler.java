@@ -102,6 +102,13 @@ public final class ScriptCompiler {
                         default -> throw new CompileException(header.number(),
                                 "NeoSkript can't run this yet: '" + header.key() + "'");
                     }
+                } catch (RuntimeException e) {
+                    // A bug in NeoSkript, not the script: this structure is left out and the rest still load.
+                    String message = "NeoSkript couldn't compile this (" + e + "). Please report it.";
+                    diagnostics.add(new Diagnostic(Severity.ERROR, name, header.number(), 0, 0, message));
+                    if (testName != null) {
+                        unrunnableTests.put(testName, "line " + header.number() + ": " + message);
+                    }
                 } catch (CompileException e) {
                     if (!e.alreadyReported()) {
                         diagnostics.add(new Diagnostic(Severity.ERROR, name, e.line(), 0, 0, e.getMessage()));

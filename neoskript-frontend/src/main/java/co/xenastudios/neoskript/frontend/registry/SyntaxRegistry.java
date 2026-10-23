@@ -39,6 +39,9 @@ public final class SyntaxRegistry {
     private final Map<String, List<FunctionInfo>> functions;
     private final Map<String, Set<String>> supertypes;
     private final Set<String> strictTypes;
+    private final Map<String, java.util.function.Predicate<String>> literalChecks;
+    /** Direct conversions, which unlike subtypes don't chain: {@code from -> {to...}}. */
+    private final Map<String, Set<String>> conversions;
     private final Set<String> entityNames;
     private final Set<String> delaying;
     private final Map<String, ParseCheck> checks;
@@ -66,6 +69,10 @@ public final class SyntaxRegistry {
         this.functions = Map.copyOf(functions);
         this.supertypes = closure(builder.supertypes);
         this.strictTypes = Set.copyOf(builder.strictTypes);
+        this.literalChecks = Map.copyOf(builder.literalChecks);
+        Map<String, Set<String>> conversions = new HashMap<>();
+        builder.conversions.forEach((from, to) -> conversions.put(from, Set.copyOf(to)));
+        this.conversions = Map.copyOf(conversions);
         this.entityNames = Set.copyOf(builder.entityNames);
         this.delaying = Set.copyOf(builder.delaying);
         this.checks = Map.copyOf(builder.checks);
@@ -125,7 +132,15 @@ public final class SyntaxRegistry {
         if (supers != null && supers.contains(to)) {
             return true;
         }
+        if (convertsTo(from, to) || (supers != null && supers.stream().anyMatch(s -> convertsTo(s, to)))) {
+            return true;
+        }
         return !strictTypes.contains(from) && !strictTypes.contains(to);
+    }
+
+    private boolean convertsTo(String from, String to) {
+        Set<String> targets = conversions.get(from);
+        return targets != null && targets.contains(to);
     }
 
     /** Whether {@code from} is {@code to} or one of its registered subtypes, with no leniency. */
@@ -137,9 +152,35 @@ public final class SyntaxRegistry {
         return supers != null && supers.contains(to);
     }
 
+    /**
+     * Whether {@code words} might be a literal of {@code type}, an open-literal type: its check says so, or
+     * it has none (so anything might be).
+     */
+    public boolean mightBeLiteral(TypeInfo type, String words) {
+        java.util.function.Predicate<String> check = literalChecks.get(type.id());
+        if (check == null) {
+            return true;
+        }
+        try {
+            return check.test(words);
+        } catch (RuntimeException e) {
+            // The check needs something that isn't there (a server, in tests): don't rule the words out.
+            return true;
+        }
+    }
+
     /** Whether {@code name} names a kind of entity, as in {@code the zombie} or {@code event-creeper}. */
     public boolean isEntityName(String name) {
-        return entityNames.contains(normalize(name));
+        if (entityNames.contains(normalize(name))) {
+            return true;
+        }
+        // Or what the entity type's literals accept, where it has a check.
+        java.util.function.Predicate<String> check = literalChecks.get("entitytype");
+        try {
+            return check != null && check.test(name);
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     static String normalize(String name) {
@@ -186,6 +227,8 @@ public final class SyntaxRegistry {
         private final Map<String, List<FunctionInfo>> functions = new HashMap<>();
         private final Map<String, Set<String>> supertypes = new HashMap<>();
         private final Set<String> strictTypes = new HashSet<>();
+        private final Map<String, java.util.function.Predicate<String>> literalChecks = new HashMap<>();
+        private final Map<String, Set<String>> conversions = new HashMap<>();
         private final Set<String> entityNames = new HashSet<>();
         private final Set<String> delaying = new HashSet<>();
         private final Map<String, ParseCheck> checks = new HashMap<>();
@@ -239,6 +282,11 @@ public final class SyntaxRegistry {
          * Marks a type's literals as open: any words might be one (item names), so the parser leaves words
          * where a value of the type is expected for the compiler to resolve.
          */
+        public Builder openLiterals(String id, java.util.function.Predicate<String> check) {
+            literalChecks.put(id.toLowerCase(Locale.ROOT), check);
+            return openLiterals(id);
+        }
+
         public Builder openLiterals(String id) {
             TypeInfo old = typesById.get(id.toLowerCase(Locale.ROOT));
             if (old == null || old.openLiterals()) {
@@ -269,6 +317,16 @@ public final class SyntaxRegistry {
         /** Values of type {@code sub} can be used as any of {@code supers} (subtype or conversion). */
         public Builder assignable(String sub, String... supers) {
             supertypes.computeIfAbsent(sub, k -> new HashSet<>()).addAll(List.of(supers));
+            return this;
+        }
+
+        /**
+         * Values of {@code from} can be converted to {@code to} where it's expected. Unlike
+         * {@link #assignable}, conversions don't chain: an entity converts to a location, a location to a
+         * block, but an entity isn't a block.
+         */
+        public Builder convertible(String from, String to) {
+            conversions.computeIfAbsent(from, k -> new HashSet<>()).add(to);
             return this;
         }
 

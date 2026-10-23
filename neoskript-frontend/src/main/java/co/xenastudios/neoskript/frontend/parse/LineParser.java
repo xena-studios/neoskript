@@ -704,7 +704,8 @@ final class LineParser {
         if (!Literals.isWords(text)) {
             return null;
         }
-        boolean open = expected.anything() || expected.types().stream().anyMatch(TypeInfo::openLiterals);
+        boolean open = expected.anything() || expected.types().stream()
+                .anyMatch(type -> type.openLiterals() && registry.mightBeLiteral(type, text));
         return open ? new Expr.Unresolved(start, end, text) : null;
     }
 

@@ -28,7 +28,7 @@ final class Locations {
         registrar.text(Location.class, location -> "x: " + Values.decimal(location.getX())
                 + ", y: " + Values.decimal(location.getY()) + ", z: " + Values.decimal(location.getZ())
                 + ", yaw: " + Values.decimal(location.getYaw()) + ", pitch: " + Values.decimal(location.getPitch())
-                + " in '" + (location.getWorld() == null ? "<none>" : location.getWorld().getName()) + "'");
+                + (location.getWorld() == null ? "" : " in '" + location.getWorld().getName() + "'"));
         registrar.converter(Entity.class, Location.class, Entity::getLocation);
         registrar.converter(Block.class, Location.class, Block::getLocation);
         registrar.converter(Location.class, World.class, Location::getWorld);
@@ -57,8 +57,12 @@ final class Locations {
             }
             for (Object entity : (Object[]) args[0]) {
                 if (entity instanceof Entity e) {
-                    // Asynchronous, as Folia requires; on Paper it happens straight away when it can.
-                    e.teleportAsync(location);
+                    try {
+                        e.teleport(location);
+                    } catch (UnsupportedOperationException folia) {
+                        // Folia only teleports asynchronously.
+                        e.teleportAsync(location);
+                    }
                 }
             }
         }, "[force] teleport %entities% to %location%");
@@ -66,7 +70,7 @@ final class Locations {
         registrar.function("location", List.of(Parameter.of("x", "number"), Parameter.of("y", "number"),
                 Parameter.of("z", "number"), new Parameter("world", "world", false, true),
                 new Parameter("yaw", "number", false, true), new Parameter("pitch", "number", false, true)),
-                "location", false, args -> new Location(args[3] instanceof World w ? w : Bukkit.getWorlds().getFirst(),
+                "location", false, args -> new Location(args[3] instanceof World w ? w : null,
                         number(args[0]), number(args[1]), number(args[2]), (float) number(args[4]), (float) number(args[5])));
         registrar.function("world", List.of(Parameter.of("name", "string")), "world", false,
                 args -> Bukkit.getWorld(Values.text(args[0])));

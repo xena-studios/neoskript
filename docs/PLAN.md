@@ -285,6 +285,27 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >    - **Conversion on save:** a value without a codec is saved as what it converts to, if that has one: a slot as its item, as in Skript.
 >    - **Tested by:** `neoskript-variables`. NeoSkript decodes the plain, named, enchanted, lore, block and counted items and the item stack the reference Skript saved, and rewrites the file byte for byte. Skript reads the items NeoSkript saves and rewrites them identically. Only `vector` is still kept raw, until vectors come with the world (step 5).
 > 5. **The world:** entities and spawning, blocks, locations and vectors, worlds, potions.
+>
+>    **5a status: done (2026-10-22).**
+>    - **Progress measure:** the new `neoskript-skript-suite` check (baseline group) runs every one of Skript's 855 tests on NeoSkript and reports how many pass, fail and can't run yet. The reference Skript passes 853 on the same server. M4 ends when NeoSkript does too. Before 5a: not measured. After: 95 pass, 76 fail, 684 can't run yet.
+>    - **Sections in the API:**
+>      - `Registrar.section(id, valueType, factory, patterns)`: a section's code runs once for each value it returns, and inside it those values are the event values of its type (`entity` in `spawn a pig:`).
+>      - The code is inlined like a loop's, so locals and waits work.
+>      - Each section is also an effect when written without code.
+>    - **Entity types:** Skript-style kinds. Every Minecraft entity type, Skript's names for some (`firework`, `lightning`, `dropped item`), and categories (`projectile`, `monster`, `animal`, `mob`...) defined by the entity class they match. Entity types are strict, so `pig` in `spawn pig` is the type, not an event value.
+>    - **Literal checks:** a type's literal parser now also checks words while parsing, so `unknown` isn't read as `all <entity type>`.
+>    - **Stricter types:** item types are strict too, so `ender pearl` (also an entity's name) stays an item where an item is expected.
+>    - **Conversions:** converters tell the parser what converts to what, one step at a time. An entity converts to a location and a location to a block, but an entity isn't accepted as a block.
+>    - **Syntax:**
+>      - Spawning (section and effect), the last spawned entity, `all <entity types> [in worlds]`, health, `kill`, and deleting entities.
+>      - Blocks at, above and below locations, settable to an item's block.
+>      - Vectors, with a byte-exact codec: `vector()`, x/y/z of locations, vectors and blocks, offsets, lengths.
+>      - `whether <condition>`, infinity and NaN, random numbers, `running [below] minecraft`.
+>    - **Skript's test environment:** `test-location`, `test-block`, `test-world`, and a test event whose `event-location`, `event-block` and `event-world` are those.
+>    - **Robustness:**
+>      - A bug that throws while compiling one structure now only leaves that structure out, with an error asking for a report. It used to stop NeoSkript loading.
+>      - Integer literals too big for a whole number become decimals, as in Skript.
+>    - **Next, in 5b:** potions, world borders, entity data, persistent data, block data, chunks.
 > 6. **The long tail:** whatever Skript's tests still need, most-used first, then the differential runner for the 95% check.
 
 **M5: Folia hardening + tooling**

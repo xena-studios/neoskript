@@ -22,9 +22,15 @@ public final class StandardLibrary {
         Time.register(registrar);
         Locations.register(registrar);
         Items.register(registrar);
+        WorldSyntax.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
         StorageCodecs.register(registrar);
         ItemCodecs.register(registrar);
+    }
+
+    /** Syntax Skript's test environment provides, for running Skript's own tests: {@code test-location}... */
+    public static void registerTesting(Registrar registrar) {
+        WorldSyntax.registerTesting(registrar);
     }
 }
