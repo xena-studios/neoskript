@@ -193,6 +193,7 @@ class LanguageTest {
                 \t\t\texit loop
                 \t\tsay {_i}
                 \tsay "done"
+                \tsuppress unreachable code warnings
                 \tstop
                 \tsay "unreachable"
                 """));
