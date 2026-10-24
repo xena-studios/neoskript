@@ -391,7 +391,7 @@ final class WorldProperties {
     }
 
     /** Where the event happened, for syntax whose location is left out: its entity's, block's or player's. */
-    private static Location eventLocation(Object event) {
+    static Location eventLocation(Object event) {
         return switch (event) {
             case org.bukkit.event.player.PlayerEvent player -> player.getPlayer().getLocation();
             case org.bukkit.event.entity.EntityEvent entity -> entity.getEntity().getLocation();

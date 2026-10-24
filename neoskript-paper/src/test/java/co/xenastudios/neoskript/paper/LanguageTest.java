@@ -363,4 +363,19 @@ class LanguageTest {
         compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
         assertEquals(List.of("false", "unknown", "true", "<none>", "true"), said);
     }
+
+    @Test
+    void chanceDatesAndText() {
+        assertEquals(List.of("true", "false", "true", "true", "false", "true", "false", "x: 2, y: 0, z: 0"), run("""
+                on load:
+                \tsay whether chance of 100%
+                \tsay whether chance of 0%
+                \tsay whether chance of 0% fails
+                \tsay whether "abc123" is alphanumeric
+                \tsay whether "abc 123" is alphanumeric
+                \tsay whether now was less than 1 minute ago
+                \tsay whether now was more than 1 minute ago
+                \tsay vector projection of vector(2, 3, 0) onto vector(1, 0, 0)
+                """));
+    }
 }

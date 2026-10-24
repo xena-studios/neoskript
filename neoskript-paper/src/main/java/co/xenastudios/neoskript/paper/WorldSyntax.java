@@ -580,9 +580,12 @@ final class WorldSyntax {
                 return args[0] instanceof Direction direction ? location.clone().add(direction.from(location)).getBlock() : null;
             };
         }, "[the] block[s] (at|of) %locations%", "[the] block %direction% %location%");
-        registrar.expression("ExprRelativeLocation", "location", info -> (context, args) ->
-                args[0] instanceof Direction direction && args[1] instanceof Location location
-                        ? location.clone().add(direction.from(location)) : null, "[the] location %direction% %location%");
+        // 'the location 2 meters above {_loc}'; without a location, the event's.
+        registrar.expression("ExprLocation", "location", info -> (context, args) -> {
+            Object location = args[1] == null ? WorldProperties.eventLocation(context.event()) : args[1];
+            List<Location> moved = WorldProperties.locations(args[0], location);
+            return moved.isEmpty() ? null : moved.getFirst();
+        }, "[the] (location|position) %directions% [%location%]");
         registrar.expression("ExprBlocks", "block", info -> {
             int pattern = info.pattern();
             return (context, args) -> {
