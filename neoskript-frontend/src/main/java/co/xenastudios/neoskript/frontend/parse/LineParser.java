@@ -168,9 +168,8 @@ final class LineParser {
                 continue;
             }
             // A kind of entity alone is the event's entity only where an entity type can't go.
-            if (syntax.regexRoles().contains(RegexRole.BARE_ENTITY) && (expected == null || expected.anything()
-                    || expected.accepts("entitytype", registry) || expected.types().stream().noneMatch(t ->
-                    registry.isSubtype("entity", t.id()) || registry.isConvertible("entity", t.id())))) {
+            // ('delete pig' too: a literal can't be changed.)
+            if (syntax.regexRoles().contains(RegexRole.BARE_ENTITY) && !bareEntityFits(expected)) {
                 continue;
             }
             CompiledPattern pattern = syntax.patterns().get(candidate.pattern());
@@ -350,6 +349,18 @@ final class LineParser {
         String word = name.group(1).toLowerCase(java.util.Locale.ROOT);
         return word.equals("value") || word.equals("index") || word.equals("counter") || word.equals("iteration")
                 || registry.resolveType(word) != null;
+    }
+
+    private boolean bareEntityFits(Expected expected) {
+        if (expected == null) {
+            return false;
+        }
+        if (expected.anything()) {
+            return expected.changeable();
+        }
+        return !expected.accepts("entitytype", registry) && expected.types().stream().anyMatch(t ->
+                registry.isSubtype("entity", t.id()) || registry.isSubtype(t.id(), "entity")
+                        || registry.isConvertible("entity", t.id()));
     }
 
     private boolean returnTypeFits(SyntaxInfo syntax, Expected expected) {
@@ -867,14 +878,20 @@ final class LineParser {
             if (first != null && k < n) {
                 reach.set(k, List.of(first));
             }
-            for (int j = 0; j < k && (reach.get(k) == null || k == n); j++) {
+            for (int j = 0; j < k; j++) {
                 if (reach.get(j) == null) {
                     continue;
                 }
                 Expr next = listItem(separators.get(j)[1], itemEnd, item, expected);
-                if (next != null && (reach.get(k) == null || reach.get(j).size() + 1 > reach.get(k).size())) {
-                    List<Expr> items = new ArrayList<>(reach.get(j));
-                    items.add(next);
+                if (next == null) {
+                    continue;
+                }
+                List<Expr> items = new ArrayList<>(reach.get(j));
+                items.add(next);
+                // Fewer items leaning on unresolved words, then more items: '1 or 0 or -1' is three numbers.
+                List<Expr> current = reach.get(k);
+                if (current == null || unresolvedItems(items) < unresolvedItems(current)
+                        || unresolvedItems(items) == unresolvedItems(current) && items.size() > current.size()) {
                     reach.set(k, items);
                 }
             }
@@ -888,6 +905,17 @@ final class LineParser {
         }
         String type = items.stream().map(Expr::type).distinct().count() == 1 ? items.getFirst().type() : SyntaxRegistry.OBJECT;
         return new Expr.ListOf(start, end, items, and[0], type);
+    }
+
+    /** How many items are syntax leaning on unresolved words; words alone may still be a literal. */
+    private static int unresolvedItems(List<Expr> items) {
+        int count = 0;
+        for (Expr item : items) {
+            if (item instanceof Expr.Syntax && hasUnresolved(item)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /** An item of a list: one value, or, in brackets, a list of its own, as in {@code 1, (2, 3)}. */
