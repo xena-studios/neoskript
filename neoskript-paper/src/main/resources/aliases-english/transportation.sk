@@ -1,0 +1,28 @@
+boats:
+	oak boat¦s = minecraft:oak_boat[relatedEntity=oak boat]
+	spruce boat¦s = minecraft:spruce_boat[relatedEntity=spruce boat]
+	birch boat¦s = minecraft:birch_boat[relatedEntity=birch boat]
+	jungle boat¦s = minecraft:jungle_boat[relatedEntity=jungle boat]
+	acacia boat¦s = minecraft:acacia_boat[relatedEntity=acacia boat]
+	dark oak boat¦s = minecraft:dark_oak_boat[relatedEntity=dark oak boat]
+	mangrove boat¦s = minecraft:mangrove_boat[relatedEntity=mangrove boat]
+	# boat with chest
+	oak (boat¦s with chest|chest boat¦s) = minecraft:oak_chest_boat[relatedEntity=oak chest boat]
+	spruce (boat¦s with chest|chest boat¦s) = minecraft:spruce_chest_boat[relatedEntity=spruce chest boat]
+	birch (boat¦s with chest|chest boat¦s) = minecraft:birch_chest_boat[relatedEntity=birch chest boat]
+	jungle (boat¦s with chest|chest boat¦s) = minecraft:jungle_chest_boat[relatedEntity=jungle chest boat]
+	acacia (boat¦s with chest|chest boat¦s) = minecraft:acacia_chest_boat[relatedEntity=acacia chest boat]
+	dark oak (boat¦s with chest|chest boat¦s) = minecraft:dark_oak_chest_boat[relatedEntity=dark oak chest boat]
+	mangrove (boat¦s with chest|chest boat¦s) = minecraft:mangrove_chest_boat[relatedEntity=mangrove chest boat]
+
+minecarts:
+	[normal] minecart¦s = minecraft:minecart[relatedEntity=minecart]
+	minecart[s] with tnt¦s = minecraft:tnt_minecart[relatedEntity=explosive minecart]
+	minecart[s] with hopper¦s = minecraft:hopper_minecart[relatedEntity=hopper minecart]
+
+trails and tales update:
+	minecraft version = 1.20 or newer
+	cherry boat¦s = minecraft:cherry_boat[relatedEntity=cherry boat]
+	cherry (boat¦s with chest|chest boat¦s) = minecraft:cherry_chest_boat[relatedEntity=cherry chest boat]
+	bamboo (boat|raft)¦s = minecraft:bamboo_raft[relatedEntity=bamboo raft]
+	bamboo ((boat|raft)¦s with chest|chest (boat|raft)¦s) = minecraft:bamboo_chest_raft[relatedEntity=bamboo chest raft]

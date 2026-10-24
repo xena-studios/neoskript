@@ -186,6 +186,9 @@ public final class ItemType {
             return item;
         }
         ItemType aliased = scriptAlias(words, amount, amountGiven);
+        if (aliased == null) {
+            aliased = defaultAlias(words, amount, amountGiven);
+        }
         if (aliased != null) {
             return aliased;
         }
@@ -282,6 +285,36 @@ public final class ItemType {
                 type.setAmount(amount);
             } else {
                 type.amountGiven = false;
+            }
+            return type;
+        } finally {
+            RESOLVING.get().remove(name);
+        }
+    }
+
+    /** The item one of Skript's default aliases calls {@code name}, like {@code speed potion}, or {@code null}. */
+    private static ItemType defaultAlias(String name, int amount, boolean amountGiven) {
+        AliasFiles.Definition definition = AliasFiles.get(name);
+        if (definition == null || !RESOLVING.get().add(name)) {
+            return null;
+        }
+        try {
+            List<ItemType> items = new ArrayList<>();
+            for (String item : definition.items()) {
+                // A Minecraft id with components, or another alias.
+                ItemStack stack = item.startsWith("minecraft:") ? AliasFiles.item(item) : null;
+                ItemType type = stack != null ? new ItemType(stack, false) : parse(item);
+                if (type == null) {
+                    return null;
+                }
+                items.add(type);
+            }
+            if (items.isEmpty()) {
+                return null;
+            }
+            ItemType type = anyOf(items);
+            if (amountGiven) {
+                type.setAmount(amount);
             }
             return type;
         } finally {

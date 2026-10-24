@@ -1,0 +1,25 @@
+# Decoratives whose IDs have never changed or whose differences can be expressed with a variant.
+unchanged decoratives:
+	painting [item]¦s = minecraft:painting[relatedEntity=painting]
+	item frame [item]¦s = minecraft:item_frame[relatedEntity=item frame]
+	armor stand [item]¦s = minecraft:armor_stand[relatedEntity=armor stand]
+
+# New decoratives introduced in 1.9
+combat update:
+	end crystal [item]¦s = minecraft:end_crystal[relatedEntity=ender crystal]
+
+caves and cliffs update part 1:
+	glow item frame [item]¦s = minecraft:glow_item_frame[relatedEntity=glow item frame]
+
+# https://github.com/SkriptLang/Skript/issues/7484
+# https://github.com/SkriptLang/Skript/issues/7667
+bricks:
+	brick = minecraft:brick
+	bricks = minecraft:bricks
+	nether brick = minecraft:nether_brick
+	nether bricks = minecraft:nether_bricks
+
+resin bricks:
+	minecraft version = 1.21.4 or newer
+	resin brick = minecraft:resin_brick
+	resin bricks = minecraft:resin_bricks

@@ -1,0 +1,11 @@
+combat update:
+	spectral arrow¦s = minecraft:spectral_arrow[relatedEntity=spectral arrow]
+	{potion types} tipped arrow¦s = minecraft:tipped_arrow
+	tipped arrow[s] of {potion types} = minecraft:tipped_arrow
+
+
+weapons:
+	arrow¦s = minecraft:arrow[relatedEntity=arrow]
+
+update aquatic combat items:
+	trident¦s = minecraft:trident[relatedEntity=trident]
