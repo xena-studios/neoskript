@@ -206,6 +206,46 @@ final class Texts {
                 "(replace [with|using] regex|regex replace) %texts% in %texts% with %text%",
                 "(replace [with|using] regex|regex replace) %texts% with %text% in %texts%");
 
+        // 'X where "a" is replaced with "b"': the texts with the replacement made.
+        registrar.expression("ExprReplace", "string", info -> {
+            boolean regex = info.pattern() == 1 || info.hasTag("regex");
+            boolean first = info.hasTag("first");
+            boolean caseSensitive = info.hasTag("case");
+            return (context, args) -> {
+                Object[] haystacks = (Object[]) args[0];
+                if (args[2] == null) {
+                    return haystacks;
+                }
+                String replacement = Values.text(args[2]);
+                List<Pattern> patterns = new ArrayList<>();
+                for (Object needle : (Object[]) args[1]) {
+                    try {
+                        patterns.add(regex ? Pattern.compile(Values.text(needle))
+                                : Pattern.compile(Pattern.quote(Values.text(needle)), caseSensitive ? 0
+                                        : Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE));
+                    } catch (PatternSyntaxException invalid) {
+                        // An invalid regex replaces nothing.
+                    }
+                }
+                String with = regex ? replacement : Matcher.quoteReplacement(replacement);
+                Object[] result = new Object[haystacks.length];
+                for (int i = 0; i < haystacks.length; i++) {
+                    String text = Values.text(haystacks[i]);
+                    for (Pattern pattern : patterns) {
+                        Matcher matcher = pattern.matcher(text);
+                        try {
+                            text = first ? matcher.replaceFirst(with) : matcher.replaceAll(with);
+                        } catch (IndexOutOfBoundsException badGroup) {
+                            // A group the regex doesn't have replaces nothing.
+                        }
+                    }
+                    result[i] = text;
+                }
+                return result;
+            };
+        }, "%strings% where [(first:[the] first instance[s]|all instances) of] %strings% (is|are) replaced with %string% [regex:using regex|case:with case sensitivity]",
+                "%strings% where [(first:[the] first instance[s]|all instances) of] regex [pattern[s]] %strings% (is|are) replaced with %string%");
+
         registrar.expression("ExprRepeat", "string", info -> (context, args) -> {
             if (!(args[1] instanceof Number times) || times.doubleValue() < 1) {
                 return ((Object[]) args[0]).length == 0 || !(args[1] instanceof Number) ? null : new Object[0];

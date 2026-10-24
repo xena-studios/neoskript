@@ -463,6 +463,13 @@ final class LineParser {
             return null;
         }
         Expr expr = single(start, end, expected);
+        if (expr != null && expected.plural() && hasUnresolved(expr)) {
+            // Leaning on unresolved words loses to a list that doesn't: '1 or 0 or -1' isn't '(1 or 0 or) - 1'.
+            Expr list = list(start, end, expected);
+            if (list != null && !hasUnresolved(list)) {
+                expr = list;
+            }
+        }
         if (expr == null && expected.plural()) {
             // A literal that has 'and' in it, like 'diamond sword of unbreaking 3 and sharpness 10', is one value
             // if a type's parser takes all of it, as in Skript.

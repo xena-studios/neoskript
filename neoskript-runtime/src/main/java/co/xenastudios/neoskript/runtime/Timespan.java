@@ -21,14 +21,15 @@ public record Timespan(long millis) implements Comparable<Timespan> {
         return millis == Long.MAX_VALUE;
     }
 
-    private static final Pattern COMPACT = Pattern.compile("(\\d+(?:\\.\\d+)?)(mo|[tsmhdwy])");
+    private static final Pattern COMPACT = Pattern.compile("(\\d+(?:\\.\\d+)?)(mo|ms|[tsmhdwy])");
     private static final Pattern NUMBER = Pattern.compile("\\d+(?:\\.\\d+)?");
     private static final Pattern CLOCK = Pattern.compile("(\\d+):(\\d\\d)((?::\\d\\d){0,2})(\\.\\d{1,4})?");
     private static final String[] WORDS = {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"};
     private static final long[] UNIT_MILLIS = {50, 1000, 60_000, 3_600_000, 86_400_000L, 604_800_000L, 2_592_000_000L,
-        31_536_000_000L};
-    private static final String[] UNITS = {"tick", "second", "minute", "hour", "day", "week", "month", "year"};
-    private static final String[] SHORT_UNITS = {"t", "s", "m", "h", "d", "w", "mo", "y"};
+        31_536_000_000L, 1};
+    private static final String[] UNITS = {"tick", "second", "minute", "hour", "day", "week", "month", "year",
+        "millisecond"};
+    private static final String[] SHORT_UNITS = {"t", "s", "m", "h", "d", "w", "mo", "y", "ms"};
 
     /**
      * Parses a timespan as Skript does, or returns {@code null}: {@code 1 minute and 30 seconds}, {@code 1d 6h},

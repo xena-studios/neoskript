@@ -18,7 +18,7 @@ final class Literals {
 
     private static final String AMOUNT = "(?:\\d+(?:\\.\\d+)?|an?|one|two|three|four|five|six|seven|eight|nine|ten)";
     private static final String UNIT =
-            "(?:(?:real|rl|irl|minecraft|mc) )?(?:ticks?|seconds?|minutes?|hours?|days?|weeks?|months?|years?)";
+            "(?:(?:real|rl|irl|minecraft|mc) )?(?:milliseconds?|ticks?|seconds?|minutes?|hours?|days?|weeks?|months?|years?)";
     private static final String PART = AMOUNT + " ?" + UNIT;
     private static final Pattern TIMESPAN =
             Pattern.compile(PART + "(?:(?:,? and |, | )" + PART + ")*", Pattern.CASE_INSENSITIVE);

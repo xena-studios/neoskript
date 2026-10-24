@@ -63,6 +63,16 @@ final class ServerEvents {
         }
 
         registerMessages(registrar);
+        // The server's max players, or in a server list ping, the count shown.
+        registrar.expression("ExprMaxPlayers", "integer", info -> {
+            boolean ping = info.eventClasses().stream().anyMatch(ServerListPingEvent.class::isAssignableFrom);
+            if (info.hasTag("fake") && !ping) {
+                throw new co.xenastudios.neoskript.api.element.SyntaxError(
+                        "The 'shown' max players count expression can't be used outside of a server list ping event");
+            }
+            return new MaxPlayers(info.hasTag("real") || !info.hasTag("fake") && !ping);
+        }, "[the] [real:(real|default)|fake:(fake|shown|displayed)] max[imum] player[s] [count|amount|number|size]",
+                "[the] [real:(real|default)|fake:(fake|shown|displayed)] max[imum] (count|amount|number|size) of players");
         registrar.expression("ExprCommandSender", "commandsender", info -> (context, args) -> sender(context.event()),
                 "[the] [command['s]] sender");
         registrar.effect("EffCancelEvent", info -> {
@@ -189,6 +199,38 @@ final class ServerEvents {
             }
             return new ExplodedBlocks();
         }, "[the:the] exploded blocks");
+    }
+
+    /** {@code the max players}: the server's, or the count a server list ping shows. */
+    private record MaxPlayers(boolean real) implements Expression, Changeable {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            if (real) {
+                return (long) org.bukkit.Bukkit.getMaxPlayers();
+            }
+            return context.event() instanceof ServerListPingEvent ping ? (long) ping.getMaxPlayers() : null;
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return switch (mode) {
+                case SET, ADD, REMOVE -> new Class<?>[] {Number.class};
+                case RESET, DELETE -> real ? null : new Class<?>[] {Number.class};
+                default -> null;
+            };
+        }
+
+        @Override
+        public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
+            int amount = delta != null && delta.length > 0 && delta[0] instanceof Number n ? n.intValue() : 0;
+            if (real) {
+                int current = org.bukkit.Bukkit.getMaxPlayers();
+                org.bukkit.Bukkit.setMaxPlayers(mode == Mode.ADD ? current + amount : mode == Mode.REMOVE ? current - amount : amount);
+            } else if (context.event() instanceof ServerListPingEvent ping) {
+                int current = ping.getMaxPlayers();
+                ping.setMaxPlayers(mode == Mode.ADD ? current + amount : mode == Mode.REMOVE ? current - amount : amount);
+            }
+        }
     }
 
     /** {@code the exploded blocks}: the blocks an explosion destroys, which can be changed. */
