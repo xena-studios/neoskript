@@ -45,6 +45,9 @@ public final class StandardLibrary {
         ServerEvents.registerLate(registrar);
         BlockProperties.register(registrar);
         Scripts.register(registrar);
+        WorldProperties.register(registrar);
+        ServerSyntax.register(registrar);
+        PlayerSyntax.register(registrar);
         Collections.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
@@ -53,6 +56,7 @@ public final class StandardLibrary {
         Banners.register(registrar);
         Configs.register(registrar);
         WorldSyntax.registerLate(registrar);
+        WorldProperties.registerLate(registrar);
         StorageCodecs.register(registrar);
         ItemCodecs.register(registrar);
     }

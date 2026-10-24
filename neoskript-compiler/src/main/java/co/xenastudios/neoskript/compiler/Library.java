@@ -40,7 +40,7 @@ public final class Library implements Registrar {
     /** Types that only accept themselves and registered subtypes, rather than any unrelated game type. */
     private static final Set<String> STRICT_TYPES =
             Set.of("number", "integer", "long", "string", "boolean", "timespan", "date", "time", "entitytype", "itemtype",
-                    "skriptpotioneffect", "hiddenpotioneffect", "damagecause");
+                    "skriptpotioneffect", "hiddenpotioneffect", "damagecause", "direction");
 
     private record Key(SyntaxKind kind, String id) {}
 

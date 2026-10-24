@@ -78,18 +78,6 @@ final class Logic {
                 range(((Number) args[0]).doubleValue(), ((Number) args[1]).doubleValue(), info.hasTag("integers")),
                 "[(all [[of] the]|the)] (numbers|integers:integers) (between|from) %number% (and|to) %number%");
 
-        registrar.condition("CondPluginEnabled", info -> {
-            boolean negated = info.hasTag("not");
-            return (context, args) -> {
-                for (Object name : (Object[]) args[0]) {
-                    if (negated == org.bukkit.Bukkit.getPluginManager().isPluginEnabled(String.valueOf(name))) {
-                        return false;
-                    }
-                }
-                return true;
-            };
-        }, "plugin[s] %strings% (is|are) enabled", "plugin[s] %strings% (not:(is|are)(n't| not) enabled)");
-
         registrar.condition("CondContains", info -> {
             boolean negated = info.hasTag("not");
             boolean containersAnd = info.and(0);

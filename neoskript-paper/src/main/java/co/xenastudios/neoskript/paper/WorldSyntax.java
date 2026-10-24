@@ -289,10 +289,10 @@ final class WorldSyntax {
                 // 'spawn 10 xp at X': an experience orb with that many points.
                 return (context, args) -> {
                     List<Object> spawned = new ArrayList<>();
-                    if (!(args[0] instanceof Experience experience) || args[1] == null) {
+                    if (!(args[0] instanceof Experience experience) || args[2] == null) {
                         return spawned.toArray();
                     }
-                    for (Object place : (Object[]) args[1]) {
+                    for (Object place : WorldProperties.locations(args[1], args[2])) {
                         if (place instanceof Location location && location.getWorld() != null) {
                             Entity orb = location.getWorld().spawn(location, org.bukkit.entity.ExperienceOrb.class,
                                     created -> created.setExperience(experience.xp()));
@@ -307,7 +307,8 @@ final class WorldSyntax {
             return (context, args) -> {
                 int amount = counted && args[0] instanceof Number n ? co.xenastudios.neoskript.runtime.Values.toInt(n.doubleValue()) : 1;
                 Object[] types = (Object[]) args[counted ? 1 : 0];
-                Object[] locations = args[counted ? 2 : 1] == null ? new Object[0] : (Object[]) args[counted ? 2 : 1];
+                int at = counted ? 2 : 1;
+                Object[] locations = WorldProperties.locations(args[at], args[at + 1]).toArray();
                 List<Object> spawned = new ArrayList<>();
                 for (Object place : locations) {
                     if (!(place instanceof Location location) || location.getWorld() == null) {
@@ -338,10 +339,10 @@ final class WorldSyntax {
                 }
                 return spawned.toArray();
             };
-        }, "(spawn|summon) %entitytypes/entitysnapshots% [(at|on) %locations%]",
-                "(spawn|summon) %number% of %entitytypes/entitysnapshots% [(at|on) %locations%]",
-                "(spawn|summon) %number% %entitytypes% [(at|on) %locations%]",
-                "(spawn|summon) %experience% [(at|on) %locations%]");
+        }, "(spawn|summon) %entitytypes/entitysnapshots% [%directions% %locations%]",
+                "(spawn|summon) %number% of %entitytypes/entitysnapshots% [%directions% %locations%]",
+                "(spawn|summon) %number% %entitytypes% [%directions% %locations%]",
+                "(spawn|summon) %experience% [%directions% %locations%]");
         // 'shoot an arrow from the player', 'make {_loc} shoot a pig at speed 2': its code runs for each one shot.
         registrar.section("EffSecShoot", "entity", info -> {
             int typesAt = info.pattern() == 0 ? 0 : 1;
@@ -948,27 +949,6 @@ final class WorldSyntax {
         registrar.expression("ExprWorldEnvironment", "environment", info -> (context, args) -> map(args[0],
                 value -> value instanceof World world ? world.getEnvironment() : null),
                 "[the] [world] environment[s] of %worlds%", "%worlds%'[s] [world] environment[s]");
-        // A world's view and simulation distances, between 2 and 32 chunks; clearing them sets 2.
-        registrar.expression("ExprWorldViewDistance", "integer", info -> {
-            boolean simulation = info.hasTag("simulation");
-            return new SettableProperty<>(World.class, Number.class,
-                    world -> (long) (simulation ? world.getSimulationDistance() : world.getViewDistance()), (world, chunks) -> {
-                        int distance = (int) Math.max(2, Math.min(32, Math.round(chunks.doubleValue())));
-                        if (simulation) {
-                            world.setSimulationDistance(distance);
-                        } else {
-                            world.setViewDistance(distance);
-                        }
-                    }).resettingTo((java.util.function.Consumer<Object>) owner -> {
-                        // Back to the server's own setting.
-                        World world = (World) owner;
-                        if (simulation) {
-                            world.setSimulationDistance(Bukkit.getSimulationDistance());
-                        } else {
-                            world.setViewDistance(Bukkit.getViewDistance());
-                        }
-                    });
-        }, "[the] (view|simulation:simulation) distance[s] of %worlds%", "%worlds%'[s] (view|simulation:simulation) distance[s]");
         registrar.expression("PropExprWXYZ", "number", info -> new Axis(info.hasTag("x") ? 0 : info.hasTag("y") ? 1
                 : info.hasTag("w") ? 3 : 2),
                 "[the] (w:w|x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])] of %objects%",

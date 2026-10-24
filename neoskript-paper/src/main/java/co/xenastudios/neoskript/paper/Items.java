@@ -47,7 +47,15 @@ final class Items {
             return new Slot(null, -1, entity, equipment);
         }
 
+        /** The item a player holds on their cursor, as a slot: Skript's {@code cursor slot}. */
+        static Slot cursor(org.bukkit.entity.HumanEntity player) {
+            return new Slot(null, -1, player, null);
+        }
+
         ItemStack item() {
+            if (inventory == null && equipment == null && entity instanceof org.bukkit.entity.HumanEntity human) {
+                return human.getItemOnCursor();
+            }
             if (equipment != null) {
                 EntityEquipment gear = entity.getEquipment();
                 return gear == null ? null : gear.getItem(equipment);
@@ -56,7 +64,9 @@ final class Items {
         }
 
         void set(ItemStack item) {
-            if (equipment != null) {
+            if (inventory == null && equipment == null && entity instanceof org.bukkit.entity.HumanEntity human) {
+                human.setItemOnCursor(item);
+            } else if (equipment != null) {
                 EntityEquipment gear = entity.getEquipment();
                 if (gear != null) {
                     gear.setItem(equipment, item);
