@@ -1143,7 +1143,7 @@ final class EntitySyntax {
         // 'equip X with Y': each item in its place, as worn: armour, a horse's armour or saddle, a pig's saddle.
         registrar.effect("EffEquip", info -> {
             boolean unequip = info.pattern() >= 2;
-            boolean allArmour = info.pattern() == 3;
+            boolean allArmour = info.pattern() == 2;
             return (context, args) -> {
                 Object[] entities = owners(args[unequip && !allArmour ? 1 : 0]);
                 Object[] items = allArmour ? new Object[0] : owners(args[unequip ? 0 : 1]);
@@ -1165,8 +1165,9 @@ final class EntitySyntax {
                     }
                 }
             };
+            // 'unequip X's armour' is tried first: their armour slots aren't items to take off.
         }, "equip [%livingentities%] with %itemtypes%", "make %livingentities% wear %itemtypes%",
-                "unequip %itemtypes% [from %livingentities%]", "unequip %livingentities%'[s] (armo[u]r|equipment)");
+                "unequip %livingentities%'[s] (armo[u]r|equipment)", "unequip %itemtypes% [from %livingentities%]");
         registrar.condition("CondIsWearing", info -> {
             boolean negated = info.pattern() == 1;
             return (context, args) -> {

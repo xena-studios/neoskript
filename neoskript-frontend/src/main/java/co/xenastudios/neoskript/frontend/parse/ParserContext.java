@@ -32,6 +32,8 @@ final class ParserContext {
     /** What each placeholder of every registered pattern accepts, by placeholder identity. Read-only. */
     private final Map<PlaceholderSpec, Expected> byPlaceholder;
     private final Map<Expected, Expected> interned = new ConcurrentHashMap<>();
+    /** The item aliases the script being parsed defines, which are items there. */
+    private java.util.Set<String> itemAliases = java.util.Set.of();
 
     ParserContext(SyntaxRegistry registry, Map<String, List<FunctionInfo>> scriptFunctions) {
         this(registry, scriptFunctions, Map.of());
@@ -89,6 +91,21 @@ final class ParserContext {
             return functions;
         }
         return registry.functions(name);
+    }
+
+    void itemAliases(java.util.Set<String> names) {
+        itemAliases = java.util.Set.copyOf(names);
+    }
+
+    /** Whether {@code words} name one of the script's item aliases, with an amount or article before it or not. */
+    boolean isItemAlias(String words) {
+        if (itemAliases.isEmpty()) {
+            return false;
+        }
+        String name = words.strip().toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+", " ")
+                .replaceFirst("^\\d+ (?:of )?", "").replaceFirst("^(?:an?|all|every|plain) ", "");
+        int brackets = name.indexOf('[');
+        return itemAliases.contains(brackets < 0 ? name : name.substring(0, brackets).strip());
     }
 
     /** What a placeholder accepts. Type names the registry doesn't know are treated as {@code object}. */

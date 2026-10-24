@@ -39,14 +39,45 @@ public final class ItemType {
 
     private ItemStack stack;
     private boolean amountGiven;
+    /**
+     * The items it may be, as for an alias like {@code any boots = diamond boots, iron boots}; {@code null}
+     * when it's one item. The first is also {@link #stack}.
+     */
+    private List<ItemType> alternatives;
 
     public ItemType(ItemStack stack, boolean amountGiven) {
         this.stack = stack.clone();
         this.amountGiven = amountGiven;
     }
 
-    /** A copy of the item, to give or put somewhere. */
+    /** An item that may be any of {@code items}, as an alias of several stands for. */
+    static ItemType anyOf(List<ItemType> items) {
+        List<ItemType> all = new ArrayList<>();
+        for (ItemType item : items) {
+            for (ItemType each : item.alternatives()) {
+                all.add(each.copy());
+            }
+        }
+        ItemType type = new ItemType(all.getFirst().stack, all.getFirst().amountGiven);
+        if (all.size() > 1) {
+            type.alternatives = all;
+        }
+        return type;
+    }
+
+    /** The items it may be: itself, unless it stands for several. */
+    public List<ItemType> alternatives() {
+        return alternatives == null ? List.of(this) : java.util.Collections.unmodifiableList(alternatives);
+    }
+
+    /**
+     * A copy of the item, to give or put somewhere. One standing for several gives one of them at random,
+     * as Skript does.
+     */
     public ItemStack stack() {
+        if (alternatives != null) {
+            return alternatives.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(alternatives.size())).stack();
+        }
         return stack.clone();
     }
 
@@ -58,15 +89,42 @@ public final class ItemType {
         return stack.getAmount();
     }
 
+    /** Whether it was written {@code plain}: only items with nothing more to them than their kind are it. */
+    private boolean plain;
+
+    public boolean plain() {
+        return plain;
+    }
+
+    private void markPlain() {
+        plain = true;
+        if (alternatives != null) {
+            alternatives.forEach(ItemType::markPlain);
+        }
+    }
+
     /** Replaces its item in place, keeping whether an amount was given. */
     void replace(ItemStack replacement) {
         stack = replacement.clone();
+    }
+
+    /** Changes its item in place, each of them if it stands for several. */
+    void editStacks(Consumer<ItemStack> change) {
+        ItemStack copy = stack.clone();
+        change.accept(copy);
+        stack = copy;
+        if (alternatives != null) {
+            alternatives.forEach(each -> each.editStacks(change));
+        }
     }
 
     /** Changes its amount in place, as when a variable's item is changed. */
     public void setAmount(int amount) {
         stack.setAmount(Math.max(0, amount));
         amountGiven = true;
+        if (alternatives != null) {
+            alternatives.forEach(each -> each.setAmount(amount));
+        }
     }
 
     /** Whether the item was written with an amount, like {@code 32 cooked beef}. */
@@ -77,18 +135,26 @@ public final class ItemType {
     /** Changes its meta in place, as when a variable's item is changed. */
     public void editMeta(Consumer<ItemMeta> change) {
         stack.editMeta(change);
+        if (alternatives != null) {
+            alternatives.forEach(each -> each.editMeta(change));
+        }
     }
 
     /** A copy, as stored in a variable. */
     public ItemType copy() {
-        return new ItemType(stack, amountGiven);
+        ItemType copy = new ItemType(stack, amountGiven);
+        copy.plain = plain;
+        if (alternatives != null) {
+            copy.alternatives = new ArrayList<>(alternatives.stream().map(ItemType::copy).toList());
+        }
+        return copy;
     }
 
     /** A copy with its meta changed by {@code change}. */
     public ItemType withMeta(Consumer<ItemMeta> change) {
-        ItemStack copy = stack.clone();
+        ItemType copy = copy();
         copy.editMeta(change);
-        return new ItemType(copy, amountGiven);
+        return copy;
     }
 
     /**
@@ -110,6 +176,19 @@ public final class ItemType {
             words = counted.group(2);
         }
         words = words.replaceFirst("^(?:an?|all|every) ", "");
+        // 'plain stone': stone with nothing else to it, which only items with nothing else to them are.
+        if (words.startsWith("plain ")) {
+            ItemType item = parse((amountGiven ? amount + " " : "") + words.substring(6));
+            if (item == null) {
+                return null;
+            }
+            item.markPlain();
+            return item;
+        }
+        ItemType aliased = scriptAlias(words, amount, amountGiven);
+        if (aliased != null) {
+            return aliased;
+        }
         // 'potion of swiftness', 'splash potion of water', 'plain potion of mundane': a potion of that kind.
         Matcher potion = POTION.matcher(words);
         if (potion.matches()) {
@@ -129,7 +208,7 @@ public final class ItemType {
             // 'diamond sword of sharpness 2': the alias is before an ' of ', and enchantments after it.
             int of = words.indexOf(" of ");
             while (material == null && of >= 0) {
-                material = alias(words.substring(0, of));
+                material = named(words.substring(0, of));
                 if (material != null) {
                     enchantments = enchantments(words.substring(of + 4));
                     if (enchantments == null) {
@@ -139,15 +218,96 @@ public final class ItemType {
                 of = words.indexOf(" of ", of + 1);
             }
         }
+        org.bukkit.block.data.BlockData state = null;
+        if (material == null) {
+            // 'minecraft:birch_door[open=false]', 'oak_stairs': a Minecraft id, with block states.
+            Matcher id = MINECRAFT_ID.matcher(words);
+            if (id.matches()) {
+                material = Material.matchMaterial(id.group(1));
+                if (material != null && id.group(2) != null) {
+                    if (!material.isBlock()) {
+                        return null;
+                    }
+                    try {
+                        state = org.bukkit.Bukkit.createBlockData(material, id.group(2));
+                    } catch (IllegalArgumentException invalid) {
+                        return null;
+                    }
+                }
+            }
+        }
         if (material == null || amount < 0) {
             return null;
         }
         ItemStack stack = new ItemStack(material, Math.max(amount, 1));
+        // No states, as in 'oak_stairs[]', is any of the block.
+        if (state != null && !words.endsWith("[]")) {
+            org.bukkit.block.data.BlockData data = state;
+            stack.editMeta(org.bukkit.inventory.meta.BlockDataMeta.class, meta -> meta.setBlockData(data));
+        }
         if (!enchantments.isEmpty()) {
             Map<Enchantment, Integer> chosen = enchantments;
             stack.editMeta(meta -> chosen.forEach((enchantment, level) -> meta.addEnchant(enchantment, level, true)));
         }
         return new ItemType(stack, amountGiven);
+    }
+
+    /** A Minecraft id, namespaced or not, with block states if any: {@code minecraft:oak_stairs[half=top]}. */
+    private static final Pattern MINECRAFT_ID = Pattern.compile("((?:[a-z0-9_.-]+:)?[a-z0-9_./-]+)(\\[[^\\]]*\\])?");
+
+    /** Guards against aliases defined in terms of themselves. */
+    private static final ThreadLocal<java.util.Set<String>> RESOLVING = ThreadLocal.withInitial(java.util.HashSet::new);
+
+    /** The item the script being compiled calls {@code name} in its {@code aliases:}, or {@code null}. */
+    private static ItemType scriptAlias(String name, int amount, boolean amountGiven) {
+        String script = co.xenastudios.neoskript.runtime.ScriptFeatures.compilingScript();
+        String definition = co.xenastudios.neoskript.runtime.ScriptAliases.definition(script, name);
+        if (definition == null || !RESOLVING.get().add(name)) {
+            return null;
+        }
+        try {
+            List<ItemType> items = new ArrayList<>();
+            for (String part : definitionParts(definition)) {
+                ItemType item = parse(part);
+                if (item == null) {
+                    return null;
+                }
+                items.add(item);
+            }
+            if (items.isEmpty()) {
+                return null;
+            }
+            ItemType type = anyOf(items);
+            if (amountGiven) {
+                type.setAmount(amount);
+            } else {
+                type.amountGiven = false;
+            }
+            return type;
+        } finally {
+            RESOLVING.get().remove(name);
+        }
+    }
+
+    /** What an alias stands for, item by item: {@code diamond boots, iron boots and golden boots}. */
+    static List<String> definitionParts(String definition) {
+        List<String> parts = new ArrayList<>();
+        for (String part : definition.split("\\s*,\\s*|\\s+(?:and|or)\\s+")) {
+            if (!part.isBlank()) {
+                parts.add(part.strip());
+            }
+        }
+        return parts;
+    }
+
+    /** Skript's error for an alias standing for {@code definition}, or {@code null} if each item is one. */
+    static String checkDefinition(String definition) {
+        for (String part : definitionParts(definition)) {
+            if (parse(part) == null) {
+                return "Minecraft id " + part + " is not valid";
+            }
+        }
+        return null;
     }
 
     private static final Pattern POTION = Pattern.compile("(plain )?(splash |lingering )?potion of (.+)");
@@ -185,6 +345,15 @@ public final class ItemType {
         }
         int roman = List.of(ROMAN).indexOf(text);
         return roman >= 0 ? roman + 1 : Integer.parseInt(text);
+    }
+
+    /** An item's name or its Minecraft id ({@code minecraft:diamond_axe}, {@code oak_stairs}), or {@code null}. */
+    private static Material named(String name) {
+        Material material = alias(name);
+        if (material == null && MINECRAFT_ID.matcher(name).matches() && !name.contains("[")) {
+            material = Material.matchMaterial(name);
+        }
+        return material;
     }
 
     /** The item called {@code name}, singular or plural, or {@code null}. */
@@ -262,13 +431,23 @@ public final class ItemType {
 
     @Override
     public String toString() {
+        if (alternatives != null) {
+            List<String> names = alternatives.stream().map(ItemType::toString).toList();
+            return String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.getLast();
+        }
         return text(stack, amountGiven);
     }
 
     /** Items are equal if they're the same item with the same amount, name, enchantments and so on. */
     @Override
     public boolean equals(Object other) {
-        return other instanceof ItemType item && item.stack.isSimilar(stack) && item.stack.getAmount() == stack.getAmount();
+        if (!(other instanceof ItemType item) || (item.alternatives == null) != (alternatives == null)) {
+            return false;
+        }
+        if (alternatives != null) {
+            return alternatives.equals(item.alternatives);
+        }
+        return item.stack.isSimilar(stack) && item.stack.getAmount() == stack.getAmount();
     }
 
     @Override

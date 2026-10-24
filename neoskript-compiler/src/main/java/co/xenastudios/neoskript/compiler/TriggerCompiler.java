@@ -2530,8 +2530,9 @@ final class TriggerCompiler {
                 expression((Expr) syntax.syntax().match().values().getFirst());
                 Class<?> type = library.javaClass(syntax.type());
                 constant(type == null ? Object.class : type, Class.class);
-                method.visitMethodInsn(INVOKESTATIC, VALUES, "cast", "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECTS,
-                        false);
+                // Values that convert to the type count too, as in Skript: 'random item out of any boots'.
+                method.visitMethodInsn(INVOKESTATIC, VALUES, "castConverting", "(" + OBJECT_DESC + "Ljava/lang/Class;)"
+                        + OBJECTS, false);
                 method.visitMethodInsn(INVOKESTATIC, VALUES, "random", "(" + OBJECTS + ")" + OBJECT_DESC, false);
             }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.CAST) -> {

@@ -106,6 +106,13 @@ public final class ScriptLoader {
         for (Diagnostic diagnostic : result.diagnostics()) {
             diagnostics.add(diagnostic);
         }
+        java.util.Set<String> aliases = new java.util.HashSet<>();
+        for (Structure structure : result.structures()) {
+            if (structure.kind() == Structure.Kind.ALIASES) {
+                aliases.addAll(AliasNames.of(structure.section()));
+            }
+        }
+        context.itemAliases(aliases);
         StatementParser statements = new StatementParser(context, diagnostics);
         List<ParsedStructure> parsed = new ArrayList<>();
         for (Structure structure : result.structures()) {

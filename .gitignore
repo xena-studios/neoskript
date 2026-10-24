@@ -15,3 +15,7 @@ run/
 # OS
 .DS_Store
 .harness-cache/
+.claude/worktrees/
+
+# Eclipse/VS Code Java output
+bin/

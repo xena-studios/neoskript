@@ -951,6 +951,10 @@ final class LineParser {
         if (!Literals.isWords(text)) {
             return null;
         }
+        if (context.isItemAlias(text) && (expected.anything() || expected.types().stream().anyMatch(type ->
+                type.id().equals("itemtype") || registry.isConvertible("itemtype", type.id())))) {
+            return new Expr.Unresolved(start, end, text, true);
+        }
         boolean open = expected.anything() || expected.types().stream()
                 .anyMatch(type -> type.openLiterals() && registry.mightBeLiteral(type, text))
                 || registry.isConvertibleLiteral(text, id -> expected.types().stream()

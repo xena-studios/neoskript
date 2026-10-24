@@ -49,6 +49,11 @@ public final class ScriptFeatures {
         }
     }
 
+    /** The script being compiled on this thread, or {@code null}. */
+    public static String compilingScript() {
+        return COMPILING.get();
+    }
+
     /** Whether the script being compiled on this thread uses {@code feature}. */
     public static boolean compilingUses(String feature) {
         String script = COMPILING.get();
