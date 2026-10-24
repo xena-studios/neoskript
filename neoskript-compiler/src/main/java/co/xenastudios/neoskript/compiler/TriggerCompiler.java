@@ -904,7 +904,7 @@ final class TriggerCompiler {
                 i++;
                 break;
             } else if (statement instanceof Statement.Section section && key.startsWith("parse if")
-                    && containsInvalid(section.body())) {
+                    && (containsInvalid(section.body()) || !compilesApart(section.body()))) {
                 // 'parse if' code that doesn't parse: Skript only parses it if the condition holds while
                 // loading, so here it can't have, and the code is left out.
                 lineOf(statement, section.line().key());
@@ -925,6 +925,23 @@ final class TriggerCompiler {
         }
         method.visitLabel(chainEnd);
         return i;
+    }
+
+    /** Whether {@code statements} compile on their own, as {@code parse if} code has to for its condition to hold. */
+    private boolean compilesApart(List<Statement> statements) {
+        try {
+            TriggerCompiler apart = new TriggerCompiler(library, functions, globals, script);
+            apart.eventClasses = eventClasses;
+            apart.eventName = eventName;
+            apart.function = function;
+            apart.compileTrigger(constantsScript, statements);
+            return true;
+        } catch (CompileException e) {
+            return false;
+        } catch (RuntimeException e) {
+            // Compiled, though not into a trigger (a function's code).
+            return true;
+        }
     }
 
     private static boolean containsInvalid(List<Statement> statements) {
