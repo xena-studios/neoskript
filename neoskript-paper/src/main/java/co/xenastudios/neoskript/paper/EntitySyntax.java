@@ -117,6 +117,24 @@ final class EntitySyntax {
         }, "%objects% (is|are)[not:(n't| not)] between %objects% and %objects%");
 
         registerSettableConditions(registrar);
+        registrar.effect("EffIncendiary", info -> {
+            boolean fire = !info.hasTag("not");
+            boolean event = info.pattern() == 2;
+            return (context, args) -> {
+                if (event) {
+                    if (context.event() instanceof org.bukkit.event.entity.ExplosionPrimeEvent prime) {
+                        prime.setFire(fire);
+                    }
+                    return;
+                }
+                for (Object value : (Object[]) args[0]) {
+                    if (value instanceof org.bukkit.entity.Explosive explosive) {
+                        explosive.setIsIncendiary(fire);
+                    }
+                }
+            };
+        }, "make %entities% [not:not] incendiary", "make %entities%'[s] explosion [not:not] (incendiary|fiery)",
+                "make [the] [event(-| )]explosion [not:not] (incendiary|fiery)");
         registrar.expression("ExprDomestication", "integer", info -> new Domestication(info.hasTag("max")),
                 co.xenastudios.neoskript.api.registration.Patterns.property("[max:max[imum]] domestication level",
                         "livingentities"));
