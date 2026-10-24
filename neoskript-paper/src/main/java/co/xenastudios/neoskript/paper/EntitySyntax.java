@@ -389,16 +389,6 @@ final class EntitySyntax {
                 allay -> new co.xenastudios.neoskript.runtime.Timespan(allay.getDuplicationCooldown() * 50),
                 (allay, time) -> allay.setDuplicationCooldown(Math.max(0, time.ticks()))),
                 "[the] duplicat(e|ion) cooldown [time] of %livingentities%", "%livingentities%'[s] duplicat(e|ion) cooldown [time]");
-        registrar.effect("EffAllowAllayDuplication", info -> {
-            boolean allow = info.pattern() == 0;
-            return (context, args) -> {
-                for (Object value : (Object[]) args[0]) {
-                    if (value instanceof org.bukkit.entity.Allay allay) {
-                        allay.setCanDuplicate(allow);
-                    }
-                }
-            };
-        }, "allow %livingentities% to (duplicate|clone)", "prevent %livingentities% from (duplicating|cloning)");
         registrar.effect("EffAllayDuplicate", info -> (context, args) -> {
             for (Object value : (Object[]) args[0]) {
                 if (value instanceof org.bukkit.entity.Allay allay) {
@@ -505,25 +495,6 @@ final class EntitySyntax {
         registrar.expression("ExprWardenAngryAt", "livingentity", info -> new SettableProperty<>(org.bukkit.entity.Warden.class,
                 LivingEntity.class, org.bukkit.entity.Warden::getEntityAngryAt, (warden, target) -> warden.setAnger(target, 150)),
                 "[the] most angered entity of %livingentities%", "%livingentities%'[s] most angered entity");
-        // Who may pick a dropped item up, and who threw it, by UUID.
-        registrar.expression("ExprItemOwner", "uuid", info -> {
-            boolean thrower = info.hasTag("thrower");
-            return new SettableProperty<>(org.bukkit.entity.Item.class, java.util.UUID.class,
-                    item -> thrower ? item.getThrower() : item.getOwner(), (item, uuid) -> {
-                        if (thrower) {
-                            item.setThrower(uuid);
-                        } else {
-                            item.setOwner(uuid);
-                        }
-                    }).deleting(item -> {
-                        if (thrower) {
-                            item.setThrower(null);
-                        } else {
-                            item.setOwner(null);
-                        }
-                    });
-        }, "[the] uuid of [the] [dropped] item (owner|thrower:thrower) of %entities%",
-                "%entities%'[s] [dropped] item (owner|thrower:thrower) uuid");
         // Why an entity was damaged, by Skript's names: 'burning', 'dragon's breath', 'potion'.
         Map<String, org.bukkit.event.entity.EntityDamageEvent.DamageCause> causes = new java.util.LinkedHashMap<>();
         for (org.bukkit.event.entity.EntityDamageEvent.DamageCause cause : org.bukkit.event.entity.EntityDamageEvent.DamageCause.values()) {
@@ -551,7 +522,7 @@ final class EntitySyntax {
         });
         condition(registrar, "CondIsBurning", "entities", "(burning|ignited|on fire)", Entity.class,
                 entity -> entity.getFireTicks() > 0);
-        registrar.expression("ExprPassengers", "entity", info -> new Passengers(),
+        registrar.expression("ExprPassenger", "entity", info -> new Passengers(),
                 "[all [[of] the]|the] passenger[s] of %entities%", "%entities%'[s] passenger[s]");
         // 'is riding', 'is riding a villager', 'is riding {_vehicle}'.
         registrar.condition("CondIsRiding", info -> {
@@ -661,12 +632,6 @@ final class EntitySyntax {
                 living -> (long) living.getNoDamageTicks(), (living, ticks) -> living.setNoDamageTicks(Math.max(0, ticks.intValue())),
                 "[the] (invulnerability|invincibility|no damage) tick[s] [of %livingentities%]",
                 "%livingentities%'[s] (invulnerability|invincibility|no damage) tick[s]");
-        SettableProperty.register(registrar, "ExprNoDamageTimespan", "timespan", LivingEntity.class,
-                co.xenastudios.neoskript.runtime.Timespan.class,
-                living -> new co.xenastudios.neoskript.runtime.Timespan(living.getNoDamageTicks() * 50L),
-                (living, time) -> living.setNoDamageTicks((int) Math.max(0, time.ticks())),
-                "[the] (invulnerability|invincibility|no damage) (time[span]|duration) [of %livingentities%]",
-                "%livingentities%'[s] (invulnerability|invincibility|no damage) (time[span]|duration)");
         SettableProperty.register(registrar, "ExprArrowsStuck", "integer", LivingEntity.class, Number.class,
                 living -> (long) living.getArrowsInBody(), (living, count) -> living.setArrowsInBody(Math.max(0, count.intValue())),
                 "[number of] arrow[s] stuck in %livingentities%");
@@ -678,10 +643,11 @@ final class EntitySyntax {
             return new SettableProperty<>(org.bukkit.entity.Interaction.class, Number.class,
                     interaction -> (double) (height ? interaction.getInteractionHeight() : interaction.getInteractionWidth()),
                     (interaction, value) -> {
+                        // Never smaller than nothing.
                         if (height) {
-                            interaction.setInteractionHeight(value.floatValue());
+                            interaction.setInteractionHeight(Math.max(value.floatValue(), 0));
                         } else {
-                            interaction.setInteractionWidth(value.floatValue());
+                            interaction.setInteractionWidth(Math.max(value.floatValue(), 0));
                         }
                     }).resettingTo(1.0);
         },
@@ -839,7 +805,7 @@ final class EntitySyntax {
                         block.setBlockData(leaves);
                     }
                 });
-        condition(registrar, "CondIsShivering", "livingentities", "shivering", org.bukkit.entity.Strider.class,
+        condition(registrar, "CondStriderIsShivering", "livingentities", "shivering", org.bukkit.entity.Strider.class,
                 org.bukkit.entity.Strider::isShivering, org.bukkit.entity.Strider::setShivering);
         condition(registrar, "CondIsCommandBlockConditional", "blocks", "[un:un]conditional", org.bukkit.block.Block.class,
                 block -> block.getBlockData() instanceof org.bukkit.block.data.type.CommandBlock command && command.isConditional(),
@@ -929,7 +895,7 @@ final class EntitySyntax {
                 org.bukkit.entity.Animals::isLoveMode, (animal, love) -> animal.setLoveModeTicks(love ? 600 : 0));
         condition(registrar, "CondIsPlayingDead", "livingentities", "playing dead", org.bukkit.entity.Axolotl.class,
                 org.bukkit.entity.Axolotl::isPlayingDead, org.bukkit.entity.Axolotl::setPlayingDead);
-        condition(registrar, "CondIsResponsive", "entities", "responsive", org.bukkit.entity.Interaction.class,
+        condition(registrar, "CondIsResponsive", "entities", "(responsive|flip:unresponsive)", org.bukkit.entity.Interaction.class,
                 org.bukkit.entity.Interaction::isResponsive, org.bukkit.entity.Interaction::setResponsive);
         condition(registrar, "CondIsFrozen", "entities", "frozen", Entity.class, Entity::isFrozen,
                 (entity, frozen) -> entity.setFreezeTicks(frozen ? entity.getMaxFreezeTicks() : 0));
@@ -960,22 +926,6 @@ final class EntitySyntax {
             return (context, args) -> tooltip.set(context, args, !hide);
         }, "(show|hide:hide) [the] [entire|additional:additional] tool[ ]tip[s] of %itemtypes%",
                 "(show|hide:hide) %itemtypes%'[s] [entire|additional:additional] tool[ ]tip[s]");
-        registrar.effect("EffPandaState", info -> {
-            boolean start = !info.hasTag("stop");
-            String state = info.hasTag("rolling") ? "rolling" : info.hasTag("sneezing") ? "sneezing" : "back";
-            return (context, args) -> {
-                for (Object entity : owners(args[0])) {
-                    if (entity instanceof org.bukkit.entity.Panda panda) {
-                        switch (state) {
-                            case "rolling" -> panda.setRolling(start);
-                            case "sneezing" -> panda.setSneezing(start);
-                            default -> panda.setOnBack(start);
-                        }
-                    }
-                }
-            };
-        }, "make %livingentities% (start|stop:stop) (rolling:rolling|sneezing:sneezing)",
-                "make %livingentities% get (on|stop:off) (its|their) back[s]");
         registrar.effect("EffStriderShivering", info -> {
             boolean start = !info.hasTag("stop");
             return (context, args) -> {
@@ -1022,20 +972,6 @@ final class EntitySyntax {
             };
         }, "make %livingentities% (start sleeping|[go to] sleep) [at %location/block%]",
                 "make %livingentities% (stop sleeping|wake up)");
-        registrar.effect("EffAllayDance", info -> {
-            boolean start = !info.hasTag("stop");
-            return (context, args) -> {
-                for (Object entity : owners(args[0])) {
-                    if (entity instanceof org.bukkit.entity.Allay allay) {
-                        if (start) {
-                            allay.startDancing();
-                        } else {
-                            allay.stopDancing();
-                        }
-                    }
-                }
-            };
-        }, "make %livingentities% (start|stop:stop) dancing");
         conditionPatterns(registrar, "CondIsTicking", Entity.class, Entity::isTicking, null,
                 "%entities% (is|are) ticking", "%entities% (isn't|is not|aren't|are not) ticking");
         conditionPatterns(registrar, "CondIsEdible", ItemType.class, item -> item.material().isEdible(), null,

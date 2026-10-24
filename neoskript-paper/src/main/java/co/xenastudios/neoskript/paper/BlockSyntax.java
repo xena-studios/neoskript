@@ -118,6 +118,7 @@ final class BlockSyntax {
                             : block.getType().createBlockData();
                     case EntityKind kind -> kind.type() == null ? kind : EntityKind.of(kind.type());
                     case Entity entity -> EntityKind.of(entity.getType());
+                    case org.bukkit.entity.EntitySnapshot snapshot -> EntityKind.of(snapshot.getEntityType());
                     case Potions.Effect effect -> effect.type;
                     case org.bukkit.inventory.Inventory inventory -> new Items.InventoryKind(inventory.getType().name());
                     case Enchantments.Levelled levelled -> levelled.enchantment();

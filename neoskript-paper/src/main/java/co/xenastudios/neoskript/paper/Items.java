@@ -690,17 +690,6 @@ final class Items {
             }
             return count;
         }, "[the] (amount|number) of %itemtypes% (in|of) %inventories%");
-        registrar.effect("EffItemLifetime", info -> {
-            boolean prevent = info.pattern() == 0;
-            return (context, args) -> {
-                for (Object value : (Object[]) args[0]) {
-                    if (value instanceof org.bukkit.entity.Item item) {
-                        item.setUnlimitedLifetime(prevent);
-                    }
-                }
-            };
-        }, "(prevent|disallow) %entities% from (naturally despawning|despawning naturally)",
-                "(allow|enable) %entities% to (naturally despawn|despawn naturally)");
         // Item flags, by name: 'hide enchants'.
         Map<String, org.bukkit.inventory.ItemFlag> flags = new LinkedHashMap<>();
         for (org.bukkit.inventory.ItemFlag flag : org.bukkit.inventory.ItemFlag.values()) {

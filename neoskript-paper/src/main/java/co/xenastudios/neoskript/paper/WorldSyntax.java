@@ -314,6 +314,15 @@ final class WorldSyntax {
                         continue;
                     }
                     for (Object type : types) {
+                        // A snapshot spawns as the entity it was taken of: 'spawn {_snapshot} at X'.
+                        if (type instanceof org.bukkit.entity.EntitySnapshot snapshot) {
+                            for (int i = 0; i < amount; i++) {
+                                Entity entity = snapshot.createEntity(location);
+                                LAST_SPAWNED.set(entity);
+                                spawned.add(entity);
+                            }
+                            continue;
+                        }
                         // Categories like 'monster' can't be spawned, only kinds that are one entity type.
                         if (!(type instanceof EntityKind kind) || !kind.spawnable()) {
                             continue;
@@ -329,8 +338,8 @@ final class WorldSyntax {
                 }
                 return spawned.toArray();
             };
-        }, "(spawn|summon) %entitytypes% [(at|on) %locations%]",
-                "(spawn|summon) %number% of %entitytypes% [(at|on) %locations%]",
+        }, "(spawn|summon) %entitytypes/entitysnapshots% [(at|on) %locations%]",
+                "(spawn|summon) %number% of %entitytypes/entitysnapshots% [(at|on) %locations%]",
                 "(spawn|summon) %number% %entitytypes% [(at|on) %locations%]",
                 "(spawn|summon) %experience% [(at|on) %locations%]");
         // 'shoot an arrow from the player', 'make {_loc} shoot a pig at speed 2': its code runs for each one shot.

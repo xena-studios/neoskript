@@ -28,6 +28,7 @@ public final class StandardLibrary {
         Enchantments.register(registrar);
         Tags.register(registrar);
         Books.register(registrar);
+        EntityProperties.registerTypes(registrar);
         WorldSyntax.register(registrar);
         BlockStates.register(registrar);
         Experience.register(registrar);
@@ -35,11 +36,14 @@ public final class StandardLibrary {
         Potions.register(registrar);
         PersistentData.register(registrar);
         EntitySyntax.register(registrar);
+        EntityProperties.register(registrar);
+        EntityEventSyntax.register(registrar);
         Displays.register(registrar);
         Quaternions.register(registrar);
         BlockSyntax.register(registrar);
         Biomes.register(registrar);
         ServerEvents.registerLate(registrar);
+        BlockProperties.register(registrar);
         Scripts.register(registrar);
         Collections.register(registrar);
         Logic.register(registrar);
