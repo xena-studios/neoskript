@@ -895,8 +895,6 @@ final class EntitySyntax {
                 org.bukkit.entity.Animals::isLoveMode, (animal, love) -> animal.setLoveModeTicks(love ? 600 : 0));
         condition(registrar, "CondIsPlayingDead", "livingentities", "playing dead", org.bukkit.entity.Axolotl.class,
                 org.bukkit.entity.Axolotl::isPlayingDead, org.bukkit.entity.Axolotl::setPlayingDead);
-        condition(registrar, "CondIsResponsive", "entities", "(responsive|flip:unresponsive)", org.bukkit.entity.Interaction.class,
-                org.bukkit.entity.Interaction::isResponsive, org.bukkit.entity.Interaction::setResponsive);
         condition(registrar, "CondIsFrozen", "entities", "frozen", Entity.class, Entity::isFrozen,
                 (entity, frozen) -> entity.setFreezeTicks(frozen ? entity.getMaxFreezeTicks() : 0));
         registrar.effect("EffPvP", info -> {

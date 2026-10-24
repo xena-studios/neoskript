@@ -64,6 +64,7 @@ final class EntityProperties {
     }
 
     private static void registerConditions(Registrar registrar) {
+        registerResponsive(registrar);
         EntitySyntax.conditionPatterns(registrar, "CondAI", LivingEntity.class, LivingEntity::hasAI, null,
                 Patterns.hasProperty("(ai|artificial intelligence)", "livingentities"));
         // Which liquid, by the pattern's mark: water (1), lava (2), a bubble column (3) or rain (4).
@@ -123,6 +124,38 @@ final class EntityProperties {
                 "[the] entity storage of %blocks% (is|are) full", "%blocks%'[s] entity storage (is|are) full",
                 "[the] entity storage of %blocks% (isn't|is not|aren't|are not) full",
                 "%blocks%'[s] entity storage (isn't|is not|aren't|are not) full");
+    }
+
+    /**
+     * Whether interactions are responsive, or with {@code unresponsive} aren't; anything else is neither.
+     * Settable.
+     */
+    private static void registerResponsive(Registrar registrar) {
+        registrar.condition("CondIsResponsive", info -> {
+            boolean negated = info.pattern() == 1;
+            boolean responsive = !info.hasTag("unresponsive");
+            boolean and = info.and(0);
+            return new co.xenastudios.neoskript.api.element.SettableCondition() {
+                @Override
+                public boolean check(TriggerContext context, Object[] args) {
+                    Object[] values = Property.of(args[0]);
+                    if (values.length == 0) {
+                        return negated;
+                    }
+                    return Condition.check(values, and, value -> (value instanceof org.bukkit.entity.Interaction interaction
+                            && interaction.isResponsive() == responsive) != negated);
+                }
+
+                @Override
+                public void set(TriggerContext context, Object[] args, boolean value) {
+                    for (Object owner : Property.of(args[0])) {
+                        if (owner instanceof org.bukkit.entity.Interaction interaction) {
+                            interaction.setResponsive((value != negated) == responsive);
+                        }
+                    }
+                }
+            };
+        }, be("entities", "(responsive|:unresponsive)"));
     }
 
     /** A property condition's check: {@code test} for each value, which must be a {@code type}. */
