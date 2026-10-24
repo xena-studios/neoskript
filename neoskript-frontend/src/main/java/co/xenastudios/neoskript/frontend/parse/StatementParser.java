@@ -43,6 +43,8 @@ final class StatementParser {
     /** The delay state before each statement's line, for the compiler. */
     private final Map<Line, DelayState> delays = new IdentityHashMap<>();
     private DelayState delay = DelayState.NOT_DELAYED;
+    /** The warnings the script suppresses so far, by the tag naming them ({@code unreachable}). */
+    private final java.util.Set<String> suppressed = new java.util.HashSet<>();
 
     /** The {@code if} chain being parsed in the current block. */
     private static final class Chain {
@@ -75,7 +77,12 @@ final class StatementParser {
         List<Statement> statements = new ArrayList<>(nodes.size());
         Statement previous = null;
         Chain chain = null;
+        boolean ended = false;
         for (Node node : nodes) {
+            if (ended && !suppressed.contains("unreachable")) {
+                diagnostics.warning(node.line().number(), node.line().column(), node.line().text().length(),
+                        "Unreachable code. The previous statement stops further execution.");
+            }
             String key = node.line().key().strip().toLowerCase(Locale.ROOT);
             boolean section = node instanceof Node.Section;
             boolean continuesChain = section && (key.startsWith("else") || key.startsWith("then"));
@@ -91,6 +98,7 @@ final class StatementParser {
                     : line(node, previous);
             statements.add(statement);
             previous = statement;
+            ended = statement instanceof Statement.Effect effect && context.registry().ends(effect.effect().syntax());
         }
         if (chain != null) {
             delay = endChain(chain);
@@ -150,6 +158,9 @@ final class StatementParser {
         ParsedSyntax effect = parser.effect(0, end);
         if (effect != null) {
             check(line, effect);
+            if (context.registry().suppressesWarnings(effect.syntax())) {
+                suppress(effect);
+            }
             if (context.registry().delays(effect.syntax())) {
                 delay = DelayState.DELAYED;
             }
@@ -192,6 +203,11 @@ final class StatementParser {
             if (call != null && call.arguments().stream().anyMatch(a -> a != null && hasSectionExpression(a))) {
                 return new Statement.Section(line, null, repeatable(section.children()));
             }
+            if (effect != null || call != null || parser.condition(0, key.length()) != null) {
+                error(line, "The line '" + key + "' is a valid statement but cannot function as a section (:) because"
+                        + " there is no syntax in the line to manage it.");
+                return new Statement.Invalid(line);
+            }
             error(line, "Can't understand this section: " + key);
             return new Statement.Invalid(line);
         }
@@ -223,6 +239,15 @@ final class StatementParser {
         if (isConditional(lower)) {
             return new Statement.Section(line, header, sectionBody(section.children()));
         }
+        if (context.registry().suppressesWarnings(header.syntax())) {
+            // Only for the section's code.
+            java.util.Set<String> before = java.util.Set.copyOf(suppressed);
+            suppress(header);
+            List<Statement> body = repeatable(section.children());
+            suppressed.clear();
+            suppressed.addAll(before);
+            return new Statement.Section(line, header, body);
+        }
         return new Statement.Section(line, header, repeatable(section.children()));
     }
 
@@ -237,6 +262,20 @@ final class StatementParser {
             delay = before;
         }
         return body;
+    }
+
+    /** {@code suppress unreachable code warnings}, or {@code unsuppress}: changes what's suppressed from here on. */
+    private void suppress(ParsedSyntax syntax) {
+        boolean allow = syntax.match().tags().contains("stop");
+        for (String tag : syntax.match().tags()) {
+            if (!tag.equals("stop")) {
+                if (allow) {
+                    suppressed.remove(tag);
+                } else {
+                    suppressed.add(tag);
+                }
+            }
+        }
     }
 
     private boolean stops(List<Statement> body) {

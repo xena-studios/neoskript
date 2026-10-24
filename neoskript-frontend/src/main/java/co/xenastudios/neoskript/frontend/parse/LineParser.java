@@ -167,6 +167,12 @@ final class LineParser {
             if (expected != null && !returnTypeFits(syntax, expected)) {
                 continue;
             }
+            // A kind of entity alone is the event's entity only where an entity type can't go.
+            if (syntax.regexRoles().contains(RegexRole.BARE_ENTITY) && (expected == null || expected.anything()
+                    || expected.accepts("entitytype", registry) || expected.types().stream().noneMatch(t ->
+                    registry.isSubtype("entity", t.id()) || registry.isConvertible("entity", t.id())))) {
+                continue;
+            }
             CompiledPattern pattern = syntax.patterns().get(candidate.pattern());
             if (!pattern.couldMatch(lower)) {
                 continue;
@@ -352,7 +358,8 @@ final class LineParser {
     }
 
     private static boolean hasTypeRole(SyntaxInfo syntax) {
-        return syntax.regexRoles().contains(RegexRole.TYPE) || syntax.regexRoles().contains(RegexRole.TYPE_OR_ENTITY);
+        return syntax.regexRoles().contains(RegexRole.TYPE) || syntax.regexRoles().contains(RegexRole.TYPE_OR_ENTITY)
+                || syntax.regexRoles().contains(RegexRole.BARE_ENTITY);
     }
 
     private static String returnType(ParsedSyntax parsed) {
@@ -408,6 +415,15 @@ final class LineParser {
                         TypeInfo entity = registry.type("entity");
                         yield ref != null || entity == null || !registry.isEntityTypeLiteral(input.substring(start, end))
                                 ? ref : new TypeRef(entity, false);
+                    }
+                    case BARE_ENTITY -> {
+                        String words = input.substring(start, end);
+                        TypeInfo entity = registry.type("entity");
+                        if (words.regionMatches(true, 0, "a ", 0, 2) || words.regionMatches(true, 0, "an ", 0, 3)) {
+                            yield null;
+                        }
+                        yield entity != null && registry.isEntityTypeLiteral(words) && !registry.isItemTypeLiteral(words)
+                                ? new TypeRef(entity, false) : null;
                     }
                     case LOOP_VALUE -> isLoopValueName(text.substring(start, end)) ? match : null;
                     case CODE -> {

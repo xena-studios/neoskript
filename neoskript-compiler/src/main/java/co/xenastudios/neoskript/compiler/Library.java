@@ -405,6 +405,16 @@ public final class Library implements Registrar {
         builder.stops(kind, id, pattern);
     }
 
+    /** Marks core syntax as ending the section it's in, so code after it is unreachable. */
+    void ends(SyntaxKind kind, String id) {
+        builder.ends(kind, id);
+    }
+
+    /** Marks core syntax as suppressing or allowing warnings while parsing, by its tags. */
+    void suppressesWarnings(SyntaxKind kind, String id) {
+        builder.suppressesWarnings(kind, id);
+    }
+
     /** Adds a parse-time check to core syntax. */
     void check(SyntaxKind kind, String id, co.xenastudios.neoskript.frontend.registry.ParseCheck check) {
         builder.check(kind, id, check);

@@ -16,4 +16,12 @@ public interface KeyAware {
     default boolean implicitKeys() {
         return false;
     }
+
+    /**
+     * Whether the indices it gives are kept even where it isn't written {@code keyed}: setting a list to it
+     * keeps them, as Skript does for expressions whose keys it recommends.
+     */
+    default boolean keysRecommended() {
+        return false;
+    }
 }

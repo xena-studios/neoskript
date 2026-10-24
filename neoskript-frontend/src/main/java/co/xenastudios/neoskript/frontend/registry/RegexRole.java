@@ -20,6 +20,11 @@ public enum RegexRole {
     /** A type name or a kind of entity, as in {@code the zombie} or {@code event-creeper}: the event's entity. */
     TYPE_OR_ENTITY,
     /**
+     * A kind of entity written alone, as {@code pig} in {@code yaw of pig}: the event's entity, as in Skript,
+     * when the words don't name an item.
+     */
+    BARE_ENTITY,
+    /**
      * What a loop value is called, as in {@code loop-<.+>}: {@code value}, {@code index}, {@code counter},
      * {@code iteration} or a type name, then optionally {@code -N}.
      */

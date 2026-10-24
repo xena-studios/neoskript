@@ -909,8 +909,8 @@ final class WorldSyntax {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
             return map(arguments[0], value -> switch (value) {
-                case Entity entity -> (double) (pitch ? entity.getLocation().getPitch() : entity.getLocation().getYaw());
-                case Location location -> (double) (pitch ? location.getPitch() : location.getYaw());
+                case Entity entity -> (double) (pitch ? entity.getLocation().getPitch() : yaw(entity.getLocation().getYaw()));
+                case Location location -> (double) (pitch ? location.getPitch() : yaw(location.getYaw()));
                 default -> null;
             });
         }
@@ -924,6 +924,14 @@ final class WorldSyntax {
         @Override
         public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
             float by = delta != null && delta.length > 0 && delta[0] instanceof Number n ? n.floatValue() : 0;
+            if (!Float.isFinite(by)) {
+                // As in Skript, infinity and NaN change nothing.
+                return;
+            }
+            if (pitch && (mode == Mode.ADD || mode == Mode.REMOVE)) {
+                // Minecraft's pitch is upside down: adding looks up, as in Skript.
+                by = -by;
+            }
             for (Object value : (Object[]) arguments[0]) {
                 switch (value) {
                     case Location location -> {
@@ -943,6 +951,12 @@ final class WorldSyntax {
                     default -> {}
                 }
             }
+        }
+
+        /** A yaw as Skript gives it: from 0 up to 360. */
+        private static float yaw(float yaw) {
+            float normal = Location.normalizeYaw(yaw);
+            return normal < 0 ? normal + 360 : normal;
         }
 
         private static float next(float current, float by, Mode mode) {

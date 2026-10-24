@@ -72,6 +72,7 @@ public final class ScriptCompiler {
         }
         for (ParsedScript script : scripts) {
             String name = script.file().name();
+            co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(name);
             Map<Integer, String> parseProblems = new HashMap<>();
             script.diagnostics().forEach(d -> parseProblems.putIfAbsent(d.line(), d.message()));
             for (ParsedStructure structure : script.structures()) {
@@ -130,6 +131,7 @@ public final class ScriptCompiler {
                 }
             }
         }
+        co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(null);
         return new CompiledScripts(triggers, bodies, diagnostics, unrunnableTests, commands);
     }
 

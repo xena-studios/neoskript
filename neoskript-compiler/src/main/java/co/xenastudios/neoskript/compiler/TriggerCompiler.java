@@ -807,6 +807,12 @@ final class TriggerCompiler {
                 method.visitLabel(end);
                 method.visitMethodInsn(INVOKESTATIC, errors, "end", "()V", false);
             }
+            // Suppressing warnings is done while parsing; its code runs as it is.
+            case Statement.Section section when isCore(section.header(), CoreSyntax.SUPPRESS_WARNINGS) -> {
+                Label end = new Label();
+                block(BlockKind.CONDITIONAL, end, section.body());
+                method.visitLabel(end);
+            }
             case Statement.Section section when library.sectionType(section.header() == null ? null
                     : section.header().syntax().id()) != null -> librarySection(section);
             case Statement.Section section when sectionExpression(section) != null -> expressionSection(section);
@@ -1306,6 +1312,7 @@ final class TriggerCompiler {
             }
             case CoreSyntax.ASSERT -> assertion(effect);
             case CoreSyntax.DELAY -> waitFor(effect);
+            case CoreSyntax.SUPPRESS_WARNINGS -> {}
             default -> throw unsupported(core.id());
         }
     }
@@ -2400,7 +2407,8 @@ final class TriggerCompiler {
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARITHMETIC) -> arithmetic(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.LOOP_VALUE) -> loopValue(syntax.syntax());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE)
-                    || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY) -> eventValue(syntax);
+                    || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY)
+                    || isCore(syntax.syntax(), CoreSyntax.EVENT_ENTITY_BARE) -> eventValue(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.FILTER) -> filter(syntax.syntax());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ANY_OF) ->
@@ -2907,6 +2915,7 @@ final class TriggerCompiler {
         return switch (expr) {
             case Expr.Syntax syntax when syntax.syntax().syntax().id().equals(KEYED) -> true;
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RECURSIVE) -> implicit || recursiveOfKeyed(syntax.syntax());
+            case Expr.Syntax syntax when keyAware(syntax) && keysRecommended(syntax) -> true;
             case Expr.Syntax syntax when keyAware(syntax) -> syntax.syntax().match().values().stream()
                     .anyMatch(value -> value instanceof Expr argument && isKeyed(argument, implicit));
             case Expr.ListOf list -> list.items().stream().anyMatch(item -> isKeyed(item, implicit));
@@ -2927,6 +2936,12 @@ final class TriggerCompiler {
     private boolean implicitKeys(Expr.Syntax syntax) {
         return library.binding(syntax.syntax().syntax()) instanceof ElementFactory<?> factory
                 && factory.create(info(syntax.syntax())) instanceof KeyAware aware && aware.implicitKeys();
+    }
+
+    /** Whether the key-aware element's indices are kept even where it isn't written keyed. */
+    private boolean keysRecommended(Expr.Syntax syntax) {
+        return library.binding(syntax.syntax().syntax()) instanceof ElementFactory<?> factory
+                && factory.create(info(syntax.syntax())) instanceof KeyAware aware && aware.keysRecommended();
     }
 
     /** Whether the expression's element keeps its values' indices ({@link KeyAware}). */

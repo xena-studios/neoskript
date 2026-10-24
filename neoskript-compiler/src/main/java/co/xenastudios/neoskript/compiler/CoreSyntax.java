@@ -37,6 +37,7 @@ final class CoreSyntax {
     static final String DELAY_CHECK = "CondDelayCheck";
     static final String EVENT_VALUE = "ExprEventValue";
     static final String EVENT_VALUE_ENTITY = "ExprEventEntity";
+    static final String EVENT_ENTITY_BARE = "ExprEventEntityBare";
     static final String ARGUMENT = "ExprArgument";
     static final String TYPED_ARGUMENT = "ExprTypedArgument";
     static final String CHOICE_ARGUMENT = "ExprChoiceArgument";
@@ -46,6 +47,8 @@ final class CoreSyntax {
     static final String PARSE = "ExprParse";
     static final String WHETHER = "ExprWhether";
     static final String CATCH_ERRORS = "SecCatchErrors";
+    /** {@code suppress unreachable code warnings}, alone or as a section: handled while parsing. */
+    static final String SUPPRESS_WARNINGS = "EffSecSuppressWarnings";
     static final String FILTER = "ExprFilter";
     static final String CURRENT_SCRIPT = "ExprScript";
     static final String COPY = "EffCopy";
@@ -148,6 +151,10 @@ final class CoreSyntax {
         // Code after these never runs, so a delay before them doesn't carry past their section.
         library.stops(SyntaxKind.EFFECT, EXIT, 0);
         library.stops(SyntaxKind.EFFECT, RETURN, -1);
+        // Code after these in the same section never runs.
+        library.ends(SyntaxKind.EFFECT, EXIT);
+        library.ends(SyntaxKind.EFFECT, RETURN);
+        library.ends(SyntaxKind.EFFECT, CONTINUE);
         library.core(SyntaxKind.EFFECT, DELAY, null, List.of(), "(wait|halt) [for] %timespan%");
         library.delays(SyntaxKind.EFFECT, DELAY);
         library.core(SyntaxKind.EFFECT, DO_IF, null, List.of(RegexRole.EFFECT, RegexRole.CONDITION), "<.+> if <.+>");
@@ -192,6 +199,12 @@ final class CoreSyntax {
 
         // Runtime errors reported inside are collected for 'last caught runtime errors', not logged.
         library.core(SyntaxKind.SECTION, CATCH_ERRORS, null, List.of(), "catch [run[ ]time] error[s]");
+        String[] suppress = {"[local[ly]] [stop:un]suppress [the] (conflict:conflict|save:variable save|conjunction:[missing] conjunction|starting:starting [with] expression[s]|colon:variable[ name][s] contain[s|ing] colon[s]|deprecated:deprecated syntax|unreachable:unreachable code|constant:constant condition[s]) warning[s]",
+                "[start|stop:stop] [local[ly]] suppressing [the] (conflict:conflict|save:variable save|conjunction:[missing] conjunction|starting:starting [with] expression[s]|colon:variable[ name][s] contain[s|ing] colon[s]|deprecated:deprecated syntax|unreachable:unreachable code|constant:constant condition[s]) warning[s]"};
+        library.core(SyntaxKind.EFFECT, SUPPRESS_WARNINGS, null, List.of(), suppress);
+        library.core(SyntaxKind.SECTION, SUPPRESS_WARNINGS, null, List.of(), suppress);
+        library.suppressesWarnings(SyntaxKind.EFFECT, SUPPRESS_WARNINGS);
+        library.suppressesWarnings(SyntaxKind.SECTION, SUPPRESS_WARNINGS);
         library.core(SyntaxKind.EXPRESSION, CAUGHT_ERRORS, "string", List.of(), "[the] last caught [run[ ]time] errors");
 
         // 'whether {_x} is set': a condition as a boolean.
@@ -259,5 +272,8 @@ final class CoreSyntax {
         // 'baby chicken' is an entity type.
         library.core(SyntaxKind.EXPRESSION, EVENT_VALUE_ENTITY, "object", List.of(RegexRole.TYPE_OR_ENTITY),
                 "the <.+>", "event-<.+>");
+        // 'yaw of pig' in 'spawn a pig:': a kind of entity alone is the event's entity too, where an entity
+        // type doesn't fit and the words don't name an item. Tried after everything else.
+        library.core(SyntaxKind.EXPRESSION, EVENT_ENTITY_BARE, "object", List.of(RegexRole.BARE_ENTITY), "<.+>");
     }
 }
