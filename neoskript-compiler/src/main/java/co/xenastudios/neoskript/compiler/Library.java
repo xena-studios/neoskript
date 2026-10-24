@@ -212,6 +212,7 @@ public final class Library implements Registrar {
             throw new IllegalArgumentException("Parser for unknown type '" + typeId + "'");
         }
         parsers.put(typeId, parser);
+        co.xenastudios.neoskript.runtime.Parsers.register(typeId, parser);
     }
 
     @Override

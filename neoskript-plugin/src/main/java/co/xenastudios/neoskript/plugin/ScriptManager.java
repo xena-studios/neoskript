@@ -303,6 +303,16 @@ final class ScriptManager {
             }
 
             @Override
+            public String source(co.xenastudios.neoskript.runtime.ScriptRef script) {
+                Path path = path(script);
+                try {
+                    return path == null ? null : Files.readString(path);
+                } catch (java.io.IOException e) {
+                    return null;
+                }
+            }
+
+            @Override
             public boolean loaded(co.xenastudios.neoskript.runtime.ScriptRef script) {
                 synchronized (ScriptManager.this) {
                     return loaded.containsKey(script.name());

@@ -47,6 +47,7 @@ public final class StandardLibrary {
         Items.registerLate(registrar);
         ItemSyntax.register(registrar);
         Banners.register(registrar);
+        Configs.register(registrar);
         WorldSyntax.registerLate(registrar);
         StorageCodecs.register(registrar);
         ItemCodecs.register(registrar);

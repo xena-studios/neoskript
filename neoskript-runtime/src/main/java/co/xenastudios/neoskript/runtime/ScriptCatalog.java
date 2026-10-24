@@ -32,6 +32,11 @@ public interface ScriptCatalog {
     /** Stops {@code script}, leaving its file as it is. */
     default void unload(ScriptRef script) {}
 
+    /** What {@code script}'s file says, or {@code null} if it can't be read. */
+    default String source(ScriptRef script) {
+        return null;
+    }
+
     /** Stops {@code script} and disables its file (a {@code -} before its name). Returns it as now named. */
     default ScriptRef disable(ScriptRef script) {
         return null;

@@ -352,6 +352,7 @@ final class Players {
             case co.xenastudios.neoskript.runtime.ScriptRef script -> Scripts.name(script);
             case co.xenastudios.neoskript.runtime.FunctionRef function -> function.name();
             case World world -> world.getName();
+            case Configs.ConfigNode node -> node.key();
             case CommandSender sender -> sender.getName();
             case Nameable nameable when nameable.customName() != null ->
                     Messages.LEGACY_SECTION.serialize(nameable.customName());
