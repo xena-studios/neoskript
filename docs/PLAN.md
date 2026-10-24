@@ -513,6 +513,27 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
 >    - **More:** `connect` and `swim toggle` events, damage causes, `is burning`, `item of` entities, transform keeping indices, script names by `using script reflection`, reduce reporting skipped values, or-lists setting one of their variables, literals with `and` in them read whole, lists in lists (`1, (2, 3)`), boats compared with their items, tropical fish colours (`red-blue kob`), display entities of enchanted items, item rarity defaults, display brightness from infinity.
 >    - **Fixes:** location equality allows for float error; Paper's rewriting of `Cow` for older plugins is handled; tags written mid-alternative are fixed; numbers too big for a whole number are kept in range everywhere instead of wrapping round; the harness stops at once when the plugin fails to start.
 
+    **Batch 14 (2026-10-24): 692 → 734 tests pass.**
+    - **Language:**
+      - Functions can wait: the caller carries on when the function starts waiting, and the rest runs later where the caller runs (its region, on Folia), as in Skript.
+      - A section that always stops (`stop`, `return`) doesn't carry a delay out of it, as Skript's execution intents have it.
+      - Code after `stop`, `return`, `exit` or `continue` gets Skript's "Unreachable code" warning, and `suppress … warnings` (alone or as a section) turns warnings off as in Skript.
+      - `using` names Skript's experiments by any of their names, and `the current script is using "for loops"` checks them. `example:` code is parsed but never run.
+      - Lists prefer items that don't lean on unknown words (`1 or 0 or -1` is three numbers), and an `and` list only fits the plural types of `%number/booleans%`.
+      - A kind of entity alone is the event's entity where an entity type can't go (`yaw of pig` in `spawn a pig:`, `delete pig`), as Skript's entity expression does.
+      - `X if C otherwise Y` and `X otherwise Y` have their values' type when they share one, so `length of (5 otherwise 10)` doesn't parse.
+      - `parse if` code that can't compile here is left out, as Skript only parses it when the condition holds.
+      - Loops over a queue take from it as they go, so values added while looping are looped too.
+      - Key-aware expressions can keep their indices without `keyed` (`KeyAware.keysRecommended`).
+    - **Commands:** `execute command` fires the command events first, as Skript does, `on command "x y"` matches as Skript's does, and script commands belong to "Skript".
+    - **Syntax:**
+      - Explosions (`on explode`, `the exploded blocks`, with Skript's error outside it), incendiary explosions, shooting (`shoot an arrow from X`, `make X shoot a pig at speed 2`, its section, `the shooter`), teleport flags and directions.
+      - Biomes, by Skript's names or keys, and the biome at a location. Trees (`grow oak tree above X`), blocks in a radius, `update X as Y without physics`.
+      - `X where "a" is replaced with "b"`, the (real) max players, (max) domestication levels, `is between` with lists and Skript's wrap-around for times, milliseconds in timespans.
+    - **Fixes:** baby frogs (ages as Skript's entity data has them), text display backgrounds reset to Minecraft's default, chests placed from items keep their contents, the inventory of a container item, `open X inventory` with Skript's error for kinds that can't be made, yaw and pitch ignore infinity and NaN, random numbers with a written amount of nothing give nothing.
+    - **Skript's test mode:** tests start 5 seconds after loading, with the test chunks ticking, as in Skript. Its test syntax: `test expr list`, `test string literal`, `test loop peeking`, `method exists`, `test key values`, `experimental only`.
+    - **Still to do, largest first:** most of Skript's events (only about a dozen exist so far), aliases (`any boots`), local variable type hints, text components, equippable components, particles, loot tables, boss bars, script config, custom operators, banners.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.
