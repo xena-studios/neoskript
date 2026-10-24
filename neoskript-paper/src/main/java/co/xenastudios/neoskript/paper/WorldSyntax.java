@@ -65,6 +65,51 @@ final class WorldSyntax {
         }
     }
 
+    /** Who shot what isn't a projectile, like a pig, for {@code the shooter} in {@code shoot a pig:}. */
+    private static final Map<Entity, org.bukkit.entity.LivingEntity> SHOOTERS =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    /**
+     * Shoots one {@code kind} from {@code shooter}, an entity or a location, as Skript does: projectiles are
+     * launched, fireballs start in front of the eyes, anything else starts halfway up and is pushed.
+     */
+    private static Entity shoot(EntityKind kind, Object shooter, double speed, Direction direction) {
+        if (!kind.spawnable()) {
+            return null;
+        }
+        Class<? extends Entity> type = kind.type().getEntityClass();
+        Entity entity;
+        Vector velocity;
+        if (shooter instanceof org.bukkit.entity.LivingEntity living) {
+            Location from = living.getLocation();
+            velocity = (direction == null ? from.getDirection() : direction.from(from)).multiply(speed);
+            if (type != null && org.bukkit.entity.Fireball.class.isAssignableFrom(type)) {
+                Location at = living.getEyeLocation().add(velocity.clone().normalize().multiply(0.5));
+                entity = living.getWorld().spawn(at, type);
+                ((org.bukkit.entity.Projectile) entity).setShooter(living);
+            } else if (type != null && org.bukkit.entity.Projectile.class.isAssignableFrom(type)) {
+                @SuppressWarnings("unchecked")
+                Class<? extends org.bukkit.entity.Projectile> projectile = (Class<? extends org.bukkit.entity.Projectile>) type;
+                entity = living.launchProjectile(projectile, velocity);
+            } else {
+                from.setY(from.getY() + living.getEyeHeight() / 2);
+                entity = kind.spawn(from);
+                if (entity != null) {
+                    SHOOTERS.put(entity, living);
+                }
+            }
+        } else if (shooter instanceof Location location) {
+            velocity = (direction == null ? location.getDirection() : direction.from(location)).multiply(speed);
+            entity = kind.spawn(location);
+        } else {
+            return null;
+        }
+        if (entity != null) {
+            entity.setVelocity(velocity);
+        }
+        return entity;
+    }
+
     /** The entities spawned last on each thread, for {@code the last spawned pig}. */
     private static final ThreadLocal<Entity> LAST_SPAWNED = new ThreadLocal<>();
 
@@ -288,6 +333,42 @@ final class WorldSyntax {
                 "(spawn|summon) %number% of %entitytypes% [(at|on) %locations%]",
                 "(spawn|summon) %number% %entitytypes% [(at|on) %locations%]",
                 "(spawn|summon) %experience% [(at|on) %locations%]");
+        // 'shoot an arrow from the player', 'make {_loc} shoot a pig at speed 2': its code runs for each one shot.
+        registrar.section("EffSecShoot", "entity", info -> {
+            int typesAt = info.pattern() == 0 ? 0 : 1;
+            return (context, args) -> {
+                Object[] types = Values.array(args[typesAt]);
+                Object[] shooters = Values.array(args[1 - typesAt]);
+                double speed = args[2] == null ? 5 : Values.single(args[2]) instanceof Number n ? n.doubleValue() : Double.NaN;
+                Object direction = Values.single(args[3]);
+                List<Object> shot = new ArrayList<>();
+                if (Double.isNaN(speed)) {
+                    return shot.toArray();
+                }
+                for (Object shooter : shooters) {
+                    for (Object type : types) {
+                        if (type instanceof EntityKind kind) {
+                            Entity entity = shoot(kind, shooter, speed, direction instanceof Direction d ? d : null);
+                            if (entity != null) {
+                                LAST_SPAWNED.set(entity);
+                                shot.add(entity);
+                            }
+                        }
+                    }
+                }
+                return shot.toArray();
+            };
+        }, "shoot %entitytypes% [from %livingentities/locations%] [(at|with) (speed|velocity) %number%] [%direction%]",
+                "(make|let) %livingentities/locations% shoot %entitytypes% [(at|with) (speed|velocity) %number%] [%direction%]");
+        // The shooter of a projectile, or in 'shoot a pig:', of what was shot.
+        registrar.expression("ExprShooter", "livingentity", info -> new SettableProperty<>(Entity.class,
+                org.bukkit.entity.LivingEntity.class, entity -> entity instanceof org.bukkit.entity.Projectile projectile
+                        ? projectile.getShooter() instanceof org.bukkit.entity.LivingEntity living ? living : null
+                        : SHOOTERS.get(entity), (entity, shooter) -> {
+                    if (entity instanceof org.bukkit.entity.Projectile projectile) {
+                        projectile.setShooter(shooter);
+                    }
+                }), "[the] shooter [of %entities%]");
         registrar.expression("ExprLastSpawnedEntity", "entity", info -> (context, args) -> {
             Entity last = LAST_SPAWNED.get();
             return last != null && (args[0] == null || (args[0] instanceof EntityKind kind && kind.matches(last))) ? last : null;

@@ -1230,6 +1230,8 @@ final class EntitySyntax {
                 for (Object entity : owners(args[0])) {
                     if (entity instanceof org.bukkit.entity.Creeper creeper) {
                         creeper.setPowered(charge);
+                    } else if (entity instanceof WitherSkull skull) {
+                        skull.setCharged(charge);
                     }
                 }
             };
