@@ -808,7 +808,8 @@ final class TriggerCompiler {
                 method.visitMethodInsn(INVOKESTATIC, errors, "end", "()V", false);
             }
             // Suppressing warnings is done while parsing; its code runs as it is.
-            case Statement.Section section when isCore(section.header(), CoreSyntax.SUPPRESS_WARNINGS) -> {
+            case Statement.Section section when isCore(section.header(), CoreSyntax.SUPPRESS_WARNINGS)
+                    || isCore(section.header(), CoreSyntax.SUPPRESS_HINTS) -> {
                 Label end = new Label();
                 block(BlockKind.CONDITIONAL, end, section.body());
                 method.visitLabel(end);
@@ -1329,7 +1330,7 @@ final class TriggerCompiler {
             }
             case CoreSyntax.ASSERT -> assertion(effect);
             case CoreSyntax.DELAY -> waitFor(effect);
-            case CoreSyntax.SUPPRESS_WARNINGS -> {}
+            case CoreSyntax.SUPPRESS_WARNINGS, CoreSyntax.SUPPRESS_HINTS -> {}
             default -> throw unsupported(core.id());
         }
     }

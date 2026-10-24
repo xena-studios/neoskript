@@ -49,6 +49,7 @@ final class CoreSyntax {
     static final String CATCH_ERRORS = "SecCatchErrors";
     /** {@code suppress unreachable code warnings}, alone or as a section: handled while parsing. */
     static final String SUPPRESS_WARNINGS = "EffSecSuppressWarnings";
+    static final String SUPPRESS_HINTS = "EffSecSuppressTypeHints";
     static final String FILTER = "ExprFilter";
     static final String CURRENT_SCRIPT = "ExprScript";
     static final String COPY = "EffCopy";
@@ -202,6 +203,11 @@ final class CoreSyntax {
         String[] suppress = {"[local[ly]] [stop:un]suppress [the] (conflict:conflict|save:variable save|conjunction:[missing] conjunction|starting:starting [with] expression[s]|colon:variable[ name][s] contain[s|ing] colon[s]|deprecated:deprecated syntax|unreachable:unreachable code|constant:constant condition[s]) warning[s]",
                 "[start|stop:stop] [local[ly]] suppressing [the] (conflict:conflict|save:variable save|conjunction:[missing] conjunction|starting:starting [with] expression[s]|colon:variable[ name][s] contain[s|ing] colon[s]|deprecated:deprecated syntax|unreachable:unreachable code|constant:constant condition[s]) warning[s]"};
         library.core(SyntaxKind.EFFECT, SUPPRESS_WARNINGS, null, List.of(), suppress);
+        // 'suppress local variable type hints', alone or as a section: handled while parsing.
+        String[] suppressHints = {"[stop:un]suppress [local variable] type hints",
+                "(start|stop:stop) suppressing [local variable] type hints"};
+        library.core(SyntaxKind.EFFECT, SUPPRESS_HINTS, null, List.of(), suppressHints);
+        library.core(SyntaxKind.SECTION, SUPPRESS_HINTS, null, List.of(), suppressHints);
         library.core(SyntaxKind.SECTION, SUPPRESS_WARNINGS, null, List.of(), suppress);
         library.suppressesWarnings(SyntaxKind.EFFECT, SUPPRESS_WARNINGS);
         library.suppressesWarnings(SyntaxKind.SECTION, SUPPRESS_WARNINGS);

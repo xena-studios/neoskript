@@ -72,6 +72,14 @@ final class LineParser {
         }
     }
 
+    /** Whether variables are held to their type hints; off to find which one is wrong after a line fails. */
+    private boolean checkHints = true;
+
+    LineParser(ParserContext context, String input, boolean checkHints) {
+        this(context, input);
+        this.checkHints = checkHints;
+    }
+
     LineParser(ParserContext context, String input) {
         this.context = context;
         this.registry = context.registry();
@@ -522,7 +530,8 @@ final class LineParser {
             return null;
         }
         if (first == '{' && Scanner.braceEnd(input, start, end, null) == end) {
-            return variable(start, end);
+            Expr variable = variable(start, end);
+            return variable instanceof Expr.Variable v && !hintFits(v, expected) ? null : variable;
         }
         Expr call = functionCall(start, end, true);
         if (call != null) {
@@ -603,6 +612,51 @@ final class LineParser {
         boolean valid = type.literals().contains(value) || ((type.openLiterals() || type.literals().isEmpty())
                 && Literals.isWords(value) && registry.mightBeLiteral(type, value));
         return valid ? new Expr.Literal(start, end, type.id(), text) : null;
+    }
+
+    /** Why a variable didn't fit, by its type hints, for the line's error; or {@code null}. */
+    private String hintProblem;
+
+    String hintProblem() {
+        return hintProblem;
+    }
+
+    /**
+     * Whether a variable may be what's expected by its type hints, as in Skript: {@code {_x}} holding an
+     * integer can't be a text. If not, the reason is kept for the line's error.
+     */
+    boolean hintFits(Expr.Variable variable, Expected expected) {
+        TypeHints hints = context.hints();
+        if (!checkHints || !hints.active() || expected.anything() || !StatementParser.simple(variable)) {
+            return true;
+        }
+        java.util.Set<String> types = hints.get(variable.name());
+        if (types.isEmpty()) {
+            return true;
+        }
+        for (TypeInfo wanted : expected.types()) {
+            for (String type : types) {
+                if (registry.isAssignable(type, wanted.id())) {
+                    return true;
+                }
+            }
+        }
+        hintProblem = "Expected variable '{" + variable.name() + "}' to be "
+                + typeNames(expected.types().stream().map(TypeInfo::id).toList()) + ", but it is " + typeNames(types);
+        return false;
+    }
+
+    /** Types as Skript lists them in hints: {@code an integer or boolean (yes/no)}. */
+    private String typeNames(java.util.Collection<String> ids) {
+        List<String> names = new ArrayList<>();
+        for (String id : ids) {
+            TypeInfo info = registry.type(id);
+            String name = info == null ? id : info.name().toLowerCase(java.util.Locale.ROOT);
+            names.add(name.equals("boolean") ? "boolean (yes/no)" : name);
+        }
+        String joined = names.size() == 1 ? names.getFirst()
+                : String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.getLast();
+        return ("aeiou".indexOf(joined.charAt(0)) >= 0 ? "an " : "a ") + joined;
     }
 
     private Expr variable(int start, int end) {

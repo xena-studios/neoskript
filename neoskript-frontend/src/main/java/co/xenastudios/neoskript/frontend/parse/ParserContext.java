@@ -93,6 +93,13 @@ final class ParserContext {
         return registry.functions(name);
     }
 
+    /** The script's local variable type hints, as its code is parsed in order. */
+    private final TypeHints hints = new TypeHints();
+
+    TypeHints hints() {
+        return hints;
+    }
+
     void itemAliases(java.util.Set<String> names) {
         itemAliases = java.util.Set.copyOf(names);
     }
