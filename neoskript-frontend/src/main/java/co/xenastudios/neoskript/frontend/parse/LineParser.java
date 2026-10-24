@@ -362,8 +362,23 @@ final class LineParser {
             }
         }
         String type = parsed.syntax().returnType();
+        if (CHOOSING.contains(parsed.syntax().id())) {
+            // 'X if C otherwise Y', 'X otherwise Y': one of its values, so their type when they share one.
+            String shared = null;
+            for (Object value : parsed.match().values()) {
+                String own = value instanceof Expr expr && !(expr instanceof Expr.Variable) ? expr.type() : null;
+                if (own == null || own.equals(SyntaxRegistry.OBJECT) || shared != null && !shared.equals(own)) {
+                    return SyntaxRegistry.OBJECT;
+                }
+                shared = own;
+            }
+            return shared == null ? SyntaxRegistry.OBJECT : shared;
+        }
         return type == null ? SyntaxRegistry.OBJECT : type;
     }
+
+    /** Expressions that give one of their arguments' values. */
+    private static final java.util.Set<String> CHOOSING = java.util.Set.of("ExprTernary", "ExprDefaultValue");
 
     private PlaceholderResolver resolver(SyntaxInfo syntax, boolean literalOnly, boolean splitTokens, boolean strictCode) {
         return new PlaceholderResolver() {
@@ -843,6 +858,9 @@ final class LineParser {
         }
         List<Expr> items = reach.get(n);
         if (items == null) {
+            return null;
+        }
+        if (and[0] && items.size() > 1 && items.stream().anyMatch(each -> !expected.acceptsMany(each.type(), registry))) {
             return null;
         }
         String type = items.stream().map(Expr::type).distinct().count() == 1 ? items.getFirst().type() : SyntaxRegistry.OBJECT;

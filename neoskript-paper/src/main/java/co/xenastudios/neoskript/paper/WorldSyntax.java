@@ -542,6 +542,9 @@ final class WorldSyntax {
                         : value instanceof org.bukkit.inventory.ItemStack stack ? stack.getType() : null;
                 if (material != null && material.isBlock()) {
                     block.setType(material);
+                    if (value instanceof ItemType item) {
+                        copyContainer(block, item);
+                    }
                     return;
                 }
             }
@@ -976,5 +979,28 @@ final class WorldSyntax {
             case org.bukkit.WorldBorder border -> border.isInside(location);
             case null, default -> false;
         };
+    }
+
+    /** Copies a container item's name and contents to the block placed for it, as Skript does. */
+    private static void copyContainer(Block block, ItemType item) {
+        if (!(block.getState() instanceof org.bukkit.block.Container container)
+                || !(item.stack().getItemMeta() instanceof org.bukkit.inventory.meta.ItemMeta meta)) {
+            return;
+        }
+        if (meta.displayName() != null) {
+            container.customName(meta.displayName());
+        }
+        if (meta instanceof org.bukkit.inventory.meta.BlockStateMeta stateMeta && stateMeta.hasBlockState()
+                && stateMeta.getBlockState() instanceof org.bukkit.block.Container from) {
+            org.bukkit.inventory.Inventory source = from.getSnapshotInventory();
+            org.bukkit.inventory.Inventory target = container.getSnapshotInventory();
+            for (int i = 0; i < source.getSize() && i < target.getSize(); i++) {
+                org.bukkit.inventory.ItemStack stack = source.getItem(i);
+                if (stack != null) {
+                    target.setItem(i, stack.clone());
+                }
+            }
+        }
+        container.update();
     }
 }

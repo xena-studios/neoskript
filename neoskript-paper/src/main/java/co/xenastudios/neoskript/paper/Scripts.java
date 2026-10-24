@@ -111,6 +111,65 @@ final class Scripts {
     /** Skript's test-only helpers. */
     static void registerTesting(Registrar registrar) {
         registrar.function("file_separator", List.<Parameter>of(), "string", false, args -> File.separator);
+        // Skript's test-only syntax, for its tests of the parser.
+        registrar.effect("EffTestExprList", info -> (context, args) -> {}, "test expr list %number/booleans%");
+        registrar.expression("ExprTestStringLiteral", "string", info -> (context, args) -> args[0],
+                "test string literal %*string%");
+        // Its values can't be peeked at with 'next loop-value' when disabled (see the compiler).
+        registrar.expression("ExprTestLoopPeeking", "integer", info -> (context, args) -> new Object[] {1L, 2L, 3L, 4L, 5L},
+                "test loop peeking disabled", "test loop peeking enabled");
+        registrar.condition("CondMethodExists", info -> {
+            boolean negated = info.hasTag("dont");
+            return (context, args) -> {
+                Object[] signatures = (Object[]) args[0];
+                for (Object signature : signatures) {
+                    if (methodExists(Values.text(signature)) == negated) {
+                        return false;
+                    }
+                }
+                return signatures.length > 0;
+            };
+        }, "method[s] %strings% [dont:do(esn't|n't)] exist[s]");
+    }
+
+    private static final java.util.regex.Pattern SIGNATURE = java.util.regex.Pattern.compile("(.+)#(.+)\\((.*)\\)");
+
+    /** Whether {@code java.lang.String#indexOf(java.lang.String)} names a public method, as Skript's test syntax checks. */
+    private static boolean methodExists(String signature) {
+        java.util.regex.Matcher matcher = SIGNATURE.matcher(signature);
+        if (!matcher.matches()) {
+            return false;
+        }
+        try {
+            Class<?> owner = Class.forName(matcher.group(1));
+            List<Class<?>> parameters = new java.util.ArrayList<>();
+            if (!matcher.group(3).isBlank()) {
+                for (String parameter : matcher.group(3).split(",")) {
+                    parameters.add(javaClass(parameter.strip()));
+                }
+            }
+            owner.getMethod(matcher.group(2), parameters.toArray(Class<?>[]::new));
+            return true;
+        } catch (ClassNotFoundException | NoSuchMethodException missing) {
+            return false;
+        }
+    }
+
+    private static Class<?> javaClass(String name) throws ClassNotFoundException {
+        if (name.endsWith("[]")) {
+            return java.lang.reflect.Array.newInstance(javaClass(name.substring(0, name.length() - 2)), 0).getClass();
+        }
+        return switch (name) {
+            case "byte" -> byte.class;
+            case "short" -> short.class;
+            case "int" -> int.class;
+            case "long" -> long.class;
+            case "float" -> float.class;
+            case "double" -> double.class;
+            case "boolean" -> boolean.class;
+            case "char" -> char.class;
+            default -> Class.forName(name);
+        };
     }
 
     /**

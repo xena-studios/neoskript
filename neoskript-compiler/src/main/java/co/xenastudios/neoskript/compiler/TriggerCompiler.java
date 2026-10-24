@@ -158,6 +158,9 @@ final class TriggerCompiler {
      *
      * @param valueType for a library section, the type of the values its code runs for
      */
+    /** Loops over values that can't be peeked at with {@code next loop-value}, with how their expression reads. */
+    private final Map<Block, String> unpeekable = new java.util.IdentityHashMap<>();
+
     private record Block(BlockKind kind, Label end, Label next, int valuesSlot, int indicesSlot, int indexSlot,
             String valueType) {
 
@@ -366,7 +369,7 @@ final class TriggerCompiler {
         };
         String[] interfaces = trigger
                 ? new String[] {Type.getInternalName(Trigger.class), Type.getInternalName(Resumable.class)}
-                : new String[] {Type.getInternalName(CompiledFunction.class)};
+                : new String[] {Type.getInternalName(CompiledFunction.class), Type.getInternalName(Resumable.class)};
         writer.visit(V21, ACC_PUBLIC | ACC_FINAL | ACC_SUPER, className, null, OBJECT, interfaces);
         writer.visitSource(scriptName, null);
 
@@ -378,7 +381,8 @@ final class TriggerCompiler {
         constructor.visitMaxs(0, 0);
         constructor.visitEnd();
 
-        String bodyDescriptor = "(" + CONTEXT + FRAME_DESC + ")V";
+        String bodyDescriptor = trigger ? "(" + CONTEXT + FRAME_DESC + ")V"
+                : "(" + CONTEXT + OBJECT_DESC + ")" + OBJECT_DESC;
         if (trigger) {
             for (boolean resume : new boolean[] {false, true}) {
                 MethodVisitor entry = writer.visitMethod(ACC_PUBLIC, resume ? "resume" : "execute",
@@ -398,7 +402,27 @@ final class TriggerCompiler {
             }
             method = writer.visitMethod(ACC_PRIVATE, "body", bodyDescriptor, null, null);
         } else {
-            method = writer.visitMethod(ACC_PUBLIC, "call", "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, null, null);
+            // A function's body takes its arguments, or the frame of a wait to carry on from. Carrying on
+            // returns nothing to anyone: the caller went on when the function started waiting, as in Skript.
+            for (boolean resume : new boolean[] {false, true}) {
+                MethodVisitor entry = writer.visitMethod(ACC_PUBLIC, resume ? "resume" : "call",
+                        resume ? "(" + CONTEXT + FRAME_DESC + ")V" : "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC,
+                        null, null);
+                entry.visitCode();
+                entry.visitVarInsn(ALOAD, 0);
+                entry.visitVarInsn(ALOAD, CONTEXT_SLOT);
+                entry.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
+                entry.visitMethodInsn(INVOKESPECIAL, className, "body", bodyDescriptor, false);
+                if (resume) {
+                    entry.visitInsn(POP);
+                    entry.visitInsn(RETURN);
+                } else {
+                    entry.visitInsn(ARETURN);
+                }
+                entry.visitMaxs(0, 0);
+                entry.visitEnd();
+            }
+            method = writer.visitMethod(ACC_PRIVATE, "body", bodyDescriptor, null, null);
         }
         method.visitCode();
         Label start = new Label();
@@ -411,6 +435,13 @@ final class TriggerCompiler {
         if (trigger) {
             method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
             method.visitJumpInsn(IFNONNULL, dispatch);
+        } else {
+            method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
+            method.visitTypeInsn(INSTANCEOF, Type.getInternalName(Frame.class));
+            method.visitJumpInsn(IFNE, dispatch);
+            method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
+            method.visitTypeInsn(CHECKCAST, OBJECTS);
+            method.visitVarInsn(ASTORE, ARGUMENTS_SLOT);
         }
         method.visitTypeInsn(NEW, STORE);
         method.visitInsn(DUP);
@@ -442,10 +473,13 @@ final class TriggerCompiler {
         method.visitVarInsn(ALOAD, EXCEPTION_SLOT);
         method.visitMethodInsn(INVOKESPECIAL, exception, "<init>", "(Ljava/lang/String;ILjava/lang/Throwable;)V", false);
         method.visitInsn(ATHROW);
-        if (trigger) {
-            method.visitLabel(dispatch);
-            dispatch();
+        method.visitLabel(dispatch);
+        if (!trigger) {
+            method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
+            method.visitTypeInsn(CHECKCAST, Type.getInternalName(Frame.class));
+            method.visitVarInsn(ASTORE, ARGUMENTS_SLOT);
         }
+        dispatch();
         method.visitMaxs(0, 0);
         method.visitEnd();
         writer.visitEnd();
@@ -463,7 +497,7 @@ final class TriggerCompiler {
         method.visitVarInsn(ASTORE, PARSE_LOGS_SLOT);
         Label done = new Label();
         if (waits.isEmpty()) {
-            method.visitInsn(RETURN);
+            exitTrigger();
             return;
         }
         Label[] cases = new Label[waits.size()];
@@ -504,7 +538,7 @@ final class TriggerCompiler {
             method.visitJumpInsn(GOTO, wait.resume());
         }
         method.visitLabel(done);
-        method.visitInsn(RETURN);
+        exitTrigger();
     }
 
     /**
@@ -512,9 +546,6 @@ final class TriggerCompiler {
      * it), schedules the rest of the trigger, and returns. The rest starts at the label after it.
      */
     private void waitFor(ParsedSyntax delay) throws CompileException {
-        if (function != null) {
-            throw unsupported("waiting in a function");
-        }
         String frame = Type.getInternalName(Frame.class);
         List<int[]> saved = new ArrayList<>();
         for (Block block : loops()) {
@@ -563,7 +594,7 @@ final class TriggerCompiler {
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "ticks", "(" + OBJECT_DESC + ")J", false);
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "schedule",
                 "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + "J)V", false);
-        method.visitInsn(RETURN);
+        exitTrigger();
         method.visitLabel(wait.resume());
     }
 
@@ -935,6 +966,7 @@ final class TriggerCompiler {
         int valuesSlot = nextSlot++;
         int indicesSlot = -1;
         int indexSlot = nextSlot++;
+        int queueSlot = -1;
         if (isKeyed(looped, true)) {
             // A list variable, or anything keeping indices: loop-index is each value's index.
             indicesSlot = nextSlot++;
@@ -948,8 +980,13 @@ final class TriggerCompiler {
                     "()[Ljava/lang/String;", false);
             method.visitVarInsn(ASTORE, indicesSlot);
         } else {
+            // A queue is taken from as the loop goes, so what the loop adds to it is looped too.
+            queueSlot = nextSlot++;
             expression(looped);
             convert(true);
+            method.visitInsn(DUP);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "loopedQueue", "(" + OBJECTS + ")Ljava/util/Queue;", false);
+            method.visitVarInsn(ASTORE, queueSlot);
             method.visitMethodInsn(INVOKESTATIC, VALUES, "loopValues", "(" + OBJECTS + ")" + OBJECTS, false);
             method.visitVarInsn(ASTORE, valuesSlot);
         }
@@ -960,11 +997,24 @@ final class TriggerCompiler {
         Label next = new Label();
         Label end = new Label();
         method.visitLabel(top);
+        if (queueSlot >= 0) {
+            method.visitVarInsn(ALOAD, valuesSlot);
+            method.visitVarInsn(ILOAD, indexSlot);
+            method.visitVarInsn(ALOAD, queueSlot);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "takeFromQueue", "(" + OBJECTS + "ILjava/util/Queue;)" + OBJECTS, false);
+            method.visitVarInsn(ASTORE, valuesSlot);
+        }
         method.visitVarInsn(ILOAD, indexSlot);
         method.visitVarInsn(ALOAD, valuesSlot);
         method.visitInsn(ARRAYLENGTH);
         method.visitJumpInsn(IF_ICMPGE, end);
-        blocks.push(new Block(BlockKind.LOOP, end, next, valuesSlot, indicesSlot, indexSlot));
+        Block block = new Block(BlockKind.LOOP, end, next, valuesSlot, indicesSlot, indexSlot);
+        if (looped instanceof Expr.Syntax syntax && syntax.syntax().syntax().id().equals("ExprTestLoopPeeking")
+                && syntax.syntax().pattern() == 0) {
+            // Skript's test expression whose values can't be peeked at.
+            unpeekable.put(block, "test loop peeking");
+        }
+        blocks.push(block);
         if (value != null) {
             variableStore(value);
             variableName(value);
@@ -2661,6 +2711,10 @@ final class TriggerCompiler {
             loop = loops.getLast();
         }
         int offset = syntax.pattern() == 1 ? 1 : syntax.pattern() == 2 ? -1 : 0;
+        if (offset == 1 && unpeekable.containsKey(loop)) {
+            throw new CompileException(line, "The expression '" + unpeekable.get(loop)
+                    + "' does not allow the usage of 'next loop-" + text + "'.");
+        }
         switch (matcher.group(1)) {
             case "index" -> {
                 if (loop.indicesSlot() >= 0) {
@@ -2780,6 +2834,8 @@ final class TriggerCompiler {
                 throw unsupported("the function " + info.name());
             }
             constant(handle, FunctionHandle.class);
+            // The caller's context, so a function that waits carries on where its caller runs.
+            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         }
         List<FunctionInfo.Parameter> parameters = info.parameters();
         pushInt(parameters.size());
@@ -2831,7 +2887,7 @@ final class TriggerCompiler {
             }
         } else {
             method.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(FunctionHandle.class), keyed ? "callKeyed" : "call",
-                    "(" + OBJECTS + ")" + OBJECT_DESC, false);
+                    "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, false);
         }
     }
 

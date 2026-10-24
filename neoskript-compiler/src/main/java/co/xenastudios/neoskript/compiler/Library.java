@@ -400,6 +400,11 @@ public final class Library implements Registrar {
         builder.delays(kind, id);
     }
 
+    /** Marks core syntax as always ending the trigger when matched by {@code pattern} (-1 for any). */
+    void stops(SyntaxKind kind, String id, int pattern) {
+        builder.stops(kind, id, pattern);
+    }
+
     /** Adds a parse-time check to core syntax. */
     void check(SyntaxKind kind, String id, co.xenastudios.neoskript.frontend.registry.ParseCheck check) {
         builder.check(kind, id, check);

@@ -137,6 +137,10 @@ final class StatementParser {
     }
 
     private Statement simple(Line line) {
+        if (line.text().strip().equalsIgnoreCase(PARSE_SECTION + ":")) {
+            error(line, "A parse section must contain code");
+            return new Statement.Invalid(line);
+        }
         LineParser parser = new LineParser(context, line.text());
         int end = line.text().length();
         Expr.FunctionCall call = parser.call(0, end);
@@ -164,6 +168,10 @@ final class StatementParser {
     private Statement section(Node.Section section, Statement previous) {
         Line line = section.line();
         String key = line.key();
+        if (key.equalsIgnoreCase(PARSE_SECTION) && section.children().isEmpty()) {
+            error(line, "A parse section must contain code");
+            return new Statement.Invalid(line);
+        }
         if (key.equalsIgnoreCase(PARSE_SECTION)) {
             // Skript's parse section: its code counts towards the trigger (including any delay), but
             // its problems are captured for the test.
@@ -208,14 +216,37 @@ final class StatementParser {
             // 'parse if' only parses its code when the condition is true while loading, which can't be
             // known here: parse it, but keep its problems out of the report.
             int mark = diagnostics.mark();
-            List<Statement> body = statements(section.children());
+            List<Statement> body = sectionBody(section.children());
             diagnostics.takeSince(mark);
             return new Statement.Section(line, header, body);
         }
         if (isConditional(lower)) {
-            return new Statement.Section(line, header, statements(section.children()));
+            return new Statement.Section(line, header, sectionBody(section.children()));
         }
         return new Statement.Section(line, header, repeatable(section.children()));
+    }
+
+    /**
+     * A section's code. If it always ends the trigger ({@code stop}, {@code return}), a delay in it doesn't
+     * carry past the section, as Skript's execution intents have it.
+     */
+    private List<Statement> sectionBody(List<Node> nodes) {
+        DelayState before = delay;
+        List<Statement> body = statements(nodes);
+        if (stops(body)) {
+            delay = before;
+        }
+        return body;
+    }
+
+    private boolean stops(List<Statement> body) {
+        for (Statement statement : body) {
+            if (statement instanceof Statement.Effect effect
+                    && context.registry().stops(effect.effect().syntax(), effect.effect().pattern())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -224,7 +255,7 @@ final class StatementParser {
      */
     private List<Statement> repeatable(List<Node> nodes) {
         DelayState before = delay;
-        List<Statement> body = statements(nodes);
+        List<Statement> body = sectionBody(nodes);
         delay = before.merge(List.of(before, delay));
         return body;
     }

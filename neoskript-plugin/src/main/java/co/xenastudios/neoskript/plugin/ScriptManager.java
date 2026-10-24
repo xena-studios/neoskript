@@ -120,7 +120,8 @@ final class ScriptManager {
         }
 
         private co.xenastudios.neoskript.runtime.FunctionRef ref(FunctionInfo info, FunctionHandle handle) {
-            return new co.xenastudios.neoskript.runtime.FunctionRef(info.name(), info.localTo(), plurals(info), handle::callKeyed);
+            return new co.xenastudios.neoskript.runtime.FunctionRef(info.name(), info.localTo(), plurals(info),
+                    arguments -> handle.callKeyed(null, arguments));
         }
 
         private List<Boolean> plurals(FunctionInfo info) {
@@ -248,7 +249,8 @@ final class ScriptManager {
         if (afterTests != null) {
             Runnable done = afterTests;
             afterTests = null;
-            scheduler.runGlobal(() -> {
+            // As in Skript's test mode, tests start once the world has had time to load and tick its chunks.
+            scheduler.runGlobalLater(100, () -> {
                 try {
                     TestRunner.run(compiled, logger);
                 } catch (IOException e) {

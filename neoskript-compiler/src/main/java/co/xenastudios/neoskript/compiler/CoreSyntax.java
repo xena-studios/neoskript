@@ -27,6 +27,7 @@ final class CoreSyntax {
     static final String ARITHMETIC = "ExprArithmetic";
     static final String DO_IF = "EffDoIf";
     static final String TEST = "TestCase";
+    static final String EXAMPLE = "StructExample";
     static final String ASSERT = "EffAssert";
     static final String PARSE_LOGS = "ExprLastParseLogs";
     static final String DELAY = "Delay";
@@ -132,6 +133,8 @@ final class CoreSyntax {
                 "for [each] [(key|index)] %~object%(,| and) [value] %~object% in %objects%",
                 "loop %~object%(,| and) %~object% in %objects%");
         library.core(SyntaxKind.SECTION, LOOP, null, List.of(), "loop %objects%");
+        // Skript's 'example:' structure: code that's parsed, for its errors, but never run.
+        library.core(SyntaxKind.STRUCTURE, EXAMPLE, null, List.of(), "example");
         library.core(SyntaxKind.SECTION, WHILE, null, condition, "[do:do] while <.+>");
 
         library.core(SyntaxKind.EFFECT, EXIT, null, List.of(),
@@ -142,6 +145,9 @@ final class CoreSyntax {
                 "continue [this loop|[the] [current] loop]",
                 "continue [the] <\\d+>(st|nd|rd|th) loop");
         library.core(SyntaxKind.EFFECT, RETURN, null, List.of(), "return %objects%");
+        // Code after these never runs, so a delay before them doesn't carry past their section.
+        library.stops(SyntaxKind.EFFECT, EXIT, 0);
+        library.stops(SyntaxKind.EFFECT, RETURN, -1);
         library.core(SyntaxKind.EFFECT, DELAY, null, List.of(), "(wait|halt) [for] %timespan%");
         library.delays(SyntaxKind.EFFECT, DELAY);
         library.core(SyntaxKind.EFFECT, DO_IF, null, List.of(RegexRole.EFFECT, RegexRole.CONDITION), "<.+> if <.+>");

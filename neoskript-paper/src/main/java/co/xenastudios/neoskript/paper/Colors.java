@@ -166,9 +166,9 @@ final class Colors {
         // The colour of a text display's background, a sheep or shulker, or a dyed or tinted item.
         registrar.expression("ExprColorOf", "color", info -> new SettableProperty<>(Object.class, Colour.class,
                 Colors::colourOf, Colors::setColour).resettingTo((java.util.function.Consumer<Object>) owner -> {
-                    // A text display goes back to Minecraft's translucent black.
+                    // A text display goes back to Minecraft's default background.
                     if (owner instanceof org.bukkit.entity.TextDisplay display) {
-                        display.setBackgroundColor(org.bukkit.Color.fromARGB(64, 0, 0, 0));
+                        display.setDefaultBackground(true);
                     }
                 }), "[the] colo[u]r[s] of %itemtypes/entities/potioneffecttypes%",
                 "%itemtypes/entities/potioneffecttypes%'[s] colo[u]r[s]");
@@ -241,6 +241,9 @@ final class Colors {
     /** The colour {@code owner} has, or {@code null}. */
     private static Colour colourOf(Object owner) {
         return switch (owner) {
+            // Minecraft's default background, which resetting gives, is translucent black.
+            case org.bukkit.entity.TextDisplay display when display.isDefaultBackground() ->
+                    Displays.colour(org.bukkit.Color.fromARGB(64, 0, 0, 0));
             case org.bukkit.entity.TextDisplay display -> display.getBackgroundColor() == null ? null
                     : Displays.colour(display.getBackgroundColor());
             case org.bukkit.potion.PotionEffectType type -> Displays.colour(type.getColor());
@@ -257,7 +260,10 @@ final class Colors {
     private static void setColour(Object owner, Colour colour) {
         org.bukkit.Color color = org.bukkit.Color.fromARGB(colour.alpha(), colour.red(), colour.green(), colour.blue());
         switch (owner) {
-            case org.bukkit.entity.TextDisplay display -> display.setBackgroundColor(color);
+            case org.bukkit.entity.TextDisplay display -> {
+                display.setDefaultBackground(false);
+                display.setBackgroundColor(color);
+            }
             case org.bukkit.material.Colorable colorable -> {
                 org.bukkit.DyeColor dye = org.bukkit.DyeColor.getByColor(org.bukkit.Color.fromRGB(colour.red(), colour.green(),
                         colour.blue()));

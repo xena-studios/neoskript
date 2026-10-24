@@ -4,6 +4,8 @@
  */
 package co.xenastudios.neoskript.runtime;
 
+import co.xenastudios.neoskript.api.element.TriggerContext;
+
 /**
  * What calls to a script function go through. Each caller holds the handle, not the function, so a
  * reload can swap in a new version of the function without recompiling every script that calls it.
@@ -43,15 +45,24 @@ public final class FunctionHandle {
     }
 
     public Object call(Object[] arguments) {
-        return KeyedValues.plain(callKeyed(arguments));
+        return call(CONTEXT, arguments);
+    }
+
+    /**
+     * Calls it from code running in {@code caller}: if it waits, it carries on where the caller runs (its
+     * region, on Folia).
+     */
+    public Object call(TriggerContext caller, Object[] arguments) {
+        return KeyedValues.plain(callKeyed(caller, arguments));
     }
 
     /** What the function returns, with the indices of a list it returns ({@link KeyedValues}), as {@code keyed f()} wants. */
-    public Object callKeyed(Object[] arguments) {
+    public Object callKeyed(TriggerContext caller, Object[] arguments) {
         CompiledFunction function = target;
         if (function == null) {
             throw new IllegalStateException("The function " + name + " isn't loaded");
         }
-        return function.call(CONTEXT, arguments);
+        Object owner = caller instanceof SimpleTriggerContext simple ? simple.owner() : null;
+        return function.call(owner == null ? CONTEXT : new SimpleTriggerContext(null, owner), arguments);
     }
 }
