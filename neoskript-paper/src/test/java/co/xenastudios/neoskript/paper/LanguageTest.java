@@ -193,6 +193,7 @@ class LanguageTest {
                 \t\t\texit loop
                 \t\tsay {_i}
                 \tsay "done"
+                \tsuppress unreachable code warnings
                 \tstop
                 \tsay "unreachable"
                 """));
@@ -284,6 +285,48 @@ class LanguageTest {
     }
 
     @Test
+    void functionsThatWaitLetTheirCallerGoOn() {
+        java.util.ArrayDeque<Runnable> later = new java.util.ArrayDeque<>();
+        co.xenastudios.neoskript.runtime.Waits.install(new co.xenastudios.neoskript.runtime.scheduler.Scheduler() {
+            @Override
+            public void runGlobal(Runnable task) {
+                later.add(task);
+            }
+
+            @Override
+            public void runGlobalLater(long ticks, Runnable task) {
+                later.add(task);
+            }
+
+            @Override
+            public Runnable runGlobalRepeating(long ticks, Runnable task) {
+                throw new UnsupportedOperationException();
+            }
+        }, e -> {
+            throw e;
+        });
+        run("""
+                function count(id: integer):
+                \tset {_n} to 0
+                \twhile {_n} < 2:
+                \t\tadd 1 to {_n}
+                \t\tsay "%{_id}%:%{_n}%"
+                \t\twait 1 tick
+                \tsay "%{_id}% done"
+
+                on load:
+                \tcount(1)
+                \tcount(2)
+                \tsay "caller"
+                """);
+        assertEquals(List.of("1:1", "2:1", "caller"), said);
+        while (!later.isEmpty()) {
+            later.poll().run();
+        }
+        assertEquals(List.of("1:1", "2:1", "caller", "1:2", "2:2", "1 done", "2 done"), said);
+    }
+
+    @Test
     void delayStateFollowsSkriptsRules() {
         Library library = new Library();
         library.enableTesting();
@@ -307,12 +350,17 @@ class LanguageTest {
                 \t\telse if has delay before is true failing if wrong:
                 \t\t\tstop
                 \tsay last parse logs
+                \tparse:
+                \t\tif true is true:
+                \t\t\twait 1 second
+                \t\t\tstop
+                \tsay has delay before
                 """)));
         assertEquals(List.of(), parsed.getFirst().diagnostics());
         CompiledScripts compiled = new ScriptCompiler(library, globals).compile(parsed);
         assertEquals(List.of(), compiled.diagnostics());
         compiled.linkFunctions();
         compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
-        assertEquals(List.of("false", "unknown", "true", "<none>"), said);
+        assertEquals(List.of("false", "unknown", "true", "<none>", "true"), said);
     }
 }

@@ -142,31 +142,51 @@ final class Logic {
         registrar.expression("LitNaN", "number", info -> (context, args) -> Double.NaN, "NaN [value]", "value of NaN");
         registrar.expression("ExprRandomNumber", "number", info -> {
             boolean integers = info.hasTag("integer");
+            boolean counted = info.pattern() == 1;
             return (context, args) -> {
-                if (!(args[1] instanceof Number a) || !(args[2] instanceof Number b)) {
-                    return null;
+                Object lowArg = args[counted ? 1 : 0];
+                Object highArg = args[counted ? 2 : 1];
+                if (!(lowArg instanceof Number a) || !(highArg instanceof Number b)
+                        || !Double.isFinite(a.doubleValue()) || !Double.isFinite(b.doubleValue())) {
+                    return new Object[0];
                 }
-                int count = args[0] instanceof Number n ? (int) Math.max(0, Math.round(n.doubleValue())) : 1;
+                // An amount that's written but nothing, or not above 0, gives nothing, as in Skript.
+                if (counted && !(args[0] instanceof Number)) {
+                    return new Object[0];
+                }
+                long wanted = counted ? Values.toInt(((Number) args[0]).doubleValue()) : 1;
+                if (wanted <= 0) {
+                    return new Object[0];
+                }
+                int count = (int) wanted;
                 double low = Math.min(a.doubleValue(), b.doubleValue());
                 double high = Math.max(a.doubleValue(), b.doubleValue());
                 java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
                 Object[] numbers = new Object[count];
-                for (int i = 0; i < count; i++) {
-                    if (integers) {
-                        long from = (long) Math.ceil(low);
-                        long to = (long) Math.floor(high);
-                        if (from > to) {
-                            // No whole number between them, like between 1.5 and 1.6.
-                            return null;
+                if (integers) {
+                    long to = (long) Math.floor(high);
+                    long from = (long) Math.ceil(low);
+                    if (high - low < 1 && from - to <= 1) {
+                        // At most one whole number between them, like between 0 and 0.5, or none, like 1.5 and 1.6.
+                        Long only = to == from || low == from ? Long.valueOf(from) : high == to ? Long.valueOf(to) : null;
+                        if (only == null) {
+                            return new Object[0];
                         }
-                        numbers[i] = from + random.nextLong(to - from + 1);
-                    } else {
-                        numbers[i] = low + random.nextDouble() * (high - low);
+                        java.util.Arrays.fill(numbers, only);
+                        return numbers.length == 1 ? numbers[0] : numbers;
+                    }
+                    for (int i = 0; i < count; i++) {
+                        numbers[i] = from + Math.floorMod(random.nextLong(), to - from + 1);
+                    }
+                } else {
+                    for (int i = 0; i < count; i++) {
+                        numbers[i] = Math.min(low + random.nextDouble() * (high - low), high);
                     }
                 }
                 return numbers.length == 1 ? numbers[0] : numbers;
             };
-        }, "[a|%integer%] random (integer:integer|number)[s] (from|between) %number% (to|and) %number%");
+        }, "[a] random (integer:integer|number)[s] (from|between) %number% (to|and) %number%",
+                "%integer% random (integer:integer|number)[s] (from|between) %number% (to|and) %number%");
         registrar.condition("CondMinecraftVersion", info -> {
             boolean below = info.hasTag("below");
             return (context, args) -> {

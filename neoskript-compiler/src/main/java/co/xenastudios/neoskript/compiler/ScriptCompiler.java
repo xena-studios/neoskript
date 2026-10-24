@@ -72,6 +72,7 @@ public final class ScriptCompiler {
         }
         for (ParsedScript script : scripts) {
             String name = script.file().name();
+            co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(name);
             Map<Integer, String> parseProblems = new HashMap<>();
             script.diagnostics().forEach(d -> parseProblems.putIfAbsent(d.line(), d.message()));
             for (ParsedStructure structure : script.structures()) {
@@ -101,6 +102,8 @@ public final class ScriptCompiler {
                         case ParsedStructure.Function function -> bodies.add(new CompiledScripts.CompiledFunctionBody(name,
                                 functions.get(function.signature()),
                                 new TriggerCompiler(library, functions, globals, script).compileFunction(name, function)));
+                        case ParsedStructure.Custom custom when library.binding(custom.syntax().syntax())
+                                instanceof Library.Core core && core.id().equals(CoreSyntax.EXAMPLE) -> {}
                         case ParsedStructure.Custom custom when testName != null -> triggers.add(
                                 new CompiledScripts.CompiledTrigger(name, header.number(), null, null, null, testName,
                                         new TriggerCompiler(library, functions, globals, script).compileTest(name, custom)));
@@ -128,6 +131,7 @@ public final class ScriptCompiler {
                 }
             }
         }
+        co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(null);
         return new CompiledScripts(triggers, bodies, diagnostics, unrunnableTests, commands);
     }
 

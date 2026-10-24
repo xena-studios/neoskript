@@ -26,14 +26,22 @@ final class Expected {
     private final boolean plural;
     private final boolean literalOnly;
     private final boolean changeable;
+    /** With some types single and others plural ({@code %number/booleans%}), the plural ones; else {@code null}. */
+    private final List<TypeInfo> pluralTypes;
     private final int hash;
 
     Expected(List<TypeInfo> types, boolean plural, boolean literalOnly, boolean changeable) {
+        this(types, plural, literalOnly, changeable, null);
+    }
+
+    private Expected(List<TypeInfo> types, boolean plural, boolean literalOnly, boolean changeable,
+            List<TypeInfo> pluralTypes) {
         this.types = List.copyOf(types);
         this.plural = plural;
         this.literalOnly = literalOnly;
         this.changeable = changeable;
-        this.hash = Objects.hash(this.types, plural, literalOnly, changeable);
+        this.pluralTypes = pluralTypes == null ? null : List.copyOf(pluralTypes);
+        this.hash = Objects.hash(this.types, plural, literalOnly, changeable, this.pluralTypes);
     }
 
     static Expected of(List<TypeRef> refs, boolean literalOnly, boolean changeable) {
@@ -44,7 +52,25 @@ final class Expected {
             anything |= ref.type().id().equals(SyntaxRegistry.OBJECT);
         }
         List<TypeInfo> types = anything ? List.of() : refs.stream().map(TypeRef::type).toList();
-        return new Expected(types, plural, literalOnly, changeable);
+        List<TypeInfo> pluralTypes = refs.stream().filter(TypeRef::plural).map(TypeRef::type).toList();
+        boolean mixed = !anything && !pluralTypes.isEmpty() && pluralTypes.size() < refs.size();
+        return new Expected(types, plural, literalOnly, changeable, mixed ? pluralTypes : null);
+    }
+
+    /**
+     * Whether a list of several values of {@code type} fits: with {@code %number/booleans%}, only the plural
+     * types take one, as in Skript.
+     */
+    boolean acceptsMany(String type, SyntaxRegistry registry) {
+        if (pluralTypes == null || type == null || type.equals(SyntaxRegistry.OBJECT)) {
+            return true;
+        }
+        for (TypeInfo expected : pluralTypes) {
+            if (registry.isAssignable(type, expected.id())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     List<TypeInfo> types() {
@@ -84,17 +110,17 @@ final class Expected {
     }
 
     Expected single() {
-        return plural ? new Expected(types, false, literalOnly, changeable) : this;
+        return plural ? new Expected(types, false, literalOnly, changeable, null) : this;
     }
 
     Expected asLiteralOnly() {
-        return literalOnly ? this : new Expected(types, plural, true, changeable);
+        return literalOnly ? this : new Expected(types, plural, true, changeable, pluralTypes);
     }
 
     @Override
     public boolean equals(Object other) {
         return other instanceof Expected e && e.hash == hash && e.plural == plural && e.literalOnly == literalOnly
-                && e.changeable == changeable && e.types.equals(types);
+                && e.changeable == changeable && e.types.equals(types) && Objects.equals(e.pluralTypes, pluralTypes);
     }
 
     @Override

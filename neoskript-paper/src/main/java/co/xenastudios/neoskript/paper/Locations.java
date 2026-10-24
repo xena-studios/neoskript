@@ -94,26 +94,67 @@ final class Locations {
             return null;
         }, "[the] distance between %location% and %location%");
 
-        registrar.effect("EffTeleport", info -> (context, args) -> {
-            if (!(args[1] instanceof Location location)) {
-                return;
+        // What a teleport keeps: 'teleport X to Y retaining passengers and xyz velocity'.
+        java.util.Map<String, TeleportFlags> flags = new java.util.LinkedHashMap<>();
+        java.util.function.BiConsumer<String, io.papermc.paper.entity.TeleportFlag[]> flag = (names, kept) -> {
+            String[] all = names.split(", ");
+            TeleportFlags value = new TeleportFlags(all[0], List.of(kept));
+            for (String name : all) {
+                flags.put(name, value);
             }
-            for (Object entity : (Object[]) args[0]) {
-                if (entity instanceof Entity e) {
-                    // A location without a world is in the entity's world.
-                    Location target = location.getWorld() == null ? location.clone() : location;
-                    if (target.getWorld() == null) {
-                        target.setWorld(e.getWorld());
-                    }
-                    try {
-                        e.teleport(target);
-                    } catch (UnsupportedOperationException folia) {
-                        // Folia only teleports asynchronously.
-                        e.teleportAsync(target);
+        };
+        flag.accept("opened inventory, open inventory, inventory",
+                new io.papermc.paper.entity.TeleportFlag[] {io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_OPEN_INVENTORY});
+        flag.accept("passengers, passenger",
+                new io.papermc.paper.entity.TeleportFlag[] {io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS});
+        flag.accept("vehicle",
+                new io.papermc.paper.entity.TeleportFlag[] {io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_VEHICLE});
+        flag.accept("directional velocity, pitch and yaw velocity, yaw and pitch velocity",
+                new io.papermc.paper.entity.TeleportFlag[] {io.papermc.paper.entity.TeleportFlag.Relative.VELOCITY_ROTATION});
+        flag.accept("pitch velocity", new io.papermc.paper.entity.TeleportFlag[] {io.papermc.paper.entity.TeleportFlag.Relative.PITCH});
+        flag.accept("yaw velocity", new io.papermc.paper.entity.TeleportFlag[] {io.papermc.paper.entity.TeleportFlag.Relative.YAW});
+        flag.accept("xyz velocity", new io.papermc.paper.entity.TeleportFlag[] {io.papermc.paper.entity.TeleportFlag.Relative.VELOCITY_X,
+                io.papermc.paper.entity.TeleportFlag.Relative.VELOCITY_Y, io.papermc.paper.entity.TeleportFlag.Relative.VELOCITY_Z});
+        flag.accept("x velocity", new io.papermc.paper.entity.TeleportFlag[] {io.papermc.paper.entity.TeleportFlag.Relative.VELOCITY_X});
+        flag.accept("y velocity", new io.papermc.paper.entity.TeleportFlag[] {io.papermc.paper.entity.TeleportFlag.Relative.VELOCITY_Y});
+        flag.accept("z velocity", new io.papermc.paper.entity.TeleportFlag[] {io.papermc.paper.entity.TeleportFlag.Relative.VELOCITY_Z});
+        registrar.namedType("teleportflag", "teleport flag", TeleportFlags.class, flags);
+
+        registrar.effect("EffTeleport", info -> {
+            boolean directed = info.pattern() == 1;
+            return (context, args) -> {
+                if (!(Values.single(args[directed ? 2 : 1]) instanceof Location given)) {
+                    return;
+                }
+                Object direction = directed ? Values.single(args[1]) : null;
+                List<io.papermc.paper.entity.TeleportFlag> kept = new java.util.ArrayList<>();
+                for (Object value : Values.array(args[directed ? 3 : 2])) {
+                    if (value instanceof TeleportFlags each) {
+                        kept.addAll(each.flags());
                     }
                 }
-            }
-        }, "[force] teleport %entities% to %location%");
+                io.papermc.paper.entity.TeleportFlag[] keep = kept.toArray(io.papermc.paper.entity.TeleportFlag[]::new);
+                for (Object entity : (Object[]) args[0]) {
+                    if (entity instanceof Entity e) {
+                        Location target = given.clone();
+                        // A location without a world is in the entity's world.
+                        if (target.getWorld() == null) {
+                            target.setWorld(e.getWorld());
+                        }
+                        if (direction instanceof WorldSyntax.Direction d) {
+                            target.add(d.from(target));
+                        }
+                        try {
+                            e.teleport(target, keep);
+                        } catch (UnsupportedOperationException folia) {
+                            // Folia only teleports asynchronously.
+                            e.teleportAsync(target, org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN, keep);
+                        }
+                    }
+                }
+            };
+        }, "[force] teleport %entities% to %location% [[while] retaining %teleportflags%]",
+                "[force] teleport %entities% %direction% %location% [[while] retaining %teleportflags%]");
 
         registrar.function("location", List.of(Parameter.of("x", "number"), Parameter.of("y", "number"),
                 Parameter.of("z", "number"),
@@ -169,5 +210,13 @@ final class Locations {
     /** Whether two coordinates are equal, give or take floating point error, as numbers are compared. */
     private static boolean close(double a, double b) {
         return a == b || Math.abs(a - b) < 1e-10;
+    }
+
+    /** One of Skript's teleport flags: what a teleport keeps, as Paper's flags. */
+    record TeleportFlags(String name, List<io.papermc.paper.entity.TeleportFlag> flags) {
+        @Override
+        public String toString() {
+            return name;
+        }
     }
 }

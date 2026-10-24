@@ -73,6 +73,14 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         StandardLibrary.register(library);
         if (TestRunner.enabled()) {
             StandardLibrary.registerTesting(library);
+            // As Skript's test mode does: the chunks tests use stay loaded and ticking.
+            try {
+                org.bukkit.World world = getServer().getWorlds().getFirst();
+                world.addPluginChunkTicket(0, 0, this);
+                world.addPluginChunkTicket(100, 100, this);
+            } catch (RuntimeException notHere) {
+                getSLF4JLogger().warn("Couldn't keep the test chunks loaded: {}", notHere.toString());
+            }
         }
         Scheduler scheduler = platform == Platform.FOLIA ? new FoliaScheduler(this) : new PaperScheduler(this);
         // Waiting triggers carry on through the scheduler; their errors can only be logged.

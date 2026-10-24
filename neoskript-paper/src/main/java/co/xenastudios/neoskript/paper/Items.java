@@ -522,6 +522,45 @@ final class Items {
             "GRINDSTONE", "STONECUTTER", "COMPOSTER", "CHISELED_BOOKSHELF", "JUKEBOX", "DECORATED_POT", "CRAFTER");
 
     /** A kind of inventory, Skript's {@code inventory type}: {@code hopper inventory}. */
+    /**
+     * The inventory of a container item, like a chest or shulker box, or {@code null}: changing it changes
+     * the item, as in Skript.
+     */
+    private static Inventory itemInventory(ItemType item) {
+        if (!(item.stack().getItemMeta() instanceof org.bukkit.inventory.meta.BlockStateMeta meta)
+                || !(meta.getBlockState() instanceof org.bukkit.block.Container state)) {
+            return null;
+        }
+        Inventory inventory = state.getInventory();
+        return (Inventory) java.lang.reflect.Proxy.newProxyInstance(Items.class.getClassLoader(),
+                new Class<?>[] {Inventory.class}, (proxy, method, arguments) -> {
+                    Object result;
+                    try {
+                        result = method.invoke(inventory, arguments);
+                    } catch (java.lang.reflect.InvocationTargetException e) {
+                        throw e.getCause();
+                    }
+                    if (state.update()) {
+                        item.editMeta(edited -> ((org.bukkit.inventory.meta.BlockStateMeta) edited).setBlockState(state));
+                    }
+                    return result;
+                });
+    }
+
+    /** The kind of inventory {@code text} names, as {@code hopper inventory}, or {@code null}. */
+    static InventoryKind inventoryKind(String text) {
+        String name = text.strip().toLowerCase(java.util.Locale.ROOT);
+        if (!name.endsWith(" inventory")) {
+            return null;
+        }
+        name = name.substring(0, name.length() - " inventory".length());
+        if (name.equals("crafting table")) {
+            return new InventoryKind("WORKBENCH");
+        }
+        String upper = name.toUpperCase(java.util.Locale.ROOT).replace(' ', '_');
+        return INVENTORY_KINDS.contains(upper) ? new InventoryKind(upper) : null;
+    }
+
     record InventoryKind(String name) {
         org.bukkit.event.inventory.InventoryType type() {
             try {
@@ -832,28 +871,59 @@ final class Items {
                 } else if (holder instanceof org.bukkit.block.Block block
                         && block.getState() instanceof InventoryHolder h) {
                     inventories.add(h.getInventory());
+                } else if (holder instanceof ItemType item && itemInventory(item) instanceof Inventory inventory) {
+                    inventories.add(inventory);
                 }
             }
             return inventories.size() == 1 ? inventories.getFirst() : inventories.toArray();
-        }, "[the] inventor(y|ies) of %inventoryholders/blocks%", "%inventoryholders/blocks%'[s] inventor(y|ies)");
+        }, "[the] inventor(y|ies) of %inventoryholders/blocks/itemtypes%",
+                "%inventoryholders/blocks/itemtypes%'[s] inventor(y|ies)");
 
         registrar.effect("EffOpenInventory", info -> {
             int pattern = info.pattern();
+            String literal = pattern == 2 ? info.argumentLiteral(0) : null;
+            if (literal != null) {
+                InventoryKind kind = inventoryKind(literal);
+                org.bukkit.event.inventory.InventoryType type = kind == null ? null : kind.type();
+                if (type != null && !type.isCreatable()) {
+                    throw new co.xenastudios.neoskript.api.element.SyntaxError(
+                            "Cannot create an inventory of type " + kind);
+                }
+            }
+            String fixed = switch (pattern) {
+                case 3 -> "WORKBENCH";
+                case 4 -> "CHEST";
+                case 5 -> "ANVIL";
+                case 6 -> "HOPPER";
+                case 7 -> "DROPPER";
+                case 8 -> "DISPENSER";
+                default -> null;
+            };
             return (context, args) -> {
-                Object[] players = (Object[]) args[pattern <= 1 ? 0 : 1];
+                Object[] players = (Object[]) args[pattern == 2 ? 1 : 0];
                 for (Object player : players) {
                     if (!(player instanceof Player p)) {
                         continue;
                     }
                     if (pattern <= 1) {
                         p.closeInventory();
-                    } else if (args[0] instanceof Inventory inventory) {
+                        continue;
+                    }
+                    Object opened = fixed != null ? new InventoryKind(fixed) : Values.single(args[0]);
+                    if (opened instanceof InventoryKind kind) {
+                        org.bukkit.event.inventory.InventoryType type = kind.type();
+                        opened = type == null || !type.isCreatable() ? null : Bukkit.createInventory(null, type);
+                    }
+                    if (opened instanceof Inventory inventory) {
                         p.openInventory(inventory);
                     }
                 }
             };
         }, "close %players%'[s] inventory [view]", "close [the] inventory [view] (to|of|for) %players%",
-                "open %inventory% (to|for) %players%");
+                "open %inventory/inventorytype% (to|for) %players%",
+                "open [a] (crafting table|workbench) (to|for) %players%", "open [a] chest (to|for) %players%",
+                "open [a[n]] anvil (to|for) %players%", "open [a] hopper (to|for) %players%",
+                "open [a] dropper (to|for) %players%", "open [a] dispenser (to|for) %players%");
 
         registrar.event("EvtInventoryClick", List.of(InventoryClickEvent.class), info -> (context, args) -> {
             if (args[0] == null) {

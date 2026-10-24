@@ -65,6 +65,51 @@ final class WorldSyntax {
         }
     }
 
+    /** Who shot what isn't a projectile, like a pig, for {@code the shooter} in {@code shoot a pig:}. */
+    private static final Map<Entity, org.bukkit.entity.LivingEntity> SHOOTERS =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    /**
+     * Shoots one {@code kind} from {@code shooter}, an entity or a location, as Skript does: projectiles are
+     * launched, fireballs start in front of the eyes, anything else starts halfway up and is pushed.
+     */
+    private static Entity shoot(EntityKind kind, Object shooter, double speed, Direction direction) {
+        if (!kind.spawnable()) {
+            return null;
+        }
+        Class<? extends Entity> type = kind.type().getEntityClass();
+        Entity entity;
+        Vector velocity;
+        if (shooter instanceof org.bukkit.entity.LivingEntity living) {
+            Location from = living.getLocation();
+            velocity = (direction == null ? from.getDirection() : direction.from(from)).multiply(speed);
+            if (type != null && org.bukkit.entity.Fireball.class.isAssignableFrom(type)) {
+                Location at = living.getEyeLocation().add(velocity.clone().normalize().multiply(0.5));
+                entity = living.getWorld().spawn(at, type);
+                ((org.bukkit.entity.Projectile) entity).setShooter(living);
+            } else if (type != null && org.bukkit.entity.Projectile.class.isAssignableFrom(type)) {
+                @SuppressWarnings("unchecked")
+                Class<? extends org.bukkit.entity.Projectile> projectile = (Class<? extends org.bukkit.entity.Projectile>) type;
+                entity = living.launchProjectile(projectile, velocity);
+            } else {
+                from.setY(from.getY() + living.getEyeHeight() / 2);
+                entity = kind.spawn(from);
+                if (entity != null) {
+                    SHOOTERS.put(entity, living);
+                }
+            }
+        } else if (shooter instanceof Location location) {
+            velocity = (direction == null ? location.getDirection() : direction.from(location)).multiply(speed);
+            entity = kind.spawn(location);
+        } else {
+            return null;
+        }
+        if (entity != null) {
+            entity.setVelocity(velocity);
+        }
+        return entity;
+    }
+
     /** The entities spawned last on each thread, for {@code the last spawned pig}. */
     private static final ThreadLocal<Entity> LAST_SPAWNED = new ThreadLocal<>();
 
@@ -288,6 +333,42 @@ final class WorldSyntax {
                 "(spawn|summon) %number% of %entitytypes% [(at|on) %locations%]",
                 "(spawn|summon) %number% %entitytypes% [(at|on) %locations%]",
                 "(spawn|summon) %experience% [(at|on) %locations%]");
+        // 'shoot an arrow from the player', 'make {_loc} shoot a pig at speed 2': its code runs for each one shot.
+        registrar.section("EffSecShoot", "entity", info -> {
+            int typesAt = info.pattern() == 0 ? 0 : 1;
+            return (context, args) -> {
+                Object[] types = Values.array(args[typesAt]);
+                Object[] shooters = Values.array(args[1 - typesAt]);
+                double speed = args[2] == null ? 5 : Values.single(args[2]) instanceof Number n ? n.doubleValue() : Double.NaN;
+                Object direction = Values.single(args[3]);
+                List<Object> shot = new ArrayList<>();
+                if (Double.isNaN(speed)) {
+                    return shot.toArray();
+                }
+                for (Object shooter : shooters) {
+                    for (Object type : types) {
+                        if (type instanceof EntityKind kind) {
+                            Entity entity = shoot(kind, shooter, speed, direction instanceof Direction d ? d : null);
+                            if (entity != null) {
+                                LAST_SPAWNED.set(entity);
+                                shot.add(entity);
+                            }
+                        }
+                    }
+                }
+                return shot.toArray();
+            };
+        }, "shoot %entitytypes% [from %livingentities/locations%] [(at|with) (speed|velocity) %number%] [%direction%]",
+                "(make|let) %livingentities/locations% shoot %entitytypes% [(at|with) (speed|velocity) %number%] [%direction%]");
+        // The shooter of a projectile, or in 'shoot a pig:', of what was shot.
+        registrar.expression("ExprShooter", "livingentity", info -> new SettableProperty<>(Entity.class,
+                org.bukkit.entity.LivingEntity.class, entity -> entity instanceof org.bukkit.entity.Projectile projectile
+                        ? projectile.getShooter() instanceof org.bukkit.entity.LivingEntity living ? living : null
+                        : SHOOTERS.get(entity), (entity, shooter) -> {
+                    if (entity instanceof org.bukkit.entity.Projectile projectile) {
+                        projectile.setShooter(shooter);
+                    }
+                }), "[the] shooter [of %entities%]");
         registrar.expression("ExprLastSpawnedEntity", "entity", info -> (context, args) -> {
             Entity last = LAST_SPAWNED.get();
             return last != null && (args[0] == null || (args[0] instanceof EntityKind kind && kind.matches(last))) ? last : null;
@@ -542,11 +623,160 @@ final class WorldSyntax {
                         : value instanceof org.bukkit.inventory.ItemStack stack ? stack.getType() : null;
                 if (material != null && material.isBlock()) {
                     block.setType(material);
+                    if (value instanceof ItemType item) {
+                        copyContainer(block, item);
+                    }
                     return;
                 }
             }
         });
         registrar.changer(Block.class, Changeable.Mode.DELETE, (block, values) -> block.setType(Material.AIR));
+        registerTrees(registrar);
+
+        // 'blocks in radius 2 of X': the blocks whose centres are within the radius, as Skript finds them.
+        registrar.expression("ExprBlockSphere", "block", info -> {
+            int radiusAt = info.pattern() == 0 ? 0 : 1;
+            return (context, args) -> {
+                Location center = (Location) Values.single(args[1 - radiusAt]);
+                if (!(Values.single(args[radiusAt]) instanceof Number number) || center == null || center.getWorld() == null) {
+                    return new Object[0];
+                }
+                double radius = number.doubleValue();
+                double reach = radius + 0.5001;
+                World world = center.getWorld();
+                int minX = (int) Math.ceil(center.getX() - reach);
+                int maxX = (int) Math.floor(center.getX() + reach);
+                int minY = (int) Math.ceil(Math.max(center.getY() - reach, world.getMinHeight()));
+                int maxY = (int) Math.floor(Math.min(center.getY() + reach, world.getMaxHeight() - 1));
+                int minZ = (int) Math.ceil(center.getZ() - reach);
+                int maxZ = (int) Math.floor(center.getZ() + reach);
+                double squared = radius * radius * 1.00001;
+                List<Object> blocks = new ArrayList<>();
+                for (int y = minY; y <= maxY; y++) {
+                    for (int z = minZ; z <= maxZ; z++) {
+                        for (int x = minX; x <= maxX; x++) {
+                            double dx = x + 0.5 - center.getX();
+                            double dy = y + 0.5 - center.getY();
+                            double dz = z + 0.5 - center.getZ();
+                            if (dx * dx + dy * dy + dz * dz < squared) {
+                                blocks.add(world.getBlockAt(x, y, z));
+                            }
+                        }
+                    }
+                }
+                return blocks.toArray();
+            };
+        }, "[(all [[of] the]|the)] blocks in radius %number% [(of|around) %location%]",
+                "[(all [[of] the]|the)] blocks around %location% in radius %number%");
+        registrar.effect("EffBlockUpdate", info -> {
+            boolean physics = !info.hasTag("physics");
+            return (context, args) -> {
+                if (!(Values.single(args[1]) instanceof org.bukkit.block.data.BlockData data)) {
+                    return;
+                }
+                for (Object value : (Object[]) args[0]) {
+                    if (value instanceof Block block) {
+                        block.setBlockData(data, physics);
+                    }
+                }
+            };
+        }, "update %blocks% (as|to be) %blockdata% [physics:without [neighbo[u]r[ing]|adjacent] [physics] update[s]]");
+    }
+
+    /** Skript's tree types: kinds of tree or huge mushroom, by Bukkit's tree types, grown at random among them. */
+    record TreeKind(String name, List<String> types) {
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
+    private static void registerTrees(Registrar registrar) {
+        Map<String, TreeKind> kinds = new java.util.LinkedHashMap<>();
+        java.util.function.BiConsumer<String, String[]> kind = (names, types) -> {
+            String[] all = names.split(", ");
+            TreeKind tree = new TreeKind(all[0], List.of(types));
+            for (String name : all) {
+                kinds.put(name, tree);
+            }
+        };
+        kind.accept("tree, any tree", new String[] {"*"});
+        kind.accept("oak tree, any oak tree, any normal tree, any regular tree", new String[] {"TREE", "BIG_TREE"});
+        kind.accept("small oak tree, small normal tree, small regular tree", new String[] {"TREE"});
+        kind.accept("big oak tree, big normal tree, big regular tree", new String[] {"BIG_TREE"});
+        kind.accept("spruce tree, any spruce tree", new String[] {"REDWOOD", "TALL_REDWOOD"});
+        kind.accept("small spruce tree", new String[] {"REDWOOD"});
+        kind.accept("big spruce tree, tall spruce tree", new String[] {"TALL_REDWOOD"});
+        kind.accept("mega spruce tree, giant spruce tree", new String[] {"MEGA_REDWOOD"});
+        kind.accept("birch tree, any birch tree", new String[] {"BIRCH", "TALL_BIRCH"});
+        kind.accept("small birch tree", new String[] {"BIRCH"});
+        kind.accept("tall birch tree", new String[] {"TALL_BIRCH"});
+        kind.accept("jungle tree, any jungle tree", new String[] {"SMALL_JUNGLE", "JUNGLE", "COCOA_TREE"});
+        kind.accept("small jungle tree", new String[] {"SMALL_JUNGLE"});
+        kind.accept("big jungle tree, tall jungle tree, giant jungle tree", new String[] {"JUNGLE"});
+        kind.accept("cocoa tree, jungle cocoa tree, cocoa jungle tree", new String[] {"COCOA_TREE"});
+        kind.accept("jungle bush, jungle bush tree", new String[] {"JUNGLE_BUSH"});
+        kind.accept("acacia tree", new String[] {"ACACIA"});
+        kind.accept("dark oak tree", new String[] {"DARK_OAK"});
+        kind.accept("swamp tree, swamp oak, swamp oak tree", new String[] {"SWAMP"});
+        kind.accept("huge mushroom, any huge mushroom", new String[] {"RED_MUSHROOM", "BROWN_MUSHROOM"});
+        kind.accept("huge red mushroom", new String[] {"RED_MUSHROOM"});
+        kind.accept("huge brown mushroom", new String[] {"BROWN_MUSHROOM"});
+        kind.accept("mangrove tree, any mangrove tree", new String[] {"MANGROVE", "TALL_MANGROVE"});
+        kind.accept("small mangrove tree", new String[] {"MANGROVE"});
+        kind.accept("big mangrove tree", new String[] {"TALL_MANGROVE"});
+        kind.accept("azalea tree", new String[] {"AZALEA"});
+        kind.accept("pale oak tree, any pale oak tree", new String[] {"PALE_OAK", "PALE_OAK_CREAKING"});
+        kind.accept("normal pale oak tree", new String[] {"PALE_OAK"});
+        kind.accept("creaking pale oak tree", new String[] {"PALE_OAK_CREAKING"});
+        kind.accept("cherry tree", new String[] {"CHERRY"});
+        kind.accept("crimson fungus, crimson tree, crimson fungus tree", new String[] {"CRIMSON_FUNGUS"});
+        kind.accept("warped fungus, warped tree, warped fungus tree", new String[] {"WARPED_FUNGUS"});
+        kind.accept("chorus plant", new String[] {"CHORUS_PLANT"});
+        kind.accept("poplar tree, any poplar tree", new String[] {"POPLAR"});
+        registrar.namedType("treetype", "tree type", TreeKind.class, kinds);
+        registrar.effect("EffTree", info -> {
+            boolean typed = info.pattern() == 1;
+            return (context, args) -> {
+                Object chosen = typed || args[0] != null ? Values.single(args[0]) : kinds.get("tree");
+                if (!(chosen instanceof TreeKind tree)) {
+                    return;
+                }
+                Object[] directions = Values.array(args[1]);
+                for (Object value : (Object[]) args[2]) {
+                    if (value instanceof Location location && location.getWorld() != null) {
+                        Location at = location.clone();
+                        for (Object direction : directions) {
+                            if (direction instanceof Direction d) {
+                                at.add(d.from(at));
+                            }
+                        }
+                        grow(tree, at);
+                    }
+                }
+            };
+        }, "(grow|create|generate) tree [of type %treetype%] %directions% %locations%",
+                "(grow|create|generate) %treetype% %directions% %locations%");
+    }
+
+    /** Grows one of the tree's types at {@code location}, at random. */
+    private static void grow(TreeKind tree, Location location) {
+        List<org.bukkit.TreeType> types = new ArrayList<>();
+        for (String name : tree.types()) {
+            if (name.equals("*")) {
+                types.addAll(List.of(org.bukkit.TreeType.values()));
+                continue;
+            }
+            try {
+                types.add(org.bukkit.TreeType.valueOf(name));
+            } catch (IllegalArgumentException notInThisVersion) {
+                // A tree newer than this server.
+            }
+        }
+        if (!types.isEmpty()) {
+            location.getWorld().generateTree(location,
+                    types.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(types.size())));
+        }
     }
 
     private static void registerVectors(Registrar registrar) {
@@ -906,8 +1136,8 @@ final class WorldSyntax {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
             return map(arguments[0], value -> switch (value) {
-                case Entity entity -> (double) (pitch ? entity.getLocation().getPitch() : entity.getLocation().getYaw());
-                case Location location -> (double) (pitch ? location.getPitch() : location.getYaw());
+                case Entity entity -> (double) (pitch ? entity.getLocation().getPitch() : yaw(entity.getLocation().getYaw()));
+                case Location location -> (double) (pitch ? location.getPitch() : yaw(location.getYaw()));
                 default -> null;
             });
         }
@@ -921,6 +1151,14 @@ final class WorldSyntax {
         @Override
         public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
             float by = delta != null && delta.length > 0 && delta[0] instanceof Number n ? n.floatValue() : 0;
+            if (!Float.isFinite(by)) {
+                // As in Skript, infinity and NaN change nothing.
+                return;
+            }
+            if (pitch && (mode == Mode.ADD || mode == Mode.REMOVE)) {
+                // Minecraft's pitch is upside down: adding looks up, as in Skript.
+                by = -by;
+            }
             for (Object value : (Object[]) arguments[0]) {
                 switch (value) {
                     case Location location -> {
@@ -940,6 +1178,12 @@ final class WorldSyntax {
                     default -> {}
                 }
             }
+        }
+
+        /** A yaw as Skript gives it: from 0 up to 360. */
+        private static float yaw(float yaw) {
+            float normal = Location.normalizeYaw(yaw);
+            return normal < 0 ? normal + 360 : normal;
         }
 
         private static float next(float current, float by, Mode mode) {
@@ -976,5 +1220,28 @@ final class WorldSyntax {
             case org.bukkit.WorldBorder border -> border.isInside(location);
             case null, default -> false;
         };
+    }
+
+    /** Copies a container item's name and contents to the block placed for it, as Skript does. */
+    private static void copyContainer(Block block, ItemType item) {
+        if (!(block.getState() instanceof org.bukkit.block.Container container)
+                || !(item.stack().getItemMeta() instanceof org.bukkit.inventory.meta.ItemMeta meta)) {
+            return;
+        }
+        if (meta.displayName() != null) {
+            container.customName(meta.displayName());
+        }
+        if (meta instanceof org.bukkit.inventory.meta.BlockStateMeta stateMeta && stateMeta.hasBlockState()
+                && stateMeta.getBlockState() instanceof org.bukkit.block.Container from) {
+            org.bukkit.inventory.Inventory source = from.getSnapshotInventory();
+            org.bukkit.inventory.Inventory target = container.getSnapshotInventory();
+            for (int i = 0; i < source.getSize() && i < target.getSize(); i++) {
+                org.bukkit.inventory.ItemStack stack = source.getItem(i);
+                if (stack != null) {
+                    target.setItem(i, stack.clone());
+                }
+            }
+        }
+        container.update();
     }
 }

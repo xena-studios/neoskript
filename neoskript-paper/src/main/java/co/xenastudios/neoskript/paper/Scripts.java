@@ -106,11 +106,120 @@ final class Scripts {
                 return scripts.length > 0;
             };
         }, "%scripts% (is|are)[not:(n't| not)] loaded", "script[s] %scripts% (is|are)[not:(n't| not)] loaded");
+        // 'the current script is using "for loops"': the experiments a script turns on with 'using'.
+        registrar.condition("CondIsUsingFeature", info -> {
+            boolean negated = info.pattern() >= 2;
+            return (context, args) -> {
+                Object[] names = (Object[]) args[1];
+                if (names.length == 0) {
+                    return true;
+                }
+                boolean using = true;
+                for (Object script : Values.array(args[0])) {
+                    for (Object name : names) {
+                        using &= script instanceof ScriptRef ref
+                                && co.xenastudios.neoskript.runtime.ScriptFeatures.uses(ref.name(), Values.text(name));
+                    }
+                }
+                return using != negated;
+            };
+        }, "%script% is using %strings%", "%scripts% are using %strings%", "%script% is(n't| not) using %strings%",
+                "%scripts% are(n't| not) using %strings%");
     }
 
     /** Skript's test-only helpers. */
     static void registerTesting(Registrar registrar) {
         registrar.function("file_separator", List.<Parameter>of(), "string", false, args -> File.separator);
+        // Skript's test-only syntax, for its tests of the parser. 'experimental only' needs 'using example feature'.
+        registrar.expression("ExprExperimentalOnly", "boolean", info -> {
+            if (!co.xenastudios.neoskript.runtime.ScriptFeatures.compilingUses("example feature")) {
+                throw new co.xenastudios.neoskript.api.element.SyntaxError("Can't understand this expression: 'experimental only'");
+            }
+            return (context, args) -> true;
+        }, "experimental only");
+        registrar.expression("ExprKeyValueSet", "string", info -> new TestKeyValues(info.pattern() == 1),
+                "test key values of %~objects%", "test key values");
+        registrar.effect("EffTestExprList", info -> (context, args) -> {}, "test expr list %number/booleans%");
+        registrar.expression("ExprTestStringLiteral", "string", info -> (context, args) -> args[0],
+                "test string literal %*string%");
+        // Its values can't be peeked at with 'next loop-value' when disabled (see the compiler).
+        registrar.expression("ExprTestLoopPeeking", "integer", info -> (context, args) -> new Object[] {1L, 2L, 3L, 4L, 5L},
+                "test loop peeking disabled", "test loop peeking enabled");
+        registrar.condition("CondMethodExists", info -> {
+            boolean negated = info.hasTag("dont");
+            return (context, args) -> {
+                Object[] signatures = (Object[]) args[0];
+                for (Object signature : signatures) {
+                    if (methodExists(Values.text(signature)) == negated) {
+                        return false;
+                    }
+                }
+                return signatures.length > 0;
+            };
+        }, "method[s] %strings% [dont:do(esn't|n't)] exist[s]");
+    }
+
+    /** Skript's test expression giving values with their own indices, or a list's with its indices. */
+    private record TestKeyValues(boolean fixed) implements co.xenastudios.neoskript.api.element.Expression,
+            co.xenastudios.neoskript.api.element.KeyAware {
+        @Override
+        public Object get(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments) {
+            if (fixed) {
+                return new co.xenastudios.neoskript.runtime.KeyedValues(new Object[] {"there", "bar", "b"},
+                        new String[] {"hello", "foo", "a"});
+            }
+            return arguments[0];
+        }
+
+        @Override
+        public boolean implicitKeys() {
+            return true;
+        }
+
+        @Override
+        public boolean keysRecommended() {
+            return true;
+        }
+    }
+
+    private static final java.util.regex.Pattern SIGNATURE = java.util.regex.Pattern.compile("(.+)#(.+)\\((.*)\\)");
+
+    /** Whether {@code java.lang.String#indexOf(java.lang.String)} names a public method, as Skript's test syntax checks. */
+    private static boolean methodExists(String signature) {
+        java.util.regex.Matcher matcher = SIGNATURE.matcher(signature);
+        if (!matcher.matches()) {
+            return false;
+        }
+        try {
+            Class<?> owner = Class.forName(matcher.group(1));
+            List<Class<?>> parameters = new java.util.ArrayList<>();
+            if (!matcher.group(3).isBlank()) {
+                for (String parameter : matcher.group(3).split(",")) {
+                    parameters.add(javaClass(parameter.strip()));
+                }
+            }
+            owner.getMethod(matcher.group(2), parameters.toArray(Class<?>[]::new));
+            return true;
+        } catch (ClassNotFoundException | NoSuchMethodException missing) {
+            return false;
+        }
+    }
+
+    private static Class<?> javaClass(String name) throws ClassNotFoundException {
+        if (name.endsWith("[]")) {
+            return java.lang.reflect.Array.newInstance(javaClass(name.substring(0, name.length() - 2)), 0).getClass();
+        }
+        return switch (name) {
+            case "byte" -> byte.class;
+            case "short" -> short.class;
+            case "int" -> int.class;
+            case "long" -> long.class;
+            case "float" -> float.class;
+            case "double" -> double.class;
+            case "boolean" -> boolean.class;
+            case "char" -> char.class;
+            default -> Class.forName(name);
+        };
     }
 
     /**

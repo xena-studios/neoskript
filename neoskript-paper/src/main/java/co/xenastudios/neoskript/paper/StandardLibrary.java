@@ -38,6 +38,8 @@ public final class StandardLibrary {
         Displays.register(registrar);
         Quaternions.register(registrar);
         BlockSyntax.register(registrar);
+        Biomes.register(registrar);
+        ServerEvents.registerLate(registrar);
         Scripts.register(registrar);
         Collections.register(registrar);
         Logic.register(registrar);

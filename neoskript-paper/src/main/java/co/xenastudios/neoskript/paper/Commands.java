@@ -46,7 +46,7 @@ final class Commands {
                     for (Object command : commands) {
                         String line = Values.text(command);
                         ScriptCommandInfo.FAILED.remove();
-                        Bukkit.dispatchCommand(s, line.startsWith("/") ? line.substring(1) : line);
+                        dispatch(s, line.startsWith("/") ? line.substring(1) : line);
                         String failed = ScriptCommandInfo.FAILED.get();
                         if (failed != null) {
                             ScriptCommandInfo.FAILED.remove();
@@ -125,6 +125,31 @@ final class Commands {
         }, "[all [[of] the]|the] [registered] [script:script] commands");
     }
 
+    /**
+     * Runs {@code command} as {@code sender} would type it, as Skript does: the command events fire first, so
+     * {@code on command} triggers see it and can cancel or rewrite it.
+     */
+    private static void dispatch(CommandSender sender, String command) {
+        try {
+            if (sender instanceof Player player) {
+                PlayerCommandPreprocessEvent event = new PlayerCommandPreprocessEvent(player, "/" + command);
+                Bukkit.getPluginManager().callEvent(event);
+                if (!event.isCancelled() && event.getMessage().startsWith("/")) {
+                    Bukkit.dispatchCommand(event.getPlayer(), event.getMessage().substring(1));
+                }
+            } else {
+                ServerCommandEvent event = new ServerCommandEvent(sender, command);
+                Bukkit.getPluginManager().callEvent(event);
+                if (!event.isCancelled() && !event.getCommand().isEmpty()) {
+                    Bukkit.dispatchCommand(event.getSender(), event.getCommand());
+                }
+            }
+        } catch (org.bukkit.command.CommandException e) {
+            co.xenastudios.neoskript.runtime.RuntimeErrors.report("Failed to execute command: "
+                    + (e.getCause() != null ? e.getCause().getMessage() : e.getMessage()));
+        }
+    }
+
     /** {@code the description of command "x"}, its label, usage, aliases, permission... */
     private static void commandInfo(Registrar registrar) {
         List<Function<Command, Object>> getters = List.of(
@@ -135,7 +160,9 @@ final class Commands {
                 command -> command.getAliases().toArray(),
                 Command::getPermission,
                 command -> command instanceof ScriptCommandInfo script ? script.scriptPermissionMessage() : null,
-                command -> command instanceof PluginIdentifiableCommand owned ? owned.getPlugin().getName() : null);
+                // Script commands are Skript's, as their 'skript:' fallback prefix says.
+                command -> command instanceof ScriptCommandInfo ? "Skript"
+                        : command instanceof PluginIdentifiableCommand owned ? owned.getPlugin().getName() : null);
         List<String> properties = List.of("main command [label|name]", "description", "label", "usage", "aliases",
                 "permission", "permission message", "plugin [owner]");
         List<String> patterns = new ArrayList<>();

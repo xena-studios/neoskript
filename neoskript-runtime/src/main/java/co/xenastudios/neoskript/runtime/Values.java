@@ -75,14 +75,29 @@ public final class Values {
 
     /** What a loop goes through: the values, or a queue's elements, which looping takes out of it. */
     public static Object[] loopValues(Object[] values) {
-        if (values.length == 1 && values[0] instanceof java.util.Queue<?> queue) {
-            List<Object> taken = new ArrayList<>(queue.size());
-            for (Object element = queue.poll(); element != null; element = queue.poll()) {
-                taken.add(element);
-            }
-            return taken.toArray();
+        return loopedQueue(values) != null ? new Object[0] : values;
+    }
+
+    /** The queue a loop over {@code values} takes from as it goes, or {@code null} if they aren't one. */
+    public static java.util.Queue<?> loopedQueue(Object[] values) {
+        return values.length == 1 && values[0] instanceof java.util.Queue<?> queue ? queue : null;
+    }
+
+    /**
+     * The values a loop over a queue has taken, with the queue's next value added once the loop reaches
+     * {@code index}: it sees what was added to the queue while looping, as in Skript.
+     */
+    public static Object[] takeFromQueue(Object[] taken, int index, java.util.Queue<?> queue) {
+        if (queue == null || index < taken.length) {
+            return taken;
         }
-        return values;
+        Object next = queue.poll();
+        if (next == null) {
+            return taken;
+        }
+        Object[] more = java.util.Arrays.copyOf(taken, index + 1);
+        more[index] = next;
+        return more;
     }
 
     /** One of {@code values} at random, or {@code null} if there are none. */

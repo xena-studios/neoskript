@@ -90,26 +90,54 @@ final class EntitySyntax {
 
         registrar.condition("CondIsBetween", info -> {
             boolean negated = info.hasTag("not");
+            boolean[] all = {info.and(0), info.and(1), info.and(2)};
             return (context, args) -> {
                 Object[] values = (Object[]) args[0];
-                if (values.length == 0 || args[1] == null || args[2] == null) {
+                Object[] lows = co.xenastudios.neoskript.runtime.Values.array(args[1]);
+                Object[] highs = co.xenastudios.neoskript.runtime.Values.array(args[2]);
+                if (values.length == 0 || lows.length == 0 || highs.length == 0) {
                     return false;
                 }
-                for (Object value : values) {
-                    Integer first = co.xenastudios.neoskript.runtime.Comparison.order(value, args[1]);
-                    Integer second = co.xenastudios.neoskript.runtime.Comparison.order(value, args[2]);
-                    // Between, whichever bound is the lower one.
-                    boolean between = first != null && second != null
-                            && ((first >= 0 && second <= 0) || (first <= 0 && second >= 0));
-                    if (between == negated) {
-                        return false;
+                // As in Skript, each value against each bound, by whether the lists are 'and' or 'or' lists.
+                return check(values, all[0], value -> check(lows, all[1], low -> check(highs, all[2], high -> {
+                    Integer first = co.xenastudios.neoskript.runtime.Comparison.order(value, low);
+                    Integer second = co.xenastudios.neoskript.runtime.Comparison.order(value, high);
+                    if (value instanceof co.xenastudios.neoskript.runtime.TimeOfDay
+                            && low instanceof co.xenastudios.neoskript.runtime.TimeOfDay
+                            && high instanceof co.xenastudios.neoskript.runtime.TimeOfDay && first != null && second != null) {
+                        // Times go round: 23:00 is between 20:00 and 01:00, but not between 01:00 and 20:00.
+                        Integer bounds = co.xenastudios.neoskript.runtime.Comparison.order(low, high);
+                        return bounds != null && bounds >= 0 ? first >= 0 || second <= 0 : first >= 0 && second <= 0;
                     }
-                }
-                return true;
+                    // Between, whichever bound is the lower one.
+                    return first != null && second != null
+                            && ((first >= 0 && second <= 0) || (first <= 0 && second >= 0));
+                }))) != negated;
             };
-        }, "%objects% (is|are)[not:(n't| not)] between %object% and %object%");
+        }, "%objects% (is|are)[not:(n't| not)] between %objects% and %objects%");
 
         registerSettableConditions(registrar);
+        registrar.effect("EffIncendiary", info -> {
+            boolean fire = !info.hasTag("not");
+            boolean event = info.pattern() == 2;
+            return (context, args) -> {
+                if (event) {
+                    if (context.event() instanceof org.bukkit.event.entity.ExplosionPrimeEvent prime) {
+                        prime.setFire(fire);
+                    }
+                    return;
+                }
+                for (Object value : (Object[]) args[0]) {
+                    if (value instanceof org.bukkit.entity.Explosive explosive) {
+                        explosive.setIsIncendiary(fire);
+                    }
+                }
+            };
+        }, "make %entities% [not:not] incendiary", "make %entities%'[s] explosion [not:not] (incendiary|fiery)",
+                "make [the] [event(-| )]explosion [not:not] (incendiary|fiery)");
+        registrar.expression("ExprDomestication", "integer", info -> new Domestication(info.hasTag("max")),
+                co.xenastudios.neoskript.api.registration.Patterns.property("[max:max[imum]] domestication level",
+                        "livingentities"));
         registerProperties(registrar);
 
         registrar.effect("EffDetonate", info -> (context, args) -> {
@@ -1202,6 +1230,8 @@ final class EntitySyntax {
                 for (Object entity : owners(args[0])) {
                     if (entity instanceof org.bukkit.entity.Creeper creeper) {
                         creeper.setPowered(charge);
+                    } else if (entity instanceof WitherSkull skull) {
+                        skull.setCharged(charge);
                     }
                 }
             };
@@ -1768,6 +1798,69 @@ final class EntitySyntax {
                     } else {
                         metadatable.setMetadata(key, new org.bukkit.metadata.FixedMetadataValue(plugin, next));
                     }
+                }
+            }
+        }
+    }
+
+    /** Whether all of {@code values}, or with {@code all} false any of them, pass {@code test}. */
+    private static boolean check(Object[] values, boolean all, java.util.function.Predicate<Object> test) {
+        for (Object value : values) {
+            if (test.test(value) != all) {
+                return !all;
+            }
+        }
+        return all;
+    }
+
+    /**
+     * {@code the (max) domestication level of a horse}: how close it is to being tame. Changes work in whole
+     * numbers as Skript's do, then stay at 1 or more, and the level at most the max.
+     */
+    private record Domestication(boolean max) implements co.xenastudios.neoskript.api.element.Expression,
+            co.xenastudios.neoskript.api.element.Changeable {
+        @Override
+        public Object get(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments) {
+            List<Object> levels = new ArrayList<>();
+            for (Object value : Values.array(arguments[0])) {
+                if (value instanceof org.bukkit.entity.AbstractHorse horse) {
+                    levels.add((long) (max ? horse.getMaxDomestication() : horse.getDomestication()));
+                }
+            }
+            return levels.size() == 1 ? levels.getFirst() : levels.toArray();
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return switch (mode) {
+                case SET, ADD, REMOVE, RESET -> new Class<?>[] {Number.class};
+                default -> null;
+            };
+        }
+
+        @Override
+        public void change(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments,
+                Object[] delta, Mode mode) {
+            int change = delta != null && delta.length > 0 && delta[0] instanceof Number n ? n.intValue() : 0;
+            for (Object value : Values.array(arguments[0])) {
+                if (!(value instanceof org.bukkit.entity.AbstractHorse horse)) {
+                    continue;
+                }
+                int level = max ? horse.getMaxDomestication() : horse.getDomestication();
+                level = switch (mode) {
+                    case SET -> change;
+                    case ADD -> level + change;
+                    case REMOVE -> level - change;
+                    default -> 1;
+                };
+                if (max) {
+                    level = Math.max(level, 1);
+                    horse.setMaxDomestication(level);
+                    if (horse.getDomestication() > level) {
+                        horse.setDomestication(level);
+                    }
+                } else {
+                    horse.setDomestication(Math.max(1, Math.min(level, horse.getMaxDomestication())));
                 }
             }
         }

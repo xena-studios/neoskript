@@ -23,6 +23,8 @@ import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.ServerCommandEvent;
+import org.bukkit.block.Block;
+import org.bukkit.event.entity.EntityExplodeEvent;
 
 /** Server events, the values triggers get from them, and cancelling them. */
 final class ServerEvents {
@@ -61,6 +63,16 @@ final class ServerEvents {
         }
 
         registerMessages(registrar);
+        // The server's max players, or in a server list ping, the count shown.
+        registrar.expression("ExprMaxPlayers", "integer", info -> {
+            boolean ping = info.eventClasses().stream().anyMatch(ServerListPingEvent.class::isAssignableFrom);
+            if (info.hasTag("fake") && !ping) {
+                throw new co.xenastudios.neoskript.api.element.SyntaxError(
+                        "The 'shown' max players count expression can't be used outside of a server list ping event");
+            }
+            return new MaxPlayers(info.hasTag("real") || !info.hasTag("fake") && !ping);
+        }, "[the] [real:(real|default)|fake:(fake|shown|displayed)] max[imum] player[s] [count|amount|number|size]",
+                "[the] [real:(real|default)|fake:(fake|shown|displayed)] max[imum] (count|amount|number|size) of players");
         registrar.expression("ExprCommandSender", "commandsender", info -> (context, args) -> sender(context.event()),
                 "[the] [command['s]] sender");
         registrar.effect("EffCancelEvent", info -> {
@@ -161,15 +173,100 @@ final class ServerEvents {
             case ServerCommandEvent server -> server.getCommand();
             default -> "";
         };
-        String command = line.startsWith("/") ? line.substring(1) : line;
-        int space = command.indexOf(' ');
-        String label = (space < 0 ? command : command.substring(0, space)).toLowerCase(Locale.ROOT);
+        String command = (line.startsWith("/") ? line.substring(1) : line).toLowerCase(Locale.ROOT);
         for (Object wanted : labels) {
             String text = String.valueOf(wanted).toLowerCase(Locale.ROOT);
-            if (label.equals(text.startsWith("/") ? text.substring(1) : text)) {
+            String label = text.startsWith("/") ? text.substring(1) : text;
+            // As in Skript: 'home' matches 'home' and 'home x'; 'home set' matches anything starting with it.
+            if (command.startsWith(label) && (label.contains(" ") || command.length() == label.length()
+                    || Character.isWhitespace(command.charAt(label.length())))) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** Events whose values need the world types: explosions. */
+    static void registerLate(Registrar registrar) {
+        registrar.event("EvtExplode", List.of(EntityExplodeEvent.class), null, "explo(d(e|ing)|sion)");
+        registrar.eventValue(EntityExplodeEvent.class, "entity", EntityExplodeEvent::getEntity);
+        registrar.eventValue(EntityExplodeEvent.class, "location", EntityExplodeEvent::getLocation);
+        registrar.eventValue(EntityExplodeEvent.class, "world", event -> event.getLocation().getWorld());
+        registrar.expression("ExprExplodedBlocks", "block", info -> {
+            if (info.eventClasses().stream().noneMatch(EntityExplodeEvent.class::isAssignableFrom)) {
+                throw new co.xenastudios.neoskript.api.element.SyntaxError("'" + (info.hasTag("the") ? "the " : "")
+                        + "exploded blocks' can only be used in the on explode event");
+            }
+            return new ExplodedBlocks();
+        }, "[the:the] exploded blocks");
+    }
+
+    /** {@code the max players}: the server's, or the count a server list ping shows. */
+    private record MaxPlayers(boolean real) implements Expression, Changeable {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            if (real) {
+                return (long) org.bukkit.Bukkit.getMaxPlayers();
+            }
+            return context.event() instanceof ServerListPingEvent ping ? (long) ping.getMaxPlayers() : null;
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return switch (mode) {
+                case SET, ADD, REMOVE -> new Class<?>[] {Number.class};
+                case RESET, DELETE -> real ? null : new Class<?>[] {Number.class};
+                default -> null;
+            };
+        }
+
+        @Override
+        public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
+            int amount = delta != null && delta.length > 0 && delta[0] instanceof Number n ? n.intValue() : 0;
+            if (real) {
+                int current = org.bukkit.Bukkit.getMaxPlayers();
+                org.bukkit.Bukkit.setMaxPlayers(mode == Mode.ADD ? current + amount : mode == Mode.REMOVE ? current - amount : amount);
+            } else if (context.event() instanceof ServerListPingEvent ping) {
+                int current = ping.getMaxPlayers();
+                ping.setMaxPlayers(mode == Mode.ADD ? current + amount : mode == Mode.REMOVE ? current - amount : amount);
+            }
+        }
+    }
+
+    /** {@code the exploded blocks}: the blocks an explosion destroys, which can be changed. */
+    private static final class ExplodedBlocks implements Expression, Changeable {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            return context.event() instanceof EntityExplodeEvent event ? event.blockList().toArray() : new Object[0];
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return switch (mode) {
+                case ADD, REMOVE, SET -> new Class<?>[] {Block.class};
+                case DELETE -> new Class<?>[0];
+                default -> null;
+            };
+        }
+
+        @Override
+        public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
+            if (!(context.event() instanceof EntityExplodeEvent event)) {
+                return;
+            }
+            List<Block> blocks = event.blockList();
+            if (mode == Mode.DELETE || mode == Mode.SET) {
+                blocks.clear();
+            }
+            for (Object value : delta == null ? new Object[0] : delta) {
+                if (value instanceof Block block) {
+                    if (mode == Mode.REMOVE) {
+                        blocks.remove(block);
+                    } else {
+                        blocks.add(block);
+                    }
+                }
+            }
+        }
     }
 }

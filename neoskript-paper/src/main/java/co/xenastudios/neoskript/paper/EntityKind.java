@@ -590,15 +590,12 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
         }
     }
 
+    /** Being a baby or an adult, by age as Skript's entity data has it: a frog can be a baby frog too. */
     private static Variant age(boolean baby) {
-        return new Variant("age=" + (baby ? "baby" : "adult"), e -> e instanceof Ageable ageable && ageable.isAdult() != baby,
+        return new Variant("age=" + (baby ? "baby" : "adult"), e -> e instanceof Ageable ageable && ageable.getAge() >= 0 != baby,
                 e -> {
                     if (e instanceof Ageable ageable) {
-                        if (baby) {
-                            ageable.setBaby();
-                        } else {
-                            ageable.setAdult();
-                        }
+                        ageable.setAge(baby ? -24000 : 0);
                     }
                 });
     }

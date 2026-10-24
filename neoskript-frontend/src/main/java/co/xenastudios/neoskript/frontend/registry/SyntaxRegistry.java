@@ -45,6 +45,9 @@ public final class SyntaxRegistry {
     private final Map<String, Set<String>> conversions;
     private final Set<String> entityNames;
     private final Set<String> delaying;
+    private final Set<String> stopping;
+    private final Set<String> ending;
+    private final Set<String> suppressing;
     private final Map<String, ParseCheck> checks;
 
     private SyntaxRegistry(Builder builder) {
@@ -81,12 +84,31 @@ public final class SyntaxRegistry {
         this.conversions = Map.copyOf(conversions);
         this.entityNames = Set.copyOf(builder.entityNames);
         this.delaying = Set.copyOf(builder.delaying);
+        this.stopping = Set.copyOf(builder.stopping);
+        this.ending = Set.copyOf(builder.ending);
+        this.suppressing = Set.copyOf(builder.suppressing);
         this.checks = Map.copyOf(builder.checks);
     }
 
     /** Whether the syntax element makes the trigger wait, like {@code wait 1 second}. */
     public boolean delays(SyntaxInfo syntax) {
         return delaying.contains(syntax.kind() + ":" + syntax.id());
+    }
+
+    /** Whether the syntax element, matched by {@code pattern}, always ends the trigger, like {@code stop}. */
+    public boolean stops(SyntaxInfo syntax, int pattern) {
+        return stopping.contains(syntax.kind() + ":" + syntax.id() + ":" + pattern)
+                || stopping.contains(syntax.kind() + ":" + syntax.id() + ":*");
+    }
+
+    /** Whether the syntax element ends the section it's in ({@code stop}, {@code continue}): code after it never runs. */
+    public boolean ends(SyntaxInfo syntax) {
+        return ending.contains(syntax.kind() + ":" + syntax.id());
+    }
+
+    /** Whether the syntax element suppresses or allows warnings while parsing, by the tags it matched with. */
+    public boolean suppressesWarnings(SyntaxInfo syntax) {
+        return suppressing.contains(syntax.kind() + ":" + syntax.id());
     }
 
     /** The check the syntax element makes while it's parsed, or {@code null} if it makes none. */
@@ -231,6 +253,16 @@ public final class SyntaxRegistry {
         }
     }
 
+    /** Whether {@code words} name an item, by what the item type's literals accept. */
+    public boolean isItemTypeLiteral(String words) {
+        java.util.function.Predicate<String> check = literalChecks.get("itemtype");
+        try {
+            return check != null && check.test(words);
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        }
+    }
+
     static String normalize(String name) {
         String lower = name.strip().toLowerCase(Locale.ROOT);
         if (lower.indexOf("  ") < 0 && lower.indexOf('\t') < 0) {
@@ -279,6 +311,9 @@ public final class SyntaxRegistry {
         private final Map<String, Set<String>> conversions = new HashMap<>();
         private final Set<String> entityNames = new HashSet<>();
         private final Set<String> delaying = new HashSet<>();
+        private final Set<String> stopping = new HashSet<>();
+        private final Set<String> ending = new HashSet<>();
+        private final Set<String> suppressing = new HashSet<>();
         private final Map<String, ParseCheck> checks = new HashMap<>();
 
         private Builder() {}
@@ -286,6 +321,27 @@ public final class SyntaxRegistry {
         /** Marks a syntax element as making the trigger wait. */
         public Builder delays(SyntaxKind kind, String id) {
             delaying.add(kind + ":" + id);
+            return this;
+        }
+
+        /**
+         * Marks a syntax element as always ending the trigger when matched by {@code pattern}, or by any
+         * pattern if it's -1, as Skript's execution intents do.
+         */
+        public Builder stops(SyntaxKind kind, String id, int pattern) {
+            stopping.add(kind + ":" + id + ":" + (pattern < 0 ? "*" : String.valueOf(pattern)));
+            return this;
+        }
+
+        /** Marks a syntax element as ending the section it's in. */
+        public Builder ends(SyntaxKind kind, String id) {
+            ending.add(kind + ":" + id);
+            return this;
+        }
+
+        /** Marks a syntax element as suppressing or allowing warnings while parsing, by its tags. */
+        public Builder suppressesWarnings(SyntaxKind kind, String id) {
+            suppressing.add(kind + ":" + id);
             return this;
         }
 
