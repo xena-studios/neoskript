@@ -51,17 +51,29 @@ final class Plurality {
             return known != null && known == 'P';
         }
         // Several values when a plural argument is several values, as Skript's property expressions.
-        CompiledPattern pattern = syntax.syntax().patterns().get(syntax.pattern());
-        PlaceholderSpec[] specs = new PlaceholderSpec[pattern.placeholderCount()];
-        collect(pattern.root(), specs);
+        boolean[] pluralSpecs = PLURAL_SPECS.computeIfAbsent(syntax.syntax().patterns().get(syntax.pattern()),
+                pattern -> pluralSpecs(pattern, registry));
         List<Object> values = syntax.match().values();
-        for (int i = 0; i < values.size() && i < specs.length; i++) {
-            if (values.get(i) instanceof Expr argument && specs[i] != null && pluralSpec(specs[i], registry)
-                    && plural(argument, registry)) {
+        for (int i = 0; i < values.size() && i < pluralSpecs.length; i++) {
+            if (pluralSpecs[i] && values.get(i) instanceof Expr argument && plural(argument, registry)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** For each placeholder of a pattern, whether it takes several values. */
+    private static final Map<CompiledPattern, boolean[]> PLURAL_SPECS =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    private static boolean[] pluralSpecs(CompiledPattern pattern, SyntaxRegistry registry) {
+        PlaceholderSpec[] specs = new PlaceholderSpec[pattern.placeholderCount()];
+        collect(pattern.root(), specs);
+        boolean[] plural = new boolean[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            plural[i] = specs[i] != null && pluralSpec(specs[i], registry);
+        }
+        return plural;
     }
 
     private static boolean pluralSpec(PlaceholderSpec spec, SyntaxRegistry registry) {

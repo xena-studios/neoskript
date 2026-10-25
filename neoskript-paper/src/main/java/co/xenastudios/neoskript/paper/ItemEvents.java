@@ -37,7 +37,6 @@ import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerPickupItemEvent;
-import org.bukkit.event.world.LootGenerateEvent;
 import org.bukkit.inventory.ComplexRecipe;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
@@ -88,7 +87,6 @@ final class ItemEvents {
         Events.simple(registrar, "EvtAnvilDamage", com.destroystokyo.paper.event.block.AnvilDamagedEvent.class,
                 "anvil damag(e|ing)");
         Events.simple(registrar, "EvtInventoryDrag", InventoryDragEvent.class, "inventory drag[ging]");
-        Events.simple(registrar, "EvtLootGenerate", LootGenerateEvent.class, "loot generat(e|ing)");
 
         registerValues(registrar);
     }
@@ -209,8 +207,6 @@ final class ItemEvents {
                         .map(entry -> new Enchantments.Levelled(entry.getKey(), entry.getValue()))
                         .toArray(Enchantments.Levelled[]::new));
         registrar.eventValue(EnchantItemEvent.class, "block", EnchantItemEvent::getEnchantBlock);
-        registrar.eventValue(LootGenerateEvent.class, "entity", LootGenerateEvent::getEntity);
-        registrar.eventValue(LootGenerateEvent.class, "location", event -> event.getLootContext().getLocation());
     }
 
     private static Player player(HumanEntity entity) {

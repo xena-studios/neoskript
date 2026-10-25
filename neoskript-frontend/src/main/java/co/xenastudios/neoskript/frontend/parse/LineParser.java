@@ -207,7 +207,9 @@ final class LineParser {
                 result = new Expr.Syntax(start, end, parsed, type);
                 // Several values can't go where one does: 'test location' isn't the entities called 'test'.
                 if (expected.onlyOne() && Plurality.plural((Expr) result, registry)) {
-                    problem("'" + text.strip() + "' can only be a single " + typeNames(expected) + ", not more.");
+                    if (problem == null) {
+                        problem = "'" + text.strip() + "' can only be a single " + typeNames(expected) + ", not more.";
+                    }
                     continue;
                 }
             }
