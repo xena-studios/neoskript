@@ -49,7 +49,9 @@ final class ServerEvents {
                 "command [%texts%]");
 
         // Moving is in PlayerEvents, as Skript's EvtMove: 'on player move', 'on zombie move'.
-        registrar.event("EvtServerListPing", List.of(ServerListPingEvent.class), null, "server [list] ping");
+        // Paper's own ping event, as Skript listens to, which syntax only for it can be used in.
+        registrar.event("EvtServerListPing", List.of(com.destroystokyo.paper.event.server.PaperServerListPingEvent.class),
+                null, "server [list] ping");
 
         registrar.eventValue(PlayerEvent.class, "player", PlayerEvent::getPlayer);
         registrar.eventValue(PlayerEvent.class, "world", event -> event.getPlayer().getWorld());

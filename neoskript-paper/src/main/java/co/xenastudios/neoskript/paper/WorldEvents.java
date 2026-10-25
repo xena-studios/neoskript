@@ -113,7 +113,7 @@ final class WorldEvents {
     }
 
     /** The colour a firework shows for a colour written, as Skript's: a named colour's dye's, or the colour itself. */
-    private static org.bukkit.Color firework(Colors.Colour colour) {
+    static org.bukkit.Color firework(Colors.Colour colour) {
         if (!(colour instanceof Colors.Named named)) {
             return org.bukkit.Color.fromARGB(colour.alpha(), colour.red(), colour.green(), colour.blue());
         }
