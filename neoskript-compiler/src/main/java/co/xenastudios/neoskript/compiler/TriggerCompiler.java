@@ -1206,6 +1206,12 @@ final class TriggerCompiler {
                 lineOf(statement, statement.line().key());
                 Label then = new Label();
                 boolean any = key.contains(" any") || key.contains("at least one");
+                // As Skript, checked before the conditions are read.
+                if (i + 1 >= statements.size() || !(statements.get(i + 1) instanceof Statement.Section following)
+                        || !following.line().key().strip().toLowerCase(Locale.ROOT).startsWith("then")) {
+                    throw new CompileException(statement.line().number(), (any ? "'if any'" : "'if all'")
+                            + " has to be placed just before a 'then' section");
+                }
                 for (int c = 0; c < conditions.conditions().size(); c++) {
                     // Each condition's positions are in its own line.
                     co.xenastudios.neoskript.frontend.structure.Line conditionLine = conditions.conditionLines().get(c);
@@ -1224,11 +1230,7 @@ final class TriggerCompiler {
                 }
                 method.visitLabel(then);
                 i++;
-                if (i >= statements.size() || !(statements.get(i) instanceof Statement.Section body)
-                        || !body.line().key().strip().toLowerCase(Locale.ROOT).startsWith("then")) {
-                    throw new CompileException(statement.line().number(), (any ? "'if any'" : "'if all'")
-                            + " has to be placed just before a 'then' section");
-                }
+                Statement.Section body = (Statement.Section) statements.get(i);
                 block(BlockKind.CONDITIONAL, chainEnd, body.body());
             } else if (statement instanceof Statement.Section section && key.equals("else")) {
                 lineOf(statement, section.line().key());
