@@ -48,6 +48,8 @@ public final class StandardLibrary {
         Biomes.register(registrar);
         LootTables.register(registrar);
         BossBars.register(registrar);
+        Particles.register(registrar);
+        Sounds.register(registrar);
         ServerEvents.registerLate(registrar);
         BlockProperties.register(registrar);
         Scripts.register(registrar);
