@@ -39,8 +39,8 @@ final class BlockStates {
         registrar.expression("ExprFurnaceSlot", "itemtype", info -> {
             int slot = info.hasTag("fuel") ? 1 : info.hasTag("result") ? 2 : 0;
             return slotOf(org.bukkit.block.Furnace.class, furnace -> furnace.getInventory(), slot);
-        }, "[the] (ore|input|smelted|fuel:fuel|result:(result|output)) slot[s] of %blocks%",
-                "%blocks%'[s] (ore|input|smelted|fuel:fuel|result:(result|output)) slot[s]");
+        }, "[the] ((ore|input)|fuel:fuel|result:(result|output)) slot[s] [of %blocks%]",
+                "%blocks%'[s] ((ore|input)|fuel:fuel|result:(result|output)) slot[s]");
         registrar.expression("ExprBrewingFuelLevel", "integer", info -> new SettableProperty<>(Block.class, Number.class,
                 block -> state(block, org.bukkit.block.BrewingStand.class, stand -> (long) stand.getFuelLevel()),
                 (block, level) -> change(block, org.bukkit.block.BrewingStand.class,

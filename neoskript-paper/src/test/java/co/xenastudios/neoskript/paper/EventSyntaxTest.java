@@ -257,4 +257,15 @@ class EventSyntaxTest {
                 \t\tsay "x"
                 """));
     }
+
+    @Test
+    void furnaceSlotsDefaultToTheEventBlock() {
+        assertEquals(List.of(), errors("""
+                on smelt:
+                \tset {_x} to fuel slot
+                on break:
+                \tset {_x} to the ore slot
+                """));
+        assertEquals(1, errors("on join:\n\tset {_x} to result slot\n").size());
+    }
 }
