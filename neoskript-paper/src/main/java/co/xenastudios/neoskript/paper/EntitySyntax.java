@@ -114,7 +114,10 @@ final class EntitySyntax {
                             && ((first >= 0 && second <= 0) || (first <= 0 && second >= 0));
                 }))) != negated;
             };
-        }, "%objects% (is|are)[not:(n't| not)] between %objects% and %objects%");
+        }, "%objects% (is|are)[not:(n't| not)] between %objects% and %objects%",
+                // Before and after the event, as Skript's: 'event-block was between ...'.
+                "%objects@-1% (was|were)[not:(n't| not)] between %objects% and %objects%",
+                "%objects@1% (will be|not:(will not be|won't be)) between %objects% and %objects%");
 
         registerSettableConditions(registrar);
         registrar.effect("EffIncendiary", info -> {

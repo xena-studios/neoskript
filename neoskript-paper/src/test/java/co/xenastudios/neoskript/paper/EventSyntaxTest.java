@@ -236,4 +236,25 @@ class EventSyntaxTest {
                 \tsay the last launched firework
                 """));
     }
+
+    @Test
+    void comparisonsBeforeAndAfterTheEvent() {
+        assertEquals(List.of(), errors("""
+                on place:
+                \tif event-block was {_b}:
+                \t\tsay "x"
+                \tif event-block wasn't between 1 and 2:
+                \t\tsay "x"
+                """));
+        assertEquals(List.of("{_x} does not have a past state",
+                "Cannot use time states after the event has already passed"), errors("""
+                on place:
+                \tif {_x} was 1:
+                \t\tsay "x"
+                on place:
+                \twait 1 tick
+                \tif event-block was {_b}:
+                \t\tsay "x"
+                """));
+    }
 }

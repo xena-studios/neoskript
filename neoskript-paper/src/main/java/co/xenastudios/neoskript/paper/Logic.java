@@ -65,7 +65,17 @@ final class Logic {
                 + "|gt:(greater|more|higher|bigger|larger) than|gt:above"
                 + "|le:(less|smaller|lower) than or (equal to|the same as)|lt:(less|smaller|lower) than|lt:below"
                 + "|eq:[equal to|the same as]) %objects%",
-                "%objects% (ge:\\>=|gt:\\>|le:\\<=|ne:\\<\\>|lt:\\<|eq:=|ne:!=) %objects%");
+                "%objects% (ge:\\>=|gt:\\>|le:\\<=|ne:\\<\\>|lt:\\<|eq:=|ne:!=) %objects%",
+                // Before and after the event, as Skript's: 'player's tool was a diamond sword'.
+                "%objects@-1% (was|were)[(not:n't|not: not)] (ge:(greater|more|higher|bigger|larger|above) [than] or (equal to|the same as)"
+                + "|gt:(greater|more|higher|bigger|larger) than|gt:above"
+                + "|le:(less|smaller|lower|below) [than] or (equal to|the same as)|lt:(less|smaller|lower) than|lt:below"
+                + "|eq:[equal to|the same as]) %objects%",
+                "%objects@1% (will be|not:will not be|not:won't be) (ge:(greater|more|higher|bigger|larger|above) [than] or (equal to|the same as)"
+                + "|gt:(greater|more|higher|bigger|larger) than|gt:above"
+                + "|le:(less|smaller|lower|below) [than] or (equal to|the same as)|lt:(less|smaller|lower) than|lt:below"
+                + "|eq:[equal to|the same as]) %objects%",
+                "%objects@1% ((is|are)|not:(isn't|aren't|is not|are not)) (turning|changing) [in]to %objects%");
 
         registrar.condition("CondIsSet", info -> {
             boolean negated = info.hasTag("not");

@@ -2411,7 +2411,11 @@ final class TriggerCompiler {
             List<String> outerLiteralTypes = literalTypes;
             literalTypes = literalTypesFor(syntax, values, i, specs[i]);
             try {
-                expression(expr);
+                if (specs[i].time() != 0) {
+                    timedArgument(expr, specs[i].time());
+                } else {
+                    expression(expr);
+                }
             } finally {
                 literalTypes = outerLiteralTypes;
             }
@@ -2556,8 +2560,24 @@ final class TriggerCompiler {
      * or will be after it. Only event values that have such a state can be written so.
      */
     private void timeState(Expr.Syntax syntax) throws CompileException {
-        int time = syntax.syntax().pattern() < 2 ? -1 : 1;
-        Object inner = syntax.syntax().match().values().getFirst();
+        timed(syntax.syntax().match().values().getFirst(), syntax.syntax().pattern() < 2 ? -1 : 1, syntax);
+    }
+
+    /**
+     * A placeholder with a time state, {@code %objects@-1%} in {@code X was Y}: as Skript's type pattern
+     * elements apply it, a literal can't have one, nor anything after the event has passed.
+     */
+    private void timedArgument(Expr expr, int time) throws CompileException {
+        if (expr instanceof Expr.Literal) {
+            throw new CompileException(line, "Can't understand this condition/effect: " + source.strip());
+        }
+        if (currentLine != null && script.delayBefore(currentLine) == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED) {
+            throw new CompileException(line, "Cannot use time states after the event has already passed");
+        }
+        timed(expr, time, expr);
+    }
+
+    private void timed(Object inner, int time, Expr whole) throws CompileException {
         if (hasTimeState(inner)) {
             eventValue((Expr.Syntax) inner, time);
             return;
@@ -2581,7 +2601,7 @@ final class TriggerCompiler {
             return;
         }
         String text = inner instanceof Expr expr && expr.end() <= source.length()
-                ? source.substring(expr.start(), expr.end()) : source.substring(syntax.start(), syntax.end());
+                ? source.substring(expr.start(), expr.end()) : source.substring(whole.start(), whole.end());
         throw new CompileException(line, text + " does not have a " + (time < 0 ? "past" : "future") + " state");
     }
 
