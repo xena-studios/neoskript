@@ -41,6 +41,8 @@ import org.junit.jupiter.api.Test;
 class HooksTest {
 
     private final List<String> said = new ArrayList<>();
+    /** The warnings compiling the last script gave. */
+    private final List<String> warnings = new ArrayList<>();
     private final Map<Object, Double> balances = new HashMap<>();
 
     private final OfflinePlayer notch = player("Notch");
@@ -96,13 +98,21 @@ class HooksTest {
         library.expression("TestLocation", "location", info -> (context, args) -> new Location(null, 1, 2, 3),
                 "test location");
         List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk", script)));
-        List<String> errors = new ArrayList<>(parsed.getFirst().diagnostics().stream().map(Diagnostic::message).toList());
+        List<String> errors = new ArrayList<>(parsed.getFirst().diagnostics().stream()
+                .filter(d -> d.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR)
+                .map(Diagnostic::message).toList());
         if (!errors.isEmpty()) {
             return errors;
         }
         CompiledScripts compiled = new ScriptCompiler(library, new VariableStore()).compile(parsed);
-        if (!compiled.diagnostics().isEmpty()) {
-            return compiled.diagnostics().stream().map(Diagnostic::message).toList();
+        warnings.clear();
+        compiled.diagnostics().stream().filter(d -> d.severity() == co.xenastudios.neoskript.frontend.source.Severity.WARNING)
+                .forEach(d -> warnings.add(d.message()));
+        List<String> compileErrors = compiled.diagnostics().stream()
+                .filter(d -> d.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR)
+                .map(Diagnostic::message).toList();
+        if (!compileErrors.isEmpty()) {
+            return compileErrors;
         }
         compiled.linkFunctions();
         if (execute) {
@@ -160,6 +170,56 @@ class HooksTest {
                 \tsay test player's balance
                 """));
         assertEquals(22.0, balances.get(notch));
+    }
+
+    @Test
+    void moneyWithMoneyIsMoney() {
+        // As Skript 2.17.0 with EssentialsX gives: money with money is money, with a number it's a number.
+        assertEquals(List.of("$40.00", "$0.00", "$400.00", "$1.00", "25", "$15.00", "$20.00"), run(this::vault, """
+                on load:
+                \tset test player's balance to 20
+                \tset {_m} to test player's balance
+                \tsay {_m} + {_m}
+                \tsay {_m} - {_m}
+                \tsay {_m} * {_m}
+                \tsay {_m} / {_m}
+                \tsay {_m} + 5
+                \tsay difference between {_m} and ("5 dollars" parsed as money)
+                \tsay {_x} + {_m}
+                """));
+    }
+
+    @Test
+    void moneyInAVariableOnlyChangesByMoney() {
+        // As Skript's Variable.change: money's own operations take money, so adding a number does nothing.
+        assertEquals(List.of("$20.00", "$20.00", "$25.00", "$22.00"), run(this::vault, """
+                on load:
+                \tset test player's balance to 20
+                \tset {_m} to test player's balance
+                \tadd 1 to {_m}
+                \tsay {_m}
+                \tremove 1 from {_m}
+                \tsay {_m}
+                \tadd ("5 dollars" parsed as money) to {_m}
+                \tsay {_m}
+                \tremove ("3 dollars" parsed as money) from {_m}
+                \tsay {_m}
+                """));
+    }
+
+    @Test
+    void moneyCantBeSaved() {
+        assertEquals(List.of(), run(this::vault, """
+                on load:
+                \tset {m} to test player's balance
+                \tset {_m} to test player's balance
+                \tadd test player's balance to {list::*}
+                \tsuppress variable save warnings
+                \tset {n} to test player's balance
+                """, false));
+        assertEquals(List.of("a money cannot be saved. That is, the contents of the variable {m} will be lost when the"
+                + " server stops.", "a money cannot be saved. That is, the contents of the variable {list::*} will be"
+                + " lost when the server stops."), warnings);
     }
 
     @Test
@@ -296,5 +356,19 @@ class HooksTest {
                 on entering of region "spawn":
                 \tsay player
                 """, false));
+    }
+
+    @Test
+    void regionSyntaxIsDeprecated() {
+        // As Skript 2.17.0 warns wherever its region syntax is used, unless the script suppresses it.
+        String deprecated = "[Deprecated] " + Regions.DEPRECATION_MESSAGE;
+        assertEquals(List.of(), run(this::regions, """
+                on region enter:
+                \tsay regions at test location
+                \tsay whether test player is a member of test region
+                \tsuppress deprecated syntax warnings
+                \tsay blocks in test region
+                """, false));
+        assertEquals(List.of(deprecated, deprecated, deprecated), warnings);
     }
 }

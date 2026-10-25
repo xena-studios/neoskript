@@ -56,7 +56,13 @@ final class ServerEvents {
         registrar.eventValue(PlayerEvent.class, "player", PlayerEvent::getPlayer);
         registrar.eventValue(PlayerEvent.class, "world", event -> event.getPlayer().getWorld());
         registrar.eventValue(ServerCommandEvent.class, "commandsender", ServerCommandEvent::getSender);
-        for (String type : List.of("player", "offlineplayer", "commandsender", "audience", "world", "entity")) {
+        // Skript's types whose default expression is the event's value of them.
+        // As Skript: a left-out audience is the event's command sender, as there may be several audiences.
+        registrar.eventDefault("audience", org.bukkit.command.CommandSender.class);
+        for (String type : List.of("player", "offlineplayer", "commandsender", "world", "entity",
+                "livingentity", "projectile", "block", "location", "inventory", "inventoryholder", "slot", "itemstack",
+                "nameable", "vector", "display", "time", "gameeffect", "particle", "convergingparticle",
+                "directionalparticle", "scalableparticle", "equippablecomponent", "worldborder", "quaternion")) {
             registrar.eventDefault(type);
         }
 
@@ -158,6 +164,7 @@ final class ServerEvents {
     static CommandSender sender(Object event) {
         return switch (event) {
             case ServerCommandEvent command -> command.getSender();
+            case EffectCommandEvent command -> command.getSender();
             case co.xenastudios.neoskript.runtime.command.CommandEvent command -> (CommandSender) command.sender();
             case PlayerEvent player -> player.getPlayer();
             case null, default -> null;

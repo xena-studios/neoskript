@@ -14,6 +14,19 @@ final class Time {
 
     private Time() {}
 
+    /** Skript's difference between two dates, timespans, numbers or vectors; {@code null} for anything else. */
+    private static Object difference(Object first, Object second) {
+        return switch (first) {
+            case Date a when second instanceof Date b -> a.difference(b);
+            case Timespan a when second instanceof Timespan b -> new Timespan(Math.abs(a.millis() - b.millis()));
+            case Long a when second instanceof Long b -> Math.abs(a - b);
+            case Number a when second instanceof Number b -> Math.abs(a.doubleValue() - b.doubleValue());
+            case org.bukkit.util.Vector a when second instanceof org.bukkit.util.Vector b -> new org.bukkit.util.Vector(
+                    Math.abs(a.getX() - b.getX()), Math.abs(a.getY() - b.getY()), Math.abs(a.getZ() - b.getZ()));
+            case null, default -> null;
+        };
+    }
+
     static void register(Registrar registrar) {
         // date(year, month, day, ...): fields that spill over carry into the next one, as in Skript; a left out
         // time zone or DST offset is NaN, which Skript sets as 0.
@@ -47,15 +60,9 @@ final class Time {
         registrar.expression("ExprTime", "time", info -> new WorldTime(), "[the] time[s] [([with]in|of) %worlds%]",
                 "%worlds%'[s] time[s]");
 
-        registrar.expression("ExprDifference", "object", info -> (context, args) -> switch (args[0]) {
-            case Date a when args[1] instanceof Date b -> a.difference(b);
-            case Timespan a when args[1] instanceof Timespan b -> new Timespan(Math.abs(a.millis() - b.millis()));
-            case Long a when args[1] instanceof Long b -> Math.abs(a - b);
-            case Number a when args[1] instanceof Number b -> Math.abs(a.doubleValue() - b.doubleValue());
-            case org.bukkit.util.Vector a when args[1] instanceof org.bukkit.util.Vector b -> new org.bukkit.util.Vector(
-                    Math.abs(a.getX() - b.getX()), Math.abs(a.getY() - b.getY()), Math.abs(a.getZ() - b.getZ()));
-            case null, default -> null;
-        }, "difference (between|of) %object% and %object%");
+        // Types with a difference of their own, like money, first.
+        registrar.expression("ExprDifference", "object", info -> (context, args) -> co.xenastudios.neoskript.runtime
+                .Arithmetic.difference(args[0], args[1], Time::difference), "difference (between|of) %object% and %object%");
 
         registrar.expression("ExprDateAgoLater", "date", info -> {
             boolean later = info.pattern() == 1;

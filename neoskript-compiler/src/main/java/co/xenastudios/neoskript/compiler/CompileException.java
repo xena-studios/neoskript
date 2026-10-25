@@ -9,9 +9,21 @@ final class CompileException extends Exception {
 
     private final int line;
 
+    /** Whether it's about words nothing understands, whose error depends on where they are. */
+    private final boolean unknownWords;
+
     CompileException(int line, String message) {
+        this(line, message, false);
+    }
+
+    CompileException(int line, String message, boolean unknownWords) {
         super(message);
         this.line = line;
+        this.unknownWords = unknownWords;
+    }
+
+    boolean unknownWords() {
+        return unknownWords;
     }
 
     int line() {

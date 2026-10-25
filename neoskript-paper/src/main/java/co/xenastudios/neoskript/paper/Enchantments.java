@@ -54,7 +54,7 @@ final class Enchantments {
         registrar.literalParser("enchantmenttype", Enchantments::levelled);
         registrar.parser("enchantmenttype", Enchantments::levelled);
         registrar.converter(Enchantment.class, Levelled.class, enchantment -> new Levelled(enchantment, -1));
-        registrar.converter(Levelled.class, Enchantment.class, Levelled::enchantment);
+        registrar.converter(Levelled.class, Enchantment.class, Levelled::enchantment, Registrar.PLACEHOLDERS_ONLY);
         // 'sharpness' is any level of it; levels given have to match.
         registrar.comparison(Levelled.class, Levelled.class, (a, b) -> a.enchantment().equals(b.enchantment())
                 && (a.level() < 0 || b.level() < 0 || a.level() == b.level()));

@@ -68,7 +68,7 @@ class ScriptLoaderTest {
     void reportsLinesItCantUnderstand() {
         ParsedScript script = load("on join:\n\tfrobnicate the player\n\tsend \"ok\" to player\non flying pigs:\n\tstop\n");
         assertEquals(List.of("2: Can't understand this condition/effect: frobnicate the player",
-                "4: Can't understand this event: 'on flying pigs'"), errors(script));
+                "4: Can't understand this structure: on flying pigs"), errors(script));
     }
 
     @Test

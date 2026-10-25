@@ -22,6 +22,7 @@ public final class StandardLibrary {
      */
     public static void register(Registrar registrar, java.util.function.Consumer<Registrar> hooks) {
         CoreTypes.register(registrar);
+        UnsavableTypes.register(registrar);
         TextComponents.register(registrar);
         ScriptEvents.register(registrar);
         ServerEvents.register(registrar);
@@ -52,6 +53,7 @@ public final class StandardLibrary {
         EntityEventSyntax.register(registrar);
         DamageSources.register(registrar);
         Displays.register(registrar);
+        DefaultConverters.register(registrar);
         Quaternions.register(registrar);
         BlockSyntax.register(registrar);
         Biomes.register(registrar);
@@ -68,6 +70,7 @@ public final class StandardLibrary {
         EventTypes.register(registrar);
         EnumTypes.register(registrar);
         BlockEvents.register(registrar);
+        EffectCommands.register(registrar);
         EntityEvents.register(registrar);
         PlayerEvents.register(registrar);
         PickItems.register(registrar);

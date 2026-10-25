@@ -25,7 +25,9 @@ class CommandParserTest {
     }
 
     private static List<String> errors(String text) {
-        return load(text).diagnostics().stream().map(d -> d.message()).toList();
+        return load(text).diagnostics().stream()
+                .filter(d -> d.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR)
+                .map(d -> d.message()).toList();
     }
 
     private static ParsedStructure.Command command(String text) {

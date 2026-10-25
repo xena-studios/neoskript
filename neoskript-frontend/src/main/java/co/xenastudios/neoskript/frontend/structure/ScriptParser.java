@@ -38,8 +38,7 @@ public final class ScriptParser {
                         continue;
                     }
                     diagnostics.error(line.number(), line.column(), line.text().length(),
-                            "Can't understand this line: code has to go inside an event, command, function or"
-                                    + " other structure");
+                            "Can't understand this structure: " + line.text().strip());
                 }
             }
         }

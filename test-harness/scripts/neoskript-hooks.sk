@@ -1,0 +1,75 @@
+# The neoskript-hooks scenario: Skript's Vault and WorldGuard hooks against the real plugins. Each check sends
+# "[harness] hooks ok ..." or "[harness] hooks FAIL ..."; regions and money are checked as the script loads, and
+# groups by /nsk-hooks-groups once the harness has created LuckPerms' "vip" group.
+
+function expect(label: text, actual: objects, expected: text):
+	if "%{_actual::*}%" is "%{_expected}%":
+		send "[harness] hooks ok %{_label}%" to console
+	else:
+		send "[harness] hooks FAIL %{_label}%: expected '%{_expected}%', got '%{_actual::*}%'" to console
+
+on load:
+	# WorldGuard: "shop" is 0..15 x -64..100 x 0..15 with Alice a member and Bob its owner, and "booth" is
+	# 2..3 x 0..1 x 2..4 inside it.
+	set {_shop} to location(8, 50, 8, world "world")
+	set {_booth} to location(2, 0, 3, world "world")
+	set {_outside} to location(100, 50, 100, world "world")
+	expect("regions at", regions at {_shop}, "shop in world world")
+	expect("region count", size of regions at {_booth}, "2")
+	expect("no regions", size of regions at {_outside}, "0")
+	expect("parsed region", "shop" parsed as region, "shop in world world")
+	expect("unknown region", "nowhere" parsed as region, "<none>")
+	expect("is in region", whether {_shop} is in region "shop", "true")
+	expect("is not in region", whether {_outside} is in region "shop", "false")
+	expect("not contained in region", whether {_outside} isn't contained in region "shop", "true")
+	expect("not part of region", whether {_shop} is not part of region "booth", "true")
+	expect("part of regions", whether {_booth} is part of region "shop" and "booth", "true")
+	expect("region contains", whether region "shop" contains at {_booth}, "true")
+	expect("region doesn't contain", whether region "booth" doesn't contain at {_shop}, "true")
+	# Players who never joined only have a name once the server has been asked for them by it.
+	set {_alice} to offlineplayer("Alice")
+	set {_bob} to offlineplayer("Bob")
+	expect("members", members of region "shop", "Alice")
+	expect("owners", owners of region "shop", "Bob")
+	expect("member", whether offlineplayer("Alice") is a member of region "shop", "true")
+	expect("owner is a member", whether offlineplayer("Bob") is a member of region "shop", "true")
+	expect("member isn't owner", whether offlineplayer("Alice") is the owner of region "shop", "false")
+	expect("owner", whether offlineplayer("Bob") is the owner of region "shop", "true")
+	expect("stranger", whether offlineplayer("Carol") is not a member of region "shop", "true")
+	expect("blocks", size of blocks in region "booth", "12")
+
+	# Vault with EssentialsX's economy.
+	set {_carol} to offlineplayer("Carol")
+	set balance of {_carol} to 100
+	expect("set balance", balance of {_carol}, "$100")
+	add 25.5 to balance of {_carol}
+	expect("add balance", balance of {_carol}, "$125.50")
+	remove 20 from balance of {_carol}
+	expect("remove balance", balance of {_carol}, "$105.50")
+	expect("balance compare", whether balance of {_carol} > 105, "true")
+	expect("balance amount", balance of {_carol} + 0, "105.5")
+	set money of {_carol} to 3
+	expect("set money", money of {_carol}, "$3")
+	set {_m} to money of {_carol}
+	expect("money plus money", {_m} + {_m}, "$6")
+	expect("money minus money", {_m} - {_m}, "$0")
+	expect("money plus a number", {_m} + 2, "5")
+	expect("money difference", difference between {_m} and ("$1" parsed as money), "$2")
+	expect("parsed money", "$5" parsed as money, "$5")
+	expect("not money", "five" parsed as money, "<none>")
+	send "[harness] hooks loaded" to console
+
+command /nsk-hooks-groups:
+	executable by: console
+	trigger:
+		# Vault with LuckPerms' permissions.
+		set {_dave} to offlineplayer("Dave")
+		expect("primary group", group of {_dave}, "default")
+		expect("all groups", sorted all groups, "default and vip")
+		add "vip" to groups of {_dave}
+		expect("added group", sorted groups of {_dave}, "default and vip")
+		remove "vip" from groups of {_dave}
+		expect("removed group", groups of {_dave}, "default")
+		set groups of {_dave} to "vip"
+		expect("set groups", groups of {_dave}, "vip")
+		send "[harness] hooks groups done" to console

@@ -75,6 +75,22 @@ public final class ScriptFeatures {
         return features != null && features.contains(codeName(feature));
     }
 
+    /** The experiments Skript 2.17.0 includes by default, or has deprecated, by code name. */
+    private static final Set<String> MAINSTREAM = Set.of("for loop", "damage source");
+    private static final Set<String> DEPRECATED = Set.of("deprecated feature");
+
+    /** Skript's warning for {@code using <name>}, as its {@code StructUsing} gives it, or {@code null}. */
+    public static String usingWarning(String name) {
+        String code = codeName(name);
+        if (MAINSTREAM.contains(code)) {
+            return "The experimental feature '" + name + "' is now included by default and is no longer required.";
+        }
+        if (DEPRECATED.contains(code)) {
+            return "The experimental feature '" + name + "' is deprecated and may be removed in future versions.";
+        }
+        return EXPERIMENTS.containsKey(code) ? null : "The experimental feature '" + name + "' was not found.";
+    }
+
     /** The experiment {@code name} is written for, by its code name, or the name itself if it isn't one. */
     private static String codeName(String name) {
         String normal = name.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");

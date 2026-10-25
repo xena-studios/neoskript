@@ -145,6 +145,17 @@ final class ParserContext {
         itemAliases = java.util.Set.copyOf(names);
     }
 
+    /** The name of the script being parsed ({@code folder/script.sk}), for warnings that suggest it. */
+    private String scriptName = "";
+
+    void scriptName(String name) {
+        scriptName = name;
+    }
+
+    String scriptName() {
+        return scriptName;
+    }
+
     /** Whether {@code words} name one of the script's item aliases, with an amount or article before it or not. */
     boolean isItemAlias(String words) {
         if (itemAliases.isEmpty()) {

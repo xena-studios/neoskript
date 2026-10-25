@@ -53,7 +53,8 @@ public final class CorpusCheck {
         long lines = 0;
         for (ParsedScript script : scripts) {
             lines += script.file().lines().size();
-            falseErrors.addAll(script.diagnostics());
+            // Warnings don't stop a script loading.
+            script.diagnostics().stream().filter(CorpusCheck::isError).forEach(falseErrors::add);
             structures(script, script.structures(), counter);
         }
         return new Result(scripts.size(), lines, falseErrors, counter.expectedErrors, counter.caughtErrors,
@@ -83,6 +84,10 @@ public final class CorpusCheck {
         }
     }
 
+    private static boolean isError(Diagnostic diagnostic) {
+        return diagnostic.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR;
+    }
+
     private static void body(ParsedScript script, List<Statement> body, Counter counter) {
         for (int i = 0; i < body.size(); i++) {
             Statement statement = body.get(i);
@@ -98,7 +103,7 @@ public final class CorpusCheck {
                     }
                 } else if (Boolean.FALSE.equals(expectError)) {
                     counter.expectedClean++;
-                    if (!parse.captured().isEmpty()) {
+                    if (parse.captured().stream().anyMatch(CorpusCheck::isError)) {
                         counter.falselyRejected.add(where + ": " + parse.captured());
                     }
                 }

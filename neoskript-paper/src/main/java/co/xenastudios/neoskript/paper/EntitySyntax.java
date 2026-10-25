@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.paper;
 
+import co.xenastudios.neoskript.api.element.Warnings;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Values;
 import java.nio.charset.StandardCharsets;
@@ -307,6 +308,10 @@ final class EntitySyntax {
         registrar.expression("ExprHash", "string", info -> {
             String algorithm = info.hasTag("md5") ? "MD5" : info.hasTag("384") ? "SHA-384"
                     : info.hasTag("512") ? "SHA-512" : "SHA-256";
+            if (algorithm.equals("MD5") && !Warnings.suppressed("deprecated")) {
+                Warnings.warn("MD5 is not secure and shouldn't be used if a"
+                        + " cryptographically secure hashing algorithm is required.");
+            }
             return (context, args) -> {
                 List<Object> hashes = new ArrayList<>();
                 for (Object text : (Object[]) args[0]) {
@@ -675,8 +680,12 @@ final class EntitySyntax {
                 (entity, time) -> entity.setPortalCooldown((int) Math.max(0, Math.min(Integer.MAX_VALUE, time.ticks()))),
                 // Minecraft's own cooldown after using a portal: 15 seconds.
                 new co.xenastudios.neoskript.runtime.Timespan(15000));
-        SettableProperty.register(registrar, "ExprNoDamageTicks", "integer", LivingEntity.class, Number.class,
-                living -> (long) living.getNoDamageTicks(), (living, ticks) -> living.setNoDamageTicks(Math.max(0, ticks.intValue())),
+        registrar.expression("ExprNoDamageTicks", "integer", info -> {
+                    Warnings.deprecated("This expression is deprecated. Please use"
+                            + " 'invulnerability time' instead of 'invulnerability ticks'.");
+                    return new SettableProperty<>(LivingEntity.class, Number.class, living -> (long) living.getNoDamageTicks(),
+                            (living, ticks) -> living.setNoDamageTicks(Math.max(0, ticks.intValue())));
+                },
                 "[the] (invulnerability|invincibility|no damage) tick[s] [of %livingentities%]",
                 "%livingentities%'[s] (invulnerability|invincibility|no damage) tick[s]");
         SettableProperty.register(registrar, "ExprArrowsStuck", "integer", LivingEntity.class, Number.class,

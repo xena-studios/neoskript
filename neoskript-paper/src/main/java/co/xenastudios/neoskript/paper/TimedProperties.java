@@ -177,6 +177,16 @@ final class TimedProperties {
             if (mode == Mode.REMOVE_ALL) {
                 return null;
             }
+            boolean delayed = co.xenastudios.neoskript.api.element.Warnings.surelyDelayed();
+            if (info.isEvent(org.bukkit.event.player.PlayerRespawnEvent.class) && !delayed) {
+                throw new SyntaxError("Cannot change a player's level in a respawn event. Add a delay of 1 tick or change"
+                        + " the 'new level' in a death event.");
+            }
+            if (info.isEvent(EntityDeathEvent.class) && info.time() == 0 && info.isDefault(0) && !delayed) {
+                co.xenastudios.neoskript.api.element.Warnings.warn("Changing the player's level in a death event will"
+                        + " change the player's level before they die. Use either 'past level of player' or 'new level of"
+                        + " player' to clearly state whether to change the level before or after they die.");
+            }
             if (info.time() == -1 && !info.isEvent(EntityDeathEvent.class)) {
                 return null;
             }

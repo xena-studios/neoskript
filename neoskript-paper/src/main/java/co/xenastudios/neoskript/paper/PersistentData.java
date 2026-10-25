@@ -114,11 +114,22 @@ final class PersistentData {
                     continue;
                 }
                 if (list) {
+                    // As Skript: elements of other types are skipped, with a warning naming their types.
+                    java.util.Map<Class<?>, String> mismatches = new java.util.LinkedHashMap<>();
                     for (PersistentDataContainer element : container.get(key, LIST)) {
                         Object value = decode(element, VALUE);
                         if (value != null && (type == null || matches(value))) {
                             values.add(value);
+                        } else if (value != null) {
+                            mismatches.putIfAbsent(value.getClass(), typeName(value));
                         }
+                    }
+                    if (!mismatches.isEmpty()) {
+                        List<String> names = new ArrayList<>(mismatches.values());
+                        String joined = names.size() == 1 ? names.getFirst()
+                                : String.join(", ", names.subList(0, names.size() - 1)) + " and " + names.getLast();
+                        RuntimeErrors.warning(mismatches.size() + " element(s) in tag '" + key + "' were of type(s) "
+                                + joined + ", not the expected type " + type.name() + ". Skipping.");
                     }
                     continue;
                 }

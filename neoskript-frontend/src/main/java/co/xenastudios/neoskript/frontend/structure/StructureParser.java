@@ -29,7 +29,7 @@ public final class StructureParser {
 
     public static List<Node> parse(SourceFile file, Diagnostics diagnostics) {
         StructureParser parser = new StructureParser(lines(file), diagnostics);
-        return parser.block("");
+        return parser.section(0, null);
     }
 
     /** The file's code lines, with comments, blank lines and block comments removed. */
@@ -59,80 +59,78 @@ public final class StructureParser {
         return lines;
     }
 
-    /** Parses the lines at {@code indent}, returning at a line that belongs to an outer level. */
-    private List<Node> block(String indent) {
+    /** Skript's warning for a line ending in ':' with nothing under it. */
+    static final String EMPTY_SECTION = "Empty configuration section! You might want to indent one or more of the"
+            + " subsequent lines to make them belong to this section or remove the colon at the end of the line if you"
+            + " don't want this line to start a section.";
+
+    /** One level of indentation, as Skript's config: a tab until the first indented line of a structure says. */
+    private String unit = "\t";
+    private boolean unitSet;
+
+    /**
+     * Skript's {@code SectionNode.load_i}: the lines at {@code level}, each with what's under it, returning at
+     * a line of an outer level. A line indented wrongly is reported and left out on its own.
+     */
+    private List<Node> section(int level, Line header) {
         List<Node> nodes = new ArrayList<>();
+        if (level == 1) {
+            // Each structure's first indented line sets it again (and it stays for those that indent nothing).
+            unitSet = false;
+        }
         while (next < lines.size()) {
             Line line = lines.get(next);
-            if (line.indent().equals(indent)) {
-                next++;
-                nodes.add(line.opensSection() ? new Node.Section(line, children(line)) : new Node.Simple(line));
-            } else if (indent.startsWith(line.indent())) {
-                return nodes;
-            } else {
-                if (extendsIndent(line.indent(), indent)) {
-                    error(line, "Unexpected indentation: only the lines under a section (a line ending in ':')"
-                            + " can be indented further");
+            String indent = line.indent();
+            if (!unitSet && level == 1 && !indent.isEmpty()) {
+                if (indent.chars().allMatch(c -> c == ' ') || indent.chars().allMatch(c -> c == '\t')) {
+                    unit = indent;
+                    unitSet = true;
                 } else {
-                    error(line, "Indentation error: expected " + describe(indent) + ", but found "
-                            + describe(line.indent()));
+                    error(line, "indentation error: indent must only consist of either spaces or tabs, but not mixed"
+                            + " (found " + readable(indent) + ")");
+                    next++;
+                    continue;
                 }
-                skipDeeperThan(indent);
             }
+            String expected = unit.repeat(level);
+            if (!indent.equals(expected)) {
+                if (indent.startsWith(expected) || !levels(indent)) {
+                    int count = level * unit.length();
+                    error(line, "indentation error: expected " + count + " " + (unit.charAt(0) == ' ' ? "space" : "tab")
+                            + (count == 1 ? "" : "s") + ", but found " + readable(indent));
+                    next++;
+                    continue;
+                }
+                // A line of an outer level.
+                break;
+            }
+            next++;
+            nodes.add(line.opensSection() ? new Node.Section(line, section(level + 1, line)) : new Node.Simple(line));
+        }
+        if (header != null && nodes.isEmpty()) {
+            diagnostics.warning(header.number(), 0, header.indent().length(), EMPTY_SECTION);
         }
         return nodes;
     }
 
-    private List<Node> children(Line header) {
-        String parentIndent = header.indent();
-        if (next >= lines.size() || parentIndent.startsWith(lines.get(next).indent())) {
-            return List.of();
-        }
-        String childIndent = lines.get(next).indent();
-        if (!extendsIndent(childIndent, parentIndent)) {
-            error(lines.get(next), "Indentation error: expected " + describe(parentIndent) + " or more, but found "
-                    + describe(childIndent));
-            skipDeeperThan(parentIndent);
-            return List.of();
-        }
-        List<Node> children = block(childIndent);
-        // The block ended at a line that isn't at the section's level or an outer one.
-        if (next < lines.size() && !parentIndent.startsWith(lines.get(next).indent())) {
-            error(lines.get(next), "Indentation error: expected " + describe(childIndent) + ", but found "
-                    + describe(lines.get(next).indent()));
-            skipDeeperThan(parentIndent);
-        }
-        return children;
+    /** Whether {@code indent} is whole levels of indentation. */
+    private boolean levels(String indent) {
+        return indent.length() % unit.length() == 0 && indent.equals(unit.repeat(indent.length() / unit.length()));
     }
 
-    /** Skips lines until one is at {@code indent} or an outer level, so one mistake is reported once. */
-    private void skipDeeperThan(String indent) {
-        while (next < lines.size() && !indent.startsWith(lines.get(next).indent())) {
-            next++;
+    /** Skript's {@code readableWhitespace}. */
+    static String readable(String indent) {
+        if (!indent.isEmpty() && indent.chars().allMatch(c -> c == ' ')) {
+            return indent.length() + " space" + (indent.length() == 1 ? "" : "s");
         }
-    }
-
-    private static boolean extendsIndent(String indent, String base) {
-        return indent.length() > base.length() && indent.startsWith(base);
+        if (!indent.isEmpty() && indent.chars().allMatch(c -> c == '\t')) {
+            return indent.length() + " tab" + (indent.length() == 1 ? "" : "s");
+        }
+        return "'" + indent.replace("\t", "->").replace(' ', '_').replaceAll("\\s", "?")
+                + "' [-> = tab, _ = space, ? = other whitespace]";
     }
 
     private void error(Line line, String message) {
         diagnostics.error(line.number(), 0, line.indent().length(), message);
-    }
-
-    static String describe(String indent) {
-        if (indent.isEmpty()) {
-            return "no indentation";
-        }
-        long tabs = indent.chars().filter(c -> c == '\t').count();
-        long spaces = indent.length() - tabs;
-        List<String> parts = new ArrayList<>();
-        if (tabs > 0) {
-            parts.add(tabs + (tabs == 1 ? " tab" : " tabs"));
-        }
-        if (spaces > 0) {
-            parts.add(spaces + (spaces == 1 ? " space" : " spaces"));
-        }
-        return String.join(" and ", parts);
     }
 }

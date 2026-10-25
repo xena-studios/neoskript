@@ -20,14 +20,19 @@ final class Books {
     private Books() {}
 
     static void register(Registrar registrar) {
-        registrar.expression("ExprBookTitle", "string", info -> new SettableProperty<>(ItemType.class, String.class,
-                item -> item.stack().getItemMeta() instanceof BookMeta book && book.title() != null
-                        ? Messages.LEGACY_SECTION.serialize(book.title()) : null,
-                (item, title) -> item.editMeta(meta -> {
-                    if (meta instanceof BookMeta book) {
-                        book.title(Messages.component(title));
-                    }
-                })), "[the] book (title|name) of %itemtypes%", "%itemtypes%'[s] book (title|name)");
+        registrar.expression("ExprBookTitle", "string", info -> {
+            co.xenastudios.neoskript.api.element.Warnings.deprecated("This element is deprecated and scheduled for removal"
+                    + " in a future release. Consider using 'title of '" + co.xenastudios.neoskript.api.element.Warnings.argument(0)
+                    + "' instead.");
+            return new SettableProperty<>(ItemType.class, String.class,
+                    item -> item.stack().getItemMeta() instanceof BookMeta book && book.title() != null
+                            ? Messages.LEGACY_SECTION.serialize(book.title()) : null,
+                    (item, title) -> item.editMeta(meta -> {
+                        if (meta instanceof BookMeta book) {
+                            book.title(Messages.component(title));
+                        }
+                    }));
+        }, "[the] book (title|name) of %itemtypes%", "%itemtypes%'[s] book (title|name)");
         registrar.expression("ExprBookAuthor", "string", info -> new SettableProperty<>(ItemType.class, String.class,
                 item -> item.stack().getItemMeta() instanceof BookMeta book && book.author() != null
                         ? Messages.LEGACY_SECTION.serialize(book.author()) : null,

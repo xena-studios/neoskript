@@ -6,6 +6,8 @@ package co.xenastudios.neoskript.paper;
 
 import co.xenastudios.neoskript.api.element.Condition;
 import co.xenastudios.neoskript.api.element.ElementInfo;
+import co.xenastudios.neoskript.api.element.SyntaxError;
+import co.xenastudios.neoskript.api.element.Warnings;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
@@ -47,6 +49,45 @@ public final class Regions {
     }
 
     private Regions() {}
+
+    /** What Skript warns of wherever its region syntax is used, as its {@code RegionsPlugin.DEPRECATION_MESSAGE}. */
+    static final String DEPRECATION_MESSAGE = "Skript's region syntaxes are deprecated and will be removed in a future"
+            + " release. For WorldGuard support, we recommend using skript-worldguard:"
+            + " https://github.com/SkriptLang/skript-worldguard";
+
+    /**
+     * Region syntax being set up: Skript's errors for a region named in quotes at one of {@code regionArguments}
+     * that doesn't exist, as its region parser gives them while loading, then its deprecation warning.
+     */
+    private static void used(ElementInfo info, int... regionArguments) {
+        for (int index : regionArguments) {
+            String name = info.argumentLiteral(index);
+            if (name != null && "string".equals(info.argumentType(index))) {
+                check(name);
+            }
+        }
+        Warnings.deprecated(DEPRECATION_MESSAGE);
+    }
+
+    /** Skript's {@code Region.parse} with errors: the region must be in exactly one world. */
+    private static void check(String name) {
+        if (PLUGINS.isEmpty() || Bukkit.getServer() == null) {
+            return;
+        }
+        int found = 0;
+        for (World world : Bukkit.getWorlds()) {
+            if (getRegion(world, name) != null) {
+                found++;
+            }
+        }
+        if (found > 1) {
+            throw new SyntaxError("Multiple regions with the name '" + name + "' exist");
+        }
+        if (found == 0) {
+            throw new SyntaxError("Region '" + name + "' could not be found. Ensure that the region name is correct, in"
+                    + " the proper world, and that the region data for that world is loaded.");
+        }
+    }
 
     /** A regions plugin NeoSkript is hooked into, as Skript's {@code RegionsPlugin}. */
     interface RegionsPlugin {
@@ -201,6 +242,7 @@ public final class Regions {
         registrar.parser("region", Regions::parse);
 
         registrar.condition("CondCanBuild", info -> {
+            used(info);
             boolean negated = info.pattern() == 1;
             boolean playersAnd = info.and(0);
             boolean locationsAnd = info.and(2);
@@ -213,6 +255,7 @@ public final class Regions {
                 "%players% (can('t|not)|(is|are)(n't| not) allowed to) build %directions% %locations%");
 
         registrar.condition("CondIsMember", info -> {
+            used(info, 1);
             boolean negated = info.pattern() == 1;
             boolean owner = info.mark() == 1;
             boolean playersAnd = info.and(0);
@@ -228,6 +271,7 @@ public final class Regions {
             // 'X contains Y' has a direction; 'Y is in X' doesn't.
             boolean directed = info.pattern() % 2 == 0;
             int regionsAt = directed ? 0 : 1;
+            used(info, regionsAt);
             boolean regionsAnd = info.and(regionsAt);
             boolean locationsAnd = info.and(directed ? 2 : 0);
             return (context, args) -> {
@@ -241,17 +285,21 @@ public final class Regions {
                 "[[the] region] %regions% (do|does)(n't| not) contain %directions% %locations%",
                 "%locations% (is|are)(n't| not) (contained in|part of) [[the] region] %regions%");
 
-        registrar.expression("ExprBlocksInRegion", "block", info -> (context, args) -> {
-            List<Object> blocks = new ArrayList<>();
-            for (Object region : Values.array(args[0])) {
-                if (region instanceof Region r) {
-                    r.getBlocks().forEachRemaining(blocks::add);
+        registrar.expression("ExprBlocksInRegion", "block", info -> {
+            used(info, 0);
+            return (context, args) -> {
+                List<Object> blocks = new ArrayList<>();
+                for (Object region : Values.array(args[0])) {
+                    if (region instanceof Region r) {
+                        r.getBlocks().forEachRemaining(blocks::add);
+                    }
                 }
-            }
-            return blocks.toArray();
+                return blocks.toArray();
+            };
         }, "[(all|the)] blocks (in|of) [[the] region[s]] %regions%");
 
         registrar.expression("ExprMembersOfRegion", "offlineplayer", info -> {
+            used(info, 0);
             boolean owners = info.mark() == 1;
             return (context, args) -> {
                 List<Object> players = new ArrayList<>();
@@ -265,16 +313,20 @@ public final class Regions {
         }, "(all|the|) (0¦members|1¦owner[s]) of [[the] region[s]] %regions%",
                 "[[the] region[s]] %regions%'[s] (0¦members|1¦owner[s])");
 
-        registrar.expression("ExprRegionsAt", "region", info -> (context, args) -> {
-            List<Object> regions = new ArrayList<>();
-            for (Location location : Direction.combine(args[0], args[1])) {
-                regions.addAll(getRegionsAt(location));
-            }
-            return regions.toArray();
+        registrar.expression("ExprRegionsAt", "region", info -> {
+            used(info);
+            return (context, args) -> {
+                List<Object> regions = new ArrayList<>();
+                for (Location location : Direction.combine(args[0], args[1])) {
+                    regions.addAll(getRegionsAt(location));
+                }
+                return regions.toArray();
+            };
         }, "[the] region(1¦s|) %direction% %locations%");
 
         // Skript's EvtRegionBorder.
         registrar.event("EvtRegionBorder", List.of(RegionBorderEvent.class), info -> {
+            used(info, 0);
             boolean enter = info.hasTag("enter");
             return (context, args) -> {
                 if (!(context.event() instanceof RegionBorderEvent event) || event.isEntering() != enter) {

@@ -220,10 +220,12 @@ final class ItemComponents {
         registrar.subtype("equippablecomponent", "itemcomponent");
         registrar.text(ItemComponent.class, component -> "item component");
         registrar.text(EquippableComponent.class, component -> "equippable component");
-        registrar.converter(ItemStack.class, EquippableComponent.class, EquippableComponent::new);
-        registrar.converter(ItemType.class, EquippableComponent.class, EquippableComponent::new);
+        registrar.converter(ItemStack.class, EquippableComponent.class, EquippableComponent::new,
+                Registrar.NO_RIGHT_CHAINING);
+        registrar.converter(ItemType.class, EquippableComponent.class, EquippableComponent::new,
+                Registrar.NO_RIGHT_CHAINING);
         registrar.converter(Items.Slot.class, EquippableComponent.class, slot -> slot.item() == null ? null
-                : new EquippableComponent(slot));
+                : new EquippableComponent(slot), Registrar.NO_RIGHT_CHAINING);
 
         registrar.expression("ExprItemCompCopy", "itemcomponent", info -> (context, args) -> {
             List<Object> copies = new ArrayList<>();

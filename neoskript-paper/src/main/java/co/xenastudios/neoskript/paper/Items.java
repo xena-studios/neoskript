@@ -976,6 +976,15 @@ final class Items {
         // 'items in {_inventory}': each stack in it, in slot order; 'all stone in X' only those of the items given.
         registrar.expression("ExprItemsIn", "itemtype", info -> {
             boolean filtered = info.pattern() == 1;
+            int inventories = filtered ? 1 : 0;
+            String written = co.xenastudios.neoskript.api.element.Warnings.argument(inventories);
+            if (written != null && written.startsWith("{") && written.endsWith("}") && !info.isSingle(inventories)
+                    && !info.hasTag("1") && info.mark() != 1) {
+                co.xenastudios.neoskript.api.element.Warnings.warn("'items in {variable::*}' does not actually represent the"
+                        + " items stored in the variable. Use either '{variable::*}' (e.g. 'loop {variable::*}') if the"
+                        + " variable contains items, or 'items in inventories {variable::*}' if the variable contains"
+                        + " inventories.");
+            }
             return (context, args) -> {
                 List<Object> found = new ArrayList<>();
                 Object[] wanted = filtered ? (Object[]) args[0] : null;
@@ -997,8 +1006,8 @@ final class Items {
                 }
                 return found.toArray();
             };
-        }, "[all [[of] the]] items ([with]in|of|contained in|out of) [inventor(y|ies)] %inventories%",
-                "all [[of] the] %itemtypes% ([with]in|of|contained in|out of) [inventor(y|ies)] %inventories%");
+        }, "[all [[of] the]] items ([with]in|of|contained in|out of) [1:inventor(y|ies)] %inventories%",
+                "all [[of] the] %itemtypes% ([with]in|of|contained in|out of) [1:inventor(y|ies)] %inventories%");
         // 'a hopper inventory named "x"': any kind of inventory that can be made on its own. The kinds are
         // looked up when used, as Bukkit's inventory types touch the server's registries.
         Map<String, InventoryKind> kinds = new LinkedHashMap<>();

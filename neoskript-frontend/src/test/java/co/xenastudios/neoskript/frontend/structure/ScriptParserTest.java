@@ -73,9 +73,9 @@ class ScriptParserTest {
     }
 
     @Test
-    void sectionsCanBeEmpty() {
+    void emptySectionsAreWarnedAbout() {
         ScriptParser.Result result = parse("on join:\non quit:\n\tsend \"bye\"\n");
-        assertEquals(List.of(), result.diagnostics());
+        assertEquals(List.of("1: " + StructureParser.EMPTY_SECTION), errors(result));
         assertEquals(List.of(), result.structures().get(0).section().children());
         assertEquals(1, result.structures().get(1).section().children().size());
     }
@@ -110,13 +110,12 @@ class ScriptParserTest {
     @Test
     void reportsCodeOutsideStructures() {
         ScriptParser.Result result = parse("send \"hi\"\non join:\n\tstop\n");
-        assertEquals(List.of("1: Can't understand this line: code has to go inside an event, command, function"
-                + " or other structure"), errors(result));
+        assertEquals(List.of("1: Can't understand this structure: send \"hi\""), errors(result));
         assertEquals(1, result.structures().size());
     }
 
     @Test
-    void reportsUnexpectedIndentationOnce() {
+    void reportsEachLineIndentedWrongly() {
         ScriptParser.Result result = parse("""
                 on join:
                 \tsend "a"
@@ -124,8 +123,8 @@ class ScriptParserTest {
                 \t\tsend "c"
                 \tsend "d"
                 """);
-        assertEquals(List.of("3: Unexpected indentation: only the lines under a section (a line ending in ':')"
-                + " can be indented further"), errors(result));
+        assertEquals(List.of("3: indentation error: expected 1 tab, but found 2 tabs",
+                "4: indentation error: expected 1 tab, but found 2 tabs"), errors(result));
         assertEquals(2, result.structures().getFirst().section().children().size());
     }
 
@@ -137,16 +136,17 @@ class ScriptParserTest {
                 \t\t\tsend "a"
                 \tsend "b"
                 """);
-        assertEquals(List.of("4: Indentation error: expected 2 tabs, but found 1 tab"), errors(result));
+        // As Skript: the first indented line sets the indentation to two tabs.
+        assertEquals(List.of("3: indentation error: expected 4 tabs, but found 3 tabs",
+                "4: indentation error: expected 4 tabs, but found 1 tab", "2: " + StructureParser.EMPTY_SECTION),
+                errors(result));
     }
 
     @Test
     void reportsMixedTabsAndSpaces() {
         ScriptParser.Result result = parse("on join:\n    if true:\n\t\tsend \"a\"\n    send \"b\"\n");
-        assertEquals(1, result.diagnostics().size());
-        Diagnostic error = result.diagnostics().getFirst();
-        assertEquals(3, error.line());
-        assertTrue(error.message().startsWith("Indentation error"), error.message());
+        assertEquals(List.of("3: indentation error: expected 8 spaces, but found 2 tabs",
+                "2: " + StructureParser.EMPTY_SECTION), errors(result));
         assertEquals(2, result.structures().getFirst().section().children().size());
     }
 
@@ -169,7 +169,7 @@ class ScriptParserTest {
     @Test
     void reportsUndefinedOptions() {
         ScriptParser.Result result = parse("on join:\n\tsend \"{@missing}\"\n");
-        assertEquals(List.of("2: Undefined option {@missing}"), errors(result));
+        assertEquals(List.of("2: undefined option {@missing}"), errors(result));
         assertEquals(7, result.diagnostics().getFirst().column());
     }
 

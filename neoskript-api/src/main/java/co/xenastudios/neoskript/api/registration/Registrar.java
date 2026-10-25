@@ -188,6 +188,14 @@ public interface Registrar {
     void eventDefault(String typeId);
 
     /**
+     * {@link #eventDefault(String)} with the event's value of another class, as Skript's default expressions may
+     * be: a left-out audience is the event's command sender, since an event may have several audiences.
+     */
+    default void eventDefault(String typeId, Class<?> valueClass) {
+        eventDefault(typeId);
+    }
+
+    /**
      * Where a placeholder of {@code typeId} sits in an optional part that wasn't used and the event has no
      * value of it, it gets {@code value}, as Skript's literal default expressions: a number left out is 1.
      */
@@ -207,6 +215,13 @@ public interface Registrar {
      * column in {@code variables.csv}, e.g. {@code location}).
      */
     <T> void storage(String name, Class<T> type, co.xenastudios.neoskript.api.storage.VariableCodec<T> codec);
+
+    /**
+     * Marks {@code typeId} as one Skript can't save in variables, for its warning where a script sets a global
+     * variable to one: "{@code named} cannot be saved...". {@code named} is the type's name with its article, as
+     * Skript writes it ({@code an entity}).
+     */
+    default void unsavable(String typeId, String named) {}
 
     /**
      * Words scripts can write as values of {@code typeId}, like item names ({@code 2 stone swords}). The
@@ -233,6 +248,35 @@ public interface Registrar {
      * location is expected is the entity's location. The converter returns {@code null} if it can't.
      */
     <F, T> void converter(Class<F> from, Class<T> to, java.util.function.Function<? super F, ? extends T> converter);
+
+    /** A converter that may follow another in a chain of converters, but not come before one: Skript's flag. */
+    int NO_LEFT_CHAINING = 1;
+    /** A converter that may come before another in a chain, but not follow one: Skript's flag. */
+    int NO_RIGHT_CHAINING = 2;
+    /** A converter that isn't chained with others. */
+    int NO_CHAINING = NO_LEFT_CHAINING | NO_RIGHT_CHAINING;
+    /** A converter used even where it would only be for some of the values, as Skript's flag. */
+    int ALLOW_UNSAFE_CASTS = 4;
+    /**
+     * A converter Skript doesn't have, used only where a placeholder wants a value of the other type: not to get
+     * event values ({@code event-block} isn't the block at the event's location) as Skript's converters are.
+     */
+    int PLACEHOLDERS_ONLY = 16;
+    /**
+     * One of Skript's converters NeoSkript uses only to get event values ({@code event-entitytype} in a join event
+     * is the player's type), not where placeholders want the type.
+     */
+    int EVENT_VALUES_ONLY = 32;
+
+    /**
+     * {@link #converter(Class, Class, java.util.function.Function)} with Skript's flags for chaining it with
+     * others ({@link #NO_LEFT_CHAINING}, {@link #NO_RIGHT_CHAINING}, ...). Converters are chained as Skript's
+     * are when looking for how to get an event value of a type the event has none of.
+     */
+    default <F, T> void converter(Class<F> from, Class<T> to, java.util.function.Function<? super F, ? extends T> converter,
+            int flags) {
+        converter(from, to, converter);
+    }
 
     /**
      * How {@code set}/{@code add}/{@code remove}... change a value of {@code owner} that's the target

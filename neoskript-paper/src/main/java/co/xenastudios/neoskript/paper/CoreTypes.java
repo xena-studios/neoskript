@@ -105,6 +105,10 @@ final class CoreTypes {
         registrar.type("entity", "entity", Entity.class);
         registrar.type("uuid", "uuid", UUID.class);
         registrar.subtype("commandsender", "audience");
+        // Skript's names for command senders: 'event-sender', 'executor'.
+        registrar.alias("commandsender", "sender", "senders");
+        registrar.alias("commandsender", "executor", "executors");
+        registrar.alias("commandsender", "command executor", "command executors");
         registrar.subtype("player", "commandsender");
         registrar.subtype("player", "offlineplayer");
         // A UUID is the text of it: '{_uuid} is "a0789aeb-..."'.
@@ -155,8 +159,10 @@ final class CoreTypes {
             }
         });
 
-        // How they read in text: players and worlds by name, the console as Skript writes it.
-        registrar.text(OfflinePlayer.class, player -> String.valueOf(player.getName()));
+        // How they read in text: players and worlds by name (a player the server has no name for, by UUID), the
+        // console as Skript writes it.
+        registrar.text(OfflinePlayer.class, player -> player.getName() == null ? player.getUniqueId().toString()
+                : player.getName());
         registrar.text(World.class, World::getName);
         registrar.text(CommandSender.class, sender -> sender instanceof org.bukkit.command.ConsoleCommandSender
                 ? "the console" : sender.getName());

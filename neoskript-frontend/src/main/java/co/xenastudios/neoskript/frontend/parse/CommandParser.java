@@ -120,6 +120,7 @@ final class CommandParser {
         List<Statement> suggestions = null;
         Line suggestionsLine = null;
         List<Node.Section> children = new ArrayList<>();
+        boolean unexpected = false;
         for (Node child : section.children()) {
             Line entry = child.line();
             String key = entry.key().strip().toLowerCase(Locale.ROOT);
@@ -148,9 +149,14 @@ final class CommandParser {
                     messages.put(name, message);
                 }
             } else {
-                report(entry, (child instanceof Node.Section ? "Invalid section in command: " : "Invalid entry in command: ")
-                        + entry.text());
+                // As Skript's entry validator: each is reported, then the command isn't loaded.
+                report(entry, "Unexpected entry '" + entry.key().strip() + "'. Check whether it's spelled correctly or"
+                        + " remove it");
+                unexpected = true;
             }
+        }
+        if (unexpected) {
+            return null;
         }
 
         Set<Executor> own = executors;
@@ -160,6 +166,22 @@ final class CommandParser {
                 return null;
             }
         }
+
+        // Skript's warnings about the entries, as its SubCommandEntryData gives them.
+        java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
+        if (!entries.containsKey("cooldown")) {
+            for (String unused : List.of("message", "bypass", "storage")) {
+                if (entries.containsKey("cooldown " + unused)) {
+                    warnings.add(":There is a cooldown " + unused + " set, but not a cooldown");
+                }
+            }
+        }
+        if (entries.containsKey("permission message")) {
+            warnings.add("deprecated:[Deprecated] The 'permission message' entry has been deprecated for removal in a"
+                    + " future release. Commands that a player does not have permission to execute are no longer sent"
+                    + " to their client.");
+        }
+        statements.warn(section.line(), warnings);
 
         List<ParsedStructure.CommandNode> subcommands = new ArrayList<>();
         for (Node.Section child : children) {
@@ -387,7 +409,7 @@ final class CommandParser {
             candidate = candidate.substring(0, space).strip();
         }
         if (type == null) {
-            throw new PatternException("'" + typeText + "' is not a type");
+            throw new PatternException("'" + typeText + "' is not a known type.");
         }
 
         Double min = null;
@@ -413,7 +435,7 @@ final class CommandParser {
                     } else if ((m = MAX.matcher(clause)).matches()) {
                         max = number(m.group(1), typeText);
                     } else {
-                        throw new PatternException("'" + typeText + "' is not a type");
+                        throw new PatternException("'" + typeText + "' is not a known type.");
                     }
                 }
             }

@@ -89,6 +89,15 @@ final class VaultHook {
         registrar.text(Money.class, Money::toString);
         registrar.variableNameText(Money.class, Money::variableName);
         registrar.converter(Money.class, Double.class, Money::getAmount);
+        // Money with money is money, as in Skript; with a number it's a number, as money converts to one.
+        registrar.arithmetic('+', Money.class, Money.class, (a, b) -> new Money(a.getAmount() + b.getAmount()));
+        registrar.arithmetic('-', Money.class, Money.class, (a, b) -> new Money(a.getAmount() - b.getAmount()));
+        registrar.arithmetic('*', Money.class, Money.class, (a, b) -> new Money(a.getAmount() * b.getAmount()));
+        registrar.arithmetic('/', Money.class, Money.class, (a, b) -> new Money(a.getAmount() / b.getAmount()));
+        co.xenastudios.neoskript.runtime.Arithmetic.registerDifference(Money.class, (a, b) -> {
+            double difference = Math.abs(a.getAmount() - b.getAmount());
+            return new Money(difference < 1e-10 ? 0 : difference); // Skript.EPSILON
+        });
         registrar.arithmeticDefault(Money.class, () -> new Money(0));
         registrar.expression("ExprBalance", "money", info -> {
             require(economy, "money", "an economy plugin");

@@ -21,3 +21,34 @@ events:
   priority: high
   # Whether 'on <event>' triggers also run for events another plugin cancelled.
   listen-to-cancelled: false
+
+runtime-errors:
+  # As Skript's 'runtime errors' in config.sk. Frames are the duration over which runtime errors are
+  # collected; at the end of each, what wasn't printed is summed up.
+  frame-duration: 1 second
+  # The most errors printed per frame; more are hidden, and counted at the end of the frame.
+  total-errors-per-frame: 8
+  # The most errors one line prints per frame, so a line in a loop can't fill the frame.
+  errors-from-one-line-per-frame: 2
+  # A line with this many errors in a frame is put in timeout: its errors are hidden for a while.
+  error-spam-timeout-limit: 4
+  # How many frames a line stays in timeout.
+  error-timeout-length: 10
+  # The same for warnings.
+  total-warnings-per-frame: 8
+  warnings-from-one-line-per-frame: 2
+  warning-spam-timeout-limit: 4
+  warning-timeout-length: 10
+
+effect-commands:
+  # Skript's effect commands, as its 'enable effect commands': console commands and chat messages starting with
+  # the token are effects, run straight away, like '!set time to 6:00'. Players need the permission
+  # skript.effectcommands, which ops don't have unless allow-ops is on, as these commands can do anything.
+  # Moving over from Skript copies its settings for them.
+  enabled: false
+  # Skript's 'effect command token'. It can be longer than a character, but shouldn't start with / (a command).
+  token: "!"
+  # Skript's 'allow ops to use effect commands': ops can use them without the permission.
+  allow-ops: false
+  # Skript's 'log effect commands': players' effect commands are logged as '<player> issued effect command: <command>'.
+  log: false

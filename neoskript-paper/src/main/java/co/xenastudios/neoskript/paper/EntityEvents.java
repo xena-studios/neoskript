@@ -407,7 +407,7 @@ final class EntityEvents {
                 "vehicle block collision [(with|of) [a[n]] %-itemtypes/blockdatas%]",
                 "vehicle entity collision [(with|of) [a[n]] %-entitytypes%]");
 
-        registrar.eventValue(VehicleEvent.class, "entity", Vehicle.class, 0, VehicleEvent::getVehicle);
+        registrar.eventValue(VehicleEvent.class, "vehicle", VehicleEvent::getVehicle);
         registrar.eventValue(VehicleEvent.class, "world", event -> event.getVehicle().getWorld());
         registrar.eventValue(VehicleExitEvent.class, "livingentity", VehicleExitEvent::getExited);
         registrar.eventValue(VehicleEnterEvent.class, "entity", VehicleEnterEvent::getEntered);

@@ -204,6 +204,9 @@ public final class VariableStore {
         update(name, old -> {
             Object result = old;
             for (Object value : values) {
+                if (Arithmetic.unchangedBy('+', old, value)) {
+                    continue; // 'add 1 to {_money}', as in Skript
+                }
                 result = result == null ? value : Arithmetic.add(result, value);
             }
             return result;
@@ -233,6 +236,9 @@ public final class VariableStore {
         update(name, old -> {
             Object result = old == null ? 0L : old;
             for (Object value : values) {
+                if (Arithmetic.unchangedBy('-', old, value)) {
+                    continue;
+                }
                 result = Arithmetic.subtract(result, value);
             }
             return result;

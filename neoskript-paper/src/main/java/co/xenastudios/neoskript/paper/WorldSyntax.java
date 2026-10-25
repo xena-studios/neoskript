@@ -125,6 +125,11 @@ final class WorldSyntax {
         registrar.cloner(Vector.class, Vector::clone);
         registrar.cloner(Location.class, Location::clone);
         registrar.subtype("livingentity", "entity");
+        registrar.type("vehicle", "vehicle", org.bukkit.entity.Vehicle.class);
+        registrar.subtype("vehicle", "entity");
+        // A script command's block, where a command block ran it.
+        registrar.eventValue(co.xenastudios.neoskript.runtime.command.CommandEvent.class, "block",
+                event -> event.sender() instanceof org.bukkit.command.BlockCommandSender sender ? sender.getBlock() : null);
         registrar.subtype("player", "livingentity");
         registrar.text(Entity.class, entity -> entity.customName() != null
                 ? Messages.LEGACY_SECTION.serialize(entity.customName()) : EntityKind.name(entity.getType()));
@@ -151,9 +156,11 @@ final class WorldSyntax {
         }, "%entitytypes% (is|are) spawnable [in [the [world]] %world%]", "%entitytypes% can be spawned [in [the [world]] %world%]",
                 "%entitytypes% (isn't|is not|aren't|are not) spawnable [in [the [world]] %world%]",
                 "%entitytypes% (can't|can not|cannot) be spawned [in [the [world]] %world%]");
-        registrar.converter(Location.class, Block.class, location -> location.getWorld() == null ? null : location.getBlock());
+        // Not Skript's: only for placeholders, so 'event-block' isn't the block at an event's location.
+        registrar.converter(Location.class, Block.class, location -> location.getWorld() == null ? null : location.getBlock(),
+                Registrar.PLACEHOLDERS_ONLY);
         registrar.converter(Block.class, ItemType.class, block -> new ItemType(new org.bukkit.inventory.ItemStack(
-                block.getType().isItem() ? block.getType() : Material.AIR), false));
+                block.getType().isItem() ? block.getType() : Material.AIR), false), Registrar.NO_LEFT_CHAINING);
 
         registrar.storage("vector", Vector.class, new VariableCodec<>() {
             @Override
@@ -1129,10 +1136,16 @@ final class WorldSyntax {
         registrar.expression("ExprWorldEnvironment", "environment", info -> (context, args) -> map(args[0],
                 value -> value instanceof World world ? world.getEnvironment() : null),
                 "[the] [world] environment[s] of %worlds%", "%worlds%'[s] [world] environment[s]");
-        registrar.expression("PropExprWXYZ", "number", info -> new Axis(info.hasTag("x") ? 0 : info.hasTag("y") ? 1
-                : info.hasTag("w") ? 3 : 2),
-                "[the] (w:w|x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])] of %objects%",
-                "%objects%'[s] (w:w|x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])]");
+        registrar.expression("PropExprWXYZ", "number", info -> {
+                    if (info.hasTag("dep")) {
+                        co.xenastudios.neoskript.api.element.Warnings.warn("Using 'pos[ition]' or 'loc[ation]' to refer to"
+                                + " specific coordinates is deprecated and will be removed. Please use 'coord[inate]',"
+                                + " 'component[s]' or just the axis name 'x of {loc}' instead.");
+                    }
+                    return new Axis(info.hasTag("x") ? 0 : info.hasTag("y") ? 1 : info.hasTag("w") ? 3 : 2);
+                },
+                "[the] (w:w|x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|dep:(pos[ition[s]]|loc[ation][s])] of %objects%",
+                "%objects%'[s] (w:w|x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|dep:(pos[ition[s]]|loc[ation][s])]");
         Locations.registerOffsetAndSpawn(registrar);
         SettableProperty.register(registrar, "ExprVectorLength", "number", Vector.class, Number.class, Vector::length,
                 (vector, length) -> {

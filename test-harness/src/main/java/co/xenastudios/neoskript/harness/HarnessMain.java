@@ -11,11 +11,13 @@ import co.xenastudios.neoskript.harness.scenario.NeoSkriptMigrationScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptParseScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptCommandsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptCorpusScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptHooksScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptItemsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptSkriptSuiteScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptReloadScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptAutoReloadScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptRunScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptRuntimeErrorsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptSkriptTestsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptVariablesScenario;
 import co.xenastudios.neoskript.harness.scenario.SkriptConflictScenario;
@@ -43,10 +45,12 @@ public final class HarnessMain {
             new NeoSkriptSkriptTestsScenario(),
             new NeoSkriptReloadScenario(),
             new NeoSkriptAutoReloadScenario(),
+            new NeoSkriptRuntimeErrorsScenario(),
             new NeoSkriptEventsScenario(),
             new NeoSkriptCommandsScenario(),
             new NeoSkriptCorpusScenario(),
             new NeoSkriptItemsScenario(),
+            new NeoSkriptHooksScenario(),
             new NeoSkriptSkriptSuiteScenario(),
             new NeoSkriptVariablesScenario(),
             new NeoSkriptMigrationScenario(),

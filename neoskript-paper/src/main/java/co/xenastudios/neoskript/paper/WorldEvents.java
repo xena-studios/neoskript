@@ -211,8 +211,15 @@ final class WorldEvents {
                 event -> new Experience(event.getSpawnedXP()));
 
         registrar.event("EvtSkript", List.of(EventBridges.SkriptStartEvent.class, EventBridges.SkriptStopEvent.class),
-                info -> Events.narrowed(List.of(info.pattern() == 0 ? EventBridges.SkriptStartEvent.class
-                        : EventBridges.SkriptStopEvent.class), (context, args) -> true),
+                info -> {
+                    if (info.hasTag("server")) {
+                        co.xenastudios.neoskript.api.element.Warnings.warn("Server start/stop events are actually called"
+                                + " when Skript is started or stopped.It is thus recommended to use 'on Skript start/stop'"
+                                + " instead.");
+                    }
+                    return Events.narrowed(List.of(info.pattern() == 0 ? EventBridges.SkriptStartEvent.class
+                            : EventBridges.SkriptStopEvent.class), (context, args) -> true);
+                },
                 "(:server|skript) (start|load|enable)", "(:server|skript) (stop|unload|disable)");
         registrar.eventValue(EventBridges.SkriptStartEvent.class, "commandsender", event -> Bukkit.getConsoleSender());
         registrar.eventValue(EventBridges.SkriptStopEvent.class, "commandsender", event -> Bukkit.getConsoleSender());

@@ -599,6 +599,16 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **`/skript`** as Skript's: `reload`, `enable`, `disable`, `list`, `info`, `restore` and `help`, with Skript's messages and `skript.*` permissions. Disabled scripts and folders start with `-`, and `.` folders are skipped. Reloading or unloading a script runs its `on unload` events.
     - Known differences: a name ending in `/` is a folder. Skript 2.17 never finds folders, because of a bug.
 
+    **Batch 26 (2026-10-25): 862 of 862 tests pass; checked line by line against a real Skript server.**
+    - **Differential probes:** scripts are loaded on a Skript 2.17.0 server and a NeoSkript one side by side, and each line's messages compared. The fixes below came from them.
+    - **Errors:** every bad line in a trigger is reported, not only the first. Each message matches Skript's: words nothing understands (in a change, a text's `%...%`, a condition, a loop, or the line), `Can't compare`, `else` with no `if`, `if any` without `then` or with one condition, unclosed quotes and brackets, structures, indentation (one unit per structure, set by its first indented line), command entries, function parameters and return types, functions that don't exist, `return` where nothing returns, command argument types and options. The empty section warning is ported.
+    - **Event values** as Skript resolves them: subclasses and superclasses checked when they run, converters and chains of them, and Skript's errors. Left-out placeholders use the event's value for the same types as Skript (`fuel slot` in a smelt event). The command, script load and vehicle events gained Skript's values.
+    - **Warnings:** Skript's parse-time warnings from elements, with its suppression: deprecations (regions, MD5, `permission message` and more), lists missing `and`/`or`, variable names, values that can't be saved, constant conditions, a text inside `%...%`, loops and delays, experiments, default variables and `on server start`. Region names that don't exist are errors.
+    - **Runtime errors** print as Skript prints them, with its per-frame limits (config.yml `runtime-errors`) and `skript.see_runtime_errors`.
+    - **Effect commands:** `!effect` from the console and chat, with Skript's options, permission, messages, `me` and a cancellable `EffectCommandEvent`. Moving over from Skript copies the options.
+    - **Hooks** tested against the real WorldGuard, Vault, EssentialsX and LuckPerms (`neoskript-hooks`, baseline). Money with money is money; `add 1 to {_money}` leaves it, as in Skript.
+    - Known differences: Skript 2.17's warning frames never reset because of a bug, and NeoSkript resets them as intended. The code under a section whose header fails is still checked, so its errors show too. Event names in errors are as the script writes them.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.

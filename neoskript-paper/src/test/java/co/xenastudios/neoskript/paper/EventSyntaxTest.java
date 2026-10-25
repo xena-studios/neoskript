@@ -177,7 +177,7 @@ class EventSyntaxTest {
         // As in Skript: 'slots' isn't the event's slot where there's none, but the inventory's slots.
         assertEquals(List.of(), errors("on load:\n\tset {_a} to amount of slots of {_inv}\n"));
         // Where nothing else parses, it's still the error.
-        assertEquals(List.of("There's no slot in a join event"), errors("on join:\n\tset {_a} to event-slot\n"));
+        assertEquals(List.of("There's no slot in an on join event."), errors("on join:\n\tset {_a} to event-slot\n"));
         assertEquals(List.of(), errors("on join:\n\tset {_a} to event-player\n"));
     }
 
@@ -256,5 +256,18 @@ class EventSyntaxTest {
                 \tif event-block was {_b}:
                 \t\tsay "x"
                 """));
+    }
+
+    @Test
+    void furnaceSlotsDefaultToTheEventBlock() {
+        assertEquals(List.of(), errors("""
+                on smelt:
+                \tset {_x} to fuel slot
+                on break:
+                \tset {_x} to the ore slot
+                """));
+        // As in Skript, a player is a block as an inventory holder (if it were a block state), but a world isn't.
+        assertEquals(List.of(), errors("on join:\n\tset {_x} to result slot\n"));
+        assertEquals(1, errors("on weather change:\n\tset {_x} to result slot\n").size());
     }
 }

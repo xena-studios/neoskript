@@ -1,4 +1,6 @@
 # Harness check: NeoSkript compiles and runs this script.
 on load:
 	send "[harness] neoskript hello: ok" to console
-	send "[harness] neoskript says %"hi"% %1 and 2.5%" to the console
+	# Literals can't go in %...% (Skript parses only expressions there), so the list is in a variable.
+	set {_list::*} to 1 and 2.5
+	send "[harness] neoskript says %"hi"% %{_list::*}%" to the console

@@ -82,8 +82,9 @@ final class Locations {
         // A location is a block when the block's location is it, as Skript compares them through that converter.
         registrar.comparison(Location.class, Block.class, (location, block) -> location.getWorld() == block.getWorld()
                 && location.toVector().equals(block.getLocation().add(0.5, 0.5, 0.5).toVector()));
-        registrar.converter(Location.class, World.class, Location::getWorld);
-        registrar.converter(Entity.class, World.class, Entity::getWorld);
+        // Not Skript's: only for placeholders, so 'event-world' isn't the world of an event's location.
+        registrar.converter(Location.class, World.class, Location::getWorld, Registrar.PLACEHOLDERS_ONLY);
+        registrar.converter(Entity.class, World.class, Entity::getWorld, Registrar.PLACEHOLDERS_ONLY);
         // 'spawn of "world"': a world by its name.
         registrar.converter(String.class, World.class, Bukkit::getWorld);
 

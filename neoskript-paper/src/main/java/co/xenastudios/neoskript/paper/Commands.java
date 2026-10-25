@@ -46,8 +46,14 @@ final class Commands {
             return suggestion.tooltip() instanceof net.kyori.adventure.text.Component tooltip
                     ? component.hoverEvent(tooltip) : component;
         };
+        // Skript's: its player is the sender, if a player, as event values of a superclass are cast down.
+        registrar.eventValue(CommandEvent.class, "string", String[].class, 0, event -> {
+            // Its arguments as typed, split at spaces, as Bukkit gives them.
+            String full = event.fullCommand();
+            int space = full.indexOf(' ');
+            return space < 0 ? new String[0] : full.substring(space + 1).split(" ", -1);
+        });
         registrar.eventValue(CommandEvent.class, "commandsender", CommandEvent::sender);
-        registrar.eventValue(CommandEvent.class, "player", event -> event.sender() instanceof Player p ? p : null);
         registrar.eventValue(CommandEvent.class, "world",
                 event -> event.sender() instanceof Player p ? p.getWorld() : null);
 
@@ -204,6 +210,10 @@ final class Commands {
         }
         registrar.expression("ExprCommandInfo", "string", info -> {
             Function<Command, Object> getter = getters.get(info.pattern() / 2);
+            if (info.pattern() / 2 == 6) {
+                co.xenastudios.neoskript.api.element.Warnings.deprecated("Permission messages are deprecated for player"
+                        + " executed commands, as clients are not aware of commands that they cannot execute.");
+            }
             return (context, args) -> {
                 Object[] names = args[0] == null ? new Object[] {currentLabel(context.event())} : (Object[]) args[0];
                 List<Object> values = new ArrayList<>();

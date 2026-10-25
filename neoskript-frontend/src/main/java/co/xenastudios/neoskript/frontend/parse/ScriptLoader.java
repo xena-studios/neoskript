@@ -35,7 +35,7 @@ public final class ScriptLoader {
             "(local\\s+)?function\\s+([\\p{L}_][\\p{L}\\p{N}_]*)\\s*\\((.*)\\)\\s*(?:(?:::|->|returns)\\s*(.+))?",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern PARAMETER =
-            Pattern.compile("\\s*([\\p{L}_][\\p{L}\\p{N}_]*)\\s*:\\s*(.+?)(?:\\s*=\\s*(.+))?\\s*");
+            Pattern.compile("^\\s*([^:(){}\",]+?)\\s*:\\s*([a-zA-Z ]+?)\\s*(?:\\s*=\\s*(.+))?\\s*$");
     /** Skript's test-only top-level {@code parse:} block, whose {@code code:} holds structures. */
     private static final String PARSE_STRUCTURE = "parse";
     private static final Pattern EVENT_MODIFIERS = Pattern.compile(
@@ -64,6 +64,31 @@ public final class ScriptLoader {
         TypeRef ref = registry.resolveType(type);
         Expected expected = ref == null ? Expected.OBJECTS : context.expected(ref);
         return new LineParser(context, text).expression(0, text.length(), expected);
+    }
+
+    /**
+     * One line of code on its own, as Skript's effect commands parse what follows the token. {@code statement}
+     * is what it parsed to (an effect, a condition, a function call, or {@link Statement.Invalid}), and
+     * {@code script} has its problems and delay state.
+     */
+    public record ParsedLine(ParsedScript script, Statement statement) {}
+
+    /**
+     * Parses {@code text} as one line of code, with the global functions {@code functions} (by name) callable
+     * and the event values {@code scope} allows ({@code null} for any), for Skript's effect commands.
+     * {@code name} is what its problems are reported under.
+     */
+    public ParsedLine parseLine(String name, String text, Map<String, List<FunctionInfo>> functions,
+            EventValues.Scope scope) {
+        SourceFile file = new SourceFile(name, text);
+        ParserContext context = new ParserContext(registry, functions);
+        context.eventScope(scope);
+        Diagnostics diagnostics = new Diagnostics(file);
+        StatementParser statements = new StatementParser(context, diagnostics);
+        Line line = new Line(1, "", text);
+        List<Statement> body = statements.body(List.of(new Node.Simple(line)));
+        return new ParsedLine(new ParsedScript(file, List.of(), diagnostics.all(), statements.delays()),
+                body.getFirst());
     }
 
     public List<ParsedScript> load(List<SourceFile> files) {
@@ -115,6 +140,7 @@ public final class ScriptLoader {
             }
         }
         context.itemAliases(aliases);
+        context.scriptName(result.file().name());
         boolean hinted = false;
         for (Structure structure : result.structures()) {
             if (structure.kind() == Structure.Kind.USING && structure.node().line().text().strip()
@@ -131,7 +157,7 @@ public final class ScriptLoader {
                 parsed.add(p);
             }
         }
-        return new ParsedScript(result.file(), parsed, diagnostics.all(), statements.delays());
+        return new ParsedScript(result.file(), parsed, diagnostics.all(), statements.delays(), statements.suppressions());
     }
 
     private ParsedStructure structure(Structure structure, ParserContext context, StatementParser statements,
@@ -143,6 +169,7 @@ public final class ScriptLoader {
             case COMMAND -> values == null ? null : values.command();
             default -> null;
         });
+        statements.note(structure.node().line());
         try {
             return switch (structure.kind()) {
                 case OPTIONS, VARIABLES, ALIASES, USING -> new ParsedStructure.Data(structure);
@@ -259,9 +286,12 @@ public final class ScriptLoader {
             event = eventHeader(context, key, EVENT_MODIFIERS);
         }
         if (event == null) {
-            diagnostics.error(line.number(), line.column(), key.length(), "Can't understand this event: '" + key + "'");
+            diagnostics.error(line.number(), line.column(), key.length(), "Can't understand this structure: " + key);
             return null;
         }
+        java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
+        LineParser.listWarnings(key, event, warnings);
+        statements.warn(line, warnings);
         context.eventScope(values == null ? null : values.event(event.syntax()));
         return new ParsedStructure.Event(structure, event, statements.body(section.children()));
     }
@@ -338,9 +368,15 @@ public final class ScriptLoader {
             for (int[] piece : Scanner.split(list, 0, list.length(), ',')) {
                 String text = list.substring(piece[0], piece[1]);
                 Matcher parameter = PARAMETER.matcher(text);
-                TypeRef type = parameter.matches() ? registry.resolveType(parameter.group(2)) : null;
+                if (!parameter.matches()) {
+                    int n = parameters.size() + 1;
+                    report(diagnostics, line, "The " + n + ordinalSuffix(n) + " argument's definition is invalid. It"
+                            + " should look like 'name: type' or 'name: type = default value'.");
+                    return null;
+                }
+                TypeRef type = registry.resolveType(parameter.group(2));
                 if (type == null) {
-                    report(diagnostics, line, "Invalid function parameter: '" + text.strip() + "'");
+                    report(diagnostics, line, "Cannot recognise the type '" + parameter.group(2).strip() + "'");
                     return null;
                 }
                 parameters.add(new FunctionInfo.Parameter(parameter.group(1), type.type().id(), type.plural(),
@@ -352,7 +388,7 @@ public final class ScriptLoader {
         if (header.group(4) != null) {
             TypeRef type = registry.resolveType(header.group(4));
             if (type == null) {
-                report(diagnostics, line, "Invalid function return type: '" + header.group(4).strip() + "'");
+                report(diagnostics, line, "Cannot recognise the type '" + header.group(4).strip() + "'");
                 return null;
             }
             returnType = type.type().id();
@@ -381,5 +417,18 @@ public final class ScriptLoader {
         if (diagnostics != null) {
             diagnostics.error(line.number(), line.column(), line.text().length(), message);
         }
+    }
+
+    /** {@code st}, {@code nd}, {@code rd} or {@code th}, as Skript's {@code fancyOrderNumber}. */
+    private static String ordinalSuffix(int n) {
+        if (n % 100 / 10 == 1) {
+            return "th";
+        }
+        return switch (n % 10) {
+            case 1 -> "st";
+            case 2 -> "nd";
+            case 3 -> "rd";
+            default -> "th";
+        };
     }
 }
