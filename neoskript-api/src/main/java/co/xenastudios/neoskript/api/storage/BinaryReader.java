@@ -20,6 +20,8 @@ public interface BinaryReader {
     /** Starts an object; returns its field count. */
     int beginObject();
 
+    byte byteField(String name);
+
     int intField(String name);
 
     long longField(String name);
@@ -40,6 +42,15 @@ public interface BinaryReader {
      * {@link #beginObject}), or {@code null} if the field holds nothing.
      */
     String objectOrNullField(String name);
+
+    /** The type of an object a field holds, from {@link #anyField}: follow with {@link #beginObject}. */
+    record ObjectType(String type) {}
+
+    /**
+     * Reads a field holding anything but an array: a boxed primitive (as {@code Integer} or {@code Float}), a
+     * string, {@code null} if it holds nothing, or an {@link ObjectType} for an object.
+     */
+    Object anyField(String name);
 
     /** Reads a field holding an array of objects of {@code componentType}; returns its length. */
     int objectArrayField(String name, String componentType);

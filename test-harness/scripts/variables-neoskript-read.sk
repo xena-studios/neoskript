@@ -2,6 +2,7 @@
 on load:
 	send "[harness] read: %{t::text}% | %{t::unicode}% | %{t::quote}% | %{t::long}% | %{t::double}% | %{t::bool}% | %{t::timespan}% | %{t::list::*}% | %{t::item}%" to console
 	send "[harness] read items: %{t::item}% | %{t::item plain}% | %{t::item block}% | %item amount of {t::item amount}% | %{t::item enchanted}% | %{t::stack}% | %{t::gamemode}%" to console
+	send "[harness] read particles: %{t::particle}% | %{t::particle plain}% | %{t::particle portal}% | %{t::particle sweep}% | %{t::particle dust}% | %{t::particle transition}% | %{t::particle block}% | %{t::particle item}% | %{t::particle shriek}% | %{t::particle charge}% | %{t::particle trail}% | %{t::particle effect}%" to console
 	send "[harness] read loc: %{t::loc}%" to console
 	# A memory-only change makes NeoSkript rewrite the file without changing what's in it.
 	set {-harness::touched} to true

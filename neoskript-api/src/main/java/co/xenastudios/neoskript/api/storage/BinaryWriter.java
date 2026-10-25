@@ -24,6 +24,8 @@ public interface BinaryWriter {
 
     void beginObject(int fields);
 
+    void byteField(String name, byte value);
+
     void intField(String name, int value);
 
     void longField(String name, long value);
@@ -41,6 +43,12 @@ public interface BinaryWriter {
 
     /** A field holding nothing ({@code null}). */
     void nullField(String name);
+
+    /**
+     * A field holding a boxed primitive, as Skript writes an {@code Integer} or {@code Float} held as an object
+     * rather than a primitive: {@code value} is an {@code Integer}, {@code Float} and the like.
+     */
+    void boxedField(String name, Object value);
 
     /**
      * A field holding an array of {@code length} objects whose declared element type is

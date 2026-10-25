@@ -36,5 +36,17 @@ on load:
 	set {t::stack} to slot 0 of {_inv}
 	set {t::vector} to vector(1, 2, 3)
 	set {t::gamemode} to creative
+	set {t::particle} to flame particle
+	set {t::particle plain} to heart particle
+	set {t::particle portal} to portal particle
+	set {t::particle sweep} to sweep attack particle
+	set {t::particle dust} to red dust particle of size 2
+	set {t::particle transition} to red dust particle that transitions to blue
+	set {t::particle block} to stone block particle
+	set {t::particle item} to diamond item particle
+	set {t::particle shriek} to shriek particle delayed by 2 ticks
+	set {t::particle charge} to sculk charge particle with roll angle 90
+	set {t::particle trail} to red trail particle moving to location(1, 64, 2, world "world") over 3 seconds
+	set {t::particle effect} to red potion effect particle
 	set {-t::memory} to 1
 	broadcast "[harness] variables set"

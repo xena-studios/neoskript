@@ -33,6 +33,22 @@ final class ItemCodecs {
 
     private ItemCodecs() {}
 
+    /** An item stack, as Bukkit's YAML of it. */
+    static final VariableCodec<ItemStack> ITEM_STACK = new VariableCodec<>() {
+        @Override
+        public void encode(ItemStack stack, BinaryWriter out) {
+            out.beginObject(1);
+            out.stringField("value", yaml(stack));
+        }
+
+        @Override
+        public ItemStack decode(BinaryReader in) {
+            in.beginObject();
+            Object value = load(in.stringField("value"));
+            return value instanceof ItemStack stack ? stack : null;
+        }
+    };
+
     static void register(Registrar registrar) {
         registrar.storage("gamemode", GameMode.class, new VariableCodec<>() {
             @Override
@@ -46,20 +62,7 @@ final class ItemCodecs {
             }
         });
 
-        registrar.storage("itemstack", ItemStack.class, new VariableCodec<>() {
-            @Override
-            public void encode(ItemStack stack, BinaryWriter out) {
-                out.beginObject(1);
-                out.stringField("value", yaml(stack));
-            }
-
-            @Override
-            public ItemStack decode(BinaryReader in) {
-                in.beginObject();
-                Object value = load(in.stringField("value"));
-                return value instanceof ItemStack stack ? stack : null;
-            }
-        });
+        registrar.storage("itemstack", ItemStack.class, ITEM_STACK);
 
         registrar.storage("itemtype", ItemType.class, new VariableCodec<>() {
             @Override
@@ -141,13 +144,14 @@ final class ItemCodecs {
     }
 
     /** {@code value} as Bukkit saves it in YAML, under the key {@code value}, as Skript does. */
-    private static String yaml(Object value) {
+    /** {@code value}, a Bukkit configuration-serializable object, as YAML under {@code value}, as Skript saves them. */
+    static String yaml(Object value) {
         YamlConfiguration yaml = new YamlConfiguration();
         yaml.set("value", value);
         return yaml.saveToString();
     }
 
-    private static Object load(String text) {
+    static Object load(String text) {
         YamlConfiguration yaml = new YamlConfiguration();
         try {
             yaml.loadFromString(text);

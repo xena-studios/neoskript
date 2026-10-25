@@ -13,3 +13,11 @@ on load:
 	set slot 0 of {_inv} to 2 diamonds
 	set {n::stack} to slot 0 of {_inv}
 	set {n::mode} to creative
+	set {n::particle} to flame particle
+	set {n::particle dust} to blue dust particle of size 3
+	set {n::particle transition} to red dust particle that transitions to green
+	set {n::particle block} to oak planks block particle
+	set {n::particle item} to stick item particle
+	set {n::particle shriek} to shriek particle delayed by 5 ticks
+	set {n::particle trail} to blue trail particle moving to location(3, 70, 4, world "world")
+	set {n::particle effect} to green potion effect particle

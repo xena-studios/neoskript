@@ -80,6 +80,7 @@ public final class StandardLibrary {
         WorldProperties.registerLate(registrar);
         StorageCodecs.register(registrar);
         ItemCodecs.register(registrar);
+        ParticleCodecs.register(registrar);
     }
 
     /** Syntax Skript's test environment provides, for running Skript's own tests: {@code test-location}... */

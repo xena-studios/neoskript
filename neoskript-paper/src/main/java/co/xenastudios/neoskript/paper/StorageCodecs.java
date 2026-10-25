@@ -22,6 +22,36 @@ final class StorageCodecs {
 
     private StorageCodecs() {}
 
+    /** A location: its world, coordinates and rotation. */
+    static final VariableCodec<Location> LOCATION = new VariableCodec<>() {
+        @Override
+        public void encode(Location location, BinaryWriter out) {
+            out.beginObject(6);
+            out.objectField("world", "world");
+            writeWorld(location.getWorld(), out);
+            out.doubleField("x", location.getX());
+            out.doubleField("y", location.getY());
+            out.doubleField("z", location.getZ());
+            out.floatField("pitch", location.getPitch());
+            out.floatField("yaw", location.getYaw());
+        }
+
+        @Override
+        public Location decode(BinaryReader in) {
+            in.beginObject();
+            if (!in.objectField("world").equals("world")) {
+                return null;
+            }
+            World world = readWorld(in);
+            double x = in.doubleField("x");
+            double y = in.doubleField("y");
+            double z = in.doubleField("z");
+            float pitch = in.floatField("pitch");
+            float yaw = in.floatField("yaw");
+            return world == null ? null : new Location(world, x, y, z, yaw, pitch);
+        }
+    };
+
     static void register(Registrar registrar) {
         registrar.storage("world", World.class, new VariableCodec<>() {
             @Override
@@ -35,34 +65,7 @@ final class StorageCodecs {
             }
         });
 
-        registrar.storage("location", Location.class, new VariableCodec<>() {
-            @Override
-            public void encode(Location location, BinaryWriter out) {
-                out.beginObject(6);
-                out.objectField("world", "world");
-                writeWorld(location.getWorld(), out);
-                out.doubleField("x", location.getX());
-                out.doubleField("y", location.getY());
-                out.doubleField("z", location.getZ());
-                out.floatField("pitch", location.getPitch());
-                out.floatField("yaw", location.getYaw());
-            }
-
-            @Override
-            public Location decode(BinaryReader in) {
-                in.beginObject();
-                if (!in.objectField("world").equals("world")) {
-                    return null;
-                }
-                World world = readWorld(in);
-                double x = in.doubleField("x");
-                double y = in.doubleField("y");
-                double z = in.doubleField("z");
-                float pitch = in.floatField("pitch");
-                float yaw = in.floatField("yaw");
-                return world == null ? null : new Location(world, x, y, z, yaw, pitch);
-            }
-        });
+        registrar.storage("location", Location.class, LOCATION);
 
         // Enums are saved by their constant's name, as Skript's enum serializer does.
         enumStorage(registrar, "clicktype", org.bukkit.event.inventory.ClickType.class);
