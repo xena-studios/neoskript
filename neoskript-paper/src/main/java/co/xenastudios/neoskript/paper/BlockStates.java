@@ -45,7 +45,7 @@ final class BlockStates {
                 block -> state(block, org.bukkit.block.BrewingStand.class, stand -> (long) stand.getFuelLevel()),
                 (block, level) -> change(block, org.bukkit.block.BrewingStand.class,
                         stand -> stand.setFuelLevel((int) Math.max(0, Math.min(Integer.MAX_VALUE, level.doubleValue()))))),
-                "[the] brewing [stand] fuel level of %blocks%", "%blocks%'[s] brewing [stand] fuel level");
+                "[the] brewing [stand] fuel (level|amount) [of %blocks%]", "%blocks%'[s] brewing [stand] fuel (level|amount)");
         registrar.expression("ExprBrewingSlot", "itemtype", info -> {
             int slot = info.hasTag("second") ? 1 : info.hasTag("third") ? 2 : info.hasTag("ingredient") ? 3
                     : info.hasTag("fuel") ? 4 : 0;

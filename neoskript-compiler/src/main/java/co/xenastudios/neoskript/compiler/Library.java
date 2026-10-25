@@ -60,16 +60,13 @@ public final class Library implements Registrar {
     private record EventValue(Class<?> eventClass, String type, int time, Class<?> valueClass,
             java.util.function.Function<Object, ?> getter, String excluded) {}
 
-    /** Thrown where a trigger asks for an event value its event leaves out on purpose, with the reason. */
-    static final class ExcludedEventValue extends RuntimeException {
-        ExcludedEventValue(String message) {
-            super(message, null, false, false);
-        }
-    }
-
     private final SyntaxRegistry.Builder builder = SyntaxRegistry.builder();
     private final Map<Key, Object> bindings = new HashMap<>();
     private final Map<String, Class<?>> javaClasses = new HashMap<>();
+    /** Every type, in the order registered. */
+    private final List<String> javaClassOrder = new ArrayList<>();
+    /** The converters, as Skript looks them up to get event values. */
+    private final Converters converters = new Converters();
     private final Map<FunctionInfo, Function> functions = new HashMap<>();
     private final Map<String, Object> literalValues = new HashMap<>();
     /** Each named type's values, in the order registered, without repeats: what 'all colours' gives. */
@@ -109,10 +106,16 @@ public final class Library implements Registrar {
     public void type(String id, String name, Class<?> javaClass) {
         checkOpen();
         builder.type(new TypeInfo(id, name, Set.of(), false));
-        javaClasses.put(id, javaClass);
+        putJavaClass(id, javaClass);
         co.xenastudios.neoskript.runtime.TypeNames.register(javaClass, name);
         if (STRICT_TYPES.contains(id)) {
             builder.strict(id);
+        }
+    }
+
+    private void putJavaClass(String id, Class<?> javaClass) {
+        if (javaClasses.put(id, javaClass) == null) {
+            javaClassOrder.add(id);
         }
     }
 
@@ -123,7 +126,7 @@ public final class Library implements Registrar {
         if (STRICT_TYPES.contains(id)) {
             builder.strict(id);
         }
-        javaClasses.put(id, javaClass);
+        putJavaClass(id, javaClass);
         co.xenastudios.neoskript.runtime.TypeNames.register(javaClass, name);
         // A word several types have is the first's where nothing says which.
         values.forEach(literalValues::putIfAbsent);
@@ -443,6 +446,25 @@ public final class Library implements Registrar {
         eventDefaults.add(typeId);
     }
 
+    /** The class of the event value a left-out placeholder of a type gets, where it isn't the type's own. */
+    private final Map<String, Class<?>> eventDefaultClasses = new HashMap<>();
+
+    @Override
+    public void eventDefault(String typeId, Class<?> valueClass) {
+        eventDefault(typeId);
+        eventDefaultClasses.put(typeId, valueClass);
+    }
+
+    /**
+     * Skript's default expression of {@code typeId} where its type's default is the event's value: how to get it
+     * from events of {@code eventClasses}, or the error, about {@code eventDescription}.
+     */
+    EventValueLookup eventDefault(List<Class<?>> eventClasses, String typeId, String eventDescription) {
+        Class<?> valueClass = eventDefaultClasses.getOrDefault(typeId, javaClass(typeId));
+        return eventValue(eventClasses, valueClass, valueClass == javaClass(typeId) ? typeId : null, 0,
+                eventDescription);
+    }
+
     private final Map<String, Object> defaultValues = new HashMap<>();
 
     @Override
@@ -462,162 +484,215 @@ public final class Library implements Registrar {
     }
 
     /**
-     * How to get a value of {@code typeId}, or a subtype, from events of {@code eventClasses}, or
-     * {@code null} if none of them has one. As in Skript, it's enough for one of the classes to have it:
-     * for the others the value is {@code null}. For each class, the value registered for the closest
-     * superclass wins, and among those, one of exactly {@code typeId}.
+     * How to get the value of {@code typeId} from events of {@code eventClasses}, as Skript's event value
+     * expression of the type's class does, or {@code null} if they have none (or leave it out on purpose).
      */
     java.util.function.Function<Object, Object> eventValue(List<Class<?>> eventClasses, String typeId) {
-        try {
-            return eventValue(eventClasses, typeId, 0);
-        } catch (ExcludedEventValue excluded) {
-            return null;
+        return eventDefault(eventClasses, typeId, null).getter();
+    }
+
+    /**
+     * What an event value asks for: values of {@code valueClass}, of the type {@code type} where that's the type
+     * named. {@code words} is the kind of entity an {@code event-zombie} names, else {@code null}.
+     */
+    record EventValueRequest(Class<?> valueClass, String type, String words) {}
+
+    /**
+     * What an event value of the type {@code ref}, written as {@code text} ({@code event-zombie}, or {@code null}
+     * if unknown), asks for: the type's class, an array of it for a plural ({@code event-blocks}), or for a kind
+     * of entity, its class, as Skript's {@code ExprEntity}.
+     */
+    EventValueRequest request(co.xenastudios.neoskript.frontend.registry.TypeRef ref, String text) {
+        String typeId = ref.type().id();
+        Class<?> single = javaClass(typeId);
+        if (ref.plural()) {
+            return single.isArray() ? new EventValueRequest(single, typeId, null)
+                    : new EventValueRequest(single.arrayType(), null, null);
         }
+        if (!typeId.equals("entity") || text == null) {
+            return new EventValueRequest(single, typeId, null);
+        }
+        String words = text.strip().toLowerCase(java.util.Locale.ROOT);
+        boolean prefixed = false;
+        for (String prefix : new String[] {"the ", "event-"}) {
+            if (words.startsWith(prefix)) {
+                words = words.substring(prefix.length()).strip();
+                prefixed |= prefix.equals("event-");
+            }
+        }
+        if (registry().resolveType(words) != null) {
+            return new EventValueRequest(single, typeId, null);
+        }
+        Class<?> kind = kindClass("entitytype", words);
+        return kind == null || kind == single ? new EventValueRequest(single, typeId, null)
+                : new EventValueRequest(kind, null, prefixed ? words : null);
+    }
+
+    /** What looking for an event value found: how to get it, or else Skript's error for asking for it. */
+    record EventValueLookup(java.util.function.Function<Object, Object> getter, String error) {}
+
+    /** What Skript's event values are resolved from: the registered values, by their classes, and converters. */
+    private synchronized EventValueResolver resolver() {
+        if (resolver == null) {
+            List<EventValueResolver.Value> values = new ArrayList<>();
+            for (EventValue value : eventValues) {
+                Class<?> valueClass = value.valueClass() != null ? value.valueClass() : javaClass(value.type());
+                values.add(new EventValueResolver.Value(value.eventClass(), valueClass,
+                        value.valueClass() == null ? value.type() : null, value.time(), value.getter(), value.excluded()));
+            }
+            resolver = new EventValueResolver(List.copyOf(values), converters, this::exactType);
+        }
+        return resolver;
+    }
+
+    private EventValueResolver resolver;
+
+    /** The type whose values are exactly of {@code javaClass}, the first registered of several, or {@code null}. */
+    String exactType(Class<?> javaClass) {
+        for (String type : typeOrder()) {
+            if (javaClasses.get(type) == javaClass) {
+                return type;
+            }
+        }
+        return null;
     }
 
     /**
-     * {@link #eventValue(List, String)} at {@code time}: the value before the event ({@code -1}) or after it
-     * ({@code 1}), or the value now where an event has no other. Throws {@link ExcludedEventValue} if the events
-     * that would have it leave it out on purpose.
+     * The type of the closest superclass of {@code javaClass} (or of the class itself), as Skript's
+     * {@code getSuperClassInfo}: what Skript's errors call a value of the class.
      */
-    java.util.function.Function<Object, Object> eventValue(List<Class<?>> eventClasses, String typeId, int time) {
-        return eventValue(eventClasses, typeId, null, time);
+    String superType(Class<?> javaClass) {
+        String exact = exactType(javaClass);
+        if (exact != null) {
+            return exact;
+        }
+        String best = null;
+        for (String type : typeOrder()) {
+            Class<?> candidate = javaClasses.get(type);
+            if (candidate == null || candidate == Object.class || !candidate.isAssignableFrom(javaClass)) {
+                continue;
+            }
+            if (best == null || javaClasses.get(best).isAssignableFrom(candidate)) {
+                best = type;
+            }
+        }
+        return best != null ? best : SyntaxRegistry.OBJECT;
+    }
+
+    /** Every type, in the order registered. */
+    private List<String> typeOrder() {
+        return javaClassOrder;
     }
 
     /**
-     * {@link #eventValue(List, String, int)} for a narrower kind of value, of {@code narrow} ({@code null} for
-     * any): {@code event-projectile} is the event's projectile, or its entity if that's a projectile.
+     * Skript's {@code EventValueExpression.init}, then its values: the event value of {@code valueClass} (of the
+     * type {@code type}, if given) at {@code time} in events of {@code eventClasses}. Each event class gets the value
+     * resolved for it, as in Skript; one having it is enough. Else Skript's error for it, about
+     * {@code eventDescription} ({@code an on join event}); without a description, just that there's none.
      */
-    java.util.function.Function<Object, Object> eventValue(List<Class<?>> eventClasses, String typeId, Class<?> narrow,
-            int time) {
-        List<Map.Entry<Class<?>, java.util.function.Function<Object, ?>>> getters = new ArrayList<>();
-        String excluded = null;
+    EventValueLookup eventValue(List<Class<?>> eventClasses, Class<?> valueClass, String type, int time,
+            String eventDescription) {
+        EventValueResolver resolver = resolver();
+        String error = null;
+        boolean hasValue = false;
+        List<Map.Entry<Class<?>, java.util.function.Function<Object, Object>>> getters = new ArrayList<>();
         for (Class<?> eventClass : eventClasses) {
-            EventValue best = null;
-            for (int at : time == 0 ? new int[] {0} : new int[] {time, 0}) {
-                best = best == null ? best(eventClass, typeId, at, narrow == null ? null : narrow) : best;
+            EventValueResolver.Resolution exact = resolver.resolve(eventClass, valueClass, type, time,
+                    EventValueResolver.DEFAULT & ~EventValueResolver.CONVERSION);
+            error = error != null ? error : exact.error();
+            if (exact.multiple()) {
+                return new EventValueLookup(null, error != null ? error : eventDescription == null ? "multiple"
+                        : "There are multiple " + input(valueClass, type, true) + " in " + eventDescription
+                                + ". You must define which " + input(valueClass, type, false) + " to use.");
             }
-            // Values of a kind are checked to be of the kind asked for: 'event-arrow' isn't any projectile. A
-            // plural ('event-blocks') without values of its own is the single value.
-            boolean filter = narrow != null && !narrow.isArray();
-            if (best == null && narrow != null) {
-                // A wider value, kept only when it's of the kind asked for.
-                for (int at : time == 0 ? new int[] {0} : new int[] {time, 0}) {
-                    best = best == null ? best(eventClass, typeId, at, null) : best;
+            EventValueResolver.Resolution resolution = resolver.resolve(eventClass, valueClass, type, time,
+                    EventValueResolver.DEFAULT);
+            error = error != null ? error : resolution.error();
+            hasValue |= resolution.successful();
+            getters.add(Map.entry(eventClass, resolution.successful() ? resolution.all().getFirst().getter()
+                    : event -> null));
+        }
+        if (!hasValue) {
+            if (eventDescription == null) {
+                return new EventValueLookup(null, error != null ? error : "none");
+            }
+            // As Skript suggests: 'event-block' where the event has several, 'event-blocks' where it has one.
+            Class<?> suggested = valueClass.isArray() ? valueClass.componentType() : valueClass.arrayType();
+            String suggestedType = valueClass.isArray() ? exactType(suggested) == null ? null : type(suggested, type)
+                    : null;
+            boolean suggestedExists = false;
+            for (Class<?> eventClass : eventClasses) {
+                EventValueResolver.Resolution exact = resolver.resolve(eventClass, suggested, suggestedType, 0,
+                        EventValueResolver.DEFAULT & ~EventValueResolver.CONVERSION);
+                error = error != null ? error : exact.error();
+                if (exact.multiple()) {
+                    continue;
                 }
-            } else if (best == null) {
-                // No plain value, but one of a narrower kind: the entity of a lightning strike is its lightning.
-                best = best(eventClass, typeId, 0, Object.class);
+                EventValueResolver.Resolution resolution = resolver.resolve(eventClass, suggested, suggestedType, 0,
+                        EventValueResolver.DEFAULT);
+                error = error != null ? error : resolution.error();
+                if (resolution.successful()) {
+                    suggestedExists = true;
+                    break;
+                }
             }
-            if (best != null && best.excluded() != null) {
-                excluded = best.excluded();
-            } else if (best != null) {
-                java.util.function.Function<Object, ?> getter = best.getter();
-                getters.add(Map.entry(eventClass, filter ? event -> {
-                    Object value = getter.apply(event);
-                    return narrow.isInstance(value) ? value : null;
-                } : getter));
+            if (error != null) {
+                return new EventValueLookup(null, error);
             }
-        }
-        if (getters.isEmpty()) {
-            if (excluded != null) {
-                throw new ExcludedEventValue(excluded);
+            String message;
+            if (suggestedExists) {
+                message = (suggested.isArray() ? "There are multiple " + input(suggested, suggestedType, true)
+                        : "There's only one " + input(suggested, suggestedType, false)) + " in " + eventDescription
+                        + ". Did you mean 'event-" + input(suggested, suggestedType, suggested.isArray()) + "'?";
+            } else {
+                boolean single = !valueClass.isArray();
+                message = "There" + (single ? "'s" : " are") + " no " + input(valueClass, type, !single) + " in "
+                        + eventDescription + ".";
             }
-            return null;
+            return new EventValueLookup(null, message);
         }
-        if (getters.size() == 1 && eventClasses.size() == 1) {
-            java.util.function.Function<Object, ?> getter = getters.getFirst().getValue();
-            return event -> getter.apply(event);
+        if (getters.size() == 1) {
+            return new EventValueLookup(getters.getFirst().getValue(), null);
         }
-        return event -> {
-            for (Map.Entry<Class<?>, java.util.function.Function<Object, ?>> getter : getters) {
+        // As Skript: an event gets the value resolved for the first of the classes it's one of.
+        return new EventValueLookup(event -> {
+            for (Map.Entry<Class<?>, java.util.function.Function<Object, Object>> getter : getters) {
                 if (getter.getKey().isInstance(event)) {
                     return getter.getValue().apply(event);
                 }
             }
             return null;
-        };
+        }, null);
+    }
+
+    /** {@code type} where it's the type of {@code javaClass}'s values, else that class's own type. */
+    private String type(Class<?> javaClass, String type) {
+        return type != null && javaClasses.get(type) == javaClass ? type : exactType(javaClass);
+    }
+
+    /** What Skript's event value errors call values of {@code valueClass}: {@code block}, {@code blocks}. */
+    private String input(Class<?> valueClass, String type, boolean plural) {
+        Class<?> component = valueClass.isArray() ? valueClass.componentType() : valueClass;
+        String id = type != null && javaClasses.get(type) == component ? type : superType(component);
+        co.xenastudios.neoskript.frontend.registry.TypeInfo info = registry().type(id);
+        String name = info == null ? id : info.name();
+        return plural ? SyntaxRegistry.plural(name) : name;
     }
 
     /**
-     * Whether any of {@code eventClasses} has a past or future value of {@code typeId} (or of the narrower kind),
-     * as time states need.
+     * Whether any of {@code eventClasses} has a past or future value of {@code valueClass}, as Skript's event value
+     * expressions need to take a time state.
      */
-    boolean hasTimeStates(List<Class<?>> eventClasses, String typeId, Class<?> narrow) {
+    boolean hasTimeStates(List<Class<?>> eventClasses, Class<?> valueClass, String type) {
+        EventValueResolver resolver = resolver();
         for (Class<?> eventClass : eventClasses) {
             for (int time : new int[] {-1, 1}) {
-                EventValue best = best(eventClass, typeId, time, null);
-                if (best == null && narrow != null) {
-                    best = best(eventClass, typeId, time, narrow);
-                }
-                if (best != null && best.excluded() == null) {
+                if (resolver.resolve(eventClass, valueClass, type, time, EventValueResolver.CONVERSION).successful()) {
                     return true;
                 }
             }
         }
         return false;
-    }
-
-    /**
-     * The value of {@code typeId} at exactly {@code time} registered closest to {@code eventClass}, or null. With
-     * {@code narrow}, only values of a kind that is, or may be, of that one; without, only values of any kind.
-     */
-    private EventValue best(Class<?> eventClass, String typeId, int time, Class<?> narrow) {
-        SyntaxRegistry registry = registry();
-        EventValue best = null;
-        for (EventValue value : eventValues) {
-            if (value.time() != time || !value.eventClass().isAssignableFrom(eventClass)
-                    || !registry.isSubtype(value.type(), typeId)) {
-                continue;
-            }
-            if (narrow == null ? value.valueClass() != null : value.valueClass() == null
-                    || !narrow.isAssignableFrom(value.valueClass()) && !value.valueClass().isAssignableFrom(narrow)
-                    // Values of a kind in place of a plain value, but not several in place of one.
-                    || narrow == Object.class && value.valueClass().isArray()) {
-                continue;
-            }
-            if (best == null || isBetter(value, best, typeId)) {
-                best = value;
-            }
-        }
-        if (best != null) {
-            return best;
-        }
-        // As in Skript, a value of a narrower event will do, where the event is one: 'event-projectile' in any
-        // damage event is the projectile of damage by one.
-        for (EventValue value : eventValues) {
-            if (value.time() != time || value.excluded() != null || value.eventClass() == eventClass
-                    || !eventClass.isAssignableFrom(value.eventClass()) || !registry.isSubtype(value.type(), typeId)) {
-                continue;
-            }
-            if (narrow == null ? value.valueClass() != null : value.valueClass() == null
-                    || !narrow.isAssignableFrom(value.valueClass()) && !value.valueClass().isAssignableFrom(narrow)
-                    || narrow == Object.class && value.valueClass().isArray()) {
-                continue;
-            }
-            if (best == null || best.eventClass() != value.eventClass()
-                    && value.eventClass().isAssignableFrom(best.eventClass())) {
-                best = value;
-            }
-        }
-        if (best == null) {
-            return null;
-        }
-        Class<?> narrower = best.eventClass();
-        java.util.function.Function<Object, ?> getter = best.getter();
-        return new EventValue(narrower, best.type(), best.time(), best.valueClass(),
-                event -> narrower.isInstance(event) ? getter.apply(event) : null, null);
-    }
-
-    private static boolean isBetter(EventValue value, EventValue than, String typeId) {
-        if (value.eventClass() != than.eventClass()) {
-            return than.eventClass().isAssignableFrom(value.eventClass());
-        }
-        // For the same class, one of exactly the type asked for; then an exclusion over a value.
-        if (value.type().equals(typeId) != than.type().equals(typeId)) {
-            return value.type().equals(typeId);
-        }
-        return value.excluded() != null && than.excluded() == null;
     }
 
     @Override
@@ -644,7 +719,17 @@ public final class Library implements Registrar {
 
     @Override
     public <F, T> void converter(Class<F> from, Class<T> to, java.util.function.Function<? super F, ? extends T> converter) {
+        converter(from, to, converter, 0);
+    }
+
+    @Override
+    public <F, T> void converter(Class<F> from, Class<T> to, java.util.function.Function<? super F, ? extends T> converter,
+            int flags) {
         checkOpen();
+        converters.register(from, to, converter, flags);
+        if ((flags & EVENT_VALUES_ONLY) != 0) {
+            return;
+        }
         Values.registerConverter(from, to, converter);
         // What converts can be used where the other type is expected, even for strict types.
         for (Map.Entry<String, Class<?>> source : javaClasses.entrySet()) {
@@ -754,7 +839,7 @@ public final class Library implements Registrar {
     void literalType(String id, String name, Set<String> literals, java.util.function.Function<String, Object> toValue) {
         checkOpen();
         builder.type(new TypeInfo(id, name, literals, false));
-        javaClasses.put(id, Object.class);
+        putJavaClass(id, Object.class);
         for (String literal : literals) {
             literalValues.put(literal, toValue.apply(literal));
         }

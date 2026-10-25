@@ -643,8 +643,10 @@ final class ScriptManager {
         loaded.values().forEach(this::runUnload);
     }
 
+    /** Runs a script's {@code on load} or {@code on unload} trigger. */
     private void run(CompiledScripts.CompiledTrigger trigger) {
-        run(trigger, null);
+        run(trigger, new co.xenastudios.neoskript.runtime.ScriptLoadEvent(trigger.script(),
+                trigger.event() == ScriptEvent.LOAD));
     }
 
     /** Runs {@code trigger} in {@code event}, which may be {@code null}. */

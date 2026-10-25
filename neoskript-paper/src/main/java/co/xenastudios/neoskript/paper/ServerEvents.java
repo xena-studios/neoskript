@@ -57,7 +57,9 @@ final class ServerEvents {
         registrar.eventValue(PlayerEvent.class, "world", event -> event.getPlayer().getWorld());
         registrar.eventValue(ServerCommandEvent.class, "commandsender", ServerCommandEvent::getSender);
         // Skript's types whose default expression is the event's value of them.
-        for (String type : List.of("player", "offlineplayer", "commandsender", "audience", "world", "entity",
+        // As Skript: a left-out audience is the event's command sender, as there may be several audiences.
+        registrar.eventDefault("audience", org.bukkit.command.CommandSender.class);
+        for (String type : List.of("player", "offlineplayer", "commandsender", "world", "entity",
                 "livingentity", "projectile", "block", "location", "inventory", "inventoryholder", "slot", "itemstack",
                 "nameable", "vector", "display", "time", "gameeffect", "particle", "convergingparticle",
                 "directionalparticle", "scalableparticle", "equippablecomponent", "worldborder", "quaternion")) {

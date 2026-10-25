@@ -247,6 +247,11 @@ final class TriggerCompiler {
     private List<String> literalTypes = List.of();
     /** The event's name, for errors: {@code join} in {@code on join:}. */
     private String eventName;
+    /**
+     * What Skript calls the code's event in errors, as its current event name: {@code on join}, {@code command};
+     * {@code null} in a function.
+     */
+    private String eventLabel;
     /** A command trigger's arguments, by number, or {@code null} outside commands. */
     private List<CommandPattern.Argument> commandArguments;
     /** How many choices a command trigger's pattern has. */
@@ -278,13 +283,22 @@ final class TriggerCompiler {
             throws CompileException {
         eventClasses = List.copyOf(classes);
         this.eventName = eventName;
+        eventLabel = eventName;
         return compileTrigger(scriptName, List.of(statement));
+    }
+
+    /** A script's {@code on load} or {@code on unload} trigger, whose event is a {@link co.xenastudios.neoskript.runtime.ScriptLoadEvent}. */
+    Trigger compileScriptTrigger(String scriptName, List<Statement> body) throws CompileException {
+        eventClasses = List.of(co.xenastudios.neoskript.runtime.ScriptLoadEvent.class);
+        eventLabel = "on script load/unload";
+        return compileTrigger(scriptName, body);
     }
 
     /** A periodical trigger ({@code every 5 seconds}), whose event is a {@link co.xenastudios.neoskript.runtime.PeriodicalEvent}. */
     Trigger compilePeriodical(String scriptName, List<Statement> body) throws CompileException {
         eventClasses = List.of(co.xenastudios.neoskript.runtime.PeriodicalEvent.class);
         eventName = "periodical";
+        eventLabel = "periodical";
         return compileTrigger(scriptName, body);
     }
 
@@ -297,6 +311,7 @@ final class TriggerCompiler {
         eventClasses = binding.classes();
         String key = event.structure().node().line().key();
         eventName = key.regionMatches(true, 0, "on ", 0, 3) ? key.substring(3).strip() : key.strip();
+        eventLabel = "on " + eventName;
         return (Trigger) define(generate(scriptName, () -> {
             if (binding.filter() != null) {
                 line = event.structure().node().line().number();
@@ -332,6 +347,7 @@ final class TriggerCompiler {
         commandChoices = choices;
         eventClasses = List.of(CommandEvent.class);
         eventName = "command";
+        eventLabel = "command";
         return (Trigger) define(generate(scriptName, () -> {
             line = headerLine;
             for (int i = 0; i < arguments.size(); i++) {
@@ -380,6 +396,7 @@ final class TriggerCompiler {
         suggestingArguments = suggesting;
         eventClasses = List.of(co.xenastudios.neoskript.runtime.command.CommandSuggestionEvent.class);
         eventName = "command suggestions";
+        eventLabel = "command suggestions";
         return (Trigger) define(generate(scriptName, () -> {
             line = entryLine;
             source = entry;
@@ -394,6 +411,7 @@ final class TriggerCompiler {
     Trigger compileCommandMessage(String scriptName, int entryLine, String text, Expr message) throws CompileException {
         eventClasses = List.of(CommandEvent.class);
         eventName = "command";
+        eventLabel = "command";
         return (Trigger) define(generate(scriptName, () -> {
             line = entryLine;
             source = text;
@@ -407,6 +425,7 @@ final class TriggerCompiler {
     Trigger compileTest(String scriptName, ParsedStructure.Custom test) throws CompileException {
         eventClasses = List.of(co.xenastudios.neoskript.runtime.testing.TestEvent.class);
         eventName = "test";
+        eventLabel = "on test case";
         byte[] bytes = generate(scriptName, () -> {
             if (test.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition) {
                 line = test.structure().node().line().number();
@@ -853,6 +872,7 @@ final class TriggerCompiler {
             TriggerCompiler apart = new TriggerCompiler(library, functions, globals, script);
             apart.eventClasses = eventClasses;
             apart.eventName = eventName;
+            apart.eventLabel = eventLabel;
             apart.warnings = (at, message) -> apartWarnings.add(message);
             for (Block block : blocks) {
                 if (block.kind() == BlockKind.SECTION && block.valueType() != null) {
@@ -1152,6 +1172,7 @@ final class TriggerCompiler {
             TriggerCompiler apart = new TriggerCompiler(library, functions, globals, script);
             apart.eventClasses = eventClasses;
             apart.eventName = eventName;
+            apart.eventLabel = eventLabel;
             apart.function = function;
             apart.compileTrigger(constantsScript, statements);
             return true;
@@ -2742,7 +2763,7 @@ final class TriggerCompiler {
      * Skript's event value default expressions do ({@code hide the particles} outside a potion effect's section).
      */
     private void missingDefault(PlaceholderSpec spec) throws CompileException {
-        if (spec.nullable() || eventClasses == null) {
+        if (spec.nullable()) {
             return;
         }
         for (String name : spec.types()) {
@@ -2753,16 +2774,16 @@ final class TriggerCompiler {
         }
         TypeRef first = registry.resolveType(spec.types().getFirst());
         if (first != null && !spec.types().isEmpty()) {
-            throw new CompileException(line, "There's no " + first.type().name() + " in " + eventDescription());
+            // Skript's error from the first type's default expression, as it's the first logged.
+            String type = first.type().id();
+            throw new CompileException(line, library.eventDefault(eventClasses == null ? List.of() : eventClasses, type,
+                    eventDescription()).error());
         }
     }
 
     /** The trigger's event as Skript's errors name it: {@code an on test case event}. */
     private String eventDescription() {
-        if (eventClasses == null) {
-            return function != null ? "a function" : "this event";
-        }
-        String name = "test".equals(eventName) ? "on test case" : eventName;
+        String name = eventLabel != null ? eventLabel : "function";
         return article(name) + " " + name + " event";
     }
 
@@ -2862,33 +2883,13 @@ final class TriggerCompiler {
         return expr instanceof Expr.Syntax value && (isCore(value.syntax(), CoreSyntax.EVENT_VALUE)
                 || isCore(value.syntax(), CoreSyntax.EVENT_VALUE_ENTITY))
                 && value.syntax().match().regexValues().getFirst() instanceof TypeRef ref
-                && eventClasses != null && library.hasTimeStates(eventClasses, ref.type().id(), kind(value, ref));
+                && eventClasses != null && library.hasTimeStates(eventClasses, request(value, ref).valueClass(),
+                        request(value, ref).type());
     }
 
-    /**
-     * For an event value named by a kind of entity rather than a type ({@code event-projectile}), the class of
-     * that kind; for a plural ({@code event-blocks}), the array class of its type; else {@code null}.
-     */
-    private Class<?> kind(Expr.Syntax syntax, TypeRef ref) {
-        if (ref.plural()) {
-            // 'event-blocks': the event's several blocks, if it has them, as an array of the type's class.
-            Class<?> single = library.javaClass(ref.type().id());
-            return single == null || single.isArray() ? null : single.arrayType();
-        }
-        if (!ref.type().id().equals("entity") || syntax.end() > source.length()) {
-            return null;
-        }
-        String words = source.substring(syntax.start(), syntax.end()).strip().toLowerCase(java.util.Locale.ROOT);
-        for (String prefix : new String[] {"the ", "event-"}) {
-            if (words.startsWith(prefix)) {
-                words = words.substring(prefix.length()).strip();
-            }
-        }
-        if (registry.resolveType(words) != null) {
-            return null;
-        }
-        Class<?> kind = library.kindClass("entitytype", words);
-        return kind == null || kind == library.javaClass("entity") ? null : kind;
+    /** What an event value asks for: the class of the named type, kind of entity, or for a plural, an array. */
+    private Library.EventValueRequest request(Expr.Syntax syntax, TypeRef ref) {
+        return library.request(ref, syntax.end() > source.length() ? null : source.substring(syntax.start(), syntax.end()));
     }
 
     /** {@code player}, {@code event-world}: the event's value of the named type. */
@@ -2902,13 +2903,7 @@ final class TriggerCompiler {
             throw unsupported("'" + source.substring(syntax.start(), syntax.end()) + "'");
         }
         if (time != 0) {
-            java.util.function.Function<Object, Object> getter;
-            try {
-                getter = library.eventValue(eventClasses, ref.type().id(), kind(syntax, ref), time);
-            } catch (Library.ExcludedEventValue excluded) {
-                throw new CompileException(line, excluded.getMessage());
-            }
-            eventValue(getter);
+            eventValue(lookup(syntax, ref, time));
             return;
         }
         Block section = sectionFor(ref.type().id());
@@ -2930,17 +2925,21 @@ final class TriggerCompiler {
                     false);
             return;
         }
-        java.util.function.Function<Object, Object> getter;
-        try {
-            getter = eventClasses == null ? null
-                    : library.eventValue(eventClasses, ref.type().id(), kind(syntax, ref), 0);
-        } catch (Library.ExcludedEventValue excluded) {
-            throw new CompileException(line, excluded.getMessage());
+        eventValue(lookup(syntax, ref, 0));
+    }
+
+    /** How to get the event value {@code syntax} names at {@code time}, as Skript resolves it, or its error. */
+    private java.util.function.Function<Object, Object> lookup(Expr.Syntax syntax, TypeRef ref, int time)
+            throws CompileException {
+        Library.EventValueRequest request = request(syntax, ref);
+        Library.EventValueLookup lookup = library.eventValue(eventClasses == null ? List.of() : eventClasses,
+                request.valueClass(), request.type(), time, eventDescription());
+        if (lookup.getter() == null) {
+            // Skript tries 'event-zombie' as a value named so first, whose error is kept.
+            throw new CompileException(line, request.words() != null
+                    ? "There's no " + request.words() + " in " + eventDescription() + "." : lookup.error());
         }
-        if (getter == null) {
-            throw new CompileException(line, "There's no " + ref.type().name() + " in " + eventDescription());
-        }
-        eventValue(getter);
+        return lookup.getter();
     }
 
     // ---------------------------------------------------------------- inline functions

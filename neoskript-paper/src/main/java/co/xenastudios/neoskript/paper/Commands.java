@@ -46,8 +46,14 @@ final class Commands {
             return suggestion.tooltip() instanceof net.kyori.adventure.text.Component tooltip
                     ? component.hoverEvent(tooltip) : component;
         };
+        // Skript's: its player is the sender, if a player, as event values of a superclass are cast down.
+        registrar.eventValue(CommandEvent.class, "string", String[].class, 0, event -> {
+            // Its arguments as typed, split at spaces, as Bukkit gives them.
+            String full = event.fullCommand();
+            int space = full.indexOf(' ');
+            return space < 0 ? new String[0] : full.substring(space + 1).split(" ", -1);
+        });
         registrar.eventValue(CommandEvent.class, "commandsender", CommandEvent::sender);
-        registrar.eventValue(CommandEvent.class, "player", event -> event.sender() instanceof Player p ? p : null);
         registrar.eventValue(CommandEvent.class, "world",
                 event -> event.sender() instanceof Player p ? p.getWorld() : null);
 

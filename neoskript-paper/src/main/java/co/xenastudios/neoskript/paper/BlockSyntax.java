@@ -93,9 +93,10 @@ final class BlockSyntax {
                 "[the] carr(ied|ying) block[[ ]data] of %livingentities%", "%livingentities%'[s] carr(ied|ying) block[[ ]data]");
         registrar.parser("blockdata", BlockSyntax::blockData);
         registrar.text(BlockData.class, data -> data.getAsString().replaceFirst("^minecraft:", ""));
-        registrar.converter(Block.class, BlockData.class, Block::getBlockData);
+        // Not Skript's converters: only for placeholders, not to get event values.
+        registrar.converter(Block.class, BlockData.class, Block::getBlockData, Registrar.PLACEHOLDERS_ONLY);
         registrar.converter(ItemType.class, BlockData.class, item -> item.material().isBlock()
-                ? item.material().createBlockData() : null);
+                ? item.material().createBlockData() : null, Registrar.PLACEHOLDERS_ONLY);
         registrar.comparison(BlockData.class, BlockData.class, (a, b) -> a.matches(b) || b.matches(a));
         registrar.comparison(BlockData.class, ItemType.class, (data, item) -> item.alternatives().stream()
                 .anyMatch(each -> data.getMaterial() == each.material()));

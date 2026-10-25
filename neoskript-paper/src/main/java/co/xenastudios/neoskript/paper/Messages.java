@@ -53,7 +53,7 @@ public final class Messages {
                 }
             }
             };
-        }, "broadcast %objects% [(to|in) %worlds%]");
+        }, "broadcast %objects% [(to|in) %-worlds%]");
 
         registrar.expression("LitConsole", "commandsender", info -> (context, args) -> Bukkit.getConsoleSender(),
                 "[the] (console|server)");

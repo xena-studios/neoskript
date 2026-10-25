@@ -52,6 +52,7 @@ public final class StandardLibrary {
         EntityEventSyntax.register(registrar);
         DamageSources.register(registrar);
         Displays.register(registrar);
+        DefaultConverters.register(registrar);
         Quaternions.register(registrar);
         BlockSyntax.register(registrar);
         Biomes.register(registrar);

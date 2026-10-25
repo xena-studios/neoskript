@@ -47,9 +47,9 @@ final class LibraryEventValues implements EventValues {
     public Scope event(SyntaxInfo event) {
         return switch (library.binding(event)) {
             case Library.ServerEvent server -> scope(server.classes());
-            // Script events ('on load') and periodical ones have no event values, as the compiler has none.
-            case ScriptEvent script -> scope(List.of());
-            case Library.Core core when core.id().equals(CoreSyntax.PERIODICAL) -> scope(List.of());
+            case ScriptEvent script -> scope(List.of(co.xenastudios.neoskript.runtime.ScriptLoadEvent.class));
+            case Library.Core core when core.id().equals(CoreSyntax.PERIODICAL)
+                    -> scope(List.of(co.xenastudios.neoskript.runtime.PeriodicalEvent.class));
             case null, default -> null;
         };
     }
@@ -99,18 +99,18 @@ final class LibraryEventValues implements EventValues {
             if (classes.isEmpty()) {
                 return false;
             }
-            // A kind of entity ('event-projectile') isn't looked into: any value of the type, of any kind, will do,
-            // which allows at least what the compiler does.
-            String key = type.type().id() + (type.plural() ? "*" : "");
-            return known.computeIfAbsent(key, k -> has(type.type().id(), null)
-                    || type.plural() && has(type.type().id(), several(type.type().id())));
+            // As the compiler resolves it, now: Skript's event value expressions initialize before a time state.
+            Library.EventValueRequest request = library.request(type, words);
+            String key = request.valueClass().getName() + "/" + request.type();
+            return known.computeIfAbsent(key, k -> library.eventValue(classes, request.valueClass(), request.type(),
+                    0, null).getter() != null);
         }
 
         @Override
         public boolean allowsLeftOut(SyntaxInfo syntax, PlaceholderSpec spec) {
             // As the compiler fills in a library element's: unless nothing but the event's value can, and the event
-            // has none. (Outside events nothing is filled in, and nothing fails.)
-            if (spec.nullable() || classes.isEmpty() || spec.types().isEmpty()) {
+            // (or function) has none.
+            if (spec.nullable() || spec.types().isEmpty()) {
                 return true;
             }
             SyntaxRegistry registry = library.registry();
@@ -134,26 +134,6 @@ final class LibraryEventValues implements EventValues {
                 }
             }
             return false;
-        }
-
-        /** Whether the events have a value of the type (of {@code kind}), now, before or after the event. */
-        private boolean has(String typeId, Class<?> kind) {
-            for (int time : new int[] {0, -1, 1}) {
-                try {
-                    if (library.eventValue(classes, typeId, kind, time) != null) {
-                        return true;
-                    }
-                } catch (Library.ExcludedEventValue excluded) {
-                    // Left out on purpose: no value, as Skript's error says if nothing else parses.
-                }
-            }
-            return false;
-        }
-
-        /** For a plural ({@code event-blocks}), the array class of its type, as the compiler asks for. */
-        private Class<?> several(String typeId) {
-            Class<?> single = library.javaClass(typeId);
-            return single == null || single.isArray() ? null : single.arrayType();
         }
     }
 }

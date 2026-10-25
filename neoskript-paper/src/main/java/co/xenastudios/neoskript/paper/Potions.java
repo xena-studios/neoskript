@@ -148,7 +148,7 @@ final class Potions {
         registrar.text(Effect.class, Effect::toString);
         registrar.cloner(Effect.class, Effect::copy);
         // 'apply speed to player': a type alone is its effect at tier 1, for the default time.
-        registrar.converter(PotionEffectType.class, Effect.class, Effect::new);
+        registrar.converter(PotionEffectType.class, Effect.class, Effect::new, Registrar.NO_CHAINING);
         registrar.comparison(Effect.class, Effect.class, (a, b) -> a.matches(b) && b.matches(a));
         registrar.comparison(PotionEffectType.class, Effect.class, (type, effect) -> type.equals(effect.type));
 

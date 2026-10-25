@@ -98,7 +98,7 @@ public final class ScriptCompiler {
                             if (binding instanceof ScriptEvent scriptEvent) {
                                 triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), scriptEvent, null,
                                         null, null, new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> diagnostics.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message)))
-                                                .compileTrigger(name, event.body())));
+                                                .compileScriptTrigger(name, event.body())));
                             } else if (binding instanceof Library.ServerEvent serverEvent) {
                                 TriggerCompiler compiler = new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> diagnostics.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message)));
                                 co.xenastudios.neoskript.runtime.Trigger trigger = compiler.compileTrigger(name, event,
@@ -488,7 +488,7 @@ public final class ScriptCompiler {
                             .compileFunction(name, function);
                 } else if (code instanceof ParsedStructure.Event event
                         && library.binding(event.event().syntax()) instanceof ScriptEvent) {
-                    new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> messages.add(message)).compileTrigger(name, event.body());
+                    new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> messages.add(message)).compileScriptTrigger(name, event.body());
                 }
             } catch (CompileException e) {
                 if (!e.alreadyReported() && !e.getMessage().startsWith("NeoSkript can't")) {

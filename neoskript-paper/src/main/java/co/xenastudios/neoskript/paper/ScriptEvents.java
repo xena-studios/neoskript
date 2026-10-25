@@ -15,5 +15,7 @@ final class ScriptEvents {
     static void register(Registrar registrar) {
         registrar.event("ScriptLoad", ScriptEvent.LOAD, "[async] [script] (load|init|enable)");
         registrar.event("EvtScript", ScriptEvent.UNLOAD, "[:async] [script] (unload|stop|disable)");
+        registrar.eventValue(co.xenastudios.neoskript.runtime.ScriptLoadEvent.class, "commandsender",
+                event -> org.bukkit.Bukkit.getConsoleSender());
     }
 }

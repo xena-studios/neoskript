@@ -125,6 +125,11 @@ final class WorldSyntax {
         registrar.cloner(Vector.class, Vector::clone);
         registrar.cloner(Location.class, Location::clone);
         registrar.subtype("livingentity", "entity");
+        registrar.type("vehicle", "vehicle", org.bukkit.entity.Vehicle.class);
+        registrar.subtype("vehicle", "entity");
+        // A script command's block, where a command block ran it.
+        registrar.eventValue(co.xenastudios.neoskript.runtime.command.CommandEvent.class, "block",
+                event -> event.sender() instanceof org.bukkit.command.BlockCommandSender sender ? sender.getBlock() : null);
         registrar.subtype("player", "livingentity");
         registrar.text(Entity.class, entity -> entity.customName() != null
                 ? Messages.LEGACY_SECTION.serialize(entity.customName()) : EntityKind.name(entity.getType()));
@@ -151,9 +156,11 @@ final class WorldSyntax {
         }, "%entitytypes% (is|are) spawnable [in [the [world]] %world%]", "%entitytypes% can be spawned [in [the [world]] %world%]",
                 "%entitytypes% (isn't|is not|aren't|are not) spawnable [in [the [world]] %world%]",
                 "%entitytypes% (can't|can not|cannot) be spawned [in [the [world]] %world%]");
-        registrar.converter(Location.class, Block.class, location -> location.getWorld() == null ? null : location.getBlock());
+        // Not Skript's: only for placeholders, so 'event-block' isn't the block at an event's location.
+        registrar.converter(Location.class, Block.class, location -> location.getWorld() == null ? null : location.getBlock(),
+                Registrar.PLACEHOLDERS_ONLY);
         registrar.converter(Block.class, ItemType.class, block -> new ItemType(new org.bukkit.inventory.ItemStack(
-                block.getType().isItem() ? block.getType() : Material.AIR), false));
+                block.getType().isItem() ? block.getType() : Material.AIR), false), Registrar.NO_LEFT_CHAINING);
 
         registrar.storage("vector", Vector.class, new VariableCodec<>() {
             @Override

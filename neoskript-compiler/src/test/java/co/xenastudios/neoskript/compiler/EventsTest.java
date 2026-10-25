@@ -147,9 +147,9 @@ class EventsTest {
 
     @Test
     void outsideEventsThereIsNoDefault() {
-        CompiledScripts compiled = compile("on load:\n\twave\n");
-        compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
-        assertEquals(List.of("wave at nobody"), said);
+        // As Skript's default expressions, which fail where the event has no such value.
+        assertTrue(error("on load:\n\twave\n").startsWith("There's no person in an on script load/unload event"));
+        assertTrue(error("function f():\n\twave\n").startsWith("There's no person in a function event"));
     }
 
     @Test
@@ -171,7 +171,7 @@ class EventsTest {
 
     @Test
     void anEventWithoutTheValueIsAnError() {
-        assertEquals("There's no number in a greet event", error("on greet:\n\tsay event-number\n"));
+        assertEquals("There's no number in an on greet event.", error("on greet:\n\tsay event-number\n"));
         assertTrue(error("on load:\n\tsay person\n").startsWith("There's no person in"));
     }
 
