@@ -25,6 +25,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     private VariableStorage storage;
     private ScriptCommands commands;
     private ScriptManager scripts;
+    /** What stops the runtime error frames. */
+    private Runnable runtimeErrorFrames;
 
     /** https://bstats.org/plugin/bukkit/NeoSkript/34868 */
     private static final int BSTATS_PLUGIN_ID = 34868;
@@ -99,8 +101,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             }
         }
         Scheduler scheduler = platform == Platform.FOLIA ? new FoliaScheduler(this) : new PaperScheduler(this);
-        // Waiting triggers carry on through the scheduler; their errors can only be logged.
-        co.xenastudios.neoskript.runtime.RuntimeErrors.install(message -> getSLF4JLogger().warn("Runtime error: {}", message));
+        // Runtime errors go to the console as Skript prints them, limited per frame by config.yml.
+        runtimeErrorFrames = RuntimeErrorConsole.start(getConfig().getConfigurationSection("runtime-errors"), scheduler);
         Waits.install(scheduler, e -> {
             // A command failed after a wait just stops, as there's no one left to tell.
             if (!(e.getCause() instanceof co.xenastudios.neoskript.runtime.command.CommandEvent.Failed)) {
@@ -201,6 +203,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (runtimeErrorFrames != null) {
+            runtimeErrorFrames.run();
+        }
         if (scripts != null) {
             co.xenastudios.neoskript.paper.EventBridges.stop();
             scripts.unloadAll();

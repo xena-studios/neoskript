@@ -21,9 +21,13 @@ permissions:
     children:
       skript.reloadnotify: true
       skript.admin: true
+      skript.see_runtime_errors: true
   skript.reloadnotify:
     default: false
     description: Notifies when others are reloading script files.
   skript.admin:
     default: op
     description: Allows use of administrative commands and receiving notifications of new versions.
+  skript.see_runtime_errors:
+    default: op
+    description: Shows notifications in chat when runtime errors occur.

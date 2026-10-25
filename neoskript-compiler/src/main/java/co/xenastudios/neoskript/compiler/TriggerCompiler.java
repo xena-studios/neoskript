@@ -202,6 +202,11 @@ final class TriggerCompiler {
     private String constantsScript;
     /** The classes of the event a trigger runs for, or {@code null} outside server events. */
     private List<Class<?>> eventClasses;
+    /** The calls into syntax elements so far, with where they are, for runtime errors (see {@link #site}). */
+    private final List<Label> siteLabels = new ArrayList<>();
+    private final List<co.xenastudios.neoskript.runtime.errors.ErrorSites.Site> sites = new ArrayList<>();
+    /** Whether the class just generated is small enough that its labels' offsets are final. */
+    private boolean sitesExact;
 
     /** The classes the last server event trigger compiled listens to: its event's, or those its filter chose. */
     List<Class<?>> eventClasses() {
@@ -293,6 +298,7 @@ final class TriggerCompiler {
                 constant(filter, Condition.class);
                 method.visitVarInsn(ALOAD, CONTEXT_SLOT);
                 arguments(syntax);
+                site(syntax);
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Condition.class), "check",
                         "(" + CONTEXT + OBJECTS + ")Z", true);
                 Label run = new Label();
@@ -426,6 +432,8 @@ final class TriggerCompiler {
      */
     private byte[] generate(String scriptName, Body body) throws CompileException {
         constantsScript = scriptName;
+        siteLabels.clear();
+        sites.clear();
         boolean trigger = function == null;
         String className = PACKAGE + (trigger ? "Trigger" : "Function");
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
@@ -550,7 +558,56 @@ final class TriggerCompiler {
         method.visitMaxs(0, 0);
         method.visitEnd();
         writer.visitEnd();
-        return writer.toByteArray();
+        byte[] bytes = writer.toByteArray();
+        // A method over 32 KiB may have had its jumps widened after the labels were placed, moving the code.
+        sitesExact = bytes.length <= Short.MAX_VALUE;
+        return bytes;
+    }
+
+    /**
+     * Marks the call into {@code syntax}'s element that's emitted next, so a runtime error it reports can say
+     * where it came from. Costs nothing when the code runs: a label has no instructions.
+     */
+    private void site(ParsedSyntax syntax) {
+        Label at = new Label();
+        method.visitLabel(at);
+        String code = currentLine != null ? currentLine.text() : source;
+        siteLabels.add(at);
+        sites.add(new co.xenastudios.neoskript.runtime.errors.ErrorSites.Site(kindName(syntax.syntax().kind()),
+                syntax.syntax().id(), constantsScript, line, code));
+    }
+
+    /** Skript's {@code getSyntaxTypeName}: events are structures. */
+    private static String kindName(co.xenastudios.neoskript.frontend.registry.SyntaxKind kind) {
+        return switch (kind) {
+            case STRUCTURE, EVENT -> "structure";
+            case SECTION -> "section";
+            case EFFECT -> "effect";
+            case CONDITION -> "condition";
+            case EXPRESSION -> "expression";
+        };
+    }
+
+    /** Records where the class's element calls are, now that it's defined. */
+    private void registerSites(Class<?> compiled) {
+        List<int[]> placed = new ArrayList<>();
+        for (int i = 0; i < siteLabels.size(); i++) {
+            try {
+                placed.add(new int[] {siteLabels.get(i).getOffset(), i});
+            } catch (IllegalStateException notWritten) {
+                // Compiled only to see whether it compiles; not in the class.
+            }
+        }
+        placed.sort(java.util.Comparator.comparingInt(p -> p[0]));
+        int[] offsets = new int[placed.size()];
+        var found = new co.xenastudios.neoskript.runtime.errors.ErrorSites.Site[placed.size()];
+        for (int i = 0; i < placed.size(); i++) {
+            offsets[i] = placed.get(i)[0];
+            found[i] = sites.get(placed.get(i)[1]);
+        }
+        co.xenastudios.neoskript.runtime.errors.ErrorSites.register(compiled, offsets, found, sitesExact);
+        siteLabels.clear();
+        sites.clear();
     }
 
     /** Restores a waiting trigger's frame and jumps to just after its {@code wait}. */
@@ -680,6 +737,7 @@ final class TriggerCompiler {
         try {
             MethodHandles.Lookup hidden =
                     TriggerHost.lookup().defineHiddenClassWithClassData(bytes, List.copyOf(constants), true);
+            registerSites(hidden.lookupClass());
             return hidden.findConstructor(hidden.lookupClass(), MethodType.methodType(void.class)).invoke();
         } catch (Throwable e) {
             throw new IllegalStateException("Couldn't load compiled code", e);
@@ -1200,6 +1258,7 @@ final class TriggerCompiler {
         int valuesSlot = nextSlot++;
         int indexSlot = nextSlot++;
         callThrough(header, co.xenastudios.neoskript.api.element.Section.class);
+        site(header);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(co.xenastudios.neoskript.api.element.Section.class),
                 "run", "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
         convert(true);
@@ -1499,6 +1558,7 @@ final class TriggerCompiler {
         }
         if (!(library.binding(effect.syntax()) instanceof Library.Core core)) {
             callThrough(effect, Effect.class);
+            site(effect);
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Effect.class), "execute",
                     "(" + CONTEXT + OBJECTS + ")V", true);
             return;
@@ -1864,6 +1924,7 @@ final class TriggerCompiler {
             constant(update, Update.class);
             method.visitVarInsn(ALOAD, CONTEXT_SLOT);
             arguments(effect);
+            site(effect);
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Update.class), "update",
                     "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
             PlaceholderSpec spec = placeholderSpecs(effect.syntax().patterns().get(effect.pattern()))[update.target()];
@@ -1884,6 +1945,7 @@ final class TriggerCompiler {
             constant(update, Update.class);
             method.visitVarInsn(ALOAD, CONTEXT_SLOT);
             arguments(effect);
+            site(effect);
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Update.class), "update",
                     "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
             method.visitMethodInsn(INVOKESTATIC, VALUES, "array", "(" + OBJECT_DESC + ")" + OBJECTS, false);
@@ -1904,6 +1966,7 @@ final class TriggerCompiler {
             constant(update, Update.class);
             method.visitVarInsn(ALOAD, CONTEXT_SLOT);
             arguments(effect);
+            site(effect);
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Update.class), "update",
                     "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
         });
@@ -1937,6 +2000,7 @@ final class TriggerCompiler {
         constant(accepted, Class[].class);
         method.visitMethodInsn(INVOKESTATIC, VALUES, "narrow", "(" + OBJECT_DESC + "[Ljava/lang/Class;)" + OBJECTS, false);
         constant(Changeable.Mode.SET, Changeable.Mode.class);
+        site(parsed);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Changeable.class), "change",
                 "(" + CONTEXT + OBJECTS + OBJECTS + Type.getDescriptor(Changeable.Mode.class) + ")V", true);
     }
@@ -1956,6 +2020,7 @@ final class TriggerCompiler {
         arguments(condition);
         expression((Expr) effect.match().values().get(1));
         method.visitMethodInsn(INVOKESTATIC, VALUES, "isTrue", "(" + OBJECT_DESC + ")Z", false);
+        site(condition);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(SettableCondition.class), "set",
                 "(" + CONTEXT + OBJECTS + "Z)V", true);
     }
@@ -2067,6 +2132,7 @@ final class TriggerCompiler {
             method.visitInsn(ACONST_NULL);
         }
         constant(changeMode, Changeable.Mode.class);
+        site(syntax);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Changeable.class), "change",
                 "(" + CONTEXT + OBJECTS + OBJECTS + Type.getDescriptor(Changeable.Mode.class) + ")V", true);
     }
@@ -2252,6 +2318,7 @@ final class TriggerCompiler {
 
     private void checkOne(ParsedSyntax condition) throws CompileException {
         callThrough(condition, Condition.class);
+        site(condition);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Condition.class), "check",
                 "(" + CONTEXT + OBJECTS + ")Z", true);
     }
@@ -2913,9 +2980,11 @@ final class TriggerCompiler {
         Label fine = new Label();
         method.visitVarInsn(ILOAD, skipped);
         method.visitJumpInsn(IFEQ, fine);
+        // A warning in Skript, from the reduce expression.
         method.visitLdcInsn("The reduce expression returned null for one or more elements, which were skipped.");
+        site(syntax);
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(co.xenastudios.neoskript.runtime.RuntimeErrors.class),
-                "report", "(" + STRING_DESC + ")V", false);
+                "warning", "(" + STRING_DESC + ")V", false);
         method.visitLabel(fine);
         method.visitVarInsn(ALOAD, reduced);
     }
@@ -3475,6 +3544,7 @@ final class TriggerCompiler {
             case Expr.Syntax syntax -> {
                 boolean keyAware = keyAware(syntax);
                 callThrough(syntax.syntax(), Expression.class, keyAware, keyAware && implicitKeys(syntax));
+                site(syntax.syntax());
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Expression.class), "get",
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
                 if (keyAware) {
@@ -4061,6 +4131,7 @@ final class TriggerCompiler {
             }
             case Expr.Syntax syntax when keyAware(syntax) -> {
                 callThrough(syntax.syntax(), Expression.class, true, implicit || implicitKeys(syntax));
+                site(syntax.syntax());
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Expression.class), "get",
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
             }
