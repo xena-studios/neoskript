@@ -106,6 +106,21 @@ public final class ScriptLoader {
         for (Diagnostic diagnostic : result.diagnostics()) {
             diagnostics.add(diagnostic);
         }
+        java.util.Set<String> aliases = new java.util.HashSet<>();
+        for (Structure structure : result.structures()) {
+            if (structure.kind() == Structure.Kind.ALIASES) {
+                aliases.addAll(AliasNames.of(structure.section()));
+            }
+        }
+        context.itemAliases(aliases);
+        boolean hinted = false;
+        for (Structure structure : result.structures()) {
+            if (structure.kind() == Structure.Kind.USING && structure.node().line().text().strip()
+                    .toLowerCase(java.util.Locale.ROOT).matches("using (local variable )?type hints")) {
+                hinted = true;
+            }
+        }
+        context.hints().enable(hinted);
         StatementParser statements = new StatementParser(context, diagnostics);
         List<ParsedStructure> parsed = new ArrayList<>();
         for (Structure structure : result.structures()) {
@@ -203,8 +218,16 @@ public final class ScriptLoader {
             String text = defaultTexts.get(i);
             defaults.add(text == null ? null : statements.expression(line, text, parameter.type(), parameter.plural()));
         }
+        // A function's parameters start out as their types.
+        Map<String, java.util.Set<String>> hints = new HashMap<>();
+        for (FunctionInfo.Parameter parameter : signature.parameters()) {
+            co.xenastudios.neoskript.frontend.registry.TypeRef ref = registry.resolveType(parameter.type());
+            if (ref != null && !ref.type().id().equals(SyntaxRegistry.OBJECT)) {
+                hints.put("_" + parameter.name() + (parameter.plural() ? "::*" : ""), java.util.Set.of(ref.type().id()));
+            }
+        }
         return new ParsedStructure.Function(structure, signature, local, defaults, defaultTexts,
-                statements.body(structure.section().children()));
+                statements.body(structure.section().children(), hints));
     }
 
     /** The text of each parameter's default value in a function header, or null where there's none. */

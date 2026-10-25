@@ -69,6 +69,19 @@ public final class ScriptCompiler {
                 }
             }
             co.xenastudios.neoskript.runtime.ScriptFeatures.set(script.file().name(), features);
+            Map<String, String> aliases = new java.util.LinkedHashMap<>();
+            co.xenastudios.neoskript.runtime.ScriptAliases.set(script.file().name(), aliases);
+            co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(script.file().name());
+            for (ParsedStructure structure : script.structures()) {
+                if (structure.structure().kind() == co.xenastudios.neoskript.frontend.structure.Structure.Kind.ALIASES) {
+                    for (String problem : aliases(structure.structure().section(), aliases, script.file().name())) {
+                        diagnostics.add(new Diagnostic(Severity.ERROR, script.file().name(),
+                                structure.structure().node().line().number(), 0, 0, problem));
+                    }
+                }
+            }
+            co.xenastudios.neoskript.runtime.ScriptAliases.set(script.file().name(), aliases);
+            co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(null);
         }
         for (ParsedScript script : scripts) {
             String name = script.file().name();
@@ -150,6 +163,53 @@ public final class ScriptCompiler {
      * {@code variables:}: each {@code {name} = value} sets the global variable if it isn't set yet, as in
      * Skript. Values are literals: text, numbers, booleans, or words like items.
      */
+    /**
+     * Reads an {@code aliases:} structure's {@code name = items} lines into {@code into}, by each name's
+     * forms ({@code boot¦s} is {@code boot} and {@code boots}), and returns Skript's errors for them.
+     * Variation sections ({@code {kind}:}) are accepted and their names may be used.
+     */
+    static List<String> aliases(co.xenastudios.neoskript.frontend.structure.Node.Section section, Map<String, String> into,
+            String script) {
+        List<String> problems = new ArrayList<>();
+        java.util.Set<String> variations = new java.util.HashSet<>();
+        for (co.xenastudios.neoskript.frontend.structure.Node child : section.children()) {
+            if (child instanceof co.xenastudios.neoskript.frontend.structure.Node.Section variation) {
+                variations.add(variation.line().key().strip().toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        for (co.xenastudios.neoskript.frontend.structure.Node child : section.children()) {
+            if (child instanceof co.xenastudios.neoskript.frontend.structure.Node.Section) {
+                continue;
+            }
+            String line = child.line().text().strip();
+            int equals = line.indexOf('=');
+            if (equals < 0) {
+                continue;
+            }
+            String names = line.substring(0, equals).strip().toLowerCase(java.util.Locale.ROOT);
+            String definition = line.substring(equals + 1).strip();
+            java.util.regex.Matcher variation = java.util.regex.Pattern.compile("\\{[^}]*\\}").matcher(names);
+            while (variation.find()) {
+                if (!variations.contains(variation.group())) {
+                    problems.add("The variation " + variation.group() + " has not been defined before");
+                }
+            }
+            String problem = co.xenastudios.neoskript.runtime.ScriptAliases.check(definition);
+            if (problem != null) {
+                problems.add(problem);
+                continue;
+            }
+            for (String form : co.xenastudios.neoskript.frontend.parse.AliasNames.forms(names)) {
+                into.put(form, definition);
+            }
+            // Later aliases can be made of earlier ones.
+            if (script != null) {
+                co.xenastudios.neoskript.runtime.ScriptAliases.set(script, into);
+            }
+        }
+        return problems;
+    }
+
     private void defaultVariables(ParsedStructure.Data data) {
         if (!data.structure().node().line().key().strip().equalsIgnoreCase("variables")) {
             return;
@@ -297,6 +357,10 @@ public final class ScriptCompiler {
         List<Object> messages = new ArrayList<>(parse.captured().stream().map(Diagnostic::message).toList());
         // What its code's elements say while being set up, as compiling it would: 'cancel event' in 'on quit'.
         for (ParsedStructure code : parse.code()) {
+            if (code.structure().kind() == co.xenastudios.neoskript.frontend.structure.Structure.Kind.ALIASES) {
+                messages.addAll(aliases(code.structure().section(), new java.util.HashMap<>(), null));
+                continue;
+            }
             if (code instanceof ParsedStructure.Parse inner) {
                 String results = resultsEntry(inner);
                 if (results != null && !(results.startsWith("{") && results.endsWith("::*}"))) {

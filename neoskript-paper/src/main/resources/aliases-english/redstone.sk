@@ -1,0 +1,4 @@
+# Redstone category items whose IDs have never changed or whose differences across versions can be
+# defined purely by variations.
+unchanged redstone:
+	tnt [block¦s] = minecraft:tnt[relatedEntity=primed tnt]

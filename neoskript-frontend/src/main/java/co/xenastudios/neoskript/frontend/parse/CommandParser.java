@@ -87,6 +87,23 @@ final class CommandParser {
         return root == null ? null : new ParsedStructure.Command(structure, header.group(1), root);
     }
 
+    /** Named arguments, as {@code <x:number>}, start out as their types for the type hints. */
+    private Map<String, java.util.Set<String>> hints(List<CommandPattern.Part> parts) {
+        Map<String, java.util.Set<String>> hints = new java.util.HashMap<>();
+        for (CommandPattern.Part part : parts) {
+            if (part instanceof CommandPattern.Argument argument && argument.name() != null) {
+                co.xenastudios.neoskript.frontend.registry.TypeRef ref = registry.resolveType(argument.type());
+                if (ref != null) {
+                    hints.put("_" + argument.name() + (argument.plural() || ref.plural() ? "::*" : ""),
+                            java.util.Set.of(ref.type().id()));
+                }
+            } else if (part instanceof CommandPattern.Optional optional) {
+                hints.putAll(hints(optional.parts()));
+            }
+        }
+        return hints;
+    }
+
     /**
      * A command, subcommand or group and what's under it, or {@code null} (having reported why) if it has
      * no code to run.
@@ -105,7 +122,7 @@ final class CommandParser {
             if (child instanceof Node.Section s && (key.equals("trigger") || key.equals("subcommands")
                     || SUBCOMMAND.matcher(key).matches())) {
                 if (key.equals("trigger")) {
-                    trigger = statements.body(s.children());
+                    trigger = statements.body(s.children(), hints(pattern));
                 } else {
                     children.add(s);
                 }

@@ -1,0 +1,13 @@
+# Food items
+
+# Most of the foods are simple items that have always existed. These didn't change in 1.13.
+unchanged foods:
+	chicken¦s = minecraft:chicken[relatedEntity=chicken]
+	rabbit¦s = minecraft:rabbit[relatedEntity=rabbit]
+
+# Foods whose IDs were changed as part of the ID flattening in 1.13.
+foods after flattening:
+	cod¦s = minecraft:cod[relatedEntity=cod]
+	salmon¦s = minecraft:salmon[relatedEntity=salmon]
+	pufferfish¦es = minecraft:pufferfish[relatedEntity=puffer fish]
+	tropical fish¦es = minecraft:tropical_fish[relatedEntity=tropical fish]

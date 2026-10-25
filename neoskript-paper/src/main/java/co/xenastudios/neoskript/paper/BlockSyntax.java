@@ -96,9 +96,11 @@ final class BlockSyntax {
         registrar.converter(ItemType.class, BlockData.class, item -> item.material().isBlock()
                 ? item.material().createBlockData() : null);
         registrar.comparison(BlockData.class, BlockData.class, (a, b) -> a.matches(b) || b.matches(a));
-        registrar.comparison(BlockData.class, ItemType.class, (data, item) -> data.getMaterial() == item.material());
+        registrar.comparison(BlockData.class, ItemType.class, (data, item) -> item.alternatives().stream()
+                .anyMatch(each -> data.getMaterial() == each.material()));
         // 'block at X is stone': a block is an item if it's that item's block.
-        registrar.comparison(org.bukkit.block.Block.class, ItemType.class, (block, item) -> block.getType() == item.material());
+        registrar.comparison(org.bukkit.block.Block.class, ItemType.class, (block, item) -> item.alternatives().stream()
+                .anyMatch(each -> block.getType() == each.material()));
         registrar.comparison(org.bukkit.block.Block.class, BlockData.class, (block, data) -> block.getBlockData().matches(data));
 
         registrar.expression("ExprBlockData", "blockdata", info -> new DataOf(),
@@ -116,6 +118,7 @@ final class BlockSyntax {
                             : block.getType().createBlockData();
                     case EntityKind kind -> kind.type() == null ? kind : EntityKind.of(kind.type());
                     case Entity entity -> EntityKind.of(entity.getType());
+                    case org.bukkit.entity.EntitySnapshot snapshot -> EntityKind.of(snapshot.getEntityType());
                     case Potions.Effect effect -> effect.type;
                     case org.bukkit.inventory.Inventory inventory -> new Items.InventoryKind(inventory.getType().name());
                     case Enchantments.Levelled levelled -> levelled.enchantment();
@@ -168,7 +171,8 @@ final class BlockSyntax {
             return Bukkit.createBlockData((name.contains(":") ? name : "minecraft:" + name) + states);
         } catch (IllegalArgumentException e) {
             // An item's name, like 'oak log[]', for its block.
-            org.bukkit.Material material = ItemType.alias(written);
+            ItemType named = ItemType.parse(written);
+            org.bukkit.Material material = named == null ? null : named.material();
             if (material == null || !material.isBlock()) {
                 return null;
             }

@@ -534,6 +534,15 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **Skript's test mode:** tests start 5 seconds after loading, with the test chunks ticking, as in Skript. Its test syntax: `test expr list`, `test string literal`, `test loop peeking`, `method exists`, `test key values`, `experimental only`.
     - **Still to do, largest first:** most of Skript's events (only about a dozen exist so far), aliases (`any boots`), local variable type hints, text components, equippable components, particles, loot tables, boss bars, script config, custom operators, banners.
 
+    **Batch 15 (2026-10-25): 734 → 776 tests pass.**
+    - **Aliases:** Skript's default alias files are bundled and loaded (potions, tipped arrows, firework flights, `any boots` and the rest), with their version conditions and variations. Scripts' own `aliases:` sections work, with Skript's errors for unknown variations. Item types stand for several items (`any sword`, a random one when given), `plain` items, and Minecraft ids with block states (`minecraft:oak_stairs[facing=north]`).
+    - **Type hints:** `using local variable type hints` checks what local variables hold as Skript does, from `set`, `add`, `copy` and `transform`, through loops and sections, from function parameters and command arguments, with `suppress type hints` to turn it off.
+    - **Config nodes:** `the skript config`, scripts as nodes, nodes and subnodes by path, and the values of nodes.
+    - **Items:** holding items, room for items, damaged items, stored enchantments, item cooldowns, fuel, stackable items, exact items, `items of type`, banner patterns, banner pattern items and the patterns of banners.
+    - **Entities and blocks:** targets, ages, sounds, signs, entity snapshots, storage blocks, interactions (and whether they respond), with many more properties of entities and blocks.
+    - **Players, server and world:** the server's operators, online player counts (real and shown), plugins, world properties, and Skript's location expression with directions (`spawn a pig 2 meters above X`).
+    - **Still to do, largest first:** most of Skript's events, text components, equippable components, particles, loot tables, boss bars, custom operators, expression sections.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.

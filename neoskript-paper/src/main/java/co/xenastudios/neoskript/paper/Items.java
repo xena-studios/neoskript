@@ -47,7 +47,15 @@ final class Items {
             return new Slot(null, -1, entity, equipment);
         }
 
+        /** The item a player holds on their cursor, as a slot: Skript's {@code cursor slot}. */
+        static Slot cursor(org.bukkit.entity.HumanEntity player) {
+            return new Slot(null, -1, player, null);
+        }
+
         ItemStack item() {
+            if (inventory == null && equipment == null && entity instanceof org.bukkit.entity.HumanEntity human) {
+                return human.getItemOnCursor();
+            }
             if (equipment != null) {
                 EntityEquipment gear = entity.getEquipment();
                 return gear == null ? null : gear.getItem(equipment);
@@ -56,7 +64,9 @@ final class Items {
         }
 
         void set(ItemStack item) {
-            if (equipment != null) {
+            if (inventory == null && equipment == null && entity instanceof org.bukkit.entity.HumanEntity human) {
+                human.setItemOnCursor(item);
+            } else if (equipment != null) {
                 EntityEquipment gear = entity.getEquipment();
                 if (gear != null) {
                     gear.setItem(equipment, item);
@@ -65,6 +75,42 @@ final class Items {
                 inventory.setItem(index, item);
             }
         }
+    }
+
+    /** A type to check an item against: an item type, or a kind of entity that's also an item ({@code armor stand}). */
+    private static ItemType asItem(Object type) {
+        return type instanceof ItemType item ? item
+                : type instanceof EntityKind kind ? ItemType.parse(kind.toString()) : null;
+    }
+
+    /**
+     * Whether {@code stack} is of the type {@code type}, as Skript's 'is of type': the same kind, whatever its
+     * amount, with what the type was written with ({@code plain} meaning nothing more).
+     */
+    private static boolean ofType(ItemStack stack, ItemType type) {
+        for (ItemType each : type.alternatives()) {
+            ItemStack wanted = each.alternatives().getFirst().stack();
+            if (stack.getType() != wanted.getType()) {
+                continue;
+            }
+            boolean bare = !stack.hasItemMeta() || stack.getItemMeta().equals(new ItemStack(stack.getType()).getItemMeta());
+            if (each.plain() ? bare : !wanted.hasItemMeta() || stack.isSimilar(wanted.asQuantity(stack.getAmount()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether one item is another: the same item, with the meta and amount the other was written with. */
+    private static boolean isItem(ItemType item, ItemType pattern) {
+        ItemStack wanted = pattern.alternatives().getFirst().stack();
+        ItemStack actual = item.alternatives().getFirst().stack();
+        if (pattern.plain() && actual.hasItemMeta() && !actual.getItemMeta().equals(new ItemStack(actual.getType()).getItemMeta())) {
+            // 'plain diamond' is only a diamond with nothing more to it.
+            return false;
+        }
+        return actual.getType() == wanted.getType() && (!wanted.hasItemMeta() || actual.isSimilar(wanted))
+                && (!pattern.amountGiven() || actual.getAmount() == wanted.getAmount());
     }
 
     static void register(Registrar registrar) {
@@ -88,9 +134,12 @@ final class Items {
             }
             return item.material() == org.bukkit.Material.matchMaterial(entity.getType().getKey().getKey());
         });
-        registrar.comparison(ItemType.class, ItemType.class, (item, pattern) -> item.material() == pattern.material()
-                && (!pattern.stack().hasItemMeta() || item.stack().isSimilar(pattern.stack()))
-                && (!pattern.amountGiven() || item.amount() == pattern.amount()));
+        // An item standing for several (an alias like 'any boots') is another if each of its items is.
+        registrar.comparison(ItemType.class, ItemType.class, (item, pattern) -> item.alternatives().stream()
+                .allMatch(each -> pattern.alternatives().stream().anyMatch(wanted -> isItem(each, wanted))));
+        registrar.comparison(ItemStack.class, ItemType.class, (stack, item) -> item.alternatives().stream()
+                .anyMatch(wanted -> isItem(new ItemType(stack, true), wanted)));
+        co.xenastudios.neoskript.runtime.ScriptAliases.installChecker(ItemType::checkDefinition);
         registrar.converter(ItemType.class, ItemStack.class, ItemType::stack);
         registrar.converter(ItemStack.class, ItemType.class, stack -> new ItemType(stack, true));
         registrar.converter(Slot.class, ItemStack.class, Slot::item);
@@ -109,6 +158,21 @@ final class Items {
         // Before naming items, so 'chest inventory with 2 rows named "x"' is one chest inventory, not a named one.
         registerInventories(registrar);
 
+        // 'items of type any boots': each item an item type stands for.
+        registrar.expression("ExprItems", "itemtype", info -> (context, args) -> {
+            List<Object> items = new ArrayList<>();
+            for (Object value : (Object[]) args[0]) {
+                if (value instanceof ItemType type) {
+                    for (ItemType each : type.alternatives()) {
+                        if (!info.hasTag("block") || each.material().isBlock()) {
+                            items.add(each.copy());
+                        }
+                    }
+                }
+            }
+            return items.toArray();
+        }, "[all [[of] the]|the|every] item[s] of type[s] %itemtypes%",
+                "[all [[of] the]|the|every] block:block[s] of type[s] %itemtypes%");
         registrar.expression("ExprNamed", "itemtype", info -> (context, args) -> args[0] instanceof ItemType item
                 ? item.withMeta(meta -> meta.displayName(Messages.component(args[1]))) : null,
                 "%itemtype% (named|with name[s]) %text%");
@@ -308,7 +372,9 @@ final class Items {
                     boolean any = false;
                     for (Object type : (Object[]) args[1]) {
                         any |= switch (value) {
-                            case ItemStack stack -> type instanceof ItemType item && stack.getType() == item.material();
+                            case ItemStack stack -> asItem(type) instanceof ItemType item && ofType(stack, item);
+                            case ItemType item -> asItem(type) instanceof ItemType wanted && item.alternatives().stream()
+                                    .allMatch(each -> ofType(each.stack(), wanted));
                             case org.bukkit.entity.Entity entity -> type instanceof EntityKind kind && kind.matches(entity);
                             default -> false;
                         };
@@ -319,8 +385,8 @@ final class Items {
                 }
                 return values.length > 0;
             };
-        }, "%itemstacks/entities% (is|are) of type[s] %itemtypes/entitytypes%",
-                "%itemstacks/entities% (isn't|is not|aren't|are not) of type[s] %itemtypes/entitytypes%");
+        }, "%itemtypes/itemstacks/entities% (is|are) of type[s] %itemtypes/entitytypes%",
+                "%itemtypes/itemstacks/entities% (isn't|is not|aren't|are not) of type[s] %itemtypes/entitytypes%");
 
         // 'player has 5 diamonds': an inventory holds the items.
         registrar.condition("CondHasItems", info -> {
@@ -414,7 +480,6 @@ final class Items {
         };
     }
 
-    /** Changes the item {@code owner} is or holds, in place. */
     /** Changes the meta of the item {@code owner} is or holds, in place. */
     static void editMeta(Object owner, java.util.function.Consumer<org.bukkit.inventory.meta.ItemMeta> change) {
         editStack(owner, stack -> stack.editMeta(change));
@@ -422,11 +487,7 @@ final class Items {
 
     private static void editStack(Object owner, java.util.function.Consumer<ItemStack> change) {
         switch (owner) {
-            case ItemType item -> {
-                ItemStack stack = item.stack();
-                change.accept(stack);
-                item.replace(stack);
-            }
+            case ItemType item -> item.editStacks(change);
             case ItemStack stack -> change.accept(stack);
             case Slot slot when slot.item() != null -> {
                 ItemStack stack = slot.item();
@@ -639,17 +700,6 @@ final class Items {
             }
             return count;
         }, "[the] (amount|number) of %itemtypes% (in|of) %inventories%");
-        registrar.effect("EffItemLifetime", info -> {
-            boolean prevent = info.pattern() == 0;
-            return (context, args) -> {
-                for (Object value : (Object[]) args[0]) {
-                    if (value instanceof org.bukkit.entity.Item item) {
-                        item.setUnlimitedLifetime(prevent);
-                    }
-                }
-            };
-        }, "(prevent|disallow) %entities% from (naturally despawning|despawning naturally)",
-                "(allow|enable) %entities% to (naturally despawn|despawn naturally)");
         // Item flags, by name: 'hide enchants'.
         Map<String, org.bukkit.inventory.ItemFlag> flags = new LinkedHashMap<>();
         for (org.bukkit.inventory.ItemFlag flag : org.bukkit.inventory.ItemFlag.values()) {

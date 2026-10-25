@@ -5,6 +5,8 @@
 package co.xenastudios.neoskript.frontend.parse;
 
 import co.xenastudios.neoskript.frontend.registry.DelayState;
+import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
+import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
 import co.xenastudios.neoskript.frontend.registry.ParseCheck;
 import co.xenastudios.neoskript.frontend.registry.TypeInfo;
 import co.xenastudios.neoskript.frontend.registry.TypeRef;
@@ -69,7 +71,13 @@ final class StatementParser {
 
     /** Parses a trigger's or function's code, which starts with no delay. */
     List<Statement> body(List<Node> nodes) {
+        return body(nodes, Map.of());
+    }
+
+    /** {@link #body(List)}, with what types local variables start with: a function's parameters'. */
+    List<Statement> body(List<Node> nodes, Map<String, java.util.Set<String>> hints) {
         delay = DelayState.NOT_DELAYED;
+        context.hints().reset(hints);
         return statements(nodes);
     }
 
@@ -99,6 +107,9 @@ final class StatementParser {
             statements.add(statement);
             previous = statement;
             ended = statement instanceof Statement.Effect effect && context.registry().ends(effect.effect().syntax());
+            if (statement instanceof Statement.Effect effect) {
+                stopsHints(effect.effect(), false);
+            }
         }
         if (chain != null) {
             delay = endChain(chain);
@@ -161,6 +172,7 @@ final class StatementParser {
             if (context.registry().suppressesWarnings(effect.syntax())) {
                 suppress(effect);
             }
+            hint(effect);
             if (context.registry().delays(effect.syntax())) {
                 delay = DelayState.DELAYED;
             }
@@ -171,7 +183,10 @@ final class StatementParser {
             check(line, condition);
             return new Statement.Condition(line, condition);
         }
-        String problem = parser.functionProblem();
+        String problem = context.hints().active() ? hintProblem(line) : null;
+        if (problem == null) {
+            problem = parser.functionProblem();
+        }
         error(line, problem != null ? problem : "Can't understand this condition/effect: " + line.text());
         return new Statement.Invalid(line);
     }
@@ -239,6 +254,13 @@ final class StatementParser {
         if (isConditional(lower)) {
             return new Statement.Section(line, header, sectionBody(section.children()));
         }
+        if (header.syntax().id().equals(SUPPRESS_HINTS)) {
+            boolean before = context.hints().suppressed();
+            context.hints().suppress(!header.match().tags().contains("stop"));
+            List<Statement> body = repeatable(section.children());
+            context.hints().suppress(before);
+            return new Statement.Section(line, header, body);
+        }
         if (context.registry().suppressesWarnings(header.syntax())) {
             // Only for the section's code.
             java.util.Set<String> before = java.util.Set.copyOf(suppressed);
@@ -248,7 +270,34 @@ final class StatementParser {
             suppressed.addAll(before);
             return new Statement.Section(line, header, body);
         }
-        return new Statement.Section(line, header, repeatable(section.children()));
+        return new Statement.Section(line, header, repeatable(section.children(),
+                header.syntax().id().equals("SecFor") ? header : null));
+    }
+
+    /** A {@code for} loop's code: its value variable may also be any of what the list holds. */
+    private List<Statement> loopBody(List<Node> nodes, ParsedSyntax loop) {
+        DelayState before = delay;
+        context.hints().enter();
+        List<Statement> body;
+        try {
+            List<Object> values = loop.match().values();
+            Object looped = values.getLast();
+            Object value = values.get(loop.pattern() == 0 ? 0 : 1);
+            if (value instanceof Expr.Variable variable && simple(variable) && looped instanceof Expr list) {
+                java.util.Set<String> types = new java.util.LinkedHashSet<>(types(list));
+                if (!types.isEmpty()) {
+                    types.addAll(context.hints().get(variable.name()));
+                    context.hints().set(variable.name(), types);
+                }
+            }
+            body = statements(nodes);
+        } finally {
+            context.hints().exit();
+        }
+        if (stops(body)) {
+            delay = before;
+        }
+        return body;
     }
 
     /**
@@ -257,11 +306,204 @@ final class StatementParser {
      */
     private List<Statement> sectionBody(List<Node> nodes) {
         DelayState before = delay;
-        List<Statement> body = statements(nodes);
+        context.hints().enter();
+        List<Statement> body;
+        try {
+            body = statements(nodes);
+        } finally {
+            context.hints().exit();
+        }
         if (stops(body)) {
             delay = before;
         }
         return body;
+    }
+
+    /**
+     * Why a line that didn't parse fails by its type hints, as Skript says: the line is parsed again without
+     * them, and the first variable whose hints don't fit where it was put is the reason. {@code null} if
+     * the line doesn't parse that way either, or every variable fits.
+     */
+    private String hintProblem(Line line) {
+        LineParser loose = new LineParser(context, line.text(), false);
+        int end = line.text().length();
+        Object parsed = loose.call(0, end);
+        if (parsed == null) {
+            parsed = loose.effect(0, end);
+        }
+        if (parsed == null) {
+            parsed = loose.condition(0, end);
+        }
+        if (parsed == null) {
+            return null;
+        }
+        LineParser strict = new LineParser(context, line.text());
+        return hintProblem(parsed, strict);
+    }
+
+    private String hintProblem(Object node, LineParser strict) {
+        switch (node) {
+            case ParsedSyntax syntax -> {
+                co.xenastudios.neoskript.frontend.pattern.PlaceholderSpec[] specs = specs(syntax);
+                List<Object> values = syntax.match().values();
+                for (int i = 0; i < values.size(); i++) {
+                    String problem = i < specs.length && specs[i] != null
+                            ? hintProblem(values.get(i), context.expected(specs[i]), strict) : null;
+                    if (problem != null) {
+                        return problem;
+                    }
+                }
+                for (Object value : syntax.match().regexValues()) {
+                    String problem = hintProblem(value, strict);
+                    if (problem != null) {
+                        return problem;
+                    }
+                }
+            }
+            case Expr.FunctionCall call -> {
+                for (int i = 0; i < call.arguments().size() && i < call.function().parameters().size(); i++) {
+                    FunctionInfo.Parameter parameter = call.function().parameters().get(i);
+                    TypeRef ref = context.registry().resolveType(parameter.type());
+                    if (ref != null && call.arguments().get(i) != null) {
+                        String problem = hintProblem(call.arguments().get(i),
+                                context.expected(new TypeRef(ref.type(), parameter.plural())), strict);
+                        if (problem != null) {
+                            return problem;
+                        }
+                    }
+                }
+            }
+            case Expr.Syntax syntax -> {
+                return hintProblem(syntax.syntax(), strict);
+            }
+            default -> {}
+        }
+        return null;
+    }
+
+    private String hintProblem(Object value, Expected expected, LineParser strict) {
+        if (value instanceof Expr.Variable variable) {
+            return strict.hintFits(variable, expected) ? null : strict.hintProblem();
+        }
+        if (value instanceof Expr.ListOf list) {
+            for (Expr item : list.items()) {
+                String problem = hintProblem(item, expected, strict);
+                if (problem != null) {
+                    return problem;
+                }
+            }
+            return null;
+        }
+        return hintProblem(value, strict);
+    }
+
+    private static co.xenastudios.neoskript.frontend.pattern.PlaceholderSpec[] specs(ParsedSyntax syntax) {
+        co.xenastudios.neoskript.frontend.pattern.CompiledPattern pattern = syntax.syntax().patterns().get(syntax.pattern());
+        co.xenastudios.neoskript.frontend.pattern.PlaceholderSpec[] specs =
+                new co.xenastudios.neoskript.frontend.pattern.PlaceholderSpec[pattern.placeholderCount()];
+        collect(pattern.root(), specs);
+        return specs;
+    }
+
+    private static void collect(co.xenastudios.neoskript.frontend.pattern.PatternElement element,
+            co.xenastudios.neoskript.frontend.pattern.PlaceholderSpec[] specs) {
+        switch (element) {
+            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Placeholder placeholder ->
+                    specs[placeholder.index()] = placeholder.spec();
+            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Sequence sequence ->
+                    sequence.elements().forEach(e -> collect(e, specs));
+            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Choice choice ->
+                    choice.alternatives().forEach(a -> collect(a.body(), specs));
+            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Optional optional ->
+                    collect(optional.choice(), specs);
+            default -> {}
+        }
+    }
+
+    /** Skript's {@code suppress local variable type hints}, alone or as a section. */
+    private static final String SUPPRESS_HINTS = "EffSecSuppressTypeHints";
+
+    /** What an effect tells the type hints: {@code set {_x} to 10}, {@code delete {_x}}, {@code copy}... */
+    private void hint(ParsedSyntax effect) {
+        TypeHints hints = context.hints();
+        List<Object> values = effect.match().values();
+        switch (effect.syntax().id()) {
+            case SUPPRESS_HINTS -> hints.suppress(!effect.match().tags().contains("stop"));
+            case "EffChange" -> {
+                switch (effect.pattern()) {
+                    case 0 -> forEachVariable(values.get(0), v -> hints.set(v.name(), types((Expr) values.get(1))));
+                    case 1 -> forEachVariable(values.get(1), v -> hints.add(v.name(), types((Expr) values.get(0))));
+                    case 6 -> forEachVariable(values.get(0), v -> hints.delete(v.name()));
+                    default -> {}
+                }
+            }
+            case "EffCopy" -> forEachVariable(values.get(1), v -> hints.set(v.name(),
+                    values.get(0) instanceof Expr source ? types(source) : java.util.Set.of()));
+            case "EffTransform" -> {
+                if (!effect.match().regexValues().isEmpty() && effect.match().regexValues().getFirst() instanceof Expr mapping) {
+                    forEachVariable(values.get(0), v -> hints.set(v.name(), types(mapping)));
+                }
+            }
+            default -> {}
+        }
+    }
+
+    /** How far an effect stops execution, for the type hints: {@code stop}, {@code exit 2 sections}. */
+    private void stopsHints(ParsedSyntax effect, boolean conditional) {
+        switch (effect.syntax().id()) {
+            case "EffExit" -> {
+                int levels = -1;
+                if (effect.pattern() == 1) {
+                    levels = 1;
+                } else if (effect.pattern() == 2 && effect.match().regexValues().getFirst() instanceof java.util.regex.MatchResult n) {
+                    levels = Integer.parseInt(n.group());
+                }
+                context.hints().stop(levels, conditional);
+            }
+            case "EffReturn" -> context.hints().stop(-1, conditional);
+            case "EffContinue" -> context.hints().stop(1, conditional);
+            case "EffDoIf" -> {
+                if (effect.match().regexValues().getFirst() instanceof ParsedSyntax inner) {
+                    stopsHints(inner, true);
+                }
+            }
+            default -> {}
+        }
+    }
+
+    private static void forEachVariable(Object target, java.util.function.Consumer<Expr.Variable> action) {
+        if (target instanceof Expr.Variable variable && simple(variable)) {
+            action.accept(variable);
+        } else if (target instanceof Expr.ListOf list) {
+            list.items().forEach(item -> forEachVariable(item, action));
+        }
+    }
+
+    /** A local variable whose name is all written out: only those have hints, as in Skript. */
+    static boolean simple(Expr.Variable variable) {
+        return variable.local() && variable.embedded().isEmpty();
+    }
+
+    /** The types {@code expr}'s values may be, as far as is known while parsing; none if unknown. */
+    private java.util.Set<String> types(Expr expr) {
+        return switch (expr) {
+            case Expr.Variable variable when simple(variable) -> context.hints().get(variable.name());
+            case Expr.ListOf list -> {
+                java.util.Set<String> all = new java.util.LinkedHashSet<>();
+                for (Expr item : list.items()) {
+                    java.util.Set<String> types = types(item);
+                    if (types.isEmpty()) {
+                        yield java.util.Set.of();
+                    }
+                    all.addAll(types);
+                }
+                yield all;
+            }
+            case Expr.Variable variable -> java.util.Set.of();
+            case Expr.Unresolved unresolved -> java.util.Set.of();
+            default -> expr.type() == null || expr.type().equals(SyntaxRegistry.OBJECT) ? java.util.Set.of()
+                    : java.util.Set.of(expr.type());
+        };
     }
 
     /** {@code suppress unreachable code warnings}, or {@code unsuppress}: changes what's suppressed from here on. */
@@ -293,8 +535,13 @@ final class StatementParser {
      * only if it already was; if the code may wait, it's maybe delayed.
      */
     private List<Statement> repeatable(List<Node> nodes) {
+        return repeatable(nodes, null);
+    }
+
+    /** {@link #repeatable(List)}, with a loop's variables hinted first ({@code for {_value} in X}). */
+    private List<Statement> repeatable(List<Node> nodes, ParsedSyntax loop) {
         DelayState before = delay;
-        List<Statement> body = sectionBody(nodes);
+        List<Statement> body = loop == null ? sectionBody(nodes) : loopBody(nodes, loop);
         delay = before.merge(List.of(before, delay));
         return body;
     }

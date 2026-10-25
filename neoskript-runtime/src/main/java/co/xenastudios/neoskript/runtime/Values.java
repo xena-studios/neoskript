@@ -152,6 +152,11 @@ public final class Values {
         return values.toArray();
     }
 
+    /** {@link #cast}, keeping too the values that convert to {@code type}, converted. */
+    public static Object[] castConverting(Object value, Class<?> type) {
+        return cast(convert(array(value), type), type);
+    }
+
     /** {@code array[index + offset]}, or {@code null} if that's outside the array: for next/previous loop values. */
     public static Object element(Object[] array, int index, int offset) {
         int i = index + offset;
