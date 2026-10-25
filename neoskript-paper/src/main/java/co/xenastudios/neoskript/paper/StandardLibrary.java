@@ -12,6 +12,15 @@ public final class StandardLibrary {
     private StandardLibrary() {}
 
     public static void register(Registrar registrar) {
+        register(registrar, hooks -> {});
+    }
+
+    /**
+     * Registers the standard library with the syntax of plugin hooks ({@link Hooks#register}), which goes before
+     * comparisons and {@code contains}, as Skript tries those last: {@code player is the owner of region X} is the
+     * region condition, not a comparison.
+     */
+    public static void register(Registrar registrar, java.util.function.Consumer<Registrar> hooks) {
         CoreTypes.register(registrar);
         TextComponents.register(registrar);
         ScriptEvents.register(registrar);
@@ -71,6 +80,7 @@ public final class StandardLibrary {
         Fireworks.register(registrar);
         EventSyntax.register(registrar);
         Collections.register(registrar);
+        hooks.accept(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
         Items.registerLate(registrar);

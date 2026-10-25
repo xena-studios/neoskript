@@ -79,7 +79,13 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (TestRunner.enabled()) {
             library.enableTesting();
         }
-        StandardLibrary.register(library);
+        // Syntax of the plugins NeoSkript hooks into, as Skript's hooks, only when they're installed.
+        boolean hooks = co.xenastudios.neoskript.paper.Hooks.anyInstalled();
+        StandardLibrary.register(library, registrar -> {
+            if (hooks) {
+                co.xenastudios.neoskript.paper.Hooks.register(registrar, getPluginMeta().getVersion(), getSLF4JLogger());
+            }
+        });
         StandardLibrary.usePlayerUuidsInVariableNames(getConfig().getBoolean("variables.player-uuids-in-names", true));
         if (TestRunner.enabled()) {
             StandardLibrary.registerTesting(library);
@@ -111,13 +117,26 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         storage = new VariableStorage(scripts.globals(), library.codecs(),
                 getDataPath().resolve(getConfig().getString("variables.file", "variables.csv")));
         loadVariables();
-        try {
-            scripts.loadAll();
-        } catch (IOException e) {
-            getSLF4JLogger().error("Couldn't read the scripts folder", e);
+        Runnable start = () -> {
+            if (hooks) {
+                co.xenastudios.neoskript.paper.Hooks.hookServices(getSLF4JLogger());
+            }
+            try {
+                scripts.loadAll();
+            } catch (IOException e) {
+                getSLF4JLogger().error("Couldn't read the scripts folder", e);
+            }
+            // Events NeoSkript fires itself: experience spawning, times of day, starting and stopping.
+            co.xenastudios.neoskript.paper.EventBridges.start(this, eventPriority());
+            co.xenastudios.neoskript.paper.Hooks.start(this, eventPriority());
+        };
+        if (hooks) {
+            // As Skript: with plugins to hook into, taking Vault's services and then loading scripts wait for the
+            // server to start, when every plugin has enabled and registered its services.
+            getServer().getGlobalRegionScheduler().run(this, task -> start.run());
+        } else {
+            start.run();
         }
-        // Events NeoSkript fires itself: experience spawning, times of day, starting and stopping.
-        co.xenastudios.neoskript.paper.EventBridges.start(this, eventPriority());
         // D10: NeoSkript takes over /skript and /sk, with /neoskript as an alias.
         getCommand("skript").setExecutor(new SkriptCommand(scripts, getPluginMeta().getVersion()));
     }

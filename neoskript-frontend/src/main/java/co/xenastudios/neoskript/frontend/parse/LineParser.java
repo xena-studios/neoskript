@@ -253,7 +253,9 @@ final class LineParser {
 
     /** Types arithmetic works on; an operand of another known type rules arithmetic out, as in Skript. */
     private static final java.util.Set<String> ARITHMETIC_TYPES = java.util.Set.of(SyntaxRegistry.OBJECT, "number",
-            "integer", "long", "timespan", "date", "time", "timeperiod", "string", "vector", "location", "experience");
+            "integer", "long", "timespan", "date", "time", "timeperiod", "string", "vector", "location", "experience",
+            // Vault's money, when it's hooked.
+            "money");
 
     /** Whether arithmetic's operands could be added: {@code the script named X + "y"} isn't arithmetic. */
     private boolean arithmeticOperands(ParsedSyntax parsed) {
