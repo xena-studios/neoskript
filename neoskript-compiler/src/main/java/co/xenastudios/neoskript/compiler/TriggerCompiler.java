@@ -221,11 +221,6 @@ final class TriggerCompiler {
     private String outerArgument;
     /** Values left-out placeholders of a type get, from Skript's custom default test sections, innermost first. */
     private final java.util.Deque<Map.Entry<String, Expr>> customDefaults = new java.util.ArrayDeque<>();
-    /**
-     * Whether words nothing parses get Skript's error rather than NeoSkript's, as in a test's {@code parse:}
-     * section, whose errors are what's being tested.
-     */
-    private boolean skriptErrors;
     /** For code compiled apart, the types of the sections around it, whose values it may use (as nothing). */
     private final java.util.Set<String> outerSections = new java.util.HashSet<>();
     /** Warnings from the last code compiled apart, for a {@code parse:} section's logs. */
@@ -773,7 +768,6 @@ final class TriggerCompiler {
             TriggerCompiler apart = new TriggerCompiler(library, functions, globals, script);
             apart.eventClasses = eventClasses;
             apart.eventName = eventName;
-            apart.skriptErrors = true;
             apart.warnings = (at, message) -> apartWarnings.add(message);
             for (Block block : blocks) {
                 if (block.kind() == BlockKind.SECTION && block.valueType() != null) {
@@ -2192,7 +2186,7 @@ final class TriggerCompiler {
             try {
                 conditionChecked(condition, values);
             } catch (CompileException e) {
-                if (!e.getMessage().contains("NeoSkript can't run this yet")) {
+                if (!e.getMessage().startsWith("Can't understand this expression")) {
                     throw e;
                 }
                 String text = source.strip();
@@ -3514,13 +3508,10 @@ final class TriggerCompiler {
                     // Words Skript has a clearer error for: 'dust particle' needs its colour.
                     throw new CompileException(line, library.literalError(unresolved.text()));
                 }
-                if (value == null && (inList > 0 || skriptErrors) && outerArgument != null && !outerArgument.contains("event-")) {
-                    // Words nothing parses in a list: Skript reports the whole argument they're in. (An event value
-                    // NeoSkript doesn't have yet is something it can't run, not a mistake.)
-                    throw new CompileException(line, "Can't understand this expression: '" + outerArgument + "'");
-                }
                 if (value == null) {
-                    throw unsupported("'" + unresolved.text() + "'");
+                    // Words nothing parses: Skript reports the whole argument they're in.
+                    throw new CompileException(line, "Can't understand this expression: '"
+                            + (outerArgument != null ? outerArgument : unresolved.text().strip()) + "'");
                 }
                 constant(value, Object.class);
             }

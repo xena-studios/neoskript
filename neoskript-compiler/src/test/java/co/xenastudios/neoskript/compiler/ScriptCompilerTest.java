@@ -89,11 +89,11 @@ class ScriptCompilerTest {
     }
 
     @Test
-    void reportsWhatItCantCompileYet() {
+    void reportsWordsItCantUnderstand() {
         CompiledScripts compiled = compile("on load:\n\tsay \"a\"\n\tsay diamond sword\n");
         assertEquals(List.of(), compiled.triggers());
         assertEquals(1, compiled.diagnostics().size());
-        assertTrue(compiled.diagnostics().getFirst().message().startsWith("NeoSkript can't run this yet"),
+        assertTrue(compiled.diagnostics().getFirst().message().equals("Can't understand this expression: 'diamond sword'"),
                 compiled.diagnostics().toString());
     }
 }
