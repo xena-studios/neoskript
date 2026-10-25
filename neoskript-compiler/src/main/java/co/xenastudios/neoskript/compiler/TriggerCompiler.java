@@ -1640,6 +1640,15 @@ final class TriggerCompiler {
     }
 
     private void change(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Object target) throws CompileException {
+        if (mode == CoreSyntax.ChangeMode.SET && target instanceof Expr.Variable variable && variable.list()) {
+            // 'set {_x::*} to "1, 2" parsed as "%integers%"': each placeholder's values stay a sublist, as in Skript.
+            Object changer = effect.match().values().get(mode.value);
+            for (Object each : changer instanceof Expr.ListOf list ? list.items() : List.of(changer)) {
+                if (each instanceof Expr.Syntax parse && isCore(parse.syntax(), CoreSyntax.PARSE_PATTERN)) {
+                    groupedParses.add(parse);
+                }
+            }
+        }
         if (mode == CoreSyntax.ChangeMode.SET && target instanceof Expr.Syntax whether
                 && isCore(whether.syntax(), CoreSyntax.WHETHER)) {
             setCondition(effect, whether);
@@ -2877,6 +2886,7 @@ final class TriggerCompiler {
                 condition(condition);
                 method.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;", false);
             }
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.PARSE_PATTERN) -> parsePattern(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.PARSE) -> {
                 if (!(syntax.syntax().match().regexValues().getFirst() instanceof TypeRef ref)) {
                     throw unsupported("'" + source.substring(syntax.start(), syntax.end()) + "'");
@@ -3280,6 +3290,90 @@ final class TriggerCompiler {
         }
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Arithmetic.class), operation,
                 "(" + OBJECT_DESC + OBJECT_DESC + ")" + OBJECT_DESC, false);
+    }
+
+    /** {@code X parsed as "pattern"} that are set into a list variable: their values stay grouped by placeholder. */
+    private final java.util.Set<Expr> groupedParses = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
+    /**
+     * {@code X parsed as "%integer%, %text%"}: the text matched against the pattern, its placeholders parsed
+     * as their types (a plural one as a list). Its values come one after another, or grouped by placeholder
+     * when set into a list variable, as Skript's ExprParse does.
+     */
+    private void parsePattern(Expr.Syntax syntax) throws CompileException {
+        Object regex = syntax.syntax().match().regexValues().getFirst();
+        String text = regex instanceof java.util.regex.MatchResult match ? match.group() : String.valueOf(regex);
+        co.xenastudios.neoskript.frontend.pattern.CompiledPattern pattern;
+        try {
+            pattern = co.xenastudios.neoskript.frontend.pattern.PatternCompiler.compile(text);
+        } catch (RuntimeException e) {
+            throw new CompileException(line, "Malformed pattern: " + e.getMessage());
+        }
+        PlaceholderSpec[] specs = placeholderSpecs(pattern);
+        for (PlaceholderSpec spec : specs) {
+            for (String type : spec.types()) {
+                TypeRef ref = registry.resolveType(type);
+                if (ref == null || library.parser(ref.type().id()) == null) {
+                    String name = ref == null ? type : ref.type().name();
+                    throw new CompileException(line, "Text cannot be parsed as " + article(name) + " " + name);
+                }
+            }
+        }
+        boolean grouped = groupedParses.contains(syntax);
+        SyntaxRegistry types = registry;
+        Library parsers = library;
+        java.util.function.Function<String, Object> parse = input -> {
+            co.xenastudios.neoskript.frontend.pattern.MatchResult match = pattern.match(input, (in, start, end, spec) ->
+                    parsePlaceholder(in.substring(start, end), spec, types, parsers));
+            if (match == null) {
+                return null;
+            }
+            List<Object> values = new ArrayList<>();
+            for (Object value : match.values()) {
+                if (value == null) {
+                    continue;
+                }
+                if (!grouped && value instanceof Object[] many) {
+                    values.addAll(java.util.Arrays.asList(many));
+                } else {
+                    values.add(value);
+                }
+            }
+            return values.toArray();
+        };
+        constant(parse, java.util.function.Function.class);
+        expression((Expr) syntax.syntax().match().values().getFirst());
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "parse",
+                "(Ljava/util/function/Function;" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+    }
+
+    /** A placeholder's text parsed as one of its types, a plural one as a list ({@code 1, 2 and 3}). */
+    private static Object parsePlaceholder(String text, PlaceholderSpec spec, SyntaxRegistry types, Library parsers) {
+        for (String type : spec.types()) {
+            TypeRef ref = types.resolveType(type);
+            java.util.function.Function<String, ?> parser = ref == null ? null : parsers.parser(ref.type().id());
+            if (parser == null) {
+                continue;
+            }
+            if (!ref.plural()) {
+                Object value = parser.apply(text.strip());
+                if (value != null) {
+                    return value;
+                }
+                continue;
+            }
+            String[] pieces = text.split("\\s*,\\s*(?:(?:and|or|n?or)\\s+)?|\\s+(?:and|n?or)\\s+");
+            Object[] values = new Object[pieces.length];
+            boolean all = true;
+            for (int i = 0; i < pieces.length && all; i++) {
+                values[i] = parser.apply(pieces[i].strip());
+                all = values[i] != null;
+            }
+            if (all) {
+                return values;
+            }
+        }
+        return null;
     }
 
     // ---------------------------------------------------------------- functions

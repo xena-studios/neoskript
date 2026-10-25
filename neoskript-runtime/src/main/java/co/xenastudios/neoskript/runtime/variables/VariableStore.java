@@ -306,7 +306,16 @@ public final class VariableStore {
         Node node = create(prefix);
         int index = 1;
         for (Object value : values) {
-            if (value != null) {
+            if (value instanceof Object[] group) {
+                // Several values in one place are a list there, as Skript sets {x::1::1}, {x::1::2}...
+                Node sublist = node.children().computeIfAbsent(Integer.toString(index++), k -> new Node());
+                int inner = 1;
+                for (Object each : group) {
+                    if (each != null) {
+                        sublist.children().computeIfAbsent(Integer.toString(inner++), k -> new Node()).value.set(Values.copy(each));
+                    }
+                }
+            } else if (value != null) {
                 node.children().computeIfAbsent(Integer.toString(index++), k -> new Node()).value.set(Values.copy(value));
             }
         }

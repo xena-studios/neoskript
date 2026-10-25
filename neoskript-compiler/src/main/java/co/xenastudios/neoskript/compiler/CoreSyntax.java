@@ -52,6 +52,8 @@ final class CoreSyntax {
     static final String SORT = "EffSort";
     static final String PERIODICAL = "EvtPeriodical";
     static final String PARSE = "ExprParse";
+    /** {@code X parsed as "%integer% and %text%"}: text parsed with a pattern of types, as Skript's ExprParse. */
+    static final String PARSE_PATTERN = "ExprParse-pattern";
     static final String WHETHER = "ExprWhether";
     static final String CATCH_ERRORS = "SecCatchErrors";
     /** {@code suppress unreachable code warnings}, alone or as a section: handled while parsing. */
@@ -311,6 +313,7 @@ final class CoreSyntax {
         // library's expressions, as Skript tries it after most: 'difference between {_a} and "5" parsed as a
         // number' is the difference with a parsed number.
         library.core(SyntaxKind.EXPRESSION, PARSE, "object", List.of(RegexRole.TYPE), "%text% parsed as [a[n]] <.+>");
+        library.core(SyntaxKind.EXPRESSION, PARSE_PATTERN, "object", List.of(), "%text% parsed as \"<.*>\"");
         // 'past event-block', 'event-item after the event': an event value before or after the event.
         library.core(SyntaxKind.EXPRESSION, TIME_STATE, "object", List.of(),
                 "[the] (former|past|old) [state] [of] %objects%", "%objects% before [the event]",

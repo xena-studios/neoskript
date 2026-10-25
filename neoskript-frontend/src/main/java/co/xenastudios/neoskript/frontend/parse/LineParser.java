@@ -198,6 +198,11 @@ final class LineParser {
                     && !(parsed.match().regexValues().getFirst() instanceof TypeRef ref && registry.isEnumerable(ref.type().id()))) {
                 continue;
             }
+            // Filtering one value isn't filtering, as Skript's filter refuses: '"1" parsed as "%integer%" where [...]'.
+            if (syntax.id().equals("ExprFilter") && parsed.match().values().getFirst() instanceof Expr filtered
+                    && Plurality.single(filtered, registry)) {
+                continue;
+            }
             Object result = parsed;
             if (expected != null) {
                 String type = returnType(parsed);
