@@ -83,53 +83,32 @@ public final class RuntimeErrors {
         emit(Level.WARNING, message, highlight);
     }
 
-    /**
-     * Where an error reported now would come from, for code that reports one later, off the trigger's
-     * thread; null outside compiled code.
-     */
-    public static ErrorSource source() {
+    /** Where an error reported now comes from: the element running in the innermost compiled code. */
+    private static ErrorSource source() {
         ErrorSites.Site site = ErrorSites.current();
         return site == null ? null : site.source();
     }
 
-    /** Reports a runtime error from {@code source}, as found earlier with {@link #source()}. */
-    public static void report(ErrorSource source, String message) {
-        emit(Level.ERROR, message, null, source);
-    }
-
+    /** Catches an error, or counts it in its frame and prints it if the frame's limits allow. */
     private static void emit(Level level, String message, String highlight) {
         Deque<List<String>> catching = CATCHING.get();
         if (!catching.isEmpty()) {
-            catch_(catching, message);
-            return;
-        }
-        if (consumer == null) {
-            return;
-        }
-        emit(level, message, highlight, source());
-    }
-
-    private static void emit(Level level, String message, String highlight, ErrorSource source) {
-        Deque<List<String>> catching = CATCHING.get();
-        if (!catching.isEmpty()) {
-            catch_(catching, message);
+            // As Skript's catcher, which keeps at most 1000.
+            List<String> caught = catching.peek();
+            if (caught.size() < CATCH_LIMIT) {
+                caught.add(message);
+            }
             return;
         }
         Consumer to = consumer;
         if (to == null) {
             return;
         }
+        ErrorSource source = source();
         RuntimeError error = new RuntimeError(level,
                 source == null ? ErrorSource.unknown("syntax", "-unknown-") : source, message, highlight);
         if ((level == Level.WARNING ? warningFrame : errorFrame).add(error)) {
             to.printError(error);
-        }
-    }
-
-    private static void catch_(Deque<List<String>> catching, String message) {
-        List<String> caught = catching.peek();
-        if (caught.size() < CATCH_LIMIT) {
-            caught.add(message);
         }
     }
 
