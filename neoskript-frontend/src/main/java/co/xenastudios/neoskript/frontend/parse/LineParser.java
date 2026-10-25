@@ -857,8 +857,46 @@ final class LineParser {
                         && overloads.stream().anyMatch(f -> parameterIndex(f.parameters(), n) >= 0));
         functionProblem(problem != null && !onlyUnknownNames
                 ? problem
-                : "The function " + name + "(" + describe(pieces) + ") does not exist");
+                : "The function " + name + "(" + describe(pieces) + ") does not exist." + intended(overloads, pieces));
         return null;
+    }
+
+    /**
+     * Skript's guess at the function meant, for its error: of those whose parameters take every argument whose
+     * type is known, the one whose number of parameters is closest to the number of arguments.
+     */
+    private String intended(List<FunctionInfo> overloads, List<int[]> pieces) {
+        List<String> known = new ArrayList<>();
+        for (int[] piece : pieces) {
+            String named = argumentName(piece);
+            int valueStart = named == null ? piece[0] : input.indexOf(':', piece[0]) + 1;
+            Expr value = expression(valueStart, piece[1], Expected.OBJECTS);
+            if (value != null && countUnresolved(value) == 0 && value.type() != null && !value.type().equals(SyntaxRegistry.OBJECT)) {
+                known.add(value.type());
+            }
+        }
+        FunctionInfo best = null;
+        for (FunctionInfo function : overloads) {
+            List<String> left = new ArrayList<>(known);
+            for (FunctionInfo.Parameter parameter : function.parameters()) {
+                left.stream().filter(type -> registry.isAssignable(type, parameter.type())).findFirst().ifPresent(left::remove);
+            }
+            if (left.isEmpty() && (best == null || Math.abs(pieces.size() - function.parameters().size())
+                    < Math.abs(pieces.size() - best.parameters().size()))) {
+                best = function;
+            }
+        }
+        if (best == null) {
+            return "";
+        }
+        List<String> parameters = new ArrayList<>();
+        for (FunctionInfo.Parameter parameter : best.parameters()) {
+            co.xenastudios.neoskript.frontend.registry.TypeInfo info = registry.type(parameter.type());
+            String type = info == null ? parameter.type() : info.name().toLowerCase(java.util.Locale.ROOT);
+            parameters.add(parameter.name() + ": " + (parameter.plural() ? SyntaxRegistry.plural(type) : type));
+        }
+        return " Did you mean to use the function '" + (best.localTo() != null ? "local " : "") + best.name() + "("
+                + String.join(", ", parameters) + ")'?";
     }
 
     @SuppressWarnings("unchecked")
@@ -883,6 +921,18 @@ final class LineParser {
             int[] last = {pieces.get(parameters.size() - 1)[0], inner[1]};
             pieces = new ArrayList<>(pieces.subList(0, parameters.size() - 1));
             pieces.add(last);
+        }
+        java.util.Set<String> names = new java.util.HashSet<>();
+        for (int[] piece : pieces) {
+            String named = argumentName(piece);
+            if (named != null && !names.add(named)) {
+                // Checked first, as Skript does, whichever function it would be.
+                return "A value has already been assigned to parameter '" + named + "'";
+            }
+        }
+        if (pieces.size() > parameters.size()) {
+            // More arguments than it takes: not this function, as Skript skips it before parsing any.
+            return null;
         }
         if (mixesNamedAndUnnamed(pieces, parameters)) {
             return "Mixing named and unnamed arguments is not allowed";
@@ -918,11 +968,6 @@ final class LineParser {
                 String written = input.substring(valueStart, piece[1]).strip();
                 if (written.startsWith("(") && written.indexOf('(', 1) > 0) {
                     // A list with a list in it: no function takes that, so there's no such function.
-                    return null;
-                }
-                Expr anything = expression(valueStart, piece[1], Expected.OBJECTS);
-                if (anything != null && !(anything instanceof Expr.Unresolved)) {
-                    // It's a value, just not of this parameter's type: no such overload.
                     return null;
                 }
                 String typeName = ref == null ? parameter.type() : ref.type().name().toLowerCase(java.util.Locale.ROOT);
@@ -1021,7 +1066,8 @@ final class LineParser {
             int valueStart = named == null ? piece[0] : input.indexOf(':', piece[0]) + 1;
             Expr value = expression(valueStart, piece[1], Expected.OBJECTS);
             String type;
-            if (value == null) {
+            if (value == null || countUnresolved(value) > 0) {
+                // What can't be read, as Skript writes it.
                 type = "?";
             } else {
                 co.xenastudios.neoskript.frontend.registry.TypeInfo info = registry.type(value.type());

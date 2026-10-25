@@ -223,6 +223,8 @@ final class TriggerCompiler {
      * section, whose errors are what's being tested.
      */
     private boolean skriptErrors;
+    /** For code compiled apart, the types of the sections around it, whose values it may use (as nothing). */
+    private final java.util.Set<String> outerSections = new java.util.HashSet<>();
     /** How many lists the expression being compiled is in. */
     private int inList;
 
@@ -724,6 +726,12 @@ final class TriggerCompiler {
             apart.eventClasses = eventClasses;
             apart.eventName = eventName;
             apart.skriptErrors = true;
+            for (Block block : blocks) {
+                if (block.kind() == BlockKind.SECTION && block.valueType() != null) {
+                    apart.outerSections.add(block.valueType());
+                }
+            }
+            apart.outerSections.addAll(outerSections);
             apart.compileTrigger(constantsScript, statements);
             return null;
         } catch (CompileException e) {
@@ -1338,6 +1346,16 @@ final class TriggerCompiler {
             }
         }
         return null;
+    }
+
+    /** Whether code compiled apart is in a section around it whose values are of type {@code typeId}. */
+    private boolean inOuterSection(String typeId) {
+        for (String type : outerSections) {
+            if (type.equals(typeId) || registry.isSubtype(type, typeId) || registry.isSubtype(typeId, type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The innermost library section whose values are of a type {@code typeId} is a kind of, or {@code null}. */
@@ -2222,6 +2240,9 @@ final class TriggerCompiler {
                     method.visitInsn(AASTORE);
                     continue;
                 }
+                if (specs[i].types().stream().map(registry::resolveType).anyMatch(r -> r != null && inOuterSection(r.type().id()))) {
+                    continue;
+                }
                 if (specs[i].types().contains("script")) {
                     // A script left out is the one running: 'function "heal"' finds this script's functions.
                     method.visitInsn(DUP);
@@ -2502,6 +2523,10 @@ final class TriggerCompiler {
         if (section != null) {
             // 'entity' in 'spawn a pig:' is the pig.
             element(section.valuesSlot(), section.indexSlot(), 0);
+            return;
+        }
+        if (inOuterSection(ref.type().id())) {
+            method.visitInsn(ACONST_NULL);
             return;
         }
         Block wider = widerSection(ref.type().id());
