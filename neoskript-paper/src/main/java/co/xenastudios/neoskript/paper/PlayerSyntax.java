@@ -732,16 +732,7 @@ final class PlayerSyntax {
             each(args[0], Player.class, player -> hidden.addAll(player.spigot().getHiddenPlayers()));
             return hidden.toArray();
         }, "[(all [[of] the]|the)] hidden players (of|for) %players%", "[(all [[of] the]|the)] players hidden (from|for|by) %players%");
-        registrar.expression("ExprHotbarSlot", "slot", info -> new Property<>(Player.class,
-                player -> new Items.Slot(player.getInventory(), player.getInventory().getHeldItemSlot()),
-                mode -> mode == Changeable.Mode.SET ? new Class<?>[] {Items.Slot.class, Number.class} : null,
-                (player, delta, mode) -> {
-                    int index = delta[0] instanceof Items.Slot slot ? slot.index() : ((Number) delta[0]).intValue();
-                    // Only a slot in the hotbar can be the selected one.
-                    if (index >= 0 && index <= 8) {
-                        player.getInventory().setHeldItemSlot(index);
-                    }
-                }), defaultProperty("[([current:currently] selected|current:current)] hotbar slot[s]", "players"));
+        TimedProperties.registerHotbarSlot(registrar);
         registrar.expression("ExprIP", "string", info -> {
             if (info.pattern() == 2 && !inEvent(info, org.bukkit.event.player.PlayerLoginEvent.class)
                     && !inEvent(info, org.bukkit.event.server.ServerListPingEvent.class)) {
@@ -784,18 +775,7 @@ final class PlayerSyntax {
         property(registrar, "ExprLastResourcePackResponse", "resourcepackstate",
                 Patterns.property("[last] resource pack response[s]", "players"), Player.class, Player::getResourcePackStatus,
                 null, null);
-        registrar.expression("ExprLevel", "integer", info -> new Property<>(Player.class, player -> (long) player.getLevel(),
-                mode -> mode == Changeable.Mode.REMOVE_ALL ? null : new Class<?>[] {Number.class},
-                (player, delta, mode) -> {
-                    int by = delta == null || delta.length == 0 ? 0 : ((Number) delta[0]).intValue();
-                    int level = switch (mode) {
-                        case SET -> by;
-                        case ADD -> player.getLevel() + by;
-                        case REMOVE -> player.getLevel() - by;
-                        default -> 0;
-                    };
-                    player.setLevel(Math.max(0, level));
-                }), defaultProperty("[xp|exp[erience]] level", "players"));
+        TimedProperties.registerLevel(registrar);
         property(registrar, "ExprLevelProgress", "number", Patterns.property("level progress", "players"), Player.class,
                 player -> (double) player.getExp(), mode -> mode == Changeable.Mode.REMOVE_ALL ? null : new Class<?>[] {Number.class},
                 (player, delta, mode) -> {
@@ -890,7 +870,10 @@ final class PlayerSyntax {
     }
 
     private static void registerMoreExpressions(Registrar registrar) {
-        registrar.expression("ExprSpectatorTarget", "entity", info -> new SpectatorTarget(), "spectator target [of %-players%]", "%players%'[s] spectator target");
+        registrar.expression("ExprSpectatorTarget", "entity", info -> new SpectatorTarget(info.time()), "spectator target [of %-players%]", "%players%'[s] spectator target");
+        // 'past spectator target' when a player starts spectating something is what they spectated before.
+        registrar.timeStates("ExprSpectatorTarget", 0, com.destroystokyo.paper.event.player.PlayerStartSpectatingEntityEvent.class,
+                com.destroystokyo.paper.event.player.PlayerStopSpectatingEntityEvent.class);
         registrar.expression("ExprSpeed", "number", info -> {
             boolean walk = info.mark() == 0;
             return new Property<>(Player.class, player -> (double) (walk ? player.getWalkSpeed() : player.getFlySpeed()),
@@ -941,6 +924,8 @@ final class PlayerSyntax {
                     }
                 }), "[(all [[of] the]|the)] scoreboard tags of %entities%", "%entities%'[s] scoreboard tags");
         // Blocks that aren't air count as solid; 'actual' targets the real hit box. Skript looks 100 blocks.
+        // Any time state is taken, and changes nothing, as in Skript.
+        registrar.timeStates("ExprTargetedBlock", info -> true);
         registrar.expression("ExprTargetedBlock", "block", info -> {
             boolean actual = info.hasTag("actual");
             return (context, args) -> map(args[0], LivingEntity.class, living -> {
@@ -953,9 +938,12 @@ final class PlayerSyntax {
                 LivingEntity.class, LivingEntity::getEyeLocation, null, null);
         property(registrar, "ExprSkull", "itemtype", Patterns.property("skull", "offlineplayers"), OfflinePlayer.class,
                 PlayerSyntax::skull, null, null);
+        // Before an input event ('past input keys'), the keys the player pressed until then; there's no future state.
+        registrar.timeStates("ExprCurrentInputKeys", info -> info.time() < 0
+                && info.isEvent(org.bukkit.event.player.PlayerInputEvent.class));
         registrar.expression("ExprCurrentInputKeys", "inputkey", info -> (context, args) -> {
             List<Object> pressed = new ArrayList<>();
-            Object event = context.event();
+            Object event = info.time() == 0 ? context.event() : null;
             each(args[0], Player.class, player -> {
                 Input input = event instanceof org.bukkit.event.player.PlayerInputEvent inputEvent && inputEvent.getPlayer().equals(player)
                         ? inputEvent.getInput() : player.getCurrentInput();
@@ -1000,13 +988,16 @@ final class PlayerSyntax {
     }
 
     /** The entities players are spectating; in a spectating event without players, the event's target. */
-    private static final class SpectatorTarget implements Expression, Changeable {
+    private record SpectatorTarget(int time) implements Expression, Changeable {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
             if (arguments[0] == null) {
                 return switch (context.event()) {
-                    case com.destroystokyo.paper.event.player.PlayerStartSpectatingEntityEvent start -> start.getNewSpectatorTarget();
-                    case com.destroystokyo.paper.event.player.PlayerStopSpectatingEntityEvent stop -> stop.getSpectatorTarget();
+                    case com.destroystokyo.paper.event.player.PlayerStartSpectatingEntityEvent start ->
+                            time < 0 ? start.getCurrentSpectatorTarget() : start.getNewSpectatorTarget();
+                    // Nothing is spectated after a player stops.
+                    case com.destroystokyo.paper.event.player.PlayerStopSpectatingEntityEvent stop ->
+                            time > 0 ? null : stop.getSpectatorTarget();
                     case null, default -> null;
                 };
             }

@@ -64,6 +64,7 @@ public final class NeoSkriptEventsScenario implements Scenario {
                 server.await(line("[harness] events damage 1 by custom"), mark, WAIT);
                 server.await(line("[harness] events death of pig"), mark, WAIT);
                 server.await(Pattern.compile("\\[harness] events weather in .* to rain$"), mark, WAIT);
+                server.await(line("[harness] events weather was clear now rain and will be rain"), mark, WAIT);
             }
             // Counted before stopping, as 'stop' is a command too.
             int anyCommand = server.linesMatching(line("[harness] events any command")).size();

@@ -145,6 +145,8 @@ final class Biomes {
                     });
             return info.pattern() == 1 ? biome : new Located(biome);
         }, "[the] biome [(of|%direction%) %locations%]", "%locations%'[s] biome");
+        // Any time state is taken, and changes nothing, as in Skript.
+        registrar.timeStates("ExprBiome", info -> true);
     }
 
     /**

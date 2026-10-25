@@ -43,3 +43,5 @@ on death of pig:
 
 on weather change to rain:
 	send "[harness] events weather in %event-world% to rain" to console
+	# Time states: the world's weather before the event, and the one it changes to.
+	send "[harness] events weather was %past weather% now %weather% and will be %future weather%" to console
