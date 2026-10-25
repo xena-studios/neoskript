@@ -36,7 +36,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: .harness-cache
-          key: harness-${{ matrix.env }}-${{ hashFiles(format('test-harness/environments/{0}.json', matrix.env), 'test-harness/reference-skript.properties', 'test-harness/src/main/java/co/xenastudios/neoskript/harness/scenario/NeoSkriptHooksScenario.java') }}
+          key: harness-${{ matrix.env }}-${{ hashFiles(format('test-harness/environments/{0}.json', matrix.env), 'test-harness/reference-skript.properties') }}
       - run: ./gradlew :test-harness:harness -Pharness.env=${{ matrix.env }} -Pharness.group=baseline
       - uses: actions/upload-artifact@v7
         if: always()
