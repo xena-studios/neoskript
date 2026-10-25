@@ -42,8 +42,8 @@ final class Displays {
         ticks(registrar, "ExprDisplayTeleportationDuration", "teleport[ation] duration[s]", "", Display::getTeleportDuration,
                 null, Display::setTeleportDuration, null, 59);
         registrar.expression("ExprDisplayBrightness", "integer", info -> new Brightness(info.hasTag("block") ? 1
-                : info.hasTag("sky") ? 2 : 0), "[the] (brightness|block:block light [level]|sky:sky light [level]) override[s]" + of,
-                "%entities%'[s] (brightness|block:block light [level]|sky:sky light [level]) override[s]");
+                : info.hasTag("sky") ? 2 : 0), "[the] [block:block|sky:sky] (light [level]|brightness) override[s]" + of,
+                "%entities%'[s] [block:block|sky:sky] (light [level]|brightness) override[s]");
 
         Map<String, Display.Billboard> billboards = new LinkedHashMap<>();
         for (Display.Billboard billboard : Display.Billboard.values()) {
@@ -102,9 +102,10 @@ final class Displays {
                 "remove [the] (drop|text) shadow from [the] [text of] %entities%",
                 "remove [the] (drop|text) shadow from %entities%'[s] text");
         registrar.effect("EffTextDisplaySeeThroughBlocks", info -> {
-            boolean see = info.pattern() == 0;
+            boolean see = info.pattern() < 2;
             return (context, args) -> each(args[0], TextDisplay.class, display -> display.setSeeThrough(see));
-        }, "force %entities% to be visible through (blocks|walls)", "(prevent|block) %entities% from being visible through (blocks|walls)");
+        }, "make %entities% visible through (blocks|walls)", "force %entities% to be visible through (blocks|walls)",
+                "(prevent|block) %entities% from being (visible|seen) through (blocks|walls)");
     }
 
     private static <T> void each(Object values, Class<T> type, java.util.function.Consumer<T> action) {

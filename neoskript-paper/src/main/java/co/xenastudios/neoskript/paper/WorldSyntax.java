@@ -138,9 +138,9 @@ final class WorldSyntax {
         registrar.comparison(Entity.class, EntityKind.class, (entity, kind) -> kind.matches(entity));
         registrar.comparison(EntityKind.class, EntityKind.class, (kind, other) -> other.includes(kind));
         registrar.condition("CondIsSpawnable", info -> {
-            boolean negated = info.pattern() == 1;
+            boolean negated = info.pattern() >= 2;
             return (context, args) -> {
-                Object[] kinds = (Object[]) args[0];
+                Object[] kinds = Values.array(args[0]);
                 for (Object kind : kinds) {
                     if (!(kind instanceof EntityKind k) || k.spawnable() == negated) {
                         return false;
@@ -148,7 +148,9 @@ final class WorldSyntax {
                 }
                 return kinds.length > 0;
             };
-        }, "%entitytypes% (is|are) spawnable [in %world%]", "%entitytypes% (isn't|is not|aren't|are not) spawnable [in %world%]");
+        }, "%entitytypes% (is|are) spawnable [in [the [world]] %world%]", "%entitytypes% can be spawned [in [the [world]] %world%]",
+                "%entitytypes% (isn't|is not|aren't|are not) spawnable [in [the [world]] %world%]",
+                "%entitytypes% (can't|can not|cannot) be spawned [in [the [world]] %world%]");
         registrar.converter(Location.class, Block.class, location -> location.getWorld() == null ? null : location.getBlock());
         registrar.converter(Block.class, ItemType.class, block -> new ItemType(new org.bukkit.inventory.ItemStack(
                 block.getType().isItem() ? block.getType() : Material.AIR), false));

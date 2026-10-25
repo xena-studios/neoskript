@@ -193,10 +193,12 @@ final class CoreSyntax {
         library.core(SyntaxKind.STRUCTURE, EXAMPLE, null, List.of(), "example");
         library.core(SyntaxKind.SECTION, WHILE, null, condition, "[do:do] while <.+>");
 
+        // A count below 1 isn't understood, as Skript's init refuses it.
         library.core(SyntaxKind.EFFECT, EXIT, null, List.of(),
                 "(exit|stop) [[the] trigger]",
                 "(exit|stop) [1|a|the|this] (section:section|loop:loop|conditional:conditional)",
-                "(exit|stop) <\\d+> (section:section|loop:loop|conditional:conditional)s");
+                "(exit|stop) <0*[1-9]\\d*(_\\d+)*> (section:section|loop:loop|conditional:conditional)s",
+                "(exit|stop) all (section:section|loop:loop|conditional:conditional)s");
         library.core(SyntaxKind.EFFECT, CONTINUE, null, List.of(),
                 "continue [this loop|[the] [current] loop]",
                 "continue [the] <\\d+>(st|nd|rd|th) loop");

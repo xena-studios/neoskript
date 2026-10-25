@@ -43,7 +43,7 @@ final class Scripts {
             String action = info.hasTag("reload") ? "reload" : info.hasTag("unload") ? "unload"
                     : info.hasTag("disable") ? "disable" : "load";
             return (context, args) -> {
-                for (Object value : (Object[]) args[0]) {
+                for (Object value : Values.array(args[0])) {
                     ScriptRef script = value instanceof ScriptRef ref ? ref : ScriptCatalog.get().find(Values.text(value));
                     if (script == null) {
                         continue;
@@ -56,7 +56,8 @@ final class Scripts {
                     }
                 }
             };
-        }, "(enable|load|reload:reload|unload:unload|disable:disable) [script] [file] [named] %scripts/strings%");
+        }, "(enable|load|reload:reload|unload:unload|disable:disable) [script] [file] [named] %scripts/strings% [with errors]",
+                "(enable|load|reload:reload|unload:unload|disable:disable) skript file %string% [with errors]");
         registrar.effect("EffRun", info -> (context, args) -> {
             if (args[0] instanceof co.xenastudios.neoskript.runtime.FunctionRef function) {
                 function.call(args[1] == null ? new Object[0] : (Object[]) args[1]);

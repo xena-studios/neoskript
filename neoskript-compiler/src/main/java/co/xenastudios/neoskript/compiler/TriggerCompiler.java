@@ -1641,19 +1641,26 @@ final class TriggerCompiler {
             exitTrigger();
             return;
         }
-        int count = effect.pattern() == 1 ? 1 : regexNumber(effect);
         BlockKind kind = effect.match().hasTag("loop") ? BlockKind.LOOP
                 : effect.match().hasTag("conditional") ? BlockKind.CONDITIONAL : null;
-        int seen = 0;
-        for (Block block : blocks) {
-            boolean matches = kind == null || block.kind() == kind
-                    || (kind == BlockKind.LOOP && block.kind() == BlockKind.WHILE);
-            if (matches && ++seen == count) {
-                method.visitJumpInsn(GOTO, block.end());
-                return;
+        String names = kind == BlockKind.LOOP ? "loops" : kind == BlockKind.CONDITIONAL ? "conditionals" : "sections";
+        List<Block> matching = new ArrayList<>();
+        for (Block block : blocks) { // innermost first
+            if (kind == null || block.kind() == kind || (kind == BlockKind.LOOP && block.kind() == BlockKind.WHILE)) {
+                matching.add(block);
             }
         }
-        throw new CompileException(line, "There aren't " + count + " sections like that to exit");
+        int count = effect.pattern() == 1 ? 1 : effect.pattern() == 3 ? matching.size()
+                : Integer.parseInt(((java.util.regex.MatchResult) effect.match().regexValues().getFirst()).group()
+                        .replace("_", ""));
+        if (matching.isEmpty()) {
+            throw new CompileException(line, "Can't stop any " + names + " as there are no " + names + " present");
+        }
+        if (count > matching.size()) {
+            throw new CompileException(line, "Can't stop " + count + " " + names + " as there are only "
+                    + matching.size() + " " + names + " present");
+        }
+        method.visitJumpInsn(GOTO, matching.get(count - 1).end());
     }
 
     private static int regexNumber(ParsedSyntax syntax) {

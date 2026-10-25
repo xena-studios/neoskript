@@ -44,7 +44,7 @@ final class Collections {
             }
             // Its elements in order, left in it: taking them out is what 'first element of' does.
             return queue.toArray();
-        }, "(de|un)queued %queue%", "%queue% (de|un)queued");
+        }, "(de|un)queued %queue%", "unrolled %queue%");
         registrar.expression("ExprQueueStartEnd", "object", info -> new StartEnd(info.hasTag("end")),
                 "[the] (start|end:end) of %queue%", "%queue%'[s] (start|end:end)");
         registrar.changer(ScriptQueue.class, Changeable.Mode.ADD, (queue, values) -> {
