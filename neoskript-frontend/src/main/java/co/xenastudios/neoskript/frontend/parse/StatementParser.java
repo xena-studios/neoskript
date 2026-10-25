@@ -207,7 +207,7 @@ final class StatementParser {
         int end = line.text().length();
         Object parsed = simple(parser, end);
         EventValues.Scope scope = context.eventScope();
-        if (scope != null && (parsed == null || unresolved(parsed) > 0)) {
+        if (scope != null && parser.refusedEventValues() && (parsed == null || unresolved(parsed) > 0)) {
             // Without the event values the code can't have, nothing parses, or only by leaning on words nothing
             // knows: with them it may, for the compiler to say which there's none of, as Skript does when nothing
             // else parses ('event-number' isn't 'event - number').
@@ -667,7 +667,7 @@ final class StatementParser {
             delays.put(line, delay);
             LineParser parser = new LineParser(context, line.text());
             ParsedSyntax condition = node instanceof Node.Simple ? parser.condition(0, line.text().length()) : null;
-            if (node instanceof Node.Simple && context.eventScope() != null
+            if (node instanceof Node.Simple && context.eventScope() != null && parser.refusedEventValues()
                     && (condition == null || unresolved(condition) > 0)) {
                 // With event values the code can't have, for the compiler to say which, as for other lines.
                 EventValues.Scope scope = context.eventScope(null);

@@ -42,6 +42,7 @@ final class LineParser {
     private final SyntaxRegistry registry;
     /** The event values the line can use, or {@code null} for any. Fixed for the line, so the memo holds. */
     private final co.xenastudios.neoskript.frontend.registry.EventValues.Scope eventScope;
+    private boolean refusedEventValues;
     private final String input;
     private final String lowerInput;
     private final Map<Key, Object> memo = new HashMap<>();
@@ -204,6 +205,7 @@ final class LineParser {
             // An event value the code can't have isn't one, so another reading is tried, as Skript's fails to
             // initialize: 'amount of slots of {_inv}' in 'on load' is the inventory's number of slots.
             if (eventScope != null && hasTypeRole(syntax) && !eventValueAllowed(parsed, text)) {
+                refusedEventValues = true;
                 continue;
             }
             if (syntax.id().equals("ExprArithmetic") && !arithmeticOperands(parsed)) {
@@ -390,6 +392,11 @@ final class LineParser {
         String word = name.group(1).toLowerCase(java.util.Locale.ROOT);
         return word.equals("value") || word.equals("index") || word.equals("counter") || word.equals("iteration")
                 || registry.resolveType(word) != null;
+    }
+
+    /** Whether an event value the line can't use was turned down: only then could parsing with any differ. */
+    boolean refusedEventValues() {
+        return refusedEventValues;
     }
 
     /** Whether {@code parsed}, if it's an event value, is one the line can use. */

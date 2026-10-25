@@ -11,7 +11,6 @@ import co.xenastudios.neoskript.frontend.registry.TypeRef;
 import co.xenastudios.neoskript.runtime.command.CommandEvent;
 import co.xenastudios.neoskript.runtime.testing.TestEvent;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -96,12 +95,14 @@ final class LibraryEventValues implements EventValues {
             if (classes.isEmpty()) {
                 return false;
             }
-            Class<?> kind = kind(type, words);
-            String key = type.type().id() + (type.plural() ? "*" : "") + (kind == null ? "" : "/" + kind.getName());
-            return known.computeIfAbsent(key, k -> has(type.type().id(), kind));
+            // A kind of entity ('event-projectile') isn't looked into: any value of the type, of any kind, will do,
+            // which allows at least what the compiler does.
+            String key = type.type().id() + (type.plural() ? "*" : "");
+            return known.computeIfAbsent(key, k -> has(type.type().id(), null)
+                    || type.plural() && has(type.type().id(), several(type.type().id())));
         }
 
-        /** Whether the events have a value of the type, now, before or after the event. */
+        /** Whether the events have a value of the type (of {@code kind}), now, before or after the event. */
         private boolean has(String typeId, Class<?> kind) {
             for (int time : new int[] {0, -1, 1}) {
                 try {
@@ -115,26 +116,10 @@ final class LibraryEventValues implements EventValues {
             return false;
         }
 
-        /** The kind of value asked for, as {@code TriggerCompiler.kind} works it out. */
-        private Class<?> kind(TypeRef ref, String words) {
-            if (ref.plural()) {
-                Class<?> single = library.javaClass(ref.type().id());
-                return single == null || single.isArray() ? null : single.arrayType();
-            }
-            if (!ref.type().id().equals("entity")) {
-                return null;
-            }
-            String name = words.toLowerCase(Locale.ROOT);
-            for (String prefix : new String[] {"the ", "event-"}) {
-                if (name.startsWith(prefix)) {
-                    name = name.substring(prefix.length()).strip();
-                }
-            }
-            if (library.registry().resolveType(name) != null) {
-                return null;
-            }
-            Class<?> kind = library.kindClass("entitytype", name);
-            return kind == null || kind == library.javaClass("entity") ? null : kind;
+        /** For a plural ({@code event-blocks}), the array class of its type, as the compiler asks for. */
+        private Class<?> several(String typeId) {
+            Class<?> single = library.javaClass(typeId);
+            return single == null || single.isArray() ? null : single.arrayType();
         }
     }
 }
