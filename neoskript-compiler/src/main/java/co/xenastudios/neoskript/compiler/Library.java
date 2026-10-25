@@ -84,6 +84,8 @@ public final class Library implements Registrar {
     private final Set<String> eventDefaults = new HashSet<>();
     private final Map<String, String> sectionTypes = new HashMap<>();
     private final Map<String, String> sectionExpressions = new HashMap<>();
+    /** What says where an expression has time states, by its id. */
+    private final Map<String, java.util.function.Predicate<co.xenastudios.neoskript.api.element.ElementInfo>> timeStates = new HashMap<>();
     private final java.util.Set<String> deferredSections = new java.util.HashSet<>();
     private final Map<String, java.util.function.Function<String, ?>> parsers = new HashMap<>();
     private final Map<String, java.util.function.Function<String, ?>> literalParsers = new java.util.LinkedHashMap<>();
@@ -192,6 +194,33 @@ public final class Library implements Registrar {
         sectionExpressions.put(expressionId, SyntaxRegistry.OBJECT);
         deferredSections.add(expressionId);
         builder.sectionOnly(expressionId);
+    }
+
+    @Override
+    public void lateSyntax() {
+        if (!hasTimeStateSyntax()) {
+            CoreSyntax.registerTimeStates(this);
+        }
+    }
+
+    /** Whether the time state syntax ('past X') is registered yet. */
+    boolean hasTimeStateSyntax() {
+        return bindings.containsKey(new Key(SyntaxKind.EXPRESSION, CoreSyntax.TIME_STATE));
+    }
+
+    @Override
+    public void timeStates(String expressionId, java.util.function.Predicate<co.xenastudios.neoskript.api.element.ElementInfo> accepts) {
+        checkOpen();
+        timeStates.put(expressionId, accepts);
+    }
+
+    /**
+     * Whether expression {@code id}, matched as {@code info} says, has the time state {@code info.time()}, as
+     * Skript's {@code setTime}.
+     */
+    boolean acceptsTime(String id, co.xenastudios.neoskript.api.element.ElementInfo info) {
+        java.util.function.Predicate<co.xenastudios.neoskript.api.element.ElementInfo> accepts = timeStates.get(id);
+        return accepts != null && accepts.test(info);
     }
 
     /** Whether expression {@code id}'s section runs later, its value being the section itself. */
