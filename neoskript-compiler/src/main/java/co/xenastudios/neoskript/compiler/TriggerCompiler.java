@@ -2098,7 +2098,7 @@ final class TriggerCompiler {
         return expr instanceof Expr.Syntax value && (isCore(value.syntax(), CoreSyntax.EVENT_VALUE)
                 || isCore(value.syntax(), CoreSyntax.EVENT_VALUE_ENTITY))
                 && value.syntax().match().regexValues().getFirst() instanceof TypeRef ref
-                && eventClasses != null && library.hasTimeStates(eventClasses, ref.type().id());
+                && eventClasses != null && library.hasTimeStates(eventClasses, ref.type().id(), kind(value, ref));
     }
 
     /**

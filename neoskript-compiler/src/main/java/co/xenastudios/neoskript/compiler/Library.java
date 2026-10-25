@@ -427,11 +427,17 @@ public final class Library implements Registrar {
         };
     }
 
-    /** Whether any of {@code eventClasses} has a past or future value of {@code typeId}, as time states need. */
-    boolean hasTimeStates(List<Class<?>> eventClasses, String typeId) {
+    /**
+     * Whether any of {@code eventClasses} has a past or future value of {@code typeId} (or of the narrower kind),
+     * as time states need.
+     */
+    boolean hasTimeStates(List<Class<?>> eventClasses, String typeId, Class<?> narrow) {
         for (Class<?> eventClass : eventClasses) {
             for (int time : new int[] {-1, 1}) {
                 EventValue best = best(eventClass, typeId, time, null);
+                if (best == null && narrow != null) {
+                    best = best(eventClass, typeId, time, narrow);
+                }
                 if (best != null && best.excluded() == null) {
                     return true;
                 }

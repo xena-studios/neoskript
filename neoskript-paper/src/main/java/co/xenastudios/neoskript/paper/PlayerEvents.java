@@ -456,6 +456,8 @@ final class PlayerEvents {
         var stopUsing = io.papermc.paper.event.player.PlayerStopUsingItemEvent.class;
         registrar.eventValue(stopUsing, "timespan", event -> new Timespan(event.getTicksHeldFor() * 50L));
         registrar.eventValue(stopUsing, "itemtype", event -> new ItemType(event.getItem(), true));
+        // Skript has only the item type, which its items convert from.
+        registrar.eventValue(stopUsing, "itemstack", io.papermc.paper.event.player.PlayerStopUsingItemEvent::getItem);
         var slotChange = io.papermc.paper.event.player.PlayerInventorySlotChangeEvent.class;
         registrar.eventValue(slotChange, "itemstack", io.papermc.paper.event.player.PlayerInventorySlotChangeEvent::getNewItemStack);
         registrar.eventValue(slotChange, "itemstack", -1, io.papermc.paper.event.player.PlayerInventorySlotChangeEvent::getOldItemStack);

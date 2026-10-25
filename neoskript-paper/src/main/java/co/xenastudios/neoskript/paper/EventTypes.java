@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The types events give values of, which Skript names in its English language file: heal reasons, teleport
@@ -18,20 +19,6 @@ import java.util.Map;
 final class EventTypes {
 
     private EventTypes() {}
-
-    /** Skript's weather types, which say what a world's (or a player's) weather is. */
-    enum Weather {
-        CLEAR, RAIN, THUNDER;
-
-        /** Whether this is the weather with rain and thunder as given. */
-        boolean is(boolean rain, boolean thunder) {
-            return switch (this) {
-                case CLEAR -> !thunder && !rain;
-                case RAIN -> !thunder && rain;
-                case THUNDER -> thunder && rain;
-            };
-        }
-    }
 
     static void register(Registrar registrar) {
         enumType(registrar, "healreason", "heal reason", org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason.class, """
@@ -133,16 +120,6 @@ final class EventTypes {
                 player_unleash: player unleash, player unleashed, unleashed by player
                 unknown: unknown
                 """, "unleash cause");
-        enumType(registrar, "resourcepackstate", "resource pack state", org.bukkit.event.player.PlayerResourcePackStatusEvent.Status.class, """
-                accepted: accept, accepted
-                declined: decline, refuse, reject, declined, refused, rejected
-                failed_download: download fail, fail, failed to download, failed
-                successfully_loaded: successfully load, successfully install, success, successfully loaded, successfully installed
-                downloaded: downloaded
-                invalid_url: invalid url
-                failed_reload: failed reload, failed to reload
-                discarded: discarded
-                """, "resourcepack state", "resource packstate", "resourcepackstate");
         enumType(registrar, "inventoryaction", "inventory action", org.bukkit.event.inventory.InventoryAction.class, """
                 nothing: nothing, do nothing
                 pickup_all: pickup all, pickup all items
@@ -268,21 +245,6 @@ final class EventTypes {
                 burst: burst
                 """, "fireworktype");
 
-        // Weather, which Skript names itself rather than by Bukkit's two states.
-        Map<String, Weather> weathers = new LinkedHashMap<>();
-        for (String name : List.of("clear", "sun", "sunny")) {
-            weathers.put(name, Weather.CLEAR);
-        }
-        for (String name : List.of("rain", "rainy", "raining")) {
-            weathers.put(name, Weather.RAIN);
-        }
-        for (String name : List.of("thunder", "thundering", "thunderstorm")) {
-            weathers.put(name, Weather.THUNDER);
-        }
-        registrar.namedType("weathertype", "weather type", Weather.class, weathers);
-        registrar.alias("weathertype", "weather condition", "weather conditions");
-        registrar.alias("weathertype", "weather", "weathers");
-        registrar.text(Weather.class, weather -> weather.name().toLowerCase(Locale.ROOT));
     }
 
     /**
@@ -321,11 +283,49 @@ final class EventTypes {
             values.putIfAbsent(fallback, constant.getValue());
             texts.putIfAbsent(constant.getValue(), fallback);
         }
-        registrar.namedType(id, name, type, values);
+        // Words that also name an item, an entity or a type, like 'spawner' or 'player', stay those where nothing
+        // says otherwise, as Skript tries items and entities first; where one of these is expected
+        // ('spawn reason is spawner', 'heal due to potion') they're still read as one.
+        Map<String, E> words = new LinkedHashMap<>();
+        values.forEach((word, constant) -> {
+            if (!namesSomethingElse(word)) {
+                words.put(word, constant);
+            }
+        });
+        registrar.namedType(id, name, type, words);
+        Map<String, E> all = Map.copyOf(values);
+        registrar.parser(id, text -> all.get(text.strip().toLowerCase(Locale.ROOT)));
         for (String alias : aliases) {
             registrar.alias(id, alias, alias + "s");
         }
         registrar.text(type, value -> texts.getOrDefault(value, value.name().toLowerCase(Locale.ROOT)));
+    }
+
+    /** Words that are values of other types more often: type names and Skript's aliases of entities. */
+    private static final Set<String> OTHER_WORDS = Set.of("player", "entity", "block", "item", "location", "world",
+            "command", "text", "number", "time", "lightning", "wither", "drowned", "plugin", "death", "slot",
+            "inventory", "chunk", "potion", "egg", "bed", "spawner", "trap", "magic", "explosion", "left", "right",
+            "unknown", "custom", "default");
+
+    /** Whether {@code word} names an item, an entity or a common type, so isn't one of these where unsaid. */
+    private static boolean namesSomethingElse(String word) {
+        String key = word.replaceFirst("^(?:an?|the) ", "").replace(' ', '_').toUpperCase(Locale.ROOT);
+        if (OTHER_WORDS.contains(word)) {
+            return true;
+        }
+        try {
+            if (org.bukkit.Material.getMaterial(key) != null) {
+                return true;
+            }
+        } catch (RuntimeException | LinkageError notHere) {
+            // Without a server, materials can't always be looked at.
+        }
+        for (org.bukkit.entity.EntityType entity : org.bukkit.entity.EntityType.values()) {
+            if (entity.name().equals(key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The names {@code pattern} stands for, choosing each {@code (a|b)} group's alternatives. */

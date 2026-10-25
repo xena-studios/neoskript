@@ -77,7 +77,7 @@ final class ItemEvents {
         registrar.event("EvtItemMerge", List.of(ItemMergeEvent.class), itemFilter(),
                 "(item[ ][stack]|[item] %-itemtypes%) merg(e|ing)", "item[ ][stack] merg(e|ing)" + of);
         registrar.event("EvtInventoryItemMove", List.of(InventoryMoveItemEvent.class), null,
-                "inventory (mov(e|ing)|transport[ing]) [an] item");
+                "inventory item (move|transport)", "inventory (mov(e|ing)|transport[ing]) [an] item");
         registrar.event("EvtStonecutting", List.of(io.papermc.paper.event.player.PlayerStonecutterRecipeSelectEvent.class),
                 itemFilter(), "stonecutting" + of);
 

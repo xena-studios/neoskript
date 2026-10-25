@@ -77,7 +77,7 @@ final class WorldEvents {
                             : ((ThunderChangeEvent) event).getWorld().hasStorm();
                     boolean thunder = event instanceof ThunderChangeEvent change ? change.toThunderState()
                             : ((WeatherChangeEvent) event).getWorld().isThundering();
-                    return Events.any(types, type -> type instanceof EventTypes.Weather weather && weather.is(rain, thunder));
+                    return Events.any(types, type -> type instanceof WorldProperties.Weather weather && is(weather, rain, thunder));
                 }), "weather change [to %-weathertypes%]");
         registrar.eventValue(WeatherEvent.class, "world", WeatherEvent::getWorld);
 
@@ -146,6 +146,15 @@ final class WorldEvents {
             }
         }
         return Displays.colour(color);
+    }
+
+    /** Whether {@code weather} is the weather with rain and thunder as given, as Skript's WeatherType.isWeather. */
+    private static boolean is(WorldProperties.Weather weather, boolean rain, boolean thunder) {
+        return switch (weather) {
+            case CLEAR -> !thunder && !rain;
+            case RAIN -> !thunder && rain;
+            case THUNDER -> thunder && rain;
+        };
     }
 
     /** The world border events Paper fires. */
