@@ -52,6 +52,7 @@ final class LineParser {
     /** How many times code in a regex part was turned down for leaning on unresolved words. */
     private int unresolvedCode;
     private String functionProblem;
+    private String problem;
     /** Per kind, the unindexed patterns whose required literals all occur somewhere in the line. */
     private final Map<SyntaxKind, List<PatternIndex.Entry<SyntaxRegistry.Candidate>>> viableUnindexed =
             new EnumMap<>(SyntaxKind.class);
@@ -204,6 +205,11 @@ final class LineParser {
                     continue;
                 }
                 result = new Expr.Syntax(start, end, parsed, type);
+                // Several values can't go where one does: 'test location' isn't the entities called 'test'.
+                if (expected.onlyOne() && Plurality.plural((Expr) result, registry)) {
+                    problem("'" + text.strip() + "' can only be a single " + typeNames(expected) + ", not more.");
+                    continue;
+                }
             }
             // A parse that leans on unresolved words only wins if nothing parses without them, as Skript
             // only accepts real literals: 'loot context at test-location' isn't '(...test) - location'.
@@ -503,7 +509,33 @@ final class LineParser {
         if (expr != null && expected.changeable() && !isChangeable(expr)) {
             return null;
         }
+        if (expr != null && expected.onlyOne() && Plurality.plural(expr, registry)) {
+            // Several values where only one goes, as Skript's parser checks. A word that may yet be a value of
+            // the type ('dirt', not the entities called that) is still one.
+            Expr word = unresolved(start, end, expected);
+            if (word != null) {
+                return word;
+            }
+            problem("'" + input.substring(start, end) + "' can only be a single " + typeNames(expected) + ", not more.");
+            return null;
+        }
         return expr;
+    }
+
+    /** The types expected, as Skript lists them in errors: {@code number, text or player}. */
+    private static String typeNames(Expected expected) {
+        List<TypeInfo> types = expected.types();
+        if (types.isEmpty()) {
+            return "object";
+        }
+        StringBuilder names = new StringBuilder();
+        for (int i = 0; i < types.size(); i++) {
+            if (i > 0) {
+                names.append(i == types.size() - 1 ? " or " : ", ");
+            }
+            names.append(types.get(i).name().toLowerCase(java.util.Locale.ROOT));
+        }
+        return names.toString();
     }
 
     private Expr single(int start, int end, Expected expected) {
@@ -902,7 +934,14 @@ final class LineParser {
 
     /** The first problem found with a function call in this line, in Skript's wording, or {@code null}. */
     String functionProblem() {
-        return functionProblem;
+        return functionProblem != null ? functionProblem : problem;
+    }
+
+    /** A problem found while parsing, reported if the line doesn't parse at all. */
+    private void problem(String found) {
+        if (problem == null) {
+            problem = found;
+        }
     }
 
     private void functionProblem(String problem) {

@@ -106,7 +106,7 @@ final class CoreSyntax {
         library.core(SyntaxKind.STRUCTURE, TEST, null, List.of(RegexRole.CONDITION), "test %string% [when <.+>]");
         library.core(SyntaxKind.EFFECT, ASSERT, null, List.of(RegexRole.CONDITION),
                 "assert [unsafely] <.+> [fail:to fail] [with [error] %string%[, expected %objects%][, got %objects%]]");
-        library.core(SyntaxKind.EXPRESSION, PARSE_LOGS, "string", List.of(), "[the] last parse logs");
+        library.core(SyntaxKind.EXPRESSION, PARSE_LOGS, "string", List.of(), "[the] [last] parse logs");
 
         // Whether the trigger may have waited at this point: true, false or unknown.
         library.literalType("kleenean", "kleenean", java.util.Set.of("unknown"), word -> word);

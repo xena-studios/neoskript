@@ -28,6 +28,8 @@ final class Expected {
     private final boolean changeable;
     /** With some types single and others plural ({@code %number/booleans%}), the plural ones; else {@code null}. */
     private final List<TypeInfo> pluralTypes;
+    /** An item of a list: one item, which may itself be several values ({@code {_a::*} and {_b::*}}). */
+    private final boolean item;
     private final int hash;
 
     Expected(List<TypeInfo> types, boolean plural, boolean literalOnly, boolean changeable) {
@@ -36,12 +38,18 @@ final class Expected {
 
     private Expected(List<TypeInfo> types, boolean plural, boolean literalOnly, boolean changeable,
             List<TypeInfo> pluralTypes) {
+        this(types, plural, literalOnly, changeable, pluralTypes, false);
+    }
+
+    private Expected(List<TypeInfo> types, boolean plural, boolean literalOnly, boolean changeable,
+            List<TypeInfo> pluralTypes, boolean item) {
         this.types = List.copyOf(types);
         this.plural = plural;
         this.literalOnly = literalOnly;
         this.changeable = changeable;
         this.pluralTypes = pluralTypes == null ? null : List.copyOf(pluralTypes);
-        this.hash = Objects.hash(this.types, plural, literalOnly, changeable, this.pluralTypes);
+        this.item = item;
+        this.hash = Objects.hash(this.types, plural, literalOnly, changeable, this.pluralTypes, item);
     }
 
     static Expected of(List<TypeRef> refs, boolean literalOnly, boolean changeable) {
@@ -109,17 +117,23 @@ final class Expected {
         return types.stream().anyMatch(t -> t.id().equals(id));
     }
 
+    /** What an item of a list of these takes: one item, not a list of them. */
     Expected single() {
-        return plural ? new Expected(types, false, literalOnly, changeable, null) : this;
+        return plural ? new Expected(types, false, literalOnly, changeable, null, true) : this;
+    }
+
+    /** Whether only one value goes here, so several can't. */
+    boolean onlyOne() {
+        return !plural && !item;
     }
 
     Expected asLiteralOnly() {
-        return literalOnly ? this : new Expected(types, plural, true, changeable, pluralTypes);
+        return literalOnly ? this : new Expected(types, plural, true, changeable, pluralTypes, item);
     }
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof Expected e && e.hash == hash && e.plural == plural && e.literalOnly == literalOnly
+        return other instanceof Expected e && e.hash == hash && e.plural == plural && e.item == item && e.literalOnly == literalOnly
                 && e.changeable == changeable && e.types.equals(types) && Objects.equals(e.pluralTypes, pluralTypes);
     }
 
