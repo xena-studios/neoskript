@@ -861,6 +861,14 @@ final class LineParser {
                 // A list of lists isn't an argument: 'f(ns: (1, (2, 3)))'.
                 return null;
             }
+            if (!parameter.plural() && Plurality.plural(argument, registry)) {
+                // Several values for a parameter that takes one, as Skript checks when it parses the call.
+                String expectedName = ref == null ? parameter.type() : ref.type().name().toLowerCase(java.util.Locale.ROOT);
+                TypeInfo given = argument.type() == null ? null : registry.type(argument.type());
+                String givenName = given == null ? "objects" : SyntaxRegistry.plural(given.name().toLowerCase(java.util.Locale.ROOT));
+                return "Expected type " + expectedName + " for argument '" + parameter.name() + "', but "
+                        + input.substring(valueStart, piece[1]).strip() + " is of type " + givenName + ".";
+            }
             byParameter[index] = argument;
             next = index + 1;
         }

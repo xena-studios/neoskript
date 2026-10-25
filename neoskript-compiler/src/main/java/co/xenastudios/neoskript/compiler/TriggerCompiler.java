@@ -211,6 +211,10 @@ final class TriggerCompiler {
     private final Deque<InputFrame> inputs = new ArrayDeque<>();
     /** Expressions already worked out into a slot, as an expression section's value is before its effect runs. */
     private final Map<Expr, Integer> precomputed = new java.util.IdentityHashMap<>();
+    /** The text of the statement's argument being compiled, for errors about words in it nothing parses. */
+    private String outerArgument;
+    /** How many lists the expression being compiled is in. */
+    private int inList;
 
     /** The types of the placeholder whose value is being compiled, which words are first tried as. */
     private List<String> literalTypes = List.of();
@@ -1783,6 +1787,57 @@ final class TriggerCompiler {
     // ---------------------------------------------------------------- elements
 
     private void condition(ParsedSyntax condition) throws CompileException {
+        List<Object> values = condition.match().values();
+        if (!values.isEmpty() && values.getFirst() instanceof Expr.ListOf list && list.items().size() > 1
+                && ITEM_CONDITIONS.contains(baseId(condition.syntax().id()))) {
+            // A list of what's checked is checked item by item, as Skript's expression lists are: '"" or {_x} is
+            // not empty' holds if either item isn't, and 'X and Y are not set' if neither is.
+            Label decided = new Label();
+            Label end = new Label();
+            for (Expr item : list.items()) {
+                List<Object> one = new ArrayList<>(values);
+                one.set(0, item);
+                co.xenastudios.neoskript.frontend.pattern.MatchResult match = condition.match();
+                checkOne(new ParsedSyntax(condition.syntax(), condition.pattern(),
+                        new co.xenastudios.neoskript.frontend.pattern.MatchResult(match.mark(), match.tags(), one, match.spans(), match.regexValues(), match.regexSpans())));
+                method.visitJumpInsn(list.and() ? IFEQ : IFNE, decided);
+            }
+            method.visitInsn(list.and() ? ICONST_1 : ICONST_0);
+            method.visitJumpInsn(GOTO, end);
+            method.visitLabel(decided);
+            method.visitInsn(list.and() ? ICONST_0 : ICONST_1);
+            method.visitLabel(end);
+            return;
+        }
+        checkOne(condition);
+    }
+
+    /** Conditions that check a list of what they're about item by item, as Skript's property conditions do. */
+    private static final java.util.Set<String> ITEM_CONDITIONS = loadIds("item-conditions.txt");
+
+    private static java.util.Set<String> loadIds(String resource) {
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        try (java.io.InputStream in = TriggerCompiler.class.getResourceAsStream(resource)) {
+            if (in != null) {
+                for (String line : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).split("\n")) {
+                    if (!line.isBlank() && !line.startsWith("#")) {
+                        ids.add(line.strip());
+                    }
+                }
+            }
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        return java.util.Set.copyOf(ids);
+    }
+
+    /** An element's id without the suffix that tells its registrations apart ({@code ExprSets-itemtypes}). */
+    private static String baseId(String id) {
+        int dash = id.indexOf('-');
+        return dash < 0 ? id : id.substring(0, dash);
+    }
+
+    private void checkOne(ParsedSyntax condition) throws CompileException {
         callThrough(condition, Condition.class);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Condition.class), "check",
                 "(" + CONTEXT + OBJECTS + ")Z", true);
@@ -2574,17 +2629,37 @@ final class TriggerCompiler {
             method.visitVarInsn(ALOAD, worked);
             return;
         }
+        if (outerArgument == null && source != null && expr.start() >= 0 && expr.end() <= source.length()
+                && expr.start() < expr.end()) {
+            // The outermost expression: errors about words in it nothing parses name all of it, as Skript's do.
+            outerArgument = source.substring(expr.start(), expr.end()).strip();
+            try {
+                compileExpression(expr);
+            } finally {
+                outerArgument = null;
+            }
+            return;
+        }
+        compileExpression(expr);
+    }
+
+    private void compileExpression(Expr expr) throws CompileException {
         switch (expr) {
             case Expr.Literal literal -> literal(literal);
             case Expr.Text text -> text(text.start(), text.end(), text.embedded());
             case Expr.ListOf list -> {
                 pushInt(list.items().size());
                 method.visitTypeInsn(ANEWARRAY, OBJECT);
-                for (int i = 0; i < list.items().size(); i++) {
-                    method.visitInsn(DUP);
-                    pushInt(i);
-                    expression(list.items().get(i));
-                    method.visitInsn(AASTORE);
+                inList++;
+                try {
+                    for (int i = 0; i < list.items().size(); i++) {
+                        method.visitInsn(DUP);
+                        pushInt(i);
+                        expression(list.items().get(i));
+                        method.visitInsn(AASTORE);
+                    }
+                } finally {
+                    inList--;
                 }
                 method.visitMethodInsn(INVOKESTATIC, VALUES, "list", "(" + OBJECTS + ")" + OBJECTS, false);
             }
@@ -2767,6 +2842,11 @@ final class TriggerCompiler {
                 }
                 if (value == null) {
                     value = library.literal(unresolved.text());
+                }
+                if (value == null && inList > 0 && outerArgument != null && !outerArgument.contains("event-")) {
+                    // Words nothing parses in a list: Skript reports the whole argument they're in. (An event value
+                    // NeoSkript doesn't have yet is something it can't run, not a mistake.)
+                    throw new CompileException(line, "Can't understand this expression: '" + outerArgument + "'");
                 }
                 if (value == null) {
                     throw unsupported("'" + unresolved.text() + "'");

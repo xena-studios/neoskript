@@ -64,7 +64,8 @@ final class Collections {
             return (context, args) -> {
                 Object[] values = (Object[]) args[0];
                 if (values.length == 0) {
-                    return !negated;
+                    // Nothing to check holds only when negated, as Skript's checks have it.
+                    return negated;
                 }
                 for (Object value : values) {
                     boolean empty = switch (value) {
