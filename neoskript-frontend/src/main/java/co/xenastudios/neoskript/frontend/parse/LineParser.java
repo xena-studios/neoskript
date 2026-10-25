@@ -861,6 +861,13 @@ final class LineParser {
                 // A list of lists isn't an argument: 'f(ns: (1, (2, 3)))'.
                 return null;
             }
+            if (!parameter.plural() && Plurality.plural(argument, registry) && ref != null) {
+                // Read as one value where that's what the parameter takes: 'axolotl' is the entity type there.
+                Expr one = expression(valueStart, piece[1], context.expected(new TypeRef(ref.type(), false)));
+                if (one != null) {
+                    argument = one;
+                }
+            }
             if (!parameter.plural() && Plurality.plural(argument, registry)) {
                 // Several values for a parameter that takes one, as Skript checks when it parses the call.
                 String expectedName = ref == null ? parameter.type() : ref.type().name().toLowerCase(java.util.Locale.ROOT);
