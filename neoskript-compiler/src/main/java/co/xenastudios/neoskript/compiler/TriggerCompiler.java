@@ -1387,6 +1387,7 @@ final class TriggerCompiler {
                 method.visitLabel(skip);
             }
             case CoreSyntax.ASSERT -> assertion(effect);
+            case CoreSyntax.ASSERT_UNPARSED -> {}
             case CoreSyntax.DELAY -> waitFor(effect);
             case CoreSyntax.SUPPRESS_WARNINGS, CoreSyntax.SUPPRESS_HINTS -> {}
             default -> throw unsupported(core.id());
@@ -2696,6 +2697,14 @@ final class TriggerCompiler {
             }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.SETS) -> {
                 List<Object> all = library.namedValues(syntax.type());
+                java.util.function.Supplier<Object[]> listed = all == null ? library.allValues(syntax.type()) : null;
+                if (listed != null) {
+                    // Listed when it runs, as the server's registries say.
+                    constant(listed, java.util.function.Supplier.class);
+                    method.visitMethodInsn(INVOKEINTERFACE, "java/util/function/Supplier", "get", "()" + OBJECT_DESC, true);
+                    method.visitTypeInsn(CHECKCAST, OBJECTS);
+                    break;
+                }
                 if (all == null) {
                     throw unsupported("all " + syntax.type() + "s");
                 }
@@ -2839,6 +2848,11 @@ final class TriggerCompiler {
      * or a variable's braces), with each embedded {@code %expression%} converted to text and joined in.
      */
     private void text(int start, int end, List<Expr> embedded) throws CompileException {
+        text(start, end, embedded, false);
+    }
+
+    /** {@link #text}, or with {@code name}, a variable's name: values there read as in variable names. */
+    private void text(int start, int end, List<Expr> embedded, boolean name) throws CompileException {
         List<String> pieces = new ArrayList<>();
         int pos = start + 1;
         for (Expr part : embedded) {
@@ -2862,7 +2876,8 @@ final class TriggerCompiler {
             }
             if (i < embedded.size()) {
                 expression(embedded.get(i));
-                method.visitMethodInsn(INVOKESTATIC, VALUES, "text", "(" + OBJECT_DESC + ")" + STRING_DESC, false);
+                method.visitMethodInsn(INVOKESTATIC, VALUES, name ? "nameText" : "text", "(" + OBJECT_DESC + ")"
+                        + STRING_DESC, false);
                 method.visitMethodInsn(INVOKEVIRTUAL, builder, "append", "(" + STRING_DESC + ")Ljava/lang/StringBuilder;",
                         false);
             }
@@ -2887,7 +2902,7 @@ final class TriggerCompiler {
     /** Pushes the variable's name, without the {@code ::*} of a list. */
     private void variableName(Expr.Variable variable) throws CompileException {
         int end = variable.list() ? variable.end() - 3 : variable.end();
-        text(variable.start(), end, variable.embedded());
+        text(variable.start(), end, variable.embedded(), true);
     }
 
     // ---------------------------------------------------------------- loop values

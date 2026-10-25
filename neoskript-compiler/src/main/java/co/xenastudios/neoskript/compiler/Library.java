@@ -124,6 +124,27 @@ public final class Library implements Registrar {
         parsers.put(id, text -> copy.get(text.strip().toLowerCase(java.util.Locale.ROOT)));
     }
 
+    @Override
+    public void allValues(String id, java.util.function.Supplier<? extends Iterable<?>> values) {
+        checkOpen();
+        if (!javaClasses.containsKey(id)) {
+            throw new IllegalArgumentException("Values of unknown type '" + id + "'");
+        }
+        builder.enumerable(id);
+        allValues.put(id, () -> {
+            List<Object> all = new ArrayList<>();
+            values.get().forEach(all::add);
+            return all.toArray();
+        });
+    }
+
+    /** What lists every value of type {@code id} when scripts run, or {@code null}: see {@link #allValues}. */
+    java.util.function.Supplier<Object[]> allValues(String id) {
+        return allValues.get(id);
+    }
+
+    private final Map<String, java.util.function.Supplier<Object[]>> allValues = new java.util.HashMap<>();
+
     /** Every value of the named type {@code id}, or {@code null} if it isn't a named type. */
     public List<Object> namedValues(String id) {
         return namedValues.get(id);
@@ -582,6 +603,11 @@ public final class Library implements Registrar {
     @Override
     public <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText) {
         Values.registerText(type, toText);
+    }
+
+    @Override
+    public <T> void variableNameText(Class<T> type, java.util.function.Function<? super T, String> toText) {
+        Values.registerNameText(type, toText);
     }
 
     /**

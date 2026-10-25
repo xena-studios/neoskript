@@ -40,6 +40,8 @@ public final class SyntaxRegistry {
     private final Map<String, List<FunctionInfo>> functions;
     private final Map<String, Set<String>> supertypes;
     private final Set<String> strictTypes;
+    /** Types whose values can all be listed, though they aren't a closed set of words: {@code all biomes}. */
+    private final Set<String> enumerableTypes;
     private final Map<String, java.util.function.Predicate<String>> literalChecks;
     /** Direct conversions, which unlike subtypes don't chain: {@code from -> {to...}}. */
     private final Map<String, Set<String>> conversions;
@@ -79,6 +81,7 @@ public final class SyntaxRegistry {
         this.functions = Map.copyOf(functions);
         this.supertypes = closure(builder.supertypes);
         this.strictTypes = Set.copyOf(builder.strictTypes);
+        this.enumerableTypes = Set.copyOf(builder.enumerableTypes);
         this.literalChecks = Map.copyOf(builder.literalChecks);
         Map<String, Set<String>> conversions = new HashMap<>();
         builder.conversions.forEach((from, to) -> conversions.put(from, Set.copyOf(to)));
@@ -177,6 +180,12 @@ public final class SyntaxRegistry {
             return true;
         }
         return !strictTypes.contains(from) && !strictTypes.contains(to);
+    }
+
+    /** Whether {@code all <type>} can list the values of type {@code id}: a closed set, or values listed later. */
+    public boolean isEnumerable(String id) {
+        TypeInfo type = type(id);
+        return type != null && (!type.literals().isEmpty() || enumerableTypes.contains(type.id().toLowerCase(Locale.ROOT)));
     }
 
     /** Whether {@code from} converts directly to {@code to}. */
@@ -314,6 +323,7 @@ public final class SyntaxRegistry {
         private final Map<String, List<FunctionInfo>> functions = new HashMap<>();
         private final Map<String, Set<String>> supertypes = new HashMap<>();
         private final Set<String> strictTypes = new HashSet<>();
+        private final Set<String> enumerableTypes = new HashSet<>();
         private final Map<String, java.util.function.Predicate<String>> literalChecks = new HashMap<>();
         private final Map<String, Set<String>> conversions = new HashMap<>();
         private final Set<String> entityNames = new HashSet<>();
@@ -448,7 +458,14 @@ public final class SyntaxRegistry {
             return this;
         }
 
+        /** Lets {@code all <type>} list the values of type {@code id}, as for biomes. */
+        public Builder enumerable(String id) {
+            enumerableTypes.add(id.toLowerCase(Locale.ROOT));
+            return this;
+        }
+
         /** Types that only accept themselves and registered conversions, like numbers and text. */
+
         public Builder strict(String... types) {
             strictTypes.addAll(List.of(types));
             return this;

@@ -157,6 +157,9 @@ final class WorldSyntax {
         registrar.text(Entity.class, entity -> entity.customName() != null
                 ? Messages.LEGACY_SECTION.serialize(entity.customName()) : EntityKind.name(entity.getType()));
         registrar.text(Block.class, block -> ItemType.name(block.getType()));
+        // In a variable's name, a block is where it is, as in Skript: '{_types::%loop-block%}'.
+        registrar.variableNameText(Block.class, block -> block.getWorld().getName() + ":" + block.getX() + ","
+                + block.getY() + "," + block.getZ());
         registrar.text(Vector.class, vector -> "x: " + Values.decimal(vector.getX()) + ", y: "
                 + Values.decimal(vector.getY()) + ", z: " + Values.decimal(vector.getZ()));
         // '{_entity} is a pig', 'lucy axolotl is axolotl'.

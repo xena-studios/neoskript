@@ -374,6 +374,39 @@ public final class Values {
         return false;
     }
 
+    private static final Map<Class<?>, Function<Object, String>> NAME_CONVERTERS = new ConcurrentHashMap<>();
+
+    /**
+     * Registers how values of {@code type} (and its subtypes) read in variable names, where that isn't
+     * their text, as Skript's {@code toVariableNameString}: a block is its world and coordinates there.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> void registerNameText(Class<T> type, Function<? super T, String> toText) {
+        NAME_CONVERTERS.put(type, value -> ((Function<Object, String>) toText).apply(value));
+    }
+
+    /** How a value reads in a variable's name, as in {@code {_x::%loop-block%}}. */
+    public static String nameText(Object value) {
+        if (value instanceof Object[] array && array.length > 0) {
+            StringBuilder text = new StringBuilder();
+            for (int i = 0; i < array.length; i++) {
+                if (i > 0) {
+                    text.append(i == array.length - 1 ? " and " : ", ");
+                }
+                text.append(nameText(array[i]));
+            }
+            return text.toString();
+        }
+        if (value != null && !NAME_CONVERTERS.isEmpty()) {
+            for (Map.Entry<Class<?>, Function<Object, String>> named : NAME_CONVERTERS.entrySet()) {
+                if (named.getKey().isInstance(value)) {
+                    return named.getValue().apply(value);
+                }
+            }
+        }
+        return text(value);
+    }
+
     private static final Map<Class<?>, Function<Object, String>> CONVERTERS = new ConcurrentHashMap<>();
     private static final Map<Class<?>, Optional<Function<Object, String>>> RESOLVED = new ConcurrentHashMap<>();
 

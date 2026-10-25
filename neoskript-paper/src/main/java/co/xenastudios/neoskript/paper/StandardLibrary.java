@@ -45,6 +45,7 @@ public final class StandardLibrary {
         Biomes.register(registrar);
         LootTables.register(registrar);
         BossBars.register(registrar);
+        EnumTypes.register(registrar);
         ServerEvents.registerLate(registrar);
         BlockProperties.register(registrar);
         Scripts.register(registrar);

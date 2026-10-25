@@ -36,6 +36,13 @@ public interface Registrar {
      */
     <T> void namedType(String id, String name, Class<T> javaClass, java.util.Map<String, ? extends T> values);
 
+    /**
+     * Lets scripts list every value of type {@code id} with {@code all <type>}, like {@code all biomes}, for
+     * types that aren't a fixed set of names. {@code values} is asked each time, when scripts run, so it may
+     * read the server's registries.
+     */
+    void allValues(String id, java.util.function.Supplier<? extends Iterable<?>> values);
+
     /** Another name for a type in patterns and scripts, like {@code int} for {@code integer}. */
     void alias(String typeId, String singular, String plural);
 
@@ -218,4 +225,10 @@ public interface Registrar {
 
     /** How values of {@code type} read as text, as when embedded in a string. */
     <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText);
+
+    /**
+     * How values of {@code type} read in variable names ({@code {_x::%block%}}) where that isn't their text,
+     * as with Skript's {@code toVariableNameString}.
+     */
+    <T> void variableNameText(Class<T> type, java.util.function.Function<? super T, String> toText);
 }

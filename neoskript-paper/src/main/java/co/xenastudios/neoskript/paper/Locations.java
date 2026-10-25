@@ -32,16 +32,30 @@ final class Locations {
             if (!(args[0] instanceof Location location)) {
                 return null;
             }
+            boolean local = info.hasTag("facingrelative");
             Location offset = location.clone();
             for (Object vector : (Object[]) args[1]) {
                 if (vector instanceof org.bukkit.util.Vector v) {
-                    offset.add(v);
+                    offset.add(local ? facingRelative(offset, v) : v);
                 }
             }
             return offset;
-        }, "%location% offset by [[the] vectors] %vectors%", "%location%[ ]~[~][ ]%vectors%");
+        }, "%location% offset by [[the] vectors] %vectors% [facingrelative:using local axes]",
+                "%location%[ ]~[~][ ]%vectors%");
         registrar.expression("ExprSpawn", "location", info -> new Spawn(), "[the] spawn[s] [(point|location)[s]] [of %worlds%]",
                 "%worlds%'[s] spawn[s] [(point|location)[s]]");
+    }
+
+    /**
+     * {@code offset} turned to the way {@code location} faces, as Minecraft's local coordinates are: Skript's
+     * local axes, worked out in floats as Skript does.
+     */
+    private static org.bukkit.util.Vector facingRelative(Location location, org.bukkit.util.Vector offset) {
+        float yaw = (float) Math.toRadians(-location.getYaw());
+        float pitch = (float) Math.toRadians(location.getPitch());
+        org.joml.Vector3f local = offset.toVector3f();
+        new org.joml.Quaternionf().rotateYXZ(yaw, pitch, 0f).transform(local);
+        return new org.bukkit.util.Vector(local.x, local.y, local.z);
     }
 
     private static World defaultWorld() {
@@ -63,6 +77,9 @@ final class Locations {
                 && Location.normalizePitch(a.getPitch()) + 0.0f == Location.normalizePitch(b.getPitch()) + 0.0f);
         // A block's location is its centre, as in Skript.
         registrar.converter(Block.class, Location.class, block -> block.getLocation().add(0.5, 0.5, 0.5));
+        // A location is a block when the block's location is it, as Skript compares them through that converter.
+        registrar.comparison(Location.class, Block.class, (location, block) -> location.getWorld() == block.getWorld()
+                && location.toVector().equals(block.getLocation().add(0.5, 0.5, 0.5).toVector()));
         registrar.converter(Location.class, World.class, Location::getWorld);
         registrar.converter(Entity.class, World.class, Entity::getWorld);
         // 'spawn of "world"': a world by its name.

@@ -29,6 +29,8 @@ final class CoreSyntax {
     static final String TEST = "TestCase";
     static final String EXAMPLE = "StructExample";
     static final String ASSERT = "EffAssert";
+    /** {@code assert X to fail} where X isn't a condition at all: as in Skript, that has failed as expected. */
+    static final String ASSERT_UNPARSED = "EffAssertUnparsed";
     static final String PARSE_LOGS = "ExprLastParseLogs";
     static final String DELAY = "Delay";
     static final String CAST = "ExprCast";
@@ -105,8 +107,13 @@ final class CoreSyntax {
     /** Skript's test syntax, as its own test suite uses it: only registered in test mode. */
     static void registerTesting(Library library) {
         library.core(SyntaxKind.STRUCTURE, TEST, null, List.of(RegexRole.CONDITION), "test %string% [when <.+>]");
+        // With 'to fail' first: where both read the condition with unresolved words, the one leaning on fewer
+        // wins, so 'X is set to fail' is X failing to be set, not X being 'set to fail'.
         library.core(SyntaxKind.EFFECT, ASSERT, null, List.of(RegexRole.CONDITION),
-                "assert [unsafely] <.+> [fail:to fail] [with [error] %string%[, expected %objects%][, got %objects%]]");
+                "assert [unsafely] <.+> (fail:to fail) [with [error] %string%[, expected %objects%][, got %objects%]]",
+                "assert [unsafely] <.+> [with [error] %string%[, expected %objects%][, got %objects%]]");
+        library.core(SyntaxKind.EFFECT, ASSERT_UNPARSED, null, List.of(RegexRole.NOT_CONDITION),
+                "assert [unsafely] <.+> to fail [with [error] %string%[, expected %objects%][, got %objects%]]");
         library.core(SyntaxKind.EXPRESSION, PARSE_LOGS, "string", List.of(), "[the] [last] parse logs");
 
         // Whether the trigger may have waited at this point: true, false or unknown.

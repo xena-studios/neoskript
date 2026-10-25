@@ -510,6 +510,25 @@ final class EntitySyntax {
                 // Not on this version.
             }
         });
+        // The rest of Skript's names for them.
+        String[] moreNames = {"ENTITY_ATTACK", "an attack, an entity attack", "ENTITY_SWEEP_ATTACK", "sweeping",
+            "PROJECTILE", "a projectile", "SUFFOCATION", "suffocate", "FALL", "a fall", "FIRE", "a fire",
+            "FIRE_TICK", "burn", "MELTING", "melt", "DROWNING", "drown", "BLOCK_EXPLOSION", "a block explosion",
+            "ENTITY_EXPLOSION", "an entity explosion", "VOID", "the void",
+            "LIGHTNING", "lightning strike, a lightning, a lightning strike", "MAGIC", "a potion",
+            "WITHER", "a wither, wither potion effect", "FALLING_BLOCK", "a falling block", "DRAGON_BREATH", "dragonfire",
+            "FLY_INTO_WALL", "hitting wall while flying, flying into a wall", "HOT_FLOOR", "magma",
+            "CUSTOM", "unknown, plugin, a plugin", "KILL", "killed"};
+        for (int i = 0; i < moreNames.length; i += 2) {
+            try {
+                var cause = org.bukkit.event.entity.EntityDamageEvent.DamageCause.valueOf(moreNames[i]);
+                for (String name : moreNames[i + 1].split(", ")) {
+                    causes.putIfAbsent(name, cause);
+                }
+            } catch (IllegalArgumentException missing) {
+                // Not on this version.
+            }
+        }
         registrar.namedType("damagecause", "damage cause", org.bukkit.event.entity.EntityDamageEvent.DamageCause.class, causes);
         registrar.text(org.bukkit.event.entity.EntityDamageEvent.DamageCause.class, cause -> {
             for (Map.Entry<String, String> named : causeNames.entrySet()) {
