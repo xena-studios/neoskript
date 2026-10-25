@@ -689,6 +689,12 @@ final class EntityProperties {
                 }), Patterns.property("(projectile|arrow) critical (state|ability|mode)", "entities"));
         registrar.expression("ExprAttachedBlock", "block", info -> {
             boolean multiple = info.hasTag("multiple");
+            if (!multiple) {
+                String projectiles = co.xenastudios.neoskript.api.element.Warnings.argument(0);
+                co.xenastudios.neoskript.api.element.Warnings.warn("It is recommended to use the plural version of this"
+                        + " expression instead: 'attached blocks of " + (projectiles == null ? "event-projectile" : projectiles)
+                        + "'");
+            }
             return (context, args) -> {
                 Set<Object> blocks = new LinkedHashSet<>();
                 for (Object value : Property.of(args[0])) {

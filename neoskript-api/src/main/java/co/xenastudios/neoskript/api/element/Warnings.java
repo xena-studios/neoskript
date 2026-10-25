@@ -18,6 +18,26 @@ public final class Warnings {
 
         /** Whether the script suppresses warnings with this tag where the element is. */
         boolean suppresses(String tag);
+
+        /** Argument {@code index} of the element being set up, as written, or {@code null} if that isn't known. */
+        default String argument(int index) {
+            return null;
+        }
+
+        /** The line (or section header's key) the element is on, as written, or {@code null}. */
+        default String line() {
+            return null;
+        }
+
+        /** Whether the code may have waited before the element, as Skript's {@code isDelayed} isn't false. */
+        default boolean delayed() {
+            return false;
+        }
+
+        /** Whether the code has certainly waited before the element, as Skript's {@code getHasDelayBefore} is true. */
+        default boolean surelyDelayed() {
+            return false;
+        }
     }
 
     private static final ThreadLocal<Sink> SINK = new ThreadLocal<>();
@@ -53,6 +73,33 @@ public final class Warnings {
     public static boolean suppressed(String tag) {
         Sink sink = SINK.get();
         return sink != null && sink.suppresses(tag);
+    }
+
+    /**
+     * Argument {@code index} of the element being set up, as written in the script ({@code {_book}}), for a
+     * warning that quotes it, or {@code null} if that isn't known.
+     */
+    public static String argument(int index) {
+        Sink sink = SINK.get();
+        return sink == null ? null : sink.argument(index);
+    }
+
+    /** The line (or section header's key) the element being set up is on, as written, or {@code null}. */
+    public static String line() {
+        Sink sink = SINK.get();
+        return sink == null ? null : sink.line();
+    }
+
+    /** Whether the code may have waited before the element being set up (Skript's {@code isDelayed} isn't false). */
+    public static boolean delayed() {
+        Sink sink = SINK.get();
+        return sink != null && sink.delayed();
+    }
+
+    /** Whether the code has certainly waited before the element being set up (Skript's {@code getHasDelayBefore}). */
+    public static boolean surelyDelayed() {
+        Sink sink = SINK.get();
+        return sink != null && sink.surelyDelayed();
     }
 
     /**

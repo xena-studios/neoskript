@@ -253,6 +253,13 @@ final class PlayerSyntax {
         registrar.condition("CondIsPressingKey", info -> {
             boolean negated = info.pattern() == 1 || info.pattern() == 3;
             boolean past = info.pattern() > 1;
+            if (past && !info.isEvent(org.bukkit.event.player.PlayerInputEvent.class)) {
+                co.xenastudios.neoskript.api.element.Warnings.warn(
+                        "Checking the past state of a player's input outside the 'player input' event has no effect.");
+            } else if (past && co.xenastudios.neoskript.api.element.Warnings.delayed()) {
+                co.xenastudios.neoskript.api.element.Warnings.warn(
+                        "Checking the past state of a player's input after the event has passed has no effect.");
+            }
             boolean and = info.and(0);
             boolean keysAnd = info.and(1);
             return (context, args) -> {

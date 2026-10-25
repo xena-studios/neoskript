@@ -251,16 +251,19 @@ final class Logic {
             return new Reordered(false);
         }, "reversed %objects%");
         // After the lists, as in Skript: 'reversed 5 times' is 5 times, reversed.
-        registrar.expression("ExprTimes", "integer", info -> (context, args) -> {
-            // Rounded, so floating point error doesn't lose one: 10 - 1.05 / 0.15 times is 3 times.
-            long count = info.hasTag("once") ? 1 : info.hasTag("twice") ? 2 : info.hasTag("thrice") ? 3
-                    : args[0] instanceof Number n ? Math.max(0, Math.round(n.doubleValue())) : 0;
-            Object[] numbers = new Object[(int) Math.min(count, Integer.MAX_VALUE)];
-            for (int i = 0; i < numbers.length; i++) {
-                numbers[i] = (long) i + 1;
-            }
-            return numbers;
-        }, "%number% times", "(once:once|twice:twice|thrice:thrice)");
+        registrar.expression("ExprTimes", "integer", info -> {
+            timesChecks(info);
+            return (context, args) -> {
+                // Rounded, so floating point error doesn't lose one: 10 - 1.05 / 0.15 times is 3 times.
+                long count = info.hasTag("once") ? 1 : info.hasTag("twice") ? 2 : info.hasTag("thrice") ? 3
+                        : args[0] instanceof Number n ? Math.max(0, Math.round(n.doubleValue())) : 0;
+                Object[] numbers = new Object[(int) Math.min(count, Integer.MAX_VALUE)];
+                for (int i = 0; i < numbers.length; i++) {
+                    numbers[i] = (long) i + 1;
+                }
+                return numbers;
+            };
+        }, "%number% time[s]", "(once:once|twice:twice|thrice:thrice)");
         registrar.expression("ExprPi", "number", info -> (context, args) -> Math.PI, "(pi|\u03c0)");
         // Why the last 'X parsed as Y' failed, as Skript's ExprParseError.
         registrar.expression("ExprParseError", "string", info -> (context, args) -> Values.lastParseError(),
@@ -422,6 +425,40 @@ final class Logic {
                     case null, default -> {}
                 }
             }
+        }
+    }
+
+    /**
+     * Skript's checks for {@code X times} with a literal number, as its {@code ExprTimes.init}: warnings for looping
+     * zero times or once, errors for a negative amount.
+     */
+    private static void timesChecks(co.xenastudios.neoskript.api.element.ElementInfo info) {
+        long amount;
+        if (info.pattern() == 1) {
+            amount = info.hasTag("once") ? 1 : info.hasTag("twice") ? 2 : 3;
+        } else {
+            String literal = info.argumentLiteral(0);
+            if (literal == null || "string".equals(info.argumentType(0))) {
+                return;
+            }
+            try {
+                amount = (long) Double.parseDouble(literal.replace("_", ""));
+            } catch (NumberFormatException notNumber) {
+                return;
+            }
+        }
+        String line = co.xenastudios.neoskript.api.element.Warnings.line();
+        // As Skript tells a loop from the line's key.
+        boolean inLoop = line != null && line.strip().toLowerCase(java.util.Locale.ROOT).startsWith("loop ");
+        if (amount == 0 && inLoop) {
+            co.xenastudios.neoskript.api.element.Warnings.warn("Looping zero times makes the code inside of the loop useless");
+        } else if (amount == 1 && inLoop) {
+            co.xenastudios.neoskript.api.element.Warnings.warn(
+                    "Since you're looping exactly one time, you could simply remove the loop instead");
+        } else if (amount < 0) {
+            throw new co.xenastudios.neoskript.api.element.SyntaxError(inLoop
+                    ? "Looping a negative amount of times is impossible"
+                    : "The times expression only supports positive numbers");
         }
     }
 

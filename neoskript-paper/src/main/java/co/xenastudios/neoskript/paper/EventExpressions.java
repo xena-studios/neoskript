@@ -830,6 +830,10 @@ final class EventExpressions {
         registrar.expression("ExprEnchantItem", "itemtype", info -> {
             restrict(info, "the enchanted item", "the enchant event or the enchant prepare event", EnchantItemEvent.class,
                     PrepareItemEnchantEvent.class);
+            if (!info.hasTag("ed")) {
+                co.xenastudios.neoskript.api.element.Warnings.deprecated("The 'enchant item' form of the enchanted item"
+                        + " expression is deprecated, please use 'enchanted item'!");
+            }
             return new EventProperty(event -> switch (event) {
                 case EnchantItemEvent enchant -> new ItemType(enchant.getItem(), true);
                 case PrepareItemEnchantEvent prepare -> new ItemType(prepare.getItem(), true);

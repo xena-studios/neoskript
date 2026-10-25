@@ -1136,10 +1136,16 @@ final class WorldSyntax {
         registrar.expression("ExprWorldEnvironment", "environment", info -> (context, args) -> map(args[0],
                 value -> value instanceof World world ? world.getEnvironment() : null),
                 "[the] [world] environment[s] of %worlds%", "%worlds%'[s] [world] environment[s]");
-        registrar.expression("PropExprWXYZ", "number", info -> new Axis(info.hasTag("x") ? 0 : info.hasTag("y") ? 1
-                : info.hasTag("w") ? 3 : 2),
-                "[the] (w:w|x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])] of %objects%",
-                "%objects%'[s] (w:w|x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|(pos[ition[s]]|loc[ation][s])]");
+        registrar.expression("PropExprWXYZ", "number", info -> {
+                    if (info.hasTag("dep")) {
+                        co.xenastudios.neoskript.api.element.Warnings.warn("Using 'pos[ition]' or 'loc[ation]' to refer to"
+                                + " specific coordinates is deprecated and will be removed. Please use 'coord[inate]',"
+                                + " 'component[s]' or just the axis name 'x of {loc}' instead.");
+                    }
+                    return new Axis(info.hasTag("x") ? 0 : info.hasTag("y") ? 1 : info.hasTag("w") ? 3 : 2);
+                },
+                "[the] (w:w|x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|dep:(pos[ition[s]]|loc[ation][s])] of %objects%",
+                "%objects%'[s] (w:w|x:x|y:y|z:z)( |-)[component[s]|coord[inate][s]|dep:(pos[ition[s]]|loc[ation][s])]");
         Locations.registerOffsetAndSpawn(registrar);
         SettableProperty.register(registrar, "ExprVectorLength", "number", Vector.class, Number.class, Vector::length,
                 (vector, length) -> {

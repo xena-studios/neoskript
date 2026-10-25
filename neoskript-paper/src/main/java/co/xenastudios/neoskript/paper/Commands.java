@@ -210,6 +210,10 @@ final class Commands {
         }
         registrar.expression("ExprCommandInfo", "string", info -> {
             Function<Command, Object> getter = getters.get(info.pattern() / 2);
+            if (info.pattern() / 2 == 6) {
+                co.xenastudios.neoskript.api.element.Warnings.deprecated("Permission messages are deprecated for player"
+                        + " executed commands, as clients are not aware of commands that they cannot execute.");
+            }
             return (context, args) -> {
                 Object[] names = args[0] == null ? new Object[] {currentLabel(context.event())} : (Object[]) args[0];
                 List<Object> values = new ArrayList<>();

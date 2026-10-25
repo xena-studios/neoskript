@@ -258,6 +258,20 @@ final class TriggerCompiler {
         }
     }
 
+    /** The element last set up, and the text its positions are in, for the text of its arguments in warnings. */
+    private ParsedSyntax settingUp;
+    private String settingUpSource;
+
+    /** Argument {@code index} of the element being set up, as written, or {@code null}. */
+    private String argumentText(int index) {
+        if (settingUp == null || index < 0 || index >= settingUp.match().values().size()
+                || !(settingUp.match().values().get(index) instanceof Expr expr) || settingUpSource == null
+                || expr.end() > settingUpSource.length() || expr.start() > expr.end()) {
+            return null;
+        }
+        return settingUpSource.substring(expr.start(), expr.end()).strip();
+    }
+
     /** Whether the script suppresses warnings tagged {@code tag} at the line being compiled. */
     private boolean suppresses(String tag) {
         return script.suppresses(currentLine != null ? currentLine : headerLine, tag);
@@ -594,6 +608,28 @@ final class TriggerCompiler {
                     public boolean suppresses(String tag) {
                         return TriggerCompiler.this.suppresses(tag);
                     }
+
+                    @Override
+                    public String argument(int index) {
+                        return argumentText(index);
+                    }
+
+                    @Override
+                    public String line() {
+                        return settingUpSource;
+                    }
+
+                    @Override
+                    public boolean delayed() {
+                        return currentLine != null && script.delayBefore(currentLine)
+                                != co.xenastudios.neoskript.frontend.registry.DelayState.NOT_DELAYED;
+                    }
+
+                    @Override
+                    public boolean surelyDelayed() {
+                        return currentLine != null && script.delayBefore(currentLine)
+                                == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED;
+                    }
                 });
         try {
             body.emit();
@@ -774,6 +810,17 @@ final class TriggerCompiler {
      * it), schedules the rest of the trigger, and returns. The rest starts at the label after it.
      */
     private void waitFor(ParsedSyntax delay) throws CompileException {
+        // Skript's checks of a delay written out, as its Delay.init.
+        Object duration = delay.match().values().getFirst();
+        if (duration instanceof Expr.Syntax eternity && eternity.syntax().syntax().id().equals("LitEternity")) {
+            throw new CompileException(line, "Delaying for an eternity is not allowed. Use the 'stop' effect instead.");
+        }
+        if (duration instanceof Expr.Literal literal && "timespan".equals(literal.type())) {
+            co.xenastudios.neoskript.runtime.Timespan timespan = co.xenastudios.neoskript.runtime.Timespan.parse(literal.text());
+            if (timespan != null && timespan.millis() < 50) {
+                warn(null, "Delays less than one tick are not possible, defaulting to one tick.");
+            }
+        }
         method.visitVarInsn(ALOAD, 0);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         WaitPoint wait = saveFrame();
@@ -2512,6 +2559,8 @@ final class TriggerCompiler {
 
     /** How the element was matched, for its factory: its pattern, marks, tags and which arguments are lists. */
     private ElementInfo info(ParsedSyntax syntax) {
+        settingUp = syntax;
+        settingUpSource = source;
         long or = 0;
         long lists = 0;
         List<Object> values = syntax.match().values();

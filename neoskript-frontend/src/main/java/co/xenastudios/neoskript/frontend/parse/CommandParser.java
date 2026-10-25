@@ -167,6 +167,22 @@ final class CommandParser {
             }
         }
 
+        // Skript's warnings about the entries, as its SubCommandEntryData gives them.
+        java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
+        if (!entries.containsKey("cooldown")) {
+            for (String unused : List.of("message", "bypass", "storage")) {
+                if (entries.containsKey("cooldown " + unused)) {
+                    warnings.add(":There is a cooldown " + unused + " set, but not a cooldown");
+                }
+            }
+        }
+        if (entries.containsKey("permission message")) {
+            warnings.add("deprecated:[Deprecated] The 'permission message' entry has been deprecated for removal in a"
+                    + " future release. Commands that a player does not have permission to execute are no longer sent"
+                    + " to their client.");
+        }
+        statements.warn(section.line(), warnings);
+
         List<ParsedStructure.CommandNode> subcommands = new ArrayList<>();
         for (Node.Section child : children) {
             String key = child.line().key().strip();
