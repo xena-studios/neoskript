@@ -138,6 +138,7 @@ final class Potions {
     static void register(Registrar registrar) {
         registrar.type("potioneffecttype", "potion effect type", PotionEffectType.class);
         registrar.type("skriptpotioneffect", "potion effect", Effect.class);
+        registrar.eventDefault("skriptpotioneffect");
         // Hidden effects can be looked at, not changed.
         registrar.type("hiddenpotioneffect", "hidden potion effect", Effect.class);
         registrar.subtype("hiddenpotioneffect", "skriptpotioneffect");
@@ -416,7 +417,7 @@ final class Potions {
                     }
                 }
             };
-        }, "(show:show|hide) [the] [potion|effect['s]|potion's] " + word + " [(for|of) %-skriptpotioneffects%]",
+        }, "(show:show|hide) [the] [potion|effect['s]|potion's] " + word + " [(for|of) %skriptpotioneffects%]",
                 "(show:show|hide) %skriptpotioneffects%'[s] " + word);
     }
 

@@ -47,6 +47,8 @@ final class Players {
             Component component = name == null ? null : Messages.component(name);
             switch (owner) {
                 case org.bukkit.entity.Player player -> player.displayName(component);
+                // A boss bar's name is its title.
+                case org.bukkit.boss.BossBar bar -> bar.setTitle(component == null ? null : Messages.LEGACY_SECTION.serialize(component));
                 case Entity entity -> entity.customName(component);
                 case ItemType item -> item.editMeta(meta -> meta.displayName(component));
                 case org.bukkit.inventory.ItemStack stack -> stack.editMeta(meta -> meta.displayName(component));
@@ -322,7 +324,7 @@ final class Players {
                     }
                 }
             }
-        }, "play sound[s] %texts% [(at|with) volume %number%] [(and|at|with) pitch %number%] [(to|for) %players%] "
+        }, "play sound[s] %texts% [(at|with) volume %number%] [(and|at|with) pitch %number%] [(to|for) %-players%] "
                 + "[(at|on|from) %locations/entities%]");
     }
 
@@ -354,6 +356,7 @@ final class Players {
             case World world -> world.getName();
             case Configs.ConfigNode node -> node.key();
             case CommandSender sender -> sender.getName();
+            case org.bukkit.boss.BossBar bar -> bar.getTitle();
             case Nameable nameable when nameable.customName() != null ->
                     Messages.LEGACY_SECTION.serialize(nameable.customName());
             // A named block, like a chest: its state has the name.

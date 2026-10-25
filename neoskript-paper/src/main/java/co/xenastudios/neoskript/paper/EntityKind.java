@@ -105,12 +105,34 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
     /** An amount before a kind's name: {@code 5 villagers}. */
     private static final java.util.regex.Pattern AMOUNT = java.util.regex.Pattern.compile("(\\d{1,9}) (.+)");
 
-    /** Types whose kinds include their subtypes' entities, as in Skript: a trader llama is a llama. */
-    private static final java.util.Set<EntityType> INCLUDES_SUBTYPES = java.util.Set.of(EntityType.LLAMA, EntityType.FIREBALL);
+    /**
+     * Types whose kinds include their subtypes' entities, as in Skript: a trader llama is a llama, and a
+     * lingering potion a thrown potion (its own entity type from Minecraft 1.21.5).
+     */
+    private static boolean includesSubtypes(EntityType type) {
+        return type == EntityType.LLAMA || type == EntityType.FIREBALL || type == thrownPotion();
+    }
+
+    /** The thrown potion's entity type: named differently across versions. */
+    private static EntityType thrownPotion() {
+        EntityType known = thrownPotion;
+        if (known == null) {
+            for (EntityType type : EntityType.values()) {
+                if (type.name().equals("SPLASH_POTION") || type.name().equals("POTION")) {
+                    known = type;
+                    break;
+                }
+            }
+            thrownPotion = known;
+        }
+        return known;
+    }
+
+    private static volatile EntityType thrownPotion;
 
     /** Whether {@code entity} is of this kind. */
     public boolean matches(Entity entity) {
-        if (type != null && !INCLUDES_SUBTYPES.contains(type) ? entity.getType() != type : !entityClass.isInstance(entity)) {
+        if (type != null && !includesSubtypes(type) ? entity.getType() != type : !entityClass.isInstance(entity)) {
             return false;
         }
         for (Variant variant : variants) {
@@ -123,7 +145,7 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
 
     /** Whether every entity of {@code other} is of this kind: {@code axolotl} includes {@code lucy axolotl}. */
     public boolean includes(EntityKind other) {
-        boolean base = type != null && !INCLUDES_SUBTYPES.contains(type) ? other.type == type
+        boolean base = type != null && !includesSubtypes(type) ? other.type == type
                 : other.type != null ? other.type.getEntityClass() != null && entityClass.isAssignableFrom(other.type.getEntityClass())
                 : entityClass.isAssignableFrom(other.entityClass);
         return base && other.variants.containsAll(variants);
@@ -146,6 +168,13 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
             // Stone unless it says otherwise, as in Skript.
             entity = location.getWorld().spawn(location, FallingBlock.class,
                     falling -> falling.setBlockData(Material.STONE.createBlockData()));
+        } else if (type == thrownPotion() && variants.stream().anyMatch(v -> v.key().startsWith("thrown="))) {
+            // A lingering potion is its own kind of entity, as Skript spawns it.
+            boolean lingering = variants.stream().anyMatch(v -> v.key().startsWith("thrown=" + Material.LINGERING_POTION));
+            @SuppressWarnings("removal")
+            Class<? extends org.bukkit.entity.ThrownPotion> potion = lingering
+                    ? org.bukkit.entity.LingeringPotion.class : org.bukkit.entity.ThrownPotion.class;
+            return location.getWorld().spawn(location, potion, spawned -> variants.forEach(v -> v.apply().accept(spawned)));
         } else {
             entity = location.getWorld().spawnEntity(location, type);
         }
@@ -210,6 +239,28 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
             return new EntityKind(name, EntityType.FALLING_BLOCK, FallingBlock.class, List.of(new Variant("block=" + material,
                     e -> e instanceof FallingBlock falling && falling.getBlockData().getMaterial() == material,
                     e -> ((FallingBlock) e).setBlockData(material.createBlockData()))));
+        }
+        // 'thrown speed potion', 'thrown lingering potion of healing': a thrown potion of that item, a plain
+        // potion thrown as a splash potion, as in Skript.
+        if (words.startsWith("thrown ") && !words.matches("thrown potions?") && thrownPotion() != null) {
+            ItemType item = ItemType.parse(words.substring(7));
+            if (item == null) {
+                return null;
+            }
+            ItemStack stack = item.stack();
+            stack.setAmount(1);
+            if (stack.getType() == Material.POTION) {
+                ItemStack splash = new ItemStack(Material.SPLASH_POTION);
+                splash.setItemMeta(stack.getItemMeta());
+                stack = splash;
+            } else if (stack.getType() != Material.SPLASH_POTION && stack.getType() != Material.LINGERING_POTION) {
+                return null;
+            }
+            ItemStack thrown = stack;
+            return new EntityKind(name, thrownPotion(), org.bukkit.entity.ThrownPotion.class, List.of(new Variant(
+                    "thrown=" + thrown.getType() + thrown.getItemMeta(),
+                    e -> e instanceof org.bukkit.entity.ThrownPotion potion && potion.getItem().isSimilar(thrown),
+                    e -> ((org.bukkit.entity.ThrownPotion) e).setItem(thrown.clone()))));
         }
         int with = words.indexOf(" with nectar");
         int without = words.indexOf(" without nectar");
@@ -340,7 +391,11 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
                 Variant variant = vocabulary.get(phrase);
                 // 'lazy-aggressive panda' or 'brown playful panda': the main gene, then the hidden one.
                 if (variant == null && base.entityClass == Panda.class && (phrase.contains("-") || end - i == 2)) {
-                    variant = pandaGenes(phrase.replace(' ', '-'));
+                    Variant[] genes = pandaGenes(phrase.replace(' ', '-'));
+                    if (genes != null) {
+                        into.add(genes[0]);
+                        variant = genes[1];
+                    }
                 }
                 // 'red-blue kob': a red fish with a blue pattern.
                 if (variant == null && base.entityClass == TropicalFish.class && phrase.contains("-") && end - i == 1) {
@@ -443,11 +498,7 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
                     (e, v) -> ((MushroomCow) e).setVariant(v));
         } else if (c == Panda.class) {
             for (Panda.Gene gene : Panda.Gene.values()) {
-                words.put(lower(gene.name()), new Variant("panda=" + gene, e -> ((Panda) e).getMainGene() == gene,
-                        e -> {
-                            ((Panda) e).setMainGene(gene);
-                            ((Panda) e).setHiddenGene(gene);
-                        }));
+                words.put(lower(gene.name()), mainGene(gene));
             }
         } else if (c == Salmon.class) {
             enumWords(words, "salmon", Salmon.Variant.values(), e -> ((Salmon) e).getVariant(), (e, v) -> ((Salmon) e).setVariant(v));
@@ -516,10 +567,12 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
 
     /**
      * {@code warm chicken}, {@code cold cow}, {@code temperate pig}: the climate variants farm animals have
-     * from Minecraft 1.21.5, looked up by reflection so older servers simply don't have them.
+     * from Minecraft 1.21.5 (and {@code warm zombie nautilus} from 1.21.11), looked up by reflection so older
+     * servers simply don't have them.
      */
     private static final java.util.Set<String> FARM_ANIMALS =
-            java.util.Set.of("org.bukkit.entity.Chicken", "org.bukkit.entity.Cow", "org.bukkit.entity.Pig");
+            java.util.Set.of("org.bukkit.entity.Chicken", "org.bukkit.entity.Cow", "org.bukkit.entity.Pig",
+                    "org.bukkit.entity.ZombieNautilus");
 
     private static void farmVariants(Class<? extends Entity> entityClass, Map<String, Variant> words) {
         try {
@@ -561,7 +614,8 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
     private static Registry<? extends Keyed> variantRegistry(Class<? extends Entity> entityClass, Class<?> variantClass) {
         try {
             Object key = io.papermc.paper.registry.RegistryKey.class
-                    .getField(entityClass.getSimpleName().toUpperCase(Locale.ROOT) + "_VARIANT").get(null);
+                    .getField(entityClass.getSimpleName().replaceAll("(?<=[a-z])(?=[A-Z])", "_").toUpperCase(Locale.ROOT)
+                            + "_VARIANT").get(null);
             return io.papermc.paper.registry.RegistryAccess.registryAccess()
                     .getRegistry((io.papermc.paper.registry.RegistryKey) key);
         } catch (ReflectiveOperationException | RuntimeException notPaper) {
@@ -574,20 +628,31 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
                 : entity instanceof ZombieVillager zombie ? zombie.getVillagerProfession() : null;
     }
 
-    /** {@code lazy-aggressive panda}: a panda's main and hidden genes. */
-    private static Variant pandaGenes(String phrase) {
+    /**
+     * {@code lazy-aggressive panda}: a panda's main and hidden genes, as two variants, so {@code lazy panda}
+     * (whatever its hidden gene) includes it, as in Skript. Or {@code null}.
+     */
+    private static Variant[] pandaGenes(String phrase) {
         String[] genes = phrase.split("-", 2);
+        if (genes.length < 2) {
+            return null;
+        }
         try {
             Panda.Gene main = Panda.Gene.valueOf(genes[0].strip().toUpperCase(Locale.ROOT));
             Panda.Gene hidden = Panda.Gene.valueOf(genes[1].strip().toUpperCase(Locale.ROOT));
-            return new Variant("panda=" + main + "-" + hidden,
-                    e -> ((Panda) e).getMainGene() == main && ((Panda) e).getHiddenGene() == hidden, e -> {
-                        ((Panda) e).setMainGene(main);
-                        ((Panda) e).setHiddenGene(hidden);
-                    });
+            return new Variant[] {mainGene(main), new Variant("hidden gene=" + hidden,
+                    e -> ((Panda) e).getHiddenGene() == hidden, e -> ((Panda) e).setHiddenGene(hidden))};
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    /** A panda's main gene; spawned, its hidden gene is the same unless said otherwise, as in Skript. */
+    private static Variant mainGene(Panda.Gene gene) {
+        return new Variant("panda=" + gene, e -> ((Panda) e).getMainGene() == gene, e -> {
+            ((Panda) e).setMainGene(gene);
+            ((Panda) e).setHiddenGene(gene);
+        });
     }
 
     /** Being a baby or an adult, by age as Skript's entity data has it: a frog can be a baby frog too. */
@@ -713,10 +778,15 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
             add(known, of(EntityType.ENDER_PEARL), "enderpearl");
             add(known, of(EntityType.BAMBOO_RAFT), "bamboo boat");
             add(known, of(EntityType.BAMBOO_CHEST_RAFT), "bamboo chest boat");
-            // The thrown potion's entity type is named differently across versions.
+            // Any thrown potion, lingering ones too.
+            if (thrownPotion() != null) {
+                add(known, new EntityKind("thrown potion", thrownPotion(), org.bukkit.entity.ThrownPotion.class, List.of()),
+                        "thrown potion");
+            }
             for (EntityType type : EntityType.values()) {
-                if (type.name().equals("SPLASH_POTION") || type.name().equals("POTION")) {
-                    known.putIfAbsent("thrown potion", of(type));
+                // Zombie nautiluses came after the API this is built against.
+                if (type.name().equals("ZOMBIE_NAUTILUS")) {
+                    add(known, of(type), "zombified nautilus");
                 }
             }
             for (Villager.Profession profession : Registry.VILLAGER_PROFESSION) {

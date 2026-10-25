@@ -196,6 +196,12 @@ final class TriggerCompiler {
     private String constantsScript;
     /** The classes of the event a trigger runs for, or {@code null} outside server events. */
     private List<Class<?>> eventClasses;
+
+    /** The classes the last server event trigger compiled listens to: its event's, or those its filter chose. */
+    List<Class<?>> eventClasses() {
+        return eventClasses;
+    }
+
     /**
      * An inline function's loop over a list ({@code where [...]}): the slots of the current value, its
      * position, the list's indices (or -1), and the reduced value so far (or -1).
@@ -243,6 +249,10 @@ final class TriggerCompiler {
                 source = key;
                 ParsedSyntax syntax = event.event();
                 Condition filter = binding.filter().create(info(syntax));
+                if (filter instanceof co.xenastudios.neoskript.api.element.EventFilter narrowing) {
+                    // 'on player move' listens to player moves only; its code is checked against those.
+                    eventClasses = List.copyOf(narrowing.eventClasses());
+                }
                 constant(filter, Condition.class);
                 method.visitVarInsn(ALOAD, CONTEXT_SLOT);
                 arguments(syntax);
@@ -542,10 +552,10 @@ final class TriggerCompiler {
     }
 
     /**
-     * {@code wait %timespan%}: saves the frame (the state number, local variables and the loops around
-     * it), schedules the rest of the trigger, and returns. The rest starts at the label after it.
+     * Pushes a new frame to carry on from here (the state number, local variables and the loops around it),
+     * and returns the point it carries on from, whose label the caller places.
      */
-    private void waitFor(ParsedSyntax delay) throws CompileException {
+    private WaitPoint saveFrame() {
         String frame = Type.getInternalName(Frame.class);
         List<int[]> saved = new ArrayList<>();
         for (Block block : loops()) {
@@ -561,8 +571,6 @@ final class TriggerCompiler {
         int state = waits.size();
         waits.add(wait);
 
-        method.visitVarInsn(ALOAD, 0);
-        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         method.visitTypeInsn(NEW, frame);
         method.visitInsn(DUP);
         method.visitMethodInsn(INVOKESPECIAL, frame, "<init>", "()V", false);
@@ -590,6 +598,17 @@ final class TriggerCompiler {
             method.visitInsn(AASTORE);
         }
         method.visitFieldInsn(PUTFIELD, frame, "slots", OBJECTS);
+        return wait;
+    }
+
+    /**
+     * {@code wait %timespan%}: saves the frame (the state number, local variables and the loops around
+     * it), schedules the rest of the trigger, and returns. The rest starts at the label after it.
+     */
+    private void waitFor(ParsedSyntax delay) throws CompileException {
+        method.visitVarInsn(ALOAD, 0);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        WaitPoint wait = saveFrame();
         expression((Expr) delay.match().values().getFirst());
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "ticks", "(" + OBJECT_DESC + ")J", false);
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "schedule",
@@ -1120,6 +1139,10 @@ final class TriggerCompiler {
      */
     private void expressionSection(Statement.Section section) throws CompileException {
         Expr.Syntax made = sectionExpression(section);
+        if (library.deferredSection(made.syntax().syntax().id())) {
+            deferredSection(section, made);
+            return;
+        }
         int valuesSlot = nextSlot++;
         int indexSlot = nextSlot++;
         expression(made);
@@ -1143,6 +1166,41 @@ final class TriggerCompiler {
         method.visitIincInsn(indexSlot, 1);
         method.visitJumpInsn(GOTO, top);
         method.visitLabel(end);
+        lineOf(section, section.line().key());
+        precomputed.put(made, valuesSlot);
+        try {
+            effect(section.header());
+        } finally {
+            precomputed.remove(made);
+        }
+    }
+
+    /**
+     * An effect whose expression's section runs later ({@code set {_r} to a new runnable:}): the expression's
+     * value is a {@link Runnable} that carries on from the section's first line with this trigger's frame, as
+     * a wait does, and stops at the section's end.
+     */
+    private void deferredSection(Statement.Section section, Expr.Syntax made) throws CompileException {
+        int valuesSlot = nextSlot++;
+        Label after = new Label();
+        method.visitVarInsn(ALOAD, 0);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        WaitPoint start = saveFrame();
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "section",
+                "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + ")" + OBJECT_DESC, false);
+        method.visitVarInsn(ASTORE, valuesSlot);
+        pushInt(1);
+        method.visitTypeInsn(ANEWARRAY, OBJECT);
+        method.visitInsn(DUP);
+        method.visitInsn(ICONST_0);
+        method.visitVarInsn(ALOAD, valuesSlot);
+        method.visitInsn(AASTORE);
+        method.visitVarInsn(ASTORE, valuesSlot);
+        method.visitJumpInsn(GOTO, after);
+        method.visitLabel(start.resume());
+        statements(section.body());
+        exitTrigger();
+        method.visitLabel(after);
         lineOf(section, section.line().key());
         precomputed.put(made, valuesSlot);
         try {
@@ -1329,6 +1387,7 @@ final class TriggerCompiler {
                 method.visitLabel(skip);
             }
             case CoreSyntax.ASSERT -> assertion(effect);
+            case CoreSyntax.ASSERT_UNPARSED -> {}
             case CoreSyntax.DELAY -> waitFor(effect);
             case CoreSyntax.SUPPRESS_WARNINGS, CoreSyntax.SUPPRESS_HINTS -> {}
             default -> throw unsupported(core.id());
@@ -1871,6 +1930,8 @@ final class TriggerCompiler {
                     eventValue(fallback);
                     convert(isPlural(specs[i]));
                     method.visitInsn(AASTORE);
+                } else {
+                    missingDefault(specs[i]);
                 }
                 continue;
             }
@@ -1960,6 +2021,35 @@ final class TriggerCompiler {
         return null;
     }
 
+    /**
+     * Fails when a placeholder left out has only the event's value to stand for it and the event has none, as
+     * Skript's event value default expressions do ({@code hide the particles} outside a potion effect's section).
+     */
+    private void missingDefault(PlaceholderSpec spec) throws CompileException {
+        if (spec.nullable() || eventClasses == null) {
+            return;
+        }
+        for (String name : spec.types()) {
+            TypeRef ref = registry.resolveType(name);
+            if (ref == null || !library.hasEventDefault(ref.type().id())) {
+                return;
+            }
+        }
+        TypeRef first = registry.resolveType(spec.types().getFirst());
+        if (first != null && !spec.types().isEmpty()) {
+            throw new CompileException(line, "There's no " + first.type().name() + " in " + eventDescription());
+        }
+    }
+
+    /** The trigger's event as Skript's errors name it: {@code an on test case event}. */
+    private String eventDescription() {
+        if (eventClasses == null) {
+            return function != null ? "a function" : "this event";
+        }
+        String name = "test".equals(eventName) ? "on test case" : eventName;
+        return article(name) + " " + name + " event";
+    }
+
     /** Pushes the value {@code getter} gets from the trigger's event. */
     private void eventValue(java.util.function.Function<Object, Object> getter) {
         constant(getter, java.util.function.Function.class);
@@ -1970,10 +2060,93 @@ final class TriggerCompiler {
                 "(" + OBJECT_DESC + ")" + OBJECT_DESC, true);
     }
 
+    /**
+     * {@code past event-block}, {@code event-item after the event}: an event value as it was before the event,
+     * or will be after it. Only event values that have such a state can be written so.
+     */
+    private void timeState(Expr.Syntax syntax) throws CompileException {
+        int time = syntax.syntax().pattern() < 2 ? -1 : 1;
+        Object inner = syntax.syntax().match().values().getFirst();
+        if (hasTimeState(inner)) {
+            eventValue((Expr.Syntax) inner, time);
+            return;
+        }
+        // A list is in that state where its values have one, as in Skript: 'past event-block and event-player'.
+        if (inner instanceof Expr.ListOf list && list.items().stream().anyMatch(this::hasTimeState)) {
+            pushInt(list.items().size());
+            method.visitTypeInsn(ANEWARRAY, OBJECT);
+            for (int i = 0; i < list.items().size(); i++) {
+                method.visitInsn(DUP);
+                pushInt(i);
+                Expr item = list.items().get(i);
+                if (hasTimeState(item)) {
+                    eventValue((Expr.Syntax) item, time);
+                } else {
+                    expression(item);
+                }
+                method.visitInsn(AASTORE);
+            }
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "list", "(" + OBJECTS + ")" + OBJECTS, false);
+            return;
+        }
+        String text = inner instanceof Expr expr && expr.end() <= source.length()
+                ? source.substring(expr.start(), expr.end()) : source.substring(syntax.start(), syntax.end());
+        throw new CompileException(line, text + " does not have a " + (time < 0 ? "past" : "future") + " state");
+    }
+
+    /** Whether {@code expr} is an event value that has a past or future state in this trigger's event. */
+    private boolean hasTimeState(Object expr) {
+        return expr instanceof Expr.Syntax value && (isCore(value.syntax(), CoreSyntax.EVENT_VALUE)
+                || isCore(value.syntax(), CoreSyntax.EVENT_VALUE_ENTITY))
+                && value.syntax().match().regexValues().getFirst() instanceof TypeRef ref
+                && eventClasses != null && library.hasTimeStates(eventClasses, ref.type().id(), kind(value, ref));
+    }
+
+    /**
+     * For an event value named by a kind of entity rather than a type ({@code event-projectile}), the class of
+     * that kind; for a plural ({@code event-blocks}), the array class of its type; else {@code null}.
+     */
+    private Class<?> kind(Expr.Syntax syntax, TypeRef ref) {
+        if (ref.plural()) {
+            // 'event-blocks': the event's several blocks, if it has them, as an array of the type's class.
+            Class<?> single = library.javaClass(ref.type().id());
+            return single == null || single.isArray() ? null : single.arrayType();
+        }
+        if (!ref.type().id().equals("entity") || syntax.end() > source.length()) {
+            return null;
+        }
+        String words = source.substring(syntax.start(), syntax.end()).strip().toLowerCase(java.util.Locale.ROOT);
+        for (String prefix : new String[] {"the ", "event-"}) {
+            if (words.startsWith(prefix)) {
+                words = words.substring(prefix.length()).strip();
+            }
+        }
+        if (registry.resolveType(words) != null) {
+            return null;
+        }
+        Class<?> kind = library.kindClass("entitytype", words);
+        return kind == null || kind == library.javaClass("entity") ? null : kind;
+    }
+
     /** {@code player}, {@code event-world}: the event's value of the named type. */
     private void eventValue(Expr.Syntax syntax) throws CompileException {
+        eventValue(syntax, 0);
+    }
+
+    /** The event's value of the named type at {@code time}: -1 before the event, 1 after, 0 now. */
+    private void eventValue(Expr.Syntax syntax, int time) throws CompileException {
         if (!(syntax.syntax().match().regexValues().getFirst() instanceof TypeRef ref)) {
             throw unsupported("'" + source.substring(syntax.start(), syntax.end()) + "'");
+        }
+        if (time != 0) {
+            java.util.function.Function<Object, Object> getter;
+            try {
+                getter = library.eventValue(eventClasses, ref.type().id(), kind(syntax, ref), time);
+            } catch (Library.ExcludedEventValue excluded) {
+                throw new CompileException(line, excluded.getMessage());
+            }
+            eventValue(getter);
+            return;
         }
         Block section = sectionFor(ref.type().id());
         if (section != null) {
@@ -1990,12 +2163,15 @@ final class TriggerCompiler {
                     false);
             return;
         }
-        java.util.function.Function<Object, Object> getter =
-                eventClasses == null ? null : library.eventValue(eventClasses, ref.type().id());
+        java.util.function.Function<Object, Object> getter;
+        try {
+            getter = eventClasses == null ? null
+                    : library.eventValue(eventClasses, ref.type().id(), kind(syntax, ref), 0);
+        } catch (Library.ExcludedEventValue excluded) {
+            throw new CompileException(line, excluded.getMessage());
+        }
         if (getter == null) {
-            String where = eventClasses == null ? (function != null ? "a function" : "this event")
-                    : article(eventName) + " " + eventName + " event";
-            throw new CompileException(line, "There's no " + ref.type().name() + " in " + where);
+            throw new CompileException(line, "There's no " + ref.type().name() + " in " + eventDescription());
         }
         eventValue(getter);
     }
@@ -2427,6 +2603,7 @@ final class TriggerCompiler {
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE)
                     || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY)
                     || isCore(syntax.syntax(), CoreSyntax.EVENT_ENTITY_BARE) -> eventValue(syntax);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TIME_STATE) -> timeState(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.FILTER) -> filter(syntax.syntax());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ANY_OF) ->
@@ -2520,6 +2697,14 @@ final class TriggerCompiler {
             }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.SETS) -> {
                 List<Object> all = library.namedValues(syntax.type());
+                java.util.function.Supplier<Object[]> listed = all == null ? library.allValues(syntax.type()) : null;
+                if (listed != null) {
+                    // Listed when it runs, as the server's registries say.
+                    constant(listed, java.util.function.Supplier.class);
+                    method.visitMethodInsn(INVOKEINTERFACE, "java/util/function/Supplier", "get", "()" + OBJECT_DESC, true);
+                    method.visitTypeInsn(CHECKCAST, OBJECTS);
+                    break;
+                }
                 if (all == null) {
                     throw unsupported("all " + syntax.type() + "s");
                 }
@@ -2663,6 +2848,11 @@ final class TriggerCompiler {
      * or a variable's braces), with each embedded {@code %expression%} converted to text and joined in.
      */
     private void text(int start, int end, List<Expr> embedded) throws CompileException {
+        text(start, end, embedded, false);
+    }
+
+    /** {@link #text}, or with {@code name}, a variable's name: values there read as in variable names. */
+    private void text(int start, int end, List<Expr> embedded, boolean name) throws CompileException {
         List<String> pieces = new ArrayList<>();
         int pos = start + 1;
         for (Expr part : embedded) {
@@ -2686,7 +2876,8 @@ final class TriggerCompiler {
             }
             if (i < embedded.size()) {
                 expression(embedded.get(i));
-                method.visitMethodInsn(INVOKESTATIC, VALUES, "text", "(" + OBJECT_DESC + ")" + STRING_DESC, false);
+                method.visitMethodInsn(INVOKESTATIC, VALUES, name ? "nameText" : "text", "(" + OBJECT_DESC + ")"
+                        + STRING_DESC, false);
                 method.visitMethodInsn(INVOKEVIRTUAL, builder, "append", "(" + STRING_DESC + ")Ljava/lang/StringBuilder;",
                         false);
             }
@@ -2711,7 +2902,7 @@ final class TriggerCompiler {
     /** Pushes the variable's name, without the {@code ::*} of a list. */
     private void variableName(Expr.Variable variable) throws CompileException {
         int end = variable.list() ? variable.end() - 3 : variable.end();
-        text(variable.start(), end, variable.embedded());
+        text(variable.start(), end, variable.embedded(), true);
     }
 
     // ---------------------------------------------------------------- loop values

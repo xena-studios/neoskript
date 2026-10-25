@@ -170,8 +170,12 @@ final class Colors {
                     if (owner instanceof org.bukkit.entity.TextDisplay display) {
                         display.setDefaultBackground(true);
                     }
-                }), "[the] colo[u]r[s] of %itemtypes/entities/potioneffecttypes%",
-                "%itemtypes/entities/potioneffecttypes%'[s] colo[u]r[s]");
+                    // A boss bar goes back to white.
+                    if (owner instanceof org.bukkit.boss.BossBar bar) {
+                        bar.setColor(org.bukkit.boss.BarColor.WHITE);
+                    }
+                }), "[the] colo[u]r[s] of %itemtypes/entities/potioneffecttypes/bossbars%",
+                "%itemtypes/entities/potioneffecttypes/bossbars%'[s] colo[u]r[s]");
         registrar.expression("ExprColorFromHexCode", "color", info -> (context, args) -> {
             List<Object> colours = new ArrayList<>();
             for (Object value : (Object[]) args[0]) {
@@ -247,6 +251,7 @@ final class Colors {
             case org.bukkit.entity.TextDisplay display -> display.getBackgroundColor() == null ? null
                     : Displays.colour(display.getBackgroundColor());
             case org.bukkit.potion.PotionEffectType type -> Displays.colour(type.getColor());
+            case org.bukkit.boss.BossBar bar -> BossBars.colour(bar.getColor());
             case org.bukkit.material.Colorable colorable when colorable.getColor() != null -> named(colorable.getColor());
             case ItemType item -> switch (item.stack().getItemMeta()) {
                 case org.bukkit.inventory.meta.LeatherArmorMeta leather -> Displays.colour(leather.getColor());
@@ -260,6 +265,8 @@ final class Colors {
     private static void setColour(Object owner, Colour colour) {
         org.bukkit.Color color = org.bukkit.Color.fromARGB(colour.alpha(), colour.red(), colour.green(), colour.blue());
         switch (owner) {
+            // The nearest bar colour, or an error if none is near.
+            case org.bukkit.boss.BossBar bar -> BossBars.setColour(bar, colour);
             case org.bukkit.entity.TextDisplay display -> {
                 display.setDefaultBackground(false);
                 display.setBackgroundColor(color);

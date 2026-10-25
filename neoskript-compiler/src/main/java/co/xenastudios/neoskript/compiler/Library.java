@@ -50,7 +50,21 @@ public final class Library implements Registrar {
     /** The binding of a server event. */
     public record ServerEvent(List<Class<?>> classes, ElementFactory<Condition> filter) {}
 
-    private record EventValue(Class<?> eventClass, String type, java.util.function.Function<Object, ?> getter) {}
+    /**
+     * A value of {@code type} events of {@code eventClass} have, at {@code time} (-1 past, 0 now, 1 future). If
+     * {@code excluded} isn't {@code null}, the events don't have it, and that's the error for asking. A
+     * {@code valueClass} makes it the value of only a narrower kind, like the projectile of a damage event, which
+     * {@code event-projectile} gets; plain {@code event-entity} doesn't.
+     */
+    private record EventValue(Class<?> eventClass, String type, int time, Class<?> valueClass,
+            java.util.function.Function<Object, ?> getter, String excluded) {}
+
+    /** Thrown where a trigger asks for an event value its event leaves out on purpose, with the reason. */
+    static final class ExcludedEventValue extends RuntimeException {
+        ExcludedEventValue(String message) {
+            super(message, null, false, false);
+        }
+    }
 
     private final SyntaxRegistry.Builder builder = SyntaxRegistry.builder();
     private final Map<Key, Object> bindings = new HashMap<>();
@@ -63,9 +77,11 @@ public final class Library implements Registrar {
     private final Map<FunctionInfo, List<java.util.function.Supplier<?>>> functionDefaults = new HashMap<>();
     private final VariableCodecs codecs = new VariableCodecs();
     private final List<EventValue> eventValues = new ArrayList<>();
+    private final Map<String, java.util.function.Function<Object, Class<?>>> kindClasses = new HashMap<>();
     private final Set<String> eventDefaults = new HashSet<>();
     private final Map<String, String> sectionTypes = new HashMap<>();
     private final Map<String, String> sectionExpressions = new HashMap<>();
+    private final java.util.Set<String> deferredSections = new java.util.HashSet<>();
     private final Map<String, java.util.function.Function<String, ?>> parsers = new HashMap<>();
     private final Map<String, java.util.function.Function<String, ?>> literalParsers = new java.util.LinkedHashMap<>();
     private SyntaxRegistry registry;
@@ -108,6 +124,27 @@ public final class Library implements Registrar {
         parsers.put(id, text -> copy.get(text.strip().toLowerCase(java.util.Locale.ROOT)));
     }
 
+    @Override
+    public void allValues(String id, java.util.function.Supplier<? extends Iterable<?>> values) {
+        checkOpen();
+        if (!javaClasses.containsKey(id)) {
+            throw new IllegalArgumentException("Values of unknown type '" + id + "'");
+        }
+        builder.enumerable(id);
+        allValues.put(id, () -> {
+            List<Object> all = new ArrayList<>();
+            values.get().forEach(all::add);
+            return all.toArray();
+        });
+    }
+
+    /** What lists every value of type {@code id} when scripts run, or {@code null}: see {@link #allValues}. */
+    java.util.function.Supplier<Object[]> allValues(String id) {
+        return allValues.get(id);
+    }
+
+    private final Map<String, java.util.function.Supplier<Object[]>> allValues = new java.util.HashMap<>();
+
     /** Every value of the named type {@code id}, or {@code null} if it isn't a named type. */
     public List<Object> namedValues(String id) {
         return namedValues.get(id);
@@ -138,6 +175,19 @@ public final class Library implements Registrar {
     public void sectionExpression(String expressionId, String valueType) {
         checkOpen();
         sectionExpressions.put(expressionId, valueType);
+    }
+
+    @Override
+    public void deferredSectionExpression(String expressionId) {
+        checkOpen();
+        sectionExpressions.put(expressionId, SyntaxRegistry.OBJECT);
+        deferredSections.add(expressionId);
+        builder.sectionOnly(expressionId);
+    }
+
+    /** Whether expression {@code id}'s section runs later, its value being the section itself. */
+    boolean deferredSection(String id) {
+        return deferredSections.contains(id);
     }
 
     /** The type of value expression {@code id} runs a section for, or {@code null} if it doesn't take one. */
@@ -198,11 +248,67 @@ public final class Library implements Registrar {
     @Override
     @SuppressWarnings("unchecked")
     public <E> void eventValue(Class<E> eventClass, String typeId, java.util.function.Function<? super E, ?> getter) {
+        eventValue(eventClass, typeId, 0, getter);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <E> void eventValue(Class<E> eventClass, String typeId, int time,
+            java.util.function.Function<? super E, ?> getter) {
         checkOpen();
         if (!javaClasses.containsKey(typeId)) {
             throw new IllegalArgumentException("Event value of unknown type '" + typeId + "'");
         }
-        eventValues.add(new EventValue(eventClass, typeId, (java.util.function.Function<Object, ?>) getter));
+        if (time < -1 || time > 1) {
+            throw new IllegalArgumentException("Event value time must be -1, 0 or 1, not " + time);
+        }
+        eventValues.add(new EventValue(eventClass, typeId, time, null, (java.util.function.Function<Object, ?>) getter,
+                null));
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <E> void eventValue(Class<E> eventClass, String typeId, Class<?> valueClass, int time,
+            java.util.function.Function<? super E, ?> getter) {
+        checkOpen();
+        if (!javaClasses.containsKey(typeId)) {
+            throw new IllegalArgumentException("Event value of unknown type '" + typeId + "'");
+        }
+        eventValues.add(new EventValue(eventClass, typeId, time, valueClass,
+                (java.util.function.Function<Object, ?>) getter, null));
+    }
+
+    @Override
+    public void kindClass(String typeId, java.util.function.Function<Object, Class<?>> classOf) {
+        checkOpen();
+        kindClasses.put(typeId, classOf);
+    }
+
+    /**
+     * The class of what {@code words} name as a literal of {@code typeId}, like the entity class of
+     * {@code projectile}, or {@code null}.
+     */
+    Class<?> kindClass(String typeId, String words) {
+        java.util.function.Function<Object, Class<?>> classOf = kindClasses.get(typeId);
+        java.util.function.Function<String, ?> parser = literalParsers.get(typeId);
+        if (classOf == null || parser == null) {
+            return null;
+        }
+        try {
+            Object kind = parser.apply(words.strip());
+            return kind == null ? null : classOf.apply(kind);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    @Override
+    public void eventValueExcluded(Class<?> eventClass, String typeId, String message) {
+        checkOpen();
+        if (!javaClasses.containsKey(typeId)) {
+            throw new IllegalArgumentException("Event value of unknown type '" + typeId + "'");
+        }
+        eventValues.add(new EventValue(eventClass, typeId, 0, null, null, message));
     }
 
     @Override
@@ -271,24 +377,61 @@ public final class Library implements Registrar {
      * superclass wins, and among those, one of exactly {@code typeId}.
      */
     java.util.function.Function<Object, Object> eventValue(List<Class<?>> eventClasses, String typeId) {
-        SyntaxRegistry registry = registry();
+        try {
+            return eventValue(eventClasses, typeId, 0);
+        } catch (ExcludedEventValue excluded) {
+            return null;
+        }
+    }
+
+    /**
+     * {@link #eventValue(List, String)} at {@code time}: the value before the event ({@code -1}) or after it
+     * ({@code 1}), or the value now where an event has no other. Throws {@link ExcludedEventValue} if the events
+     * that would have it leave it out on purpose.
+     */
+    java.util.function.Function<Object, Object> eventValue(List<Class<?>> eventClasses, String typeId, int time) {
+        return eventValue(eventClasses, typeId, null, time);
+    }
+
+    /**
+     * {@link #eventValue(List, String, int)} for a narrower kind of value, of {@code narrow} ({@code null} for
+     * any): {@code event-projectile} is the event's projectile, or its entity if that's a projectile.
+     */
+    java.util.function.Function<Object, Object> eventValue(List<Class<?>> eventClasses, String typeId, Class<?> narrow,
+            int time) {
         List<Map.Entry<Class<?>, java.util.function.Function<Object, ?>>> getters = new ArrayList<>();
+        String excluded = null;
         for (Class<?> eventClass : eventClasses) {
             EventValue best = null;
-            for (EventValue value : eventValues) {
-                if (!value.eventClass().isAssignableFrom(eventClass)
-                        || !registry.isSubtype(value.type(), typeId)) {
-                    continue;
-                }
-                if (best == null || isBetter(value, best, typeId)) {
-                    best = value;
-                }
+            for (int at : time == 0 ? new int[] {0} : new int[] {time, 0}) {
+                best = best == null ? best(eventClass, typeId, at, narrow == null ? null : narrow) : best;
             }
-            if (best != null) {
-                getters.add(Map.entry(eventClass, best.getter()));
+            // Values of a kind are checked to be of the kind asked for: 'event-arrow' isn't any projectile. A
+            // plural ('event-blocks') without values of its own is the single value.
+            boolean filter = narrow != null && !narrow.isArray();
+            if (best == null && narrow != null) {
+                // A wider value, kept only when it's of the kind asked for.
+                for (int at : time == 0 ? new int[] {0} : new int[] {time, 0}) {
+                    best = best == null ? best(eventClass, typeId, at, null) : best;
+                }
+            } else if (best == null) {
+                // No plain value, but one of a narrower kind: the entity of a lightning strike is its lightning.
+                best = best(eventClass, typeId, 0, Object.class);
+            }
+            if (best != null && best.excluded() != null) {
+                excluded = best.excluded();
+            } else if (best != null) {
+                java.util.function.Function<Object, ?> getter = best.getter();
+                getters.add(Map.entry(eventClass, filter ? event -> {
+                    Object value = getter.apply(event);
+                    return narrow.isInstance(value) ? value : null;
+                } : getter));
             }
         }
         if (getters.isEmpty()) {
+            if (excluded != null) {
+                throw new ExcludedEventValue(excluded);
+            }
             return null;
         }
         if (getters.size() == 1 && eventClasses.size() == 1) {
@@ -305,11 +448,85 @@ public final class Library implements Registrar {
         };
     }
 
+    /**
+     * Whether any of {@code eventClasses} has a past or future value of {@code typeId} (or of the narrower kind),
+     * as time states need.
+     */
+    boolean hasTimeStates(List<Class<?>> eventClasses, String typeId, Class<?> narrow) {
+        for (Class<?> eventClass : eventClasses) {
+            for (int time : new int[] {-1, 1}) {
+                EventValue best = best(eventClass, typeId, time, null);
+                if (best == null && narrow != null) {
+                    best = best(eventClass, typeId, time, narrow);
+                }
+                if (best != null && best.excluded() == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The value of {@code typeId} at exactly {@code time} registered closest to {@code eventClass}, or null. With
+     * {@code narrow}, only values of a kind that is, or may be, of that one; without, only values of any kind.
+     */
+    private EventValue best(Class<?> eventClass, String typeId, int time, Class<?> narrow) {
+        SyntaxRegistry registry = registry();
+        EventValue best = null;
+        for (EventValue value : eventValues) {
+            if (value.time() != time || !value.eventClass().isAssignableFrom(eventClass)
+                    || !registry.isSubtype(value.type(), typeId)) {
+                continue;
+            }
+            if (narrow == null ? value.valueClass() != null : value.valueClass() == null
+                    || !narrow.isAssignableFrom(value.valueClass()) && !value.valueClass().isAssignableFrom(narrow)
+                    // Values of a kind in place of a plain value, but not several in place of one.
+                    || narrow == Object.class && value.valueClass().isArray()) {
+                continue;
+            }
+            if (best == null || isBetter(value, best, typeId)) {
+                best = value;
+            }
+        }
+        if (best != null) {
+            return best;
+        }
+        // As in Skript, a value of a narrower event will do, where the event is one: 'event-projectile' in any
+        // damage event is the projectile of damage by one.
+        for (EventValue value : eventValues) {
+            if (value.time() != time || value.excluded() != null || value.eventClass() == eventClass
+                    || !eventClass.isAssignableFrom(value.eventClass()) || !registry.isSubtype(value.type(), typeId)) {
+                continue;
+            }
+            if (narrow == null ? value.valueClass() != null : value.valueClass() == null
+                    || !narrow.isAssignableFrom(value.valueClass()) && !value.valueClass().isAssignableFrom(narrow)
+                    || narrow == Object.class && value.valueClass().isArray()) {
+                continue;
+            }
+            if (best == null || best.eventClass() != value.eventClass()
+                    && value.eventClass().isAssignableFrom(best.eventClass())) {
+                best = value;
+            }
+        }
+        if (best == null) {
+            return null;
+        }
+        Class<?> narrower = best.eventClass();
+        java.util.function.Function<Object, ?> getter = best.getter();
+        return new EventValue(narrower, best.type(), best.time(), best.valueClass(),
+                event -> narrower.isInstance(event) ? getter.apply(event) : null, null);
+    }
+
     private static boolean isBetter(EventValue value, EventValue than, String typeId) {
         if (value.eventClass() != than.eventClass()) {
             return than.eventClass().isAssignableFrom(value.eventClass());
         }
-        return value.type().equals(typeId) && !than.type().equals(typeId);
+        // For the same class, one of exactly the type asked for; then an exclusion over a value.
+        if (value.type().equals(typeId) != than.type().equals(typeId)) {
+            return value.type().equals(typeId);
+        }
+        return value.excluded() != null && than.excluded() == null;
     }
 
     @Override
@@ -386,6 +603,11 @@ public final class Library implements Registrar {
     @Override
     public <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText) {
         Values.registerText(type, toText);
+    }
+
+    @Override
+    public <T> void variableNameText(Class<T> type, java.util.function.Function<? super T, String> toText) {
+        Values.registerNameText(type, toText);
     }
 
     /**

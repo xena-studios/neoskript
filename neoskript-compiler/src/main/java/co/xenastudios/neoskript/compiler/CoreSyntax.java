@@ -29,6 +29,8 @@ final class CoreSyntax {
     static final String TEST = "TestCase";
     static final String EXAMPLE = "StructExample";
     static final String ASSERT = "EffAssert";
+    /** {@code assert X to fail} where X isn't a condition at all: as in Skript, that has failed as expected. */
+    static final String ASSERT_UNPARSED = "EffAssertUnparsed";
     static final String PARSE_LOGS = "ExprLastParseLogs";
     static final String DELAY = "Delay";
     static final String CAST = "ExprCast";
@@ -36,6 +38,7 @@ final class CoreSyntax {
     static final String HAS_DELAY = "ExprHasDelay";
     static final String DELAY_CHECK = "CondDelayCheck";
     static final String EVENT_VALUE = "ExprEventValue";
+    static final String TIME_STATE = "ExprTimeState";
     static final String EVENT_VALUE_ENTITY = "ExprEventEntity";
     static final String EVENT_ENTITY_BARE = "ExprEventEntityBare";
     static final String ARGUMENT = "ExprArgument";
@@ -104,9 +107,14 @@ final class CoreSyntax {
     /** Skript's test syntax, as its own test suite uses it: only registered in test mode. */
     static void registerTesting(Library library) {
         library.core(SyntaxKind.STRUCTURE, TEST, null, List.of(RegexRole.CONDITION), "test %string% [when <.+>]");
+        // With 'to fail' first: where both read the condition with unresolved words, the one leaning on fewer
+        // wins, so 'X is set to fail' is X failing to be set, not X being 'set to fail'.
         library.core(SyntaxKind.EFFECT, ASSERT, null, List.of(RegexRole.CONDITION),
-                "assert [unsafely] <.+> [fail:to fail] [with [error] %string%[, expected %objects%][, got %objects%]]");
-        library.core(SyntaxKind.EXPRESSION, PARSE_LOGS, "string", List.of(), "[the] last parse logs");
+                "assert [unsafely] <.+> (fail:to fail) [with [error] %string%[, expected %objects%][, got %objects%]]",
+                "assert [unsafely] <.+> [with [error] %string%[, expected %objects%][, got %objects%]]");
+        library.core(SyntaxKind.EFFECT, ASSERT_UNPARSED, null, List.of(RegexRole.NOT_CONDITION),
+                "assert [unsafely] <.+> to fail [with [error] %string%[, expected %objects%][, got %objects%]]");
+        library.core(SyntaxKind.EXPRESSION, PARSE_LOGS, "string", List.of(), "[the] [last] parse logs");
 
         // Whether the trigger may have waited at this point: true, false or unknown.
         library.literalType("kleenean", "kleenean", java.util.Set.of("unknown"), word -> word);
@@ -272,6 +280,10 @@ final class CoreSyntax {
         // library's expressions, as Skript tries it after most: 'difference between {_a} and "5" parsed as a
         // number' is the difference with a parsed number.
         library.core(SyntaxKind.EXPRESSION, PARSE, "object", List.of(RegexRole.TYPE), "%text% parsed as [a[n]] <.+>");
+        // 'past event-block', 'event-item after the event': an event value before or after the event.
+        library.core(SyntaxKind.EXPRESSION, TIME_STATE, "object", List.of(),
+                "[the] (former|past|old) [state] [of] %objects%", "%objects% before [the event]",
+                "[the] (future|to-be|new) [state] [of] %objects%", "%objects%(-to-be| after[(wards| the event)])");
         // 'player', 'event-world': the event's value of that type. Tried last, as it matches any type name.
         library.core(SyntaxKind.EXPRESSION, EVENT_VALUE, "object", List.of(RegexRole.TYPE), "[the] [event-]<.+>");
         // 'the zombie', 'event-creeper': a kind of entity is the event's entity only when it says so; alone,

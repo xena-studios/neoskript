@@ -30,5 +30,10 @@ public enum RegexRole {
      */
     LOOP_VALUE,
     /** A condition, else an effect, else an expression: whatever code Skript's test {@code assert} wraps. */
-    CODE
+    CODE,
+    /**
+     * Text that isn't a condition at all, as in Skript's test {@code assert <.+> to fail}: a condition that
+     * can't even be parsed has failed as expected.
+     */
+    NOT_CONDITION
 }

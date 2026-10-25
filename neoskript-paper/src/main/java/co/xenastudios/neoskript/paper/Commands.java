@@ -56,7 +56,7 @@ final class Commands {
                     }
                 }
             };
-        }, "execute [the] [bungee[cord]] command[s] %texts% [by %commandsenders%]",
+        }, "execute [the] [bungee[cord]] command[s] %texts% [by %-commandsenders%]",
                 "execute [the] %commandsenders% [bungee[cord]] command[s] %texts%",
                 "(let|make) %commandsenders% execute [[the] [bungee[cord]] command[s]] %texts%");
 

@@ -201,6 +201,12 @@ final class ScriptManager {
             }
         }
         if (only == null) {
+            // Scripts that are gone run their unload events first.
+            loaded.forEach((name, old) -> {
+                if (!byName.containsKey(name)) {
+                    runUnload(old);
+                }
+            });
             loaded.keySet().removeIf(name -> !byName.containsKey(name));
             loadedCommands.keySet().removeIf(name -> !byName.containsKey(name));
             for (String name : List.copyOf(periodic.keySet())) {
@@ -223,6 +229,8 @@ final class ScriptManager {
             }
         }
         for (String name : switching) {
+            // The previous version of a script unloads before the new one loads.
+            runUnload(loaded.getOrDefault(name, List.of()));
             loaded.put(name, triggers.getOrDefault(name, List.of()));
             loadedCommands.put(name, scriptCommands.getOrDefault(name, List.of()));
         }
@@ -433,6 +441,20 @@ final class ScriptManager {
     private static boolean isEnabledScript(Path path) {
         String name = path.getFileName().toString();
         return name.endsWith(".sk") && !name.startsWith("-") && Files.isRegularFile(path);
+    }
+
+    /** Runs the unload events ({@code on script unload}) of a script's triggers. */
+    private void runUnload(List<CompiledScripts.CompiledTrigger> triggers) {
+        for (CompiledScripts.CompiledTrigger trigger : triggers) {
+            if (trigger.event() == ScriptEvent.UNLOAD) {
+                run(trigger);
+            }
+        }
+    }
+
+    /** Runs every loaded script's unload events, as the server stops. */
+    synchronized void unloadAll() {
+        loaded.values().forEach(this::runUnload);
     }
 
     private void run(CompiledScripts.CompiledTrigger trigger) {

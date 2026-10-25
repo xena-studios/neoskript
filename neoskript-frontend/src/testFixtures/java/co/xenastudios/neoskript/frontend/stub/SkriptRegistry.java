@@ -196,6 +196,8 @@ public final class SkriptRegistry {
         builder.assignable("textcomponent", "string");
         builder.assignable("timeperiod", "time");
         builder.assignable("vector", "direction");
+        // Skript converts UUIDs to text.
+        builder.assignable("uuid", "string");
     }
 
     /**
@@ -224,9 +226,9 @@ public final class SkriptRegistry {
         syntax(builder, SyntaxKind.EFFECT, "TestAssert", null,
                 "assert <.+> [to fail] [with [error] %string%[, expected %objects%][, got %objects%]]");
         syntax(builder, SyntaxKind.EXPRESSION, "TestParseLogs", "string", "[the] last parse logs");
-        syntax(builder, SyntaxKind.EXPRESSION, "TestLocation", "location", "[the] test-location");
-        syntax(builder, SyntaxKind.EXPRESSION, "TestBlock", "block", "[the] test-block");
-        syntax(builder, SyntaxKind.EXPRESSION, "TestWorld", "world", "[the] test-world");
+        syntax(builder, SyntaxKind.EXPRESSION, "TestLocation", "location", "[the] test(-| )location");
+        syntax(builder, SyntaxKind.EXPRESSION, "TestBlock", "block", "[the] test(-| )block");
+        syntax(builder, SyntaxKind.EXPRESSION, "TestWorld", "world", "[the] test(-| )world");
         syntax(builder, SyntaxKind.EVENT, "TestEvent", null, "test %string%");
         syntax(builder, SyntaxKind.STRUCTURE, "TestExampleStructure", null, "example");
         syntax(builder, SyntaxKind.CONDITION, "TestMethodExists", null, "method %string% (exists|doesn't exist)");

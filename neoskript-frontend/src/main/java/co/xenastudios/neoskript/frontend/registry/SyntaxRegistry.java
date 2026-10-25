@@ -40,6 +40,8 @@ public final class SyntaxRegistry {
     private final Map<String, List<FunctionInfo>> functions;
     private final Map<String, Set<String>> supertypes;
     private final Set<String> strictTypes;
+    /** Types whose values can all be listed, though they aren't a closed set of words: {@code all biomes}. */
+    private final Set<String> enumerableTypes;
     private final Map<String, java.util.function.Predicate<String>> literalChecks;
     /** Direct conversions, which unlike subtypes don't chain: {@code from -> {to...}}. */
     private final Map<String, Set<String>> conversions;
@@ -48,6 +50,7 @@ public final class SyntaxRegistry {
     private final Set<String> stopping;
     private final Set<String> ending;
     private final Set<String> suppressing;
+    private final Set<String> sectionOnly;
     private final Map<String, ParseCheck> checks;
 
     private SyntaxRegistry(Builder builder) {
@@ -78,6 +81,7 @@ public final class SyntaxRegistry {
         this.functions = Map.copyOf(functions);
         this.supertypes = closure(builder.supertypes);
         this.strictTypes = Set.copyOf(builder.strictTypes);
+        this.enumerableTypes = Set.copyOf(builder.enumerableTypes);
         this.literalChecks = Map.copyOf(builder.literalChecks);
         Map<String, Set<String>> conversions = new HashMap<>();
         builder.conversions.forEach((from, to) -> conversions.put(from, Set.copyOf(to)));
@@ -87,6 +91,7 @@ public final class SyntaxRegistry {
         this.stopping = Set.copyOf(builder.stopping);
         this.ending = Set.copyOf(builder.ending);
         this.suppressing = Set.copyOf(builder.suppressing);
+        this.sectionOnly = Set.copyOf(builder.sectionOnly);
         this.checks = Map.copyOf(builder.checks);
     }
 
@@ -109,6 +114,11 @@ public final class SyntaxRegistry {
     /** Whether the syntax element suppresses or allows warnings while parsing, by the tags it matched with. */
     public boolean suppressesWarnings(SyntaxInfo syntax) {
         return suppressing.contains(syntax.kind() + ":" + syntax.id());
+    }
+
+    /** Whether the expression can only be used with a section under it, as Skript's section-only expressions. */
+    public boolean sectionOnly(SyntaxInfo syntax) {
+        return sectionOnly.contains(syntax.id());
     }
 
     /** The check the syntax element makes while it's parsed, or {@code null} if it makes none. */
@@ -170,6 +180,12 @@ public final class SyntaxRegistry {
             return true;
         }
         return !strictTypes.contains(from) && !strictTypes.contains(to);
+    }
+
+    /** Whether {@code all <type>} can list the values of type {@code id}: a closed set, or values listed later. */
+    public boolean isEnumerable(String id) {
+        TypeInfo type = type(id);
+        return type != null && (!type.literals().isEmpty() || enumerableTypes.contains(type.id().toLowerCase(Locale.ROOT)));
     }
 
     /** Whether {@code from} converts directly to {@code to}. */
@@ -307,6 +323,7 @@ public final class SyntaxRegistry {
         private final Map<String, List<FunctionInfo>> functions = new HashMap<>();
         private final Map<String, Set<String>> supertypes = new HashMap<>();
         private final Set<String> strictTypes = new HashSet<>();
+        private final Set<String> enumerableTypes = new HashSet<>();
         private final Map<String, java.util.function.Predicate<String>> literalChecks = new HashMap<>();
         private final Map<String, Set<String>> conversions = new HashMap<>();
         private final Set<String> entityNames = new HashSet<>();
@@ -314,6 +331,7 @@ public final class SyntaxRegistry {
         private final Set<String> stopping = new HashSet<>();
         private final Set<String> ending = new HashSet<>();
         private final Set<String> suppressing = new HashSet<>();
+        private final Set<String> sectionOnly = new HashSet<>();
         private final Map<String, ParseCheck> checks = new HashMap<>();
 
         private Builder() {}
@@ -342,6 +360,12 @@ public final class SyntaxRegistry {
         /** Marks a syntax element as suppressing or allowing warnings while parsing, by its tags. */
         public Builder suppressesWarnings(SyntaxKind kind, String id) {
             suppressing.add(kind + ":" + id);
+            return this;
+        }
+
+        /** Marks an expression as only usable with a section under it. */
+        public Builder sectionOnly(String id) {
+            sectionOnly.add(id);
             return this;
         }
 
@@ -434,7 +458,14 @@ public final class SyntaxRegistry {
             return this;
         }
 
+        /** Lets {@code all <type>} list the values of type {@code id}, as for biomes. */
+        public Builder enumerable(String id) {
+            enumerableTypes.add(id.toLowerCase(Locale.ROOT));
+            return this;
+        }
+
         /** Types that only accept themselves and registered conversions, like numbers and text. */
+
         public Builder strict(String... types) {
             strictTypes.addAll(List.of(types));
             return this;

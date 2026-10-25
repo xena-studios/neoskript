@@ -79,6 +79,7 @@ class EventsTest {
         library = new Library();
         library.type("string", "text", String.class);
         library.type("person", "person", Person.class);
+        library.type("number", "number", Number.class);
         library.event("ScriptLoad", ScriptEvent.LOAD, "[script] load");
         library.event("Greet", List.of(Greeting.class),
                 info -> (context, args) -> args[0] == null || ((Greeting) context.event()).person.name.equals(args[0]),
@@ -170,8 +171,17 @@ class EventsTest {
 
     @Test
     void anEventWithoutTheValueIsAnError() {
-        assertEquals("There's no text in a greet event", error("on greet:\n\tsay event-text\n"));
+        assertEquals("There's no number in a greet event", error("on greet:\n\tsay event-number\n"));
         assertTrue(error("on load:\n\tsay person\n").startsWith("There's no person in"));
+    }
+
+    @Test
+    void aNarrowerEventsValueIsTheValueWhenTheEventIsOne() {
+        // As in Skript: a farewell is a greeting, so a greeting's trigger can ask for a farewell's text.
+        String script = "on greet:\n\tsay event-text\n";
+        fire(script, new Greeting(new Person("Alice", false)));
+        fire(script, new Farewell(new Person("Bob", false)));
+        assertEquals(List.of("[]", "[bye]"), said);
     }
 
     @Test

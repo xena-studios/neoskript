@@ -543,6 +543,13 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **Players, server and world:** the server's operators, online player counts (real and shown), plugins, world properties, and Skript's location expression with directions (`spawn a pig 2 meters above X`).
     - **Still to do, largest first:** most of Skript's events, text components, equippable components, particles, loot tables, boss bars, custom operators, expression sections.
 
+    **Batch 16 (2026-10-25): 776 → 803 tests pass.**
+    - **Events:** most of Skript's events, with their filters, event values (past and future ones too, and plural ones like `event-blocks`) and Skript's errors; NeoSkript fires the ones Bukkit has no event for (`at 6:00`, `on server start`, `on script unload`, experience spawns). Event expressions: damage, attacker, victim, drops, dropped experience, messages, reasons, `clicked`, moved and absorbed blocks, and more.
+    - **Plurality:** several values where only one goes is an error, as in Skript ("'{_l::*}' can only be a single location, not more."), going by Skript's own elements.
+    - **Expression sections that run later** (Skript's test runnables), with Skript's errors when two things claim a line's section, and errors for a left-out value the event doesn't have ("There's no potion effect in an on test case event").
+    - **Loot tables and boss bars**, as Skript's modules have them.
+    - **Entity data:** panda genes, thrown potions, zombie nautiluses; literal specifications (`black (cat type)`), `all biomes`, Skript's enum types by their names, `using local axes`, blocks that aren't items (`oak wall sign`, `void air`), and tags before a choice (`:(a|b)`) as Skript sets them.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.

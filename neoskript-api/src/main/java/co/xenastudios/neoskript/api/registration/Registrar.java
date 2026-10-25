@@ -36,6 +36,13 @@ public interface Registrar {
      */
     <T> void namedType(String id, String name, Class<T> javaClass, java.util.Map<String, ? extends T> values);
 
+    /**
+     * Lets scripts list every value of type {@code id} with {@code all <type>}, like {@code all biomes}, for
+     * types that aren't a fixed set of names. {@code values} is asked each time, when scripts run, so it may
+     * read the server's registries.
+     */
+    void allValues(String id, java.util.function.Supplier<? extends Iterable<?>> values);
+
     /** Another name for a type in patterns and scripts, like {@code int} for {@code integer}. */
     void alias(String typeId, String singular, String plural);
 
@@ -82,6 +89,13 @@ public interface Registrar {
     void sectionExpression(String expressionId, String valueType);
 
     /**
+     * Lets expression {@code expressionId} take a section that runs later, as Skript's test runnables do:
+     * {@code set {_r} to a new runnable:}. The expression's value is the section itself, a {@link Runnable}
+     * that runs the code under it with the local variables of the trigger it was made in.
+     */
+    void deferredSectionExpression(String expressionId);
+
+    /**
      * A property expression, {@code [the] <property> of %owners%} and {@code %owners%'[s] <property>}: the
      * value of {@code getter} for each owner of {@code ownerClass}. Owners of other classes, and
      * {@code null} results, are left out.
@@ -109,6 +123,35 @@ public interface Registrar {
      * @param typeId the id of the value's type
      */
     <E> void eventValue(Class<E> eventClass, String typeId, java.util.function.Function<? super E, ?> getter);
+
+    /**
+     * An event value at a time state, as Skript's: {@code past event-block} ({@code time} -1) is the block before
+     * the event, {@code future event-item} (1) the item after it. 0 is the value now, as
+     * {@link #eventValue(Class, String, java.util.function.Function)} registers. Where an event has no value for
+     * a time state, the value now is used, but a time state can only be written where some value has one.
+     */
+    <E> void eventValue(Class<E> eventClass, String typeId, int time, java.util.function.Function<? super E, ?> getter);
+
+    /**
+     * Events of {@code eventClass} (and subclasses) don't have a value of {@code typeId}, though a superclass
+     * does: asking for it is an error with {@code message}, as Skript's {@code event-entity} in a damage event.
+     */
+    void eventValueExcluded(Class<?> eventClass, String typeId, String message);
+
+    /**
+     * An event value of {@code typeId} that's only for a narrower kind, whose values are {@code valueClass}:
+     * {@code event-projectile} in a damage event is the projectile that hit, though {@code event-entity} isn't.
+     * Where a trigger asks for a kind (see {@link #kindClass}) that an event has no such value for, its plain value
+     * is used if it's of that kind.
+     */
+    <E> void eventValue(Class<E> eventClass, String typeId, Class<?> valueClass, int time,
+            java.util.function.Function<? super E, ?> getter);
+
+    /**
+     * What class of values a literal of {@code typeId} stands for, as an entity type stands for its entities:
+     * {@code event-projectile} asks for an event value of the class {@code projectile} gives.
+     */
+    void kindClass(String typeId, java.util.function.Function<Object, Class<?>> classOf);
 
     /**
      * Where a placeholder of {@code typeId} sits in an optional part that wasn't used, it gets the event's
@@ -182,4 +225,10 @@ public interface Registrar {
 
     /** How values of {@code type} read as text, as when embedded in a string. */
     <T> void text(Class<T> type, java.util.function.Function<? super T, String> toText);
+
+    /**
+     * How values of {@code type} read in variable names ({@code {_x::%block%}}) where that isn't their text,
+     * as with Skript's {@code toVariableNameString}.
+     */
+    <T> void variableNameText(Class<T> type, java.util.function.Function<? super T, String> toText);
 }

@@ -24,6 +24,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     private VariableStorage storage;
     private ScriptCommands commands;
+    private ScriptManager scripts;
 
     /** https://bstats.org/plugin/bukkit/NeoSkript/34868 */
     private static final int BSTATS_PLUGIN_ID = 34868;
@@ -90,7 +91,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         EventDispatcher events = new EventDispatcher(this, getSLF4JLogger(), eventPriority(),
                 getConfig().getBoolean("events.listen-to-cancelled", false));
         commands = new ScriptCommands(this, getSLF4JLogger(), scheduler);
-        ScriptManager scripts = new ScriptManager(getDataPath().resolve("scripts"), library, scheduler, events,
+        scripts = new ScriptManager(getDataPath().resolve("scripts"), library, scheduler, events,
                 commands, getSLF4JLogger(), TestRunner.enabled() ? () -> getServer().shutdown() : null);
         co.xenastudios.neoskript.runtime.ScriptCatalog.install(scripts.catalog());
         storage = new VariableStorage(scripts.globals(), library.codecs(),
@@ -101,6 +102,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         } catch (IOException e) {
             getSLF4JLogger().error("Couldn't read the scripts folder", e);
         }
+        // Events NeoSkript fires itself: experience spawning, times of day, starting and stopping.
+        co.xenastudios.neoskript.paper.EventBridges.start(this, eventPriority());
         // D10: NeoSkript takes over /skript and /sk, with /neoskript as an alias.
         getCommand("skript").setExecutor(new SkriptCommand(scripts, getPluginMeta().getVersion()));
     }
@@ -154,6 +157,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (scripts != null) {
+            co.xenastudios.neoskript.paper.EventBridges.stop();
+            scripts.unloadAll();
+        }
         getServer().getAsyncScheduler().cancelTasks(this);
         if (commands != null) {
             commands.unregister(getServer().getCommandMap());

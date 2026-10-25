@@ -19,3 +19,27 @@ on command "nsk-wait":
 	cancel event
 	wait 2 ticks
 	send "[harness] events after wait: %sender%" to console
+
+# Entity and world events, driven by a command that spawns, hurts and kills a pig and makes it rain.
+on command "nsk-pig":
+	cancel event
+	spawn a pig at spawn of world "world"
+	damage last spawned entity by 1
+	kill last spawned entity
+	set weather of world "world" to rain
+
+on spawn of pig:
+	send "[harness] events spawned %event-entity%" to console
+
+on spawn of a zombie:
+	send "[harness] events wrong spawn filter ran" to console
+
+on damage of pig:
+	send "[harness] events damage %damage% by %damage cause%" to console
+
+on death of pig:
+	send "[harness] events death of %victim%" to console
+	clear drops
+
+on weather change to rain:
+	send "[harness] events weather in %event-world% to rain" to console

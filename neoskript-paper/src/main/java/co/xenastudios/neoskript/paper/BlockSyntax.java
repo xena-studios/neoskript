@@ -157,8 +157,14 @@ final class BlockSyntax {
     /** Block data written as {@code campfire[lit=false]} or {@code minecraft:stone[]}, or {@code null}. */
     static BlockData blockData(String text) {
         String words = text.strip().toLowerCase(Locale.ROOT).replaceFirst("^(?:an?|the) ", "");
-        if (words.isEmpty() || words.contains(" ") && !words.contains("[")) {
+        if (words.isEmpty()) {
             return null;
+        }
+        if (words.contains(" ") && !words.contains("[")) {
+            // A block that isn't an item, by its name, as Skript names every material: 'oak wall sign', 'void air'.
+            org.bukkit.Material material = org.bukkit.Material.matchMaterial(words.replace(' ', '_'));
+            return material != null && material.isBlock() && !material.isItem() && !material.isLegacy()
+                    ? material.createBlockData() : null;
         }
         int bracket = words.indexOf('[');
         String written = (bracket < 0 ? words : words.substring(0, bracket)).strip();

@@ -52,6 +52,7 @@ final class LineParser {
     /** How many times code in a regex part was turned down for leaning on unresolved words. */
     private int unresolvedCode;
     private String functionProblem;
+    private String problem;
     /** Per kind, the unindexed patterns whose required literals all occur somewhere in the line. */
     private final Map<SyntaxKind, List<PatternIndex.Entry<SyntaxRegistry.Candidate>>> viableUnindexed =
             new EnumMap<>(SyntaxKind.class);
@@ -192,9 +193,9 @@ final class LineParser {
             if (syntax.id().equals("ExprArithmetic") && !arithmeticOperands(parsed)) {
                 continue;
             }
-            // 'all colours' only for types with a fixed set of values; 'all players' is something else's.
+            // 'all colours' only for types whose values can be listed; 'all players' is something else's.
             if (syntax.id().equals("ExprSets") && !parsed.match().regexValues().isEmpty()
-                    && !(parsed.match().regexValues().getFirst() instanceof TypeRef ref && !ref.type().literals().isEmpty())) {
+                    && !(parsed.match().regexValues().getFirst() instanceof TypeRef ref && registry.isEnumerable(ref.type().id()))) {
                 continue;
             }
             Object result = parsed;
@@ -204,6 +205,13 @@ final class LineParser {
                     continue;
                 }
                 result = new Expr.Syntax(start, end, parsed, type);
+                // Several values can't go where one does: 'test location' isn't the entities called 'test'.
+                if (expected.onlyOne() && Plurality.plural((Expr) result, registry)) {
+                    if (problem == null) {
+                        problem = "'" + text.strip() + "' can only be a single " + typeNames(expected) + ", not more.";
+                    }
+                    continue;
+                }
             }
             // A parse that leans on unresolved words only wins if nothing parses without them, as Skript
             // only accepts real literals: 'loot context at test-location' isn't '(...test) - location'.
@@ -263,7 +271,8 @@ final class LineParser {
 
     /** {@code code}, unless {@code strict} and it leans on unresolved words; counts each one turned down. */
     private ParsedSyntax strict(ParsedSyntax code, boolean strict) {
-        if (strict && code != null && hasUnresolved(code)) {
+        // Words a type's parser took, like 'wooden hoe', are as good as resolved.
+        if (strict && code != null && countUnresolved(code) > 0) {
             unresolvedCode++;
             return null;
         }
@@ -445,6 +454,7 @@ final class LineParser {
                                 ? new TypeRef(entity, false) : null;
                     }
                     case LOOP_VALUE -> isLoopValueName(text.substring(start, end)) ? match : null;
+                    case NOT_CONDITION -> condition(start, end) == null ? match : null;
                     case CODE -> {
                         Object code = condition(start, end);
                         if (code == null) {
@@ -482,10 +492,20 @@ final class LineParser {
             return null;
         }
         Expr expr = single(start, end, expected);
+        if (expr != null && !(expr instanceof Expr.Unresolved) && hasUnresolved(expr)) {
+            // Words a type's parser takes whole are that literal, not syntax leaning on unresolved words, as
+            // Skript's syntax can't take words it can't parse: 'baby normal-normal panda' isn't a subtraction.
+            Expr whole = verifiedLiteral(start, end, expected);
+            if (whole != null) {
+                expr = whole;
+            }
+        }
         if (expr != null && expected.plural() && hasUnresolved(expr)) {
             // Leaning on unresolved words loses to a list that doesn't: '1 or 0 or -1' isn't '(1 or 0 or) - 1'.
+            // Nor to one whose words are known literals: 'the block at the event-location and an oak sign'
+            // isn't '(the block at the event) - (location and an oak sign)'.
             Expr list = list(start, end, expected);
-            if (list != null && !hasUnresolved(list)) {
+            if (list != null && (!hasUnresolved(list) || countUnresolved(list) < countUnresolved(expr))) {
                 expr = list;
             }
         }
@@ -503,7 +523,33 @@ final class LineParser {
         if (expr != null && expected.changeable() && !isChangeable(expr)) {
             return null;
         }
+        if (expr != null && expected.onlyOne() && Plurality.plural(expr, registry)) {
+            // Several values where only one goes, as Skript's parser checks. A word that may yet be a value of
+            // the type ('dirt', not the entities called that) is still one.
+            Expr word = unresolved(start, end, expected);
+            if (word != null) {
+                return word;
+            }
+            problem("'" + input.substring(start, end) + "' can only be a single " + typeNames(expected) + ", not more.");
+            return null;
+        }
         return expr;
+    }
+
+    /** The types expected, as Skript lists them in errors: {@code number, text or player}. */
+    private static String typeNames(Expected expected) {
+        List<TypeInfo> types = expected.types();
+        if (types.isEmpty()) {
+            return "object";
+        }
+        StringBuilder names = new StringBuilder();
+        for (int i = 0; i < types.size(); i++) {
+            if (i > 0) {
+                names.append(i == types.size() - 1 ? " or " : ", ");
+            }
+            names.append(types.get(i).name().toLowerCase(java.util.Locale.ROOT));
+        }
+        return names.toString();
     }
 
     private Expr single(int start, int end, Expected expected) {
@@ -902,7 +948,14 @@ final class LineParser {
 
     /** The first problem found with a function call in this line, in Skript's wording, or {@code null}. */
     String functionProblem() {
-        return functionProblem;
+        return functionProblem != null ? functionProblem : problem;
+    }
+
+    /** A problem found while parsing, reported if the line doesn't parse at all. */
+    private void problem(String found) {
+        if (problem == null) {
+            problem = found;
+        }
     }
 
     private void functionProblem(String problem) {
@@ -993,6 +1046,20 @@ final class LineParser {
         }
         Iterable<TypeInfo> types = expected.anything() ? registry.types() : expected.types();
         for (TypeInfo type : types) {
+            if (type.openLiterals() && registry.isLiteral(type, text)) {
+                return new Expr.Unresolved(start, end, text, true);
+            }
+        }
+        return null;
+    }
+
+    /** {@code [start, end)} as words an expected open type's parser takes, or {@code null}. */
+    private Expr verifiedLiteral(int start, int end, Expected expected) {
+        String text = input.substring(start, end);
+        if (expected.anything() || !Literals.isWords(text)) {
+            return null;
+        }
+        for (TypeInfo type : expected.types()) {
             if (type.openLiterals() && registry.isLiteral(type, text)) {
                 return new Expr.Unresolved(start, end, text, true);
             }
