@@ -560,6 +560,11 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **Directions** as Skript's `Direction` and `ExprDirection`: relative and absolute ones, diagonals, `in the direction of`, chains, storable in variables; block lines and cuboids as Skript's `ExprBlocks`.
     - **Language:** Skript's variable name checks and single-colon warning, its pretty quotes error, its warning for words with several types (`'unknown' has multiple types (...)`), function call errors as Skript gives them (unreadable arguments as `?`, the function probably meant), a time unit alone (`wait tick`), hyphenated words kept whole (`loop-value - 1`), block displays of block data, and warnings logged as warnings.
 
+    **Batch 19 (2026-10-25): 856 → 862 tests pass (of 862): the whole Skript 2.17 test suite passes.**
+    - **Particles and game effects** as Skript's particle module has them: particles by Skript's names with counts, directional, converging and scalable particles, particles with data, offset, distribution, speed and velocity, `draw`/`play`/`show` for particles and game effects, entity effects, and play sound with Skript's patterns (seed, category, both orders).
+    - **Language:** an effect section that refuses a section written under it gives Skript's error; within one pattern a split with no unresolved words wins.
+    - Known differences: particles and game effects can't be saved in variable files yet, and a particle that needs data gives the generic error rather than Skript's "requires data".
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.

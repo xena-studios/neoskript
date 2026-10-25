@@ -12,12 +12,9 @@ import co.xenastudios.neoskript.runtime.Values;
 import java.util.List;
 import java.util.UUID;
 import net.kyori.adventure.audience.Audience;
-import net.kyori.adventure.key.Key;
-import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
-import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.LivingEntity;
@@ -261,46 +258,6 @@ final class Players {
             }
             };
         }, "send [the] action[ ]bar [with text] %object% [to %audiences%]");
-
-        registrar.effect("EffPlaySound", info -> (context, args) -> {
-            float volume = args[1] instanceof Number v ? v.floatValue() : 1;
-            float pitch = args[2] instanceof Number p ? p.floatValue() : 1;
-            Object[] players = args[3] == null ? null : (Object[]) args[3];
-            Object[] where = args[4] == null ? null : (Object[]) args[4];
-            for (Object name : (Object[]) args[0]) {
-                Key key;
-                try {
-                    key = Key.key(Values.text(name).toLowerCase(java.util.Locale.ROOT));
-                } catch (RuntimeException e) {
-                    continue;
-                }
-                Sound sound = Sound.sound(key, Sound.Source.MASTER, volume, pitch);
-                if (where == null) {
-                    for (Object player : players == null ? new Object[0] : players) {
-                        if (player instanceof Player p) {
-                            p.playSound(sound, Sound.Emitter.self());
-                        }
-                    }
-                    continue;
-                }
-                for (Object place : where) {
-                    Location location = place instanceof Entity e ? e.getLocation() : place instanceof Location l ? l : null;
-                    if (location == null) {
-                        continue;
-                    }
-                    if (players == null) {
-                        location.getWorld().playSound(sound, location.getX(), location.getY(), location.getZ());
-                    } else {
-                        for (Object player : players) {
-                            if (player instanceof Player p) {
-                                p.playSound(sound, location.getX(), location.getY(), location.getZ());
-                            }
-                        }
-                    }
-                }
-            }
-        }, "play sound[s] %texts% [(at|with) volume %-number%] [(and|at|with) pitch %-number%] [(to|for) %-players%] "
-                + "[(at|on|from) %locations/entities%]");
     }
 
     /** Whether there are values, and {@code test} holds for every one (which has to be a {@code type}). */

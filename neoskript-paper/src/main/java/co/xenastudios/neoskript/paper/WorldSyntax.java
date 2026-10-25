@@ -1040,8 +1040,6 @@ final class WorldSyntax {
         }, "rotate %vectors% around %vector% by %number% [degrees]");
         registrar.expression("ExprYawPitch", "number", info -> new YawPitch(info.hasTag("pitch")),
                 "[the] (yaw|pitch:pitch)[s] of %entities/locations%", "%entities/locations%'[s] (yaw|pitch:pitch)[s]");
-        registrar.expression("ExprVelocity", "vector", info -> new SettableProperty<>(Entity.class, Vector.class,
-                Entity::getVelocity, Entity::setVelocity), "[the] velocit(y|ies) of %entities%", "%entities%'[s] velocit(y|ies)");
         registrar.condition("CondHasLineOfSight", info -> {
             boolean negated = info.pattern() >= 1;
             return (context, args) -> {
