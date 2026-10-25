@@ -1021,11 +1021,11 @@ final class Items {
             }
             return holders.size() == 1 ? holders.getFirst() : holders.toArray();
         }, "[the] holder[s] of %inventories%", "%inventories%'[s] holder[s]");
-        // Where an inventory's holder is: a block's centre, as for blocks; a double chest's left half.
+        // Where an inventory's holder is: its block's location, as for blocks; a double chest's left half.
         registrar.converter(InventoryHolder.class, org.bukkit.Location.class, holder -> switch (holder) {
-            case org.bukkit.block.BlockState state -> state.getLocation().add(0.5, 0.5, 0.5);
+            case org.bukkit.block.BlockState state -> Direction.blockLocation(state.getBlock());
             case org.bukkit.block.DoubleChest chest when chest.getLeftSide() instanceof org.bukkit.block.BlockState left ->
-                    left.getLocation().add(0.5, 0.5, 0.5);
+                    Direction.blockLocation(left.getBlock());
             case org.bukkit.entity.Entity entity -> entity.getLocation();
             default -> null;
         });

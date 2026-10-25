@@ -128,13 +128,14 @@ public final class PatternCompiler {
         return new PatternElement.Sequence(elements);
     }
 
-    /** The index of {@code ¦} if the alternative starts with {@code digits¦}, otherwise -1. */
+    /** The index of {@code ¦} if the alternative starts with {@code digits¦} or {@code -digits¦}, otherwise -1. */
     private int markEnd() {
-        int i = pos;
+        int start = pos < source.length() && source.charAt(pos) == '-' ? pos + 1 : pos;
+        int i = start;
         while (i < source.length() && Character.isDigit(source.charAt(i))) {
             i++;
         }
-        return i > pos && i < source.length() && source.charAt(i) == '¦' ? i : -1;
+        return i > start && i < source.length() && source.charAt(i) == '¦' ? i : -1;
     }
 
     /** The index of {@code :} if the alternative starts with {@code word:} or {@code :}, otherwise -1. */

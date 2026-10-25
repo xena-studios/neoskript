@@ -265,11 +265,15 @@ final class EntitySyntax {
                 "[the] %*entitytypes% (nearest|closest) [to %entity/location%]");
 
         registrar.effect("EffDrop", info -> (context, args) -> {
-            Object[] places = args[1] == null ? new Object[0] : (Object[]) args[1];
-            for (Object place : places) {
-                if (!(place instanceof Location location) || location.getWorld() == null) {
+            boolean still = info.mark() == 1;
+            // Without a location, the event's: 'drop a diamond'.
+            Object places = args[2] == null ? WorldProperties.eventLocation(context.event()) : args[2];
+            for (Location location : Direction.combine(args[1], places)) {
+                if (location.getWorld() == null) {
                     continue;
                 }
+                // dropItemNaturally moves items by 0.15 to 0.85 on each axis, so Skript starts half a block back.
+                Location dropAt = location.clone().subtract(0.5, 0.5, 0.5);
                 for (Object value : (Object[]) args[0]) {
                     // Experience drops as an orb: 'drop 10 xp at {_spawn}'.
                     if (value instanceof Experience experience) {
@@ -278,15 +282,21 @@ final class EntitySyntax {
                     }
                 }
                 for (ItemStack stack : Items.stacks((Object[]) args[0])) {
-                    org.bukkit.entity.Item item = info.hasTag("still") ? location.getWorld().dropItem(location, stack)
-                            : location.getWorld().dropItemNaturally(location, stack);
-                    if (info.hasTag("still")) {
-                        item.setVelocity(new Vector());
+                    if (stack.getType().isAir() || stack.getAmount() <= 0) {
+                        continue;
+                    }
+                    org.bukkit.entity.Item item;
+                    if (still) {
+                        item = location.getWorld().dropItem(location, stack);
+                        item.teleport(location);
+                        item.setVelocity(new Vector(0, 0, 0));
+                    } else {
+                        item = location.getWorld().dropItemNaturally(dropAt, stack);
                     }
                     LAST_DROPPED.set(item);
                 }
             }
-        }, "drop %itemtypes/experiences% [(at|on) %locations%] [still:without velocity]");
+        }, "drop %itemtypes/experiences% [%directions% %locations%] [(1¦without velocity)]");
 
         registrar.expression("ExprRandomUUID", "uuid", info -> (context, args) -> UUID.randomUUID(), "[a] random uuid");
         registrar.expression("ExprVectorRandom", "vector", info -> (context, args) -> Vector.getRandom()
@@ -964,16 +974,18 @@ final class EntitySyntax {
             };
         }, "make %livingentities% (start|stop:stop) (playing|pretending to be) dead");
         registrar.effect("EffWakeupSleep", info -> {
-            boolean sleep = info.pattern() == 0;
+            boolean sleep = info.pattern() <= 3;
+            boolean force = info.hasTag("force");
+            boolean setSpawn = !info.hasTag("spawn");
+            boolean placed = sleep && !info.isDefault(1);
             return (context, args) -> {
-                Location at = sleep && args.length > 1 ? switch (args[1]) {
-                    case Location location -> location;
-                    case org.bukkit.block.Block block -> block.getLocation();
-                    case null, default -> null;
-                } : null;
+                Location at = null;
+                if (placed) {
+                    List<Location> combined = Direction.combine(args[1], args[2]);
+                    at = combined.isEmpty() ? null : combined.getFirst();
+                }
                 for (Object entity : owners(args[0])) {
                     switch (entity) {
-                        case org.bukkit.entity.Fox fox -> fox.setSleeping(sleep);
                         case org.bukkit.entity.Bat bat -> bat.setAwake(!sleep);
                         case org.bukkit.entity.Villager villager -> {
                             if (!sleep) {
@@ -982,13 +994,26 @@ final class EntitySyntax {
                                 villager.sleep(at);
                             }
                         }
-                        case org.bukkit.entity.HumanEntity human when !sleep -> human.wakeup(false);
+                        case org.bukkit.entity.Fox fox -> fox.setSleeping(sleep);
+                        case org.bukkit.entity.HumanEntity human -> {
+                            if (!sleep) {
+                                human.wakeup(setSpawn);
+                            } else if (at != null) {
+                                human.sleep(at, force);
+                            }
+                        }
                         default -> {}
                     }
                 }
             };
-        }, "make %livingentities% (start sleeping|[go to] sleep) [at %location/block%]",
-                "make %livingentities% (stop sleeping|wake up)");
+        }, "make %livingentities% (start sleeping|[go to] sleep) [%-direction% %-location%]",
+                "force %livingentities% to (start sleeping|[go to] sleep) [%-direction% %-location%]",
+                "make %players% (start sleeping|[go to] sleep) %direction% %location% (force:with force)",
+                "force %players% to (start sleeping|[go to] sleep) %direction% %location% (force:with force)",
+                "make %livingentities% (stop sleeping|wake up)",
+                "force %livingentities% to (stop sleeping|wake up)",
+                "make %players% (stop sleeping|wake up) (spawn:without spawn [location] update)",
+                "force %players% to (stop sleeping|wake up) (spawn:without spawn [location] update)");
         conditionPatterns(registrar, "CondIsTicking", Entity.class, Entity::isTicking, null,
                 "%entities% (is|are) ticking", "%entities% (isn't|is not|aren't|are not) ticking");
         conditionPatterns(registrar, "CondIsEdible", ItemType.class, item -> item.material().isEdible(), null,

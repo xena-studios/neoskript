@@ -75,8 +75,8 @@ final class Locations {
                 && close(a.getX(), b.getX()) && close(a.getY(), b.getY()) && close(a.getZ(), b.getZ())
                 && Location.normalizeYaw(a.getYaw()) + 0.0f == Location.normalizeYaw(b.getYaw()) + 0.0f
                 && Location.normalizePitch(a.getPitch()) + 0.0f == Location.normalizePitch(b.getPitch()) + 0.0f);
-        // A block's location is its centre, as in Skript.
-        registrar.converter(Block.class, Location.class, block -> block.getLocation().add(0.5, 0.5, 0.5));
+        // A block's location is its centre, looking where the block faces, as Skript's BlockUtils.getLocation.
+        registrar.converter(Block.class, Location.class, Direction::blockLocation);
         // A location is a block when the block's location is it, as Skript compares them through that converter.
         registrar.comparison(Location.class, Block.class, (location, block) -> location.getWorld() == block.getWorld()
                 && location.toVector().equals(block.getLocation().add(0.5, 0.5, 0.5).toVector()));
@@ -158,8 +158,8 @@ final class Locations {
                         if (target.getWorld() == null) {
                             target.setWorld(e.getWorld());
                         }
-                        if (direction instanceof WorldSyntax.Direction d) {
-                            target.add(d.from(target));
+                        if (direction instanceof Direction d) {
+                            target = d.getRelative(target);
                         }
                         try {
                             e.teleport(target, keep);

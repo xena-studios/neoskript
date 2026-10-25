@@ -270,7 +270,7 @@ final class WorldProperties {
                     return;
                 }
                 int at = pattern <= 1 ? 1 : 0;
-                for (Location location : locations(args[at], args[at + 1])) {
+                for (Location location : Direction.combine(args[at], args[at + 1])) {
                     if (location.getWorld() == null) {
                         continue;
                     }
@@ -289,7 +289,7 @@ final class WorldProperties {
         registrar.effect("EffLightning", info -> {
             boolean effect = info.mark() == 1;
             return (context, args) -> {
-                for (Location location : locations(args[0], args[1])) {
+                for (Location location : Direction.combine(args[0], args[1])) {
                     if (location.getWorld() == null) {
                         continue;
                     }
@@ -317,7 +317,7 @@ final class WorldProperties {
             int light = info.mark() == 0 ? 3 : info.mark();
             return (context, args) -> {
                 Object[] places = args[1] == null ? new Object[] {eventLocation(context.event())}
-                        : args[0] == null ? owners(args[1]) : locations(args[0], args[1]).toArray();
+                        : args[0] == null ? owners(args[1]) : Direction.combine(args[0], args[1]).toArray();
                 return map(places, Location.class, location -> {
                     Block block = location.getBlock();
                     return (long) (light == 3 ? block.getLightLevel() : light == 2 ? block.getLightFromBlocks() : block.getLightFromSky());
@@ -356,9 +356,8 @@ final class WorldProperties {
                 throw new SyntaxError("The direction in '%directions% vector[s]' can not be a variable. Use the direction "
                         + "expression instead: 'northwards vector'.");
             }
-            // Relative directions are relative to the origin, facing south: 'forwards' is (0, 0, 1).
-            Location origin = new Location(null, 0, 0, 0);
-            return (context, args) -> map(args[0], WorldSyntax.Direction.class, direction -> direction.from(origin));
+            // Relative directions are relative to 0 pitch and yaw: 'forwards' is (1, 0, 0), as in Skript.
+            return (context, args) -> map(args[0], Direction.class, Direction::getDirection);
         }, "vector[s] [from] %directions%", "%directions% vector[s]");
         registrar.expression("ExprVectorProjection", "vector", info -> (context, args) -> {
             Vector left = Values.single(args[0]) instanceof Vector v ? v : new Vector();
@@ -369,25 +368,7 @@ final class WorldProperties {
 
     /** Skript's {@code at}: the direction that goes nowhere, as in {@code strike lightning at the player}. */
     static void registerLate(Registrar registrar) {
-        registrar.expression("LitAt", "direction", info -> (context, args) -> new WorldSyntax.Direction(new Vector(), false), "at");
-    }
-
-    /** Each location moved by each direction in turn, as Skript combines {@code %directions% %locations%}. */
-    static List<Location> locations(Object directions, Object locations) {
-        List<Location> result = new ArrayList<>();
-        for (Object place : owners(locations)) {
-            if (!(place instanceof Location location)) {
-                continue;
-            }
-            Location moved = location.clone();
-            for (Object direction : owners(directions)) {
-                if (direction instanceof WorldSyntax.Direction d) {
-                    moved.add(d.from(moved));
-                }
-            }
-            result.add(moved);
-        }
-        return result;
+        registrar.expression("LitAt", "direction", info -> (context, args) -> Direction.ZERO, "at");
     }
 
     /** Where the event happened, for syntax whose location is left out: its entity's, block's or player's. */
@@ -538,38 +519,15 @@ final class WorldProperties {
         public Object get(TriggerContext context, Object[] arguments) {
             return map(arguments[0], Object.class, owner -> switch (owner) {
                 case Block block -> block.getBlockData() instanceof org.bukkit.block.data.Directional directional
-                        ? direction(directional.getFacing()) : null;
-                case LivingEntity living -> direction(facing(living.getLocation(), horizontal));
+                        ? new Direction(directional.getFacing(), 1) : null;
+                case LivingEntity living -> new Direction(Direction.getFacing(living.getLocation(), horizontal), 1);
                 default -> null;
             });
         }
 
-        private static WorldSyntax.Direction direction(BlockFace face) {
-            return new WorldSyntax.Direction(new Vector(face.getModX(), face.getModY(), face.getModZ()), false);
-        }
-
-        /** Skript's {@code Direction.getFacing}: the axis direction nearest where a location looks. */
-        private static BlockFace facing(Location location, boolean horizontal) {
-            double yaw = (Math.toRadians(location.getYaw() + 90) + 2 * Math.PI) % (2 * Math.PI);
-            double pitch = horizontal ? 0 : Math.toRadians(-location.getPitch());
-            if (-Math.PI / 4 < pitch && pitch < Math.PI / 4) {
-                if (yaw < Math.PI / 4 || yaw >= Math.PI * 7 / 4) {
-                    return BlockFace.EAST;
-                }
-                if (yaw < Math.PI * 3 / 4) {
-                    return BlockFace.SOUTH;
-                }
-                if (yaw < Math.PI * 5 / 4) {
-                    return BlockFace.WEST;
-                }
-                return BlockFace.NORTH;
-            }
-            return pitch > 0 ? BlockFace.UP : BlockFace.DOWN;
-        }
-
         @Override
         public Class<?>[] acceptChange(Mode mode) {
-            return mode == Mode.SET ? new Class<?>[] {WorldSyntax.Direction.class} : null;
+            return mode == Mode.SET ? new Class<?>[] {Direction.class} : null;
         }
 
         @Override
@@ -578,7 +536,7 @@ final class WorldProperties {
                     || !(block.getBlockData() instanceof org.bukkit.block.data.Directional directional)) {
                 return;
             }
-            Vector towards = ((WorldSyntax.Direction) delta[0]).from(block.getLocation());
+            Vector towards = ((Direction) delta[0]).getDirection(block);
             BlockFace nearest = null;
             double best = Double.MAX_VALUE;
             for (BlockFace face : BlockFace.values()) {

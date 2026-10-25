@@ -105,8 +105,8 @@ final class BlockEvents {
         registrar.eventValue(BlockPlaceEvent.class, "block", -1, event -> Events.stateBlock(event.getBlockReplacedState()));
         registrar.eventValue(BlockPlaceEvent.class, "direction", event -> {
             BlockFace face = event.getBlockPlaced().getFace(event.getBlockAgainst());
-            return new WorldSyntax.Direction(face == null ? new org.bukkit.util.Vector()
-                    : new org.bukkit.util.Vector(face.getModX(), face.getModY(), face.getModZ()), false);
+            return face == null ? Direction.ZERO
+                    : new Direction(new double[] {face.getModX(), face.getModY(), face.getModZ()});
         });
         registrar.eventValue(BlockFadeEvent.class, "block", -1, BlockEvent::getBlock);
         registrar.eventValue(BlockFadeEvent.class, "block", BlockEvent::getBlock);
@@ -151,9 +151,9 @@ final class BlockEvents {
         registrar.eventValue(HangingPlaceEvent.class, "player", HangingPlaceEvent::getPlayer);
     }
 
-    /** Skript's BlockUtils.getLocation: the middle of a block. */
+    /** Skript's BlockUtils.getLocation: the middle of a block, looking where it faces. */
     static Location center(Block block) {
-        return block.getLocation().add(0.5, 0.5, 0.5);
+        return Direction.blockLocation(block);
     }
 
     /**
@@ -227,9 +227,8 @@ final class BlockEvents {
         Events.simple(registrar, "EvtSignChange", SignChangeEvent.class, "sign (chang[e]|edit)[ing]", "[player] (chang[e]|edit)[ing] [a] sign");
 
         registrar.eventValue(org.bukkit.event.block.BellRingEvent.class, "entity", org.bukkit.event.block.BellRingEvent::getEntity);
-        registrar.eventValue(org.bukkit.event.block.BellRingEvent.class, "direction", event -> new WorldSyntax.Direction(
-                new org.bukkit.util.Vector(event.getDirection().getModX(), event.getDirection().getModY(),
-                        event.getDirection().getModZ()), false));
+        registrar.eventValue(org.bukkit.event.block.BellRingEvent.class, "direction", event -> new Direction(
+                event.getDirection(), 1));
         registrar.eventValue(org.bukkit.event.block.BellResonateEvent.class, "entity", org.bukkit.entity.Entity[].class, 0,
                 event -> event.getResonatedEntities().toArray(new org.bukkit.entity.LivingEntity[0]));
         registrar.eventValue(org.bukkit.event.block.VaultDisplayItemEvent.class, "itemstack",
