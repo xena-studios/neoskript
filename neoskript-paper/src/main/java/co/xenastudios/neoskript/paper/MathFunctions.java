@@ -56,6 +56,53 @@ final class MathFunctions {
         List<Parameter> ns = List.of(new Parameter("ns", "number", true, false));
         registrar.function("min", ns, "number", false, args -> extreme((Object[]) args[0], -1));
         registrar.function("max", ns, "number", false, args -> extreme((Object[]) args[0], 1));
+        // Trigonometry in degrees, as Skript's.
+        registrar.function("sin", n, "number", false, args -> Math.sin(Math.toRadians(number(args[0]))));
+        registrar.function("cos", n, "number", false, args -> Math.cos(Math.toRadians(number(args[0]))));
+        registrar.function("tan", n, "number", false, args -> Math.tan(Math.toRadians(number(args[0]))));
+        registrar.function("asin", n, "number", false, args -> Math.toDegrees(Math.asin(number(args[0]))));
+        registrar.function("acos", n, "number", false, args -> Math.toDegrees(Math.acos(number(args[0]))));
+        registrar.function("atan", n, "number", false, args -> Math.toDegrees(Math.atan(number(args[0]))));
+        registrar.function("atan2", List.of(Parameter.of("x", "number"), Parameter.of("y", "number")), "number", false,
+                args -> Math.toDegrees(Math.atan2(number(args[1]), number(args[0]))));
+        registrar.function("ln", n, "number", false, args -> Math.log(number(args[0])));
+        registrar.function("log", List.of(Parameter.of("n", "number"), Parameter.defaulting("base", "number", () -> 10L)),
+                "number", false, args -> Math.log10(number(args[0])) / Math.log10(number(args[1])));
+        registrar.function("exp", n, "number", false, args -> Math.exp(number(args[0])));
+        registrar.function("sum", ns, "number", false, args -> {
+            Object[] values = (Object[]) args[0];
+            if (values.length == 0) {
+                return null;
+            }
+            double sum = number(values[0]);
+            for (int i = 1; i < values.length; i++) {
+                sum += number(values[i]);
+            }
+            return sum;
+        });
+        registrar.function("product", ns, "number", false, args -> {
+            Object[] values = (Object[]) args[0];
+            if (values.length == 0) {
+                return null;
+            }
+            double product = number(values[0]);
+            for (int i = 1; i < values.length; i++) {
+                product *= number(values[i]);
+            }
+            return product;
+        });
+        // The experience needed to reach a level from none.
+        registrar.function("calcExperience", List.of(Parameter.of("level", "integer")), "integer", false, args -> {
+            long level = (long) number(args[0]);
+            if (level <= 0) {
+                return 0L;
+            } else if (level <= 15) {
+                return level * level + 6 * level;
+            } else if (level <= 30) {
+                return (long) (int) (2.5 * level * level - 40.5 * level + 360);
+            }
+            return (long) (int) (4.5 * level * level - 162.5 * level + 2220);
+        });
         registrar.function("isNaN", n, "boolean", false, args -> args[0] instanceof Number x && Double.isNaN(x.doubleValue()));
         registrar.function("root", List.of(Parameter.of("n", "number"), Parameter.of("x", "number")), "number", false,
                 args -> {
