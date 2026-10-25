@@ -162,6 +162,7 @@ final class ServerEvents {
     static CommandSender sender(Object event) {
         return switch (event) {
             case ServerCommandEvent command -> command.getSender();
+            case EffectCommandEvent command -> command.getSender();
             case co.xenastudios.neoskript.runtime.command.CommandEvent command -> (CommandSender) command.sender();
             case PlayerEvent player -> player.getPlayer();
             case null, default -> null;

@@ -66,6 +66,31 @@ public final class ScriptLoader {
         return new LineParser(context, text).expression(0, text.length(), expected);
     }
 
+    /**
+     * One line of code on its own, as Skript's effect commands parse what follows the token. {@code statement}
+     * is what it parsed to (an effect, a condition, a function call, or {@link Statement.Invalid}), and
+     * {@code script} has its problems and delay state.
+     */
+    public record ParsedLine(ParsedScript script, Statement statement) {}
+
+    /**
+     * Parses {@code text} as one line of code, with the global functions {@code functions} (by name) callable
+     * and the event values {@code scope} allows ({@code null} for any), for Skript's effect commands.
+     * {@code name} is what its problems are reported under.
+     */
+    public ParsedLine parseLine(String name, String text, Map<String, List<FunctionInfo>> functions,
+            EventValues.Scope scope) {
+        SourceFile file = new SourceFile(name, text);
+        ParserContext context = new ParserContext(registry, functions);
+        context.eventScope(scope);
+        Diagnostics diagnostics = new Diagnostics(file);
+        StatementParser statements = new StatementParser(context, diagnostics);
+        Line line = new Line(1, "", text);
+        List<Statement> body = statements.body(List.of(new Node.Simple(line)));
+        return new ParsedLine(new ParsedScript(file, List.of(), diagnostics.all(), statements.delays()),
+                body.getFirst());
+    }
+
     public List<ParsedScript> load(List<SourceFile> files) {
         List<ScriptParser.Result> results = files.parallelStream().map(ScriptParser::parse).toList();
         Map<String, List<FunctionInfo>> functions = new HashMap<>();

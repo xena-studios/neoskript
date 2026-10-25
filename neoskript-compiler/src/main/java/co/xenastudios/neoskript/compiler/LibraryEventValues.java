@@ -75,7 +75,8 @@ final class LibraryEventValues implements EventValues {
         return library.binding(header) instanceof Library.Core core && KEEPING.contains(core.id());
     }
 
-    private Scope scope(List<Class<?>> classes) {
+    /** What code in events of {@code classes} can use. */
+    Scope scope(List<Class<?>> classes) {
         return scopes.computeIfAbsent(List.copyOf(classes), EventScope::new);
     }
 

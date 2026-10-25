@@ -69,4 +69,20 @@ class SkriptMigrationTest {
         Files.writeString(config, "use player UUIDs in variable names: true\n");
         assertEquals(Boolean.TRUE, SkriptMigration.playerUuids(config));
     }
+
+    @Test
+    void readsSkriptsEffectCommandSettings() throws Exception {
+        Path skript = skript();
+        assertEquals(java.util.Map.of(), SkriptMigration.migrate(skript, plugins.resolve("NeoSkript")).settings());
+        Path config = skript.resolve("config.sk");
+        Files.writeString(config, """
+                enable effect commands: true
+                effect command token: ##! # the token
+                # If 'enable effect commands' is set to true, ...
+                allow ops to use effect commands: false
+                log effect commands: maybe
+                """);
+        assertEquals(java.util.Map.of("effect-commands.enabled", true, "effect-commands.token", "#!",
+                "effect-commands.allow-ops", false), SkriptMigration.settings(config));
+    }
 }

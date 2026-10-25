@@ -27,6 +27,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     private ScriptManager scripts;
     /** What stops the runtime error frames. */
     private Runnable runtimeErrorFrames;
+    private EffectCommands effectCommands;
 
     /** https://bstats.org/plugin/bukkit/NeoSkript/34868 */
     private static final int BSTATS_PLUGIN_ID = 34868;
@@ -73,6 +74,18 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 getSLF4JLogger().info("Players are their {} in variable names, as in Skript's config.sk.",
                         migration.playerUuids() ? "UUIDs" : "names");
             }
+            // Effect commands work as they did in Skript.
+            boolean changed = false;
+            for (java.util.Map.Entry<String, Object> setting : migration.settings().entrySet()) {
+                if (!setting.getValue().equals(getConfig().get(setting.getKey()))) {
+                    getConfig().set(setting.getKey(), setting.getValue());
+                    changed = true;
+                }
+            }
+            if (changed) {
+                saveConfig();
+                getSLF4JLogger().info("Effect commands are set up as in Skript's config.sk.");
+            }
         } catch (IOException e) {
             getSLF4JLogger().error("Couldn't copy Skript's scripts and variables", e);
         }
@@ -116,6 +129,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         scripts = new ScriptManager(getDataPath().resolve("scripts"), library, scheduler, events,
                 commands, getSLF4JLogger(), TestRunner.enabled() ? () -> getServer().shutdown() : null);
         co.xenastudios.neoskript.runtime.ScriptCatalog.install(scripts.catalog());
+        effectCommands = new EffectCommands(scripts, scheduler, getSLF4JLogger(), TestRunner.enabled(),
+                EffectCommands.Settings.read(getConfig().getConfigurationSection("effect-commands")));
+        getServer().getPluginManager().registerEvents(effectCommands, this);
         storage = new VariableStorage(scripts.globals(), library.codecs(),
                 getDataPath().resolve(getConfig().getString("variables.file", "variables.csv")));
         loadVariables();
@@ -152,6 +168,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         saveDefaultConfig();
         reloadConfig();
         StandardLibrary.usePlayerUuidsInVariableNames(getConfig().getBoolean("variables.player-uuids-in-names", true));
+        if (effectCommands != null) {
+            effectCommands.settings(EffectCommands.Settings.read(getConfig().getConfigurationSection("effect-commands")));
+        }
     }
 
     /** The priority triggers listen to events at, {@code high} by default as in Skript. */

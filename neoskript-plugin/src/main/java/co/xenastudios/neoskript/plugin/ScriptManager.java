@@ -198,6 +198,19 @@ final class ScriptManager {
         return globals;
     }
 
+    /**
+     * Compiles one effect on its own, for an effect command: it can call the loaded scripts' global functions
+     * and use the global variables, and its code runs in events of {@code eventClass}. The loaded scripts aren't
+     * touched, so it needn't wait for a reload.
+     */
+    ScriptCompiler.CompiledLine compileEffect(String effect, Class<?> eventClass) {
+        return new ScriptCompiler(library, globals, functions).compileLine(EFFECT_COMMAND, effect, eventClass,
+                EFFECT_COMMAND);
+    }
+
+    /** What effect commands' code is called, as the script it runs in and its event. */
+    private static final String EFFECT_COMMAND = "effect command";
+
     /** Loads the scripts {@code scope} accepts, or every script if it's {@code null}. */
     private Outcome load(Predicate<String> scope, Consumer<String> problems) throws IOException {
         return load(scope, problems, false);

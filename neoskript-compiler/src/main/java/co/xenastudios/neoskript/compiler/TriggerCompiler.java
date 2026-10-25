@@ -270,6 +270,17 @@ final class TriggerCompiler {
         return (Trigger) define(generate(scriptName, () -> statements(body)));
     }
 
+    /**
+     * A line of code on its own, run for an event of one of {@code classes}: Skript's effect commands, whose
+     * event is called {@code eventName} in errors.
+     */
+    Trigger compileLine(String scriptName, Statement statement, List<Class<?>> classes, String eventName)
+            throws CompileException {
+        eventClasses = List.copyOf(classes);
+        this.eventName = eventName;
+        return compileTrigger(scriptName, List.of(statement));
+    }
+
     /** A periodical trigger ({@code every 5 seconds}), whose event is a {@link co.xenastudios.neoskript.runtime.PeriodicalEvent}. */
     Trigger compilePeriodical(String scriptName, List<Statement> body) throws CompileException {
         eventClasses = List.of(co.xenastudios.neoskript.runtime.PeriodicalEvent.class);

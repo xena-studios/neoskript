@@ -48,3 +48,7 @@ command /nsk-info:
 			send "[harness] commands help isn't a script command"
 		set {_description} to description of command "nsk-add"
 		send "[harness] commands description: %{_description}%"
+
+# Called by an effect command the harness runs: '!set {effcmd::doubled} to nskEffcmdDouble(21)'.
+function nskEffcmdDouble(n: number) :: number:
+	return {_n} * 2

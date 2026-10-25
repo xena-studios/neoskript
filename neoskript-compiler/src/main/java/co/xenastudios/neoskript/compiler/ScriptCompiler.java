@@ -159,6 +159,54 @@ public final class ScriptCompiler {
         return new CompiledScripts(triggers, bodies, diagnostics, unrunnableTests, commands);
     }
 
+    /** One line of code compiled on its own, for Skript's effect commands: its trigger, or else its errors. */
+    public record CompiledLine(Trigger trigger, List<String> errors) {}
+
+    /** The start of the parser's error for a line nothing understands, which Skript's effect commands don't give. */
+    private static final String NOT_UNDERSTOOD = "Can't understand this condition/effect: ";
+
+    /**
+     * Parses and compiles {@code text} as one effect on its own, as Skript's effect commands do with what follows
+     * the token: a function call or an effect, not a condition. Its code runs for events of {@code eventClass}
+     * (called {@code eventName} in errors) and can call the global functions of the handles this compiler was given
+     * that are loaded, and use the global variables. {@code name} is the script name it runs as. Nothing about the
+     * loaded scripts changes, and warnings are left out, as Skript's effect commands leave them out.
+     *
+     * <p>The errors are Skript's for the line, without the generic one for a line nothing understands, for which
+     * Skript has no specific information.
+     */
+    public CompiledLine compileLine(String name, String text, Class<?> eventClass, String eventName) {
+        Map<String, List<FunctionInfo>> callable = new HashMap<>();
+        handles.forEach((info, handle) -> {
+            if (info.localTo() == null && handle.loaded()) {
+                callable.computeIfAbsent(info.name(), k -> new ArrayList<>()).add(info);
+            }
+        });
+        LibraryEventValues values = library.registry().eventValues() instanceof LibraryEventValues v ? v : null;
+        co.xenastudios.neoskript.frontend.parse.ScriptLoader.ParsedLine parsed =
+                new co.xenastudios.neoskript.frontend.parse.ScriptLoader(library.registry()).parseLine(name, text,
+                        callable, values == null ? null : values.scope(List.of(eventClass)));
+        List<String> errors = new ArrayList<>();
+        for (Diagnostic diagnostic : parsed.script().diagnostics()) {
+            if (diagnostic.severity() == Severity.ERROR && !diagnostic.message().startsWith(NOT_UNDERSTOOD)) {
+                errors.add(diagnostic.message());
+            }
+        }
+        boolean effect = parsed.statement() instanceof co.xenastudios.neoskript.frontend.parse.Statement.Effect
+                || parsed.statement() instanceof co.xenastudios.neoskript.frontend.parse.Statement.Call;
+        if (!effect || !errors.isEmpty()) {
+            return new CompiledLine(null, errors);
+        }
+        try {
+            return new CompiledLine(new TriggerCompiler(library, handles, globals, parsed.script())
+                    .compileLine(name, parsed.statement(), List.of(eventClass), eventName), List.of());
+        } catch (CompileException e) {
+            return new CompiledLine(null, e.alreadyReported() ? List.of() : List.of(e.getMessage()));
+        } catch (RuntimeException e) {
+            return new CompiledLine(null, List.of("NeoSkript couldn't compile this (" + e + "). Please report it."));
+        }
+    }
+
     /** How often an {@code every <timespan>} event runs: its timespan, which has to be written out. */
     private static Timespan period(int line, ParsedStructure.Event event) throws CompileException {
         if (event.event().match().values().getFirst() instanceof Expr.Literal literal && literal.type().equals("timespan")) {

@@ -39,3 +39,16 @@ runtime-errors:
   warnings-from-one-line-per-frame: 2
   warning-spam-timeout-limit: 4
   warning-timeout-length: 10
+
+effect-commands:
+  # Skript's effect commands, as its 'enable effect commands': console commands and chat messages starting with
+  # the token are effects, run straight away, like '!set time to 6:00'. Players need the permission
+  # skript.effectcommands, which ops don't have unless allow-ops is on, as these commands can do anything.
+  # Moving over from Skript copies its settings for them.
+  enabled: false
+  # Skript's 'effect command token'. It can be longer than a character, but shouldn't start with / (a command).
+  token: "!"
+  # Skript's 'allow ops to use effect commands': ops can use them without the permission.
+  allow-ops: false
+  # Skript's 'log effect commands': players' effect commands are logged as '<player> issued effect command: <command>'.
+  log: false

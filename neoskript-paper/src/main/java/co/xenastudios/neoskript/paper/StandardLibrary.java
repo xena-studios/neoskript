@@ -68,6 +68,7 @@ public final class StandardLibrary {
         EventTypes.register(registrar);
         EnumTypes.register(registrar);
         BlockEvents.register(registrar);
+        EffectCommands.register(registrar);
         EntityEvents.register(registrar);
         PlayerEvents.register(registrar);
         PickItems.register(registrar);
