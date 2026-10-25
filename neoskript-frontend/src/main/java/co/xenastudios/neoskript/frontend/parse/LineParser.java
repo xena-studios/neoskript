@@ -238,7 +238,8 @@ final class LineParser {
      * the hyphen is part of a word, not a minus sign.
      */
     private boolean splitsToken(int position) {
-        return position >= 2 && position < input.length() && Character.isDigit(input.charAt(position))
+        // ...or of a hyphenated word, as the 'value' of 'loop-value': only if nothing else parses is it split there.
+        return position >= 2 && position < input.length() && Character.isLetterOrDigit(input.charAt(position))
                 && input.charAt(position - 1) == '-' && Character.isLetter(input.charAt(position - 2));
     }
 

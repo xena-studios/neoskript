@@ -218,6 +218,11 @@ final class TriggerCompiler {
     private String outerArgument;
     /** Values left-out placeholders of a type get, from Skript's custom default test sections, innermost first. */
     private final java.util.Deque<Map.Entry<String, Expr>> customDefaults = new java.util.ArrayDeque<>();
+    /**
+     * Whether words nothing parses get Skript's error rather than NeoSkript's, as in a test's {@code parse:}
+     * section, whose errors are what's being tested.
+     */
+    private boolean skriptErrors;
     /** How many lists the expression being compiled is in. */
     private int inList;
 
@@ -718,6 +723,7 @@ final class TriggerCompiler {
             TriggerCompiler apart = new TriggerCompiler(library, functions, globals, script);
             apart.eventClasses = eventClasses;
             apart.eventName = eventName;
+            apart.skriptErrors = true;
             apart.compileTrigger(constantsScript, statements);
             return null;
         } catch (CompileException e) {
@@ -3133,7 +3139,7 @@ final class TriggerCompiler {
                 if (value == null) {
                     value = library.literal(unresolved.text());
                 }
-                if (value == null && inList > 0 && outerArgument != null && !outerArgument.contains("event-")) {
+                if (value == null && (inList > 0 || skriptErrors) && outerArgument != null && !outerArgument.contains("event-")) {
                     // Words nothing parses in a list: Skript reports the whole argument they're in. (An event value
                     // NeoSkript doesn't have yet is something it can't run, not a mistake.)
                     throw new CompileException(line, "Can't understand this expression: '" + outerArgument + "'");
