@@ -578,6 +578,12 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **Elements:** the pick item event and picked item (1.21.5+), `exit all loops` and Skript's exit errors, Skript's 'requires data' error, and Skript's patterns for script files, see-through displays, spawnable types, light overrides and unrolled queues.
     - Found with a check that writes a sample line for every pattern in Skript's syntax list and parses it with NeoSkript's library.
 
+    **Batch 22 (2026-10-25): 862 of 862 tests still pass; Skript's plugin hooks and full patterns.**
+    - **Hooks** as Skript's: Vault money (`$5`, `5 dollars`), balances, prefixes and suffixes, and groups; WorldGuard and GriefPrevention regions (`region` type, can build, is member, contains, blocks and members of regions, regions at, region enter and exit). Only when the plugin is installed; scripts then load on the first tick, after the plugins they hook into, as in Skript.
+    - **Events:** attack attempts, player input (toggle, press, release), and `every X in world "..."`.
+    - **Patterns:** Skript's full patterns for silence, breedable, aging, playing dead, shivering, custom names, creepers, force attack, run, enchant at level, warden anger, carried blocks, item despawning and reeling in hooked entities.
+    - Known differences: money in a variable is saved as a number, and quoted region names are looked up when the script runs. `was` and `will be` comparisons aren't there yet.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.
