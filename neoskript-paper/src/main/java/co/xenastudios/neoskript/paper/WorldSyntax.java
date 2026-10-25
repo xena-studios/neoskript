@@ -362,10 +362,15 @@ final class WorldSyntax {
                         projectile.setShooter(shooter);
                     }
                 }), "[the] shooter [of %entities%]");
-        registrar.expression("ExprLastSpawnedEntity", "entity", info -> (context, args) -> {
-            Entity last = LAST_SPAWNED.get();
-            return last != null && (args[0] == null || (args[0] instanceof EntityKind kind && kind.matches(last))) ? last : null;
-        }, "[the] [last[ly]] (spawned|shot) %*entitytype%");
+        registrar.expression("ExprLastSpawnedEntity", "entity", info -> {
+            if (info.pattern() == 1) {
+                return (context, args) -> Fireworks.LAST_LAUNCHED.get();
+            }
+            return (context, args) -> {
+                Entity last = LAST_SPAWNED.get();
+                return last != null && (args[0] == null || (args[0] instanceof EntityKind kind && kind.matches(last))) ? last : null;
+            };
+        }, "[the] [last[ly]] (spawned|shot) %*entitytype%", "[the] [last[ly]] (launched|deployed) firework");
 
         // Replaces the players-only version from step 4: 'all players', 'all zombies in world "world"'.
         registrar.expression("ExprEntities", "entity", info -> {

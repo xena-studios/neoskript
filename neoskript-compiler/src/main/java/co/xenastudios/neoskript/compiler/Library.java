@@ -108,6 +108,7 @@ public final class Library implements Registrar {
         checkOpen();
         builder.type(new TypeInfo(id, name, Set.of(), false));
         javaClasses.put(id, javaClass);
+        co.xenastudios.neoskript.runtime.TypeNames.register(javaClass, name);
         if (STRICT_TYPES.contains(id)) {
             builder.strict(id);
         }
@@ -121,6 +122,7 @@ public final class Library implements Registrar {
             builder.strict(id);
         }
         javaClasses.put(id, javaClass);
+        co.xenastudios.neoskript.runtime.TypeNames.register(javaClass, name);
         // A word several types have is the first's where nothing says which.
         values.forEach(literalValues::putIfAbsent);
         namedValues.put(id, List.copyOf(new java.util.LinkedHashSet<>(values.values())));

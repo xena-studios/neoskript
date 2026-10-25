@@ -64,6 +64,10 @@ public final class StandardLibrary {
         ItemEvents.register(registrar);
         WorldEvents.register(registrar);
         EventExpressions.register(registrar);
+        Workstations.register(registrar);
+        Fishing.register(registrar);
+        Fireworks.register(registrar);
+        EventSyntax.register(registrar);
         Collections.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);

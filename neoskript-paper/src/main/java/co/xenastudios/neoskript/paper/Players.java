@@ -46,9 +46,23 @@ final class Players {
                 case org.bukkit.entity.Player player -> player.displayName(component);
                 // A boss bar's name is its title.
                 case org.bukkit.boss.BossBar bar -> bar.setTitle(component == null ? null : Messages.LEGACY_SECTION.serialize(component));
-                case Entity entity -> entity.customName(component);
+                case Entity entity -> {
+                    entity.customName(component);
+                    // A named mob stays, as Skript has it.
+                    if (entity instanceof org.bukkit.entity.LivingEntity living) {
+                        living.setRemoveWhenFarAway(component == null);
+                    }
+                }
                 case ItemType item -> item.editMeta(meta -> meta.displayName(component));
                 case org.bukkit.inventory.ItemStack stack -> stack.editMeta(meta -> meta.displayName(component));
+                case Items.Slot slot -> {
+                    org.bukkit.inventory.ItemStack stack = slot.item();
+                    if (stack != null && !stack.getType().isAir()) {
+                        stack.editMeta(meta -> meta.displayName(component));
+                        slot.set(stack);
+                    }
+                }
+                case org.bukkit.inventory.Inventory inventory -> retitle(inventory, component);
                 case org.bukkit.block.Block block -> {
                     if (block.getState() instanceof Nameable nameable) {
                         nameable.customName(component);
@@ -61,18 +75,21 @@ final class Players {
         // 'display name', 'nick name', 'chat name', 'custom name': a player's display name, or anything else's
         // custom name. Giving an entity a display name shows it, as in Skript.
         registrar.expression("PropExprName-display", "textcomponent", info -> {
-            boolean display = info.hasTag("display");
             java.util.function.BiConsumer<Object, Object> setter = (owner, name) -> {
                 rename.accept(owner, name);
-                if (display && owner instanceof Entity entity && !(owner instanceof org.bukkit.entity.Player)) {
+                if (owner instanceof Entity entity && !(owner instanceof org.bukkit.entity.Player)) {
                     entity.setCustomNameVisible(name != null);
                 }
             };
-            return new SettableProperty<>(Object.class, Object.class, owner -> owner instanceof org.bukkit.entity.Player player
-                    ? player.displayName() : name(owner), setter)
+            // An entity's is its custom name, if it has one.
+            return new SettableProperty<>(Object.class, Object.class, owner -> switch (owner) {
+                case org.bukkit.entity.Player player -> player.displayName();
+                case Entity entity -> entity.customName();
+                default -> name(owner);
+            }, setter)
                     .resettingTo((java.util.function.Consumer<Object>) owner -> setter.accept(owner, null))
                     .deleting(owner -> setter.accept(owner, null));
-        }, Patterns.property("(display:display|nick|chat|custom)[ ]name[s]", "objects"));
+        }, Patterns.property("(display|nick|chat|custom)[ ]name[s]", "objects"));
         // Resetting or deleting a name takes the custom name away.
         registrar.expression("PropExprName", "textcomponent", info -> new SettableProperty<>(Object.class, Object.class,
                 Players::name, rename).resettingTo((java.util.function.Consumer<Object>) owner -> rename.accept(owner, null))
@@ -293,10 +310,32 @@ final class Players {
             case Nameable nameable -> nameable.customName();
             // A named block, like a chest: its state has the name.
             case org.bukkit.block.Block block when block.getState() instanceof Nameable nameable -> nameable.customName();
+            case Items.Slot slot when slot.item() != null && slot.item().hasItemMeta() -> slot.item().getItemMeta().displayName();
+            // An inventory's is the title it's shown with, if anyone has it open.
+            case org.bukkit.inventory.Inventory inventory -> inventory.getViewers().isEmpty() ? null
+                    : inventory.getViewers().getFirst().getOpenInventory().title();
             case ItemType item when item.stack().getItemMeta() != null -> item.stack().getItemMeta().displayName();
             case org.bukkit.inventory.ItemStack stack when stack.getItemMeta() != null -> stack.getItemMeta().displayName();
             default -> null;
         };
+    }
+
+    /**
+     * Gives an inventory a new title, as Skript does: its viewers are shown a copy with the same contents.
+     * Without a title, its kind's default one.
+     */
+    private static void retitle(org.bukkit.inventory.Inventory inventory, Component title) {
+        if (inventory.getViewers().isEmpty() || !inventory.getType().isCreatable()) {
+            return;
+        }
+        List<org.bukkit.entity.HumanEntity> viewers = new java.util.ArrayList<>(inventory.getViewers());
+        org.bukkit.event.inventory.InventoryType type = inventory.getType();
+        Component name = title == null ? type.defaultTitle() : title;
+        org.bukkit.inventory.Inventory copy = type == org.bukkit.event.inventory.InventoryType.CHEST
+                ? org.bukkit.Bukkit.createInventory(inventory.getHolder(), inventory.getSize(), name)
+                : org.bukkit.Bukkit.createInventory(inventory.getHolder(), type, name);
+        copy.setContents(inventory.getContents());
+        viewers.forEach(viewer -> viewer.openInventory(copy));
     }
 
     private static Component text(String text) {

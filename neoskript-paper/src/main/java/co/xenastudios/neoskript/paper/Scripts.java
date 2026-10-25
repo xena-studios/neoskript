@@ -89,11 +89,40 @@ final class Scripts {
                 return scripts.size() == 1 && !folder ? scripts.getFirst() : scripts.toArray();
             };
         }, "[the] script[s] [named] %texts%", "[the] scripts in [directory|folder] %text%");
+        // 'all scripts': with 'using script reflection' the scripts, as Skript's ExprScripts; otherwise their
+        // paths in the scripts folder as text (or just their file names), as its ExprScriptsOld.
         registrar.expression("ExprScripts", "script", info -> {
             int pattern = info.pattern();
-            return (context, args) -> ScriptCatalog.get().scripts(pattern != 2, pattern != 1).toArray();
-        }, "[all [[of] the]|the] scripts", "[all [[of] the]|the] (enabled|loaded) scripts",
-                "[all [[of] the]|the] (disabled|unloaded) scripts");
+            boolean reflection = co.xenastudios.neoskript.runtime.ScriptFeatures.compilingUses("reflection");
+            boolean noPaths = info.mark() == 1;
+            return (context, args) -> {
+                List<ScriptRef> scripts = ScriptCatalog.get().scripts(pattern != 2, pattern != 1);
+                if (reflection) {
+                    return scripts.toArray();
+                }
+                return scripts.stream().map(script -> noPaths
+                        ? script.name().substring(script.name().lastIndexOf('/') + 1) : script.name()).toArray();
+            };
+        }, "[all [[of] the]|the] scripts [1:without ([subdirectory] paths|parents)]",
+                "[all [[of] the]|the] (enabled|loaded) scripts [1:without ([subdirectory] paths|parents)]",
+                "[all [[of] the]|the] (disabled|unloaded) scripts [1:without ([subdirectory] paths|parents)]");
+        // 'script is loaded', 'script "other.sk" is loaded': whether the current script, or the scripts with
+        // those names, are loaded, as Skript's CondScriptLoaded. Tried after scripts as values.
+        registrar.condition("CondScriptLoaded", info -> {
+            boolean negated = info.pattern() == 1;
+            if (info.isDefault(0)) {
+                String current = co.xenastudios.neoskript.runtime.ScriptFeatures.compilingScript();
+                if (current == null) {
+                    throw new co.xenastudios.neoskript.api.element.SyntaxError("The condition 'script loaded' requires a "
+                            + "script name argument when used outside of script files");
+                }
+                return (context, args) -> ScriptCatalog.get().loaded(new ScriptRef(current)) != negated;
+            }
+            return (context, args) -> co.xenastudios.neoskript.api.element.Condition.check(Values.array(args[0]), info.and(0), name -> {
+                ScriptRef script = ScriptCatalog.get().find(Values.text(name));
+                return script != null && ScriptCatalog.get().loaded(script);
+            }) != negated;
+        }, "script[s] [%-strings%] (is|are) loaded", "script[s] [%-strings%] (isn't|is not|aren't|are not) loaded");
         registrar.condition("CondIsScriptLoaded", info -> {
             boolean negated = info.hasTag("not");
             return (context, args) -> {

@@ -284,7 +284,9 @@ final class CoreSyntax {
         library.core(SyntaxKind.EXPRESSION, RANDOM, "object", List.of(RegexRole.TYPE),
                 "[a] random <.+> [out] (of|from) %objects%");
         library.core(SyntaxKind.EXPRESSION, LOOP_VALUE, "object", List.of(RegexRole.LOOP_VALUE),
-                "[the] [current] loop-<.+>", "[the] next loop-<.+>", "[the] previous loop-<.+>");
+                "[the] [current] loop-<.+>", "[the] next loop-<.+>", "[the] previous loop-<.+>",
+                // Skript's ExprLoopIteration also takes a space: 'the loop counter'.
+                "[the] loop <(?:counter|iteration)(?:-\\d+)?>");
         // A command's arguments. Before arithmetic, so 'arg-1' isn't 'arg - 1'.
         // 'arg-1', 'the second argument', 'the last argument', 'the arguments'.
         String ordinal = "(first:first|second:second|third:third|<(\\d*1)st|(\\d*2)nd|(\\d*3)rd|(\\d*[4-90])th>)";
@@ -319,7 +321,7 @@ final class CoreSyntax {
         // 'number within {_x}': the values of that type. Its type comes from the type name. Late, as in Skript,
         // so 'items in {_inventory}' is the inventory's items.
         library.core(SyntaxKind.EXPRESSION, CAST, "object", List.of(RegexRole.TYPE),
-                "[the] (<.+>|value[s]) (within|in) %~objects%");
+                "[the] (<.+>|value[:s]) (within|in) %~objects%");
         // '"5" parsed as integer': text through the type's parser, or nothing if it isn't one. After the
         // library's expressions, as Skript tries it after most: 'difference between {_a} and "5" parsed as a
         // number' is the difference with a parsed number.

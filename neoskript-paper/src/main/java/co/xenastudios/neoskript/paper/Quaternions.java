@@ -135,7 +135,7 @@ final class Quaternions {
     }
 
     /** Sets a display's translation or scale, if every part of it is a number. */
-    private static void setVector(Display display, boolean translation, Vector vector) {
+    static void setVector(Display display, boolean translation, Vector vector) {
         if (!Double.isFinite(vector.getX()) || !Double.isFinite(vector.getY()) || !Double.isFinite(vector.getZ())) {
             return;
         }

@@ -569,24 +569,41 @@ final class Particles {
                         default -> effect.extra(by);
                     }
                 }), Patterns.property("(particle speed [value]|extra value)", "particles"));
-        // Skript's scale property: only particles have it here.
-        registrar.expression("PropExprScale", "number", info -> new Property<>(ParticleEffect.Scalable.class, Number.class,
-                effect -> effect.hasScale() ? effect.scale() : null, (effect, delta, mode) -> {
-                    double by = delta == null ? 1 : ((Number) delta).doubleValue();
-                    switch (mode) {
-                        case ADD, REMOVE -> {
-                            if (effect.hasScale()) { // only one that has a scale
-                                effect.scale(effect.scale() + (mode == Changeable.Mode.REMOVE ? -by : by));
-                            }
-                        }
-                        case SET -> effect.scale(by);
-                        default -> {
-                            if (effect.hasScale()) {
-                                effect.scale(by);
-                            }
-                        }
+        // Skript's scale property: a scalable particle's size, or a display's scale as a vector.
+        registrar.expression("PropExprScale", "object", info -> new Property<>(Object.class, Object.class, owner -> switch (owner) {
+            case ParticleEffect.Scalable effect when effect.hasScale() -> effect.scale();
+            case org.bukkit.entity.Display display -> {
+                org.joml.Vector3f v = display.getTransformation().getScale();
+                yield new Vector(v.x, v.y, v.z);
+            }
+            default -> null;
+        }, (owner, delta, mode) -> {
+            if (owner instanceof org.bukkit.entity.Display display) {
+                if (mode == Changeable.Mode.RESET) {
+                    Quaternions.setVector(display, false, new Vector(1, 1, 1));
+                } else if (mode == Changeable.Mode.SET && delta instanceof Vector vector) {
+                    Quaternions.setVector(display, false, vector);
+                }
+                return;
+            }
+            if (!(owner instanceof ParticleEffect.Scalable effect) || (delta != null && !(delta instanceof Number))) {
+                return;
+            }
+            double by = delta == null ? 1 : ((Number) delta).doubleValue();
+            switch (mode) {
+                case ADD, REMOVE -> {
+                    if (effect.hasScale()) { // only one that has a scale
+                        effect.scale(effect.scale() + (mode == Changeable.Mode.REMOVE ? -by : by));
                     }
-                }), Patterns.property("scale[s]", "scalableparticles"));
+                }
+                case SET -> effect.scale(by);
+                default -> {
+                    if (effect.hasScale()) {
+                        effect.scale(by);
+                    }
+                }
+            }
+        }).accepting(Number.class, Vector.class), Patterns.property("scale[s]", "objects"));
         // Entities' velocity, and directional particles' at a count of 0.
         registrar.expression("ExprVelocity", "vector", info -> new Property<>(Object.class, Vector.class, owner -> switch (owner) {
             case Entity entity -> entity.getVelocity();
@@ -681,16 +698,22 @@ final class Particles {
     private static final class Property<T> implements Expression, Changeable {
 
         private final Class<T> ownerClass;
-        private final Class<?> deltaClass;
+        private Class<?>[] deltaClasses;
         private final Function<? super T, ?> getter;
         private final Change<? super T> change;
         private boolean deletable;
 
         Property(Class<T> ownerClass, Class<?> deltaClass, Function<? super T, ?> getter, Change<? super T> change) {
             this.ownerClass = ownerClass;
-            this.deltaClass = deltaClass;
+            this.deltaClasses = new Class<?>[] {deltaClass};
             this.getter = getter;
             this.change = change;
+        }
+
+        /** Lets set, add and remove take any of {@code classes}. */
+        Property<T> accepting(Class<?>... classes) {
+            deltaClasses = classes;
+            return this;
         }
 
         Property<T> deletable() {
@@ -715,7 +738,7 @@ final class Particles {
         @Override
         public Class<?>[] acceptChange(Mode mode) {
             return switch (mode) {
-                case SET, ADD, REMOVE -> new Class<?>[] {deltaClass};
+                case SET, ADD, REMOVE -> deltaClasses;
                 case RESET -> new Class<?>[0];
                 case DELETE -> deletable ? new Class<?>[0] : null;
                 default -> null;

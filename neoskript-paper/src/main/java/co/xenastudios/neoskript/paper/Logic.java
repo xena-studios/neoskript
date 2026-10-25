@@ -78,29 +78,33 @@ final class Logic {
                 range(((Number) args[0]).doubleValue(), ((Number) args[1]).doubleValue(), info.hasTag("integers")),
                 "[(all [[of] the]|the)] (numbers|integers:integers) (between|from) %number% (and|to) %number%");
 
+        // As Skript 2.17's PropCondContains: what's in each container (an inventory, a text...), falling back to
+        // whether the values are among them; 'contains' after several only the latter, 'contents of' only the former.
         registrar.condition("CondContains", info -> {
             boolean negated = info.hasTag("not");
             boolean containersAnd = info.and(0);
             boolean valuesAnd = info.and(1);
-            return (context, args) -> negated != contains((Object[]) args[0], containersAnd, (Object[]) args[1], valuesAnd);
-        }, "%objects% contain[s] %objects%", "%objects% (not:(doesn't|does not|do not|don't) contain) %objects%");
+            // Only containers written as several ('a and b', a list variable) are taken as several: an 'or' list
+            // is one of them, as in Skript.
+            boolean containment = info.pattern() >= 2 || !info.hasTag("s") || !(info.isList(0) && containersAnd);
+            boolean direct = info.pattern() < 2;
+            return (context, args) -> {
+                Object[] containers = (Object[]) args[0];
+                if (containers.length == 0) {
+                    return negated;
+                }
+                return negated != contains(containers, containersAnd, (Object[]) args[1], valuesAnd, containment, direct);
+            };
+        }, "%objects% contain[s:s] %objects%", "%objects% (not:(s:doesn't|s:does not|do not|don't) contain) %objects%",
+                "contents of %objects% contain %objects%", "contents of %objects% (not:(do not|don't)) contain %objects%");
 
         // Before elements, as in Skript: 'size of 10 random elements of X' is the size of the elements.
-        registrar.expression("ExprAmount", "integer", info -> {
-            boolean list = info.isList(0);
-            return (context, args) -> {
-                Object[] values = (Object[]) args[0];
-                // The size of a queue is how many elements it has; the amount of one item, how many of it.
-                if (values.length == 1 && values[0] instanceof java.util.Collection<?> collection) {
-                    return (long) collection.size();
-                }
-                if (!list && values.length == 1 && values[0] instanceof ItemType item) {
-                    return (long) item.amount();
-                }
-                return (long) values.length;
-            };
-        },
-                "[the] (amount|number|size) of %objects%");
+        // Skript 2.17's PropExprAmount, PropExprSize and PropExprNumber: of one value (or written 'amounts'),
+        // each value's amount; of several, how many there are.
+        registrar.expression("ExprAmount", "integer", info -> new Amount(info.hasTag("s") || info.isSingle(0),
+                !info.isList(0), !info.hasTag("size") && !info.hasTag("number")),
+                "[the] (amount|number:number|size:size)[s:s] of %objects%",
+                "%objects%'[s] (amount|number:number|size:size)[s:s]");
         registrar.expression("ExprElement", "object", info -> new Element(info.pattern(), info.hasTag("last"),
                 info.hasTag("tolast"), info.hasTag("distinct")),
                 "[the] (first|last:last) element [out] (of|in) %objects%",
@@ -117,16 +121,6 @@ final class Logic {
                 "positive (infinity|\u221e) [value]", "\u221e [value]", "infinity value", "value of [positive] (infinity|\u221e)");
         registrar.expression("LitNegativeInfinity", "number", info -> (context, args) -> Double.NEGATIVE_INFINITY,
                 "negative (infinity|\u221e) [value]", "-(infinity|\u221e) [value]", "value of negative (infinity|\u221e)");
-        registrar.expression("LitMaxMinValue", "number", info -> {
-            boolean min = info.hasTag("min");
-            Object value = switch (info.tags().stream().filter(t -> t.startsWith("t_")).findFirst().orElse("t_integer")) {
-                case "t_long" -> min ? Long.MIN_VALUE : Long.MAX_VALUE;
-                case "t_float" -> min ? (double) -Float.MAX_VALUE : (double) Float.MAX_VALUE;
-                case "t_double" -> min ? -Double.MAX_VALUE : Double.MAX_VALUE;
-                default -> (long) (min ? Integer.MIN_VALUE : Integer.MAX_VALUE);
-            };
-            return (context, args) -> value;
-        }, "[the] (max[imum]|min:min[imum]) (t_integer:integer|t_long:long|t_float:float|t_double:double) value");
         registrar.expression("LitNaN", "number", info -> (context, args) -> Double.NaN, "NaN [value]", "value of NaN");
         registrar.expression("ExprRandomNumber", "number", info -> {
             boolean integers = info.hasTag("integer");
@@ -258,6 +252,31 @@ final class Logic {
             return numbers;
         }, "%number% times", "(once:once|twice:twice|thrice:thrice)");
         registrar.expression("ExprPi", "number", info -> (context, args) -> Math.PI, "(pi|\u03c0)");
+        // Why the last 'X parsed as Y' failed, as Skript's ExprParseError.
+        registrar.expression("ExprParseError", "string", info -> (context, args) -> Values.lastParseError(),
+                "[the] [last] [parse] error");
+        // 'debug info of 1, "a"': each value as text with its type, "1 (integer)" and ""a" (text)".
+        registrar.property("ExprDebugInfo", "string", "debug info[rmation]", "objects", Object.class, value ->
+                (value instanceof String ? "\"" + value + "\"" : Values.text(value)) + " ("
+                        + co.xenastudios.neoskript.runtime.TypeNames.of(value) + ")");
+        // The limits of Java's number types, as Skript's literals: integers as longs, floats as doubles. The
+        // minimum double and float are the smallest positive ones, as Java's MIN_VALUE is.
+        registrar.expression("LitIntMaxValue", "integer", info -> (context, args) -> (long) Integer.MAX_VALUE,
+                "[the] max[imum] integer value");
+        registrar.expression("LitIntMinValue", "integer", info -> (context, args) -> (long) Integer.MIN_VALUE,
+                "[the] min[imum] integer value");
+        registrar.expression("LitLongMaxValue", "integer", info -> (context, args) -> Long.MAX_VALUE,
+                "[the] max[imum] long value");
+        registrar.expression("LitLongMinValue", "integer", info -> (context, args) -> Long.MIN_VALUE,
+                "[the] min[imum] long value");
+        registrar.expression("LitDoubleMaxValue", "number", info -> (context, args) -> Double.MAX_VALUE,
+                "[the] max[imum] double value");
+        registrar.expression("LitDoubleMinValue", "number", info -> (context, args) -> Double.MIN_VALUE,
+                "[the] min[imum] double value");
+        registrar.expression("LitFloatMaxValue", "number", info -> (context, args) -> (double) Float.MAX_VALUE,
+                "[the] max[imum] float value");
+        registrar.expression("LitFloatMinValue", "number", info -> (context, args) -> (double) Float.MIN_VALUE,
+                "[the] min[imum] float value");
         registrar.expression("ExprRound", "integer", info -> {
             int mode = info.hasTag("down") ? -1 : info.hasTag("up") ? 1 : 0;
             return (context, args) -> {
@@ -331,9 +350,78 @@ final class Logic {
      * contain the texts (or, failing that, the values are among them); anything else, the values are among
      * the containers' values.
      */
-    private static boolean contains(Object[] containers, boolean containersAnd, Object[] values, boolean valuesAnd) {
+    /**
+     * {@code the amount of X}: with {@code properties}, each value's amount, as Skript's amount property has
+     * it (an item's or a slot's, which can be set, or how many elements a queue has); else how many values
+     * there are. {@code stacks}: whether item stacks have one, as they do for 'amount' but not 'size'.
+     *
+     * @param maybe whether a value not known to be one (as an event value isn't) may be one: then a lone value
+     *     with an amount is taken as one
+     */
+    private record Amount(boolean properties, boolean maybe, boolean stacks)
+            implements Expression, co.xenastudios.neoskript.api.element.Changeable {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            Object[] values = Values.array(arguments[0]);
+            if (!properties && !(maybe && values.length == 1 && amount(values[0]) != null)) {
+                return (long) values.length;
+            }
+            List<Object> amounts = new java.util.ArrayList<>();
+            for (Object value : values) {
+                Long amount = amount(value);
+                if (amount != null) {
+                    amounts.add(amount);
+                }
+            }
+            return amounts.size() == 1 ? amounts.getFirst() : amounts.toArray();
+        }
+
+        /** The value's amount, or {@code null} if it has none. */
+        private Long amount(Object value) {
+            return switch (value) {
+                case ItemType item -> (long) item.amount();
+                case org.bukkit.inventory.ItemStack stack when stacks -> (long) stack.getAmount();
+                case Items.Slot slot -> slot.item() == null ? 0L : (long) slot.item().getAmount();
+                case java.util.Collection<?> queue -> (long) queue.size();
+                case null, default -> null;
+            };
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return (properties || maybe) && stacks && mode == Mode.SET ? new Class<?>[] {Number.class} : null;
+        }
+
+        @Override
+        public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
+            if (delta == null || delta.length == 0 || !(delta[0] instanceof Number number)) {
+                return;
+            }
+            int amount = Values.toInt(number.doubleValue());
+            for (Object value : Values.array(arguments[0])) {
+                switch (value) {
+                    case ItemType item -> item.setAmount(amount);
+                    case org.bukkit.inventory.ItemStack stack -> stack.setAmount(amount);
+                    case Items.Slot slot -> {
+                        org.bukkit.inventory.ItemStack item = slot.item();
+                        if (item != null) {
+                            item.setAmount(amount);
+                            slot.set(item);
+                        }
+                    }
+                    case null, default -> {}
+                }
+            }
+        }
+    }
+
+    private static boolean contains(Object[] containers, boolean containersAnd, Object[] values, boolean valuesAnd,
+            boolean containment, boolean direct) {
         if (containers.length == 0) {
             return false;
+        }
+        if (!containment) {
+            return among(containers, values, valuesAnd);
         }
         if (java.util.Arrays.stream(containers).allMatch(Inventory.class::isInstance)) {
             return Condition.check(containers, containersAnd, inventory -> Condition.check(values, valuesAnd,
@@ -355,6 +443,12 @@ final class Logic {
                                 .contains(text.toLowerCase(java.util.Locale.ROOT))))) {
             return true;
         }
+        // Not all of them hold things: whether the values are among them, unless only what's in them counts.
+        return direct && among(containers, values, valuesAnd);
+    }
+
+    /** Whether the values (all, or any) are among {@code containers}, as Skript compares them. */
+    private static boolean among(Object[] containers, Object[] values, boolean valuesAnd) {
         return Condition.check(values, valuesAnd, value -> {
             for (Object container : containers) {
                 if (Comparison.equal(value, container)) {

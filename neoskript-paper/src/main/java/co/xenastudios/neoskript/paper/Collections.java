@@ -73,6 +73,8 @@ final class Collections {
                         case java.util.Collection<?> collection -> collection.isEmpty();
                         case Inventory inventory -> inventory.isEmpty();
                         case Items.Slot slot -> slot.item() == null || slot.item().getType().isAir();
+                        // Anything with an amount is empty without any, as Skript's numbered things.
+                        case ItemType item -> item.amount() == 0;
                         default -> false;
                     };
                     if (empty == negated) {
