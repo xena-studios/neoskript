@@ -217,6 +217,13 @@ public interface Registrar {
     <T> void storage(String name, Class<T> type, co.xenastudios.neoskript.api.storage.VariableCodec<T> codec);
 
     /**
+     * Marks {@code typeId} as one Skript can't save in variables, for its warning where a script sets a global
+     * variable to one: "{@code named} cannot be saved...". {@code named} is the type's name with its article, as
+     * Skript writes it ({@code an entity}).
+     */
+    default void unsavable(String typeId, String named) {}
+
+    /**
      * Words scripts can write as values of {@code typeId}, like item names ({@code 2 stone swords}). The
      * parser returns the value, or {@code null} for text that isn't one. Literals are compiled once and
      * shared, so values should be immutable or copied by the syntax that changes them.

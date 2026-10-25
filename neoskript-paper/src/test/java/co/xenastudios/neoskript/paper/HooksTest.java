@@ -190,6 +190,39 @@ class HooksTest {
     }
 
     @Test
+    void moneyInAVariableOnlyChangesByMoney() {
+        // As Skript's Variable.change: money's own operations take money, so adding a number does nothing.
+        assertEquals(List.of("$20.00", "$20.00", "$25.00", "$22.00"), run(this::vault, """
+                on load:
+                \tset test player's balance to 20
+                \tset {_m} to test player's balance
+                \tadd 1 to {_m}
+                \tsay {_m}
+                \tremove 1 from {_m}
+                \tsay {_m}
+                \tadd ("5 dollars" parsed as money) to {_m}
+                \tsay {_m}
+                \tremove ("3 dollars" parsed as money) from {_m}
+                \tsay {_m}
+                """));
+    }
+
+    @Test
+    void moneyCantBeSaved() {
+        assertEquals(List.of(), run(this::vault, """
+                on load:
+                \tset {m} to test player's balance
+                \tset {_m} to test player's balance
+                \tadd test player's balance to {list::*}
+                \tsuppress variable save warnings
+                \tset {n} to test player's balance
+                """, false));
+        assertEquals(List.of("a money cannot be saved. That is, the contents of the variable {m} will be lost when the"
+                + " server stops.", "a money cannot be saved. That is, the contents of the variable {list::*} will be"
+                + " lost when the server stops."), warnings);
+    }
+
+    @Test
     void vaultSyntaxOnlyExistsWhenHooked() {
         Library library = new Library();
         StandardLibrary.register(library);

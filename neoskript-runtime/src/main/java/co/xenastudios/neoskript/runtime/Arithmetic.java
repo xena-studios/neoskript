@@ -177,6 +177,28 @@ public final class Arithmetic {
         return NONE;
     }
 
+    /**
+     * Whether {@code add value to {x}} (or {@code remove}, by {@code operator}) leaves {@code {x}} as it is when it
+     * holds {@code current}, as Skript's {@code Variable.change} does: a number of a type of its own, like money,
+     * only changes by values one of its own operations takes, so {@code add 1 to {_money}} does nothing.
+     */
+    public static boolean unchangedBy(char operator, Object current, Object value) {
+        if (!ownNumber(current)) {
+            return false;
+        }
+        boolean operates = false;
+        for (Operation operation : OPERATIONS) {
+            if (operation.operator() == operator && operation.left() != Number.class
+                    && operation.left().isInstance(current)) {
+                operates = true;
+                if (operation.right() != Number.class && operation.right().isInstance(value)) {
+                    return false;
+                }
+            }
+        }
+        return operates;
+    }
+
     /** Whether the value is a number of a type of its own, not one of Java's. */
     private static boolean ownNumber(Object value) {
         return value instanceof Number && !value.getClass().getName().startsWith("java.");

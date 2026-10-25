@@ -1970,6 +1970,7 @@ final class TriggerCompiler {
             }
             throw unsupported("changing anything but variables");
         }
+        saveWarning(effect, mode, variable);
         variableStore(variable);
         variableName(variable);
         if (mode == CoreSyntax.ChangeMode.SET && variable.list() && isKeyed((Expr) effect.match().values().get(mode.value))) {
@@ -2012,6 +2013,25 @@ final class TriggerCompiler {
                     method.visitMethodInsn(INVOKEVIRTUAL, STORE, "set", nameValue, false);
                 }
             }
+        }
+    }
+
+    /**
+     * Skript's warning where a global variable is set (or a global list added) to values of a type it can't save,
+     * as its {@code EffChange} gives it.
+     */
+    private void saveWarning(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr.Variable variable) {
+        if (!(mode == CoreSyntax.ChangeMode.SET || variable.list() && mode == CoreSyntax.ChangeMode.ADD)
+                || variable.local() || variable.name().startsWith("-")
+                || effect.match().values().get(mode.target) != variable
+                || !(effect.match().values().get(mode.value) instanceof Expr changer)
+                || changer instanceof Expr.Variable) {
+            return;
+        }
+        String named = library.unsavable(changer.type());
+        if (named != null) {
+            warn("save", named + " cannot be saved. That is, the contents of the variable "
+                    + source.substring(variable.start(), variable.end()) + " will be lost when the server stops.");
         }
     }
 

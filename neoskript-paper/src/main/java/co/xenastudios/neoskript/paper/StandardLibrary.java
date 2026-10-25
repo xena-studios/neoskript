@@ -22,6 +22,7 @@ public final class StandardLibrary {
      */
     public static void register(Registrar registrar, java.util.function.Consumer<Registrar> hooks) {
         CoreTypes.register(registrar);
+        UnsavableTypes.register(registrar);
         TextComponents.register(registrar);
         ScriptEvents.register(registrar);
         ServerEvents.register(registrar);

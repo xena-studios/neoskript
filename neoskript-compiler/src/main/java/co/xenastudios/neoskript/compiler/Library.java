@@ -707,6 +707,19 @@ public final class Library implements Registrar {
         functions.put(info, function);
     }
 
+    /** The types Skript can't save in variables, by id, with their names as its warning writes them. */
+    private final Map<String, String> unsavable = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    public void unsavable(String typeId, String named) {
+        unsavable.put(typeId, named);
+    }
+
+    /** {@code typeId}'s name with its article, if Skript can't save values of it in variables, else {@code null}. */
+    String unsavable(String typeId) {
+        return typeId == null ? null : unsavable.get(typeId);
+    }
+
     @Override
     public <T> void storage(String name, Class<T> type, VariableCodec<T> codec) {
         codecs.register(name, type, codec);
