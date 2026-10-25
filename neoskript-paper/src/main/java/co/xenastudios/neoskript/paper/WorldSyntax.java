@@ -538,6 +538,9 @@ final class WorldSyntax {
                 "[%number% [(block|met(er|re))[s]]] (forward[s]|in front|backward:(backward[s]|behind))",
                 "[%number% [(block|met(er|re))[s]]] (towards|away:away from) %location%",
                 "along %vector%");
+        // 'at', no offset at all: 'a loot context at {_loc}'.
+        Direction at = new Direction(new Vector(), false);
+        registrar.expression("LitAt", "direction", info -> (context, args) -> at, "at");
     }
 
     private static void registerBlocks(Registrar registrar) {

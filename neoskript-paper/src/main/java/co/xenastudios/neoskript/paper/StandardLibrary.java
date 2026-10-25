@@ -19,6 +19,7 @@ public final class StandardLibrary {
         Players.register(registrar);
         Commands.register(registrar);
         Texts.register(registrar);
+        BossBars.registerTypes(registrar);
         Colors.register(registrar);
         Time.register(registrar);
         Locations.register(registrar);
@@ -42,6 +43,8 @@ public final class StandardLibrary {
         Quaternions.register(registrar);
         BlockSyntax.register(registrar);
         Biomes.register(registrar);
+        LootTables.register(registrar);
+        BossBars.register(registrar);
         ServerEvents.registerLate(registrar);
         BlockProperties.register(registrar);
         Scripts.register(registrar);
