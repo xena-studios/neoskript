@@ -62,7 +62,7 @@ final class Scripts {
             if (args[0] instanceof co.xenastudios.neoskript.runtime.FunctionRef function) {
                 function.call(args[1] == null ? new Object[0] : (Object[]) args[1]);
             }
-        }, "run %function% [with arg[ument]s %objects%]");
+        }, "run %function% [with arg[ument]s %objects%]", "execute %function% [with arg[ument]s %objects%]");
         registrar.expression("ExprResult", "object", info -> (context, args) ->
                 args[0] instanceof co.xenastudios.neoskript.runtime.FunctionRef function
                         ? function.call(args[1] == null ? new Object[0] : (Object[]) args[1]) : null,

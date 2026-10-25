@@ -373,7 +373,7 @@ final class EntitySyntax {
                     }
                 }
             };
-        }, "(show:show|hide) [the] custom name[s] of %entities%", "(show:show|hide) %entities%'[s] custom name[s]");
+        }, "(show:show|hide) [the] (custom|display)[ ]name of %entities%", "(show:show|hide) %entities%'[s] (custom|display)[ ]name");
         // Panda genes: 'the main gene of {_panda} is lazy'.
         Map<String, org.bukkit.entity.Panda.Gene> genes = new java.util.LinkedHashMap<>();
         for (org.bukkit.entity.Panda.Gene gene : org.bukkit.entity.Panda.Gene.values()) {
@@ -455,21 +455,25 @@ final class EntitySyntax {
                         minecart.setCommand("");
                     }
                 }), "[the] [command[ ]block] command of %blocks/entities%", "%blocks/entities%'[s] [command[ ]block] command");
+        // As in Skript, only the first pattern explodes at once: 'explode X instantly' starts the ignition, as
+        // 'ignite creeper X' and 'start ignition of X' do.
         registrar.effect("EffExplodeCreeper", info -> {
-            int pattern = info.pattern();
+            boolean instant = info.pattern() == 0;
+            boolean stop = info.pattern() == 4;
             return (context, args) -> {
                 for (Object value : (Object[]) args[0]) {
                     if (value instanceof org.bukkit.entity.Creeper creeper) {
-                        switch (pattern) {
-                            case 0 -> creeper.explode();
-                            case 1 -> creeper.ignite();
-                            default -> creeper.setIgnited(false);
+                        if (instant) {
+                            creeper.explode();
+                        } else {
+                            creeper.setIgnited(!stop);
                         }
                     }
                 }
             };
-        }, "[instantly|immediately] explode [creeper[s]] %livingentities%",
-                "start (ignition|explosion) [process] of %livingentities%", "stop (ignition|explosion) [process] of %livingentities%");
+        }, "instantly explode [creeper[s]] %livingentities%", "explode [creeper[s]] %livingentities% instantly",
+                "ignite creeper[s] %livingentities%", "start (ignition|explosion) [process] of [creeper[s]] %livingentities%",
+                "stop (ignition|explosion) [process] of [creeper[s]] %livingentities%");
         // 'offline player from {_uuid}', 'entity from {_uuid}': what a UUID belongs to, if it's there.
         registrar.expression("ExprFromUUID", "object", info -> {
             String kind = info.hasTag("offline") ? "offline" : info.hasTag("player") ? "player"
@@ -496,8 +500,8 @@ final class EntitySyntax {
         }, "(offline:offline player|player:player|world:world|entit(y|ies))[s] from %uuids%");
         // How angry a warden is at something, from 0 to 150.
         registrar.expression("ExprWardenEntityAnger", "integer", info -> new WardenAnger(),
-"[the] anger level[s] of %livingentities% (towards|against) %entities%",
-                "%livingentities%'[s] anger level[s] (towards|against) %entities%");
+"[the] anger level [of] %livingentities% towards %livingentities%",
+                "%livingentities%'[s] anger level towards %livingentities%");
         // Plugin metadata on entities, blocks and worlds: 'metadata "x" of {_e}'. Numbers can be added to.
         registrar.expression("ExprMetadata", "object", info -> new Metadata(), "metadata [(value|tag)[s]] %texts% of %entities/blocks/worlds%",
                 "%entities/blocks/worlds%'[s] metadata [(value|tag)[s]] %texts%");
@@ -954,7 +958,7 @@ final class EntitySyntax {
         }, "(show|hide:hide) [the] [entire|additional:additional] tool[ ]tip[s] of %itemtypes%",
                 "(show|hide:hide) %itemtypes%'[s] [entire|additional:additional] tool[ ]tip[s]");
         registrar.effect("EffStriderShivering", info -> {
-            boolean start = !info.hasTag("stop");
+            boolean start = info.pattern() <= 1;
             return (context, args) -> {
                 for (Object entity : owners(args[0])) {
                     if (entity instanceof org.bukkit.entity.Strider strider) {
@@ -962,9 +966,10 @@ final class EntitySyntax {
                     }
                 }
             };
-        }, "make %livingentities% (start|stop:stop) shivering");
+        }, "make %livingentities% start shivering", "force %livingentities% to start shivering",
+                "make %livingentities% stop shivering", "force %livingentities% to stop shivering");
         registrar.effect("EffPlayingDead", info -> {
-            boolean start = !info.hasTag("stop");
+            boolean start = info.pattern() <= 1;
             return (context, args) -> {
                 for (Object entity : owners(args[0])) {
                     if (entity instanceof org.bukkit.entity.Axolotl axolotl) {
@@ -972,7 +977,9 @@ final class EntitySyntax {
                     }
                 }
             };
-        }, "make %livingentities% (start|stop:stop) (playing|pretending to be) dead");
+        }, "make %livingentities% (start playing|play) dead", "force %livingentities% to (start playing|play) dead",
+                "make %livingentities% (stop playing|not play) dead",
+                "force %livingentities% to (stop playing|not play) dead");
         registrar.effect("EffWakeupSleep", info -> {
             boolean sleep = info.pattern() <= 3;
             boolean force = info.hasTag("force");
@@ -1165,7 +1172,7 @@ final class EntitySyntax {
             return (context, args) -> org.bukkit.Bukkit.setWhitelistEnforced(enforce);
         }, "[un:un]enforce [the] [server] white[ ]list");
         registrar.effect("EffSilence", info -> {
-            boolean silent = info.pattern() == 0;
+            boolean silent = info.pattern() % 2 == 0;
             return (context, args) -> {
                 for (Object entity : owners(args[0])) {
                     if (entity instanceof Entity e) {
@@ -1173,23 +1180,21 @@ final class EntitySyntax {
                     }
                 }
             };
-        }, "make %entities% silent", "make %entities% not silent");
+        }, "silence %entities%", "unsilence %entities%", "make %entities% silent", "make %entities% not silent");
         registrar.effect("EffBreedable", info -> {
-            boolean breedable = info.pattern() == 0;
+            boolean breedable = info.pattern() <= 1;
             return (context, args) -> {
                 for (Object entity : owners(args[0])) {
                     if (entity instanceof org.bukkit.entity.Breedable animal) {
-                        // As in Skript, something made breedable grows up so it can.
-                        if (breedable && !animal.isAdult()) {
-                            animal.setAdult();
-                        }
+                        // Being able to breed makes a baby grow up, as Bukkit's setBreed does.
                         animal.setBreed(breedable);
                     }
                 }
             };
-        }, "make %livingentities% breedable", "make %livingentities% (non(-| )|un)breedable");
+        }, "make %livingentities% breedable", "unsterilize %livingentities%",
+                "make %livingentities% (not |non(-| )|un)breedable", "sterilize %livingentities%");
         registrar.effect("EffAllowAging", info -> {
-            boolean lock = info.pattern() == 0;
+            boolean lock = info.pattern() <= 2;
             return (context, args) -> {
                 for (Object entity : owners(args[0])) {
                     if (entity instanceof org.bukkit.entity.Breedable animal) {
@@ -1197,7 +1202,8 @@ final class EntitySyntax {
                     }
                 }
             };
-        }, "lock age of %livingentities%", "unlock age of %livingentities%");
+        }, "lock age of %livingentities%", "prevent aging of %livingentities%", "prevent %livingentities% from aging",
+                "unlock age of %livingentities%", "allow aging of %livingentities%", "allow %livingentities% to age");
         registrar.effect("EffCharge", info -> {
             boolean charge = !info.hasTag("un");
             return (context, args) -> {
@@ -1225,9 +1231,14 @@ final class EntitySyntax {
                 "[the] server (isn't|is not) (in white[ ]list mode|white[ ]listed)",
                 "[the] server white[ ]list (is|is being) enforced", "[the] server white[ ]list (isn't|is not) enforced",
                 "%offlineplayers% (is|are) white[ ]listed", "%offlineplayers% (isn't|is not|aren't|are not) white[ ]listed");
-        condition(registrar, "CondIgnitionProcess", "livingentities",
-                "(going to explode|in the (process|middle) of exploding)", org.bukkit.entity.Creeper.class,
-                org.bukkit.entity.Creeper::isIgnited, org.bukkit.entity.Creeper::setIgnited);
+        conditionPatterns(registrar, "CondIgnitionProcess", org.bukkit.entity.Creeper.class,
+                org.bukkit.entity.Creeper::isIgnited, org.bukkit.entity.Creeper::setIgnited,
+                "[creeper[s]] %livingentities% (is|are) going to explode",
+                "[creeper[s]] %livingentities% (is|are) in the (ignition|explosion) process",
+                "creeper[s] %livingentities% (is|are) ignited",
+                "[creeper[s]] %livingentities% (isn't|is not|aren't|are not) going to explode",
+                "[creeper[s]] %livingentities% (isn't|is not|aren't|are not) in the (ignition|explosion) process",
+                "creeper[s] %livingentities% (isn't|is not|aren't|are not) ignited");
         condition(registrar, "CondIsChargingFireball", "livingentities", "charging [a] fireball", org.bukkit.entity.Ghast.class,
                 org.bukkit.entity.Ghast::isCharging, org.bukkit.entity.Ghast::setCharging);
         condition(registrar, "CondIsDancing", "livingentities", "dancing", org.bukkit.entity.Allay.class,
@@ -1246,7 +1257,10 @@ final class EntitySyntax {
                 LivingEntity::setRemoveWhenFarAway, "%livingentities% can despawn (on chunk unload|when far away)",
                 "%livingentities% (can't|cannot|can not) despawn (on chunk unload|when far away)");
         conditionPatterns(registrar, "CondItemDespawn", org.bukkit.entity.Item.class, item -> !item.isUnlimitedLifetime(),
-                (item, despawns) -> item.setUnlimitedLifetime(!despawns), "%entities% can (despawn naturally|naturally despawn)",
+                (item, despawns) -> item.setUnlimitedLifetime(!despawns),
+                "%entities% will (despawn naturally|naturally despawn)",
+                "%entities% can (despawn naturally|naturally despawn)",
+                "%entities% (will not|won't) (despawn naturally|naturally despawn)",
                 "%entities% (can't|cannot|can not) (despawn naturally|naturally despawn)");
         conditionPatterns(registrar, "CondPvP", org.bukkit.World.class, org.bukkit.World::getPVP, org.bukkit.World::setPVP,
                 "(is PvP|PvP is) enabled [in %worlds%]", "(is PvP|PvP is) disabled [in %worlds%]");
@@ -1654,7 +1668,7 @@ final class EntitySyntax {
         public Class<?>[] acceptChange(Mode mode) {
             return switch (mode) {
                 case SET, ADD, REMOVE -> new Class<?>[] {Entity.class};
-                case DELETE, RESET -> new Class<?>[0];
+                case DELETE -> new Class<?>[0];
                 default -> null;
             };
         }
@@ -1705,7 +1719,7 @@ final class EntitySyntax {
         public Class<?>[] acceptChange(Mode mode) {
             return switch (mode) {
                 case SET, ADD, REMOVE -> new Class<?>[] {Number.class};
-                case DELETE, RESET -> new Class<?>[0];
+                case DELETE -> new Class<?>[0];
                 default -> null;
             };
         }
@@ -1775,7 +1789,7 @@ final class EntitySyntax {
         public Class<?>[] acceptChange(Mode mode) {
             return switch (mode) {
                 case SET, ADD, REMOVE -> new Class<?>[] {Object.class};
-                case DELETE, RESET -> new Class<?>[0];
+                case DELETE -> new Class<?>[0];
                 default -> null;
             };
         }
