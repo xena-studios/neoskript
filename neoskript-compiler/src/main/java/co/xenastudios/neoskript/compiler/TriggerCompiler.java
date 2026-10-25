@@ -869,6 +869,15 @@ final class TriggerCompiler {
             case Statement.Section section when library.sectionType(section.header() == null ? null
                     : section.header().syntax().id()) != null -> librarySection(section);
             case Statement.Section section when sectionExpression(section) != null -> expressionSection(section);
+            case Statement.Section section when section.header() == null && section.call() != null
+                    && callSectionExpression(section.call()) != null -> {
+                // 'f(a worldborder):': the argument's section runs for its value, then the function is called.
+                Expr.Syntax made = callSectionExpression(section.call());
+                expressionSection(section, made, () -> {
+                    call(section.call());
+                    method.visitInsn(POP);
+                });
+            }
             case Statement.Section section -> throw unsupported("sections like '" + section.line().key() + "'");
             case Statement.Conditions conditions -> throw unsupported("'" + conditions.line().key() + "' here");
             case Statement.Parse parse -> {
@@ -1176,6 +1185,21 @@ final class TriggerCompiler {
             deferredSection(section, made);
             return;
         }
+        expressionSection(section, made, () -> effect(section.header()));
+    }
+
+    /** The argument of a function call that takes the section under it, or {@code null}. */
+    private Expr.Syntax callSectionExpression(Expr.FunctionCall call) {
+        for (Expr argument : call.arguments()) {
+            if (argument instanceof Expr.Syntax syntax && library.sectionExpressionType(syntax.syntax().syntax().id()) != null) {
+                return syntax;
+            }
+        }
+        return null;
+    }
+
+    /** The section of expression {@code made} runs for each of its values, then {@code then} uses them. */
+    private void expressionSection(Statement.Section section, Expr.Syntax made, Body then) throws CompileException {
         int valuesSlot = nextSlot++;
         int indexSlot = nextSlot++;
         expression(made);
@@ -1202,7 +1226,7 @@ final class TriggerCompiler {
         lineOf(section, section.line().key());
         precomputed.put(made, valuesSlot);
         try {
-            effect(section.header());
+            then.emit();
         } finally {
             precomputed.remove(made);
         }

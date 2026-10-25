@@ -225,7 +225,12 @@ final class StatementParser {
             }
             Expr.FunctionCall call = parser.call(0, key.length());
             if (call != null && call.arguments().stream().anyMatch(a -> a != null && hasSectionExpression(a))) {
-                return new Statement.Section(line, null, repeatable(section.children()));
+                return new Statement.Section(line, null, repeatable(section.children()), call);
+            }
+            if (call != null && effect == null) {
+                error(line, "The line '" + key + "' is a valid function call but cannot function as a section (:) because"
+                        + " there is no parameter to manage it.");
+                return new Statement.Invalid(line);
             }
             if (effect != null || call != null || parser.condition(0, key.length()) != null) {
                 error(line, "The line '" + key + "' is a valid statement but cannot function as a section (:) because"
