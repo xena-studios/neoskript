@@ -210,13 +210,8 @@ final class Players {
 
         SettableProperty.register(registrar, "ExprFlightMode", "boolean", "fl(y[ing]|ight) (mode|state)", "players",
                 Player.class, Boolean.class, Player::getAllowFlight, Player::setAllowFlight);
-        SettableProperty.register(registrar, "ExprGameMode", "gamemode", "game[ ]mode", "players", Player.class,
-                GameMode.class, Player::getGameMode, Player::setGameMode);
-        SettableProperty.register(registrar, "ExprFoodLevel", "number", Player.class, Number.class,
-                player -> (long) player.getFoodLevel(), (player, level) -> player.setFoodLevel(
-                        Math.max(0, Math.min(20, co.xenastudios.neoskript.runtime.Values.toInt(level.doubleValue())))),
-                "[the] (food|hunger)[[ ](level|met(er|re)|bar)] [of %players%]",
-                "%players%'[s] (food|hunger)[[ ](level|met(er|re)|bar)]");
+        TimedProperties.registerGameMode(registrar);
+        TimedProperties.registerFoodLevel(registrar);
         SettableProperty.register(registrar, "ExprPlayerListName", "string", "(player|tab)[ ]list name[s]", "players",
                 Player.class, Object.class, player -> Messages.LEGACY_SECTION.serialize(player.playerListName()),
                 (player, name) -> player.playerListName(Messages.component(name)));

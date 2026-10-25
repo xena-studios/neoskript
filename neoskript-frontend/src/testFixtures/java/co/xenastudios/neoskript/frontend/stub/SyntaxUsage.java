@@ -68,6 +68,7 @@ public final class SyntaxUsage {
                 }
                 case ParsedStructure.Parse parse -> structures(parse.code());
                 case ParsedStructure.Data data -> {}
+                case ParsedStructure.AutoReload autoReload -> {}
             }
         }
     }

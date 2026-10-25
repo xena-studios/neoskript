@@ -38,8 +38,7 @@ final class Items {
      * it can be read and set. Or the item inside an entity, like a dropped item or an item frame
      * ({@code holder}).
      */
-    record Slot(Inventory inventory, int index, LivingEntity entity, EquipmentSlot equipment,
-            org.bukkit.entity.Entity holder) {
+    record Slot(Inventory inventory, int index, LivingEntity entity, EquipmentSlot equipment, Object holder) {
 
         Slot(Inventory inventory, int index) {
             this(inventory, index, null, null, null);
@@ -61,8 +60,17 @@ final class Items {
                     || entity instanceof org.bukkit.entity.ItemDisplay ? new Slot(null, -1, null, null, entity) : null;
         }
 
+        /**
+         * The hand a player fills or empties a bucket with, in a bucket event, as Skript's tool there: after the
+         * event ({@code future}) it's the event's item, and it's set as the event's item but before it.
+         */
+        record BucketHand(org.bukkit.event.player.PlayerBucketEvent event, int time) {}
+
         ItemStack item() {
-            if (holder != null) {
+            if (holder instanceof BucketHand bucket && bucket.time() > 0) {
+                return bucket.event().getItemStack();
+            }
+            if (holder != null && !(holder instanceof BucketHand)) {
                 return switch (holder) {
                     case org.bukkit.entity.Item dropped -> dropped.getItemStack();
                     case org.bukkit.entity.ItemFrame frame -> frame.getItem();
@@ -83,7 +91,9 @@ final class Items {
         }
 
         void set(ItemStack item) {
-            if (holder != null) {
+            if (holder instanceof BucketHand bucket && bucket.time() >= 0) {
+                bucket.event().setItemStack(item);
+            } else if (holder != null && !(holder instanceof BucketHand)) {
                 switch (holder) {
                     case org.bukkit.entity.Item dropped -> {
                         if (item != null) {
@@ -115,6 +125,23 @@ final class Items {
                 inventory.setItem(index, item);
             }
         }
+    }
+
+    /**
+     * The hand slot of {@code entity}, as Skript's tool: in an item held change event, the player's new slot
+     * (the one left, before the event); in a bucket event, the hand the bucket is in.
+     */
+    private static Slot tool(Object event, LivingEntity entity, boolean off, int time) {
+        if (!off && event instanceof org.bukkit.event.player.PlayerItemHeldEvent held && held.getPlayer() == entity) {
+            return new Slot(held.getPlayer().getInventory(), time >= 0 ? held.getNewSlot() : held.getPreviousSlot());
+        }
+        if (event instanceof org.bukkit.event.player.PlayerBucketEvent bucket && bucket.getPlayer() == entity) {
+            org.bukkit.inventory.PlayerInventory inventory = bucket.getPlayer().getInventory();
+            // The off hand is slot 40 of a player's inventory.
+            int index = off || bucket.getHand() == EquipmentSlot.OFF_HAND ? 40 : inventory.getHeldItemSlot();
+            return new Slot(inventory, index, null, null, new Slot.BucketHand(bucket, time));
+        }
+        return Slot.of(entity, off ? EquipmentSlot.OFF_HAND : EquipmentSlot.HAND);
     }
 
     /** A type to check an item against: an item type, or a kind of entity that's also an item ({@code armor stand}). */
@@ -997,18 +1024,24 @@ final class Items {
                 "[the] slot[s] %numbers% of %inventory%", "%inventory%'[s] slot[s] %numbers%");
         // The hand slots of entities: what they hold.
         registrar.expression("ExprTool", "slot", info -> {
-            EquipmentSlot hand = info.hasTag("off") ? EquipmentSlot.OFF_HAND : EquipmentSlot.HAND;
+            boolean off = info.pattern() >= 2;
+            int time = info.time();
             return (context, args) -> {
                 List<Object> slots = new ArrayList<>();
-                for (Object value : (Object[]) args[0]) {
+                // Left out, the event's entity.
+                for (Object value : Property.of(args[0] == null ? Property.eventValue(context) : args[0])) {
                     if (value instanceof LivingEntity entity) {
-                        slots.add(Slot.of(entity, hand));
+                        slots.add(tool(context.event(), entity, off, time));
                     }
                 }
                 return slots.size() == 1 ? slots.getFirst() : slots.toArray();
             };
-        }, "[the] (tool|held item|weapon|off:off[ ]hand (tool|item)) of %livingentities%",
-                "%livingentities%'[s] (tool|held item|weapon|off:off[ ]hand (tool|item))");
+        }, "[the] (tool|held item|weapon) [of %livingentities%]", "%livingentities%'[s] (tool|held item|weapon)",
+                "[the] off[ ]hand (tool|item) [of %livingentities%]", "%livingentities%'[s] off[ ]hand (tool|item)");
+        // 'past tool' in an item held change event is the item in the slot left; in a bucket event, the future
+        // tool is the bucket the player gets.
+        registrar.timeStates("ExprTool", 0, org.bukkit.event.player.PlayerItemHeldEvent.class,
+                org.bukkit.event.player.PlayerBucketEvent.class);
         registrar.expression("ExprInventoryHolder", "inventoryholder", info -> (context, args) -> {
             List<Object> holders = new ArrayList<>();
             for (Object value : (Object[]) args[0]) {

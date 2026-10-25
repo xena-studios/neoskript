@@ -42,8 +42,10 @@ final class Locations {
             return offset;
         }, "%location% offset by [[the] vectors] %vectors% [facingrelative:using local axes]",
                 "%location%[ ]~[~][ ]%vectors%");
-        registrar.expression("ExprSpawn", "location", info -> new Spawn(), "[the] spawn[s] [(point|location)[s]] [of %worlds%]",
-                "%worlds%'[s] spawn[s] [(point|location)[s]]");
+        registrar.expression("ExprSpawn", "location", info -> new Spawn(info.time()),
+                "[the] spawn[s] [(point|location)[s]] [of %worlds%]", "%worlds%'[s] spawn[s] [(point|location)[s]]");
+        // 'past spawn' in a spawn change event is where the spawn was.
+        registrar.timeStates("ExprSpawn", 0, org.bukkit.event.world.SpawnChangeEvent.class);
     }
 
     /**
@@ -91,16 +93,21 @@ final class Locations {
 
 
         // The world a location, entity or chunk is in; a location's can be changed.
-        registrar.expression("ExprWorld", "world", info -> new SettableProperty<>(Object.class, World.class, owner -> switch (owner) {
-            case Location location -> location.getWorld();
-            case Entity entity -> entity.getWorld();
-            case org.bukkit.Chunk chunk -> chunk.getWorld();
-            default -> null;
-        }, (owner, world) -> {
-            if (owner instanceof Location location) {
-                location.setWorld(world);
-            }
-        }), "[the] world of %locations/entities/chunks%", "%locations/entities/chunks%'[s] world");
+        registrar.expression("ExprWorld", "world", info -> {
+            SettableProperty<Object, World> world = new SettableProperty<>(Object.class, World.class, owner -> switch (owner) {
+                case Location location -> location.getWorld();
+                case Entity entity -> entity.getWorld();
+                case org.bukkit.Chunk chunk -> chunk.getWorld();
+                default -> null;
+            }, (owner, changed) -> {
+                if (owner instanceof Location location) {
+                    location.setWorld(changed);
+                }
+            });
+            return info.time() == 0 ? world : new TeleportWorld(world, info.time());
+        }, "[the] world of %locations/entities/chunks%", "%locations/entities/chunks%'[s] world");
+        // 'past world of player' in a teleport event is the world teleported from, the future one the world to.
+        registrar.timeStates("ExprWorld", 0, org.bukkit.event.player.PlayerTeleportEvent.class);
         registrar.expression("ExprWorldFromName", "world", info -> (context, args) -> Bukkit.getWorld(Values.text(args[0])),
                 "[the] world [(named|with name)] %text%");
 
@@ -191,9 +198,44 @@ final class Locations {
     }
 
     /** {@code the spawn of world "x"}, which can be set. */
-    private static final class Spawn implements Expression, Changeable {
+    /**
+     * The world of what's given before or after a teleport, as Skript's: the world teleported from or to, for
+     * each of them.
+     */
+    private record TeleportWorld(SettableProperty<Object, World> world, int time) implements Expression, Changeable {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
+            if (!(context.event() instanceof org.bukkit.event.player.PlayerTeleportEvent teleport)) {
+                return world.get(context, arguments);
+            }
+            Location where = time > 0 ? teleport.getTo() : teleport.getFrom();
+            List<Object> worlds = new ArrayList<>();
+            for (Object owner : PlayerSyntax.owners(arguments[0])) {
+                if (owner instanceof Location || owner instanceof Entity || owner instanceof org.bukkit.Chunk) {
+                    worlds.add(where.getWorld());
+                }
+            }
+            return worlds.size() == 1 ? worlds.getFirst() : worlds.toArray();
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return world.acceptChange(mode);
+        }
+
+        @Override
+        public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
+            world.change(context, arguments, delta, mode);
+        }
+    }
+
+    /** The spawn of worlds; before a spawn change event ({@code past spawn}), where it was. */
+    private record Spawn(int time) implements Expression, Changeable {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            if (time < 0 && context.event() instanceof org.bukkit.event.world.SpawnChangeEvent change) {
+                return change.getPreviousLocation();
+            }
             List<Object> spawns = new ArrayList<>();
             for (Object world : worlds(arguments)) {
                 if (world instanceof World w) {

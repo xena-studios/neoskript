@@ -126,6 +126,8 @@ public final class ScriptCompiler {
                                         new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> diagnostics.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message))).compileTest(name, custom)));
                         case ParsedStructure.Command command -> commands.add(command(name, script, functions, command));
                         case ParsedStructure.Data data -> defaultVariables(data);
+                        // Watched by the plugin, which reloads the script when its file changes.
+                        case ParsedStructure.AutoReload autoReload -> {}
                         case ParsedStructure.Parse parse -> parseResults(parse, name, script, functions);
                         default -> throw new CompileException(header.number(),
                                 "NeoSkript can't run this yet: '" + header.key() + "'");

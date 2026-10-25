@@ -184,6 +184,8 @@ final class EventExpressions {
                     : death.getEntity().getLastDamageCause().getCause();
             default -> null;
         }, List.of(EntityDamageEvent.class, EntityDeathEvent.class), "damage cause");
+        // 'past damage cause' is the same cause: Skript lets it have a past state, not a future one.
+        registrar.timeStates("ExprDamageCause", info -> info.time() < 0);
         registrar.condition("CondDamageCause", info -> {
             if (!isIn(info, EntityDamageEvent.class, EntityDeathEvent.class)) {
                 String event = info.eventName();
@@ -584,6 +586,8 @@ final class EventExpressions {
                 List.of(PlayerExpCooldownChangeEvent.class), "(experience|[e]xp) cooldown change (reason|cause|type)");
         eventValue(registrar, "ExprQuitReason", "quitreason", "quit reason", event -> ((PlayerQuitEvent) event).getReason(),
                 List.of(PlayerQuitEvent.class), "(quit|disconnect) (cause|reason)");
+        // As the damage cause, a past state that's the same.
+        registrar.timeStates("ExprQuitReason", info -> info.time() < 0);
         eventValue(registrar, "ExprInventoryAction", "inventoryaction", "inventory action",
                 event -> ((InventoryClickEvent) event).getAction(), List.of(InventoryClickEvent.class), "inventory action");
     }
@@ -725,6 +729,8 @@ final class EventExpressions {
             return new EventNumber(event -> event instanceof EntityRegainHealthEvent heal ? heal.getAmount() : null,
                     (event, value) -> ((EntityRegainHealthEvent) event).setAmount(value), false);
         }, "[the] heal[ing] amount");
+        // 'past heal amount' and 'future heal amount' in a heal event are the amount, as in Skript.
+        registrar.timeStates("ExprHealAmount", -1, EntityRegainHealthEvent.class);
         registrar.expression("ExprMendingRepairAmount", "integer", info -> {
             restrict(info, "the mending repair amount", "the item mend event", PlayerItemMendEvent.class);
             return new EventNumber(event -> event instanceof PlayerItemMendEvent mend ? (double) mend.getRepairAmount() : null,

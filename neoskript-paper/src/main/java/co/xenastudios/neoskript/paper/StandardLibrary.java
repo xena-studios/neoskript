@@ -83,6 +83,8 @@ public final class StandardLibrary {
         hooks.accept(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
+        // What matches almost anything comes after the time states: 'past level of player' isn't '(past level) of player'.
+        registrar.lateSyntax();
         Items.registerLate(registrar);
         ItemSyntax.register(registrar);
         Banners.register(registrar);

@@ -96,6 +96,34 @@ public interface Registrar {
     void deferredSectionExpression(String expressionId);
 
     /**
+     * Marks where the library's syntax that matches almost anything begins, as Skript's
+     * {@code PATTERN_MATCHES_EVERYTHING} expressions ({@code 3 of stone}): what's registered after this is tried
+     * after the built-in syntax Skript tries before those, as time states ({@code past level of player}).
+     */
+    default void lateSyntax() {}
+
+    /**
+     * Lets expression {@code expressionId} be written with a time state, as Skript's {@code setTime}:
+     * {@code past tool}, {@code the future gamemode of player}, {@code X was Y}. {@code accepts} gets the
+     * element as matched with the time state wanted ({@link co.xenastudios.neoskript.api.element.ElementInfo#time()},
+     * -1 or 1) and says whether it has one there; where it does, the element is made with that
+     * {@code ElementInfo} and gives its value before or after the event. Where it doesn't, the script has an
+     * error, "... does not have a past state".
+     */
+    void timeStates(String expressionId,
+            java.util.function.Predicate<co.xenastudios.neoskript.api.element.ElementInfo> accepts);
+
+    /**
+     * {@link #timeStates(String, java.util.function.Predicate)} in events of {@code eventClasses} only, and
+     * where {@code defaultArgument} isn't negative, only when that argument is left out or an event value
+     * ({@code player}, not {@code {_p}}), as Skript's {@code setTime(time, getExpr(), events...)}.
+     */
+    default void timeStates(String expressionId, int defaultArgument, Class<?>... eventClasses) {
+        timeStates(expressionId, info -> (defaultArgument < 0 || info.isDefault(defaultArgument))
+                && info.isEvent(eventClasses));
+    }
+
+    /**
      * A property expression, {@code [the] <property> of %owners%} and {@code %owners%'[s] <property>}: the
      * value of {@code getter} for each owner of {@code ownerClass}. Owners of other classes, and
      * {@code null} results, are left out.

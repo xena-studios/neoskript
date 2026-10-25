@@ -331,6 +331,17 @@ final class CoreSyntax {
                 "%object%[ ]^[ ]%object%");
     }
 
+    /**
+     * 'past event-block', 'event-item after the event', 'past tool': a value before or after the event. Tried
+     * after the library's expressions but, as Skript tries it, before those that match almost anything
+     * ('3 of stone'), which the library registers last ({@link Library#lateSyntax()}).
+     */
+    static void registerTimeStates(Library library) {
+        library.core(SyntaxKind.EXPRESSION, TIME_STATE, "object", List.of(),
+                "[the] (former|past|old) [state] [of] %objects%", "%objects% before [the event]",
+                "[the] (future|to-be|new) [state] [of] %objects%", "%objects%(-to-be| after[(wards| the event)])");
+    }
+
     /** Syntax tried after everything else, so the library's elements win: event values match any type name. */
     static void registerLast(Library library) {
         // 'all colours': every value of a type that has a fixed set of them.
@@ -346,10 +357,9 @@ final class CoreSyntax {
         // number' is the difference with a parsed number.
         library.core(SyntaxKind.EXPRESSION, PARSE, "object", List.of(RegexRole.TYPE), "%text% parsed as [a[n]] <.+>");
         library.core(SyntaxKind.EXPRESSION, PARSE_PATTERN, "object", List.of(), "%text% parsed as \"<.*>\"");
-        // 'past event-block', 'event-item after the event': an event value before or after the event.
-        library.core(SyntaxKind.EXPRESSION, TIME_STATE, "object", List.of(),
-                "[the] (former|past|old) [state] [of] %objects%", "%objects% before [the event]",
-                "[the] (future|to-be|new) [state] [of] %objects%", "%objects%(-to-be| after[(wards| the event)])");
+        if (!library.hasTimeStateSyntax()) {
+            registerTimeStates(library);
+        }
         // 'player', 'event-world': the event's value of that type. Tried last, as it matches any type name.
         library.core(SyntaxKind.EXPRESSION, EVENT_VALUE, "object", List.of(RegexRole.TYPE), "[the] [event-]<.+>");
         // 'the zombie', 'event-creeper': a kind of entity is the event's entity only when it says so; alone,

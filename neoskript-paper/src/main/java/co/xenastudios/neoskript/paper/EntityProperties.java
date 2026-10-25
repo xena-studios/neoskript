@@ -789,6 +789,9 @@ final class EntityProperties {
             return new Target(pattern, ignoreBlocks);
         }, "[the] target[[ed] %-*entitytype%] [of %livingentities%] [blocks:ignoring blocks] [[with|at] [a] ray[ ]size [of] %-number%]",
                 "%livingentities%'[s] target[[ed] %-*entitytype%] [blocks:ignoring blocks] [[with|at] [a] ray[ ]size [of] %-number%]");
+        // 'future target' in a target event, of the event's entity, is the target it's getting; there's no past one.
+        registrar.timeStates("ExprTarget", info -> info.time() > 0 && info.isDefault(1 - info.pattern())
+                && info.isEvent(org.bukkit.event.entity.EntityTargetEvent.class));
     }
 
     /** {@code the target of %livingentities%}, settable. */

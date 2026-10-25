@@ -78,6 +78,7 @@ public final class CorpusCheck {
                 // Top-level parse blocks store their results in a variable; nothing says what's expected.
                 case ParsedStructure.Parse parse -> structures(script, parse.code(), counter);
                 case ParsedStructure.Data data -> {}
+                case ParsedStructure.AutoReload autoReload -> {}
             }
         }
     }

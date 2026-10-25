@@ -382,10 +382,15 @@ final class BlockProperties {
             int pattern = info.pattern();
             int line = pattern == 1 ? (info.hasTag("1") ? 1 : info.hasTag("2") ? 2 : info.hasTag("3") ? 3 : 4) : 0;
             Side side = info.hasTag("front") ? Side.FRONT : info.hasTag("back") ? Side.BACK : null;
-            return new SignText(pattern, line, side, info.hasTag("block"));
+            // The text being written applies to the event's sign, left out or written as event-block, but not
+            // before the event ('past line 1').
+            boolean written = info.time() >= 0 && info.isDefault(pattern == 0 ? 1 : 0);
+            return new SignText(pattern, line, side, info.hasTag("block"), written);
         }, "line %integer% [of [the] (:front|:back) [side]] [block:of %block%]",
                 "[the] (1:1st|1:first|2:2nd|2:second|3:3rd|3:third|4:4th|4:fourth) line [of [the] (:front|:back) [side]] [block:of %block%]",
                 "[all [[of] the]|the] lines [of [the] (:front|:back) [side]] [block:of %block%]");
+        registrar.timeStates("ExprSignText", info -> info.isDefault(info.pattern() == 0 ? 1 : 0)
+                && info.isEvent(org.bukkit.event.block.SignChangeEvent.class));
         registrar.condition("CondGlowingText", info -> {
             Side side = info.hasTag("back") ? Side.BACK : Side.FRONT;
             return new GlowingText(info.pattern() == 1, info.and(0), side);
@@ -452,7 +457,8 @@ final class BlockProperties {
      * {@code line 2 of {_sign}}, {@code the lines of the back side of {_sign}}: a sign's text, or in a sign
      * change event, the text being written. One line can be set or deleted at a time.
      */
-    private record SignText(int pattern, int fixedLine, Side side, boolean blockGiven) implements Expression, Changeable {
+    private record SignText(int pattern, int fixedLine, Side side, boolean blockGiven, boolean written)
+            implements Expression, Changeable {
 
         /** The line, from 0, -1 for none, or {@code ALL} for every line. */
         private int line(Object[] args) {
@@ -484,7 +490,7 @@ final class BlockProperties {
                 return new Object[0];
             }
             Object blockArg = block(args);
-            if (!blockGiven && context.event() instanceof org.bukkit.event.block.SignChangeEvent event
+            if (written && context.event() instanceof org.bukkit.event.block.SignChangeEvent event
                     && (side == null || side == event.getSide())) {
                 if (line == ALL) {
                     return event.lines().stream().map(SignText::text).toArray();
@@ -527,7 +533,7 @@ final class BlockProperties {
             net.kyori.adventure.text.Component text = delta == null || delta.length == 0 ? null
                     : Messages.component(delta[0]);
             Object blockArg = block(args);
-            if (!blockGiven && context.event() instanceof org.bukkit.event.block.SignChangeEvent event
+            if (written && context.event() instanceof org.bukkit.event.block.SignChangeEvent event
                     && (side == null || side == event.getSide())) {
                 event.line(line, text);
                 return;

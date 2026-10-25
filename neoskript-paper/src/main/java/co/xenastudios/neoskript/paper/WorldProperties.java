@@ -219,9 +219,12 @@ final class WorldProperties {
                 Patterns.property("view distance[s]", "players/worlds"));
         registrar.expression("ExprSimulationDistance", "integer", info -> new Distance(true),
                 Patterns.property("simulation distance[s]", "worlds/players"));
-        registrar.expression("ExprWeather", "weathertype", info -> new WeatherOf(),
+        registrar.expression("ExprWeather", "weathertype", info -> new WeatherOf(info.time()),
                 "[the] weather [(in|of) %players/worlds%]", "[the] (custom|client) weather [of %players%]",
                 "%players/worlds%'[s] weather", "%players%'[s] (custom|client) weather");
+        // 'past weather' in a weather change event is the world's weather before it.
+        registrar.timeStates("ExprWeather", 0, org.bukkit.event.weather.WeatherChangeEvent.class,
+                org.bukkit.event.weather.ThunderChangeEvent.class);
 
         registrar.effect("EffWorldLoad", info -> {
             boolean load = info.pattern() == 0;
@@ -481,14 +484,63 @@ final class WorldProperties {
     }
 
     /** The weather of players and worlds. Clearing a player's makes it the world's; a world's, clear. */
-    private static final class WeatherOf implements Expression, Changeable {
+    /**
+     * The weather of players and worlds. In a weather change event, the event's world's is the weather it
+     * changes to, now and after the event, unless it's cancelled; before it ({@code past weather}), the world's.
+     */
+    private record WeatherOf(int time) implements Expression, Changeable {
+
+        /** The weather event about {@code world}, if this is one and the weather isn't wanted before it. */
+        private org.bukkit.event.weather.WeatherEvent event(TriggerContext context, World world) {
+            return time >= 0 && context.event() instanceof org.bukkit.event.weather.WeatherEvent event
+                    && world.equals(event.getWorld()) ? event : null;
+        }
+
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
             return map(arguments[0], Object.class, owner -> switch (owner) {
                 case Player player -> Weather.of(player);
-                case World world -> Weather.of(world);
+                case World world -> {
+                    org.bukkit.event.weather.WeatherEvent event = event(context, world);
+                    yield event != null && !(event instanceof org.bukkit.event.Cancellable cancellable && cancellable.isCancelled())
+                            ? fromEvent(event) : Weather.of(world);
+                }
                 default -> null;
             });
+        }
+
+        /** The weather a weather change event changes to, as Skript's WeatherType.fromEvent. */
+        private static Weather fromEvent(org.bukkit.event.weather.WeatherEvent event) {
+            if (event instanceof org.bukkit.event.weather.WeatherChangeEvent change) {
+                return !change.toWeatherState() ? Weather.CLEAR : change.getWorld().isThundering() ? Weather.THUNDER : Weather.RAIN;
+            }
+            if (event instanceof org.bukkit.event.weather.ThunderChangeEvent change) {
+                return change.toThunderState() ? Weather.THUNDER : change.getWorld().hasStorm() ? Weather.RAIN : Weather.CLEAR;
+            }
+            return Weather.CLEAR;
+        }
+
+        /** Sets the weather a weather change event changes {@code world} to, as Skript does: cancelling it if need be. */
+        private static void changeEvent(org.bukkit.event.weather.WeatherEvent event, World world, Weather weather) {
+            if (event instanceof org.bukkit.event.weather.WeatherChangeEvent change) {
+                if (change.toWeatherState() && weather == Weather.CLEAR) {
+                    change.setCancelled(true);
+                } else if (!change.toWeatherState() && weather == Weather.RAIN) {
+                    world.setStorm(true);
+                }
+                if (world.isThundering() != (weather == Weather.THUNDER)) {
+                    world.setThundering(weather == Weather.THUNDER);
+                }
+            } else if (event instanceof org.bukkit.event.weather.ThunderChangeEvent change) {
+                if (change.toThunderState() && weather != Weather.THUNDER) {
+                    change.setCancelled(true);
+                } else if (!change.toThunderState() && weather == Weather.THUNDER) {
+                    world.setThundering(true);
+                }
+                if (world.hasStorm() == (weather == Weather.CLEAR)) {
+                    world.setStorm(weather != Weather.CLEAR);
+                }
+            }
         }
 
         @Override
@@ -507,7 +559,12 @@ final class WorldProperties {
                         weather.apply(player);
                     }
                 } else if (owner instanceof World world) {
-                    (weather == null ? Weather.CLEAR : weather).apply(world);
+                    org.bukkit.event.weather.WeatherEvent event = event(context, world);
+                    if (event != null) {
+                        changeEvent(event, world, weather == null ? Weather.CLEAR : weather);
+                    } else {
+                        (weather == null ? Weather.CLEAR : weather).apply(world);
+                    }
                 }
             }
         }

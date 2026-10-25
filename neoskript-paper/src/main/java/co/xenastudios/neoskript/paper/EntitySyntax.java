@@ -558,8 +558,11 @@ final class EntitySyntax {
         });
         condition(registrar, "CondIsBurning", "entities", "(burning|ignited|on fire)", Entity.class,
                 entity -> entity.getFireTicks() > 0);
-        registrar.expression("ExprPassenger", "entity", info -> new Passengers(),
+        registrar.expression("ExprPassenger", "entity", info -> new Passengers(info.time()),
                 "[all [[of] the]|the] passenger[s] of %entities%", "%entities%'[s] passenger[s]");
+        // 'past passenger of event-vehicle' in a vehicle enter event is who rode it before.
+        registrar.timeStates("ExprPassenger", 0, org.bukkit.event.vehicle.VehicleEnterEvent.class,
+                org.bukkit.event.vehicle.VehicleExitEvent.class);
         // 'is riding', 'is riding a villager', 'is riding {_vehicle}'.
         registrar.condition("CondIsRiding", info -> {
             boolean negated = info.pattern() == 1;
@@ -586,15 +589,23 @@ final class EntitySyntax {
             };
         }, "%entities% (is|are) riding [%-entitytypes/entities%]",
                 "%entities% (isn't|is not|aren't|are not) riding [%-entitytypes/entities%]");
-        registrar.expression("ExprVehicle", "entity", info -> (context, args) -> {
-            List<Object> vehicles = new ArrayList<>();
-            for (Object value : (Object[]) args[0]) {
-                if (value instanceof Entity entity && entity.getVehicle() != null) {
-                    vehicles.add(entity.getVehicle());
+        // In a mount or dismount event, the event's entity's vehicle is the one it gets on (now and after the
+        // event) or got off (before it and now), as Skript's.
+        registrar.expression("ExprVehicle", "entity", info -> {
+            int time = info.time();
+            return (context, args) -> {
+                List<Object> vehicles = new ArrayList<>();
+                for (Object value : owners(args[0])) {
+                    if (value instanceof Entity entity && vehicle(context.event(), entity, time) instanceof Entity vehicle) {
+                        vehicles.add(vehicle);
+                    }
                 }
-            }
-            return vehicles.size() == 1 ? vehicles.getFirst() : vehicles.toArray();
-        }, "[the] vehicle[s] of %entities%", "%entities%'[s] vehicle[s]");
+                return vehicles.size() == 1 ? vehicles.getFirst() : vehicles.toArray();
+            };
+        }, "[the] vehicle[s] [of %entities%]", "%entities%'[s] vehicle[s]");
+        registrar.timeStates("ExprVehicle", 0, org.bukkit.event.vehicle.VehicleEnterEvent.class,
+                org.bukkit.event.vehicle.VehicleExitEvent.class, org.bukkit.event.entity.EntityMountEvent.class,
+                org.bukkit.event.entity.EntityDismountEvent.class);
 
         registrar.effect("EffPoison", info -> {
             boolean cure = info.pattern() == 1;
@@ -1654,13 +1665,38 @@ final class EntitySyntax {
     }
 
     /** The entities riding others; set, added to, removed from or cleared. */
-    private record Passengers() implements co.xenastudios.neoskript.api.element.Expression,
+    /** {@code entity}'s vehicle, as Skript's: in a mount or dismount event, the one the event is about. */
+    private static Entity vehicle(Object event, Entity entity, int time) {
+        return switch (event) {
+            case org.bukkit.event.entity.EntityDismountEvent dismount when time <= 0 ->
+                    entity.equals(dismount.getEntity()) ? dismount.getDismounted() : entity.getVehicle();
+            case org.bukkit.event.vehicle.VehicleEnterEvent enter when time >= 0 ->
+                    entity.equals(enter.getEntered()) ? enter.getVehicle() : entity.getVehicle();
+            case org.bukkit.event.vehicle.VehicleExitEvent exit when time <= 0 ->
+                    entity.equals(exit.getExited()) ? exit.getVehicle() : entity.getVehicle();
+            case org.bukkit.event.entity.EntityMountEvent mount when time >= 0 ->
+                    entity.equals(mount.getEntity()) ? mount.getMount() : entity.getVehicle();
+            case null, default -> entity.getVehicle();
+        };
+    }
+
+    /**
+     * The passengers of vehicles: in a vehicle enter or exit event, the event's vehicle's is the entity getting
+     * on or off, but before the event ({@code past passengers}).
+     */
+    private record Passengers(int time) implements co.xenastudios.neoskript.api.element.Expression,
             co.xenastudios.neoskript.api.element.Changeable {
         @Override
         public Object get(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments) {
             List<Object> passengers = new ArrayList<>();
             for (Object vehicle : owners(arguments[0])) {
-                if (vehicle instanceof Entity entity) {
+                if (time >= 0 && context.event() instanceof org.bukkit.event.vehicle.VehicleEnterEvent enter
+                        && vehicle.equals(enter.getVehicle())) {
+                    passengers.add(enter.getEntered());
+                } else if (time >= 0 && context.event() instanceof org.bukkit.event.vehicle.VehicleExitEvent exit
+                        && vehicle.equals(exit.getVehicle())) {
+                    passengers.add(exit.getExited());
+                } else if (vehicle instanceof Entity entity) {
                     passengers.addAll(entity.getPassengers());
                 }
             }

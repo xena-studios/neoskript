@@ -21,10 +21,24 @@ public record Structure(Kind kind, Node node) {
         COMMAND,
         EVENT,
         /** {@code using <experimental feature>}, a single line. */
-        USING
+        USING,
+        /** Skript's {@code auto reload}: a single line, or a section of entries. */
+        AUTO_RELOAD
     }
 
-    /** The structure's section. Every kind except {@link Kind#USING} is a section. */
+    /** Skript's pattern for {@code auto reload}: {@code auto[matically] reload [(this|the) script]}. */
+    private static final java.util.regex.Pattern AUTO_RELOAD_PATTERN = java.util.regex.Pattern.compile(
+            "auto(?:matically)? reload(?: (?:this|the) script)?", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /** Whether {@code key} is Skript's {@code auto reload} structure. */
+    public static boolean isAutoReload(String key) {
+        return AUTO_RELOAD_PATTERN.matcher(key.strip()).matches();
+    }
+
+    /**
+     * The structure's section. Every kind except {@link Kind#USING} is a section; {@link Kind#AUTO_RELOAD}
+     * can be either.
+     */
     public Node.Section section() {
         if (node instanceof Node.Section section) {
             return section;
@@ -34,6 +48,9 @@ public record Structure(Kind kind, Node node) {
 
     /** The kind of a single-line structure, or {@code null} if the line isn't one. */
     public static Kind simpleKindOf(Line line) {
+        if (isAutoReload(line.text())) {
+            return Kind.AUTO_RELOAD;
+        }
         return line.text().toLowerCase(Locale.ROOT).startsWith("using ") ? Kind.USING : null;
     }
 
@@ -44,6 +61,9 @@ public record Structure(Kind kind, Node node) {
             case "variables" -> Kind.VARIABLES;
             case "aliases" -> Kind.ALIASES;
             default -> {
+                if (isAutoReload(key)) {
+                    yield Kind.AUTO_RELOAD;
+                }
                 if (key.startsWith("function ") || key.startsWith("local function ")) {
                     yield Kind.FUNCTION;
                 }

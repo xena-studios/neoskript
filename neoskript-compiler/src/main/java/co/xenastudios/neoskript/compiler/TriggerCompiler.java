@@ -1790,7 +1790,9 @@ final class TriggerCompiler {
             setCondition(effect, whether);
             return;
         }
-        if (target instanceof Expr.Syntax syntax && !(library.binding(syntax.syntax().syntax()) instanceof Library.Core)) {
+        if (target instanceof Expr.Syntax syntax && (!(library.binding(syntax.syntax().syntax()) instanceof Library.Core)
+                || isCore(syntax.syntax(), CoreSyntax.TIME_STATE) && syntax.syntax().match().values().getFirst() instanceof Expr.Syntax inner
+                        && !(library.binding(inner.syntax().syntax()) instanceof Library.Core))) {
             changeExpression(effect, mode, syntax);
             return;
         }
@@ -1995,6 +1997,31 @@ final class TriggerCompiler {
             throws CompileException {
         Changeable.Mode changeMode = changeMode(effect, mode);
         ParsedSyntax syntax = target.syntax();
+        if (isCore(syntax, CoreSyntax.TIME_STATE) && syntax.match().values().getFirst() instanceof Expr.Syntax inner) {
+            // 'set past level of player to 3': the expression in that state is changed, as Skript's wrapper.
+            int time = syntax.pattern() < 2 ? -1 : 1;
+            if (currentLine != null && script.delayBefore(currentLine) == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED) {
+                throw new CompileException(line, "Cannot use time states after the event has already passed");
+            }
+            if (!hasTimeState(inner, time)) {
+                timed(inner, time, target);
+            }
+            ParsedSyntax outer = timedSyntax;
+            int outerTime = timedTime;
+            timedSyntax = inner.syntax();
+            timedTime = time;
+            changeShown = target;
+            try {
+                changeExpression(effect, mode, inner);
+            } finally {
+                timedSyntax = outer;
+                timedTime = outerTime;
+                changeShown = null;
+            }
+            return;
+        }
+        Expr shown = changeShown != null ? changeShown : target;
+        changeShown = null;
         if (mode.value >= 0 && mode.value < effect.match().values().size()
                 && effect.match().values().get(mode.value) instanceof Expr.FunctionCall call
                 && call.function().returnType() == null) {
@@ -2015,7 +2042,7 @@ final class TriggerCompiler {
             return;
         }
         if (accepted == null) {
-            String text = source.substring(target.start(), target.end());
+            String text = source.substring(shown.start(), shown.end());
             throw new CompileException(line, text + switch (changeMode) {
                 case SET -> " can't be set to anything";
                 case ADD -> " can't have anything added to it";
@@ -2158,6 +2185,28 @@ final class TriggerCompiler {
 
     private void condition(ParsedSyntax condition) throws CompileException {
         List<Object> values = condition.match().values();
+        if (condition.syntax().id().equals("CondCompare") && values.size() == 2
+                && values.get(0) instanceof Expr.Unresolved && values.get(1) instanceof Expr.Unresolved) {
+            // Words on both sides that nothing reads: Skript's comparison quietly fails to initialise, so the line
+            // isn't understood ('this is not valid syntax').
+            try {
+                conditionChecked(condition, values);
+            } catch (CompileException e) {
+                if (!e.getMessage().contains("NeoSkript can't run this yet")) {
+                    throw e;
+                }
+                String text = source.strip();
+                java.util.regex.Matcher header = java.util.regex.Pattern.compile("(?i)^(?:else )?if (.+?):?$").matcher(text);
+                throw new CompileException(line, header.matches()
+                        ? "Can't understand this condition: '" + header.group(1) + "'"
+                        : "Can't understand this condition/effect: " + text);
+            }
+            return;
+        }
+        conditionChecked(condition, values);
+    }
+
+    private void conditionChecked(ParsedSyntax condition, List<Object> values) throws CompileException {
         if (!values.isEmpty() && values.getFirst() instanceof Expr.ListOf list && list.items().size() > 1
                 && ITEM_CONDITIONS.contains(baseId(condition.syntax().id()))) {
             // A list of what's checked is checked item by item, as Skript's expression lists are: '"" or {_x} is
@@ -2286,8 +2335,15 @@ final class TriggerCompiler {
         }
         return new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags(), or, lists, types,
                 argumentTypes, single, literals, eventName, eventClasses == null ? List.of() : eventClasses,
-                sectionType, defaults);
+                sectionType, defaults, syntax == timedSyntax ? timedTime : 0);
     }
+
+    /** What a change's errors quote instead of its target: the time state around it ({@code past level of player}). */
+    private Expr changeShown;
+
+    /** The library expression being compiled with a time state ({@code past tool}), and that state, or null. */
+    private ParsedSyntax timedSyntax;
+    private int timedTime;
 
     /** Pushes the element, the trigger context and the element's arguments, ready to call it. */
     private void callThrough(ParsedSyntax syntax, Class<?> type) throws CompileException {
@@ -2557,9 +2613,13 @@ final class TriggerCompiler {
 
     /**
      * {@code past event-block}, {@code event-item after the event}: an event value as it was before the event,
-     * or will be after it. Only event values that have such a state can be written so.
+     * or will be after it; {@code past tool}: a library expression that takes that state
+     * ({@code Registrar.timeStates}). Nothing else can be written so, nor anything after the event has passed.
      */
     private void timeState(Expr.Syntax syntax) throws CompileException {
+        if (currentLine != null && script.delayBefore(currentLine) == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED) {
+            throw new CompileException(line, "Cannot use time states after the event has already passed");
+        }
         timed(syntax.syntax().match().values().getFirst(), syntax.syntax().pattern() < 2 ? -1 : 1, syntax);
     }
 
@@ -2578,20 +2638,20 @@ final class TriggerCompiler {
     }
 
     private void timed(Object inner, int time, Expr whole) throws CompileException {
-        if (hasTimeState(inner)) {
-            eventValue((Expr.Syntax) inner, time);
+        if (hasTimeState(inner, time)) {
+            timedValue((Expr.Syntax) inner, time);
             return;
         }
         // A list is in that state where its values have one, as in Skript: 'past event-block and event-player'.
-        if (inner instanceof Expr.ListOf list && list.items().stream().anyMatch(this::hasTimeState)) {
+        if (inner instanceof Expr.ListOf list && list.items().stream().anyMatch(item -> hasTimeState(item, time))) {
             pushInt(list.items().size());
             method.visitTypeInsn(ANEWARRAY, OBJECT);
             for (int i = 0; i < list.items().size(); i++) {
                 method.visitInsn(DUP);
                 pushInt(i);
                 Expr item = list.items().get(i);
-                if (hasTimeState(item)) {
-                    eventValue((Expr.Syntax) item, time);
+                if (hasTimeState(item, time)) {
+                    timedValue((Expr.Syntax) item, time);
                 } else {
                     expression(item);
                 }
@@ -2603,6 +2663,33 @@ final class TriggerCompiler {
         String text = inner instanceof Expr expr && expr.end() <= source.length()
                 ? source.substring(expr.start(), expr.end()) : source.substring(whole.start(), whole.end());
         throw new CompileException(line, text + " does not have a " + (time < 0 ? "past" : "future") + " state");
+    }
+
+    /**
+     * Whether {@code expr} has a state at {@code time} here: an event value with a past or future state in this
+     * trigger's event, or a library expression that takes that time state here ({@code past tool}).
+     */
+    private boolean hasTimeState(Object expr, int time) {
+        return hasTimeState(expr) || expr instanceof Expr.Syntax value
+                && library.acceptsTime(value.syntax().syntax().id(), info(value.syntax()).withTime(time));
+    }
+
+    /** {@code expr}, which {@link #hasTimeState(Object, int)}, at {@code time}. */
+    private void timedValue(Expr.Syntax expr, int time) throws CompileException {
+        if (hasTimeState(expr)) {
+            eventValue(expr, time);
+            return;
+        }
+        ParsedSyntax outer = timedSyntax;
+        int outerTime = timedTime;
+        timedSyntax = expr.syntax();
+        timedTime = time;
+        try {
+            expression(expr);
+        } finally {
+            timedSyntax = outer;
+            timedTime = outerTime;
+        }
     }
 
     /** Whether {@code expr} is an event value that has a past or future state in this trigger's event. */

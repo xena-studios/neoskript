@@ -10,6 +10,7 @@ import co.xenastudios.neoskript.compiler.CompiledScripts;
 import co.xenastudios.neoskript.compiler.Library;
 import co.xenastudios.neoskript.compiler.ScriptCompiler;
 import co.xenastudios.neoskript.frontend.parse.ParsedScript;
+import co.xenastudios.neoskript.frontend.parse.ParsedStructure;
 import co.xenastudios.neoskript.frontend.parse.ScriptLoader;
 import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
 import co.xenastudios.neoskript.frontend.source.Diagnostic;
@@ -65,6 +66,11 @@ final class ScriptManager {
     private final Map<String, List<Runnable>> periodic = new HashMap<>();
     /** The commands of each loaded script. */
     private final Map<String, List<CompiledCommand>> loadedCommands = new LinkedHashMap<>();
+
+    /** Each loaded script's {@code auto reload}, if it has one. */
+    private final Map<String, AutoReload> autoReloads = new HashMap<>();
+    /** When each script's file was last modified, as of the last time the scripts were read. */
+    private final Map<String, Long> modified = new HashMap<>();
 
     /** In test mode, what to do after the tests ran (stop the server); otherwise {@code null}. */
     private Runnable afterTests;
@@ -167,6 +173,15 @@ final class ScriptManager {
 
     /** With {@code now}, load events run straight away rather than on the next tick: for loads a script asks for. */
     private Outcome load(String only, Consumer<String> problems, boolean now) throws IOException {
+        return load(only, problems, now, null);
+    }
+
+    /**
+     * With {@code redirect}, every problem (warnings too) goes there instead of the log and
+     * {@code problems}: for {@code auto reload}, which sends them to its recipients.
+     */
+    private Outcome load(String only, Consumer<String> problems, boolean now,
+            java.util.function.BiConsumer<Diagnostic, SourceFile> redirect) throws IOException {
         long start = System.nanoTime();
         Files.createDirectories(scriptsDir);
         // Everything is parsed and compiled, even for one script, so calls between scripts resolve.
@@ -183,6 +198,14 @@ final class ScriptManager {
         int errors = 0;
         for (Diagnostic diagnostic : diagnostics) {
             if (only != null && !diagnostic.file().equals(only)) {
+                continue;
+            }
+            if (redirect != null) {
+                redirect.accept(diagnostic, byName.get(diagnostic.file()));
+                if (diagnostic.severity() == Severity.ERROR) {
+                    failed.add(diagnostic.file());
+                    errors++;
+                }
                 continue;
             }
             if (diagnostic.severity() != Severity.ERROR) {
@@ -216,6 +239,11 @@ final class ScriptManager {
             for (String name : List.copyOf(periodic.keySet())) {
                 if (!byName.containsKey(name)) {
                     periodic.remove(name).forEach(Runnable::run);
+                }
+            }
+            for (String name : List.copyOf(autoReloads.keySet())) {
+                if (!byName.containsKey(name)) {
+                    autoReloads.remove(name).stop();
                 }
             }
         }
@@ -270,6 +298,7 @@ final class ScriptManager {
             }
             periodic.put(name, stops);
         }
+        watch(switching, parsed);
         if (afterTests != null) {
             Runnable done = afterTests;
             afterTests = null;
@@ -286,10 +315,72 @@ final class ScriptManager {
         return new Outcome(only == null ? files.size() : 1, errors, millis);
     }
 
+    /**
+     * Starts watching the scripts in {@code switching} that have Skript's {@code auto reload}, and stops
+     * watching their previous versions. A script with errors that keeps its previous version keeps
+     * watching as it did.
+     */
+    private void watch(Set<String> switching, List<ParsedScript> parsed) {
+        for (String name : switching) {
+            AutoReload old = autoReloads.remove(name);
+            if (old != null) {
+                old.stop();
+            }
+        }
+        for (ParsedScript script : parsed) {
+            String name = script.file().name();
+            if (!switching.contains(name)) {
+                continue;
+            }
+            ParsedStructure.AutoReload structure = null;
+            for (ParsedStructure s : script.structures()) {
+                if (s instanceof ParsedStructure.AutoReload autoReload) {
+                    structure = autoReload;
+                }
+            }
+            if (structure == null) {
+                continue;
+            }
+            AutoReload autoReload = new AutoReload(name, structure, modified.getOrDefault(name, 0L));
+            autoReloads.put(name, autoReload);
+            autoReload.started(scheduler.runGlobalRepeating(AutoReload.PERIOD, () -> checkAutoReload(name, autoReload)));
+        }
+    }
+
+    /** Reloads a script with {@code auto reload} if its file changed since it was last loaded. */
+    private synchronized void checkAutoReload(String name, AutoReload autoReload) {
+        if (autoReloads.get(name) != autoReload) {
+            return;
+        }
+        Path path = path(new co.xenastudios.neoskript.runtime.ScriptRef(name));
+        long lastModified;
+        try {
+            lastModified = path == null ? 0 : Files.getLastModifiedTime(path).toMillis();
+        } catch (IOException e) {
+            return;
+        }
+        if (path == null || lastModified <= autoReload.lastReload()) {
+            return;
+        }
+        autoReload.lastReload(lastModified);
+        long start = System.nanoTime();
+        List<org.bukkit.command.CommandSender> audience = autoReload.audience();
+        AutoReload.send(audience, autoReload.reloading());
+        try {
+            Outcome outcome = load(name, problem -> {}, false,
+                    (problem, file) -> AutoReload.send(audience, AutoReload.describe(problem, file)));
+            AutoReload.send(audience, autoReload.reloaded(outcome.errors(), (System.nanoTime() - start) / 1_000_000));
+        } catch (IOException | RuntimeException e) {
+            logger.error("Exception occurred while automatically reloading a script ({})", name, e);
+        }
+    }
+
     private List<SourceFile> read() throws IOException {
         List<SourceFile> files = new ArrayList<>();
+        modified.clear();
         try (Stream<Path> paths = Files.walk(scriptsDir)) {
             for (Path path : paths.filter(ScriptManager::isEnabledScript).sorted().toList()) {
+                modified.put(name(path), Files.getLastModifiedTime(path).toMillis());
                 files.add(new SourceFile(name(path), Files.readString(path)));
             }
         }
@@ -449,6 +540,10 @@ final class ScriptManager {
         List<Runnable> stops = periodic.remove(name);
         if (stops != null) {
             stops.forEach(Runnable::run);
+        }
+        AutoReload autoReload = autoReloads.remove(name);
+        if (autoReload != null) {
+            autoReload.stop();
         }
         events.update(loaded.values().stream().flatMap(List::stream).toList());
         commands.update(loadedCommands.values().stream().flatMap(List::stream).toList());

@@ -172,4 +172,24 @@ class ScriptLoaderTest {
                 \t\tsend "%{_x}%" to sender
                 """);
     }
+
+    @Test
+    void autoReload() {
+        ParsedScript simple = load("automatically reload this script\non load:\n\tstop\n");
+        assertEquals(List.of(), errors(simple));
+        ParsedStructure.AutoReload plain = assertInstanceOf(ParsedStructure.AutoReload.class, simple.structures().getFirst());
+        assertEquals(List.of(), plain.recipients());
+        assertEquals("skript.reloadnotify", plain.permission());
+
+        ParsedScript entries = load("auto reload:\n\trecipients: \"Njol\", {_x}, \"a\"\"b\" and \"c%{_y}%\"\n"
+                + "\tpermission: \"my.perm\"\n");
+        assertEquals(List.of(), errors(entries));
+        ParsedStructure.AutoReload full = assertInstanceOf(ParsedStructure.AutoReload.class, entries.structures().getFirst());
+        // As in Skript, only literal texts count, and the permission is the entry's text as written.
+        assertEquals(List.of("Njol", "a\"b"), full.recipients());
+        assertEquals("\"my.perm\"", full.permission());
+
+        assertEquals(List.of("1: Unexpected entry 'foo: bar'. Check whether it's spelled correctly or remove it"),
+                errors(load("auto reload the script:\n\tfoo: bar\n")));
+    }
 }

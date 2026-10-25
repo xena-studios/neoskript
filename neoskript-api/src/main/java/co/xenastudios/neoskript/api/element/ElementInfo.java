@@ -28,11 +28,14 @@ import java.util.Set;
  *     or {@code null}: what Skript calls the current event there
  * @param defaultArguments a bit for each argument that's left out or an event value ({@code event-entity}),
  *     what Skript calls a default expression
+ * @param time the time state the element is wanted in: -1 before the event ({@code past tool}), 1 after it
+ *     ({@code future gamemode}), 0 now. Only elements that take time states
+ *     ({@link co.xenastudios.neoskript.api.registration.Registrar#timeStates}) are ever made with another
  */
 public record ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,
         java.util.List<TypeArgument> types, java.util.List<String> argumentTypes, long singleArguments,
         java.util.List<String> argumentLiterals, String eventName, java.util.List<Class<?>> eventClasses,
-        String sectionType, long defaultArguments) {
+        String sectionType, long defaultArguments, int time) {
 
     /**
      * A type named in a pattern, as {@code strings} in {@code strings data tag "x" of {_item}}.
@@ -64,6 +67,35 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
             java.util.List<String> argumentLiterals, String eventName, java.util.List<Class<?>> eventClasses) {
         this(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments, argumentLiterals,
                 eventName, eventClasses, null, 0);
+    }
+
+    public ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,
+            java.util.List<TypeArgument> types, java.util.List<String> argumentTypes, long singleArguments,
+            java.util.List<String> argumentLiterals, String eventName, java.util.List<Class<?>> eventClasses,
+            String sectionType, long defaultArguments) {
+        this(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments, argumentLiterals,
+                eventName, eventClasses, sectionType, defaultArguments, 0);
+    }
+
+    /** This element as it's wanted at {@code time}, a time state: -1 before the event, 1 after it, 0 now. */
+    public ElementInfo withTime(int time) {
+        return new ElementInfo(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments,
+                argumentLiterals, eventName, eventClasses, sectionType, defaultArguments, time);
+    }
+
+    /**
+     * Whether the element is in an event of one of {@code classes} (or of a subclass), as Skript's
+     * {@code isCurrentEvent}.
+     */
+    public boolean isEvent(Class<?>... classes) {
+        for (Class<?> current : eventClasses) {
+            for (Class<?> wanted : classes) {
+                if (wanted.isAssignableFrom(current)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Whether argument {@code index} was left out or is an event value, as Skript's default expressions are. */
