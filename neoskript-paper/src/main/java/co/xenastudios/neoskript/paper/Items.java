@@ -888,7 +888,7 @@ final class Items {
         registrar.expression("ExprItemFlags", "itemflag", info -> new Flags(), "[the] item flags of %itemtypes%",
                 "%itemtypes%'[s] item flags");
         registrar.expression("ExprItemWithItemFlags", "itemtype", info -> {
-            boolean all = info.pattern() == 1;
+            boolean all = info.pattern() == 2;
             return (context, args) -> mapItems(args[0], item -> item.withMeta(meta -> {
                 if (all) {
                     meta.addItemFlags(org.bukkit.inventory.ItemFlag.values());
@@ -900,7 +900,8 @@ final class Items {
                     }
                 }
             }));
-        }, "%itemtypes% with item flag[s] %itemflags%", "%itemtypes% with all item flags");
+        }, "%itemtypes% with [the] item flag[s] %itemflags%", "%itemtypes% with [the] %itemflags% item flag[s]",
+                "%itemtypes% with all [the] item flags");
         registrar.expression("ExprItemUnbreakable", "itemtype", info -> {
             boolean unbreakable = info.pattern() == 0;
             return (context, args) -> mapItems(args[0], item -> item.withMeta(meta -> meta.setUnbreakable(unbreakable)));
@@ -920,18 +921,14 @@ final class Items {
         }).resettingTo((java.util.function.Consumer<Object>) owner -> editStack(owner, stack -> stack.editMeta(meta -> meta.setItemModel(null))))
                 .deleting(owner -> editStack(owner, stack -> stack.editMeta(meta -> meta.setItemModel(null)))),
                 "[the] item model of %itemtypes/slots%", "%itemtypes/slots%'[s] item model");
-        registrar.expression("ExprItemWithItemModel", "itemtype", info -> (context, args) -> mapItems(args[0], item -> {
+        registrar.expression("ExprItemWithItemModel", "itemtype", info -> (context, args) -> {
             if (args[1] == null) {
-                return item;
+                return args[0];
             }
-            String model = co.xenastudios.neoskript.runtime.Values.text(args[1]);
-            org.bukkit.NamespacedKey key = org.bukkit.NamespacedKey.fromString(model.toLowerCase(java.util.Locale.ROOT));
-            if (key == null) {
-                co.xenastudios.neoskript.runtime.RuntimeErrors.report("'" + model + "' is not a valid item model key");
-                return item;
-            }
-            return item.withMeta(meta -> meta.setItemModel(key));
-        }), "%itemtypes% with [an] [item] model %text%");
+            // Checked as Skript checks namespaced keys, with its error; the items as they were if it isn't one.
+            org.bukkit.NamespacedKey key = ItemComponents.namespacedKey(co.xenastudios.neoskript.runtime.Values.text(args[1]));
+            return key == null ? args[0] : mapItems(args[0], item -> item.withMeta(meta -> meta.setItemModel(key)));
+        }, "%itemtypes% with [an|the] [item] model %text%");
         Map<String, org.bukkit.inventory.ItemRarity> rarities = new LinkedHashMap<>();
         for (org.bukkit.inventory.ItemRarity rarity : org.bukkit.inventory.ItemRarity.values()) {
             rarities.put(rarity.name().toLowerCase(java.util.Locale.ROOT), rarity);

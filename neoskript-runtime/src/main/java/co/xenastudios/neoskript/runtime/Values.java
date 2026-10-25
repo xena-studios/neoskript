@@ -48,11 +48,31 @@ public final class Values {
         return values.toArray();
     }
 
-    /** {@code "5" parsed as integer}: the text through {@code parser}, or {@code null} if it isn't one. */
+    /** Why the last {@code parsed as} failed, for {@code the last parse error}: shared, as Skript's is. */
+    private static volatile String lastParseError;
+
+    /**
+     * {@code "5" parsed as integer}: the text through {@code parser}, or {@code null} if it isn't one, which
+     * is then the last parse error ({@code what} it couldn't be parsed as: {@code an integer}).
+     */
     @SuppressWarnings("unchecked")
-    public static Object parse(Function<?, ?> parser, Object text) {
+    public static Object parse(Function<?, ?> parser, Object text, String what) {
         Object value = single(text);
-        return value == null ? null : ((Function<String, ?>) parser).apply(text(value).strip());
+        if (value == null) {
+            return null;
+        }
+        String string = text(value);
+        lastParseError = null;
+        Object parsed = ((Function<String, ?>) parser).apply(string.strip());
+        if (parsed == null) {
+            lastParseError = string + " could not be parsed as " + what;
+        }
+        return parsed;
+    }
+
+    /** Skript's {@code the last parse error}: why the last {@code parsed as} failed, or {@code null}. */
+    public static String lastParseError() {
+        return lastParseError;
     }
 
     /** Keeps only values of {@code type}: a single value or {@code null}, or an array of the ones that are. */

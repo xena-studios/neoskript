@@ -85,7 +85,10 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
                 java.util.List.of());
     }
 
-    /** Whether argument {@code index} is certainly one value: a literal, a text, or a variable that isn't a list. */
+    /**
+     * Whether argument {@code index} is certainly one value: a literal, a text, a variable that isn't a list, or
+     * an element that always gives one (or does when its arguments do), as Skript's isSingle.
+     */
     public boolean isSingle(int index) {
         return index < 64 && (singleArguments & (1L << index)) != 0;
     }

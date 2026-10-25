@@ -1037,13 +1037,13 @@ final class EntitySyntax {
                 "(clear|delete|reset) [the] enchantment glint override of %itemtypes%",
                 "(clear|delete|reset) %itemtypes%'[s] enchantment glint override");
         registrar.expression("ExprItemWithGlint", "itemtype", info -> {
-            boolean with = info.pattern() == 0;
+            boolean with = !info.hasTag("out");
             return (context, args) -> mapItems(args[0], item -> item.withMeta(meta -> meta.setEnchantmentGlintOverride(with)));
-        }, "%itemtypes% with enchantment glint", "%itemtypes% without enchantment glint");
+        }, "%itemtypes% with[:out] [enchant[ment]] glint");
         registrar.expression("ExprItemWithFireResistance", "itemtype", info -> {
-            boolean with = info.pattern() != 1;
+            boolean with = !info.hasTag("out");
             return (context, args) -> mapItems(args[0], item -> item.withMeta(meta -> meta.setFireResistant(with)));
-        }, "%itemtypes% with fire resistance", "%itemtypes% without fire resistance", "fire resistant %itemtypes%");
+        }, "%itemtypes% with[:out] fire[ ]resistance", "fire resistant %itemtypes%");
         registrar.expression("ExprItemWithTooltip", "itemtype", info -> {
             boolean hide = info.pattern() == 1;
             boolean additional = info.hasTag("additional");

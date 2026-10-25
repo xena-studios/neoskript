@@ -27,6 +27,7 @@ import static org.objectweb.asm.Opcodes.GOTO;
 import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.I2L;
 import static org.objectweb.asm.Opcodes.ICONST_0;
+import static org.objectweb.asm.Opcodes.ICONST_M1;
 import static org.objectweb.asm.Opcodes.ICONST_1;
 import static org.objectweb.asm.Opcodes.IFEQ;
 import static org.objectweb.asm.Opcodes.IFNE;
@@ -591,6 +592,8 @@ final class TriggerCompiler {
                 if (block.indicesSlot() >= 0) {
                     saved.add(new int[] {block.indicesSlot(), SAVED_INDICES});
                 }
+                saved.add(new int[] {block.indexSlot(), SAVED_INDEX});
+            } else if (block.kind() == BlockKind.WHILE) {
                 saved.add(new int[] {block.indexSlot(), SAVED_INDEX});
             }
         }
@@ -1429,6 +1432,10 @@ final class TriggerCompiler {
             throw unsupported("'" + section.line().key() + "'");
         }
         boolean doWhile = section.header().match().hasTag("do");
+        // How many times the body has run, less one, for loop-iteration: Skript's while loops count too.
+        int counterSlot = nextSlot++;
+        method.visitInsn(ICONST_M1);
+        method.visitVarInsn(ISTORE, counterSlot);
         Label top = new Label();
         Label next = new Label();
         Label end = new Label();
@@ -1445,7 +1452,8 @@ final class TriggerCompiler {
             method.visitJumpInsn(IFEQ, end);
         }
         method.visitLabel(top);
-        blocks.push(new Block(BlockKind.WHILE, end, next, -1, -1, -1));
+        method.visitIincInsn(counterSlot, 1);
+        blocks.push(new Block(BlockKind.WHILE, end, next, -1, -1, counterSlot));
         statements(section.body());
         blocks.pop();
         method.visitJumpInsn(GOTO, next);
@@ -2193,6 +2201,9 @@ final class TriggerCompiler {
                     }
                 }
                 case Expr.Variable variable -> one = !variable.list();
+                // An element that's always one value, or one when its arguments are, as Skript's isSingle.
+                case Expr.Syntax inner -> one = co.xenastudios.neoskript.frontend.parse.Plurality.single(inner, registry);
+                case Expr.FunctionCall call -> one = co.xenastudios.neoskript.frontend.parse.Plurality.single(call, registry);
                 case null, default -> {}
             }
             literals.add(literal);
@@ -3104,8 +3115,9 @@ final class TriggerCompiler {
                 }
                 constant(parser, java.util.function.Function.class);
                 expression((Expr) syntax.syntax().match().values().getFirst());
+                method.visitLdcInsn(article(ref.type().name()) + " " + ref.type().name());
                 method.visitMethodInsn(INVOKESTATIC, VALUES, "parse",
-                        "(Ljava/util/function/Function;" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+                        "(Ljava/util/function/Function;" + OBJECT_DESC + STRING_DESC + ")" + OBJECT_DESC, false);
             }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.INDICES) -> {
                 Expr.Variable list = listVariable(syntax.syntax(), "Only list variables have indices");
@@ -3169,7 +3181,18 @@ final class TriggerCompiler {
                 method.visitMethodInsn(INVOKESTATIC, VALUES, "random", "(" + OBJECTS + ")" + OBJECT_DESC, false);
             }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.CAST) -> {
-                expression((Expr) syntax.syntax().match().values().getFirst());
+                Expr within = (Expr) syntax.syntax().match().values().getFirst();
+                // As Skript's ExprValueWithin: one value from what may hold more, or several from one, is refused.
+                Object named = syntax.syntax().match().regexValues().isEmpty() ? null
+                        : syntax.syntax().match().regexValues().getFirst();
+                boolean plural = named instanceof TypeRef ref ? ref.plural() : syntax.syntax().match().hasTag("s");
+                boolean single = !co.xenastudios.neoskript.frontend.parse.Plurality.plural(within, registry);
+                if (plural == single) {
+                    throw new CompileException(line, plural ? "You cannot get multiple elements of a single value"
+                            : describe(within) + " may contain more than one "
+                                    + (named instanceof TypeRef ref ? ref.type().name() : "value"));
+                }
+                expression(within);
                 constant(library.javaClass(syntax.type()), Class.class);
                 method.visitMethodInsn(INVOKESTATIC, VALUES, "cast", "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECTS,
                         false);
@@ -3369,6 +3392,15 @@ final class TriggerCompiler {
         if (!matcher.matches()) {
             throw unsupported("loop-" + text);
         }
+        if (matcher.group(1).equals("counter") || matcher.group(1).equals("iteration")) {
+            if (syntax.pattern() == 1 || syntax.pattern() == 2) {
+                // Skript's loop values leave these to ExprLoopIteration, which has no next or previous one.
+                throw new CompileException(line, "Can't understand this expression: '"
+                        + (syntax.pattern() == 1 ? "next" : "previous") + " loop-" + text + "'");
+            }
+            loopIteration(matcher.group(2));
+            return;
+        }
         List<Block> loops = loops().stream().filter(b -> b.kind() == BlockKind.LOOP).toList();
         if (loops.isEmpty()) {
             throw new CompileException(line, "There's no loop for 'loop-" + text + "'");
@@ -3401,15 +3433,43 @@ final class TriggerCompiler {
                     method.visitMethodInsn(INVOKESTATIC, "java/lang/String", "valueOf", "(J)Ljava/lang/String;", false);
                 }
             }
-            case "counter", "iteration" -> {
-                method.visitVarInsn(ILOAD, loop.indexSlot());
-                method.visitInsn(I2L);
-                method.visitLdcInsn((long) 1 + offset);
-                method.visitInsn(LADD);
-                method.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
-            }
             default -> element(loop.valuesSlot(), loop.indexSlot(), offset);
         }
+    }
+
+    /**
+     * {@code loop-iteration}, {@code loop-counter-2}: how many times a loop (a while loop too) has run, as
+     * Skript's ExprLoopIteration picks the loop and refuses one that isn't clear.
+     */
+    private void loopIteration(String number) throws CompileException {
+        int loopNumber = number == null ? -1 : Integer.parseInt(number);
+        Block loop = null;
+        int i = 1;
+        for (Block block : loops()) {
+            if (block.kind() != BlockKind.LOOP && block.kind() != BlockKind.WHILE) {
+                continue;
+            }
+            if (i < loopNumber) {
+                i++;
+                continue;
+            }
+            if (loop != null) {
+                throw new CompileException(line, "There are multiple loops. Use loop-iteration-1/2/3/etc. to specify "
+                        + "which loop-iteration you want.");
+            }
+            loop = block;
+            if (i == loopNumber) {
+                break;
+            }
+        }
+        if (loop == null) {
+            throw new CompileException(line, "The loop iteration expression must be used in a loop");
+        }
+        method.visitVarInsn(ILOAD, loop.indexSlot());
+        method.visitInsn(I2L);
+        method.visitInsn(LCONST_1);
+        method.visitInsn(LADD);
+        method.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
     }
 
     /** Pushes {@code array[index + offset]}, or {@code null} if that's outside the array. */
@@ -3552,8 +3612,9 @@ final class TriggerCompiler {
         };
         constant(parse, java.util.function.Function.class);
         expression((Expr) syntax.syntax().match().values().getFirst());
+        method.visitLdcInsn("\"" + text + "\"");
         method.visitMethodInsn(INVOKESTATIC, VALUES, "parse",
-                "(Ljava/util/function/Function;" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+                "(Ljava/util/function/Function;" + OBJECT_DESC + STRING_DESC + ")" + OBJECT_DESC, false);
     }
 
     /** A placeholder's text parsed as one of its types, a plural one as a list ({@code 1, 2 and 3}). */

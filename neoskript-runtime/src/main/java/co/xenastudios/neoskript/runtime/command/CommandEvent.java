@@ -25,6 +25,7 @@ public final class CommandEvent {
     private String cooldownBypass;
     private boolean cooldownCancelled;
     private Object result;
+    private Object failure;
 
     /**
      * @param sender who ran it
@@ -87,6 +88,27 @@ public final class CommandEvent {
 
     public void cancelCooldown(boolean cancel) {
         cooldownCancelled = cancel;
+    }
+
+    /** Why the trigger failed the command, as {@code fail the command execution with ...}, or {@code null}. */
+    public Object failure() {
+        return failure;
+    }
+
+    /**
+     * Fails the command with {@code message}, which its sender is shown, and stops the trigger by throwing
+     * {@link Failed}, as Skript's EffFailExecution ends the trigger.
+     */
+    public void fail(Object message) {
+        failure = message;
+        throw new Failed();
+    }
+
+    /** Thrown to stop a command's trigger that failed the command: not an error. */
+    public static final class Failed extends RuntimeException {
+        Failed() {
+            super("The command execution failed", null, false, false);
+        }
     }
 
     /** The value a message or default value trigger worked out. */

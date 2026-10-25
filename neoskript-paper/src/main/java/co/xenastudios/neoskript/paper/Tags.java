@@ -106,6 +106,9 @@ final class Tags {
             }
             return contents.toArray();
         }, "[the] tag (contents|values) of %minecrafttags%", "%minecrafttags%'[s] tag (contents|values)");
+        // 'the key of {_tag}': its namespaced key, "minecraft:dirt".
+        registrar.property("ExprTagKey", "string", "[namespace[d]] key[s]", "minecrafttags", Tag.class,
+                tag -> tag.key().toString());
         registrar.expression("ExprTagsOf", "minecrafttag", info -> {
             List<String> kindsWanted = kinds(info);
             String origin = origin(info);

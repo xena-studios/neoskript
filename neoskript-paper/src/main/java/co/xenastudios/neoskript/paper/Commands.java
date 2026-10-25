@@ -104,6 +104,19 @@ final class Commands {
             };
         }, "[un:un](cancel|ignore) [the] [current] [command] cooldown");
 
+        // Ends the command's trigger, showing its sender the message as the command's error.
+        registrar.effect("EffFailExecution", info -> {
+            String message = info.argumentLiteral(0);
+            EventExpressions.restrict(info, "fail " + (info.hasTag("the") ? "the " : "") + "command execution with "
+                    + (info.hasTag("the2") ? "the " : "") + "error " + (info.hasTag("message") ? "message " : "")
+                    + (message == null ? "..." : "\"" + message + "\""), "", CommandEvent.class);
+            return (context, args) -> {
+                if (context.event() instanceof CommandEvent command && Values.single(args[0]) != null) {
+                    command.fail(TextComponents.from(Values.single(args[0])));
+                }
+            };
+        }, "fail [the:the] command execution with [the2:the] error [message:message] %textcomponent%");
+
         commandInfo(registrar);
 
         registrar.condition("CondIsScriptCommand", info -> {

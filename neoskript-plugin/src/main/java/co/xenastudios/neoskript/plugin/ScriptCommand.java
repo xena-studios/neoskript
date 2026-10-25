@@ -148,7 +148,13 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
         try {
             route.trigger().execute(new SimpleTriggerContext(event, sender instanceof Player ? sender : null));
         } catch (ScriptRuntimeException e) {
-            logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
+            if (!(e.getCause() instanceof CommandEvent.Failed)) {
+                logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
+            }
+        }
+        if (event.failure() instanceof net.kyori.adventure.text.Component failure) {
+            // Shown as the server shows a command's error, in red.
+            sender.sendMessage(failure.colorIfAbsent(net.kyori.adventure.text.format.NamedTextColor.RED));
         }
         if (cooling && event.cooldownCancelled()) {
             UUID id = ((Player) sender).getUniqueId();

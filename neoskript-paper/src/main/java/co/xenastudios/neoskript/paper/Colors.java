@@ -7,6 +7,7 @@ package co.xenastudios.neoskript.paper;
 import co.xenastudios.neoskript.api.registration.Parameter;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.RuntimeErrors;
+import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -113,6 +114,36 @@ final class Colors {
         registrar.function("rgb", List.of(Parameter.of("red", "number"), Parameter.of("green", "number"),
                 Parameter.of("blue", "number"), new Parameter("alpha", "number", false, true)), "color", false,
                 args -> new Rgb(channel(args[0]), channel(args[1]), channel(args[2]), args[3] == null ? 255 : channel(args[3])));
+        // 'dye {_boots} red', 'paint {_potion} (255, 0, 0)': leather armour, maps and potions take the colour.
+        registrar.effect("EffColorItems", info -> {
+            boolean rgb = info.pattern() == 1;
+            return (context, args) -> {
+                org.bukkit.Color color;
+                if (rgb) {
+                    if (!(Values.single(args[1]) instanceof Number red) || !(Values.single(args[2]) instanceof Number green)
+                            || !(Values.single(args[3]) instanceof Number blue)) {
+                        return;
+                    }
+                    color = org.bukkit.Color.fromRGB(fit(red.intValue()), fit(green.intValue()), fit(blue.intValue()));
+                } else if (Values.single(args[1]) instanceof Colour colour) {
+                    color = org.bukkit.Color.fromRGB(colour.red(), colour.green(), colour.blue());
+                } else {
+                    return;
+                }
+                for (Object value : Values.array(args[0])) {
+                    if (value instanceof ItemType item) {
+                        item.editMeta(meta -> {
+                            switch (meta) {
+                                case org.bukkit.inventory.meta.LeatherArmorMeta leather -> leather.setColor(color);
+                                case org.bukkit.inventory.meta.MapMeta map -> map.setColor(color);
+                                case org.bukkit.inventory.meta.PotionMeta potion -> potion.setColor(color);
+                                default -> {}
+                            }
+                        });
+                    }
+                }
+            };
+        }, "(dye|colo[u]r|paint) %itemtypes% %color%", "(dye|colo[u]r|paint) %itemtypes% \\(%number%, %number%, %number%\\)");
         registrar.expression("ExprARGB", "integer", info -> {
             int which = info.hasTag("red") ? 0 : info.hasTag("green") ? 1 : info.hasTag("blue") ? 2 : 3;
             return (context, args) -> {
@@ -263,7 +294,7 @@ final class Colors {
     }
 
     private static void setColour(Object owner, Colour colour) {
-        org.bukkit.Color color = org.bukkit.Color.fromARGB(colour.alpha(), colour.red(), colour.green(), colour.blue());
+        org.bukkit.Color color = org.bukkit.Color.fromRGB(colour.red(), colour.green(), colour.blue());
         switch (owner) {
             // The nearest bar colour, or an error if none is near.
             case org.bukkit.boss.BossBar bar -> BossBars.setColour(bar, colour);
@@ -287,6 +318,11 @@ final class Colors {
             });
             default -> {}
         }
+    }
+
+    /** A colour channel kept within 0 to 255, as Skript's rgb colours keep it. */
+    private static int fit(int channel) {
+        return Math.max(0, Math.min(255, channel));
     }
 
     /** The named colour a dye colour is. */
