@@ -31,7 +31,6 @@ import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Vibration;
 import org.bukkit.World;
-import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -393,16 +392,16 @@ final class Particles {
                         && com.destroystokyo.paper.MaterialTags.MUSIC_DISCS.isTagged(item.material()) ? item.material() : null});
         add.accept(new String[] {"SMOKE_SHOOT", "SMOKE"}, new Object[] {
                 "[dispenser] black smoke effect [(in|with|using) [the] direction] %direction%",
-                (DataSupplier) (args, info) -> args[0] instanceof WorldSyntax.Direction d ? nearestFace(d, false) : null});
+                (DataSupplier) (args, info) -> args[0] instanceof Direction d ? Direction.toNearestBlockFace(d.getDirection()) : null});
         add.accept(new String[] {"WHITE_SMOKE_SHOOT", "SHOOT_WHITE_SMOKE"}, new Object[] {
                 "[dispenser] white smoke effect [(in|with|using) [the] direction] %direction%",
-                (DataSupplier) (args, info) -> args[0] instanceof WorldSyntax.Direction d ? nearestFace(d, true) : null});
+                (DataSupplier) (args, info) -> args[0] instanceof Direction d ? Direction.toNearestCartesianBlockFace(d.getDirection()) : null});
         DataSupplier block = (args, info) -> blockData(args[0]);
         add.accept(new String[] {"STEP_SOUND"}, new Object[] {"%itemtype/blockdata% [foot]step[s] sound [effect]", block});
         add.accept(new String[] {"DESTROY_BLOCK"}, new Object[] {"%itemtype/blockdata% (break|destroy) effect", block});
         add.accept(new String[] {"DESTROY_BLOCK_WITH_SOUND"}, new Object[] {
                 "%itemtype/blockdata% (break|destroy) effect with sound", block});
-        DataSupplier cartesian = (args, info) -> args[0] instanceof WorldSyntax.Direction d ? nearestFace(d, true) : null;
+        DataSupplier cartesian = (args, info) -> args[0] instanceof Direction d ? Direction.toNearestCartesianBlockFace(d.getDirection()) : null;
         add.accept(new String[] {"DESTROY_PROGRESS"}, new Object[] {
                 "destroy progress effect on the %direction% [side|face]", cartesian});
         add.accept(new String[] {"DESTROY_PROGRESS_WITH_SOUND"}, new Object[] {
@@ -481,23 +480,6 @@ final class Particles {
 
     private static int pack(double offset, int radius) {
         return Math.clamp((long) Math.floor(offset), -radius, radius) + radius;
-    }
-
-    /** The block face nearest a direction, of all of them or only the six straight ones, as Skript finds it. */
-    private static BlockFace nearestFace(WorldSyntax.Direction direction, boolean cartesian) {
-        Vector vector = direction.from(null);
-        BlockFace[] faces = cartesian ? new BlockFace[] {BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST,
-                BlockFace.UP, BlockFace.DOWN} : BlockFace.values();
-        double max = -1;
-        BlockFace nearest = cartesian ? null : BlockFace.NORTH;
-        for (BlockFace face : faces) {
-            double dot = face.getDirection().dot(vector);
-            if (dot > max) {
-                max = dot;
-                nearest = face;
-            }
-        }
-        return nearest;
     }
 
     private static Particle particle(String name) {
@@ -762,7 +744,7 @@ final class Particles {
                 if (args[1] == null || args[2] == null) {
                     return;
                 }
-                Location[] locations = locations(Values.array(args[1]), Values.array(args[2]));
+                List<Location> locations = Direction.combine(args[1], args[2]);
                 Number radius = pattern == 2 && args[3] instanceof Number n ? n : null;
                 Object[] players = pattern == 1 ? Values.array(args[3]) : null;
                 Player as = pattern == 0 ? player(args[3]) : pattern == 1 ? player(args[4]) : null;
@@ -811,24 +793,6 @@ final class Particles {
 
     private static Player player(Object value) {
         return Values.single(value) instanceof Player player ? player : null;
-    }
-
-    /** The locations, each moved by every direction in turn, as Skript combines them. */
-    private static Location[] locations(Object[] directions, Object[] locations) {
-        List<Location> result = new ArrayList<>();
-        for (Object value : locations) {
-            Location location = value instanceof Location l ? l.clone() : value instanceof Entity e ? e.getLocation() : null;
-            if (location == null) {
-                continue;
-            }
-            for (Object direction : directions) {
-                if (direction instanceof WorldSyntax.Direction d) {
-                    location.add(d.from(location));
-                }
-            }
-            result.add(location);
-        }
-        return result.toArray(Location[]::new);
     }
 
     private static void drawEntityEffects(Object[] effects, Object[] entities) {
