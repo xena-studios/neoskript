@@ -204,7 +204,8 @@ final class LineParser {
             ParsedSyntax parsed = new ParsedSyntax(syntax, candidate.pattern(), match);
             // An event value the code can't have isn't one, so another reading is tried, as Skript's fails to
             // initialize: 'amount of slots of {_inv}' in 'on load' is the inventory's number of slots.
-            if (eventScope != null && hasTypeRole(syntax) && !eventValueAllowed(parsed, text)) {
+            if (eventScope != null && (hasTypeRole(syntax) && !eventValueAllowed(parsed, text)
+                    || !leftOutAllowed(syntax, pattern, match))) {
                 refusedEventValues = true;
                 continue;
             }
@@ -397,6 +398,45 @@ final class LineParser {
     /** Whether an event value the line can't use was turned down: only then could parsing with any differ. */
     boolean refusedEventValues() {
         return refusedEventValues;
+    }
+
+    /** Whether the placeholders {@code match} left out can be, where the event's value may have to stand for them. */
+    private boolean leftOutAllowed(SyntaxInfo syntax, CompiledPattern pattern, MatchResult match) {
+        List<Object> values = match.values();
+        PlaceholderSpec[] specs = null;
+        for (int i = 0; i < values.size(); i++) {
+            if (values.get(i) == null) {
+                specs = specs != null ? specs : placeholderSpecs.computeIfAbsent(pattern, LineParser::specs);
+                if (i < specs.length && specs[i] != null && !eventScope.allowsLeftOut(syntax, specs[i])) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** The placeholders of each pattern (compared by identity), as left-out ones are looked up. */
+    private final Map<CompiledPattern, PlaceholderSpec[]> placeholderSpecs = new HashMap<>();
+
+    private static PlaceholderSpec[] specs(CompiledPattern pattern) {
+        PlaceholderSpec[] specs = new PlaceholderSpec[pattern.placeholderCount()];
+        collectSpecs(pattern.root(), specs);
+        return specs;
+    }
+
+    private static void collectSpecs(co.xenastudios.neoskript.frontend.pattern.PatternElement element,
+            PlaceholderSpec[] specs) {
+        switch (element) {
+            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Placeholder placeholder ->
+                    specs[placeholder.index()] = placeholder.spec();
+            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Sequence sequence ->
+                    sequence.elements().forEach(e -> collectSpecs(e, specs));
+            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Choice choice ->
+                    choice.alternatives().forEach(a -> collectSpecs(a.body(), specs));
+            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Optional optional ->
+                    collectSpecs(optional.choice(), specs);
+            default -> {}
+        }
     }
 
     /** Whether {@code parsed}, if it's an event value, is one the line can use. */

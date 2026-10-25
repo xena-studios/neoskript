@@ -39,5 +39,13 @@ public interface EventValues {
          * had here. True for anything that isn't an event value.
          */
         boolean allows(SyntaxInfo syntax, TypeRef type, String words);
+
+        /**
+         * Whether a placeholder can be left out here: not if only the event's value can stand for it and there's
+         * none, as Skript's event value default expressions fail to initialize ({@code hide the particles}).
+         */
+        default boolean allowsLeftOut(SyntaxInfo syntax, co.xenastudios.neoskript.frontend.pattern.PlaceholderSpec spec) {
+            return true;
+        }
     }
 }

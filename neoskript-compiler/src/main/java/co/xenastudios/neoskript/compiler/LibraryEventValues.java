@@ -4,9 +4,12 @@
  */
 package co.xenastudios.neoskript.compiler;
 
+import co.xenastudios.neoskript.api.element.ElementFactory;
 import co.xenastudios.neoskript.api.registration.ScriptEvent;
+import co.xenastudios.neoskript.frontend.pattern.PlaceholderSpec;
 import co.xenastudios.neoskript.frontend.registry.EventValues;
 import co.xenastudios.neoskript.frontend.registry.SyntaxInfo;
+import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
 import co.xenastudios.neoskript.frontend.registry.TypeRef;
 import co.xenastudios.neoskript.runtime.command.CommandEvent;
 import co.xenastudios.neoskript.runtime.testing.TestEvent;
@@ -100,6 +103,34 @@ final class LibraryEventValues implements EventValues {
             String key = type.type().id() + (type.plural() ? "*" : "");
             return known.computeIfAbsent(key, k -> has(type.type().id(), null)
                     || type.plural() && has(type.type().id(), several(type.type().id())));
+        }
+
+        @Override
+        public boolean allowsLeftOut(SyntaxInfo syntax, PlaceholderSpec spec) {
+            // As the compiler fills in a library element's: unless nothing but the event's value can, and the event
+            // has none. (Outside events nothing is filled in, and nothing fails.)
+            if (spec.nullable() || classes.isEmpty() || spec.types().isEmpty() || spec.types().contains("script")
+                    || !(library.binding(syntax) instanceof ElementFactory<?>)) {
+                return true;
+            }
+            SyntaxRegistry registry = library.registry();
+            for (String name : spec.types()) {
+                TypeRef ref = registry.resolveType(name);
+                if (ref == null || !library.hasEventDefault(ref.type().id())) {
+                    return true;
+                }
+            }
+            if (spec.types().size() == 1 && library.defaultValue(registry.resolveType(spec.types().getFirst())
+                    .type().id()) != null) {
+                return true;
+            }
+            for (String name : spec.types()) {
+                String type = registry.resolveType(name).type().id();
+                if (known.computeIfAbsent(type + "=", k -> library.eventValue(classes, type) != null)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /** Whether the events have a value of the type (of {@code kind}), now, before or after the event. */

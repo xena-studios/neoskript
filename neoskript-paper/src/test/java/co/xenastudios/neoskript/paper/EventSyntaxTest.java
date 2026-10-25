@@ -173,6 +173,15 @@ class EventSyntaxTest {
     }
 
     @Test
+    void anEventValueTheEventHasNotIsReadAnotherWay() {
+        // As in Skript: 'slots' isn't the event's slot where there's none, but the inventory's slots.
+        assertEquals(List.of(), errors("on load:\n\tset {_a} to amount of slots of {_inv}\n"));
+        // Where nothing else parses, it's still the error.
+        assertEquals(List.of("There's no slot in a join event"), errors("on join:\n\tset {_a} to event-slot\n"));
+        assertEquals(List.of(), errors("on join:\n\tset {_a} to event-player\n"));
+    }
+
+    @Test
     void eventSyntaxParsesInItsEvents() {
         assertEquals(List.of(), errors("""
                 on brewing fuel consumption:
