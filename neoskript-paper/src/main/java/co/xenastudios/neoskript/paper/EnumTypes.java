@@ -120,7 +120,7 @@ final class EnumTypes {
      * A registry's type, by Skript's names for its values ({@code table}: key, then its names), looked up
      * in the registry the first time it's needed. A value the table leaves out goes by its key's words.
      */
-    private static <T extends Keyed> void registryType(Registrar registrar, String id, String name, Class<T> type,
+    static <T extends Keyed> void registryType(Registrar registrar, String id, String name, Class<T> type,
             RegistryKey<T> key, String node, String... table) {
         Map<String, String> names = new HashMap<>();
         for (int i = 0; i < table.length; i += 2) {

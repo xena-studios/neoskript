@@ -181,6 +181,10 @@ final class Texts {
                         result[i] = inventory;
                         continue;
                     }
+                    // A component, like a name, is changed as its text: 'replace "a" with "b" in name of X'.
+                    if (targets[i] instanceof net.kyori.adventure.text.Component component) {
+                        targets[i] = TextComponentParser.instance().toLegacyString(component);
+                    }
                     if (!(targets[i] instanceof String)) {
                         // Neither text nor an inventory: left as it is.
                         result[i] = targets[i];
@@ -337,12 +341,6 @@ final class Texts {
                 "%texts% in [(lower:lower|upper:upper) ](s_snake:snake[ ]case|s_kebab:kebab[ ]case)",
                 "[(lower:lower|upper:upper) ](s_snake:snake[ ]case|s_kebab:kebab[ ]case) %texts%");
         registrar.expression("LitNewLine", "string", info -> (context, args) -> "\n", "nl", "new[ ]line", "line[ ]break");
-
-        registrar.expression("ExprColored", "string", info -> {
-            boolean strip = info.hasTag("un");
-            return (context, args) -> map((Object[]) args[0], s -> strip
-                    ? Messages.plain(s) : Messages.LEGACY_SECTION.serialize(Messages.component(s)));
-        }, "[un:(un|non)[-]](colo[u]r-|colo[u]red )%texts%", "[un:(un|non)[-]](format-|formatted )%texts%");
     }
 
     /** {@code text} in one of Skript's cases: proper, camel, pascal, snake or kebab, upper or lower. */

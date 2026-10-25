@@ -63,7 +63,7 @@ final class Players {
         };
         // 'display name', 'nick name', 'chat name', 'custom name': a player's display name, or anything else's
         // custom name. Giving an entity a display name shows it, as in Skript.
-        registrar.expression("PropExprName-display", "string", info -> {
+        registrar.expression("PropExprName-display", "textcomponent", info -> {
             boolean display = info.hasTag("display");
             java.util.function.BiConsumer<Object, Object> setter = (owner, name) -> {
                 rename.accept(owner, name);
@@ -72,12 +72,12 @@ final class Players {
                 }
             };
             return new SettableProperty<>(Object.class, Object.class, owner -> owner instanceof org.bukkit.entity.Player player
-                    ? Messages.LEGACY_SECTION.serialize(player.displayName()) : name(owner), setter)
+                    ? player.displayName() : name(owner), setter)
                     .resettingTo((java.util.function.Consumer<Object>) owner -> setter.accept(owner, null))
                     .deleting(owner -> setter.accept(owner, null));
         }, Patterns.property("(display:display|nick|chat|custom)[ ]name[s]", "objects"));
         // Resetting or deleting a name takes the custom name away.
-        registrar.expression("PropExprName", "string", info -> new SettableProperty<>(Object.class, Object.class,
+        registrar.expression("PropExprName", "textcomponent", info -> new SettableProperty<>(Object.class, Object.class,
                 Players::name, rename).resettingTo((java.util.function.Consumer<Object>) owner -> rename.accept(owner, null))
                 .deleting(owner -> rename.accept(owner, null)), Patterns.property("name[s]", "objects"));
 
@@ -184,36 +184,6 @@ final class Players {
                 Player.class, Object.class, player -> Messages.LEGACY_SECTION.serialize(player.playerListName()),
                 (player, name) -> player.playerListName(Messages.component(name)));
 
-        // 'damage X by 2', 'heal X', 'repair X by 5': entities by hearts, items by durability.
-        registrar.effect("EffHealth", info -> {
-            int mode = info.pattern();
-            return (context, args) -> {
-                double amount = args[1] instanceof Number n ? n.doubleValue() : Double.NaN;
-                for (Object value : (Object[]) args[0]) {
-                    switch (value) {
-                        case LivingEntity living when mode == 0 -> {
-                            if (!Double.isNaN(amount)) {
-                                living.damage(amount * 2);
-                            }
-                        }
-                        case LivingEntity living when mode == 1 -> {
-                            AttributeInstance max = living.getAttribute(Attribute.MAX_HEALTH);
-                            double limit = max == null ? 20 : max.getValue();
-                            double health = Double.isNaN(amount) ? limit : living.getHealth() + amount * 2;
-                            living.setHealth(Math.max(0, Math.min(limit, health)));
-                        }
-                        case ItemType item when mode != 1 -> item.editMeta(meta -> {
-                            if (meta instanceof org.bukkit.inventory.meta.Damageable damageable) {
-                                int by = Double.isNaN(amount) ? (mode == 2 ? damageable.getDamage() : 0) : (int) amount;
-                                damageable.setDamage(Math.max(0, damageable.getDamage() + (mode == 0 ? by : -by)));
-                            }
-                        });
-                        default -> {}
-                    }
-                }
-            };
-        }, "damage %livingentities/itemtypes% by %number% [heart[s]]", "heal %livingentities% [by %-number% [heart[s]]]",
-                "repair %itemtypes% [by %-number%]");
         registrar.effect("EffDamage", info -> (context, args) -> {
             if (!(args[0] instanceof LivingEntity attacker) || !(args[2] instanceof Number amount)) {
                 return;
@@ -260,11 +230,13 @@ final class Players {
 
         registrar.effect("EffSendTitle", info -> {
             boolean subtitleOnly = info.pattern() == 1;
+            java.util.function.Function<Object, Component> first = TextComponents.componentOf(info, 0);
+            java.util.function.Function<Object, Component> second = TextComponents.componentOf(info, 1);
             return (context, args) -> {
                 int at = subtitleOnly ? 1 : 2;
-                Component title = subtitleOnly || args[0] == null ? Component.empty() : Messages.component(args[0]);
-                Component subtitle = subtitleOnly ? Messages.component(args[0])
-                        : args[1] == null ? Component.empty() : Messages.component(args[1]);
+                Component title = subtitleOnly || args[0] == null ? Component.empty() : first.apply(args[0]);
+                Component subtitle = subtitleOnly ? first.apply(args[0])
+                        : args[1] == null ? Component.empty() : second.apply(args[1]);
                 Title.Times times = Title.Times.times(duration(args[at + 2], 10), duration(args[at + 1], 70),
                         duration(args[at + 3], 20));
                 Title shown = Title.title(title, subtitle, times);
@@ -278,13 +250,16 @@ final class Players {
                 + "[with fade[(-| )]in %timespan%] [[and] [with] fade[(-| )]out %timespan%]",
                 "send subtitle %object% [to %audiences%] [for %timespan%] [with fade[(-| )]in %timespan%] "
                         + "[[and] [with] fade[(-| )]out %timespan%]");
-        registrar.effect("EffActionBar", info -> (context, args) -> {
-            Component bar = Messages.component(args[0]);
+        registrar.effect("EffActionBar", info -> {
+            java.util.function.Function<Object, Component> asComponent = TextComponents.componentOf(info, 0);
+            return (context, args) -> {
+            Component bar = asComponent.apply(args[0]);
             for (Object audience : audiences(args[1])) {
                 if (audience instanceof Audience a) {
                     a.sendActionBar(bar);
                 }
             }
+            };
         }, "send [the] action[ ]bar [with text] %object% [to %audiences%]");
 
         registrar.effect("EffPlaySound", info -> (context, args) -> {
@@ -347,26 +322,27 @@ final class Players {
         return java.time.Duration.ofMillis(timespan instanceof Timespan t ? t.millis() : ticks * 50);
     }
 
-    /** The name of a player, world, entity or anything else with one. */
-    static String name(Object owner) {
+    /** The name of a player, world, entity or anything else with one, as a text component, as Skript gives it. */
+    static Component name(Object owner) {
         return switch (owner) {
-            case OfflinePlayer player -> player.getName();
-            case co.xenastudios.neoskript.runtime.ScriptRef script -> Scripts.name(script);
-            case co.xenastudios.neoskript.runtime.FunctionRef function -> function.name();
-            case World world -> world.getName();
-            case Configs.ConfigNode node -> node.key();
-            case CommandSender sender -> sender.getName();
-            case org.bukkit.boss.BossBar bar -> bar.getTitle();
-            case Nameable nameable when nameable.customName() != null ->
-                    Messages.LEGACY_SECTION.serialize(nameable.customName());
+            case Player player -> player.name();
+            case OfflinePlayer player -> player.getName() == null ? null : Component.text(player.getName());
+            case co.xenastudios.neoskript.runtime.ScriptRef script -> text(Scripts.name(script));
+            case co.xenastudios.neoskript.runtime.FunctionRef function -> text(function.name());
+            case World world -> Component.text(world.getName());
+            case Configs.ConfigNode node -> text(node.key());
+            case CommandSender sender -> sender.name();
+            case org.bukkit.boss.BossBar bar -> text(bar.getTitle());
+            case Nameable nameable -> nameable.customName();
             // A named block, like a chest: its state has the name.
-            case org.bukkit.block.Block block when block.getState() instanceof Nameable nameable && nameable.customName() != null ->
-                    Messages.LEGACY_SECTION.serialize(nameable.customName());
-            case ItemType item when item.stack().getItemMeta() != null && item.stack().getItemMeta().displayName() != null ->
-                    Messages.LEGACY_SECTION.serialize(item.stack().getItemMeta().displayName());
-            case org.bukkit.inventory.ItemStack stack when stack.getItemMeta() != null && stack.getItemMeta().displayName() != null ->
-                    Messages.LEGACY_SECTION.serialize(stack.getItemMeta().displayName());
+            case org.bukkit.block.Block block when block.getState() instanceof Nameable nameable -> nameable.customName();
+            case ItemType item when item.stack().getItemMeta() != null -> item.stack().getItemMeta().displayName();
+            case org.bukkit.inventory.ItemStack stack when stack.getItemMeta() != null -> stack.getItemMeta().displayName();
             default -> null;
         };
+    }
+
+    private static Component text(String text) {
+        return text == null ? null : Component.text(text);
     }
 }

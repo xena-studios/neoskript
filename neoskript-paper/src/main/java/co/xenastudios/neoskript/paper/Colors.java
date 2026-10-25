@@ -162,7 +162,7 @@ final class Colors {
                 return found.size() == 1 ? found.getFirst() : found.toArray();
             };
         }, "[all [[of] the]|the] string colo[u]r[s] [code:code[s]] of %strings%",
-                "[the] (first:first|last:last) string colo[u]r [code:code] of %strings%");
+                "[the] (first:first|last:last) string colo[u]r[s] [code:code[s]] of %strings%");
         // The colour of a text display's background, a sheep or shulker, or a dyed or tinted item.
         registrar.expression("ExprColorOf", "color", info -> new SettableProperty<>(Object.class, Colour.class,
                 Colors::colourOf, Colors::setColour).resettingTo((java.util.function.Consumer<Object>) owner -> {

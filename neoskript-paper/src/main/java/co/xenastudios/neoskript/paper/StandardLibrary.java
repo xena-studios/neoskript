@@ -13,6 +13,7 @@ public final class StandardLibrary {
 
     public static void register(Registrar registrar) {
         CoreTypes.register(registrar);
+        TextComponents.register(registrar);
         ScriptEvents.register(registrar);
         ServerEvents.register(registrar);
         Messages.register(registrar);
@@ -40,6 +41,7 @@ public final class StandardLibrary {
         EntitySyntax.register(registrar);
         EntityProperties.register(registrar);
         EntityEventSyntax.register(registrar);
+        DamageSources.register(registrar);
         Displays.register(registrar);
         Quaternions.register(registrar);
         BlockSyntax.register(registrar);

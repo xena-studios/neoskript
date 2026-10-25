@@ -64,6 +64,70 @@ final class StorageCodecs {
             }
         });
 
+        // Enums are saved by their constant's name, as Skript's enum serializer does.
+        enumStorage(registrar, "clicktype", org.bukkit.event.inventory.ClickType.class);
+        enumStorage(registrar, "damagecause", org.bukkit.event.entity.EntityDamageEvent.DamageCause.class);
+        enumStorage(registrar, "difficulty", org.bukkit.Difficulty.class);
+        enumStorage(registrar, "equipmentslot", org.bukkit.inventory.EquipmentSlot.class);
+        enumStorage(registrar, "fireworktype", org.bukkit.FireworkEffect.Type.class);
+        enumStorage(registrar, "soundcategory", org.bukkit.SoundCategory.class);
+        enumStorage(registrar, "spawnreason", org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.class);
+        enumStorage(registrar, "teleportcause", org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.class);
+        enumStorage(registrar, "weathertype", WorldProperties.Weather.class);
+        // An inventory type is Bukkit's enum in Skript.
+        registrar.storage("inventorytype", Items.InventoryKind.class, new VariableCodec<>() {
+            @Override
+            public void encode(Items.InventoryKind kind, BinaryWriter out) {
+                out.beginObject(1);
+                out.stringField("name", kind.name());
+            }
+
+            @Override
+            public Items.InventoryKind decode(BinaryReader in) {
+                in.beginObject();
+                return new Items.InventoryKind(in.stringField("name"));
+            }
+        });
+        // A time of day is its ticks, as Skript's Time saves its one field.
+        registrar.storage("time", co.xenastudios.neoskript.runtime.TimeOfDay.class, new VariableCodec<>() {
+            @Override
+            public void encode(co.xenastudios.neoskript.runtime.TimeOfDay time, BinaryWriter out) {
+                out.beginObject(1);
+                out.intField("time", time.ticks());
+            }
+
+            @Override
+            public co.xenastudios.neoskript.runtime.TimeOfDay decode(BinaryReader in) {
+                in.beginObject();
+                return new co.xenastudios.neoskript.runtime.TimeOfDay(in.intField("time"));
+            }
+        });
+        // A block is its world and coordinates.
+        registrar.storage("block", org.bukkit.block.Block.class, new VariableCodec<>() {
+            @Override
+            public void encode(org.bukkit.block.Block block, BinaryWriter out) {
+                out.beginObject(4);
+                out.objectField("world", "world");
+                writeWorld(block.getWorld(), out);
+                out.intField("x", block.getX());
+                out.intField("y", block.getY());
+                out.intField("z", block.getZ());
+            }
+
+            @Override
+            public org.bukkit.block.Block decode(BinaryReader in) {
+                in.beginObject();
+                if (!in.objectField("world").equals("world")) {
+                    return null;
+                }
+                World world = readWorld(in);
+                int x = in.intField("x");
+                int y = in.intField("y");
+                int z = in.intField("z");
+                return world == null ? null : world.getBlockAt(x, y, z);
+            }
+        });
+
         registrar.storage("offlineplayer", OfflinePlayer.class, new VariableCodec<>() {
             @Override
             public void encode(OfflinePlayer player, BinaryWriter out) {
@@ -85,6 +149,27 @@ final class StorageCodecs {
                 long most = in.longField("mostsigbits");
                 long least = in.longField("leastsigbits");
                 return Bukkit.getOfflinePlayer(new UUID(most, least));
+            }
+        });
+    }
+
+    /** Saves values of an enum by their constant's name. */
+    private static <E extends Enum<E>> void enumStorage(Registrar registrar, String name, Class<E> type) {
+        registrar.storage(name, type, new VariableCodec<>() {
+            @Override
+            public void encode(E value, BinaryWriter out) {
+                out.beginObject(1);
+                out.stringField("name", value.name());
+            }
+
+            @Override
+            public E decode(BinaryReader in) {
+                in.beginObject();
+                try {
+                    return Enum.valueOf(type, in.stringField("name"));
+                } catch (IllegalArgumentException unknown) {
+                    return null;
+                }
             }
         });
     }
