@@ -2251,7 +2251,8 @@ final class TriggerCompiler {
      */
     private List<String> literalTypesFor(ParsedSyntax syntax, List<Object> values, int i, PlaceholderSpec spec) {
         if (syntax.syntax().id().equals("CondCompare") && values.size() >= 2 && values.get(i) instanceof Expr.Unresolved
-                && values.get(1 - Math.min(i, 1)) instanceof Expr.Syntax other && other.type() != null
+                && values.get(1 - Math.min(i, 1)) instanceof Expr other && !(other instanceof Expr.Unresolved)
+                && other.type() != null
                 && !other.type().equals(SyntaxRegistry.OBJECT)) {
             return List.of(other.type());
         }

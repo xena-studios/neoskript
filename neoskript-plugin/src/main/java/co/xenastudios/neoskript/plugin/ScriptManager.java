@@ -184,10 +184,13 @@ final class ScriptManager {
             if (only != null && !diagnostic.file().equals(only)) {
                 continue;
             }
-            if (diagnostic.severity() == Severity.ERROR) {
-                failed.add(diagnostic.file());
-                errors++;
+            if (diagnostic.severity() != Severity.ERROR) {
+                // Warnings are logged as warnings, as Skript does, and don't stop a script loading.
+                logger.warn(describe(diagnostic, byName.get(diagnostic.file())));
+                continue;
             }
+            failed.add(diagnostic.file());
+            errors++;
             problems.accept(describe(diagnostic, byName.get(diagnostic.file())));
         }
 
