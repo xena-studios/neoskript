@@ -59,6 +59,7 @@ final class Logic {
         registrar.condition("CondCompare", info -> {
             Relation relation = relation(info.tags());
             boolean negated = info.hasTag("not");
+            constantComparison(info, relation, negated);
             boolean leftAnd = info.and(0);
             return (context, args) -> negated != holds((Object[]) args[0], leftAnd, (Object[]) args[1], relation);
         }, "%objects% (is|are)[(not:n't|not: not)] (ge:(greater|more|higher|bigger|larger) than or (equal to|the same as)"
@@ -537,6 +538,55 @@ final class Logic {
             return Relation.NOT_EQUAL;
         }
         return Relation.EQUAL;
+    }
+
+    /**
+     * Skript's warning for a comparison of two literals, which it simplifies to its result
+     * ({@code SimplifiedCondition}): "The condition '1 is equal to 1' will always be true."
+     */
+    private static void constantComparison(co.xenastudios.neoskript.api.element.ElementInfo info, Relation relation,
+            boolean negated) {
+        Object left = literalValue(info, 0);
+        Object right = literalValue(info, 1);
+        if (left == null || right == null) {
+            return;
+        }
+        boolean result = negated != holds(new Object[] {left}, true, new Object[] {right}, relation);
+        String relationName = switch (relation) {
+            case EQUAL -> "equal to";
+            case NOT_EQUAL -> "not equal to";
+            case GREATER -> "greater than";
+            case GREATER_OR_EQUAL -> "greater than or equal to";
+            case LESS -> "smaller than";
+            case LESS_OR_EQUAL -> "smaller than or equal to";
+        };
+        // As Skript writes the literals: booleans as their value, the rest as written.
+        String first = left instanceof Boolean ? left.toString() : co.xenastudios.neoskript.api.element.Warnings.argument(0);
+        String second = right instanceof Boolean ? right.toString() : co.xenastudios.neoskript.api.element.Warnings.argument(1);
+        co.xenastudios.neoskript.api.element.Warnings.warn("constant", "The condition '" + first + " is "
+                + (negated ? "not " : "") + relationName + " " + second + "' will always be "
+                + result + ".");
+    }
+
+    /** Argument {@code index}'s value, if it's a number, boolean or text written out, else {@code null}. */
+    private static Object literalValue(co.xenastudios.neoskript.api.element.ElementInfo info, int index) {
+        String literal = info.argumentLiteral(index);
+        String type = info.argumentType(index);
+        if (literal == null || type == null) {
+            return null;
+        }
+        try {
+            return switch (type) {
+                case "string" -> literal;
+                case "boolean" -> literal.equalsIgnoreCase("true") || literal.equalsIgnoreCase("yes")
+                        || literal.equalsIgnoreCase("on");
+                case "integer" -> Long.parseLong(literal.replace("_", ""));
+                case "number" -> Double.parseDouble(literal.replace("_", ""));
+                default -> null;
+            };
+        } catch (NumberFormatException notPlain) {
+            return null;
+        }
     }
 
     /** Every value on the left relates to at least one on the right. Nothing on either side is false. */

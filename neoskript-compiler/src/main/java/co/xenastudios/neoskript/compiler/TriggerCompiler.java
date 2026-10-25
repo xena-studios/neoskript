@@ -3884,6 +3884,10 @@ final class TriggerCompiler {
             pos = part.end() + 1;
         }
         pieces.add(unescape(source.substring(pos, end - 1)));
+        if (!name && embedded.size() == 1 && embedded.getFirst().start() == start + 2
+                && embedded.getFirst().end() == end - 2) {
+            alreadyText(embedded.getFirst());
+        }
         if (embedded.isEmpty()) {
             method.visitLdcInsn(pieces.getFirst());
             return;
@@ -3913,6 +3917,38 @@ final class TriggerCompiler {
             }
         }
         method.visitMethodInsn(INVOKEVIRTUAL, builder, "toString", "()" + STRING_DESC, false);
+    }
+
+    /**
+     * Skript's warning for a text that's only one expression which is already a text, as its
+     * {@code VariableString} gives it: {@code "%arg-1%"} for a text argument. Only command arguments are checked,
+     * whose text Skript writes in a known way ({@code the 1st argument}).
+     */
+    private void alreadyText(Expr part) {
+        if (!(part instanceof Expr.Syntax syntax) || !isCore(syntax.syntax(), CoreSyntax.ARGUMENT)
+                || commandArguments == null || syntax.syntax().match().hasTag("all")) {
+            return;
+        }
+        int index;
+        try {
+            index = argumentIndex(syntax);
+        } catch (CompileException e) {
+            return; // the error comes when it's compiled
+        }
+        if (index < 0 || index >= commandArguments.size()) {
+            return;
+        }
+        CommandPattern.Argument argument = commandArguments.get(index);
+        if (argument.plural() || !"string".equals(argument.type())) {
+            return;
+        }
+        String written = switch (syntax.syntax().pattern()) {
+            case 0 -> "the last argument";
+            case 1, 2 -> "the " + ordinalText(ordinal(syntax.syntax())) + " argument";
+            default -> "the argument";
+        };
+        warn(null, written + " is already a text, so you should not put it in one (e.g. " + written + " instead of \"%"
+                + written.replace("\"", "\"\"") + "%\")");
     }
 
     private static String unescape(String text) {
