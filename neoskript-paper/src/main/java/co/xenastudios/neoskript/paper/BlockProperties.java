@@ -58,8 +58,6 @@ final class BlockProperties {
                 null, Patterns.isProperty("occluding", "itemtypes"));
         EntitySyntax.conditionPatterns(registrar, "CondIsInteractable", ItemType.class,
                 item -> item.material().isInteractable(), null, Patterns.isProperty("interactable", "itemtypes"));
-        EntitySyntax.conditionPatterns(registrar, "CondIsFuel", ItemType.class, item -> item.material().isFuel(), null,
-                Patterns.isProperty("[furnace] fuel", "itemtypes"));
         EntitySyntax.conditionPatterns(registrar, "CondIsSedated", Block.class,
                 block -> block.getState() instanceof org.bukkit.block.Beehive beehive && beehive.isSedated(), null,
                 Patterns.isProperty("sedated", "blocks"));

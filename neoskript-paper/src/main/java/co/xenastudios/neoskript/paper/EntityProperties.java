@@ -590,35 +590,6 @@ final class EntityProperties {
                         }
                     });
         }, Patterns.property("[minecart] (1¦derailed|2¦flying) velocity", "entities"));
-        // How tame a horse is, from 1 to its maximum.
-        registrar.expression("ExprDomestication", "integer", info -> {
-            boolean max = info.hasTag("max");
-            return new Property<>(LivingEntity.class, living -> living instanceof org.bukkit.entity.AbstractHorse horse
-                    ? (long) (max ? horse.getMaxDomestication() : horse.getDomestication()) : null, Number.class,
-                    Property.modes(Mode.SET, Mode.ADD, Mode.REMOVE, Mode.RESET), (living, delta, mode) -> {
-                        if (!(living instanceof org.bukkit.entity.AbstractHorse horse)) {
-                            return;
-                        }
-                        // In ints, as Skript counts: adding infinity to a level overflows.
-                        int change = delta == null ? 0 : Property.intOf(delta[0]);
-                        int level = max ? horse.getMaxDomestication() : horse.getDomestication();
-                        level = switch (mode) {
-                            case ADD -> level + change;
-                            case REMOVE -> level - change;
-                            case RESET -> 1;
-                            default -> change;
-                        };
-                        if (max) {
-                            int value = Math.max(level, 1);
-                            horse.setMaxDomestication(value);
-                            if (horse.getDomestication() > value) {
-                                horse.setDomestication(value);
-                            }
-                        } else {
-                            horse.setDomestication((int) Property.fit(1, level, horse.getMaxDomestication()));
-                        }
-                    });
-        }, Patterns.property("[:max[imum]] domestication level", "livingentities"));
         registerArrows(registrar);
         registerItemEntities(registrar);
         registerInteractions(registrar);

@@ -74,14 +74,6 @@ final class ServerSyntax {
                 "[(all [[of] the]|the)] offline[ ]players");
         registrar.expression("ExprOps", "offlineplayer", info -> new Operators(info.hasTag("non")),
                 "[all [[of] the]|the] [server] [:non(-| )]op[erator]s");
-        registrar.expression("ExprMaxPlayers", "integer", info -> {
-            boolean ping = inEvent(info, ServerListPingEvent.class);
-            if (info.mark() == 2 && !ping) {
-                throw new SyntaxError("The 'shown' max players count expression can't be used outside of a server list ping event");
-            }
-            return new PlayerCount(info.mark() == 0 && !ping || info.mark() == 1, true);
-        }, "[the] [1¦(real|default)|2¦(fake|shown|displayed)] max[imum] player[s] [count|amount|number|size]",
-                "[the] [1¦(real|default)|2¦(fake|shown|displayed)] max[imum] (count|amount|number|size) of players");
         registrar.expression("ExprOnlinePlayersCount", "integer", info -> {
             boolean ping = inEvent(info, PaperServerListPingEvent.class);
             if (info.mark() == 2 && !ping) {
