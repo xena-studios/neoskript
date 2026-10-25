@@ -565,6 +565,12 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **Language:** an effect section that refuses a section written under it gives Skript's error; within one pattern a split with no unresolved words wins.
     - Known differences: particles and game effects can't be saved in variable files yet, and a particle that needs data gives the generic error rather than Skript's "requires data".
 
+    **Batch 20 (2026-10-25): 862 of 862 tests still pass; Skript elements no test covers.**
+    - **Event syntax:** brewing (fuel, results, time), anvils (repair cost, text), enchanting (costs, bonus, hints, offers, applied enchantments, level limits), furnaces, fishing (lure, approach angle, bite and wait times, hook, hooked entity), fireworks (effects, launching, last launched firework), the thrown egg, portal blocks, the hover list, the sign side changed, the command executor, experience cooldown, interrupting item use, and inventory rows and slots. The server list ping event is Paper's, as Skript's is.
+    - **Misc elements:** number limits as Skript's `Lit*Value` (the min double and float are the smallest positive ones), `loop-iteration` for while loops and Skript's errors for it, `parse error`, `debug info`, `script is loaded`, `all scripts` as paths, tag keys, `created effect`, `dye`, `fail execution`, value-within errors, and items with glint, fire resistance, flags or models as Skript 2.17's patterns.
+    - **Type properties** as Skript 2.17 (on by default): amount, size and number of one value or several, contains of values or their contents, empty items, display names of entities, slots and inventories, and one scale property for displays and particles.
+    - Known differences: type-property parse errors for types without the property aren't reported, and the script command `suggestions:` entry isn't there yet.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.
