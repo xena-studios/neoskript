@@ -110,6 +110,20 @@ class PatternTest {
     }
 
     @Test
+    void emptyTagBeforeAChoiceTagsEachAlternative() {
+        // As Skript's ':(a|b)': each alternative that's only text is tagged with it.
+        String pattern = "[the] [:(min|max)] value of %number%";
+        assertEquals(Set.of("min"), match(pattern, "the min value of 5").tags());
+        assertEquals(Set.of("max"), match(pattern, "max value of 5").tags());
+        assertEquals(Set.of(), match(pattern, "value of 5").tags());
+        assertEquals(Set.of("a b"), match("x :(a b|c [d])", "x a b").tags());
+        assertEquals(Set.of(), match("x :(a b|c [d])", "x c d").tags());
+        assertEquals(Set.of("down"), match("look :[up|down] now", "look down now").tags());
+        assertEquals(Set.of(), match("look :[up|down] now", "look now").tags());
+        assertEquals(Set.of("foo bar"), match("[:foo bar [baz]]", "foo bar baz").tags());
+    }
+
+    @Test
     void regexes() {
         MatchResult result = match("(exit|stop) <-?\\d+(_\\d+)*> (section|loop|conditional)s", "exit 2 loops");
         assertEquals("2", ((java.util.regex.MatchResult) result.regexValues().getFirst()).group());

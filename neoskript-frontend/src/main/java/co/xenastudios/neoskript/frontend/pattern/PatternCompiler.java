@@ -67,9 +67,65 @@ public final class PatternCompiler {
         }
         PatternElement body = sequence(close);
         if (autoTag) {
-            tag = literalText(body).toLowerCase(Locale.ROOT);
+            PatternElement first = body instanceof PatternElement.Sequence sequence ? sequence.elements().getFirst() : body;
+            PatternElement tagged = tagEach(first);
+            if (tagged != null) {
+                // ':(a|b)' is '(a:a|b:b)', as in Skript.
+                body = first == body ? tagged : replaceFirst((PatternElement.Sequence) body, tagged);
+            } else {
+                String text = literalText(body).toLowerCase(Locale.ROOT);
+                tag = text.isEmpty() ? null : text;
+            }
         }
         return new PatternElement.Alternative(body, mark, tag);
+    }
+
+    /**
+     * {@code (a|b)} or {@code [a|b]} after an empty tag, with each alternative that's plain text tagged with
+     * that text, as Skript's {@code :(a|b)} is; or {@code null} if {@code element} isn't such a choice.
+     */
+    private static PatternElement tagEach(PatternElement element) {
+        PatternElement.Choice choice = element instanceof PatternElement.Choice c ? c
+                : element instanceof PatternElement.Optional optional ? optional.choice() : null;
+        if (choice == null || choice.alternatives().size() < 2) {
+            return null;
+        }
+        List<PatternElement.Alternative> alternatives = new ArrayList<>();
+        for (PatternElement.Alternative alternative : choice.alternatives()) {
+            String text = plainText(alternative.body());
+            // Alternatives with marks or tags of their own, or more than text to them, are left as they are.
+            alternatives.add(text == null || text.isEmpty() || alternative.mark() != 0 || alternative.tag() != null
+                    ? alternative
+                    : new PatternElement.Alternative(alternative.body(), 0, text.toLowerCase(Locale.ROOT)));
+        }
+        PatternElement.Choice tagged = new PatternElement.Choice(alternatives);
+        return element instanceof PatternElement.Optional ? new PatternElement.Optional(tagged) : tagged;
+    }
+
+    /** The text of an element that's only text and spaces, or {@code null}. */
+    private static String plainText(PatternElement element) {
+        return switch (element) {
+            case PatternElement.Literal literal -> literal.text();
+            case PatternElement.Whitespace whitespace -> " ";
+            case PatternElement.Sequence sequence -> {
+                StringBuilder text = new StringBuilder();
+                for (PatternElement each : sequence.elements()) {
+                    String part = plainText(each);
+                    if (part == null) {
+                        yield null;
+                    }
+                    text.append(part);
+                }
+                yield text.toString().strip();
+            }
+            default -> null;
+        };
+    }
+
+    private static PatternElement.Sequence replaceFirst(PatternElement.Sequence sequence, PatternElement first) {
+        List<PatternElement> elements = new ArrayList<>(sequence.elements());
+        elements.set(0, first);
+        return new PatternElement.Sequence(elements);
     }
 
     /** The index of {@code ¦} if the alternative starts with {@code digits¦}, otherwise -1. */
@@ -92,6 +148,7 @@ public final class PatternCompiler {
     }
 
     private PatternElement sequence(int close) {
+        boolean tagNext = false;
         List<PatternElement> elements = new ArrayList<>();
         StringBuilder literal = new StringBuilder();
         while (pos < source.length()) {
@@ -124,7 +181,20 @@ public final class PatternCompiler {
                     flush(literal, elements);
                     pos++;
                     PatternElement.Choice choice = choice(c == '[' ? ']' : ')');
-                    elements.add(c == '[' ? new PatternElement.Optional(choice) : choice);
+                    PatternElement group = c == '[' ? new PatternElement.Optional(choice) : choice;
+                    PatternElement tagged = tagNext ? tagEach(group) : null;
+                    elements.add(tagged != null ? tagged : group);
+                    tagNext = false;
+                }
+                case ':' -> {
+                    // ':(a|b)' within a sequence: each choice tagged with its text, as in Skript.
+                    char next = pos + 1 < source.length() ? source.charAt(pos + 1) : 0;
+                    if (literal.isEmpty() && (next == '(' || next == '[')) {
+                        tagNext = true;
+                    } else {
+                        literal.append(c);
+                    }
+                    pos++;
                 }
                 case '%' -> {
                     flush(literal, elements);
@@ -323,14 +393,22 @@ public final class PatternCompiler {
         }
     }
 
-    /** The plain text of an element, for {@code :text} tags. */
+    /**
+     * The text an element starts with, up to the first part that isn't text, for {@code :text} tags: as in
+     * Skript, {@code :foo bar [baz]} is tagged {@code foo bar}.
+     */
     private static String literalText(PatternElement element) {
         return switch (element) {
             case PatternElement.Literal literal -> literal.text();
             case PatternElement.Whitespace whitespace -> " ";
             case PatternElement.Sequence sequence -> {
                 StringBuilder text = new StringBuilder();
-                sequence.elements().forEach(e -> text.append(literalText(e)));
+                for (PatternElement each : sequence.elements()) {
+                    if (!(each instanceof PatternElement.Literal) && !(each instanceof PatternElement.Whitespace)) {
+                        break;
+                    }
+                    text.append(literalText(each));
+                }
                 yield text.toString().strip();
             }
             default -> "";
