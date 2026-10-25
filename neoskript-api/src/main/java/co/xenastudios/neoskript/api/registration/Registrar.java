@@ -118,6 +118,35 @@ public interface Registrar {
     <E> void eventValue(Class<E> eventClass, String typeId, java.util.function.Function<? super E, ?> getter);
 
     /**
+     * An event value at a time state, as Skript's: {@code past event-block} ({@code time} -1) is the block before
+     * the event, {@code future event-item} (1) the item after it. 0 is the value now, as
+     * {@link #eventValue(Class, String, java.util.function.Function)} registers. Where an event has no value for
+     * a time state, the value now is used, but a time state can only be written where some value has one.
+     */
+    <E> void eventValue(Class<E> eventClass, String typeId, int time, java.util.function.Function<? super E, ?> getter);
+
+    /**
+     * Events of {@code eventClass} (and subclasses) don't have a value of {@code typeId}, though a superclass
+     * does: asking for it is an error with {@code message}, as Skript's {@code event-entity} in a damage event.
+     */
+    void eventValueExcluded(Class<?> eventClass, String typeId, String message);
+
+    /**
+     * An event value of {@code typeId} that's only for a narrower kind, whose values are {@code valueClass}:
+     * {@code event-projectile} in a damage event is the projectile that hit, though {@code event-entity} isn't.
+     * Where a trigger asks for a kind (see {@link #kindClass}) that an event has no such value for, its plain value
+     * is used if it's of that kind.
+     */
+    <E> void eventValue(Class<E> eventClass, String typeId, Class<?> valueClass, int time,
+            java.util.function.Function<? super E, ?> getter);
+
+    /**
+     * What class of values a literal of {@code typeId} stands for, as an entity type stands for its entities:
+     * {@code event-projectile} asks for an event value of the class {@code projectile} gives.
+     */
+    void kindClass(String typeId, java.util.function.Function<Object, Class<?>> classOf);
+
+    /**
      * Where a placeholder of {@code typeId} sits in an optional part that wasn't used, it gets the event's
      * value of that type instead, if the event has one: {@code send "hi"} goes to the event's player.
      */

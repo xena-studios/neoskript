@@ -47,6 +47,12 @@ public final class StandardLibrary {
         BossBars.register(registrar);
         ServerEvents.registerLate(registrar);
         BlockProperties.register(registrar);
+        EventTypes.register(registrar);
+        BlockEvents.register(registrar);
+        EntityEvents.register(registrar);
+        PlayerEvents.register(registrar);
+        ItemEvents.register(registrar);
+        WorldEvents.register(registrar);
         Scripts.register(registrar);
         WorldProperties.register(registrar);
         ServerSyntax.register(registrar);

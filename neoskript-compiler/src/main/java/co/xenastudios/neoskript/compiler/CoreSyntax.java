@@ -36,6 +36,7 @@ final class CoreSyntax {
     static final String HAS_DELAY = "ExprHasDelay";
     static final String DELAY_CHECK = "CondDelayCheck";
     static final String EVENT_VALUE = "ExprEventValue";
+    static final String TIME_STATE = "ExprTimeState";
     static final String EVENT_VALUE_ENTITY = "ExprEventEntity";
     static final String EVENT_ENTITY_BARE = "ExprEventEntityBare";
     static final String ARGUMENT = "ExprArgument";
@@ -272,6 +273,10 @@ final class CoreSyntax {
         // library's expressions, as Skript tries it after most: 'difference between {_a} and "5" parsed as a
         // number' is the difference with a parsed number.
         library.core(SyntaxKind.EXPRESSION, PARSE, "object", List.of(RegexRole.TYPE), "%text% parsed as [a[n]] <.+>");
+        // 'past event-block', 'event-item after the event': an event value before or after the event.
+        library.core(SyntaxKind.EXPRESSION, TIME_STATE, "object", List.of(),
+                "[the] (former|past|old) [state] [of] %objects%", "%objects% before [the event]",
+                "[the] (future|to-be|new) [state] [of] %objects%", "%objects%(-to-be| after[(wards| the event)])");
         // 'player', 'event-world': the event's value of that type. Tried last, as it matches any type name.
         library.core(SyntaxKind.EXPRESSION, EVENT_VALUE, "object", List.of(RegexRole.TYPE), "[the] [event-]<.+>");
         // 'the zombie', 'event-creeper': a kind of entity is the event's entity only when it says so; alone,

@@ -7,5 +7,7 @@ package co.xenastudios.neoskript.api.registration;
 /** Events NeoSkript fires itself, rather than a server event. */
 public enum ScriptEvent {
     /** When a script has loaded, including on reload. */
-    LOAD
+    LOAD,
+    /** When a script unloads: before it reloads, when it's removed, and when the server stops. */
+    UNLOAD
 }

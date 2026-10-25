@@ -48,11 +48,7 @@ final class ServerEvents {
                 info -> (context, args) -> args[0] == null || matchesCommand(context.event(), (Object[]) args[0]),
                 "command [%texts%]");
 
-        // Moving, not just turning around: the position changed.
-        registrar.event("EvtMove", List.of(PlayerMoveEvent.class), info -> (context, args) -> {
-            PlayerMoveEvent move = (PlayerMoveEvent) context.event();
-            return move.hasChangedPosition();
-        }, "[player] (move|walk|step)");
+        // Moving is in PlayerEvents, as Skript's EvtMove: 'on player move', 'on zombie move'.
         registrar.event("EvtServerListPing", List.of(ServerListPingEvent.class), null, "server [list] ping");
 
         registrar.eventValue(PlayerEvent.class, "player", PlayerEvent::getPlayer);

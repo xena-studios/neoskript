@@ -100,9 +100,12 @@ public final class ScriptCompiler {
                                         null, null, new TriggerCompiler(library, functions, globals, script)
                                                 .compileTrigger(name, event.body())));
                             } else if (binding instanceof Library.ServerEvent serverEvent) {
+                                TriggerCompiler compiler = new TriggerCompiler(library, functions, globals, script);
+                                co.xenastudios.neoskript.runtime.Trigger trigger = compiler.compileTrigger(name, event,
+                                        serverEvent);
+                                // The filter may have narrowed the classes listened to.
                                 triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), null,
-                                        serverEvent.classes(), null, null, new TriggerCompiler(library, functions, globals,
-                                                script).compileTrigger(name, event, serverEvent)));
+                                        compiler.eventClasses(), null, null, trigger));
                             } else if (binding instanceof Library.Core core && core.id().equals(CoreSyntax.PERIODICAL)) {
                                 triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), null, null,
                                         period(header.number(), event), null, new TriggerCompiler(library, functions,
@@ -390,6 +393,9 @@ public final class ScriptCompiler {
                 String variable = text.substring("results:".length()).strip();
                 if (variable.startsWith("{") && variable.endsWith("::*}")) {
                     globals.setList(variable.substring(1, variable.length() - 4), messages.toArray());
+                } else if (variable.startsWith("{") && variable.endsWith("}") && !variable.contains("%")) {
+                    // A single variable is set to the first problem, as setting it to several sets it to one.
+                    globals.set(variable.substring(1, variable.length() - 1), messages.isEmpty() ? null : messages.getFirst());
                 }
             }
         }
