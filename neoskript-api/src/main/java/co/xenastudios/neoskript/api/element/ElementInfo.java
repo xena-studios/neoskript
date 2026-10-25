@@ -23,10 +23,16 @@ import java.util.Set;
  *     else {@code null}
  * @param eventName the event the element is in, as written without {@code on} ({@code quit}), or {@code null}
  * @param eventClasses the classes of that event, or none
+ * @param sectionType the type id of the values of the innermost section the element is in whose code runs for
+ *     values ({@code entity} in {@code spawn a pig:}, {@code worldborder} in {@code set {_b} to a worldborder:}),
+ *     or {@code null}: what Skript calls the current event there
+ * @param defaultArguments a bit for each argument that's left out or an event value ({@code event-entity}),
+ *     what Skript calls a default expression
  */
 public record ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,
         java.util.List<TypeArgument> types, java.util.List<String> argumentTypes, long singleArguments,
-        java.util.List<String> argumentLiterals, String eventName, java.util.List<Class<?>> eventClasses) {
+        java.util.List<String> argumentLiterals, String eventName, java.util.List<Class<?>> eventClasses,
+        String sectionType, long defaultArguments) {
 
     /**
      * A type named in a pattern, as {@code strings} in {@code strings data tag "x" of {_item}}.
@@ -51,6 +57,18 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
             java.util.List<String> argumentLiterals) {
         this(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments, argumentLiterals,
                 null, java.util.List.of());
+    }
+
+    public ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,
+            java.util.List<TypeArgument> types, java.util.List<String> argumentTypes, long singleArguments,
+            java.util.List<String> argumentLiterals, String eventName, java.util.List<Class<?>> eventClasses) {
+        this(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments, argumentLiterals,
+                eventName, eventClasses, null, 0);
+    }
+
+    /** Whether argument {@code index} was left out or is an event value, as Skript's default expressions are. */
+    public boolean isDefault(int index) {
+        return index < 64 && (defaultArguments & (1L << index)) != 0;
     }
 
     public ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,

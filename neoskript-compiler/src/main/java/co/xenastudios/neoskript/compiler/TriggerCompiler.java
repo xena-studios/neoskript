@@ -2126,8 +2126,24 @@ final class TriggerCompiler {
                 single |= 1L << i;
             }
         }
+        long defaults = 0;
+        for (int i = 0; i < values.size() && i < 64; i++) {
+            Object value = values.get(i);
+            if (value == null || (value instanceof Expr.Syntax inner && (isCore(inner.syntax(), CoreSyntax.EVENT_VALUE)
+                    || isCore(inner.syntax(), CoreSyntax.EVENT_VALUE_ENTITY)))) {
+                defaults |= 1L << i;
+            }
+        }
+        String sectionType = null;
+        for (Block block : blocks) {
+            if (block.kind() == BlockKind.SECTION) {
+                sectionType = block.valueType();
+                break;
+            }
+        }
         return new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags(), or, lists, types,
-                argumentTypes, single, literals, eventName, eventClasses == null ? List.of() : eventClasses);
+                argumentTypes, single, literals, eventName, eventClasses == null ? List.of() : eventClasses,
+                sectionType, defaults);
     }
 
     /** Pushes the element, the trigger context and the element's arguments, ready to call it. */
