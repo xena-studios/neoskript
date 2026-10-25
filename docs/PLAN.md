@@ -571,6 +571,13 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **Type properties** as Skript 2.17 (on by default): amount, size and number of one value or several, contains of values or their contents, empty items, display names of entities, slots and inventories, and one scale property for displays and particles.
     - Known differences: type-property parse errors for types without the property aren't reported, and the script command `suggestions:` entry isn't there yet.
 
+    **Batch 21 (2026-10-25): 862 of 862 tests still pass; what Skript has beyond its tests.**
+    - **Commands:** the `suggestions:` entry with Skript's suggestions, filtering and input syntax, and tab completion that follows a command's arguments.
+    - **Functions:** Skript's remaining defaults: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `ln`, `log`, `exp`, `sum`, `product`, `calcExperience`, `date`, `uuid` and `entity`.
+    - **Variables:** players are their UUIDs in variable names, as Skript's default config has it (`variables.player-uuids-in-names`; moving over keeps Skript's setting, so its saved variables are found), and particles are saved as Skript saves them (a bug in how nested names were numbered is fixed too).
+    - **Elements:** the pick item event and picked item (1.21.5+), `exit all loops` and Skript's exit errors, Skript's 'requires data' error, and Skript's patterns for script files, see-through displays, spawnable types, light overrides and unrolled queues.
+    - Found with a check that writes a sample line for every pattern in Skript's syntax list and parses it with NeoSkript's library.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.
