@@ -595,6 +595,10 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **Errors:** a comparison of words nothing reads isn't understood, as in Skript.
     - Known differences: `auto reload` doesn't need async loading; event values read after a wait still come from the event.
 
+    **Batch 25 (2026-10-25): 862 of 862 tests still pass; Skript's /skript command.**
+    - **`/skript`** as Skript's: `reload`, `enable`, `disable`, `list`, `info`, `restore` and `help`, with Skript's messages and `skript.*` permissions. Disabled scripts and folders start with `-`, and `.` folders are skipped. Reloading or unloading a script runs its `on unload` events.
+    - Known differences: a name ending in `/` is a folder. Skript 2.17 never finds folders, because of a bug.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.
