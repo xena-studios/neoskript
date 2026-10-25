@@ -736,14 +736,46 @@ final class LineParser {
         }
         List<Expr> parts = new ArrayList<>();
         for (int[] part : embedded) {
-            Expr expr = expression(part[0], part[1], Expected.OBJECTS);
+            Expr expr = embedded(part[0], part[1]);
             if (expr == null) {
-                problem("Can't understand this expression: " + input.substring(part[0], part[1]));
                 return null;
             }
             parts.add(expr);
         }
         return new Expr.Text(start, end, parts);
+    }
+
+    /**
+     * The code in a text's or variable name's {@code %...%}. As Skript parses it as expressions only, a literal
+     * there isn't understood ({@code "%1%"}, {@code "%stone%"}), nor is a list with one, with Skript's errors.
+     */
+    private Expr embedded(int start, int end) {
+        Expr expr = expression(start, end, Expected.OBJECTS);
+        String code = input.substring(start, end);
+        if (expr == null) {
+            problem("Can't understand this expression: " + code);
+            return null;
+        }
+        if (isLiteral(expr)) {
+            problem("Can't understand this expression: " + code);
+            return null;
+        }
+        if (expr instanceof Expr.ListOf list && list.items().stream().anyMatch(LineParser::isLiteral)) {
+            Expr first = list.items().getFirst();
+            String firstText = input.substring(first.start(), first.end()).strip();
+            boolean commas = input.substring(first.end(), end).stripLeading().startsWith(",");
+            problem(!commas ? "Can't understand this expression: " + code
+                    : isLiteral(first) ? "Invalid brackets/variables/text in '" + firstText + ",'"
+                    : first instanceof Expr.Variable ? "Variables cannot be used here."
+                    : "Can't understand this expression: " + code);
+            return null;
+        }
+        return expr;
+    }
+
+    /** Whether an expression is a literal: written values, or words nothing but a type's parser reads. */
+    private static boolean isLiteral(Expr expr) {
+        return expr instanceof Expr.Literal || expr instanceof Expr.Unresolved;
     }
 
     private Expr literal(int start, int end, String text, Expected expected) {
@@ -851,7 +883,7 @@ final class LineParser {
         }
         List<Expr> parts = new ArrayList<>();
         for (int[] part : embedded) {
-            Expr expr = expression(part[0], part[1], Expected.OBJECTS);
+            Expr expr = embedded(part[0], part[1]);
             if (expr == null) {
                 return null;
             }
