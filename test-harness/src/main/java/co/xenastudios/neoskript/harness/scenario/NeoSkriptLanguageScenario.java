@@ -21,6 +21,7 @@ public final class NeoSkriptLanguageScenario implements Scenario {
     static final List<String> EXPECTED = List.of(
             "arithmetic: 7, 5, 9, 2.5",
             "functions: 610, Hi Steve!, 2, 9",
+            "math functions: 1, 90, 4, 6, 6, 550, 1412121600, 069a79f4-44e9-4726-a5be-fca90e38aaf5",
             "globals: 7",
             "lists: 3 1=c 3=b 4=d ",
             "while: 1, 2, 4 and 5");

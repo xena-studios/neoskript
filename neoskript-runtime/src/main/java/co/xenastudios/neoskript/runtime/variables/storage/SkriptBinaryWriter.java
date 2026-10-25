@@ -18,7 +18,8 @@ import java.util.List;
  *
  * <ul>
  *   <li>Short names (field names, types, enum constants) are a length byte and UTF-8, or {@code FF} and an
- *       int index if the same name was written before; the value's type counts as the first name.
+ *       int index if the same name was written before; the value's type counts as the first name. Only names
+ *       longer than 4 bytes are numbered: shorter ones are always written out.
  *   <li>Strings are a compact length (two bytes with the top bit set below 32768, else four) and UTF-8.
  *   <li>An object is {@code 0x80 | fieldCount}, then each field's name, a tag and the value.
  * </ul>
@@ -28,10 +29,14 @@ public final class SkriptBinaryWriter implements BinaryWriter {
     private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     private final DataOutputStream out = new DataOutputStream(bytes);
     private final List<String> names = new ArrayList<>();
+    /** Skript only numbers names longer than this many bytes, for back-references: shorter ones are always written. */
+    private static final int SHORTEST_REFERENCED = 4;
 
     /** @param type the value's type, which counts as the first name written */
     public SkriptBinaryWriter(String type) {
-        names.add(type);
+        if (type.getBytes(StandardCharsets.UTF_8).length > SHORTEST_REFERENCED) {
+            names.add(type);
+        }
     }
 
     public byte[] toByteArray() {
@@ -74,7 +79,9 @@ public final class SkriptBinaryWriter implements BinaryWriter {
                 }
                 out.writeByte(utf8.length);
                 out.write(utf8);
-                names.add(value);
+                if (utf8.length > SHORTEST_REFERENCED) {
+                    names.add(value);
+                }
             }
         });
     }
@@ -85,6 +92,12 @@ public final class SkriptBinaryWriter implements BinaryWriter {
             throw new IllegalArgumentException("Too many fields: " + fields);
         }
         io(() -> out.writeByte(0x80 | fields));
+    }
+
+    @Override
+    public void byteField(String name, byte value) {
+        field(name, Tags.BYTE);
+        io(() -> out.writeByte(value));
     }
 
     @Override
@@ -132,6 +145,35 @@ public final class SkriptBinaryWriter implements BinaryWriter {
     @Override
     public void nullField(String name) {
         field(name, Tags.NULL);
+    }
+
+    @Override
+    public void boxedField(String name, Object value) {
+        int tag = switch (value) {
+            case Byte b -> Tags.BYTE;
+            case Short s -> Tags.SHORT;
+            case Integer i -> Tags.INT;
+            case Long l -> Tags.LONG;
+            case Float f -> Tags.FLOAT;
+            case Double d -> Tags.DOUBLE;
+            case Character c -> Tags.CHAR;
+            case Boolean b -> Tags.BOOLEAN;
+            default -> throw new IllegalArgumentException("Not a boxed primitive: " + value);
+        };
+        field(name, Tags.BOXED + tag);
+        io(() -> {
+            switch (value) {
+                case Byte b -> out.writeByte(b);
+                case Short s -> out.writeShort(s);
+                case Integer i -> out.writeInt(i);
+                case Long l -> out.writeLong(l);
+                case Float f -> out.writeFloat(f);
+                case Double d -> out.writeDouble(d);
+                case Character c -> out.writeChar(c);
+                case Boolean b -> out.writeByte(b ? 1 : 0);
+                default -> throw new IllegalStateException();
+            }
+        });
     }
 
     @Override

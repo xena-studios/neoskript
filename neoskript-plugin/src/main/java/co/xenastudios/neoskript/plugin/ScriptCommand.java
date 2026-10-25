@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.plugin;
 
+import co.xenastudios.neoskript.compiler.CommandCompletion;
 import co.xenastudios.neoskript.compiler.CompiledCommand;
 import co.xenastudios.neoskript.frontend.parse.CommandPattern;
 import co.xenastudios.neoskript.paper.Messages;
@@ -13,6 +14,7 @@ import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.Trigger;
 import co.xenastudios.neoskript.runtime.Values;
 import co.xenastudios.neoskript.runtime.command.CommandEvent;
+import co.xenastudios.neoskript.runtime.command.CommandSuggestionEvent;
 import co.xenastudios.neoskript.runtime.command.ScriptCommandInfo;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -216,54 +218,67 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
 
     // ---------------------------------------------------------------- tab completion
 
+    /**
+     * Tooltips of the suggestions last given to each player, for {@link #addTooltips}: Bukkit's tab completion
+     * only takes text.
+     */
+    private static final Map<UUID, Map<String, net.kyori.adventure.text.Component>> TOOLTIPS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
     @Override
-    public List<String> tabComplete(CommandSender sender, String alias,
-            String[] args) {
-        int position = args.length - 1;
-        String typed = args.length == 0 ? "" : args[position].toLowerCase(Locale.ROOT);
-        Set<String> suggestions = new LinkedHashSet<>();
-        for (CompiledCommand.Route route : command.routes()) {
-            if (!canExecute(route.executors(), sender)
-                    || (route.permission() != null && !sender.hasPermission(route.permission()))) {
-                continue;
-            }
-            List<List<String>> slots = new ArrayList<>();
-            slots(route.pattern(), slots);
-            if (position >= 0 && position < slots.size()) {
-                suggestions.addAll(slots.get(position));
+    public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
+        String label = alias.substring(alias.indexOf(':') + 1);
+        List<CommandSuggestionEvent.Suggestion> suggestions;
+        try {
+            suggestions = CommandCompletion.complete(command, sender, sender instanceof Player ? sender : null, label,
+                    args, route -> canExecute(route.executors(), sender)
+                            && (route.permission() == null || sender.hasPermission(route.permission())),
+                    ScriptCommand::suggestions);
+        } catch (ScriptRuntimeException e) {
+            logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
+            return List.of();
+        }
+        Map<String, net.kyori.adventure.text.Component> tooltips = new java.util.HashMap<>();
+        List<String> texts = new ArrayList<>();
+        for (CommandSuggestionEvent.Suggestion suggestion : suggestions) {
+            texts.add(suggestion.text());
+            if (suggestion.tooltip() instanceof net.kyori.adventure.text.Component tooltip) {
+                tooltips.put(suggestion.text(), tooltip);
             }
         }
-        List<String> matching = new ArrayList<>();
-        for (String suggestion : suggestions) {
-            if (suggestion.toLowerCase(Locale.ROOT).startsWith(typed)) {
-                matching.add(suggestion);
+        if (sender instanceof Player player) {
+            if (tooltips.isEmpty()) {
+                TOOLTIPS.remove(player.getUniqueId());
+            } else {
+                TOOLTIPS.put(player.getUniqueId(), tooltips);
             }
         }
-        return matching;
+        return texts;
     }
 
     /**
-     * What can be typed at each word of a pattern, roughly: optional parts and choices are laid out as if
-     * they were all typed, which is right for the usual patterns.
+     * Gives the suggestions about to be sent to a player the tooltips a {@code suggestions:} entry gave them, as
+     * Skript's do.
      */
-    private static void slots(List<CommandPattern.Part> parts, List<List<String>> slots) {
-        for (CommandPattern.Part part : parts) {
-            switch (part) {
-                case CommandPattern.Word word -> slots.add(List.of(word.text()));
-                case CommandPattern.Argument argument -> slots.add(suggestions(argument.type()));
-                case CommandPattern.Optional optional -> slots(optional.parts(), slots);
-                case CommandPattern.Choice choice -> {
-                    List<String> first = new ArrayList<>();
-                    for (List<CommandPattern.Part> alternative : choice.alternatives()) {
-                        List<List<String>> inner = new ArrayList<>();
-                        slots(alternative, inner);
-                        if (!inner.isEmpty()) {
-                            first.addAll(inner.getFirst());
-                        }
-                    }
-                    slots.add(first);
-                }
+    static void addTooltips(com.destroystokyo.paper.event.brigadier.AsyncPlayerSendSuggestionsEvent event) {
+        Map<String, net.kyori.adventure.text.Component> tooltips = TOOLTIPS.remove(event.getPlayer().getUniqueId());
+        if (tooltips == null) {
+            return;
+        }
+        com.mojang.brigadier.suggestion.Suggestions suggestions = event.getSuggestions();
+        List<com.mojang.brigadier.suggestion.Suggestion> list = new ArrayList<>();
+        boolean changed = false;
+        for (com.mojang.brigadier.suggestion.Suggestion suggestion : suggestions.getList()) {
+            net.kyori.adventure.text.Component tooltip = tooltips.get(suggestion.getText());
+            if (tooltip != null && suggestion.getTooltip() == null) {
+                suggestion = new com.mojang.brigadier.suggestion.Suggestion(suggestion.getRange(), suggestion.getText(),
+                        io.papermc.paper.command.brigadier.MessageComponentSerializer.message().serialize(tooltip));
+                changed = true;
             }
+            list.add(suggestion);
+        }
+        if (changed) {
+            event.setSuggestions(new com.mojang.brigadier.suggestion.Suggestions(suggestions.getRange(), list));
         }
     }
 

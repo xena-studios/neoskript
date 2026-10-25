@@ -13,6 +13,7 @@ function greet(name: text, punctuation: text = "!") :: text:
 on load:
 	send "{@prefix} arithmetic: %1 + 2 * 3%, %8 - 2 - 1%, %(1 + 2) * 3%, %10 / 4%" to console
 	send "{@prefix} functions: %fib(15)%, %greet("Steve")%, %floor(2.7)%, %max(3, 9 and 4)%" to console
+	send "{@prefix} math functions: %sin(90)%, %atan2(0, 1)%, %log(16, 2)%, %sum(1, 2, 3)%, %product(2, 3)%, %calcExperience(20)%, %unix timestamp of date(2014, 10, 1)%, %uuid("069a79f4-44e9-4726-a5be-fca90e38aaf5")%" to console
 	set {harness::count} to 5
 	add 2 to {harness::count}
 	send "{@prefix} globals: %{harness::count}%" to console

@@ -29,9 +29,15 @@ import org.bukkit.entity.Player;
 /** Players and other named things: names, UUIDs, being online, permissions, kicking. */
 final class Players {
 
+    /** See {@link StandardLibrary#usePlayerUuidsInVariableNames}. */
+    static volatile boolean uuidsInVariableNames = true;
+
     private Players() {}
 
     static void register(Registrar registrar) {
+        // An offline player without a name is always its UUID, as in Skript.
+        registrar.variableNameText(OfflinePlayer.class, player -> uuidsInVariableNames || player.getName() == null
+                ? player.getUniqueId().toString() : player.getName());
         registrar.property("ExprUUID", "uuid", "uuid[s]", "offlineplayers/worlds/entities", Object.class,
                 owner -> switch (owner) {
                     case OfflinePlayer player -> player.getUniqueId();
@@ -161,6 +167,23 @@ final class Players {
                         return Boolean.TRUE.equals(args[1]) ? Bukkit.getPlayerExact(text) : Bukkit.getPlayer(text);
                     }
                 });
+        registrar.function("uuid", List.of(Parameter.of("uuid", "string")), "uuid", false, args -> {
+            String text = Values.text(args[0]);
+            if (text == null || text.length() != 36 || text.charAt(8) != '-' || text.charAt(13) != '-'
+                    || text.charAt(18) != '-' || text.charAt(23) != '-') {
+                return null;
+            }
+            for (int i = 0; i < 36; i++) {
+                char c = text.charAt(i);
+                if (i != 8 && i != 13 && i != 18 && i != 23
+                        && !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F')) {
+                    return null;
+                }
+            }
+            return UUID.fromString(text);
+        });
+        registrar.function("entity", List.of(Parameter.of("uuid", "uuid")), "entity", false,
+                args -> args[0] instanceof UUID uuid ? Bukkit.getEntity(uuid) : null);
         registrar.function("offlineplayer", List.of(Parameter.of("nameOrUUID", "string"),
                 new Parameter("allowLookups", "boolean", false, true)), "offlineplayer", false, args -> {
                     String text = Values.text(args[0]);

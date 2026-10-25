@@ -173,4 +173,50 @@ class CommandsTest {
         assertEquals(List.of("This command doesn't have a 2nd argument", "'arg-1' can only be used in a command"),
                 compiled.diagnostics().stream().map(d -> d.message()).toList());
     }
+
+    /** The texts tab completion suggests for {@code args}, as a player typing them would see. */
+    private List<String> complete(CompiledCommand command, String... args) {
+        return CommandCompletion.complete(command, null, null, command.name(), args, route -> true,
+                type -> type.equals("number") ? List.of("1", "2") : List.of()).stream()
+                .map(co.xenastudios.neoskript.runtime.command.CommandSuggestionEvent.Suggestion::text).toList();
+    }
+
+    @Test
+    void suggestionsEntrySuggestsForArguments() {
+        CompiledCommand command = compile("command /menu <text> <number> [<text>]:\n\tsuggestions:\n"
+                + "\t\tset the suggestions for arg-1 to \"Apple\", \"Banana\" and \"apricot\"\n"
+                + "\t\tadd \"%arg-2%x\" and \"%arg-2%y\" to the 3rd argument's suggestions\n"
+                + "\ttrigger:\n\t\tsay arg-1\n").commands().getFirst();
+        assertEquals(List.of("Apple", "apricot"), complete(command, "a"));
+        assertEquals(List.of("Apple", "Banana", "apricot"), complete(command, ""));
+        // Arguments it doesn't set suggestions for get their type's.
+        assertEquals(List.of("1", "2"), complete(command, "Apple", ""));
+        // Arguments before the one being typed have their values.
+        assertEquals(List.of("2x", "2y"), complete(command, "Apple", "2", ""));
+    }
+
+    @Test
+    void suggestionsFilteringAndInput() {
+        CompiledCommand command = compile("command /msg <text> <text>:\n\ttab completions:\n"
+                + "\t\tset the suggestions for arg-1 to \"xa\", \"ab\" and \"b\"\n"
+                + "\t\tuse contains filtering for arg-1's suggestions\n"
+                + "\t\tset the suggestions for arg-2 to the full input, the current input and the current input position\n"
+                + "\t\tdisable filtering for arg-2's suggestions\n"
+                + "\ttrigger:\n\t\tsay arg-1\n").commands().getFirst();
+        assertEquals(List.of("xa", "ab"), complete(command, "a"));
+        // The last text argument takes the rest; only its last word is completed. Positions count the slash.
+        assertEquals(List.of("msg hi there yo", "yo", "9"), complete(command, "hi", "there", "yo"));
+    }
+
+    @Test
+    void suggestionsSyntaxOutsideTheEntryIsAnError() {
+        List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk",
+                "command /x <number>:\n\tsuggestions:\n\t\tsay the suggestions for \"a\"\n"
+                        + "\ttrigger:\n\t\tstop\ncommand /y <number>:\n\ttrigger:\n\t\tsay the suggestions for arg-1\n")));
+        CompiledScripts compiled = new ScriptCompiler(library, new VariableStore()).compile(parsed);
+        assertEquals(List.of("It is only possible to obtain or change command suggestions of an argument! Is the"
+                        + " argument expression written correctly?",
+                "'the suggestions for arg-1' can only be used in "),
+                compiled.diagnostics().stream().map(d -> d.message()).toList());
+    }
 }

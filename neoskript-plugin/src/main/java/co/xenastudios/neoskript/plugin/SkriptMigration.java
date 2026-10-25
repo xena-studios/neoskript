@@ -29,15 +29,18 @@ final class SkriptMigration {
     /** What's copied from {@code plugins/Skript}: the scripts and the saved variables. */
     static final List<String> COPIED = List.of("scripts", "variables.csv");
 
-    /** What was copied, relative to the folders, for the log. Empty if nothing was. */
-    record Result(List<String> copied, int scriptCount) {}
+    /**
+     * What was copied, relative to the folders, for the log (empty if nothing was), and Skript's
+     * {@code use player UUIDs in variable names} from its config.sk, or {@code null} if it doesn't say.
+     */
+    record Result(List<String> copied, int scriptCount, Boolean playerUuids) {}
 
     private SkriptMigration() {}
 
     static Result migrate(Path skriptDir, Path neoskriptDir) throws IOException {
         if (!Files.isDirectory(skriptDir) || Files.exists(neoskriptDir.resolve(MARKER))
                 || Files.exists(neoskriptDir.resolve("scripts"))) {
-            return new Result(List.of(), 0);
+            return new Result(List.of(), 0, null);
         }
         Files.createDirectories(neoskriptDir);
         List<String> copied = new ArrayList<>();
@@ -52,7 +55,28 @@ final class SkriptMigration {
         }
         Files.writeString(neoskriptDir.resolve(MARKER),
                 "Copied " + copied + " from " + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n");
-        return new Result(copied, scripts[0]);
+        return new Result(copied, scripts[0], playerUuids(skriptDir.resolve("config.sk")));
+    }
+
+    /** Skript's {@code use player UUIDs in variable names} option, if its config has it. */
+    static Boolean playerUuids(Path config) throws IOException {
+        if (!Files.isRegularFile(config)) {
+            return null;
+        }
+        for (String line : Files.readAllLines(config)) {
+            String option = line.strip();
+            if (option.startsWith("use player UUIDs in variable names:")) {
+                String value = option.substring(option.indexOf(':') + 1).strip().toLowerCase(java.util.Locale.ROOT);
+                int comment = value.indexOf('#');
+                value = (comment >= 0 ? value.substring(0, comment) : value).strip();
+                return switch (value) {
+                    case "true", "yes", "on" -> Boolean.TRUE;
+                    case "false", "no", "off" -> Boolean.FALSE;
+                    default -> null;
+                };
+            }
+        }
+        return null;
     }
 
     private static void copy(Path source, Path target, int[] scripts) throws IOException {

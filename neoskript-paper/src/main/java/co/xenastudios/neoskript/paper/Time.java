@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.paper;
 
+import co.xenastudios.neoskript.api.registration.Parameter;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Date;
 import co.xenastudios.neoskript.runtime.Timespan;
@@ -14,6 +15,34 @@ final class Time {
     private Time() {}
 
     static void register(Registrar registrar) {
+        // date(year, month, day, ...): fields that spill over carry into the next one, as in Skript; a left out
+        // time zone or DST offset is NaN, which Skript sets as 0.
+        registrar.function("date", java.util.List.of(Parameter.of("year", "number"), Parameter.of("month", "number"),
+                Parameter.of("day", "number"), Parameter.defaulting("hour", "number", () -> 0L),
+                Parameter.defaulting("minute", "number", () -> 0L), Parameter.defaulting("second", "number", () -> 0L),
+                Parameter.defaulting("millisecond", "number", () -> 0L),
+                Parameter.defaulting("zone_offset", "number", () -> Double.NaN),
+                Parameter.defaulting("dst_offset", "number", () -> Double.NaN)), "date", false, args -> {
+                    int[] fields = {java.util.Calendar.YEAR, java.util.Calendar.MONTH, java.util.Calendar.DAY_OF_MONTH,
+                        java.util.Calendar.HOUR_OF_DAY, java.util.Calendar.MINUTE, java.util.Calendar.SECOND,
+                        java.util.Calendar.MILLISECOND, java.util.Calendar.ZONE_OFFSET, java.util.Calendar.DST_OFFSET};
+                    int[] offsets = {0, -1, 0, 0, 0, 0, 0, 0, 0};
+                    double[] scale = {1, 1, 1, 1, 1, 1, 1, 1000 * 60, 1000 * 60};
+                    double[] relations = {1. / 12, 1. / 30, 1. / 24, 1. / 60, 1. / 60, 1. / 1000, 0, 0, 0};
+                    java.util.Calendar calendar = java.util.Calendar.getInstance();
+                    calendar.setLenient(true);
+                    double carry = 0;
+                    for (int i = 0; i < fields.length; i++) {
+                        if (!(args[i] instanceof Number number)) {
+                            return null;
+                        }
+                        double value = number.doubleValue() * scale[i] + offsets[i] + carry;
+                        int v = (int) (long) Math.floor(value + 1e-10);
+                        carry = (value - v) * relations[i];
+                        calendar.set(fields[i], v);
+                    }
+                    return new Date(calendar.getTimeInMillis());
+                });
         registrar.expression("ExprNow", "date", info -> (context, args) -> Date.now(), "now");
         registrar.expression("ExprTime", "time", info -> new WorldTime(), "[the] time[s] [([with]in|of) %worlds%]",
                 "%worlds%'[s] time[s]");

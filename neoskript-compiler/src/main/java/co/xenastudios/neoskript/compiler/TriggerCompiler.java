@@ -123,6 +123,8 @@ final class TriggerCompiler {
     /** {@code keyed %objects%}: values with their indices, where something keeps them. */
     private static final String KEYED = "ExprKeyed";
     private static final String COMMAND_EVENT = Type.getInternalName(CommandEvent.class);
+    private static final String SUGGESTION_EVENT =
+            Type.getInternalName(co.xenastudios.neoskript.runtime.command.CommandSuggestionEvent.class);
     private static final String STORE = Type.getInternalName(VariableStore.class);
     private static final String OBJECT = "java/lang/Object";
     private static final String OBJECT_DESC = "Ljava/lang/Object;";
@@ -248,6 +250,11 @@ final class TriggerCompiler {
     private List<CommandPattern.Argument> commandArguments;
     /** How many choices a command trigger's pattern has. */
     private int commandChoices;
+    /**
+     * In a command's {@code suggestions:} entry, the numbers of the arguments whose suggestions its code
+     * changes; else {@code null}.
+     */
+    private java.util.Set<Integer> suggestingArguments;
 
     TriggerCompiler(Library library, Map<FunctionInfo, FunctionHandle> functions, VariableStore globals,
             ParsedScript script) {
@@ -336,6 +343,26 @@ final class TriggerCompiler {
                     method.visitMethodInsn(INVOKEVIRTUAL, STORE, "set", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
                 }
             }
+            statements(body);
+        }));
+    }
+
+    /**
+     * A command's {@code suggestions:} entry: code run as the command is typed, which works out what's suggested
+     * for its arguments.
+     *
+     * @param suggesting gets the numbers of the arguments whose suggestions the code changes
+     */
+    Trigger compileSuggestions(String scriptName, int entryLine, String entry, List<CommandPattern.Argument> arguments,
+            int choices, List<Statement> body, java.util.Set<Integer> suggesting) throws CompileException {
+        commandArguments = arguments;
+        commandChoices = choices;
+        suggestingArguments = suggesting;
+        eventClasses = List.of(co.xenastudios.neoskript.runtime.command.CommandSuggestionEvent.class);
+        eventName = "command suggestions";
+        return (Trigger) define(generate(scriptName, () -> {
+            line = entryLine;
+            source = entry;
             statements(body);
         }));
     }
@@ -1510,6 +1537,19 @@ final class TriggerCompiler {
                 method.visitInsn(ARETURN);
             }
             case CoreSyntax.CHANGE -> change(effect);
+            case CoreSyntax.SUGGESTION_FILTERING -> {
+                suggestionsOnly(effect);
+                if (!(effect.match().values().getFirst() instanceof Expr.Syntax suggestions)
+                        || !isCore(suggestions.syntax(), CoreSyntax.COMMAND_SUGGESTIONS)) {
+                    throw new CompileException(line, "It is only possible to change the filtering mode of suggestions!"
+                            + " Is the suggestions expression written correctly?");
+                }
+                int argument = suggestionsArgument(suggestions);
+                method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+                pushInt(argument);
+                pushInt(effect.pattern());
+                method.visitMethodInsn(INVOKESTATIC, SUGGESTION_EVENT, "filtering", "(" + CONTEXT + "II)V", false);
+            }
             case CoreSyntax.SORT -> {
                 Expr.Variable list = listVariable(effect, "Only list variables can be sorted");
                 Object key = effect.match().regexValues().isEmpty() ? null : effect.match().regexValues().getFirst();
@@ -1641,19 +1681,26 @@ final class TriggerCompiler {
             exitTrigger();
             return;
         }
-        int count = effect.pattern() == 1 ? 1 : regexNumber(effect);
         BlockKind kind = effect.match().hasTag("loop") ? BlockKind.LOOP
                 : effect.match().hasTag("conditional") ? BlockKind.CONDITIONAL : null;
-        int seen = 0;
-        for (Block block : blocks) {
-            boolean matches = kind == null || block.kind() == kind
-                    || (kind == BlockKind.LOOP && block.kind() == BlockKind.WHILE);
-            if (matches && ++seen == count) {
-                method.visitJumpInsn(GOTO, block.end());
-                return;
+        String names = kind == BlockKind.LOOP ? "loops" : kind == BlockKind.CONDITIONAL ? "conditionals" : "sections";
+        List<Block> matching = new ArrayList<>();
+        for (Block block : blocks) { // innermost first
+            if (kind == null || block.kind() == kind || (kind == BlockKind.LOOP && block.kind() == BlockKind.WHILE)) {
+                matching.add(block);
             }
         }
-        throw new CompileException(line, "There aren't " + count + " sections like that to exit");
+        int count = effect.pattern() == 1 ? 1 : effect.pattern() == 3 ? matching.size()
+                : Integer.parseInt(((java.util.regex.MatchResult) effect.match().regexValues().getFirst()).group()
+                        .replace("_", ""));
+        if (matching.isEmpty()) {
+            throw new CompileException(line, "Can't stop any " + names + " as there are no " + names + " present");
+        }
+        if (count > matching.size()) {
+            throw new CompileException(line, "Can't stop " + count + " " + names + " as there are only "
+                    + matching.size() + " " + names + " present");
+        }
+        method.visitJumpInsn(GOTO, matching.get(count - 1).end());
     }
 
     private static int regexNumber(ParsedSyntax syntax) {
@@ -1738,6 +1785,10 @@ final class TriggerCompiler {
         }
         if (target instanceof Expr.Syntax syntax && !(library.binding(syntax.syntax().syntax()) instanceof Library.Core)) {
             changeExpression(effect, mode, syntax);
+            return;
+        }
+        if (target instanceof Expr.Syntax syntax && isCore(syntax.syntax(), CoreSyntax.COMMAND_SUGGESTIONS)) {
+            changeSuggestions(effect, mode, syntax);
             return;
         }
         if (!(target instanceof Expr.Variable variable)) {
@@ -2905,33 +2956,106 @@ final class TriggerCompiler {
 
     /** {@code arg-1}, {@code the second argument}, {@code the last argument}, {@code the arguments}. */
     private void argument(Expr.Syntax expr) throws CompileException {
+        int index = argumentIndex(expr);
+        if (index >= 0) {
+            commandArgument(index);
+        } else {
+            // 'the argument' is the only one; with several, it's all of them.
+            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+            method.visitMethodInsn(INVOKESTATIC, COMMAND_EVENT, "arguments", "(" + CONTEXT + ")" + OBJECTS, false);
+        }
+    }
+
+    /**
+     * The number (from 0) of the argument {@code expr} ({@code arg-1}, {@code the text argument}) is, or -1 for
+     * {@code the argument} in a command with several: all of them.
+     */
+    private int argumentIndex(Expr.Syntax expr) throws CompileException {
         List<CommandPattern.Argument> arguments = commandArguments(expr);
         ParsedSyntax syntax = expr.syntax();
+        if (isCore(syntax, CoreSyntax.TYPED_ARGUMENT)) {
+            return typedArgumentIndex(expr, arguments);
+        }
         int n = switch (syntax.pattern()) {
             case 0 -> arguments.size();
             case 1, 2 -> ordinal(syntax);
             default -> -1;
         };
         if (n == -1) {
-            // 'the argument' is the only one; with several, it's all of them.
-            if (arguments.size() == 1) {
-                commandArgument(0);
-            } else {
-                method.visitVarInsn(ALOAD, CONTEXT_SLOT);
-                method.visitMethodInsn(INVOKESTATIC, COMMAND_EVENT, "arguments", "(" + CONTEXT + ")" + OBJECTS, false);
-            }
-            return;
+            return arguments.size() == 1 ? 0 : -1;
         }
         if (n < 1 || n > arguments.size()) {
             throw new CompileException(line, arguments.isEmpty() ? "This command doesn't have any arguments"
                     : "This command doesn't have a " + ordinalText(n) + " argument");
         }
-        commandArgument(n - 1);
+        return n - 1;
+    }
+
+    // ---------------------------------------------------------------- command suggestions
+
+    /**
+     * Fails, as Skript's event-restricted syntax does, unless this is a command's {@code suggestions:} entry.
+     * Skript names the events the syntax can be used in, and as its suggestions event isn't one, names none.
+     */
+    private void suggestionsOnly(Expr.Syntax syntax) throws CompileException {
+        if (suggestingArguments == null) {
+            throw new CompileException(line, "'" + source.substring(syntax.start(), syntax.end())
+                    + "' can only be used in ");
+        }
+    }
+
+    private void suggestionsOnly(ParsedSyntax effect) throws CompileException {
+        if (suggestingArguments == null) {
+            throw new CompileException(line, "'" + source.strip() + "' can only be used in ");
+        }
+    }
+
+    /** The number of the argument {@code the suggestions for arg-1} is about, checked as Skript does. */
+    private int suggestionsArgument(Expr.Syntax suggestions) throws CompileException {
+        suggestionsOnly(suggestions);
+        Object of = suggestions.syntax().match().values().getFirst();
+        if (!(of instanceof Expr.Syntax argument) || !(isCore(argument.syntax(), CoreSyntax.ARGUMENT)
+                || isCore(argument.syntax(), CoreSyntax.TYPED_ARGUMENT))) {
+            throw new CompileException(line, "It is only possible to obtain or change command suggestions of an"
+                    + " argument! Is the argument expression written correctly?");
+        }
+        int index = argumentIndex(argument);
+        if (index < 0) {
+            throw new CompileException(line, "This command has multiple arguments, meaning it is not possible to get"
+                    + " the 'argument'. Use 'argument 1', 'argument 2', etc. instead");
+        }
+        return index;
+    }
+
+    /** {@code set the suggestions for arg-1 to "a" and "b"}, and adding, removing, deleting and resetting them. */
+    private void changeSuggestions(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr.Syntax target)
+            throws CompileException {
+        int argument = suggestionsArgument(target);
+        Changeable.Mode changeMode = changeMode(effect, mode);
+        if (changeMode == Changeable.Mode.REMOVE_ALL) {
+            throw new CompileException(line, source.substring(target.start(), target.end())
+                    + " can't have anything removed from it");
+        }
+        suggestingArguments.add(argument);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        pushInt(argument);
+        method.visitLdcInsn(changeMode.name().toLowerCase(java.util.Locale.ROOT));
+        if (mode.value >= 0) {
+            expression((Expr) effect.match().values().get(mode.value));
+            convert(true);
+        } else {
+            method.visitInsn(ACONST_NULL);
+        }
+        method.visitMethodInsn(INVOKESTATIC, SUGGESTION_EVENT, "changeSuggestions",
+                "(" + CONTEXT + "I" + STRING_DESC + OBJECTS + ")V", false);
     }
 
     /** {@code player-arg}, {@code the text argument 2}: the Nth argument of that type. */
     private void typedArgument(Expr.Syntax expr) throws CompileException {
-        List<CommandPattern.Argument> arguments = commandArguments(expr);
+        commandArgument(argumentIndex(expr));
+    }
+
+    private int typedArgumentIndex(Expr.Syntax expr, List<CommandPattern.Argument> arguments) throws CompileException {
         List<Object> regexes = expr.syntax().match().regexValues();
         if (!(regexes.getFirst() instanceof TypeRef ref)) {
             throw unsupported("'" + source.substring(expr.start(), expr.end()) + "'");
@@ -2942,8 +3066,7 @@ final class TriggerCompiler {
         for (int i = 0; i < arguments.size(); i++) {
             String type = arguments.get(i).type();
             if ((type.equals(ref.type().id()) || registry.isSubtype(type, ref.type().id())) && ++seen == n) {
-                commandArgument(i);
-                return;
+                return i;
             }
         }
         throw new CompileException(line, "This command doesn't have " + (n == 1 ? "a" : "a " + ordinalText(n)) + " "
@@ -3062,6 +3185,20 @@ final class TriggerCompiler {
                     || isCore(syntax.syntax(), CoreSyntax.EVENT_ENTITY_BARE) -> eventValue(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.TIME_STATE) -> timeState(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT) -> argument(syntax);
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.COMMAND_SUGGESTIONS) -> {
+                int argument = suggestionsArgument(syntax);
+                method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+                pushInt(argument);
+                method.visitMethodInsn(INVOKESTATIC, SUGGESTION_EVENT, "suggestions", "(" + CONTEXT + "I)" + OBJECTS,
+                        false);
+            }
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.COMMAND_INPUT) -> {
+                suggestionsOnly(syntax);
+                method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+                pushInt(syntax.syntax().pattern());
+                method.visitMethodInsn(INVOKESTATIC, SUGGESTION_EVENT, "input", "(" + CONTEXT + "I)" + OBJECT_DESC,
+                        false);
+            }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.FILTER) -> filter(syntax.syntax());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ANY_OF) ->
                     expression((Expr) syntax.syntax().match().values().getFirst());
@@ -3240,6 +3377,10 @@ final class TriggerCompiler {
                     if (value != null) {
                         multipleTypesWarning(unresolved.text().strip());
                     }
+                }
+                if (value == null && library.literalError(unresolved.text()) != null) {
+                    // Words Skript has a clearer error for: 'dust particle' needs its colour.
+                    throw new CompileException(line, library.literalError(unresolved.text()));
                 }
                 if (value == null && (inList > 0 || skriptErrors) && outerArgument != null && !outerArgument.contains("event-")) {
                     // Words nothing parses in a list: Skript reports the whole argument they're in. (An event value

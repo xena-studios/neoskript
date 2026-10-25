@@ -28,6 +28,24 @@ final class Commands {
     private Commands() {}
 
     static void register(Registrar registrar) {
+        // A command's 'suggestions:' entry: a text component suggests its plain text, its hover text the tooltip.
+        co.xenastudios.neoskript.runtime.command.CommandSuggestionEvent.toSuggestion = value -> {
+            if (value instanceof net.kyori.adventure.text.Component component) {
+                net.kyori.adventure.text.event.HoverEvent<?> hover = component.hoverEvent();
+                return new co.xenastudios.neoskript.runtime.command.CommandSuggestionEvent.Suggestion(
+                        net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                                .serialize(component),
+                        hover != null && hover.value() instanceof net.kyori.adventure.text.Component tooltip
+                                ? tooltip : null);
+            }
+            return new co.xenastudios.neoskript.runtime.command.CommandSuggestionEvent.Suggestion(
+                    value instanceof String text ? text : Values.text(value), null);
+        };
+        co.xenastudios.neoskript.runtime.command.CommandSuggestionEvent.fromSuggestion = suggestion -> {
+            net.kyori.adventure.text.Component component = net.kyori.adventure.text.Component.text(suggestion.text());
+            return suggestion.tooltip() instanceof net.kyori.adventure.text.Component tooltip
+                    ? component.hoverEvent(tooltip) : component;
+        };
         registrar.eventValue(CommandEvent.class, "commandsender", CommandEvent::sender);
         registrar.eventValue(CommandEvent.class, "player", event -> event.sender() instanceof Player p ? p : null);
         registrar.eventValue(CommandEvent.class, "world",

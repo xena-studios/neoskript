@@ -107,6 +107,9 @@ final class Particles {
     private static final Map<EntityEffect, String> ENTITY_EFFECT_NAMES = new java.util.EnumMap<>(EntityEffect.class);
     /** Each particle without data by its names, singular and plural, for parsing particles with a count. */
     private static final Map<String, Particle> PARTICLES_BY_NAME = new java.util.HashMap<>();
+    /** The particles and game effects that need data, by their names, for Skript's error when one is written alone. */
+    private static final Map<String, Particle> DATA_PARTICLES_BY_NAME = new java.util.HashMap<>();
+    private static final Map<String, Effect> DATA_GAME_EFFECTS_BY_NAME = new java.util.HashMap<>();
     private static final Pattern LEADING_NUMBER = Pattern.compile("(\\d+) (.+)");
 
     static String particleName(Particle particle) {
@@ -132,6 +135,8 @@ final class Particles {
         names(Effect.class, GAME_EFFECTS, "game effect", GAME_EFFECT_NAMES, (name, effect) -> {
             if (effect.getData() == null) {
                 gameEffects.put(name, gameEffectValues.computeIfAbsent(effect, GameEffect::new));
+            } else {
+                DATA_GAME_EFFECTS_BY_NAME.put(name, effect);
             }
         });
         registrar.namedType("gameeffect", "game effect", GameEffect.class, gameEffects);
@@ -165,8 +170,11 @@ final class Particles {
             if (particle.getDataType() == Void.class) {
                 particles.put(name, particleValues.get(particle));
                 PARTICLES_BY_NAME.put(name, particle);
+            } else {
+                DATA_PARTICLES_BY_NAME.put(name, particle);
             }
         });
+        registrar.literalError(Particles::dataError);
         registrar.namedType("particle", "particle effect", ParticleEffect.class, particles);
         registrar.alias("particle", "particle", "particles");
         registrar.literalParser("particle", text -> parseParticle(text, ParticleEffect.class));
@@ -187,6 +195,30 @@ final class Particles {
         registrar.cloner(ParticleEffect.class, ParticleEffect::copy);
         registrar.text(ParticleEffect.class, effect -> particleName(effect.particle()));
         registrar.text(Particle.class, Particles::particleName);
+    }
+
+    /**
+     * Skript's error for a particle or game effect that needs data written by its name alone, as {@code dust
+     * particle}: they're made by the expressions that take their data. As in Skript, the particle is named by its
+     * name and the game effect by its constant.
+     */
+    private static String dataError(String text) {
+        String lower = text.toLowerCase(Locale.ROOT);
+        Effect effect = DATA_GAME_EFFECTS_BY_NAME.get(lower);
+        if (effect != null) {
+            return "The effect " + effect.name() + " requires data and cannot be parsed directly. Use the Game Effect"
+                    + " expression instead.";
+        }
+        Matcher matcher = LEADING_NUMBER.matcher(lower);
+        if (matcher.matches()) {
+            lower = matcher.group(2);
+        }
+        Particle particle = DATA_PARTICLES_BY_NAME.get(lower);
+        if (particle == null) {
+            return null;
+        }
+        return "The " + particleName(particle) + " requires data and cannot be parsed directly. Use the Particle With"
+                + " Data expression instead.";
     }
 
     /**

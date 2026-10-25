@@ -8,6 +8,11 @@ package co.xenastudios.neoskript.runtime.variables.storage;
 final class Tags {
 
     static final int NULL = 0x00;
+    static final int BYTE = 0x01;
+    static final int SHORT = 0x02;
+    static final int CHAR = 0x0E;
+    /** A boxed primitive's tag is its primitive's plus this. */
+    static final int BOXED = 0x10;
     static final int INT = 0x03;
     static final int LONG = 0x04;
     static final int FLOAT = 0x08;

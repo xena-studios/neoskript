@@ -10,6 +10,10 @@ variables:
   file: variables.csv
   # How often changed variables are saved. They're also saved when the server stops.
   save-interval: 5 minutes
+  # Whether players are their UUIDs in variable names ({money::%player%}) or their names, as Skript's
+  # 'use player UUIDs in variable names' (on in Skript's default config). Moving over from Skript copies
+  # its setting, so the variables it saved are found.
+  player-uuids-in-names: true
 
 events:
   # The priority scripts listen to events at: lowest, low, normal, high or highest. As in Skript, the

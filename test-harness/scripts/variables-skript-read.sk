@@ -2,4 +2,5 @@
 on load:
 	broadcast "[harness] skript items: %name of {n::item}% | %item amount of {n::block}% | %item amount of {n::stack}% | %{n::mode}%"
 	broadcast "[harness] skript read: %{n::text}% | %{n::long}% | %{n::double}% | %{n::bool}% | %{n::timespan}% | %{n::list::*}%"
+	broadcast "[harness] skript particles: %{n::particle}% | %{n::particle dust}% | %{n::particle transition}% | %{n::particle block}% | %{n::particle item}% | %{n::particle shriek}% | %{n::particle trail}% | %{n::particle effect}%"
 	set {-harness::touched} to true

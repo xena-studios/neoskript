@@ -284,12 +284,13 @@ public final class ScriptCompiler {
             }
         }
         List<CompiledCommand.Route> routes = new ArrayList<>();
+        Map<CommandPattern.Argument, CompiledCommand.Suggester> suggesters = new java.util.IdentityHashMap<>();
         routes(name, script, functions, root, List.of(), Set.of(), entries.get("permission"),
-                command.structure().node().line().key(), routes);
+                command.structure().node().line().key(), routes, suggesters);
         return new CompiledCommand(name, line, command.name(), aliases, entries.get("description"), entries.get("usage"),
                 entries.get("permission"), message(name, script, functions, root, "permission message"), cooldown,
                 entries.get("cooldown bypass"), message(name, script, functions, root, "cooldown message"),
-                entries.get("prefix"), routes);
+                entries.get("prefix"), routes, suggesters);
     }
 
     private static final java.util.regex.Pattern ALIAS_SEPARATOR =
@@ -298,7 +299,8 @@ public final class ScriptCompiler {
     /** Adds the routes of {@code node} and its subcommands, subcommands first. */
     private void routes(String name, ParsedScript script, Map<FunctionInfo, FunctionHandle> functions,
             ParsedStructure.CommandNode node, List<CommandPattern.Part> prefix, Set<String> executors, String permission,
-            String header, List<CompiledCommand.Route> routes) throws CompileException {
+            String header, List<CompiledCommand.Route> routes,
+            Map<CommandPattern.Argument, CompiledCommand.Suggester> suggesters) throws CompileException {
         List<CommandPattern.Part> pattern = new ArrayList<>(prefix);
         pattern.addAll(node.pattern());
         if (node.entries().containsKey("executable by")) {
@@ -309,7 +311,10 @@ public final class ScriptCompiler {
         }
         for (ParsedStructure.CommandNode subcommand : node.subcommands()) {
             routes(name, script, functions, subcommand, pattern, executors, permission,
-                    subcommand.group() ? header : subcommand.line().key(), routes);
+                    subcommand.group() ? header : subcommand.line().key(), routes, suggesters);
+        }
+        if (node.suggestions() != null) {
+            suggester(name, script, functions, node, pattern, suggesters);
         }
         if (node.trigger() != null) {
             List<CommandPattern.Argument> arguments = new ArrayList<>();
@@ -320,6 +325,32 @@ public final class ScriptCompiler {
                     .compileCommand(name, node.line().number(), header, arguments, choices.size(), node.trigger());
             routes.add(new CompiledCommand.Route(pattern, executors, permission, trigger,
                     new CompiledCommand.Matcher(pattern, arguments, choices, library::parser)));
+        }
+    }
+
+    /**
+     * Compiles a {@code suggestions:} entry. As in Skript, it works out the suggestions of the arguments of its
+     * own command or subcommand that its code changes the suggestions of.
+     */
+    private void suggester(String name, ParsedScript script, Map<FunctionInfo, FunctionHandle> functions,
+            ParsedStructure.CommandNode node, List<CommandPattern.Part> pattern,
+            Map<CommandPattern.Argument, CompiledCommand.Suggester> suggesters) throws CompileException {
+        List<CommandPattern.Argument> arguments = new ArrayList<>();
+        CommandPattern.arguments(pattern, arguments);
+        List<CommandPattern.Choice> choices = new ArrayList<>();
+        CommandPattern.choices(pattern, choices);
+        Set<Integer> suggesting = new java.util.TreeSet<>();
+        Trigger trigger = new TriggerCompiler(library, functions, globals, script).compileSuggestions(name,
+                node.suggestionsLine().number(), node.suggestionsLine().key(), arguments, choices.size(),
+                node.suggestions(), suggesting);
+        CompiledCommand.Suggester suggester = new CompiledCommand.Suggester(trigger, arguments, choices.size());
+        List<CommandPattern.Argument> own = new ArrayList<>();
+        CommandPattern.arguments(node.pattern(), own);
+        for (int index : suggesting) {
+            CommandPattern.Argument argument = arguments.get(index);
+            if (own.stream().anyMatch(a -> a == argument)) {
+                suggesters.put(argument, suggester);
+            }
         }
     }
 

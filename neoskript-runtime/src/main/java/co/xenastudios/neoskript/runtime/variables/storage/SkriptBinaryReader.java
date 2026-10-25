@@ -21,7 +21,7 @@ public final class SkriptBinaryReader implements BinaryReader {
 
     public SkriptBinaryReader(String type, byte[] bytes) {
         this.in = ByteBuffer.wrap(bytes);
-        names.add(type);
+        remember(type);
     }
 
     /** Whether every byte was read: a codec that reads less didn't understand the value. */
@@ -64,8 +64,15 @@ public final class SkriptBinaryReader implements BinaryReader {
         byte[] utf8 = new byte[length];
         in.get(utf8);
         String name = new String(utf8, StandardCharsets.UTF_8);
-        names.add(name);
+        remember(name);
         return name;
+    }
+
+    /** Skript only numbers names longer than 4 bytes, for back-references: shorter ones are always written out. */
+    private void remember(String name) {
+        if (name.getBytes(StandardCharsets.UTF_8).length > 4) {
+            names.add(name);
+        }
     }
 
     @Override
@@ -75,6 +82,12 @@ public final class SkriptBinaryReader implements BinaryReader {
             throw new IllegalStateException("Expected an object");
         }
         return header & 0x7F;
+    }
+
+    @Override
+    public byte byteField(String name) {
+        field(name, Tags.BYTE);
+        return in.get();
     }
 
     @Override
@@ -127,6 +140,29 @@ public final class SkriptBinaryReader implements BinaryReader {
             throw new IllegalStateException("Expected field " + name + ", found " + actual + " (" + tag + ")");
         }
         return tag == Tags.NULL ? null : rawName();
+    }
+
+    @Override
+    public Object anyField(String name) {
+        String actual = rawName();
+        int tag = in.get() & 0xFF;
+        if (!actual.equals(name)) {
+            throw new IllegalStateException("Expected field " + name + ", found " + actual + " (" + tag + ")");
+        }
+        return switch (tag) {
+            case Tags.NULL -> null;
+            case Tags.STRING -> rawString();
+            case Tags.OBJECT -> new ObjectType(rawName());
+            case Tags.BOXED + Tags.BYTE -> in.get();
+            case Tags.BOXED + Tags.SHORT -> in.getShort();
+            case Tags.BOXED + Tags.INT -> in.getInt();
+            case Tags.BOXED + Tags.LONG -> in.getLong();
+            case Tags.BOXED + Tags.FLOAT -> in.getFloat();
+            case Tags.BOXED + Tags.DOUBLE -> in.getDouble();
+            case Tags.BOXED + Tags.CHAR -> in.getChar();
+            case Tags.BOXED + Tags.BOOLEAN -> in.get() != 0;
+            default -> throw new IllegalStateException("Unexpected tag " + tag + " in field " + name);
+        };
     }
 
     @Override

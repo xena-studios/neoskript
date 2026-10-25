@@ -10,10 +10,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A script command being run: the event its triggers run for. The generated code reads arguments
+ * A script command being run: the event its triggers run for (and, as a {@link CommandSuggestionEvent}, its
+ * {@code suggestions:} entry's). The generated code reads arguments
  * through the static helpers.
  */
-public final class CommandEvent {
+public class CommandEvent {
 
     private final Object sender;
     private final String label;
@@ -116,7 +117,7 @@ public final class CommandEvent {
         return result;
     }
 
-    private static CommandEvent of(TriggerContext context) {
+    static CommandEvent of(TriggerContext context) {
         return context.event() instanceof CommandEvent event ? event : null;
     }
 

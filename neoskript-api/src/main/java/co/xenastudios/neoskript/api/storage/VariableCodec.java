@@ -10,6 +10,10 @@ package co.xenastudios.neoskript.api.storage;
  */
 public interface VariableCodec<T> {
 
+    /**
+     * Writes a value. Throws {@link UnsupportedOperationException} for a value that can't be saved, as Skript
+     * can't save it either: it's then left out of the file.
+     */
     void encode(T value, BinaryWriter out);
 
     /**

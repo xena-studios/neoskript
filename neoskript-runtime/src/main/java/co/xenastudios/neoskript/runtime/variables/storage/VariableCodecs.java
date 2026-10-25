@@ -59,7 +59,12 @@ public final class VariableCodecs {
             return null;
         }
         SkriptBinaryWriter out = new SkriptBinaryWriter(registration.name());
-        ((VariableCodec<Object>) registration.codec()).encode(value, out);
+        try {
+            ((VariableCodec<Object>) registration.codec()).encode(value, out);
+        } catch (UnsupportedOperationException unsavable) {
+            // A value the codec can't save, as Skript can't: a particle with data Skript can't save.
+            return null;
+        }
         return new Encoded(registration.name(), out.toByteArray());
     }
 

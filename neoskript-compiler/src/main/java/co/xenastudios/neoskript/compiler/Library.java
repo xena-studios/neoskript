@@ -331,6 +331,25 @@ public final class Library implements Registrar {
         builder.parses(typeId, words -> parser.apply(words) != null);
     }
 
+    private final List<java.util.function.Function<String, String>> literalErrors = new ArrayList<>();
+
+    @Override
+    public void literalError(java.util.function.Function<String, String> problem) {
+        checkOpen();
+        literalErrors.add(problem);
+    }
+
+    /** What's wrong with words no literal parser understands, or {@code null}: see {@link #literalError}. */
+    String literalError(String words) {
+        for (java.util.function.Function<String, String> problem : literalErrors) {
+            String error = problem.apply(words.strip());
+            if (error != null) {
+                return error;
+            }
+        }
+        return null;
+    }
+
     @Override
     public void literalParser(String typeId, java.util.function.Function<String, ?> parser) {
         checkOpen();

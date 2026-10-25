@@ -76,6 +76,12 @@ public final class NeoSkriptVariablesScenario implements Scenario {
         if (!items.endsWith(expectedItems)) {
             throw new HarnessFailure("NeoSkript read items: '" + items + "', expected it to end with '" + expectedItems + "'");
         }
+        String particles = read.stream().filter(line -> line.contains("[harness] read particles: ")).findFirst()
+                .orElse("");
+        // A value NeoSkript can't decode shows as its type: '<particle>'.
+        if (particles.isEmpty() || particles.contains("particle>") || particles.contains("<none>")) {
+            throw new HarnessFailure("NeoSkript didn't decode Skript's particles: '" + particles + "'");
+        }
         if (read.stream().anyMatch(line -> line.contains("read loc: <location>"))) {
             throw new HarnessFailure("NeoSkript didn't decode the location");
         }
