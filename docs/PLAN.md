@@ -550,6 +550,11 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **Loot tables and boss bars**, as Skript's modules have them.
     - **Entity data:** panda genes, thrown potions, zombie nautiluses; literal specifications (`black (cat type)`), `all biomes`, Skript's enum types by their names, `using local axes`, blocks that aren't items (`oak wall sign`, `void air`), and tags before a choice (`:(a|b)`) as Skript sets them.
 
+    **Batch 17 (2026-10-25): 803 → 841 tests pass.**
+    - **Language:** returnable sections, custom default values (a left-out number is 1, as in Skript), arithmetic by operator priority with Skript's custom test operators, text parsed with a pattern of types (`"1, 2" parsed as "%integers%"`, grouped into sublists when set into a list), function arguments that take a section (`f(a worldborder):`), lists of what a condition checks checked item by item as Skript's expression lists, several values refused for a single function parameter, and Skript's errors for words nothing parses in a list and for changes of the wrong type ("... can't be added to ... because the former is not a time span").
+    - **Items:** equippable components, custom model data, enchantment glint overrides, skull textures, armour, body armour and saddle slots by Skript's names, `all items` and `all blocks`, removing all of an item from inventories, and item comparisons as Skript makes them.
+    - **Literals that say their type** (`unknown (heal reason)`) are read with that type's parser.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.
