@@ -150,7 +150,10 @@ final class TriggerCompiler {
         LOOP,
         WHILE,
         /** A library section's code, like {@code spawn a pig:}: run once for each value the section returns. */
-        SECTION
+        SECTION,
+        /** Code whose {@code return} gives values to the section, not the function: Skript's returnable sections. */
+        RETURNABLE,
+        RETURNABLE_PLURAL
     }
 
     /**
@@ -821,6 +824,15 @@ final class TriggerCompiler {
             case Statement.Section section when isCore(section.header(), CoreSyntax.LOOP) -> loop(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.FOR) -> forLoop(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.WHILE) -> whileLoop(section);
+            case Statement.Section section when isCore(section.header(), CoreSyntax.RETURNABLE) -> {
+                Label end = new Label();
+                String type = returnableType(section.header());
+                blocks.push(new Block(section.header().match().hasTag("plural") ? BlockKind.RETURNABLE_PLURAL
+                        : BlockKind.RETURNABLE, end, null, -1, -1, -1, type));
+                statements(section.body());
+                blocks.pop();
+                method.visitLabel(end);
+            }
             case Statement.Section section when isCore(section.header(), CoreSyntax.FILTER_SECTION) -> filterSection(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.CATCH_ERRORS) -> {
                 String errors = Type.getInternalName(co.xenastudios.neoskript.runtime.RuntimeErrors.class);
@@ -1214,6 +1226,61 @@ final class TriggerCompiler {
         }
     }
 
+    /** The type a returnable section returns: {@code string} in {@code returnable string section}. */
+    private String returnableType(ParsedSyntax header) throws CompileException {
+        Object written = header.match().values().getFirst();
+        String text = switch (written) {
+            case Expr.Literal literal -> literal.text();
+            case Expr.Unresolved unresolved -> unresolved.text();
+            case null, default -> null;
+        };
+        TypeRef ref = text == null ? null : registry.resolveType(text.strip());
+        if (ref == null) {
+            throw unsupported("'" + header.match() + "'");
+        }
+        return ref.type().id();
+    }
+
+    /** The innermost returnable section {@code return} gives its values to, or {@code null} for the function's. */
+    private Block returnHandler() {
+        for (Block block : blocks) {
+            if (block.kind() == BlockKind.RETURNABLE || block.kind() == BlockKind.RETURNABLE_PLURAL) {
+                return block;
+            }
+        }
+        return null;
+    }
+
+    /** {@code return X} in a returnable section: checked as Skript checks it, kept, and the section left. */
+    private void returnFromSection(Block handler, Expr returned) throws CompileException {
+        boolean plural = handler.kind() == BlockKind.RETURNABLE_PLURAL;
+        co.xenastudios.neoskript.frontend.registry.TypeInfo type = registry.type(handler.valueType());
+        String name = type == null ? handler.valueType() : type.name().toLowerCase(java.util.Locale.ROOT);
+        String section = "returnable " + (plural ? "plural " : "") + name + " section";
+        String text = returned.end() <= source.length() ? source.substring(returned.start(), returned.end()).strip() : "";
+        if (returned.type() != null && !returned.type().equals(SyntaxRegistry.OBJECT)
+                && !registry.isAssignable(returned.type(), handler.valueType())) {
+            throw new CompileException(line, section + " is declared to return " + article(name) + " " + name + ", but "
+                    + text + " is not of that type.");
+        }
+        if (!plural && co.xenastudios.neoskript.frontend.parse.Plurality.plural(returned, registry)) {
+            throw new CompileException(line, section + " is defined to only return a single " + name
+                    + ", but this return statement can return multiple values.");
+        }
+        expression(returned);
+        Class<?> target = library.javaClass(handler.valueType());
+        if (target == Long.class) {
+            // As Skript's number to integer converter: 2.5 is 2.
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "wholeNumbers", "(" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+        } else if (target != null && Values.convertsTo(target)) {
+            constant(target, Class.class);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "convert", "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECT_DESC, false);
+        }
+        convert(plural);
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "returned", "(" + OBJECT_DESC + ")V", false);
+        method.visitJumpInsn(GOTO, handler.end());
+    }
+
     /** The innermost section whose value a left-out placeholder of these types takes, or {@code null}. */
     private Block sectionDefault(PlaceholderSpec spec) {
         for (String type : spec.types()) {
@@ -1299,6 +1366,11 @@ final class TriggerCompiler {
                 method.visitJumpInsn(GOTO, loop.next());
             }
             case CoreSyntax.RETURN -> {
+                Block handler = returnHandler();
+                if (handler != null) {
+                    returnFromSection(handler, (Expr) effect.match().values().getFirst());
+                    return;
+                }
                 if (function == null || function.returnType() == null) {
                     throw new CompileException(line, function == null
                             ? "'return' can only be used in a function"

@@ -142,6 +142,11 @@ final class Scripts {
         registrar.effect("EffTestExprList", info -> (context, args) -> {}, "test expr list %number/booleans%");
         registrar.expression("ExprTestStringLiteral", "string", info -> (context, args) -> args[0],
                 "test string literal %*string%");
+        // What the last 'returnable ... section' returned (see the compiler).
+        registrar.expression("ExprLastReturnValues", "object", info -> (context, args) -> {
+            Object values = co.xenastudios.neoskript.runtime.Values.takeReturned();
+            return values == null ? new Object[0] : values;
+        }, "[the] last return[ed] value[s]");
         // 'a new runnable:' is its section, to run later with 'run runnable X' (see the compiler).
         registrar.expression("ExprSecRunnable", "object", info -> (context, args) -> null, "[a] new runnable");
         registrar.deferredSectionExpression("ExprSecRunnable");

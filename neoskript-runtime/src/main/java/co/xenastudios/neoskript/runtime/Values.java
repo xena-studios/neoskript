@@ -451,4 +451,30 @@ public final class Values {
     public static Object section(Resumable code, co.xenastudios.neoskript.api.element.TriggerContext context, Frame frame) {
         return (Runnable) () -> code.resume(context, frame);
     }
+
+    private static final ThreadLocal<Object> RETURNED = new ThreadLocal<>();
+
+    /** Keeps what a returnable section returned, for Skript's test expression {@code the last return values}. */
+    public static void returned(Object values) {
+        RETURNED.set(values);
+    }
+
+    /** What the last returnable section returned, once: reading it forgets it, as in Skript. */
+    public static Object takeReturned() {
+        Object values = RETURNED.get();
+        RETURNED.remove();
+        return values;
+    }
+
+    /** Numbers as whole numbers, cut short as Skript's number to integer converter does: 2.5 is 2. */
+    public static Object wholeNumbers(Object value) {
+        if (value instanceof Object[] array) {
+            Object[] whole = array.clone();
+            for (int i = 0; i < whole.length; i++) {
+                whole[i] = wholeNumbers(whole[i]);
+            }
+            return whole;
+        }
+        return value instanceof Number number && !(value instanceof Long) ? (Object) number.longValue() : value;
+    }
 }

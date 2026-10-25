@@ -29,6 +29,8 @@ final class CoreSyntax {
     static final String TEST = "TestCase";
     static final String EXAMPLE = "StructExample";
     static final String ASSERT = "EffAssert";
+    /** Skript's test section whose code can {@code return} values, for {@code the last return values}. */
+    static final String RETURNABLE = "SecReturnable";
     /** {@code assert X to fail} where X isn't a condition at all: as in Skript, that has failed as expected. */
     static final String ASSERT_UNPARSED = "EffAssertUnparsed";
     static final String PARSE_LOGS = "ExprLastParseLogs";
@@ -115,6 +117,7 @@ final class CoreSyntax {
         library.core(SyntaxKind.EFFECT, ASSERT_UNPARSED, null, List.of(RegexRole.NOT_CONDITION),
                 "assert [unsafely] <.+> to fail [with [error] %string%[, expected %objects%][, got %objects%]]");
         library.core(SyntaxKind.EXPRESSION, PARSE_LOGS, "string", List.of(), "[the] [last] parse logs");
+        library.core(SyntaxKind.SECTION, RETURNABLE, null, List.of(), "returnable [:plural] %*classinfo% section");
 
         // Whether the trigger may have waited at this point: true, false or unknown.
         library.literalType("kleenean", "kleenean", java.util.Set.of("unknown"), word -> word);

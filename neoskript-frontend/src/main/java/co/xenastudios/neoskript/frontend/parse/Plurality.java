@@ -24,14 +24,14 @@ import java.util.Map;
  * functions returning several values, and syntax elements that always are (from Skript's own elements, in
  * {@code plurality.txt}) or are because a plural argument of theirs is ({@code names of {_l::*}}).
  */
-final class Plurality {
+public final class Plurality {
 
     /** Element id to {@code S} (always one value), {@code P} (always several) or {@code A} (as its arguments). */
     private static final Map<String, Character> KNOWN = load();
 
     private Plurality() {}
 
-    static boolean plural(Expr expr, SyntaxRegistry registry) {
+    public static boolean plural(Expr expr, SyntaxRegistry registry) {
         return switch (expr) {
             case Expr.Variable variable -> variable.list();
             case Expr.ListOf list -> list.and() ? list.items().size() > 1 || list.items().stream().anyMatch(i -> plural(i, registry))
