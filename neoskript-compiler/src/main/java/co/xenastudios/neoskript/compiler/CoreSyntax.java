@@ -302,7 +302,7 @@ final class CoreSyntax {
                 "[the] last arg[ument]",
                 "[the] arg[ument](-| )<(\\d+)>",
                 "[the] " + ordinal + " arg[ument][s]",
-                "[all [[of] the]|the] arg[ument][s]");
+                "[all [[of] the]|the] arg[ument][all:s]");
         // 'player-arg', 'the text argument 2': the Nth argument of that type.
         library.core(SyntaxKind.EXPRESSION, TYPED_ARGUMENT, "object", List.of(RegexRole.TYPE, RegexRole.ANY),
                 "[the] <.+>( |-)arg[ument][( |-)<\\d+>]",
