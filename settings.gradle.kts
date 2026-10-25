@@ -8,6 +8,9 @@ dependencyResolutionManagement {
         mavenCentral()
         maven("https://repo.papermc.io/repository/maven-public/") {
             name = "papermc"
+            // Apache's parent POMs come from Maven Central only: the proxy here lacks some (org.apache:apache:31,
+            // which WorldGuard's log4j BOM needs), and a miss here fails the whole resolution.
+            content { excludeGroupByRegex("org\\.apache(\\..*)?") }
         }
         // Plugins NeoSkript hooks into, as Skript does; compile-only, never shaded.
         exclusiveContent {
