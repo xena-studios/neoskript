@@ -138,7 +138,18 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             start.run();
         }
         // D10: NeoSkript takes over /skript and /sk, with /neoskript as an alias.
-        getCommand("skript").setExecutor(new SkriptCommand(scripts, getPluginMeta().getVersion()));
+        getCommand("skript").setExecutor(new SkriptCommand(this, scripts, this::reloadSettings));
+    }
+
+    /**
+     * {@code /skript reload config}: reads config.yml again and applies what can change while the server
+     * runs. The other settings (metrics, event priority, cancelled events and where variables are saved)
+     * take effect when the server restarts.
+     */
+    private void reloadSettings() {
+        saveDefaultConfig();
+        reloadConfig();
+        StandardLibrary.usePlayerUuidsInVariableNames(getConfig().getBoolean("variables.player-uuids-in-names", true));
     }
 
     /** The priority triggers listen to events at, {@code high} by default as in Skript. */

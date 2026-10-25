@@ -10,11 +10,20 @@ website: https://xenastudios.co
 authors: [Xena Studios]
 commands:
   skript:
-    description: Reloads scripts and shows NeoSkript's version.
-    usage: /<command> reload [all|scripts|<script>]
+    description: Skript's main command. Type '/skript help' for more information.
+    usage: /skript help
     aliases: [sk, neoskript]
     permission: skript.admin
+# Skript's permissions.
 permissions:
+  skript.*:
+    default: false
+    children:
+      skript.reloadnotify: true
+      skript.admin: true
+  skript.reloadnotify:
+    default: false
+    description: Notifies when others are reloading script files.
   skript.admin:
-    description: Use /skript (reload scripts and so on).
     default: op
+    description: Allows use of administrative commands and receiving notifications of new versions.

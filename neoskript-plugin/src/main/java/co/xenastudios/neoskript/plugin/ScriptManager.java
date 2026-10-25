@@ -33,7 +33,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 
@@ -64,6 +66,8 @@ final class ScriptManager {
     private final Map<String, List<CompiledScripts.CompiledTrigger>> loaded = new LinkedHashMap<>();
     /** What stops each loaded script's periodic triggers ({@code every 5 minutes}). */
     private final Map<String, List<Runnable>> periodic = new HashMap<>();
+    /** The source of each loaded script, as it loaded. */
+    private final Map<String, String> sources = new HashMap<>();
     /** The commands of each loaded script. */
     private final Map<String, List<CompiledCommand>> loadedCommands = new LinkedHashMap<>();
 
@@ -146,14 +150,47 @@ final class ScriptManager {
     }
 
     /**
-     * Reloads every script, or only {@code only} (a script's path in the scripts folder). Problems are
-     * sent to {@code problems} as well as the log.
+     * Reloads the scripts whose names {@code scope} accepts, or every script if it's {@code null}, for
+     * {@code /skript}. Every problem (warnings too) goes to {@code problems} rather than the log, as
+     * Skript's command redirects them to whoever reloaded. Called on the global region's thread, so load
+     * events run straight away, before the command says it's done, as in Skript.
      */
-    synchronized Outcome reload(String only, Consumer<String> problems) throws IOException {
-        return load(only, problem -> {
-            logger.error(problem);
-            problems.accept(problem);
-        });
+    synchronized Outcome reload(Predicate<String> scope, BiConsumer<Diagnostic, SourceFile> problems) throws IOException {
+        return load(scope, problem -> {}, true, problems);
+    }
+
+    /**
+     * Unloads the loaded scripts whose names {@code scope} accepts, running their unload events, as Skript
+     * unloads scripts it disables.
+     */
+    synchronized void unload(Predicate<String> scope) {
+        for (String name : List.copyOf(loaded.keySet())) {
+            if (scope.test(name)) {
+                stop(name);
+            }
+        }
+    }
+
+    /** The names of the loaded scripts, in the order they loaded. */
+    synchronized List<String> loadedScripts() {
+        return List.copyOf(loaded.keySet());
+    }
+
+    /** The source of each loaded script as it was when it loaded, for {@code /skript restore}. */
+    synchronized Map<String, String> loadedSources() {
+        Map<String, String> sources = new LinkedHashMap<>();
+        for (String name : loaded.keySet()) {
+            String source = this.sources.get(name);
+            if (source != null) {
+                sources.put(name, source);
+            }
+        }
+        return sources;
+    }
+
+    /** The scripts folder. */
+    Path scriptsFolder() {
+        return scriptsDir;
     }
 
     /** Global variables, for storage to load and save. */
@@ -161,27 +198,22 @@ final class ScriptManager {
         return globals;
     }
 
-    /** Whether {@code name} is an enabled script in the scripts folder. */
-    boolean exists(String name) {
-        Path path = scriptsDir.resolve(name).normalize();
-        return path.startsWith(scriptsDir) && isEnabledScript(path);
-    }
-
-    private Outcome load(String only, Consumer<String> problems) throws IOException {
-        return load(only, problems, false);
+    /** Loads the scripts {@code scope} accepts, or every script if it's {@code null}. */
+    private Outcome load(Predicate<String> scope, Consumer<String> problems) throws IOException {
+        return load(scope, problems, false);
     }
 
     /** With {@code now}, load events run straight away rather than on the next tick: for loads a script asks for. */
-    private Outcome load(String only, Consumer<String> problems, boolean now) throws IOException {
-        return load(only, problems, now, null);
+    private Outcome load(Predicate<String> scope, Consumer<String> problems, boolean now) throws IOException {
+        return load(scope, problems, now, null);
     }
 
     /**
      * With {@code redirect}, every problem (warnings too) goes there instead of the log and
      * {@code problems}: for {@code auto reload}, which sends them to its recipients.
      */
-    private Outcome load(String only, Consumer<String> problems, boolean now,
-            java.util.function.BiConsumer<Diagnostic, SourceFile> redirect) throws IOException {
+    private Outcome load(Predicate<String> scope, Consumer<String> problems, boolean now,
+            BiConsumer<Diagnostic, SourceFile> redirect) throws IOException {
         long start = System.nanoTime();
         Files.createDirectories(scriptsDir);
         // Everything is parsed and compiled, even for one script, so calls between scripts resolve.
@@ -197,7 +229,7 @@ final class ScriptManager {
         Set<String> failed = new HashSet<>();
         int errors = 0;
         for (Diagnostic diagnostic : diagnostics) {
-            if (only != null && !diagnostic.file().equals(only)) {
+            if (scope != null && !scope.test(diagnostic.file())) {
                 continue;
             }
             if (redirect != null) {
@@ -221,13 +253,17 @@ final class ScriptManager {
         // Scripts that load cleanly, or for the first time, switch to the new version; a script with
         // errors keeps its previous version if it has one.
         Set<String> switching = new HashSet<>();
+        int inScope = 0;
         for (SourceFile file : files) {
             String name = file.name();
-            if ((only == null || only.equals(name)) && (!failed.contains(name) || !loaded.containsKey(name))) {
-                switching.add(name);
+            if (scope == null || scope.test(name)) {
+                inScope++;
+                if (!failed.contains(name) || !loaded.containsKey(name)) {
+                    switching.add(name);
+                }
             }
         }
-        if (only == null) {
+        if (scope == null) {
             // Scripts that are gone run their unload events first.
             loaded.forEach((name, old) -> {
                 if (!byName.containsKey(name)) {
@@ -235,6 +271,7 @@ final class ScriptManager {
                 }
             });
             loaded.keySet().removeIf(name -> !byName.containsKey(name));
+            sources.keySet().removeIf(name -> !byName.containsKey(name));
             loadedCommands.keySet().removeIf(name -> !byName.containsKey(name));
             for (String name : List.copyOf(periodic.keySet())) {
                 if (!byName.containsKey(name)) {
@@ -264,6 +301,7 @@ final class ScriptManager {
             // The previous version of a script unloads before the new one loads.
             runUnload(loaded.getOrDefault(name, List.of()));
             loaded.put(name, triggers.getOrDefault(name, List.of()));
+            sources.put(name, byName.get(name).text());
             loadedCommands.put(name, scriptCommands.getOrDefault(name, List.of()));
         }
         events.update(loaded.values().stream().flatMap(List::stream).toList());
@@ -312,7 +350,7 @@ final class ScriptManager {
                 done.run();
             });
         }
-        return new Outcome(only == null ? files.size() : 1, errors, millis);
+        return new Outcome(inScope, errors, millis);
     }
 
     /**
@@ -367,7 +405,7 @@ final class ScriptManager {
         List<org.bukkit.command.CommandSender> audience = autoReload.audience();
         AutoReload.send(audience, autoReload.reloading());
         try {
-            Outcome outcome = load(name, problem -> {}, false,
+            Outcome outcome = load(name::equals, problem -> {}, false,
                     (problem, file) -> AutoReload.send(audience, AutoReload.describe(problem, file)));
             AutoReload.send(audience, autoReload.reloaded(outcome.errors(), (System.nanoTime() - start) / 1_000_000));
         } catch (IOException | RuntimeException e) {
@@ -379,7 +417,7 @@ final class ScriptManager {
         List<SourceFile> files = new ArrayList<>();
         modified.clear();
         try (Stream<Path> paths = Files.walk(scriptsDir)) {
-            for (Path path : paths.filter(ScriptManager::isEnabledScript).sorted().toList()) {
+            for (Path path : paths.filter(this::isLoadable).sorted().toList()) {
                 modified.put(name(path), Files.getLastModifiedTime(path).toMillis());
                 files.add(new SourceFile(name(path), Files.readString(path)));
             }
@@ -392,7 +430,7 @@ final class ScriptManager {
      * outside the scripts folder, so in test mode names can start with what that path would be
      * ({@code neoskript.testing.scriptsRoot}), as Skript's tests expect.
      */
-    private String name(Path path) {
+    String name(Path path) {
         String relative = scriptsDir.relativize(path).toString().replace('\\', '/');
         return NAME_ROOT.isEmpty() ? relative : NAME_ROOT + "/" + relative;
     }
@@ -527,15 +565,19 @@ final class ScriptManager {
     /** Loads (or reloads) one script, running its load events straight away. */
     private void reloadNow(String name) {
         try {
-            load(name, logger::error, true);
+            load(name::equals, logger::error, true);
         } catch (IOException e) {
             logger.error("Couldn't load {}", name, e);
         }
     }
 
-    /** Stops a loaded script's triggers, commands and periodic events. */
+    /** Stops a loaded script, running its unload events, and stops its triggers, commands and periodic events. */
     private void stop(String name) {
-        loaded.remove(name);
+        List<CompiledScripts.CompiledTrigger> old = loaded.remove(name);
+        if (old != null) {
+            runUnload(old);
+        }
+        sources.remove(name);
         loadedCommands.remove(name);
         List<Runnable> stops = periodic.remove(name);
         if (stops != null) {
@@ -547,6 +589,26 @@ final class ScriptManager {
         }
         events.update(loaded.values().stream().flatMap(List::stream).toList());
         commands.update(loadedCommands.values().stream().flatMap(List::stream).toList());
+    }
+
+    /**
+     * Whether a file is a script to load: an enabled script not inside a disabled ({@code -}) or hidden
+     * folder, which Skript doesn't load from either.
+     */
+    private boolean isLoadable(Path path) {
+        if (!isEnabledScript(path)) {
+            return false;
+        }
+        Path folders = scriptsDir.relativize(path).getParent();
+        if (folders != null) {
+            for (Path folder : folders) {
+                String folderName = folder.toString();
+                if (folderName.startsWith("-") || folderName.startsWith(".")) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static boolean isEnabledScript(Path path) {
