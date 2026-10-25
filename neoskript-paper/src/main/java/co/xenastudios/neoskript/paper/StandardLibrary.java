@@ -25,6 +25,7 @@ public final class StandardLibrary {
         Locations.register(registrar);
         WorldSyntax.registerEntityTypes(registrar);
         Items.register(registrar);
+        ItemComponents.register(registrar);
         WorldSyntax.registerCountedEntityTypes(registrar);
         Enchantments.register(registrar);
         Tags.register(registrar);

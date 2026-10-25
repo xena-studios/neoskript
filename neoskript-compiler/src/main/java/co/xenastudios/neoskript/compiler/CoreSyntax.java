@@ -29,6 +29,10 @@ final class CoreSyntax {
     static final String TEST = "TestCase";
     static final String EXAMPLE = "StructExample";
     static final String ASSERT = "EffAssert";
+    /** Skript's test section whose code can {@code return} values, for {@code the last return values}. */
+    static final String RETURNABLE = "SecReturnable";
+    /** Skript's test section that changes what a left-out value of a type is, for the code in it. */
+    static final String CUSTOM_DEFAULT = "SecCustomDefault";
     /** {@code assert X to fail} where X isn't a condition at all: as in Skript, that has failed as expected. */
     static final String ASSERT_UNPARSED = "EffAssertUnparsed";
     static final String PARSE_LOGS = "ExprLastParseLogs";
@@ -48,6 +52,8 @@ final class CoreSyntax {
     static final String SORT = "EffSort";
     static final String PERIODICAL = "EvtPeriodical";
     static final String PARSE = "ExprParse";
+    /** {@code X parsed as "%integer% and %text%"}: text parsed with a pattern of types, as Skript's ExprParse. */
+    static final String PARSE_PATTERN = "ExprParse-pattern";
     static final String WHETHER = "ExprWhether";
     static final String CATCH_ERRORS = "SecCatchErrors";
     /** {@code suppress unreachable code warnings}, alone or as a section: handled while parsing. */
@@ -90,8 +96,21 @@ final class CoreSyntax {
         }
     }
 
-    /** {@link #ARITHMETIC} operators, by pattern index, from the lowest precedence. */
-    static final char[] OPERATORS = {'+', '-', '*', '/', '^'};
+    /**
+     * An arithmetic operator: its sign, how tightly it binds (higher first, as Skript's priorities), and
+     * whether a chain of it groups from the right ({@code 2^3^2} is {@code 2^(3^2)}).
+     */
+    record Operator(String sign, int priority, boolean fromRight) {}
+
+    /** {@link #ARITHMETIC} operators, by pattern index. */
+    static final List<Operator> OPERATORS = List.of(new Operator("+", 10, false), new Operator("-", 10, false),
+            new Operator("*", 20, false), new Operator("/", 20, false), new Operator("^", 30, true));
+
+    /** Skript's test-only custom operators, by pattern index of {@link #CUSTOM_ARITHMETIC}. */
+    static final List<Operator> CUSTOM_OPERATORS = List.of(new Operator("bar!", 10, false),
+            new Operator("foo!1", 5, false), new Operator("foo!2", 25, false), new Operator("blob!", 10, false));
+
+    static final String CUSTOM_ARITHMETIC = "ExprArithmetic-custom";
 
     private CoreSyntax() {}
 
@@ -115,6 +134,20 @@ final class CoreSyntax {
         library.core(SyntaxKind.EFFECT, ASSERT_UNPARSED, null, List.of(RegexRole.NOT_CONDITION),
                 "assert [unsafely] <.+> to fail [with [error] %string%[, expected %objects%][, got %objects%]]");
         library.core(SyntaxKind.EXPRESSION, PARSE_LOGS, "string", List.of(), "[the] [last] parse logs");
+        library.core(SyntaxKind.SECTION, RETURNABLE, null, List.of(), "returnable [:plural] %*classinfo% section");
+        // Skript's custom test operators (CustomTestOperators), with the priorities it gives them.
+        library.core(SyntaxKind.EXPRESSION, CUSTOM_ARITHMETIC, "object", List.of(),
+                CUSTOM_OPERATORS.stream().map(op -> "%object%[ ]" + op.sign() + "[ ]%object%").toArray(String[]::new));
+        co.xenastudios.neoskript.runtime.Arithmetic.registerCustom("bar!", String.class, String.class,
+                (a, b) -> a + " bar " + b);
+        co.xenastudios.neoskript.runtime.Arithmetic.registerCustom("foo!1", Number.class, Number.class,
+                (a, b) -> (long) (a.intValue() + 2 * b.intValue()));
+        co.xenastudios.neoskript.runtime.Arithmetic.registerCustom("foo!2", Number.class, Number.class,
+                (a, b) -> (long) (a.intValue() + 2 * b.intValue()));
+        co.xenastudios.neoskript.runtime.Arithmetic.registerCustom("blob!", String.class, Number.class,
+                (a, b) -> a + (b.intValue() + 1));
+        library.core(SyntaxKind.SECTION, CUSTOM_DEFAULT, null, List.of(),
+                "run with custom default value %*object% for %*classinfo%");
 
         // Whether the trigger may have waited at this point: true, false or unknown.
         library.literalType("kleenean", "kleenean", java.util.Set.of("unknown"), word -> word);
@@ -280,6 +313,7 @@ final class CoreSyntax {
         // library's expressions, as Skript tries it after most: 'difference between {_a} and "5" parsed as a
         // number' is the difference with a parsed number.
         library.core(SyntaxKind.EXPRESSION, PARSE, "object", List.of(RegexRole.TYPE), "%text% parsed as [a[n]] <.+>");
+        library.core(SyntaxKind.EXPRESSION, PARSE_PATTERN, "object", List.of(), "%text% parsed as \"<.*>\"");
         // 'past event-block', 'event-item after the event': an event value before or after the event.
         library.core(SyntaxKind.EXPRESSION, TIME_STATE, "object", List.of(),
                 "[the] (former|past|old) [state] [of] %objects%", "%objects% before [the event]",

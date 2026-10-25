@@ -143,6 +143,14 @@ final class PersistentData {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            if ((mode == Mode.ADD || mode == Mode.REMOVE) && type != null && !list) {
+                // Added to a single value of a type by arithmetic, as in Skript: only timespans go with a date.
+                List<Class<?>> right = co.xenastudios.neoskript.runtime.Arithmetic.rightTypes(
+                        mode == Mode.ADD ? '+' : '-', type.javaClass());
+                if (!right.isEmpty()) {
+                    return right.toArray(Class<?>[]::new);
+                }
+            }
             return switch (mode) {
                 case SET, ADD, REMOVE -> new Class<?>[] {Object.class};
                 case DELETE -> new Class<?>[0];

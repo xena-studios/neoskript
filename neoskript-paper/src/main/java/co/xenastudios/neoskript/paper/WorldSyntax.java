@@ -371,8 +371,8 @@ final class WorldSyntax {
                 }
                 return shot.toArray();
             };
-        }, "shoot %entitytypes% [from %livingentities/locations%] [(at|with) (speed|velocity) %number%] [%direction%]",
-                "(make|let) %livingentities/locations% shoot %entitytypes% [(at|with) (speed|velocity) %number%] [%direction%]");
+        }, "shoot %entitytypes% [from %livingentities/locations%] [(at|with) (speed|velocity) %-number%] [%direction%]",
+                "(make|let) %livingentities/locations% shoot %entitytypes% [(at|with) (speed|velocity) %-number%] [%direction%]");
         // The shooter of a projectile, or in 'shoot a pig:', of what was shot.
         registrar.expression("ExprShooter", "livingentity", info -> new SettableProperty<>(Entity.class,
                 org.bukkit.entity.LivingEntity.class, entity -> entity instanceof org.bukkit.entity.Projectile projectile
@@ -511,7 +511,7 @@ final class WorldSyntax {
                 explicit |= then.explicit();
             }
             return new Direction(offset, explicit);
-        }, "[%number% [(block|met(er|re))[s]] [to the]] (north:north|south:south|east:east|west:west|up:above|up:over"
+        }, "[%-number% [(block|met(er|re))[s]] [to the]] (north:north|south:south|east:east|west:west|up:above|up:over"
                 + "|up:up[ward[s]]|down:down[ward[s]]|down:below|down:under[neath]|down:beneath) [of] [%direction%]");
         // Directions that depend on where something faces or is: 'left', 'forwards', 'towards {_loc}', 'along {_v}'.
         registrar.expression("ExprDirection-relative", "direction", info -> {
@@ -537,9 +537,9 @@ final class WorldSyntax {
                 };
                 return relative == null ? null : new Direction(new Vector(), pattern < 3 && args[0] instanceof Number, relative);
             };
-        }, "[%number% [(block|met(er|re))[s]]] [to the] (left|right:right)",
-                "[%number% [(block|met(er|re))[s]]] (forward[s]|in front|backward:(backward[s]|behind))",
-                "[%number% [(block|met(er|re))[s]]] (towards|away:away from) %location%",
+        }, "[%-number% [(block|met(er|re))[s]]] [to the] (left|right:right)",
+                "[%-number% [(block|met(er|re))[s]]] (forward[s]|in front|backward:(backward[s]|behind))",
+                "[%-number% [(block|met(er|re))[s]]] (towards|away:away from) %location%",
                 "along %vector%");
     }
 
@@ -562,7 +562,7 @@ final class WorldSyntax {
                     entity.setVelocity(entity.getVelocity().add(push));
                 }
             }
-        }, "(push|thrust|pull) %entities% %direction% [(at|with) (speed|velocity|force) %number%]");
+        }, "(push|thrust|pull) %entities% %direction% [(at|with) (speed|velocity|force) %-number%]");
         registrar.expression("ExprBlock-2", "block", info -> {
             int pattern = info.pattern();
             return (context, args) -> {
@@ -811,11 +811,12 @@ final class WorldSyntax {
             if (!(args[0] instanceof Vector vector) || !(args[1] instanceof World world)) {
                 return null;
             }
-            float yaw = args[2] instanceof Number n ? n.floatValue() : 0;
-            float pitch = args[3] instanceof Number n ? n.floatValue() : 0;
+            float yaw = args.length > 2 && args[2] instanceof Number n ? n.floatValue() : 0;
+            float pitch = args.length > 3 && args[3] instanceof Number n ? n.floatValue() : 0;
             return new Location(world, vector.getX(), vector.getY(), vector.getZ(), yaw, pitch);
-        }, "[the] location (from|of) %vector% (in|within|from) %world% [with yaw %number% and pitch %number%]",
-                "%vector% to location in %world% [with yaw %number% and pitch %number%]");
+        }, "%vector% to location in %world%", "location (from|of) %vector% in %world%",
+                "%vector% [to location] in %world% with yaw %number% and pitch %number%",
+                "location (from|of) %vector% in %world% with yaw %number% and pitch %number%");
         registrar.expression("ExprVectorNormalize", "vector", info -> (context, args) -> map(args[0],
                 value -> value instanceof Vector vector ? (vector.lengthSquared() == 0 ? vector.clone() : vector.clone().normalize())
                         : null),

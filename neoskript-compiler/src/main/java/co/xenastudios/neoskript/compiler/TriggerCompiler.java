@@ -150,7 +150,10 @@ final class TriggerCompiler {
         LOOP,
         WHILE,
         /** A library section's code, like {@code spawn a pig:}: run once for each value the section returns. */
-        SECTION
+        SECTION,
+        /** Code whose {@code return} gives values to the section, not the function: Skript's returnable sections. */
+        RETURNABLE,
+        RETURNABLE_PLURAL
     }
 
     /**
@@ -211,6 +214,12 @@ final class TriggerCompiler {
     private final Deque<InputFrame> inputs = new ArrayDeque<>();
     /** Expressions already worked out into a slot, as an expression section's value is before its effect runs. */
     private final Map<Expr, Integer> precomputed = new java.util.IdentityHashMap<>();
+    /** The text of the statement's argument being compiled, for errors about words in it nothing parses. */
+    private String outerArgument;
+    /** Values left-out placeholders of a type get, from Skript's custom default test sections, innermost first. */
+    private final java.util.Deque<Map.Entry<String, Expr>> customDefaults = new java.util.ArrayDeque<>();
+    /** How many lists the expression being compiled is in. */
+    private int inList;
 
     /** The types of the placeholder whose value is being compiled, which words are first tried as. */
     private List<String> literalTypes = List.of();
@@ -817,6 +826,30 @@ final class TriggerCompiler {
             case Statement.Section section when isCore(section.header(), CoreSyntax.LOOP) -> loop(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.FOR) -> forLoop(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.WHILE) -> whileLoop(section);
+            case Statement.Section section when isCore(section.header(), CoreSyntax.CUSTOM_DEFAULT) -> {
+                // Left-out values of the type are this one in the code under it, as in Skript's test section.
+                Expr value = (Expr) section.header().match().values().getFirst();
+                String type = returnableType(new ParsedSyntax(section.header().syntax(), section.header().pattern(),
+                        new co.xenastudios.neoskript.frontend.pattern.MatchResult(0, java.util.Set.of(),
+                                List.of(section.header().match().values().get(1)), List.of(), List.of(), List.of())));
+                customDefaults.push(Map.entry(type, value));
+                Label end = new Label();
+                try {
+                    block(BlockKind.CONDITIONAL, end, section.body());
+                } finally {
+                    customDefaults.pop();
+                }
+                method.visitLabel(end);
+            }
+            case Statement.Section section when isCore(section.header(), CoreSyntax.RETURNABLE) -> {
+                Label end = new Label();
+                String type = returnableType(section.header());
+                blocks.push(new Block(section.header().match().hasTag("plural") ? BlockKind.RETURNABLE_PLURAL
+                        : BlockKind.RETURNABLE, end, null, -1, -1, -1, type));
+                statements(section.body());
+                blocks.pop();
+                method.visitLabel(end);
+            }
             case Statement.Section section when isCore(section.header(), CoreSyntax.FILTER_SECTION) -> filterSection(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.CATCH_ERRORS) -> {
                 String errors = Type.getInternalName(co.xenastudios.neoskript.runtime.RuntimeErrors.class);
@@ -836,6 +869,15 @@ final class TriggerCompiler {
             case Statement.Section section when library.sectionType(section.header() == null ? null
                     : section.header().syntax().id()) != null -> librarySection(section);
             case Statement.Section section when sectionExpression(section) != null -> expressionSection(section);
+            case Statement.Section section when section.header() == null && section.call() != null
+                    && callSectionExpression(section.call()) != null -> {
+                // 'f(a worldborder):': the argument's section runs for its value, then the function is called.
+                Expr.Syntax made = callSectionExpression(section.call());
+                expressionSection(section, made, () -> {
+                    call(section.call());
+                    method.visitInsn(POP);
+                });
+            }
             case Statement.Section section -> throw unsupported("sections like '" + section.line().key() + "'");
             case Statement.Conditions conditions -> throw unsupported("'" + conditions.line().key() + "' here");
             case Statement.Parse parse -> {
@@ -1143,6 +1185,21 @@ final class TriggerCompiler {
             deferredSection(section, made);
             return;
         }
+        expressionSection(section, made, () -> effect(section.header()));
+    }
+
+    /** The argument of a function call that takes the section under it, or {@code null}. */
+    private Expr.Syntax callSectionExpression(Expr.FunctionCall call) {
+        for (Expr argument : call.arguments()) {
+            if (argument instanceof Expr.Syntax syntax && library.sectionExpressionType(syntax.syntax().syntax().id()) != null) {
+                return syntax;
+            }
+        }
+        return null;
+    }
+
+    /** The section of expression {@code made} runs for each of its values, then {@code then} uses them. */
+    private void expressionSection(Statement.Section section, Expr.Syntax made, Body then) throws CompileException {
         int valuesSlot = nextSlot++;
         int indexSlot = nextSlot++;
         expression(made);
@@ -1169,7 +1226,7 @@ final class TriggerCompiler {
         lineOf(section, section.line().key());
         precomputed.put(made, valuesSlot);
         try {
-            effect(section.header());
+            then.emit();
         } finally {
             precomputed.remove(made);
         }
@@ -1208,6 +1265,61 @@ final class TriggerCompiler {
         } finally {
             precomputed.remove(made);
         }
+    }
+
+    /** The type a returnable section returns: {@code string} in {@code returnable string section}. */
+    private String returnableType(ParsedSyntax header) throws CompileException {
+        Object written = header.match().values().getFirst();
+        String text = switch (written) {
+            case Expr.Literal literal -> literal.text();
+            case Expr.Unresolved unresolved -> unresolved.text();
+            case null, default -> null;
+        };
+        TypeRef ref = text == null ? null : registry.resolveType(text.strip());
+        if (ref == null) {
+            throw unsupported("'" + header.match() + "'");
+        }
+        return ref.type().id();
+    }
+
+    /** The innermost returnable section {@code return} gives its values to, or {@code null} for the function's. */
+    private Block returnHandler() {
+        for (Block block : blocks) {
+            if (block.kind() == BlockKind.RETURNABLE || block.kind() == BlockKind.RETURNABLE_PLURAL) {
+                return block;
+            }
+        }
+        return null;
+    }
+
+    /** {@code return X} in a returnable section: checked as Skript checks it, kept, and the section left. */
+    private void returnFromSection(Block handler, Expr returned) throws CompileException {
+        boolean plural = handler.kind() == BlockKind.RETURNABLE_PLURAL;
+        co.xenastudios.neoskript.frontend.registry.TypeInfo type = registry.type(handler.valueType());
+        String name = type == null ? handler.valueType() : type.name().toLowerCase(java.util.Locale.ROOT);
+        String section = "returnable " + (plural ? "plural " : "") + name + " section";
+        String text = returned.end() <= source.length() ? source.substring(returned.start(), returned.end()).strip() : "";
+        if (returned.type() != null && !returned.type().equals(SyntaxRegistry.OBJECT)
+                && !registry.isAssignable(returned.type(), handler.valueType())) {
+            throw new CompileException(line, section + " is declared to return " + article(name) + " " + name + ", but "
+                    + text + " is not of that type.");
+        }
+        if (!plural && co.xenastudios.neoskript.frontend.parse.Plurality.plural(returned, registry)) {
+            throw new CompileException(line, section + " is defined to only return a single " + name
+                    + ", but this return statement can return multiple values.");
+        }
+        expression(returned);
+        Class<?> target = library.javaClass(handler.valueType());
+        if (target == Long.class) {
+            // As Skript's number to integer converter: 2.5 is 2.
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "wholeNumbers", "(" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+        } else if (target != null && Values.convertsTo(target)) {
+            constant(target, Class.class);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "convert", "(" + OBJECT_DESC + "Ljava/lang/Class;)" + OBJECT_DESC, false);
+        }
+        convert(plural);
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "returned", "(" + OBJECT_DESC + ")V", false);
+        method.visitJumpInsn(GOTO, handler.end());
     }
 
     /** The innermost section whose value a left-out placeholder of these types takes, or {@code null}. */
@@ -1295,6 +1407,11 @@ final class TriggerCompiler {
                 method.visitJumpInsn(GOTO, loop.next());
             }
             case CoreSyntax.RETURN -> {
+                Block handler = returnHandler();
+                if (handler != null) {
+                    returnFromSection(handler, (Expr) effect.match().values().getFirst());
+                    return;
+                }
                 if (function == null || function.returnType() == null) {
                     throw new CompileException(line, function == null
                             ? "'return' can only be used in a function"
@@ -1523,6 +1640,15 @@ final class TriggerCompiler {
     }
 
     private void change(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Object target) throws CompileException {
+        if (mode == CoreSyntax.ChangeMode.SET && target instanceof Expr.Variable variable && variable.list()) {
+            // 'set {_x::*} to "1, 2" parsed as "%integers%"': each placeholder's values stay a sublist, as in Skript.
+            Object changer = effect.match().values().get(mode.value);
+            for (Object each : changer instanceof Expr.ListOf list ? list.items() : List.of(changer)) {
+                if (each instanceof Expr.Syntax parse && isCore(parse.syntax(), CoreSyntax.PARSE_PATTERN)) {
+                    groupedParses.add(parse);
+                }
+            }
+        }
         if (mode == CoreSyntax.ChangeMode.SET && target instanceof Expr.Syntax whether
                 && isCore(whether.syntax(), CoreSyntax.WHETHER)) {
             setCondition(effect, whether);
@@ -1569,7 +1695,8 @@ final class TriggerCompiler {
                     method.visitMethodInsn(INVOKEVIRTUAL, STORE, "removeFromList", "(" + STRING_DESC + OBJECTS + "Z)V",
                             false);
                 } else {
-                    method.visitMethodInsn(INVOKEVIRTUAL, STORE, "subtract", nameValues, false);
+                    method.visitMethodInsn(INVOKEVIRTUAL, STORE,
+                            mode == CoreSyntax.ChangeMode.REMOVE_ALL ? "subtractAll" : "subtract", nameValues, false);
                 }
             }
             case DELETE -> {
@@ -1757,6 +1884,9 @@ final class TriggerCompiler {
                 case RESET -> " can't be reset";
             });
         }
+        if (mode.value >= 0) {
+            checkChanger((Expr) effect.match().values().get(mode.value), accepted, changeMode, target);
+        }
         constant(element, Changeable.class);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(syntax);
@@ -1780,9 +1910,164 @@ final class TriggerCompiler {
                 "(" + CONTEXT + OBJECTS + OBJECTS + Type.getDescriptor(Changeable.Mode.class) + ")V", true);
     }
 
+    /**
+     * Fails as Skript's change effect does when what's given is known to be of a type the target can't take:
+     * {@code "hello" can't be added to date data tag "date" of {_item} because the former is not a time span}.
+     * Values whose type is only known when it runs (variables, unresolved words) are let through, as are
+     * targets that take anything.
+     */
+    private void checkChanger(Expr changer, Class<?>[] accepted, Changeable.Mode mode, Expr target)
+            throws CompileException {
+        if (accepted.length == 0 || java.util.Arrays.asList(accepted).contains(Object.class)) {
+            return;
+        }
+        List<String> acceptedTypes = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        for (Class<?> type : accepted) {
+            List<String> ids = library.typesOf(new Class<?>[] {type});
+            if (ids.isEmpty()) {
+                // A class scripts have no type for: nothing to tell the user, so nothing to check.
+                return;
+            }
+            acceptedTypes.addAll(ids);
+            // Named as the type that is that class, or else the first one under it.
+            String named = ids.stream().filter(id -> library.javaClass(id) == type).findFirst().orElse(ids.getFirst());
+            TypeRef ref = registry.resolveType(named);
+            names.add(ref == null ? named : ref.type().name());
+        }
+        if (changerFits(changer, acceptedTypes)) {
+            return;
+        }
+        StringBuilder not = new StringBuilder("is ");
+        if (names.size() == 1) {
+            not.append("not ").append(article(names.getFirst())).append(' ').append(names.getFirst());
+        } else {
+            not.append("neither ");
+            for (int i = 0; i < names.size(); i++) {
+                if (i > 0) {
+                    not.append(i == names.size() - 1 ? " nor " : ", ");
+                }
+                not.append(article(names.get(i))).append(' ').append(names.get(i));
+            }
+        }
+        String what = describe(target);
+        String given = describe(changer);
+        throw new CompileException(line, switch (mode) {
+            case ADD -> given + " can't be added to " + what + " because the former " + not;
+            case SET -> what + " can't be set to " + given + " because the latter " + not;
+            default -> given + " can't be removed from " + what + " because the former " + not;
+        });
+    }
+
+    /** Whether {@code changer} could give values of one of {@code types}, as far as is known before it runs. */
+    private boolean changerFits(Expr changer, List<String> types) {
+        if (changer instanceof Expr.ListOf list) {
+            for (Expr item : list.items()) {
+                if (!changerFits(item, types)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (!(changer instanceof Expr.Text || changer instanceof Expr.Literal || changer instanceof Expr.Syntax)) {
+            return true;
+        }
+        String type = changer.type();
+        if (type == null || type.equals(SyntaxRegistry.OBJECT)) {
+            return true;
+        }
+        for (String wanted : types) {
+            // Its type, one it converts to, or one under it, which it might be when it runs.
+            if (registry.isAssignable(type, wanted) || registry.isSubtype(wanted, type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * An expression as Skript's errors write it: its text, with variables saying what they hold when testing,
+     * as Skript's debug text does.
+     */
+    private String describe(Expr expr) {
+        String text = source.substring(expr.start(), expr.end());
+        if (!library.testing()) {
+            return text;
+        }
+        List<Integer> ends = new ArrayList<>();
+        variableEnds(expr, ends);
+        StringBuilder described = new StringBuilder(text);
+        ends.sort(java.util.Comparator.reverseOrder());
+        for (int end : ends) {
+            described.insert(end - expr.start(), " (as java.lang.Object)");
+        }
+        return described.toString();
+    }
+
+    private static void variableEnds(Object value, List<Integer> ends) {
+        switch (value) {
+            case Expr.Variable variable -> ends.add(variable.end());
+            case Expr.ListOf list -> list.items().forEach(item -> variableEnds(item, ends));
+            case Expr.FunctionCall call -> call.arguments().forEach(argument -> variableEnds(argument, ends));
+            case Expr.Syntax syntax -> syntax.syntax().match().values().forEach(inner -> variableEnds(inner, ends));
+            case null, default -> { }
+        }
+    }
+
     // ---------------------------------------------------------------- elements
 
     private void condition(ParsedSyntax condition) throws CompileException {
+        List<Object> values = condition.match().values();
+        if (!values.isEmpty() && values.getFirst() instanceof Expr.ListOf list && list.items().size() > 1
+                && ITEM_CONDITIONS.contains(baseId(condition.syntax().id()))) {
+            // A list of what's checked is checked item by item, as Skript's expression lists are: '"" or {_x} is
+            // not empty' holds if either item isn't, and 'X and Y are not set' if neither is.
+            Label decided = new Label();
+            Label end = new Label();
+            for (Expr item : list.items()) {
+                List<Object> one = new ArrayList<>(values);
+                one.set(0, item);
+                co.xenastudios.neoskript.frontend.pattern.MatchResult match = condition.match();
+                checkOne(new ParsedSyntax(condition.syntax(), condition.pattern(),
+                        new co.xenastudios.neoskript.frontend.pattern.MatchResult(match.mark(), match.tags(), one, match.spans(), match.regexValues(), match.regexSpans())));
+                method.visitJumpInsn(list.and() ? IFEQ : IFNE, decided);
+            }
+            method.visitInsn(list.and() ? ICONST_1 : ICONST_0);
+            method.visitJumpInsn(GOTO, end);
+            method.visitLabel(decided);
+            method.visitInsn(list.and() ? ICONST_0 : ICONST_1);
+            method.visitLabel(end);
+            return;
+        }
+        checkOne(condition);
+    }
+
+    /** Conditions that check a list of what they're about item by item, as Skript's property conditions do. */
+    private static final java.util.Set<String> ITEM_CONDITIONS = loadIds("item-conditions.txt");
+
+    private static java.util.Set<String> loadIds(String resource) {
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        try (java.io.InputStream in = TriggerCompiler.class.getResourceAsStream(resource)) {
+            if (in != null) {
+                for (String line : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).split("\n")) {
+                    if (!line.isBlank() && !line.startsWith("#")) {
+                        ids.add(line.strip());
+                    }
+                }
+            }
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        return java.util.Set.copyOf(ids);
+    }
+
+    /** An element's id without the suffix that tells its registrations apart ({@code ExprSets-itemtypes}). */
+    private static String baseId(String id) {
+        int dash = id.indexOf('-');
+        return dash < 0 ? id : id.substring(0, dash);
+    }
+
+    private void checkOne(ParsedSyntax condition) throws CompileException {
         callThrough(condition, Condition.class);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Condition.class), "check",
                 "(" + CONTEXT + OBJECTS + ")Z", true);
@@ -1923,7 +2208,25 @@ final class TriggerCompiler {
                     method.visitInsn(AASTORE);
                     continue;
                 }
+                Expr custom = customDefault(specs[i]);
+                if (custom != null) {
+                    method.visitInsn(DUP);
+                    pushInt(i);
+                    expression(custom);
+                    convert(isPlural(specs[i]));
+                    method.visitInsn(AASTORE);
+                    continue;
+                }
                 java.util.function.Function<Object, Object> fallback = eventDefault(specs[i]);
+                Object literalDefault = fallback == null ? literalDefault(specs[i]) : null;
+                if (literalDefault != null) {
+                    method.visitInsn(DUP);
+                    pushInt(i);
+                    constant(literalDefault, Object.class);
+                    convert(isPlural(specs[i]));
+                    method.visitInsn(AASTORE);
+                    continue;
+                }
                 if (fallback != null) {
                     method.visitInsn(DUP);
                     pushInt(i);
@@ -2019,6 +2322,31 @@ final class TriggerCompiler {
             }
         }
         return null;
+    }
+
+    /** A custom default value for the placeholder's type, from a section around this code, or {@code null}. */
+    private Expr customDefault(PlaceholderSpec spec) {
+        if (spec.nullable() || customDefaults.isEmpty()) {
+            return null;
+        }
+        for (Map.Entry<String, Expr> custom : customDefaults) {
+            for (String name : spec.types()) {
+                TypeRef ref = registry.resolveType(name);
+                if (ref != null && ref.type().id().equals(custom.getKey())) {
+                    return custom.getValue();
+                }
+            }
+        }
+        return null;
+    }
+
+    /** The literal a left-out placeholder of its type is, as Skript's default expressions (a number is 1). */
+    private Object literalDefault(PlaceholderSpec spec) {
+        if (spec.nullable() || spec.types().size() != 1) {
+            return null;
+        }
+        TypeRef ref = registry.resolveType(spec.types().getFirst());
+        return ref == null ? null : library.defaultValue(ref.type().id());
     }
 
     /**
@@ -2574,17 +2902,37 @@ final class TriggerCompiler {
             method.visitVarInsn(ALOAD, worked);
             return;
         }
+        if (outerArgument == null && source != null && expr.start() >= 0 && expr.end() <= source.length()
+                && expr.start() < expr.end()) {
+            // The outermost expression: errors about words in it nothing parses name all of it, as Skript's do.
+            outerArgument = source.substring(expr.start(), expr.end()).strip();
+            try {
+                compileExpression(expr);
+            } finally {
+                outerArgument = null;
+            }
+            return;
+        }
+        compileExpression(expr);
+    }
+
+    private void compileExpression(Expr expr) throws CompileException {
         switch (expr) {
             case Expr.Literal literal -> literal(literal);
             case Expr.Text text -> text(text.start(), text.end(), text.embedded());
             case Expr.ListOf list -> {
                 pushInt(list.items().size());
                 method.visitTypeInsn(ANEWARRAY, OBJECT);
-                for (int i = 0; i < list.items().size(); i++) {
-                    method.visitInsn(DUP);
-                    pushInt(i);
-                    expression(list.items().get(i));
-                    method.visitInsn(AASTORE);
+                inList++;
+                try {
+                    for (int i = 0; i < list.items().size(); i++) {
+                        method.visitInsn(DUP);
+                        pushInt(i);
+                        expression(list.items().get(i));
+                        method.visitInsn(AASTORE);
+                    }
+                } finally {
+                    inList--;
                 }
                 method.visitMethodInsn(INVOKESTATIC, VALUES, "list", "(" + OBJECTS + ")" + OBJECTS, false);
             }
@@ -2598,7 +2946,7 @@ final class TriggerCompiler {
                 }
             }
             case Expr.FunctionCall call -> call(call);
-            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARITHMETIC) -> arithmetic(syntax);
+            case Expr.Syntax syntax when isArithmetic(syntax) -> arithmetic(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.LOOP_VALUE) -> loopValue(syntax.syntax());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE)
                     || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY)
@@ -2646,6 +2994,7 @@ final class TriggerCompiler {
                 condition(condition);
                 method.visitMethodInsn(INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;", false);
             }
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.PARSE_PATTERN) -> parsePattern(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.PARSE) -> {
                 if (!(syntax.syntax().match().regexValues().getFirst() instanceof TypeRef ref)) {
                     throw unsupported("'" + source.substring(syntax.start(), syntax.end()) + "'");
@@ -2767,6 +3116,11 @@ final class TriggerCompiler {
                 }
                 if (value == null) {
                     value = library.literal(unresolved.text());
+                }
+                if (value == null && inList > 0 && outerArgument != null && !outerArgument.contains("event-")) {
+                    // Words nothing parses in a list: Skript reports the whole argument they're in. (An event value
+                    // NeoSkript doesn't have yet is something it can't run, not a mistake.)
+                    throw new CompileException(line, "Can't understand this expression: '" + outerArgument + "'");
                 }
                 if (value == null) {
                     throw unsupported("'" + unresolved.text() + "'");
@@ -2974,13 +3328,18 @@ final class TriggerCompiler {
      */
     private void arithmetic(Expr.Syntax syntax) throws CompileException {
         List<Expr> operands = new ArrayList<>();
-        List<Character> operators = new ArrayList<>();
+        List<CoreSyntax.Operator> operators = new ArrayList<>();
         flatten(syntax, operands, operators);
         emitArithmetic(operands, operators, 0, operands.size() - 1);
     }
 
-    private void flatten(Expr expr, List<Expr> operands, List<Character> operators) {
-        if (expr instanceof Expr.Syntax syntax && isCore(syntax.syntax(), CoreSyntax.ARITHMETIC)) {
+    private boolean isArithmetic(Expr expr) {
+        return expr instanceof Expr.Syntax syntax && (isCore(syntax.syntax(), CoreSyntax.ARITHMETIC)
+                || isCore(syntax.syntax(), CoreSyntax.CUSTOM_ARITHMETIC));
+    }
+
+    private void flatten(Expr expr, List<Expr> operands, List<CoreSyntax.Operator> operators) {
+        if (expr instanceof Expr.Syntax syntax && isArithmetic(syntax)) {
             ParsedSyntax parsed = syntax.syntax();
             for (int side = 0; side < 2; side++) {
                 Expr operand = (Expr) parsed.match().values().get(side);
@@ -2993,7 +3352,8 @@ final class TriggerCompiler {
                     flatten(operand, operands, operators);
                 }
                 if (side == 0) {
-                    operators.add(CoreSyntax.OPERATORS[parsed.pattern()]);
+                    operators.add((isCore(parsed, CoreSyntax.ARITHMETIC) ? CoreSyntax.OPERATORS : CoreSyntax.CUSTOM_OPERATORS)
+                            .get(parsed.pattern()));
                 }
             }
             return;
@@ -3002,35 +3362,126 @@ final class TriggerCompiler {
     }
 
     /** Emits operands {@code [from, to]} with the operators between them, by precedence. */
-    private void emitArithmetic(List<Expr> operands, List<Character> operators, int from, int to)
+    private void emitArithmetic(List<Expr> operands, List<CoreSyntax.Operator> operators, int from, int to)
             throws CompileException {
         if (from == to) {
             expression(operands.get(from));
             return;
         }
-        // Split at the operator that binds loosest: the last + or -, else the last * or /, else the first ^.
-        int split = -1;
-        for (String group : new String[] {"+-", "*/"}) {
-            for (int i = to - 1; i >= from && split < 0; i--) {
-                if (group.indexOf(operators.get(i)) >= 0) {
-                    split = i;
-                }
-            }
+        // Split at the operator that binds loosest: its last one, or its first if it groups from the right.
+        int loosest = Integer.MAX_VALUE;
+        for (int i = from; i < to; i++) {
+            loosest = Math.min(loosest, operators.get(i).priority());
         }
-        if (split < 0) {
-            split = from;
+        int split = -1;
+        for (int i = from; i < to; i++) {
+            CoreSyntax.Operator operator = operators.get(i);
+            if (operator.priority() == loosest && (split < 0 || !operator.fromRight())) {
+                split = i;
+            }
         }
         emitArithmetic(operands, operators, from, split);
         emitArithmetic(operands, operators, split + 1, to);
-        String operation = switch (operators.get(split)) {
-            case '+' -> "add";
-            case '-' -> "subtract";
-            case '*' -> "multiply";
-            case '/' -> "divide";
-            default -> "power";
+        String operation = switch (operators.get(split).sign()) {
+            case "+" -> "add";
+            case "-" -> "subtract";
+            case "*" -> "multiply";
+            case "/" -> "divide";
+            case "^" -> "power";
+            default -> null;
         };
+        if (operation == null) {
+            method.visitLdcInsn(operators.get(split).sign());
+            method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Arithmetic.class), "custom",
+                    "(" + OBJECT_DESC + OBJECT_DESC + STRING_DESC + ")" + OBJECT_DESC, false);
+            return;
+        }
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Arithmetic.class), operation,
                 "(" + OBJECT_DESC + OBJECT_DESC + ")" + OBJECT_DESC, false);
+    }
+
+    /** {@code X parsed as "pattern"} that are set into a list variable: their values stay grouped by placeholder. */
+    private final java.util.Set<Expr> groupedParses = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
+    /**
+     * {@code X parsed as "%integer%, %text%"}: the text matched against the pattern, its placeholders parsed
+     * as their types (a plural one as a list). Its values come one after another, or grouped by placeholder
+     * when set into a list variable, as Skript's ExprParse does.
+     */
+    private void parsePattern(Expr.Syntax syntax) throws CompileException {
+        Object regex = syntax.syntax().match().regexValues().getFirst();
+        String text = regex instanceof java.util.regex.MatchResult match ? match.group() : String.valueOf(regex);
+        co.xenastudios.neoskript.frontend.pattern.CompiledPattern pattern;
+        try {
+            pattern = co.xenastudios.neoskript.frontend.pattern.PatternCompiler.compile(text);
+        } catch (RuntimeException e) {
+            throw new CompileException(line, "Malformed pattern: " + e.getMessage());
+        }
+        PlaceholderSpec[] specs = placeholderSpecs(pattern);
+        for (PlaceholderSpec spec : specs) {
+            for (String type : spec.types()) {
+                TypeRef ref = registry.resolveType(type);
+                if (ref == null || library.parser(ref.type().id()) == null) {
+                    String name = ref == null ? type : ref.type().name();
+                    throw new CompileException(line, "Text cannot be parsed as " + article(name) + " " + name);
+                }
+            }
+        }
+        boolean grouped = groupedParses.contains(syntax);
+        SyntaxRegistry types = registry;
+        Library parsers = library;
+        java.util.function.Function<String, Object> parse = input -> {
+            co.xenastudios.neoskript.frontend.pattern.MatchResult match = pattern.match(input, (in, start, end, spec) ->
+                    parsePlaceholder(in.substring(start, end), spec, types, parsers));
+            if (match == null) {
+                return null;
+            }
+            List<Object> values = new ArrayList<>();
+            for (Object value : match.values()) {
+                if (value == null) {
+                    continue;
+                }
+                if (!grouped && value instanceof Object[] many) {
+                    values.addAll(java.util.Arrays.asList(many));
+                } else {
+                    values.add(value);
+                }
+            }
+            return values.toArray();
+        };
+        constant(parse, java.util.function.Function.class);
+        expression((Expr) syntax.syntax().match().values().getFirst());
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "parse",
+                "(Ljava/util/function/Function;" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+    }
+
+    /** A placeholder's text parsed as one of its types, a plural one as a list ({@code 1, 2 and 3}). */
+    private static Object parsePlaceholder(String text, PlaceholderSpec spec, SyntaxRegistry types, Library parsers) {
+        for (String type : spec.types()) {
+            TypeRef ref = types.resolveType(type);
+            java.util.function.Function<String, ?> parser = ref == null ? null : parsers.parser(ref.type().id());
+            if (parser == null) {
+                continue;
+            }
+            if (!ref.plural()) {
+                Object value = parser.apply(text.strip());
+                if (value != null) {
+                    return value;
+                }
+                continue;
+            }
+            String[] pieces = text.split("\\s*,\\s*(?:(?:and|or|n?or)\\s+)?|\\s+(?:and|n?or)\\s+");
+            Object[] values = new Object[pieces.length];
+            boolean all = true;
+            for (int i = 0; i < pieces.length && all; i++) {
+                values[i] = parser.apply(pieces[i].strip());
+                all = values[i] != null;
+            }
+            if (all) {
+                return values;
+            }
+        }
+        return null;
     }
 
     // ---------------------------------------------------------------- functions

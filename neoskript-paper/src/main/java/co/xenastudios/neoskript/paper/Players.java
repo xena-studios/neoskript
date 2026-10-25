@@ -212,8 +212,8 @@ final class Players {
                     }
                 }
             };
-        }, "damage %livingentities/itemtypes% by %number% [heart[s]]", "heal %livingentities% [by %number% [heart[s]]]",
-                "repair %itemtypes% [by %number%]");
+        }, "damage %livingentities/itemtypes% by %number% [heart[s]]", "heal %livingentities% [by %-number% [heart[s]]]",
+                "repair %itemtypes% [by %-number%]");
         registrar.effect("EffDamage", info -> (context, args) -> {
             if (!(args[0] instanceof LivingEntity attacker) || !(args[2] instanceof Number amount)) {
                 return;
@@ -324,7 +324,7 @@ final class Players {
                     }
                 }
             }
-        }, "play sound[s] %texts% [(at|with) volume %number%] [(and|at|with) pitch %number%] [(to|for) %-players%] "
+        }, "play sound[s] %texts% [(at|with) volume %-number%] [(and|at|with) pitch %-number%] [(to|for) %-players%] "
                 + "[(at|on|from) %locations/entities%]");
     }
 

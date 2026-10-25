@@ -21,11 +21,18 @@ public sealed interface Statement {
     /** A function called as an effect: {@code heal_all()}. */
     record Call(Line line, Expr.FunctionCall call) implements Statement {}
 
-    /** A section like {@code if ...:} or {@code loop ...:} and the statements in it. */
-    record Section(Line line, ParsedSyntax header, List<Statement> body) implements Statement {
+    /**
+     * A section like {@code if ...:} or {@code loop ...:} and the statements in it; or, with no header, a
+     * function call whose argument takes the section ({@code f(a worldborder):}).
+     */
+    record Section(Line line, ParsedSyntax header, List<Statement> body, Expr.FunctionCall call) implements Statement {
 
         public Section {
             body = List.copyOf(body);
+        }
+
+        public Section(Line line, ParsedSyntax header, List<Statement> body) {
+            this(line, header, body, null);
         }
     }
 

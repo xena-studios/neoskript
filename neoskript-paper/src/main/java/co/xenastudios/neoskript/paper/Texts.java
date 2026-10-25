@@ -120,7 +120,7 @@ final class Texts {
                 }
             };
         }, "[the] (part|sub[ ](text|string)) of %texts% (between|from) [ind(ex|ices)|character[s]] %number% (and|to) [(index|character)] %number%",
-                "[the] (first|last:last) [%number%] character[s] of %texts%",
+                "[the] (first|last:last) [%-number%] character[s] of %texts%",
                 "[the] %number% (first|last:last) characters of %texts%",
                 "[the] character[s] at [(index|position|indexes|indices|positions)] %numbers% (in|of) %texts%");
 
@@ -324,7 +324,7 @@ final class Texts {
                 }
                 return picked.length == 1 ? picked[0] : picked;
             };
-        }, "[a|count:%integer%] random [alphanumeric:alphanumeric] character[s] (from|between) %text% (to|and) %text%");
+        }, "[a|count:%-integer%] random [alphanumeric:alphanumeric] character[s] (from|between) %text% (to|and) %text%");
         registrar.expression("ExprStringCase", "string", info -> {
             String style = info.tags().stream().filter(tag -> tag.startsWith("s_")).findFirst().orElse("s_upper");
             boolean strict = info.hasTag("strict");

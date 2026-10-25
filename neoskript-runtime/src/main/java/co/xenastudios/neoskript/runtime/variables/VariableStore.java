@@ -211,6 +211,19 @@ public final class VariableStore {
     }
 
     /** Subtracts {@code values} from the number in {@code {name}}. */
+    /**
+     * {@code remove all X from {name}}: all of them out of the value with its class's changer ('remove all
+     * diamonds from {_inventory}'), or else as {@link #subtract}.
+     */
+    public void subtractAll(String name, Object[] values) {
+        Object current = get(name);
+        if (current != null && Values.changeValue(current, values, Changeable.Mode.REMOVE_ALL)) {
+            changed();
+            return;
+        }
+        subtract(name, values);
+    }
+
     public void subtract(String name, Object[] values) {
         Object current = get(name);
         if (current != null && Values.changeValue(current, values, Changeable.Mode.REMOVE)) {
@@ -306,7 +319,16 @@ public final class VariableStore {
         Node node = create(prefix);
         int index = 1;
         for (Object value : values) {
-            if (value != null) {
+            if (value instanceof Object[] group) {
+                // Several values in one place are a list there, as Skript sets {x::1::1}, {x::1::2}...
+                Node sublist = node.children().computeIfAbsent(Integer.toString(index++), k -> new Node());
+                int inner = 1;
+                for (Object each : group) {
+                    if (each != null) {
+                        sublist.children().computeIfAbsent(Integer.toString(inner++), k -> new Node()).value.set(Values.copy(each));
+                    }
+                }
+            } else if (value != null) {
                 node.children().computeIfAbsent(Integer.toString(index++), k -> new Node()).value.set(Values.copy(value));
             }
         }

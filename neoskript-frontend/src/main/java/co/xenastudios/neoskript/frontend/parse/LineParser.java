@@ -198,6 +198,11 @@ final class LineParser {
                     && !(parsed.match().regexValues().getFirst() instanceof TypeRef ref && registry.isEnumerable(ref.type().id()))) {
                 continue;
             }
+            // Filtering one value isn't filtering, as Skript's filter refuses: '"1" parsed as "%integer%" where [...]'.
+            if (syntax.id().equals("ExprFilter") && parsed.match().values().getFirst() instanceof Expr filtered
+                    && Plurality.single(filtered, registry)) {
+                continue;
+            }
             Object result = parsed;
             if (expected != null) {
                 String type = returnType(parsed);
@@ -656,7 +661,7 @@ final class LineParser {
         TypeInfo type = ref.type();
         // Open types check the words with the type's own parser: 'size of all chickens (entity type)' isn't one.
         boolean valid = type.literals().contains(value) || ((type.openLiterals() || type.literals().isEmpty())
-                && Literals.isWords(value) && registry.mightBeLiteral(type, value));
+                && Literals.isWords(value) && registry.mightBeLiteral(type, value)) || registry.parses(type, value);
         return valid ? new Expr.Literal(start, end, type.id(), text) : null;
     }
 
@@ -860,6 +865,21 @@ final class LineParser {
             if (argument instanceof Expr.ListOf list && list.items().stream().anyMatch(Expr.ListOf.class::isInstance)) {
                 // A list of lists isn't an argument: 'f(ns: (1, (2, 3)))'.
                 return null;
+            }
+            if (!parameter.plural() && Plurality.plural(argument, registry) && ref != null) {
+                // Read as one value where that's what the parameter takes: 'axolotl' is the entity type there.
+                Expr one = expression(valueStart, piece[1], context.expected(new TypeRef(ref.type(), false)));
+                if (one != null) {
+                    argument = one;
+                }
+            }
+            if (!parameter.plural() && Plurality.plural(argument, registry)) {
+                // Several values for a parameter that takes one, as Skript checks when it parses the call.
+                String expectedName = ref == null ? parameter.type() : ref.type().name().toLowerCase(java.util.Locale.ROOT);
+                TypeInfo given = argument.type() == null ? null : registry.type(argument.type());
+                String givenName = given == null ? "objects" : SyntaxRegistry.plural(given.name().toLowerCase(java.util.Locale.ROOT));
+                return "Expected type " + expectedName + " for argument '" + parameter.name() + "', but "
+                        + input.substring(valueStart, piece[1]).strip() + " is of type " + givenName + ".";
             }
             byParameter[index] = argument;
             next = index + 1;

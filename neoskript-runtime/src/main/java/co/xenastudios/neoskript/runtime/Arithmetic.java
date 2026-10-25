@@ -79,9 +79,55 @@ public final class Arithmetic {
         OPERATIONS.add(new Operation(operator, left, right, (java.util.function.BiFunction<Object, Object, Object>) apply));
     }
 
+    private record CustomOperation(String sign, Class<?> left, Class<?> right,
+            java.util.function.BiFunction<Object, Object, Object> apply) {}
+
+    private static final java.util.List<CustomOperation> CUSTOM = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Registers an operator written as a word or sign of its own, as Skript's arithmetic lets addons add. */
+    @SuppressWarnings("unchecked")
+    public static <A, B> void registerCustom(String sign, Class<A> left, Class<B> right,
+            java.util.function.BiFunction<? super A, ? super B, ?> apply) {
+        CUSTOM.add(new CustomOperation(sign, left, right, (java.util.function.BiFunction<Object, Object, Object>) apply));
+    }
+
+    /** {@code a <sign> b} for a custom operator, or {@code null} if it doesn't apply to them. */
+    public static Object custom(Object a, Object b, String sign) {
+        if (a == null || b == null) {
+            return null;
+        }
+        for (CustomOperation operation : CUSTOM) {
+            if (operation.sign().equals(sign) && operation.left().isInstance(a) && operation.right().isInstance(b)) {
+                return operation.apply().apply(a, b);
+            }
+        }
+        return null;
+    }
+
     /** What a missing operand counts as next to a value of {@code type}, as 0 does for numbers. */
     public static <T> void registerDefault(Class<T> type, java.util.function.Supplier<? extends T> value) {
         DEFAULTS.put(type, value);
+    }
+
+    /**
+     * What can go on the right of {@code operator} with a value of {@code left} on its left, as Skript's
+     * arithmetic change types are: numbers for numbers, texts added to texts, timespans for dates.
+     */
+    public static java.util.List<Class<?>> rightTypes(char operator, Class<?> left) {
+        java.util.List<Class<?>> types = new java.util.ArrayList<>();
+        if (Number.class.isAssignableFrom(left) && (operator == '+' || operator == '-')) {
+            types.add(Number.class);
+        }
+        if (left == String.class && operator == '+') {
+            types.add(String.class);
+        }
+        for (Operation operation : OPERATIONS) {
+            if (operation.operator() == operator && operation.left().isAssignableFrom(left)
+                    && !types.contains(operation.right())) {
+                types.add(operation.right());
+            }
+        }
+        return types;
     }
 
     /** A registered operation's result, or {@code null} if none applies. */

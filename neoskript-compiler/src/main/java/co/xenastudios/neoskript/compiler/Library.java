@@ -85,10 +85,11 @@ public final class Library implements Registrar {
     private final Map<String, java.util.function.Function<String, ?>> parsers = new HashMap<>();
     private final Map<String, java.util.function.Function<String, ?>> literalParsers = new java.util.LinkedHashMap<>();
     private SyntaxRegistry registry;
+    private boolean testing;
 
     public Library() {
         type(SyntaxRegistry.OBJECT, "object", Object.class);
-        type("timespan", "timespan", Timespan.class);
+        type("timespan", "time span", Timespan.class);
         parser("timespan", Timespan::parse);
         type("date", "date", co.xenastudios.neoskript.runtime.Date.class);
         type("time", "time", co.xenastudios.neoskript.runtime.TimeOfDay.class);
@@ -319,6 +320,7 @@ public final class Library implements Registrar {
         }
         parsers.put(typeId, parser);
         co.xenastudios.neoskript.runtime.Parsers.register(typeId, parser);
+        builder.parses(typeId, words -> parser.apply(words) != null);
     }
 
     @Override
@@ -363,6 +365,19 @@ public final class Library implements Registrar {
     public void eventDefault(String typeId) {
         checkOpen();
         eventDefaults.add(typeId);
+    }
+
+    private final Map<String, Object> defaultValues = new HashMap<>();
+
+    @Override
+    public void defaultValue(String typeId, Object value) {
+        checkOpen();
+        defaultValues.put(typeId, value);
+    }
+
+    /** The value a left-out placeholder of {@code typeId} gets when nothing else gives one, or {@code null}. */
+    Object defaultValue(String typeId) {
+        return defaultValues.get(typeId);
     }
 
     /** Whether unused optional placeholders of {@code typeId} get the event's value of that type. */
@@ -615,7 +630,16 @@ public final class Library implements Registrar {
      * {@code last parse logs}), for running Skript's own tests. Call it before registering anything else.
      */
     public void enableTesting() {
+        testing = true;
         CoreSyntax.registerTesting(this);
+    }
+
+    /**
+     * Whether Skript's test syntax is on. Skript runs its tests at debug verbosity, so errors then describe
+     * expressions as its debug text does ({@code {_item} (as java.lang.Object)}).
+     */
+    boolean testing() {
+        return testing;
     }
 
     /** Marks core syntax as making the trigger wait. */

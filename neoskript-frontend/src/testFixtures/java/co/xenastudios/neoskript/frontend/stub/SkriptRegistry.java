@@ -54,7 +54,8 @@ public final class SkriptRegistry {
             Map.entry("ExprAttacked", List.of(RegexRole.TYPE)),
             Map.entry("ExprValueWithin", List.of(RegexRole.TYPE)),
             Map.entry("TestStructure", List.of(RegexRole.CONDITION)),
-            Map.entry("TestAssert", List.of(RegexRole.CODE)));
+            Map.entry("TestAssert", List.of(RegexRole.CODE)),
+            Map.entry("TestAssertUnparsed", List.of(RegexRole.NOT_CONDITION)));
 
     /**
      * Patterns the docs export renders without some optional parts, added back so code Skript accepts
@@ -225,7 +226,10 @@ public final class SkriptRegistry {
         syntax(builder, SyntaxKind.STRUCTURE, "TestStructure", null, "test %string% [when <.+>]");
         syntax(builder, SyntaxKind.EFFECT, "TestAssert", null,
                 "assert <.+> [to fail] [with [error] %string%[, expected %objects%][, got %objects%]]");
-        syntax(builder, SyntaxKind.EXPRESSION, "TestParseLogs", "string", "[the] last parse logs");
+        // 'assert X to fail' where X isn't a condition at all has failed, as expected.
+        syntax(builder, SyntaxKind.EFFECT, "TestAssertUnparsed", null,
+                "assert <.+> to fail [with [error] %string%[, expected %objects%][, got %objects%]]");
+        syntax(builder, SyntaxKind.EXPRESSION, "TestParseLogs", "string", "[the] [last] parse logs");
         syntax(builder, SyntaxKind.EXPRESSION, "TestLocation", "location", "[the] test(-| )location");
         syntax(builder, SyntaxKind.EXPRESSION, "TestBlock", "block", "[the] test(-| )block");
         syntax(builder, SyntaxKind.EXPRESSION, "TestWorld", "world", "[the] test(-| )world");

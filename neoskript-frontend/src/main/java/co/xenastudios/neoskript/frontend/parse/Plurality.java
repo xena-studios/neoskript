@@ -24,14 +24,14 @@ import java.util.Map;
  * functions returning several values, and syntax elements that always are (from Skript's own elements, in
  * {@code plurality.txt}) or are because a plural argument of theirs is ({@code names of {_l::*}}).
  */
-final class Plurality {
+public final class Plurality {
 
     /** Element id to {@code S} (always one value), {@code P} (always several) or {@code A} (as its arguments). */
     private static final Map<String, Character> KNOWN = load();
 
     private Plurality() {}
 
-    static boolean plural(Expr expr, SyntaxRegistry registry) {
+    public static boolean plural(Expr expr, SyntaxRegistry registry) {
         return switch (expr) {
             case Expr.Variable variable -> variable.list();
             case Expr.ListOf list -> list.and() ? list.items().size() > 1 || list.items().stream().anyMatch(i -> plural(i, registry))
@@ -44,6 +44,23 @@ final class Plurality {
 
     private static boolean plural(ParsedSyntax syntax, SyntaxRegistry registry) {
         String id = syntax.syntax().id();
+        if (id.equals("ExprParse-pattern")) {
+            // Several values if its pattern has a plural type or more than one: '"%integer%, %integer%"'.
+            Object regex = syntax.match().regexValues().isEmpty() ? null : syntax.match().regexValues().getFirst();
+            String pattern = regex instanceof java.util.regex.MatchResult match ? match.group() : String.valueOf(regex);
+            java.util.regex.Matcher types = java.util.regex.Pattern.compile("%[-*~]*([^%]+)%").matcher(pattern);
+            int count = 0;
+            while (types.find()) {
+                count++;
+                for (String type : types.group(1).split("/")) {
+                    TypeRef ref = registry.resolveType(type);
+                    if (ref != null && ref.plural()) {
+                        return true;
+                    }
+                }
+            }
+            return count > 1;
+        }
         int dash = id.indexOf('-');
         Character known = KNOWN.get(dash < 0 ? id : id.substring(0, dash));
         if (known == null || known != 'A') {
@@ -74,6 +91,28 @@ final class Plurality {
             plural[i] = specs[i] != null && pluralSpec(specs[i], registry);
         }
         return plural;
+    }
+
+    /**
+     * Whether an expression is certainly one value: a single variable, a literal or text, or an element that
+     * always is one or is as its arguments are, none of them several. Elements Skript has no fixed answer for
+     * aren't, so nothing is wrongly refused for being one value.
+     */
+    public static boolean single(Expr expr, SyntaxRegistry registry) {
+        return switch (expr) {
+            case Expr.Variable variable -> !variable.list();
+            case Expr.Literal literal -> true;
+            case Expr.Text text -> true;
+            case Expr.FunctionCall call -> call.function() != null && !call.function().returnsPlural();
+            case Expr.Syntax syntax -> {
+                String id = syntax.syntax().syntax().id();
+                int dash = id.indexOf('-');
+                Character known = KNOWN.get(dash < 0 ? id : id.substring(0, dash));
+                yield known != null && (known == 'S' || known == 'A' && !plural(syntax.syntax(), registry))
+                        || id.equals("ExprParse-pattern") && !plural(syntax.syntax(), registry);
+            }
+            case null, default -> false;
+        };
     }
 
     private static boolean pluralSpec(PlaceholderSpec spec, SyntaxRegistry registry) {

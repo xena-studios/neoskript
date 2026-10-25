@@ -44,6 +44,16 @@ public final class ItemType {
      * when it's one item. The first is also {@link #stack}.
      */
     private List<ItemType> alternatives;
+    /**
+     * The meta it was last given, as Skript's item types keep it: it can hold what its item can't, like an
+     * enchantment of level 0. {@code null} until its meta is changed, and again when its item is replaced.
+     */
+    private ItemMeta meta;
+    /**
+     * A block that has no item, like water or a bubble column, which Skript's item types can be: its stack is
+     * then air. {@code null} for anything else.
+     */
+    private Material block;
 
     public ItemType(ItemStack stack, boolean amountGiven) {
         this.stack = stack.clone();
@@ -82,7 +92,7 @@ public final class ItemType {
     }
 
     public Material material() {
-        return stack.getType();
+        return block != null ? block : stack.getType();
     }
 
     public int amount() {
@@ -103,9 +113,22 @@ public final class ItemType {
         }
     }
 
+    /**
+     * A plain copy: just its kind and amount, which, as Skript's plain types, only items with nothing more to
+     * them are.
+     */
+    ItemType plainCopy() {
+        ItemType copy = new ItemType(block != null ? new ItemStack(Material.AIR) : new ItemStack(material(), amount()),
+                amountGiven);
+        copy.block = block;
+        copy.markPlain();
+        return copy;
+    }
+
     /** Replaces its item in place, keeping whether an amount was given. */
     void replace(ItemStack replacement) {
         stack = replacement.clone();
+        meta = null;
     }
 
     /** Changes its item in place, each of them if it stands for several. */
@@ -113,6 +136,7 @@ public final class ItemType {
         ItemStack copy = stack.clone();
         change.accept(copy);
         stack = copy;
+        meta = null;
         if (alternatives != null) {
             alternatives.forEach(each -> each.editStacks(change));
         }
@@ -134,16 +158,31 @@ public final class ItemType {
 
     /** Changes its meta in place, as when a variable's item is changed. */
     public void editMeta(Consumer<ItemMeta> change) {
-        stack.editMeta(change);
+        ItemMeta edited = meta();
+        if (edited != null) {
+            change.accept(edited);
+            stack.setItemMeta(edited);
+            meta = edited.clone();
+        }
         if (alternatives != null) {
             alternatives.forEach(each -> each.editMeta(change));
         }
+    }
+
+    /**
+     * A copy of its meta, as it was last given (see {@link #meta}): what Skript's item types give as theirs,
+     * which can hold more than {@code stack().getItemMeta()}.
+     */
+    public ItemMeta meta() {
+        return meta != null ? meta.clone() : stack.getItemMeta();
     }
 
     /** A copy, as stored in a variable. */
     public ItemType copy() {
         ItemType copy = new ItemType(stack, amountGiven);
         copy.plain = plain;
+        copy.meta = meta == null ? null : meta.clone();
+        copy.block = block;
         if (alternatives != null) {
             copy.alternatives = new ArrayList<>(alternatives.stream().map(ItemType::copy).toList());
         }
@@ -241,6 +280,11 @@ public final class ItemType {
         }
         if (material == null || amount < 0) {
             return null;
+        }
+        if (!material.isItem() && material.isBlock()) {
+            ItemType block = new ItemType(new ItemStack(Material.AIR), amountGiven);
+            block.block = material;
+            return block;
         }
         ItemStack stack = new ItemStack(material, Math.max(amount, 1));
         // No states, as in 'oak_stairs[]', is any of the block.
@@ -394,18 +438,23 @@ public final class ItemType {
         Map<String, Material> known = aliases;
         if (known == null) {
             known = new HashMap<>();
-            for (Material material : Material.values()) {
-                // Air counts, as in Skript ('set block at X to air'), but not the other airs.
-                if (material.isLegacy() || !material.isItem() && material != Material.AIR
-                        || material.isAir() && material != Material.AIR) {
-                    continue;
-                }
-                String singular = name(material);
-                known.putIfAbsent(singular, material);
-                known.putIfAbsent(plural(singular), material);
-                // Items named in the plural, like stone bricks, can be written in the singular too.
-                if (singular.endsWith("s") && singular.length() > 3) {
-                    known.putIfAbsent(singular.substring(0, singular.length() - 1), material);
+            // Items first, then blocks that have no item (water, a bubble column), which Skript names after
+            // their materials too; an item keeps its names where a block's would clash.
+            for (boolean items : new boolean[] {true, false}) {
+                for (Material material : Material.values()) {
+                    // Air counts, as in Skript ('set block at X to air'), but not the other airs.
+                    if (material.isLegacy() || material.isAir() && material != Material.AIR
+                            || (items ? !material.isItem() && material != Material.AIR
+                                    : material.isItem() || !material.isBlock())) {
+                        continue;
+                    }
+                    String singular = name(material);
+                    known.putIfAbsent(singular, material);
+                    known.putIfAbsent(plural(singular), material);
+                    // Items named in the plural, like stone bricks, can be written in the singular too.
+                    if (singular.endsWith("s") && singular.length() > 3) {
+                        known.putIfAbsent(singular.substring(0, singular.length() - 1), material);
+                    }
                 }
             }
             aliases = known;
@@ -468,7 +517,7 @@ public final class ItemType {
             List<String> names = alternatives.stream().map(ItemType::toString).toList();
             return String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.getLast();
         }
-        return text(stack, amountGiven);
+        return block != null ? name(block) : text(stack, amountGiven);
     }
 
     /** Items are equal if they're the same item with the same amount, name, enchantments and so on. */
@@ -480,7 +529,7 @@ public final class ItemType {
         if (alternatives != null) {
             return alternatives.equals(item.alternatives);
         }
-        return item.stack.isSimilar(stack) && item.stack.getAmount() == stack.getAmount();
+        return item.block == block && item.stack.isSimilar(stack) && item.stack.getAmount() == stack.getAmount();
     }
 
     @Override

@@ -34,6 +34,27 @@ final class ItemSyntax {
     private ItemSyntax() {}
 
     static void register(Registrar registrar) {
+        // A head's texture: its profile's 'textures' property. Setting it gives the head a new profile with it.
+        java.util.function.Consumer<Object> clearTexture = owner -> ((ItemType) owner).editMeta(meta -> {
+            if (meta instanceof org.bukkit.inventory.meta.SkullMeta skull) {
+                skull.setPlayerProfile(null);
+            }
+        });
+        registrar.expression("ExprSkullTexture", "string", info -> new SettableProperty<>(ItemType.class, String.class,
+                item -> item.stack().getItemMeta() instanceof org.bukkit.inventory.meta.SkullMeta meta
+                        && meta.getPlayerProfile() != null ? meta.getPlayerProfile().getProperties().stream()
+                        .filter(property -> property.getName().equals("textures")).findFirst()
+                        .map(com.destroystokyo.paper.profile.ProfileProperty::getValue).orElse(null) : null,
+                (item, texture) -> {
+                    com.destroystokyo.paper.profile.PlayerProfile profile = org.bukkit.Bukkit.createProfile(java.util.UUID.randomUUID());
+                    profile.setProperty(new com.destroystokyo.paper.profile.ProfileProperty("textures", texture));
+                    item.editMeta(meta -> {
+                        if (meta instanceof org.bukkit.inventory.meta.SkullMeta skull) {
+                            skull.setPlayerProfile(profile);
+                        }
+                    });
+                }).resettingTo(clearTexture).deleting(clearTexture::accept),
+                Patterns.property("(skull|head) texture", "itemtypes"));
         // 'player is holding a diamond sword': the item in a hand is the item, as 'is' has it.
         registrar.condition("CondItemInHand", info -> {
             boolean off = info.pattern() % 4 >= 2;
@@ -102,7 +123,7 @@ final class ItemSyntax {
         }, "%itemtype% with (damage|data) [value] %number%", "%itemtype% damaged by %number%");
         // 'plain diamond sword': the item with nothing else to it.
         registrar.expression("ExprPlain", "itemtype", info -> (context, args) ->
-                map(args[0], item -> new ItemType(new ItemStack(item.material(), item.amount()), item.amountGiven())),
+                map(args[0], ItemType::plainCopy),
                 "[a[n]] (plain|unmodified) %itemtype%");
         registrar.expression("ExprStoredEnchantments", "enchantmenttype", info -> new StoredEnchantments(),
                 Patterns.property("stored enchant[ment]s", "itemtypes"));
@@ -151,6 +172,16 @@ final class ItemSyntax {
             }
             return all.toArray();
         }, "[all [[of] the]|the|every] item[ ]types");
+        // 'remove all items from {_inventory}': one of every item there is, as Skript's item type lists them.
+        registrar.expression("ExprSets-items", "itemstack", info -> (context, args) -> {
+            List<Object> all = new ArrayList<>();
+            for (Material material : Material.values()) {
+                if (!material.isLegacy() && material.isItem()) {
+                    all.add(new ItemStack(material));
+                }
+            }
+            return all.toArray();
+        }, "[all [[of] the]|the] (items|item[ ]stacks)", "every item[[ ]stack]");
     }
 
     /** Whether all of {@code values}, or with {@code all} false any of them, pass {@code test}. */
@@ -216,7 +247,7 @@ final class ItemSyntax {
         public Object get(TriggerContext context, Object[] arguments) {
             List<Object> found = new ArrayList<>();
             for (Object value : Values.array(arguments[0])) {
-                if (value instanceof ItemType item && item.stack().getItemMeta() instanceof EnchantmentStorageMeta meta) {
+                if (value instanceof ItemType item && item.meta() instanceof EnchantmentStorageMeta meta) {
                     meta.getStoredEnchants().forEach((enchantment, level) -> found.add(new Enchantments.Levelled(enchantment, level)));
                 }
             }

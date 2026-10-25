@@ -160,6 +160,12 @@ public interface Registrar {
     void eventDefault(String typeId);
 
     /**
+     * Where a placeholder of {@code typeId} sits in an optional part that wasn't used and the event has no
+     * value of it, it gets {@code value}, as Skript's literal default expressions: a number left out is 1.
+     */
+    void defaultValue(String typeId, Object value);
+
+    /**
      * Registers a built-in function. Scripts can define their own functions with the same name, which
      * take precedence.
      *
