@@ -216,7 +216,8 @@ class EventSyntaxTest {
                 \ttrigger:
                 \t\tsay the command's executor
                 on load:
-                \tsay holders of {_inv}, rows of {_inv} and {_inv}'s amount of slots
+                \tsay holders of {_inv} and rows of {_inv}
+                \tsay {_inv}'s amount of slots
                 \tsay anvil text input of {_inv}
                 \tsay the max repair cost of {_inv}
                 \tset {_inv}'s anvil repair cost to 3

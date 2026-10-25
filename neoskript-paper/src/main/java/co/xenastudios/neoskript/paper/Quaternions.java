@@ -123,13 +123,6 @@ final class Quaternions {
                             translation ? new Vector() : new Vector(1, 1, 1)));
         }, "[the] (display|[display] transformation) (scale|translation:translation)[s] of %entities%",
                 "%entities%'[s] (display|[display] transformation) (scale|translation:translation)[s]");
-        // Skript's scale property: a display's scale, as a vector of how much it's stretched on each axis.
-        registrar.expression("PropExprScale", "vector", info -> new SettableProperty<>(Display.class, Vector.class, display -> {
-            org.joml.Vector3f v = display.getTransformation().getScale();
-            return new Vector(v.x, v.y, v.z);
-        }, (display, vector) -> setVector(display, false, vector))
-                .resettingTo((java.util.function.Consumer<Object>) display -> setVector((Display) display, false,
-                        new Vector(1, 1, 1))), co.xenastudios.neoskript.api.registration.Patterns.property("scale[s]", "objects"));
         registrar.expression("ExprDisplayRotation", "quaternion", info -> {
             boolean right = info.hasTag("right");
             return new SettableProperty<>(Display.class, Quaternionf.class, display -> new Quaternionf(right
@@ -142,7 +135,7 @@ final class Quaternions {
     }
 
     /** Sets a display's translation or scale, if every part of it is a number. */
-    private static void setVector(Display display, boolean translation, Vector vector) {
+    static void setVector(Display display, boolean translation, Vector vector) {
         if (!Double.isFinite(vector.getX()) || !Double.isFinite(vector.getY()) || !Double.isFinite(vector.getZ())) {
             return;
         }
