@@ -24,14 +24,31 @@ import java.util.function.Function;
  * @param cooldown how long a player has to wait between uses, or {@code null}
  * @param cooldownMessage what a player who has to wait is told, like {@code permissionMessage}, or {@code null}
  * @param routes what can be typed after the name, most specific first: each subcommand, then the command
+ * @param suggesters the {@code suggestions:} entries, by each argument (by identity) whose suggestions they work
+ *     out: an argument of the entry's own command or subcommand whose suggestions its code changes, as in Skript
  */
 public record CompiledCommand(String script, int line, String name, List<String> aliases, String description,
         String usage, String permission, Trigger permissionMessage, Timespan cooldown, String cooldownBypass,
-        Trigger cooldownMessage, String prefix, List<Route> routes) {
+        Trigger cooldownMessage, String prefix, List<Route> routes, Map<CommandPattern.Argument, Suggester> suggesters) {
 
     public CompiledCommand {
         aliases = List.copyOf(aliases);
         routes = List.copyOf(routes);
+        suggesters = java.util.Collections.unmodifiableMap(new IdentityHashMap<>(suggesters));
+    }
+
+    /**
+     * A {@code suggestions:} entry.
+     *
+     * @param arguments the arguments of its command or subcommand, its parents' included: what {@code arg-1}
+     *     is in its code
+     * @param choices how many choices those have
+     */
+    public record Suggester(Trigger trigger, List<CommandPattern.Argument> arguments, int choices) {
+
+        public Suggester {
+            arguments = List.copyOf(arguments);
+        }
     }
 
     /**
@@ -173,6 +190,14 @@ public record CompiledCommand(String script, int line, String name, List<String>
                 }
                 default -> throw new IllegalStateException("Unknown command pattern part " + rest.part());
             }
+        }
+
+        /**
+         * The value of {@code argument}, one of this route's, for {@code text}, or {@code null} if it isn't one:
+         * for the arguments typed before the one tab completion suggests for.
+         */
+        public Object value(CommandPattern.Argument argument, String text) {
+            return argumentNumbers.containsKey(argument) ? parse(argument, text) : null;
         }
 
         /** The argument's value for {@code text}, or {@code null} if it isn't one. */

@@ -48,6 +48,10 @@ final class CoreSyntax {
     static final String ARGUMENT = "ExprArgument";
     static final String TYPED_ARGUMENT = "ExprTypedArgument";
     static final String CHOICE_ARGUMENT = "ExprChoiceArgument";
+    /** A command's {@code suggestions:} entry: the suggestions for an argument, their filtering, what's typed. */
+    static final String COMMAND_SUGGESTIONS = "ExprCommandSuggestions";
+    static final String SUGGESTION_FILTERING = "EffSuggestionFilteringMode";
+    static final String COMMAND_INPUT = "ExprCommandInput";
     static final String INDICES = "ExprIndices";
     static final String SORT = "EffSort";
     static final String PERIODICAL = "EvtPeriodical";
@@ -306,6 +310,17 @@ final class CoreSyntax {
                 "[the] choice arg[ument] <(\\d+)>",
                 "[the] " + ordinal + " choice arg[ument][s]",
                 "[the] [last] choice arg[ument]");
+        library.core(SyntaxKind.EXPRESSION, COMMAND_SUGGESTIONS, "object", List.of(),
+                "[the] [command] (suggestions|tab completions) (of|for) %objects%",
+                "%objects%'[s] [command] (suggestions|tab completions)");
+        library.core(SyntaxKind.EFFECT, SUGGESTION_FILTERING, null, List.of(),
+                "(use no|disable) filtering (for|with) %objects%",
+                "use starts with filtering (for|with) %objects%",
+                "use contains filtering (for|with) %objects%");
+        library.core(SyntaxKind.EXPRESSION, COMMAND_INPUT, "object", List.of(),
+                "[the] [command] [suggestion|tab completion] (full|complete) input",
+                "[the] [command] [suggestion|tab completion] (current|arg[ument]) input",
+                "[the] [command] [suggestion|tab completion] (current|arg[ument]) input [start[ing]] (position|index)");
         library.core(SyntaxKind.EXPRESSION, ARITHMETIC, "object", List.of(),
                 "%object%[ ]+[ ]%object%",
                 "%object%[ ]-[ ]%object%",

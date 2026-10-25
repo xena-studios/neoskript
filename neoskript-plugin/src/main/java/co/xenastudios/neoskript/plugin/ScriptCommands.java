@@ -41,6 +41,12 @@ final class ScriptCommands {
         this.plugin = plugin;
         this.logger = logger;
         this.scheduler = scheduler;
+        plugin.getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler
+            void suggestions(com.destroystokyo.paper.event.brigadier.AsyncPlayerSendSuggestionsEvent event) {
+                ScriptCommand.addTooltips(event);
+            }
+        }, plugin);
     }
 
     /** Registers {@code commands}, and only those, in place of the ones registered before. */

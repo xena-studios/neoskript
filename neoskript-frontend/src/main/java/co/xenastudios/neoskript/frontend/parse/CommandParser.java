@@ -29,6 +29,8 @@ final class CommandParser {
 
     private static final Pattern HEADER = Pattern.compile("command\\s+/?(\\S+)(?:\\s+(.*))?",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    /** The {@code suggestions:} entry, which can also be written {@code tab completions:} or {@code tab complete:}. */
+    private static final Set<String> SUGGESTIONS = Set.of("suggestions", "tab completions", "tab complete");
     private static final Pattern SUBCOMMAND = Pattern.compile("subcommand(?:\\s+(.*))?", Pattern.CASE_INSENSITIVE);
     private static final Pattern ARGUMENT_NAME = Pattern.compile("\\s*([\\p{L}_][\\p{L}\\p{N}_]*)\\s*:(.*)",
             Pattern.DOTALL);
@@ -115,13 +117,19 @@ final class CommandParser {
         Map<String, String> entries = new LinkedHashMap<>();
         Map<String, Expr> messages = new LinkedHashMap<>();
         List<Statement> trigger = null;
+        List<Statement> suggestions = null;
+        Line suggestionsLine = null;
         List<Node.Section> children = new ArrayList<>();
         for (Node child : section.children()) {
             Line entry = child.line();
             String key = entry.key().strip().toLowerCase(Locale.ROOT);
             if (child instanceof Node.Section s && (key.equals("trigger") || key.equals("subcommands")
-                    || SUBCOMMAND.matcher(key).matches())) {
-                if (key.equals("trigger")) {
+                    || SUGGESTIONS.contains(key) || SUBCOMMAND.matcher(key).matches())) {
+                if (SUGGESTIONS.contains(key)) {
+                    // Its code runs while the command is typed: named arguments aren't local variables there.
+                    suggestions = statements.body(s.children());
+                    suggestionsLine = entry;
+                } else if (key.equals("trigger")) {
                     trigger = statements.body(s.children(), hints(pattern));
                 } else {
                     children.add(s);
@@ -173,7 +181,8 @@ final class CommandParser {
 
         if (group) {
             return subcommands.isEmpty() ? null
-                    : new ParsedStructure.CommandNode(section.line(), true, pattern, entries, messages, null, subcommands);
+                    : new ParsedStructure.CommandNode(section.line(), true, pattern, entries, messages, null,
+                            subcommands, suggestions, suggestionsLine);
         }
         List<ParsedStructure.CommandNode> level = new ArrayList<>();
         flatten(subcommands, level);
@@ -190,7 +199,8 @@ final class CommandParser {
             report(section.line(), MISSING_TRIGGER);
             return null;
         }
-        return new ParsedStructure.CommandNode(section.line(), false, pattern, entries, messages, trigger, subcommands);
+        return new ParsedStructure.CommandNode(section.line(), false, pattern, entries, messages, trigger, subcommands,
+                suggestions, suggestionsLine);
     }
 
     /** The subcommands at one level: groups' subcommands count as their parent's. */

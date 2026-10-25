@@ -41,9 +41,13 @@ public sealed interface ParsedStructure {
      * @param messages entries that are text with expressions in them, like {@code cooldown message}
      * @param trigger its code, or {@code null} if it has no {@code trigger:}
      * @param subcommands its subcommands and groups, in order
+     * @param suggestions the code of its {@code suggestions:} entry, which works out what tab completion
+     *     suggests for its arguments, or {@code null}
+     * @param suggestionsLine that entry's line, or {@code null}
      */
     record CommandNode(Line line, boolean group, List<CommandPattern.Part> pattern, Map<String, String> entries,
-            Map<String, Expr> messages, List<Statement> trigger, List<CommandNode> subcommands) {
+            Map<String, Expr> messages, List<Statement> trigger, List<CommandNode> subcommands,
+            List<Statement> suggestions, Line suggestionsLine) {
 
         public CommandNode {
             pattern = List.copyOf(pattern);
@@ -51,11 +55,15 @@ public sealed interface ParsedStructure {
             messages = Map.copyOf(messages);
             trigger = trigger == null ? null : List.copyOf(trigger);
             subcommands = List.copyOf(subcommands);
+            suggestions = suggestions == null ? null : List.copyOf(suggestions);
         }
 
         private void collect(List<Statement> statements) {
             if (trigger != null) {
                 statements.addAll(trigger);
+            }
+            if (suggestions != null) {
+                statements.addAll(suggestions);
             }
             subcommands.forEach(s -> s.collect(statements));
         }
