@@ -496,6 +496,13 @@ final class LineParser {
         if (start >= end) {
             return null;
         }
+        char first = input.charAt(start);
+        char last = input.charAt(end - 1);
+        if (first == '\u201C' || first == '\u201D' || last == '\u201C' || last == '\u201D') {
+            // As Skript's parser refuses them where an expression starts or ends.
+            problem("Pretty quotes are not allowed, change to regular quotes (\")");
+            return null;
+        }
         Expr expr = single(start, end, expected);
         if (expr != null && !(expr instanceof Expr.Unresolved) && hasUnresolved(expr)) {
             // Words a type's parser takes whole are that literal, not syntax leaning on unresolved words, as
@@ -714,7 +721,7 @@ final class LineParser {
         List<int[]> embedded = new ArrayList<>();
         Scanner.braceEnd(input, start, end, embedded);
         String name = input.substring(start + 1, end - 1);
-        if (name.isBlank()) {
+        if (name.isBlank() || !validVariableName(name)) {
             return null;
         }
         List<Expr> parts = new ArrayList<>();
@@ -726,6 +733,64 @@ final class LineParser {
             parts.add(expr);
         }
         return new Expr.Variable(start, end, name, name.startsWith("_"), name.endsWith("::*"), parts);
+    }
+
+    /** Warnings found while parsing the line, as Skript gives them, for the statement parser to report. */
+    private final java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
+
+    java.util.Set<String> warnings() {
+        return warnings;
+    }
+
+    /**
+     * Whether a variable's name is one, as Skript's parser checks: no braces outside its expressions, and
+     * the separator {@code ::} and list asterisk where they can go (else the problem is kept for the line's
+     * error). A single {@code :} is only warned about.
+     */
+    private boolean validVariableName(String raw) {
+        // Text outside the expressions in it ('%...%'), where braces aren't allowed.
+        StringBuilder outside = new StringBuilder();
+        boolean inExpression = false;
+        int depth = 0;
+        for (char c : raw.toCharArray()) {
+            if (c == '%' && depth == 0) {
+                inExpression = !inExpression;
+                continue;
+            }
+            if (inExpression) {
+                if (c == '{') {
+                    depth++;
+                } else if (c == '}') {
+                    depth--;
+                }
+            } else if (c == '{' || c == '}') {
+                return false;
+            } else {
+                outside.append(c);
+            }
+        }
+        String name = raw.startsWith("_") ? raw.substring(1).strip() : raw.strip();
+        if (name.startsWith("::") || name.endsWith("::")) {
+            problem("A variable's name must neither start nor end with the separator '::' (error in variable {" + name + "})");
+            return false;
+        }
+        String plain = outside.toString();
+        int asterisks = (int) plain.chars().filter(c -> c == '*').count();
+        if (asterisks > 0 && !(asterisks == 1 && name.endsWith("::*"))) {
+            problem("A variable's name must not contain any asterisks except at the end after '::' to denote a list"
+                    + " variable, e.g. {variable::*} (error in variable {" + name + "})");
+            return false;
+        }
+        if (name.contains("::::")) {
+            problem("A variable's name must not contain the separator '::' multiple times in a row (error in variable {"
+                    + name + "})");
+            return false;
+        }
+        if (name.replace("::", "").contains(":")) {
+            warnings.add("colon:If you meant to make the variable {" + name + "} a list, its name should contain '::'."
+                    + " Having a single ':' does nothing!");
+        }
+        return true;
     }
 
     /**

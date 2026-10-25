@@ -167,6 +167,7 @@ final class StatementParser {
             return new Statement.Call(line, call);
         }
         ParsedSyntax effect = parser.effect(0, end);
+        warn(line, parser);
         if (effect != null && !sectionOnly(effect).isEmpty()) {
             error(line, "This expression requires a section.");
             return new Statement.Invalid(line);
@@ -537,6 +538,17 @@ final class StatementParser {
                 }
             }
         }
+    }
+
+    /** Reports the warnings the line's parser found ({@code tag:message}), unless they're suppressed. */
+    private void warn(Line line, LineParser parser) {
+        for (String warning : parser.warnings()) {
+            int colon = warning.indexOf(':');
+            if (!suppressed.contains(warning.substring(0, colon))) {
+                diagnostics.warning(line.number(), line.column(), line.text().length(), warning.substring(colon + 1));
+            }
+        }
+        parser.warnings().clear();
     }
 
     private boolean stops(List<Statement> body) {
