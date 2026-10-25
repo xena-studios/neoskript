@@ -58,4 +58,15 @@ class SkriptMigrationTest {
         assertEquals(List.of(), SkriptMigration.migrate(skript, neoskript).copied());
         assertFalse(Files.exists(neoskript.resolve("variables.csv")));
     }
+
+    @Test
+    void readsSkriptsPlayerUuidSetting() throws Exception {
+        Path skript = skript();
+        assertEquals(null, SkriptMigration.migrate(skript, plugins.resolve("NeoSkript")).playerUuids());
+        Path config = skript.resolve("config.sk");
+        Files.writeString(config, "language: english\n\tuse player UUIDs in variable names: false # names\n");
+        assertEquals(Boolean.FALSE, SkriptMigration.playerUuids(config));
+        Files.writeString(config, "use player UUIDs in variable names: true\n");
+        assertEquals(Boolean.TRUE, SkriptMigration.playerUuids(config));
+    }
 }

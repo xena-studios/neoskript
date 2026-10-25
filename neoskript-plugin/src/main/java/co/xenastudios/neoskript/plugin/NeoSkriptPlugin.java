@@ -63,6 +63,14 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                         String.join(" and ", migration.copied()), migration.scriptCount(),
                         migration.scriptCount() == 1 ? "script" : "scripts");
             }
+            // The variables copied are keyed as Skript's config said, so keep reading them that way.
+            if (migration.playerUuids() != null
+                    && migration.playerUuids() != getConfig().getBoolean("variables.player-uuids-in-names", true)) {
+                getConfig().set("variables.player-uuids-in-names", migration.playerUuids());
+                saveConfig();
+                getSLF4JLogger().info("Players are their {} in variable names, as in Skript's config.sk.",
+                        migration.playerUuids() ? "UUIDs" : "names");
+            }
         } catch (IOException e) {
             getSLF4JLogger().error("Couldn't copy Skript's scripts and variables", e);
         }
@@ -72,6 +80,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             library.enableTesting();
         }
         StandardLibrary.register(library);
+        StandardLibrary.usePlayerUuidsInVariableNames(getConfig().getBoolean("variables.player-uuids-in-names", true));
         if (TestRunner.enabled()) {
             StandardLibrary.registerTesting(library);
             // As Skript's test mode does: the chunks tests use stay loaded and ticking.

@@ -82,6 +82,14 @@ public final class StandardLibrary {
     }
 
     /** Syntax Skript's test environment provides, for running Skript's own tests: {@code test-location}... */
+    /**
+     * Whether players read as their UUIDs in variable names ({@code {money::%player%}}), as Skript's
+     * {@code use player UUIDs in variable names}, which its default config turns on. Otherwise as their names.
+     */
+    public static void usePlayerUuidsInVariableNames(boolean use) {
+        Players.uuidsInVariableNames = use;
+    }
+
     public static void registerTesting(Registrar registrar) {
         WorldSyntax.registerTesting(registrar);
         Scripts.registerTesting(registrar);

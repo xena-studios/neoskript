@@ -29,9 +29,15 @@ import org.bukkit.entity.Player;
 /** Players and other named things: names, UUIDs, being online, permissions, kicking. */
 final class Players {
 
+    /** See {@link StandardLibrary#usePlayerUuidsInVariableNames}. */
+    static volatile boolean uuidsInVariableNames = true;
+
     private Players() {}
 
     static void register(Registrar registrar) {
+        // An offline player without a name is always its UUID, as in Skript.
+        registrar.variableNameText(OfflinePlayer.class, player -> uuidsInVariableNames || player.getName() == null
+                ? player.getUniqueId().toString() : player.getName());
         registrar.property("ExprUUID", "uuid", "uuid[s]", "offlineplayers/worlds/entities", Object.class,
                 owner -> switch (owner) {
                     case OfflinePlayer player -> player.getUniqueId();
