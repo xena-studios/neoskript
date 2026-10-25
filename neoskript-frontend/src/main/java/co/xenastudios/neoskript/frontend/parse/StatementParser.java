@@ -5,7 +5,9 @@
 package co.xenastudios.neoskript.frontend.parse;
 
 import co.xenastudios.neoskript.frontend.registry.DelayState;
+import co.xenastudios.neoskript.frontend.registry.EventValues;
 import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
+import co.xenastudios.neoskript.frontend.registry.SyntaxKind;
 import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
 import co.xenastudios.neoskript.frontend.registry.ParseCheck;
 import co.xenastudios.neoskript.frontend.registry.TypeInfo;
@@ -119,10 +121,51 @@ final class StatementParser {
 
     private Statement line(Node node, Statement previous) {
         delays.put(node.line(), delay);
+        EventValues.Scope scope = context.eventScope();
+        if (scope == null || !(node instanceof Node.Section)) {
+            // (A line on its own tries that itself.)
+            return parse(node, previous);
+        }
+        int mark = diagnostics.mark();
+        DelayState before = delay;
+        Statement statement = parse(node, previous);
+        if (!(statement instanceof Statement.Invalid)) {
+            return statement;
+        }
+        // Nothing parses without event values the code can't have: parsed with them after all, the compiler
+        // says which one there's none of, as Skript does when nothing else parses.
+        diagnostics.takeSince(mark);
+        delay = before;
+        context.eventScope(null);
+        try {
+            return parse(node, previous);
+        } finally {
+            context.eventScope(scope);
+        }
+    }
+
+    private Statement parse(Node node, Statement previous) {
         return switch (node) {
             case Node.Simple simple -> simple(simple.line());
             case Node.Section section -> section(section, previous);
         };
+    }
+
+    /**
+     * A section's code, parsed by {@code body}. Unless {@code header} only keeps the event values of the code
+     * around it (as {@code if} does), any may be used in it, as the section may give its own.
+     */
+    private List<Statement> sectionCode(ParsedSyntax header, java.util.function.Supplier<List<Statement>> body) {
+        EventValues values = context.registry().eventValues();
+        if (context.eventScope() == null || header != null && values != null && values.keepsEventValues(header.syntax())) {
+            return body.get();
+        }
+        EventValues.Scope scope = context.eventScope(null);
+        try {
+            return body.get();
+        } finally {
+            context.eventScope(scope);
+        }
     }
 
     private static boolean isConditional(String key) {
@@ -162,11 +205,29 @@ final class StatementParser {
         }
         LineParser parser = new LineParser(context, line.text());
         int end = line.text().length();
-        Expr.FunctionCall call = parser.call(0, end);
-        if (call != null) {
+        Object parsed = simple(parser, end);
+        EventValues.Scope scope = context.eventScope();
+        if (scope != null && (parsed == null || unresolved(parsed) > 0)) {
+            // Without the event values the code can't have, nothing parses, or only by leaning on words nothing
+            // knows: with them it may, for the compiler to say which there's none of, as Skript does when nothing
+            // else parses ('event-number' isn't 'event - number').
+            context.eventScope(null);
+            try {
+                LineParser loose = new LineParser(context, line.text());
+                Object other = simple(loose, end);
+                if (other != null && (parsed == null || unresolved(other) < unresolved(parsed))) {
+                    parser = loose;
+                    parsed = other;
+                }
+            } finally {
+                context.eventScope(scope);
+            }
+        }
+        if (parsed instanceof Expr.FunctionCall call) {
             return new Statement.Call(line, call);
         }
-        ParsedSyntax effect = parser.effect(0, end);
+        ParsedSyntax effect = parsed instanceof ParsedSyntax syntax && syntax.syntax().kind() == SyntaxKind.EFFECT
+                ? syntax : null;
         warn(line, parser);
         if (effect != null && !sectionOnly(effect).isEmpty()) {
             error(line, "This expression requires a section.");
@@ -183,8 +244,7 @@ final class StatementParser {
             }
             return new Statement.Effect(line, effect);
         }
-        ParsedSyntax condition = parser.condition(0, end);
-        if (condition != null) {
+        if (parsed instanceof ParsedSyntax condition) {
             check(line, condition);
             return new Statement.Condition(line, condition);
         }
@@ -194,6 +254,22 @@ final class StatementParser {
         }
         error(line, problem != null ? problem : "Can't understand this condition/effect: " + line.text());
         return new Statement.Invalid(line);
+    }
+
+    /** A line as a function call, else an effect, else a condition, or {@code null}. */
+    private static Object simple(LineParser parser, int end) {
+        Expr.FunctionCall call = parser.call(0, end);
+        if (call != null) {
+            return call;
+        }
+        ParsedSyntax effect = parser.effect(0, end);
+        return effect != null ? effect : parser.condition(0, end);
+    }
+
+    /** How much of a parsed line is left to words nothing parses. */
+    private static int unresolved(Object parsed) {
+        return parsed instanceof ParsedSyntax syntax ? LineParser.countUnresolved(syntax)
+                : LineParser.countUnresolved((Expr) parsed);
     }
 
     private Statement section(Node.Section section, Statement previous) {
@@ -222,11 +298,11 @@ final class StatementParser {
                 return new Statement.Invalid(line);
             }
             if (effect != null && hasSectionExpression(effect)) {
-                return new Statement.Section(line, effect, repeatable(section.children()));
+                return new Statement.Section(line, effect, sectionCode(null, () -> repeatable(section.children())));
             }
             Expr.FunctionCall call = parser.call(0, key.length());
             if (call != null && call.arguments().stream().anyMatch(a -> a != null && hasSectionExpression(a))) {
-                return new Statement.Section(line, null, repeatable(section.children()), call);
+                return new Statement.Section(line, null, sectionCode(null, () -> repeatable(section.children())), call);
             }
             if (call != null && effect == null) {
                 error(line, "The line '" + key + "' is a valid function call but cannot function as a section (:) because"
@@ -297,8 +373,8 @@ final class StatementParser {
             suppressed.addAll(before);
             return new Statement.Section(line, header, body);
         }
-        return new Statement.Section(line, header, repeatable(section.children(),
-                header.syntax().id().equals("SecFor") ? header : null));
+        return new Statement.Section(line, header, sectionCode(header, () -> repeatable(section.children(),
+                header.syntax().id().equals("SecFor") ? header : null)));
     }
 
     /** A {@code for} loop's code: its value variable may also be any of what the list holds. */
@@ -591,6 +667,19 @@ final class StatementParser {
             delays.put(line, delay);
             LineParser parser = new LineParser(context, line.text());
             ParsedSyntax condition = node instanceof Node.Simple ? parser.condition(0, line.text().length()) : null;
+            if (node instanceof Node.Simple && context.eventScope() != null
+                    && (condition == null || unresolved(condition) > 0)) {
+                // With event values the code can't have, for the compiler to say which, as for other lines.
+                EventValues.Scope scope = context.eventScope(null);
+                try {
+                    ParsedSyntax other = new LineParser(context, line.text()).condition(0, line.text().length());
+                    if (other != null && (condition == null || unresolved(other) < unresolved(condition))) {
+                        condition = other;
+                    }
+                } finally {
+                    context.eventScope(scope);
+                }
+            }
             if (condition == null) {
                 error(line, "Can't understand this condition: " + line.text());
             } else {
@@ -741,7 +830,14 @@ final class StatementParser {
     Expr expression(Line line, String text, String type, boolean plural) {
         TypeInfo info = context.registry().type(type);
         Expected expected = info == null ? Expected.OBJECTS : context.expected(new TypeRef(info, plural));
-        Expr expr = new LineParser(context, text).expression(0, text.length(), expected);
+        // Values given on their own, like defaults, may be any event value: the compiler says if there's none.
+        EventValues.Scope scope = context.eventScope(null);
+        Expr expr;
+        try {
+            expr = new LineParser(context, text).expression(0, text.length(), expected);
+        } finally {
+            context.eventScope(scope);
+        }
         if (expr == null) {
             error(line, "Can't understand this expression: '" + text + "'");
         }

@@ -100,6 +100,21 @@ final class ParserContext {
         return hints;
     }
 
+    /** The event values the code being parsed can use, or {@code null} for any. */
+    private co.xenastudios.neoskript.frontend.registry.EventValues.Scope eventScope;
+
+    co.xenastudios.neoskript.frontend.registry.EventValues.Scope eventScope() {
+        return eventScope;
+    }
+
+    /** Sets the event values the code parsed next can use ({@code null} for any), returning the ones before. */
+    co.xenastudios.neoskript.frontend.registry.EventValues.Scope eventScope(
+            co.xenastudios.neoskript.frontend.registry.EventValues.Scope scope) {
+        co.xenastudios.neoskript.frontend.registry.EventValues.Scope before = eventScope;
+        eventScope = scope;
+        return before;
+    }
+
     void itemAliases(java.util.Set<String> names) {
         itemAliases = java.util.Set.copyOf(names);
     }

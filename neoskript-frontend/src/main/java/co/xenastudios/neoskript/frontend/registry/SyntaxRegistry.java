@@ -53,6 +53,8 @@ public final class SyntaxRegistry {
     private final Set<String> suppressing;
     private final Set<String> sectionOnly;
     private final Map<String, ParseCheck> checks;
+    /** Which event values code can use, or {@code null} if the registry can't tell. */
+    private final EventValues eventValues;
 
     private SyntaxRegistry(Builder builder) {
         this.typesById = Collections.unmodifiableMap(new LinkedHashMap<>(builder.typesById));
@@ -95,6 +97,12 @@ public final class SyntaxRegistry {
         this.suppressing = Set.copyOf(builder.suppressing);
         this.sectionOnly = Set.copyOf(builder.sectionOnly);
         this.checks = Map.copyOf(builder.checks);
+        this.eventValues = builder.eventValues;
+    }
+
+    /** Which event values code can use, or {@code null} if this registry can't tell. */
+    public EventValues eventValues() {
+        return eventValues;
     }
 
     /** Whether the syntax element makes the trigger wait, like {@code wait 1 second}. */
@@ -361,6 +369,13 @@ public final class SyntaxRegistry {
         private final Set<String> suppressing = new HashSet<>();
         private final Set<String> sectionOnly = new HashSet<>();
         private final Map<String, ParseCheck> checks = new HashMap<>();
+        private EventValues eventValues;
+
+        /** Tells the parser which event values code can use, so it can try other readings where there's none. */
+        public Builder eventValues(EventValues eventValues) {
+            this.eventValues = eventValues;
+            return this;
+        }
 
         private Builder() {}
 

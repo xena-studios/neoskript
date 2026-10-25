@@ -40,6 +40,8 @@ final class LineParser {
 
     private final ParserContext context;
     private final SyntaxRegistry registry;
+    /** The event values the line can use, or {@code null} for any. Fixed for the line, so the memo holds. */
+    private final co.xenastudios.neoskript.frontend.registry.EventValues.Scope eventScope;
     private final String input;
     private final String lowerInput;
     private final Map<Key, Object> memo = new HashMap<>();
@@ -84,6 +86,7 @@ final class LineParser {
     LineParser(ParserContext context, String input) {
         this.context = context;
         this.registry = context.registry();
+        this.eventScope = context.eventScope();
         this.input = input;
         this.lowerInput = input.toLowerCase(Locale.ROOT);
     }
@@ -198,6 +201,11 @@ final class LineParser {
                 continue;
             }
             ParsedSyntax parsed = new ParsedSyntax(syntax, candidate.pattern(), match);
+            // An event value the code can't have isn't one, so another reading is tried, as Skript's fails to
+            // initialize: 'amount of slots of {_inv}' in 'on load' is the inventory's number of slots.
+            if (eventScope != null && hasTypeRole(syntax) && !eventValueAllowed(parsed, text)) {
+                continue;
+            }
             if (syntax.id().equals("ExprArithmetic") && !arithmeticOperands(parsed)) {
                 continue;
             }
@@ -311,7 +319,7 @@ final class LineParser {
     }
 
     /** How much of the line {@code parsed} leaves to unresolved words. */
-    private static int countUnresolved(ParsedSyntax parsed) {
+    static int countUnresolved(ParsedSyntax parsed) {
         int count = 0;
         for (Object value : parsed.match().values()) {
             if (value instanceof Expr expr) {
@@ -328,7 +336,7 @@ final class LineParser {
         return count;
     }
 
-    private static int countUnresolved(Expr expr) {
+    static int countUnresolved(Expr expr) {
         return switch (expr) {
             // Words a type's parser has accepted are as good as resolved.
             case Expr.Unresolved unresolved -> unresolved.verified() ? 0 : unresolved.end() - unresolved.start();
@@ -382,6 +390,16 @@ final class LineParser {
         String word = name.group(1).toLowerCase(java.util.Locale.ROOT);
         return word.equals("value") || word.equals("index") || word.equals("counter") || word.equals("iteration")
                 || registry.resolveType(word) != null;
+    }
+
+    /** Whether {@code parsed}, if it's an event value, is one the line can use. */
+    private boolean eventValueAllowed(ParsedSyntax parsed, String text) {
+        for (Object value : parsed.match().regexValues()) {
+            if (value instanceof TypeRef ref) {
+                return eventScope.allows(parsed.syntax(), ref, text.strip());
+            }
+        }
+        return true;
     }
 
     private boolean bareEntityFits(Expected expected) {
