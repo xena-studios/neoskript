@@ -8,7 +8,6 @@ import co.xenastudios.neoskript.frontend.parse.ParsedScript;
 import co.xenastudios.neoskript.frontend.parse.ParsedStructure;
 import co.xenastudios.neoskript.frontend.parse.Statement;
 import co.xenastudios.neoskript.frontend.source.Diagnostic;
-import co.xenastudios.neoskript.frontend.source.Severity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -54,8 +53,8 @@ public final class CorpusCheck {
         long lines = 0;
         for (ParsedScript script : scripts) {
             lines += script.file().lines().size();
-            // Warnings don't stop code loading; Skript gives some for its own tests too (empty sections).
-            script.diagnostics().stream().filter(d -> d.severity() == Severity.ERROR).forEach(falseErrors::add);
+            // Warnings don't stop a script loading.
+            script.diagnostics().stream().filter(CorpusCheck::isError).forEach(falseErrors::add);
             structures(script, script.structures(), counter);
         }
         return new Result(scripts.size(), lines, falseErrors, counter.expectedErrors, counter.caughtErrors,
@@ -85,6 +84,10 @@ public final class CorpusCheck {
         }
     }
 
+    private static boolean isError(Diagnostic diagnostic) {
+        return diagnostic.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR;
+    }
+
     private static void body(ParsedScript script, List<Statement> body, Counter counter) {
         for (int i = 0; i < body.size(); i++) {
             Statement statement = body.get(i);
@@ -100,7 +103,7 @@ public final class CorpusCheck {
                     }
                 } else if (Boolean.FALSE.equals(expectError)) {
                     counter.expectedClean++;
-                    if (!parse.captured().isEmpty()) {
+                    if (parse.captured().stream().anyMatch(CorpusCheck::isError)) {
                         counter.falselyRejected.add(where + ": " + parse.captured());
                     }
                 }

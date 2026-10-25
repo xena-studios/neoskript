@@ -253,6 +253,9 @@ final class TriggerCompiler {
         if (inArguments > 0 || tag != null && suppresses(tag)) {
             return;
         }
+        if ("constant".equals(tag) && library.testing()) {
+            return; // Skript's test runs don't warn of constant conditions
+        }
         if (warned.add(line + ":" + message)) {
             warnings.accept(line, message);
         }

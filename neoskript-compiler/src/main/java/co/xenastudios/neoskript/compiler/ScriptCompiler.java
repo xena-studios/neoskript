@@ -67,8 +67,14 @@ public final class ScriptCompiler {
                 }
                 // 'using script reflection': an experimental feature the script turns on.
                 if (structure.structure().kind() == co.xenastudios.neoskript.frontend.structure.Structure.Kind.USING) {
-                    features.add(structure.structure().node().line().text().strip().substring(6).strip()
-                            .toLowerCase(java.util.Locale.ROOT));
+                    Line using = structure.structure().node().line();
+                    String feature = using.text().strip().substring(6).strip();
+                    features.add(feature.toLowerCase(java.util.Locale.ROOT));
+                    String warning = co.xenastudios.neoskript.runtime.ScriptFeatures.usingWarning(feature);
+                    if (warning != null) {
+                        diagnostics.add(new Diagnostic(Severity.WARNING, script.file().name(), using.number(), 0, 0,
+                                warning));
+                    }
                 }
             }
             co.xenastudios.neoskript.runtime.ScriptFeatures.set(script.file().name(), features);
@@ -127,7 +133,7 @@ public final class ScriptCompiler {
                                 new CompiledScripts.CompiledTrigger(name, header.number(), null, null, null, testName,
                                         compiler(functions, script).compileTest(name, custom)));
                         case ParsedStructure.Command command -> commands.add(command(name, script, functions, command));
-                        case ParsedStructure.Data data -> defaultVariables(data);
+                        case ParsedStructure.Data data -> defaultVariables(data, name);
                         // Watched by the plugin, which reloads the script when its file changes.
                         case ParsedStructure.AutoReload autoReload -> {}
                         case ParsedStructure.Parse parse -> parseResults(parse, name, script, functions);
@@ -302,21 +308,28 @@ public final class ScriptCompiler {
         return problems;
     }
 
-    private void defaultVariables(ParsedStructure.Data data) {
+    private void defaultVariables(ParsedStructure.Data data, String script) {
         if (!data.structure().node().line().key().strip().equalsIgnoreCase("variables")) {
             return;
         }
         for (co.xenastudios.neoskript.frontend.structure.Node child : data.structure().section().children()) {
             String line = child.line().text().strip();
             int equals = line.indexOf('=');
-            if (!line.startsWith("{") || equals < 0) {
+            if (equals < 0) {
                 continue;
             }
             String name = line.substring(0, equals).strip();
-            if (!name.endsWith("}") || name.contains("%")) {
+            if (name.startsWith("{") && name.endsWith("}")) {
+                name = name.substring(1, name.length() - 1);
+            } else {
+                // As Skript, which still takes it.
+                warnings.add(new Diagnostic(Severity.WARNING, script, child.line().number(), 0, 0, "It is suggested to"
+                        + " use brackets around the name of a variable. Example: {example::%player%} = 5\nExcluding"
+                        + " brackets is deprecated, meaning this warning will become an error in the future."));
+            }
+            if (name.contains("%") || name.isEmpty()) {
                 continue;
             }
-            name = name.substring(1, name.length() - 1);
             Object value = literal(line.substring(equals + 1).strip());
             if (value != null && globals.get(name) == null) {
                 globals.set(name, value);
