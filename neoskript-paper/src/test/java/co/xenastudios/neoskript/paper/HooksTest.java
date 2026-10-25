@@ -163,6 +163,23 @@ class HooksTest {
     }
 
     @Test
+    void moneyWithMoneyIsMoney() {
+        // As Skript 2.17.0 with EssentialsX gives: money with money is money, with a number it's a number.
+        assertEquals(List.of("$40.00", "$0.00", "$400.00", "$1.00", "25", "$15.00", "$20.00"), run(this::vault, """
+                on load:
+                \tset test player's balance to 20
+                \tset {_m} to test player's balance
+                \tsay {_m} + {_m}
+                \tsay {_m} - {_m}
+                \tsay {_m} * {_m}
+                \tsay {_m} / {_m}
+                \tsay {_m} + 5
+                \tsay difference between {_m} and ("5 dollars" parsed as money)
+                \tsay {_x} + {_m}
+                """));
+    }
+
+    @Test
     void vaultSyntaxOnlyExistsWhenHooked() {
         Library library = new Library();
         StandardLibrary.register(library);

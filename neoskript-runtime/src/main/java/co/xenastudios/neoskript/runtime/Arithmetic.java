@@ -148,6 +148,64 @@ public final class Arithmetic {
         return null;
     }
 
+    /** What {@link #ownOperation} gives when no operation of a number type of its own applies. */
+    private static final Object NONE = new Object();
+
+    /**
+     * The result of an operation registered between two numbers of a type of their own, like money, which comes
+     * before plain number arithmetic, as Skript's {@code money + money} is money; a missing operand is the type's
+     * default. {@link #NONE} if there's no such operation.
+     */
+    private static Object ownOperation(char operator, Object a, Object b) {
+        if (!ownNumber(a) && !ownNumber(b)) {
+            return NONE;
+        }
+        if (a == null) {
+            a = defaultFor(b);
+        } else if (b == null) {
+            b = defaultFor(a);
+        }
+        if (a == null || b == null) {
+            return NONE;
+        }
+        for (Operation operation : OPERATIONS) {
+            if (operation.operator() == operator && operation.left() != Number.class && operation.right() != Number.class
+                    && operation.left().isInstance(a) && operation.right().isInstance(b)) {
+                return operation.apply().apply(a, b);
+            }
+        }
+        return NONE;
+    }
+
+    /** Whether the value is a number of a type of its own, not one of Java's. */
+    private static boolean ownNumber(Object value) {
+        return value instanceof Number && !value.getClass().getName().startsWith("java.");
+    }
+
+    private record Difference(Class<?> type, java.util.function.BiFunction<Object, Object, Object> difference) {}
+
+    private static final java.util.List<Difference> DIFFERENCES = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Registers what {@code difference between a and b} is for two values of {@code type}, as Skript's arithmetic. */
+    @SuppressWarnings("unchecked")
+    public static <T> void registerDifference(Class<T> type,
+            java.util.function.BiFunction<? super T, ? super T, ?> difference) {
+        DIFFERENCES.add(new Difference(type, (java.util.function.BiFunction<Object, Object, Object>) difference));
+    }
+
+    /**
+     * {@code difference between a and b} for two values of a type that registered one ({@link #registerDifference}),
+     * or else {@code otherwise}'s.
+     */
+    public static Object difference(Object a, Object b, java.util.function.BinaryOperator<Object> otherwise) {
+        for (Difference difference : DIFFERENCES) {
+            if (difference.type().isInstance(a) && difference.type().isInstance(b)) {
+                return difference.difference().apply(a, b);
+            }
+        }
+        return otherwise.apply(a, b);
+    }
+
     private static Object defaultFor(Object value) {
         for (java.util.Map.Entry<Class<?>, java.util.function.Supplier<?>> entry : DEFAULTS.entrySet()) {
             if (entry.getKey().isInstance(value)) {
@@ -160,6 +218,10 @@ public final class Arithmetic {
     public static Object add(Object a, Object b) {
         a = Values.single(a);
         b = Values.single(b);
+        Object own = ownOperation('+', a, b);
+        if (own != NONE) {
+            return own;
+        }
         // A missing number is 0, as in Skript: {_x} + 1 is 1 when {_x} isn't set.
         if (a == null && b instanceof Number) {
             a = 0L;
@@ -183,6 +245,10 @@ public final class Arithmetic {
     public static Object subtract(Object a, Object b) {
         a = Values.single(a);
         b = Values.single(b);
+        Object own = ownOperation('-', a, b);
+        if (own != NONE) {
+            return own;
+        }
         // A missing number is 0, as in Skript: {_x} + 1 is 1 when {_x} isn't set.
         if (a == null && b instanceof Number) {
             a = 0L;
@@ -203,6 +269,10 @@ public final class Arithmetic {
     public static Object multiply(Object a, Object b) {
         a = Values.single(a);
         b = Values.single(b);
+        Object own = ownOperation('*', a, b);
+        if (own != NONE) {
+            return own;
+        }
         // A missing number is 0, as in Skript: {_x} + 1 is 1 when {_x} isn't set.
         if (a == null && b instanceof Number) {
             a = 0L;
@@ -222,6 +292,10 @@ public final class Arithmetic {
     public static Object divide(Object a, Object b) {
         a = Values.single(a);
         b = Values.single(b);
+        Object own = ownOperation('/', a, b);
+        if (own != NONE) {
+            return own;
+        }
         // A missing number is 0, as in Skript: {_x} + 1 is 1 when {_x} isn't set.
         if (a == null && b instanceof Number) {
             a = 0L;
@@ -234,6 +308,10 @@ public final class Arithmetic {
     public static Object power(Object a, Object b) {
         a = Values.single(a);
         b = Values.single(b);
+        Object own = ownOperation('^', a, b);
+        if (own != NONE) {
+            return own;
+        }
         // A missing number is 0, as in Skript: {_x} + 1 is 1 when {_x} isn't set.
         if (a == null && b instanceof Number) {
             a = 0L;
