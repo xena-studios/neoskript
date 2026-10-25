@@ -319,6 +319,7 @@ public final class Library implements Registrar {
         }
         parsers.put(typeId, parser);
         co.xenastudios.neoskript.runtime.Parsers.register(typeId, parser);
+        builder.parses(typeId, words -> parser.apply(words) != null);
     }
 
     @Override

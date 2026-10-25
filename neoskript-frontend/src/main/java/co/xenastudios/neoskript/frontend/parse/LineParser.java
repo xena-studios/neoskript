@@ -656,7 +656,7 @@ final class LineParser {
         TypeInfo type = ref.type();
         // Open types check the words with the type's own parser: 'size of all chickens (entity type)' isn't one.
         boolean valid = type.literals().contains(value) || ((type.openLiterals() || type.literals().isEmpty())
-                && Literals.isWords(value) && registry.mightBeLiteral(type, value));
+                && Literals.isWords(value) && registry.mightBeLiteral(type, value)) || registry.parses(type, value);
         return valid ? new Expr.Literal(start, end, type.id(), text) : null;
     }
 

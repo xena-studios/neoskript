@@ -43,6 +43,7 @@ public final class SyntaxRegistry {
     /** Types whose values can all be listed, though they aren't a closed set of words: {@code all biomes}. */
     private final Set<String> enumerableTypes;
     private final Map<String, java.util.function.Predicate<String>> literalChecks;
+    private final Map<String, java.util.function.Predicate<String>> parseChecks;
     /** Direct conversions, which unlike subtypes don't chain: {@code from -> {to...}}. */
     private final Map<String, Set<String>> conversions;
     private final Set<String> entityNames;
@@ -83,6 +84,7 @@ public final class SyntaxRegistry {
         this.strictTypes = Set.copyOf(builder.strictTypes);
         this.enumerableTypes = Set.copyOf(builder.enumerableTypes);
         this.literalChecks = Map.copyOf(builder.literalChecks);
+        this.parseChecks = Map.copyOf(builder.parseChecks);
         Map<String, Set<String>> conversions = new HashMap<>();
         builder.conversions.forEach((from, to) -> conversions.put(from, Set.copyOf(to)));
         this.conversions = Map.copyOf(conversions);
@@ -211,6 +213,22 @@ public final class SyntaxRegistry {
      * Whether {@code words} might be a literal of {@code type}, an open-literal type: its check says so, or
      * it has none (so anything might be).
      */
+    /**
+     * Whether the type's own parser takes {@code words}, for a literal with its type given ({@code unknown
+     * (heal reason)}), where words left out of the type's plain literals still count.
+     */
+    public boolean parses(TypeInfo type, String words) {
+        java.util.function.Predicate<String> check = parseChecks.get(type.id());
+        if (check == null) {
+            return false;
+        }
+        try {
+            return check.test(words);
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        }
+    }
+
     public boolean mightBeLiteral(TypeInfo type, String words) {
         java.util.function.Predicate<String> check = literalChecks.get(type.id());
         if (check == null) {
@@ -325,6 +343,7 @@ public final class SyntaxRegistry {
         private final Set<String> strictTypes = new HashSet<>();
         private final Set<String> enumerableTypes = new HashSet<>();
         private final Map<String, java.util.function.Predicate<String>> literalChecks = new HashMap<>();
+        private final Map<String, java.util.function.Predicate<String>> parseChecks = new HashMap<>();
         private final Map<String, Set<String>> conversions = new HashMap<>();
         private final Set<String> entityNames = new HashSet<>();
         private final Set<String> delaying = new HashSet<>();
@@ -413,6 +432,12 @@ public final class SyntaxRegistry {
         public Builder openLiterals(String id, java.util.function.Predicate<String> check) {
             literalChecks.put(id.toLowerCase(Locale.ROOT), check);
             return openLiterals(id);
+        }
+
+        /** The type's parser, for literals that say their type. */
+        public Builder parses(String id, java.util.function.Predicate<String> check) {
+            parseChecks.put(id.toLowerCase(Locale.ROOT), check);
+            return this;
         }
 
         public Builder openLiterals(String id) {
