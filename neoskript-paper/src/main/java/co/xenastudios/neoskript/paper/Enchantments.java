@@ -81,8 +81,8 @@ final class Enchantments {
         registrar.expression("ExprEnchantments", "enchantmenttype", info -> (context, args) -> {
             List<Object> found = new ArrayList<>();
             for (Object value : (Object[]) args[0]) {
-                if (value instanceof ItemType item && item.stack().getItemMeta() != null) {
-                    item.stack().getItemMeta().getEnchants().forEach((enchantment, level) -> found.add(new Levelled(enchantment, level)));
+                if (value instanceof ItemType item && item.meta() != null) {
+                    item.meta().getEnchants().forEach((enchantment, level) -> found.add(new Levelled(enchantment, level)));
                 }
             }
             return found.toArray();
@@ -97,8 +97,8 @@ final class Enchantments {
                     return negated;
                 }
                 for (Object value : items) {
-                    Map<Enchantment, Integer> enchants = value instanceof ItemType item && item.stack().getItemMeta() != null
-                            ? item.stack().getItemMeta().getEnchants() : Map.of();
+                    Map<Enchantment, Integer> enchants = value instanceof ItemType item && item.meta() != null
+                            ? item.meta().getEnchants() : Map.of();
                     boolean has = wanted == null ? !enchants.isEmpty() : java.util.Arrays.stream(wanted).allMatch(w ->
                             w instanceof Levelled levelled && enchants.containsKey(levelled.enchantment())
                                     && fits(enchants.get(levelled.enchantment()), levelled.level(), bound));
@@ -178,8 +178,8 @@ final class Enchantments {
             for (Object item : items(arguments)) {
                 for (Object value : enchantments(arguments)) {
                     if (item instanceof ItemType type && value instanceof Enchantment enchantment
-                            && type.stack().getItemMeta() != null && type.stack().getItemMeta().hasEnchant(enchantment)) {
-                        levels.add((long) type.stack().getItemMeta().getEnchantLevel(enchantment));
+                            && type.meta() != null && type.meta().hasEnchant(enchantment)) {
+                        levels.add((long) type.meta().getEnchantLevel(enchantment));
                     }
                 }
             }

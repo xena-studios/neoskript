@@ -999,13 +999,6 @@ final class EntitySyntax {
                 "%itemtypes% (is|are) solid", "%itemtypes% (isn't|is not|aren't|are not) solid");
         conditionPatterns(registrar, "CondIsTransparent", ItemType.class, item -> item.material().isTransparent(), null,
                 "%itemtypes% (is|are) transparent", "%itemtypes% (isn't|is not|aren't|are not) transparent");
-        conditionPatterns(registrar, "CondIsForcedToGlint", ItemType.class,
-                item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().hasEnchantmentGlintOverride()
-                        && item.stack().getItemMeta().getEnchantmentGlintOverride(),
-                // Made not to glint, the override is off, which is still an override.
-                (item, value) -> item.editMeta(meta -> meta.setEnchantmentGlintOverride(value)),
-                "%itemtypes% (is|are) forced to glint", "%itemtypes% (is|are) forced to not glint",
-                "%itemtypes% (isn't|is not|aren't|are not) forced to glint");
         registrar.effect("EffForceEnchantmentGlint", info -> {
             Boolean glint = info.pattern() == 0 ? Boolean.TRUE : info.pattern() == 1 ? Boolean.FALSE : null;
             return (context, args) -> {
@@ -1015,7 +1008,9 @@ final class EntitySyntax {
                     }
                 }
             };
-        }, "make %itemtypes% glint", "make %itemtypes% not glint", "make %itemtypes% glint normally");
+        }, "(force|make) %itemtypes% [to] [start] glint[ing]", "(force|make) %itemtypes% [to] (not|stop) glint[ing]",
+                "(clear|delete|reset) [the] enchantment glint override of %itemtypes%",
+                "(clear|delete|reset) %itemtypes%'[s] enchantment glint override");
         registrar.expression("ExprItemWithGlint", "itemtype", info -> {
             boolean with = info.pattern() == 0;
             return (context, args) -> mapItems(args[0], item -> item.withMeta(meta -> meta.setEnchantmentGlintOverride(with)));
@@ -1246,11 +1241,45 @@ final class EntitySyntax {
         condition(registrar, "CondIsFireResistant", "itemtypes", "(fire resistant|resistant to fire)", ItemType.class,
                 item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().isFireResistant(),
                 (item, value) -> item.editMeta(meta -> meta.setFireResistant(value)));
-        conditionPatterns(registrar, "CondItemEnchantmentGlint", ItemType.class,
-                item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().hasEnchantmentGlintOverride(),
-                (item, value) -> item.editMeta(meta -> meta.setEnchantmentGlintOverride(value ? Boolean.TRUE : null)),
-                "%itemtypes% (has|have) enchantment glint overrid(den|e)",
-                "%itemtypes% (doesn't|does not|do not|don't) have enchantment glint overrid(den|e)");
+        // Having the override at all, or being forced to glint (or, with 'not', not to).
+        registrar.condition("CondItemEnchantmentGlint", info -> {
+            boolean override = info.pattern() <= 1;
+            boolean expected = !info.hasTag("not");
+            boolean negated = info.pattern() % 2 == 1;
+            boolean and = info.and(0);
+            Predicate<ItemType> test = item -> {
+                org.bukkit.inventory.meta.ItemMeta meta = item.stack().getItemMeta();
+                if (meta == null || !meta.hasEnchantmentGlintOverride()) {
+                    return false;
+                }
+                return override || meta.getEnchantmentGlintOverride() == expected;
+            };
+            return new co.xenastudios.neoskript.api.element.SettableCondition() {
+                @Override
+                public boolean check(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] args) {
+                    Object[] items = owners(args[0]);
+                    if (items.length == 0) {
+                        return negated;
+                    }
+                    return co.xenastudios.neoskript.api.element.Condition.check(items, and,
+                            value -> (value instanceof ItemType item && test.test(item)) != negated);
+                }
+
+                @Override
+                public void set(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] args, boolean value) {
+                    boolean glint = value != negated;
+                    for (Object owner : owners(args[0])) {
+                        if (owner instanceof ItemType item) {
+                            Boolean forced = override ? (glint ? Boolean.TRUE : null) : Boolean.valueOf(glint == expected);
+                            item.editMeta(meta -> meta.setEnchantmentGlintOverride(forced));
+                        }
+                    }
+                }
+            };
+        }, "%itemtypes% (has|have) enchantment glint overrid(den|e)",
+                "%itemtypes% (doesn't|does not|do not|don't) have enchantment glint overrid(den|e)",
+                "%itemtypes% (is|are) forced to [not:not] glint",
+                "%itemtypes% (isn't|is not|aren't|are not) forced to [not:not] glint");
     }
 
     /**

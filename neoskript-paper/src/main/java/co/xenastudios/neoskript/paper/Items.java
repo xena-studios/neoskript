@@ -35,24 +35,43 @@ final class Items {
 
     /**
      * Skript's {@code slot}: a slot of an inventory, or an entity's equipment slot (its helmet...). What's in
-     * it can be read and set.
+     * it can be read and set. Or the item inside an entity, like a dropped item or an item frame
+     * ({@code holder}).
      */
-    record Slot(Inventory inventory, int index, LivingEntity entity, EquipmentSlot equipment) {
+    record Slot(Inventory inventory, int index, LivingEntity entity, EquipmentSlot equipment,
+            org.bukkit.entity.Entity holder) {
 
         Slot(Inventory inventory, int index) {
-            this(inventory, index, null, null);
+            this(inventory, index, null, null, null);
         }
 
         static Slot of(LivingEntity entity, EquipmentSlot equipment) {
-            return new Slot(null, -1, entity, equipment);
+            return new Slot(null, -1, entity, equipment, null);
         }
 
         /** The item a player holds on their cursor, as a slot: Skript's {@code cursor slot}. */
         static Slot cursor(org.bukkit.entity.HumanEntity player) {
-            return new Slot(null, -1, player, null);
+            return new Slot(null, -1, player, null, null);
+        }
+
+        /** The item inside {@code entity}, as Skript's {@code item of %entity%}, or {@code null} if it has none. */
+        static Slot inside(org.bukkit.entity.Entity entity) {
+            return entity instanceof org.bukkit.entity.Item || entity instanceof org.bukkit.entity.ItemFrame
+                    || entity instanceof org.bukkit.entity.ThrowableProjectile || entity instanceof org.bukkit.entity.AbstractArrow
+                    || entity instanceof org.bukkit.entity.ItemDisplay ? new Slot(null, -1, null, null, entity) : null;
         }
 
         ItemStack item() {
+            if (holder != null) {
+                return switch (holder) {
+                    case org.bukkit.entity.Item dropped -> dropped.getItemStack();
+                    case org.bukkit.entity.ItemFrame frame -> frame.getItem();
+                    case org.bukkit.entity.ThrowableProjectile thrown -> thrown.getItem();
+                    case org.bukkit.entity.AbstractArrow arrow -> arrow.getItemStack();
+                    case org.bukkit.entity.ItemDisplay display -> display.getItemStack();
+                    default -> null;
+                };
+            }
             if (inventory == null && equipment == null && entity instanceof org.bukkit.entity.HumanEntity human) {
                 return human.getItemOnCursor();
             }
@@ -64,7 +83,28 @@ final class Items {
         }
 
         void set(ItemStack item) {
-            if (inventory == null && equipment == null && entity instanceof org.bukkit.entity.HumanEntity human) {
+            if (holder != null) {
+                switch (holder) {
+                    case org.bukkit.entity.Item dropped -> {
+                        if (item != null) {
+                            dropped.setItemStack(item);
+                        }
+                    }
+                    case org.bukkit.entity.ItemFrame frame -> frame.setItem(item);
+                    case org.bukkit.entity.ThrowableProjectile thrown -> {
+                        if (item != null) {
+                            thrown.setItem(item);
+                        }
+                    }
+                    case org.bukkit.entity.AbstractArrow arrow -> {
+                        if (item != null) {
+                            arrow.setItemStack(item);
+                        }
+                    }
+                    case org.bukkit.entity.ItemDisplay display -> display.setItemStack(item);
+                    default -> {}
+                }
+            } else if (inventory == null && equipment == null && entity instanceof org.bukkit.entity.HumanEntity human) {
                 human.setItemOnCursor(item);
             } else if (equipment != null) {
                 EntityEquipment gear = entity.getEquipment();
@@ -93,7 +133,7 @@ final class Items {
             if (stack.getType() != wanted.getType()) {
                 continue;
             }
-            boolean bare = !stack.hasItemMeta() || stack.getItemMeta().equals(new ItemStack(stack.getType()).getItemMeta());
+            boolean bare = bare(stack);
             if (each.plain() ? bare : !wanted.hasItemMeta() || stack.isSimilar(wanted.asQuantity(stack.getAmount()))) {
                 return true;
             }
@@ -101,28 +141,46 @@ final class Items {
         return false;
     }
 
+    /** Whether {@code stack} has nothing more to it than its kind and amount, not even a hidden tooltip. */
+    private static boolean bare(ItemStack stack) {
+        return stack.isSimilar(new ItemStack(stack.getType(), Math.max(1, stack.getAmount())));
+    }
+
     /** Whether one item is another: the same item, with the meta and amount the other was written with. */
     private static boolean isItem(ItemType item, ItemType pattern) {
         ItemStack wanted = pattern.alternatives().getFirst().stack();
         ItemStack actual = item.alternatives().getFirst().stack();
-        if (pattern.plain() && actual.hasItemMeta() && !actual.getItemMeta().equals(new ItemStack(actual.getType()).getItemMeta())) {
+        if (pattern.plain() && !bare(actual)) {
             // 'plain diamond' is only a diamond with nothing more to it.
             return false;
         }
-        return actual.getType() == wanted.getType() && (!wanted.hasItemMeta() || actual.isSimilar(wanted))
+        return item.alternatives().getFirst().material() == pattern.material() && actual.getType() == wanted.getType()
+                && (!wanted.hasItemMeta() || actual.isSimilar(wanted))
                 && (!pattern.amountGiven() || actual.getAmount() == wanted.getAmount());
+    }
+
+    private static void slotNames(Map<String, EquipmentSlot> slots, EquipmentSlot slot, String... names) {
+        for (String name : names) {
+            slots.put(name, slot);
+        }
     }
 
     static void register(Registrar registrar) {
         registrar.type("itemtype", "item type", ItemType.class);
         registrar.type("itemstack", "item", ItemStack.class);
         registrar.alias("itemstack", "item", "items");
+        registrar.alias("itemstack", "item stack", "item stacks");
         registrar.type("inventory", "inventory", Inventory.class);
         registrar.type("inventoryholder", "inventory holder", InventoryHolder.class);
         registrar.type("slot", "slot", Slot.class);
         registrar.subtype("player", "inventoryholder");
 
         registrar.literalParser("itemtype", ItemType::parse);
+        // 'iron helmet (item stack)': as Skript's item stack parser, an item that's one material.
+        registrar.literalParser("itemstack", text -> {
+            ItemType item = ItemType.parse(text);
+            return item == null || item.alternatives().size() != 1 ? null : item.stack();
+        });
         registrar.cloner(ItemType.class, ItemType::copy);
         registrar.cloner(ItemStack.class, ItemStack::clone);
         registrar.parser("itemtype", ItemType::parse);
@@ -218,28 +276,29 @@ final class Items {
     }
 
     private static void registerMore(Registrar registrar) {
+        // Skript's names for equipment slots (its 'equipment slots' in default.lang), the first being how one reads.
         Map<String, EquipmentSlot> slots = new LinkedHashMap<>();
-        slots.put("helmet", EquipmentSlot.HEAD);
-        slots.put("head", EquipmentSlot.HEAD);
-        slots.put("chestplate", EquipmentSlot.CHEST);
-        // Not 'chest', which Skript reads as the chest item where both would do: 'set block at X to chest'.
-        slots.put("leggings", EquipmentSlot.LEGS);
-        slots.put("legs", EquipmentSlot.LEGS);
-        slots.put("boots", EquipmentSlot.FEET);
-        slots.put("shoes", EquipmentSlot.FEET);
-        slots.put("feet", EquipmentSlot.FEET);
-        slots.put("tool", EquipmentSlot.HAND);
-        slots.put("main hand", EquipmentSlot.HAND);
-        slots.put("off hand", EquipmentSlot.OFF_HAND);
-        slots.put("offhand", EquipmentSlot.OFF_HAND);
-        slots.put("body", EquipmentSlot.BODY);
+        slotNames(slots, EquipmentSlot.HEAD, "helmet slot", "helmet slots", "head slot", "head slots", "helmet", "helmets");
+        slotNames(slots, EquipmentSlot.CHEST, "chestplate slot", "chestplate slots", "chest slot", "chest slots",
+                "chestplate", "chestplates");
+        slotNames(slots, EquipmentSlot.LEGS, "leggings slot", "leggings slots", "leggings", "legs slot", "legs slots", "legs");
+        slotNames(slots, EquipmentSlot.FEET, "feet slot", "feet slots", "feet", "boots slot", "boots slots", "boots",
+                "shoes slot", "shoes");
+        slotNames(slots, EquipmentSlot.HAND, "tool slot", "tool slots", "hand slot", "hand slots", "main hand slot",
+                "main hand slots", "main hand", "main hands");
+        slotNames(slots, EquipmentSlot.OFF_HAND, "off hand slot", "off hand slots", "off hand", "off haands");
+        slotNames(slots, EquipmentSlot.BODY, "body slot", "body slots", "body armor slot", "body armor slots",
+                "body armour slot", "body armour slots", "body armor", "body armors", "body armour", "body armours");
+        if (SADDLE_SLOT != null) {
+            slotNames(slots, SADDLE_SLOT, "saddle slot", "saddle slots");
+        }
         registrar.namedType("equipmentslot", "equipment slot", EquipmentSlot.class, slots);
-        registrar.text(EquipmentSlot.class, slot -> slot.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' '));
-        registrar.expression("ExprArmorSlot", "slot", info -> {
-            boolean armor = info.hasTag("armor");
-            return new SlotsOfEntities(armor);
-        }, "[the] (%*equipmentslots%|armor:[the] armo[u]r[s]) [item[s]] of %livingentities%",
-                "%livingentities%'[s] (%*equipmentslots%|armor:[the] armo[u]r[s]) [item[s]]");
+        Map<EquipmentSlot, String> slotTexts = new java.util.EnumMap<>(EquipmentSlot.class);
+        slots.forEach((name, slot) -> slotTexts.putIfAbsent(slot, name));
+        registrar.text(EquipmentSlot.class, slotTexts::get);
+        registrar.expression("ExprArmorSlot", "slot", info -> new SlotsOfEntities(info.hasTag("armor"), info.pattern() == 1),
+                "[the] (%-*equipmentslots%|armor:[the] armo[u]r[s]) [item:item[s]] of %livingentities%",
+                "%livingentities%'[s] (%-*equipmentslots%|armor:[the] armo[u]r[s]) [item:item[s]]");
 
         // 'set helmet of player to diamond helmet', 'delete slot 3 of {_menu}'.
         registrar.changer(Slot.class, Changeable.Mode.SET, (slot, values) -> {
@@ -499,22 +558,28 @@ final class Items {
     }
 
     /** {@code the helmet of %livingentities%}, {@code the armor of ...}: their equipment slots. */
-    private record SlotsOfEntities(boolean armor) implements Expression {
+    private record SlotsOfEntities(boolean armor, boolean possessive) implements Expression {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
             List<Object> slots = new ArrayList<>();
-            Object[] entities = (Object[]) arguments[1];
+            Object[] entities = Property.of(arguments[possessive ? 0 : 1]);
+            Object given = arguments[possessive ? 1 : 0];
             for (Object entity : entities) {
-                if (!(entity instanceof LivingEntity living)) {
+                if (!(entity instanceof LivingEntity living) || living.getEquipment() == null) {
                     continue;
                 }
-                if (armor) {
+                if (armor || given == null) {
+                    // Entities with body armour have no other armour, as Skript has it.
+                    if (canUse(living, EquipmentSlot.BODY)) {
+                        slots.add(Slot.of(living, EquipmentSlot.BODY));
+                        continue;
+                    }
                     for (EquipmentSlot slot : List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET)) {
                         slots.add(Slot.of(living, slot));
                     }
-                } else if (arguments[0] != null) {
-                    for (Object slot : (Object[]) arguments[0]) {
-                        if (slot instanceof EquipmentSlot equipment) {
+                } else {
+                    for (Object slot : Property.of(given)) {
+                        if (slot instanceof EquipmentSlot equipment && canUse(living, equipment)) {
                             slots.add(Slot.of(living, equipment));
                         }
                     }
@@ -522,6 +587,33 @@ final class Items {
             }
             return slots.size() == 1 ? slots.getFirst() : slots.toArray();
         }
+    }
+
+    /** Skript's {@code SADDLE} equipment slot, which servers before 1.21.5 don't have. */
+    static final EquipmentSlot SADDLE_SLOT = saddleSlot();
+
+    private static EquipmentSlot saddleSlot() {
+        try {
+            return EquipmentSlot.valueOf("SADDLE");
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Whether {@code entity} has the slot, as Skript's armour slots see it: body armour only on horses,
+     * llamas, wolves and happy ghasts; a saddle only on pigs, striders and horses of all kinds.
+     */
+    static boolean canUse(LivingEntity entity, EquipmentSlot slot) {
+        if (slot == EquipmentSlot.BODY) {
+            return entity instanceof org.bukkit.entity.Horse || entity instanceof org.bukkit.entity.Llama
+                    || entity instanceof org.bukkit.entity.Wolf || entity.getType().name().equals("HAPPY_GHAST");
+        }
+        if (slot == SADDLE_SLOT) {
+            return entity instanceof org.bukkit.entity.Pig || entity instanceof org.bukkit.entity.Strider
+                    || entity instanceof org.bukkit.entity.AbstractHorse;
+        }
+        return true;
     }
 
     /** {@code the lore of %itemtype%} and its lines, which can be set. */
@@ -587,10 +679,21 @@ final class Items {
      * The inventory of a container item, like a chest or shulker box, or {@code null}: changing it changes
      * the item, as in Skript.
      */
-    private static Inventory itemInventory(ItemType item) {
-        if (!(item.stack().getItemMeta() instanceof org.bukkit.inventory.meta.BlockStateMeta meta)
+    @SuppressWarnings("UnstableApiUsage")
+    private static Inventory itemInventory(Object item) {
+        ItemStack stack = stack(item);
+        if (stack == null || !(stack.getItemMeta() instanceof org.bukkit.inventory.meta.BlockStateMeta meta)
                 || !(meta.getBlockState() instanceof org.bukkit.block.Container state)) {
             return null;
+        }
+        // An item made from a placed container keeps what's in it as the item's container data.
+        io.papermc.paper.datacomponent.item.ItemContainerContents contents =
+                stack.getData(io.papermc.paper.datacomponent.DataComponentTypes.CONTAINER);
+        if (contents != null && state.getInventory().isEmpty()) {
+            List<ItemStack> items = contents.contents();
+            for (int i = 0; i < items.size() && i < state.getInventory().getSize(); i++) {
+                state.getInventory().setItem(i, items.get(i));
+            }
         }
         Inventory inventory = state.getInventory();
         return (Inventory) java.lang.reflect.Proxy.newProxyInstance(Items.class.getClassLoader(),
@@ -602,7 +705,7 @@ final class Items {
                         throw e.getCause();
                     }
                     if (state.update()) {
-                        item.editMeta(edited -> ((org.bukkit.inventory.meta.BlockStateMeta) edited).setBlockState(state));
+                        editMeta(item, edited -> ((org.bukkit.inventory.meta.BlockStateMeta) edited).setBlockState(state));
                     }
                     return result;
                 });
@@ -726,20 +829,7 @@ final class Items {
             boolean unbreakable = info.pattern() == 0;
             return (context, args) -> mapItems(args[0], item -> item.withMeta(meta -> meta.setUnbreakable(unbreakable)));
         }, "unbreakable %itemtypes%", "breakable %itemtypes%");
-        registrar.expression("ExprCustomModelData", "integer", info -> new SettableProperty<>(ItemType.class, Number.class,
-                item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().hasCustomModelData()
-                        ? (long) item.stack().getItemMeta().getCustomModelData() : 0L,
-                (item, data) -> item.editMeta(meta -> meta.setCustomModelData((int) data.doubleValue())))
-                .resettingTo((java.util.function.Consumer<Object>) item -> ((ItemType) item).editMeta(meta -> meta.setCustomModelData(null)))
-                .deleting(item -> item.editMeta(meta -> meta.setCustomModelData(null))),
-                "[the] [custom] model data of %itemtypes%", "%itemtypes%'[s] [custom] model data");
-        EntitySyntax.conditionPatterns(registrar, "CondHasCustomModelData", ItemType.class,
-                item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().hasCustomModelData(), null,
-                "%itemtypes% (has|have) [custom] model data",
-                "%itemtypes% (doesn't|does not|do not|don't) have [custom] model data");
-        registrar.expression("ExprItemWithCustomModelData", "itemtype", info -> (context, args) -> mapItems(args[0], item ->
-                args[1] instanceof Number data ? item.withMeta(meta -> meta.setCustomModelData((int) data.doubleValue())) : item),
-                "%itemtypes% with [custom] model data %number%");
+        ModelData.register(registrar);
         registrar.expression("ExprItemModel", "string", info -> new SettableProperty<>(Object.class, String.class, owner -> {
             ItemStack stack = stack(owner);
             return stack == null || stack.getItemMeta() == null || !stack.getItemMeta().hasItemModel() ? null
@@ -807,8 +897,8 @@ final class Items {
                 }
                 return found.toArray();
             };
-        }, "[all [[of] the]] items ([inside]|in [[the] inventory of]) %inventories%",
-                "all [[of] the] %itemtypes% ([inside]|in [[the] inventory of]) %inventories%");
+        }, "[all [[of] the]] items ([with]in|of|contained in|out of) [inventor(y|ies)] %inventories%",
+                "all [[of] the] %itemtypes% ([with]in|of|contained in|out of) [inventor(y|ies)] %inventories%");
         // 'a hopper inventory named "x"': any kind of inventory that can be made on its own. The kinds are
         // looked up when used, as Bukkit's inventory types touch the server's registries.
         Map<String, InventoryKind> kinds = new LinkedHashMap<>();
@@ -863,35 +953,9 @@ final class Items {
             case org.bukkit.entity.Entity entity -> entity.getLocation();
             default -> null;
         });
-        // The item a dropped item, item frame or item display is or shows.
-        registrar.expression("ExprItemOfEntity", "itemtype", info -> new SettableProperty<>(org.bukkit.entity.Entity.class,
-                ItemType.class, entity -> {
-                    ItemStack stack = switch (entity) {
-                        case org.bukkit.entity.Item dropped -> dropped.getItemStack();
-                        case org.bukkit.entity.ItemFrame frame -> frame.getItem();
-                        case org.bukkit.entity.ItemDisplay display -> display.getItemStack();
-                        case org.bukkit.entity.ThrowableProjectile thrown -> thrown.getItem();
-                        default -> null;
-                    };
-                    return stack == null ? null : new ItemType(stack, true);
-                }, (entity, item) -> {
-                    ItemStack stack = item == null ? null : item.stack();
-                    switch (entity) {
-                        case org.bukkit.entity.Item dropped -> {
-                            if (stack != null) {
-                                dropped.setItemStack(stack);
-                            }
-                        }
-                        case org.bukkit.entity.ItemFrame frame -> frame.setItem(stack);
-                        case org.bukkit.entity.ItemDisplay display -> display.setItemStack(stack);
-                        case org.bukkit.entity.ThrowableProjectile thrown -> {
-                            if (stack != null) {
-                                thrown.setItem(stack);
-                            }
-                        }
-                        default -> {}
-                    }
-                }), "[the] item of %entities%", "%entities%'[s] item");
+        // The item inside a dropped item, item frame, item display or projectile, as a slot it can be set in.
+        registrar.expression("ExprItemOfEntity", "slot", info -> new Property<>(org.bukkit.entity.Entity.class, Slot::inside),
+                co.xenastudios.neoskript.api.registration.Patterns.property("item [inside]", "entities"));
         registrar.expression("ExprFirstEmptySlot", "slot", info -> (context, args) -> {
             List<Object> slots = new ArrayList<>();
             for (Object value : (Object[]) args[0]) {
@@ -921,13 +985,15 @@ final class Items {
                 } else if (holder instanceof org.bukkit.block.Block block
                         && block.getState() instanceof InventoryHolder h) {
                     inventories.add(h.getInventory());
-                } else if (holder instanceof ItemType item && itemInventory(item) instanceof Inventory inventory) {
+                } else if ((holder instanceof ItemType || holder instanceof ItemStack)
+                        && itemInventory(holder) instanceof Inventory inventory) {
                     inventories.add(inventory);
                 }
             }
             return inventories.size() == 1 ? inventories.getFirst() : inventories.toArray();
-        }, "[the] inventor(y|ies) of %inventoryholders/blocks/itemtypes%",
-                "%inventoryholders/blocks/itemtypes%'[s] inventor(y|ies)");
+            // Item stacks too, as Skript takes them for item types: 'inventory of (exact item of {_chest})'.
+        }, "[the] inventor(y|ies) of %inventoryholders/blocks/itemtypes/itemstacks%",
+                "%inventoryholders/blocks/itemtypes/itemstacks%'[s] inventor(y|ies)");
 
         registrar.effect("EffOpenInventory", info -> {
             int pattern = info.pattern();
@@ -1033,15 +1099,24 @@ final class Items {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            if (mode == Mode.DELETE || mode == Mode.RESET) {
+                return new Class<?>[0];
+            }
             return mode == Mode.SET || mode == Mode.ADD || mode == Mode.REMOVE ? new Class<?>[] {Number.class} : null;
         }
 
         @Override
         public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
-            if (delta == null || delta.length == 0 || !(delta[0] instanceof Number number)) {
+            int by;
+            if (mode == Mode.DELETE || mode == Mode.RESET) {
+                // Deleting or resetting an amount makes it 1, as in Skript.
+                by = 1;
+                mode = Mode.SET;
+            } else if (delta == null || delta.length == 0 || !(delta[0] instanceof Number number)) {
                 return;
+            } else {
+                by = co.xenastudios.neoskript.runtime.Values.toInt(number.doubleValue());
             }
-            int by = co.xenastudios.neoskript.runtime.Values.toInt(number.doubleValue());
             for (Object value : (Object[]) arguments[0]) {
                 switch (value) {
                     case ItemType item -> item.setAmount(amount(item.amount(), by, mode));
