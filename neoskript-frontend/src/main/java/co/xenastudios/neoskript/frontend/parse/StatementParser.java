@@ -241,6 +241,13 @@ final class StatementParser {
             error(line, "Can't understand this section: " + key);
             return new Statement.Invalid(line);
         }
+        // What takes the section may refuse it, as Skript's section expressions, then its effect sections, do.
+        String refused = argumentText(key, header, sectionRefusal(header));
+        if (refused != null) {
+            error(line, refused.isEmpty() ? "The line '" + key + "' is a valid statement but cannot function as a section (:)"
+                    + " because there is no syntax in the line to manage it." : refused);
+            return new Statement.Invalid(line);
+        }
         List<Expr.Syntax> claimants = sectionOnly(header);
         if (!claimants.isEmpty()) {
             error(line, claimError(key, claimants.getFirst(), "'" + key + "'"));
@@ -614,6 +621,34 @@ final class StatementParser {
                 check(line, inner.syntax());
             }
         }
+    }
+
+    /** {@code problem}, or for {@link ParseCheck#ARGUMENT_TEXT} and an index, the text written for that argument. */
+    private static String argumentText(String key, ParsedSyntax syntax, String problem) {
+        if (problem == null || !problem.startsWith(ParseCheck.ARGUMENT_TEXT)) {
+            return problem;
+        }
+        int index = Integer.parseInt(problem.substring(ParseCheck.ARGUMENT_TEXT.length()));
+        Object value = index < syntax.match().values().size() ? syntax.match().values().get(index) : null;
+        if (!(value instanceof Expr.Text text)) {
+            return "";
+        }
+        return key.substring(text.start() + 1, text.end() - 1).replace("\"\"", "\"");
+    }
+
+    /** Why the line's syntax won't take the section under it, or {@code null} if it does. */
+    private String sectionRefusal(ParsedSyntax header) {
+        for (Object value : header.match().values()) {
+            if (value instanceof Expr.Syntax inner) {
+                ParseCheck check = context.registry().sectionCheck(inner.syntax().syntax());
+                String problem = check == null ? null : check.check(inner.syntax().match(), delay);
+                if (problem != null) {
+                    return problem;
+                }
+            }
+        }
+        ParseCheck check = context.registry().sectionCheck(header.syntax());
+        return check == null ? null : check.check(header.match(), delay);
     }
 
     /** The expressions in a parsed line that can only be used with a section, in order. */

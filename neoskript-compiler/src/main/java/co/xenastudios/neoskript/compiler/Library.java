@@ -688,6 +688,10 @@ public final class Library implements Registrar {
     }
 
     /** Adds a parse-time check to core syntax. */
+    void sectionCheck(SyntaxKind kind, String id, co.xenastudios.neoskript.frontend.registry.ParseCheck check) {
+        builder.sectionCheck(kind, id, check);
+    }
+
     void check(SyntaxKind kind, String id, co.xenastudios.neoskript.frontend.registry.ParseCheck check) {
         builder.check(kind, id, check);
     }

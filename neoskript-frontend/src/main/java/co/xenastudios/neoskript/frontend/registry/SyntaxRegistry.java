@@ -128,6 +128,15 @@ public final class SyntaxRegistry {
         return checks.get(syntax.kind() + ":" + syntax.id());
     }
 
+    /**
+     * The check the syntax element makes when a section is written under its line, as Skript's effect sections
+     * and section expressions get the section in {@code init}; or {@code null}. An empty error means it just
+     * doesn't take one.
+     */
+    public ParseCheck sectionCheck(SyntaxInfo syntax) {
+        return checks.get("section:" + syntax.kind() + ":" + syntax.id());
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -385,6 +394,12 @@ public final class SyntaxRegistry {
         /** Marks an expression as only usable with a section under it. */
         public Builder sectionOnly(String id) {
             sectionOnly.add(id);
+            return this;
+        }
+
+        /** Adds a check the syntax element makes when a section is written under its line. */
+        public Builder sectionCheck(SyntaxKind kind, String id, ParseCheck check) {
+            checks.put("section:" + kind + ":" + id, check);
             return this;
         }
 
