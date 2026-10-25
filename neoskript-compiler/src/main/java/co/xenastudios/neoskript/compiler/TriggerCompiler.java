@@ -2411,7 +2411,11 @@ final class TriggerCompiler {
             List<String> outerLiteralTypes = literalTypes;
             literalTypes = literalTypesFor(syntax, values, i, specs[i]);
             try {
-                expression(expr);
+                if (specs[i].time() != 0) {
+                    timedArgument(expr, specs[i].time());
+                } else {
+                    expression(expr);
+                }
             } finally {
                 literalTypes = outerLiteralTypes;
             }
@@ -2556,8 +2560,24 @@ final class TriggerCompiler {
      * or will be after it. Only event values that have such a state can be written so.
      */
     private void timeState(Expr.Syntax syntax) throws CompileException {
-        int time = syntax.syntax().pattern() < 2 ? -1 : 1;
-        Object inner = syntax.syntax().match().values().getFirst();
+        timed(syntax.syntax().match().values().getFirst(), syntax.syntax().pattern() < 2 ? -1 : 1, syntax);
+    }
+
+    /**
+     * A placeholder with a time state, {@code %objects@-1%} in {@code X was Y}: as Skript's type pattern
+     * elements apply it, a literal can't have one, nor anything after the event has passed.
+     */
+    private void timedArgument(Expr expr, int time) throws CompileException {
+        if (expr instanceof Expr.Literal) {
+            throw new CompileException(line, "Can't understand this condition/effect: " + source.strip());
+        }
+        if (currentLine != null && script.delayBefore(currentLine) == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED) {
+            throw new CompileException(line, "Cannot use time states after the event has already passed");
+        }
+        timed(expr, time, expr);
+    }
+
+    private void timed(Object inner, int time, Expr whole) throws CompileException {
         if (hasTimeState(inner)) {
             eventValue((Expr.Syntax) inner, time);
             return;
@@ -2581,7 +2601,7 @@ final class TriggerCompiler {
             return;
         }
         String text = inner instanceof Expr expr && expr.end() <= source.length()
-                ? source.substring(expr.start(), expr.end()) : source.substring(syntax.start(), syntax.end());
+                ? source.substring(expr.start(), expr.end()) : source.substring(whole.start(), whole.end());
         throw new CompileException(line, text + " does not have a " + (time < 0 ? "past" : "future") + " state");
     }
 
@@ -2963,14 +2983,7 @@ final class TriggerCompiler {
 
     /** {@code arg-1}, {@code the second argument}, {@code the last argument}, {@code the arguments}. */
     private void argument(Expr.Syntax expr) throws CompileException {
-        int index = argumentIndex(expr);
-        if (index >= 0) {
-            commandArgument(index);
-        } else {
-            // 'the argument' is the only one; with several, it's all of them.
-            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
-            method.visitMethodInsn(INVOKESTATIC, COMMAND_EVENT, "arguments", "(" + CONTEXT + ")" + OBJECTS, false);
-        }
+        commandArgument(argumentIndex(expr));
     }
 
     /**
@@ -2989,7 +3002,18 @@ final class TriggerCompiler {
             default -> -1;
         };
         if (n == -1) {
-            return arguments.size() == 1 ? 0 : -1;
+            if (arguments.isEmpty()) {
+                throw new CompileException(line, "This command doesn't have any arguments");
+            }
+            if (syntax.match().hasTag("all")) {
+                throw new CompileException(line, "'arguments' cannot be used for script commands. Use 'argument 1',"
+                        + " 'argument 2', etc. instead");
+            }
+            if (arguments.size() > 1) {
+                throw new CompileException(line, "This command has multiple arguments, meaning it is not possible to"
+                        + " get the 'argument'. Use 'argument 1', 'argument 2', etc. instead");
+            }
+            return 0;
         }
         if (n < 1 || n > arguments.size()) {
             throw new CompileException(line, arguments.isEmpty() ? "This command doesn't have any arguments"
@@ -3026,12 +3050,7 @@ final class TriggerCompiler {
             throw new CompileException(line, "It is only possible to obtain or change command suggestions of an"
                     + " argument! Is the argument expression written correctly?");
         }
-        int index = argumentIndex(argument);
-        if (index < 0) {
-            throw new CompileException(line, "This command has multiple arguments, meaning it is not possible to get"
-                    + " the 'argument'. Use 'argument 1', 'argument 2', etc. instead");
-        }
-        return index;
+        return argumentIndex(argument);
     }
 
     /** {@code set the suggestions for arg-1 to "a" and "b"}, and adding, removing, deleting and resetting them. */
@@ -3067,17 +3086,36 @@ final class TriggerCompiler {
         if (!(regexes.getFirst() instanceof TypeRef ref)) {
             throw unsupported("'" + source.substring(expr.start(), expr.end()) + "'");
         }
-        int n = regexes.size() > 1 && regexes.get(1) instanceof java.util.regex.MatchResult number
-                ? Integer.parseInt(number.group()) : 1;
-        int seen = 0;
+        // As Skript's ExprArgument, whose errors name the kind of argument expression (CLASSINFO), and which
+        // takes the second of two arguments of the type when no number is given.
+        int ordinal = regexes.size() > 1 && regexes.get(1) instanceof java.util.regex.MatchResult number
+                ? Integer.parseInt(number.group()) : -1;
+        if (ordinal > arguments.size()) {
+            throw new CompileException(line, "This command doesn't have a " + ordinalText(ordinal) + " "
+                    + ref.type().name() + " argument");
+        }
+        int found = -1;
+        int amount = 0;
         for (int i = 0; i < arguments.size(); i++) {
             String type = arguments.get(i).type();
-            if ((type.equals(ref.type().id()) || registry.isSubtype(type, ref.type().id())) && ++seen == n) {
-                return i;
+            if (!type.equals(ref.type().id()) && !registry.isSubtype(type, ref.type().id())) {
+                continue;
+            }
+            if (ordinal == -1 && amount == 2) {
+                throw new CompileException(line, "There are multiple CLASSINFO arguments in this command");
+            }
+            found = i;
+            if (++amount == ordinal) {
+                break;
             }
         }
-        throw new CompileException(line, "This command doesn't have " + (n == 1 ? "a" : "a " + ordinalText(n)) + " "
-                + ref.type().name() + " argument");
+        if (amount == 0) {
+            throw new CompileException(line, "There is no CLASSINFO argument in this command");
+        } else if (ordinal > amount) {
+            throw new CompileException(line, amount == 1 ? "There is only one CLASSINFO argument in this command"
+                    : "There are only " + amount + " CLASSINFO arguments in this command");
+        }
+        return found;
     }
 
     /** {@code the first choice argument}: the text typed for a choice such as {@code (give|take)}. */

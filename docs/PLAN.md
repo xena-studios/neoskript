@@ -584,6 +584,11 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **Patterns:** Skript's full patterns for silence, breedable, aging, playing dead, shivering, custom names, creepers, force attack, run, enchant at level, warden anger, carried blocks, item despawning and reeling in hooked entities.
     - Known differences: money in a variable is saved as a number, and quoted region names are looked up when the script runs. `was` and `will be` comparisons aren't there yet.
 
+    **Batch 23 (2026-10-25): 862 of 862 tests still pass; the parser knows the event.**
+    - **Event values while parsing:** a reading that needs a value the event doesn't have is turned down and another tried, as Skript's event value expressions fail to initialise (`{_inv}'s amount of slots` in `on load` is the inventory's slots, not an amount of the event's slots). When nothing else parses, Skript's "There's no X in ..." is still the error.
+    - **Comparisons before and after the event:** `was`, `were`, `will be` and `is turning into`, with Skript's time states on placeholders (literals can't have one; none after a delay).
+    - **Command arguments:** Skript's errors for `the argument` in a command with several arguments, `the arguments` in script commands, and typed arguments (including its quirks: of two arguments of a type, the second; messages naming CLASSINFO).
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.

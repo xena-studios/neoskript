@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.parse;
 
+import co.xenastudios.neoskript.frontend.registry.EventValues;
 import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
 import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
 import co.xenastudios.neoskript.frontend.registry.TypeRef;
@@ -134,14 +135,25 @@ public final class ScriptLoader {
 
     private ParsedStructure structure(Structure structure, ParserContext context, StatementParser statements,
             Diagnostics diagnostics) {
-        return switch (structure.kind()) {
-            case OPTIONS, VARIABLES, ALIASES, USING -> new ParsedStructure.Data(structure);
-            case FUNCTION -> function(structure, statements, diagnostics, diagnostics.file().name());
-            case COMMAND -> new CommandParser(registry, statements, diagnostics).parse(structure);
-            case EVENT -> structure.section().line().key().equalsIgnoreCase(PARSE_STRUCTURE)
-                    ? parseBlock(structure, context, statements, diagnostics)
-                    : event(structure, context, statements, diagnostics);
-        };
+        // Each structure's code has the event values of its own; the event's are set once its header is parsed.
+        EventValues values = registry.eventValues();
+        EventValues.Scope before = context.eventScope(switch (structure.kind()) {
+            case FUNCTION -> values == null ? null : values.function();
+            case COMMAND -> values == null ? null : values.command();
+            default -> null;
+        });
+        try {
+            return switch (structure.kind()) {
+                case OPTIONS, VARIABLES, ALIASES, USING -> new ParsedStructure.Data(structure);
+                case FUNCTION -> function(structure, statements, diagnostics, diagnostics.file().name());
+                case COMMAND -> new CommandParser(registry, statements, diagnostics).parse(structure);
+                case EVENT -> structure.section().line().key().equalsIgnoreCase(PARSE_STRUCTURE)
+                        ? parseBlock(structure, context, statements, diagnostics)
+                        : event(structure, context, statements, diagnostics);
+            };
+        } finally {
+            context.eventScope(before);
+        }
     }
 
     /** Parses the structures in a top-level {@code parse:} block's {@code code:}, capturing their problems. */
@@ -172,7 +184,9 @@ public final class ScriptLoader {
         String key = line.key();
         LineParser parser = new LineParser(context, key);
         ParsedSyntax custom = parser.structure(0, key.length());
+        EventValues values = registry.eventValues();
         if (custom != null) {
+            context.eventScope(values == null ? null : values.structure(custom.syntax()));
             return new ParsedStructure.Custom(structure, custom, statements.body(section.children()));
         }
         ParsedSyntax event = eventHeader(context, key, ON_PREFIX);
@@ -183,6 +197,7 @@ public final class ScriptLoader {
             diagnostics.error(line.number(), line.column(), key.length(), "Can't understand this event: '" + key + "'");
             return null;
         }
+        context.eventScope(values == null ? null : values.event(event.syntax()));
         return new ParsedStructure.Event(structure, event, statements.body(section.children()));
     }
 

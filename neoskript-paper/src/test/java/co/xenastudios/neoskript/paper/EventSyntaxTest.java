@@ -173,6 +173,15 @@ class EventSyntaxTest {
     }
 
     @Test
+    void anEventValueTheEventHasNotIsReadAnotherWay() {
+        // As in Skript: 'slots' isn't the event's slot where there's none, but the inventory's slots.
+        assertEquals(List.of(), errors("on load:\n\tset {_a} to amount of slots of {_inv}\n"));
+        // Where nothing else parses, it's still the error.
+        assertEquals(List.of("There's no slot in a join event"), errors("on join:\n\tset {_a} to event-slot\n"));
+        assertEquals(List.of(), errors("on join:\n\tset {_a} to event-player\n"));
+    }
+
+    @Test
     void eventSyntaxParsesInItsEvents() {
         assertEquals(List.of(), errors("""
                 on brewing fuel consumption:
@@ -216,8 +225,7 @@ class EventSyntaxTest {
                 \ttrigger:
                 \t\tsay the command's executor
                 on load:
-                \tsay holders of {_inv} and rows of {_inv}
-                \tsay {_inv}'s amount of slots
+                \tsay holders of {_inv}, rows of {_inv} and {_inv}'s amount of slots
                 \tsay anvil text input of {_inv}
                 \tsay the max repair cost of {_inv}
                 \tset {_inv}'s anvil repair cost to 3
@@ -226,6 +234,27 @@ class EventSyntaxTest {
                 \tinterrupt the usage of {_p}'s active item
                 \tlaunch flickering trailing {_type} firework colored {_c} fading to {_c} at {_l} timed 2
                 \tsay the last launched firework
+                """));
+    }
+
+    @Test
+    void comparisonsBeforeAndAfterTheEvent() {
+        assertEquals(List.of(), errors("""
+                on place:
+                \tif event-block was {_b}:
+                \t\tsay "x"
+                \tif event-block wasn't between 1 and 2:
+                \t\tsay "x"
+                """));
+        assertEquals(List.of("{_x} does not have a past state",
+                "Cannot use time states after the event has already passed"), errors("""
+                on place:
+                \tif {_x} was 1:
+                \t\tsay "x"
+                on place:
+                \twait 1 tick
+                \tif event-block was {_b}:
+                \t\tsay "x"
                 """));
     }
 }

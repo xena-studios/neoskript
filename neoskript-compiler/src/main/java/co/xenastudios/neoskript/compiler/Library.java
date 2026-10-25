@@ -796,7 +796,7 @@ public final class Library implements Registrar {
     public synchronized SyntaxRegistry registry() {
         if (registry == null) {
             CoreSyntax.registerLast(this);
-            registry = builder.build();
+            registry = builder.eventValues(new LibraryEventValues(this)).build();
         }
         return registry;
     }
