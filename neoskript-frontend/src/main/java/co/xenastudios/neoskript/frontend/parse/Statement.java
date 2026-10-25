@@ -61,4 +61,15 @@ public sealed interface Statement {
 
     /** A line that couldn't be parsed. Its error has been reported. */
     record Invalid(Line line) implements Statement {}
+
+    /**
+     * Skript's error for an {@code else} with no {@code if} before it. An {@code else if} isn't understood as
+     * anything else either, and Skript names only its words before {@code if}.
+     */
+    static String orphanElse(String lower) {
+        java.util.regex.Matcher elseIf = java.util.regex.Pattern.compile("^(else(?: parse)?) if\\b.*").matcher(lower);
+        return elseIf.matches() ? "Can't understand this effect: " + elseIf.group(1)
+                : "'else' has to be placed just after another 'if' or 'else if' section";
+    }
+
 }

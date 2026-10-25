@@ -93,7 +93,7 @@ class ScriptCompilerTest {
         CompiledScripts compiled = compile("on load:\n\tsay \"a\"\n\tsay diamond sword\n");
         assertEquals(List.of(), compiled.triggers());
         assertEquals(1, compiled.diagnostics().size());
-        assertTrue(compiled.diagnostics().getFirst().message().equals("Can't understand this expression: 'diamond sword'"),
+        assertTrue(compiled.diagnostics().getFirst().message().equals("Can't understand this condition/effect: say diamond sword"),
                 compiled.diagnostics().toString());
     }
 }

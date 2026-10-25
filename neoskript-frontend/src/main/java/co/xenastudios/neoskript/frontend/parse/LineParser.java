@@ -677,6 +677,7 @@ final class LineParser {
         for (int[] part : embedded) {
             Expr expr = expression(part[0], part[1], Expected.OBJECTS);
             if (expr == null) {
+                problem("Can't understand this expression: " + input.substring(part[0], part[1]));
                 return null;
             }
             parts.add(expr);
@@ -1143,6 +1144,11 @@ final class LineParser {
     /** The first problem found with a function call in this line, in Skript's wording, or {@code null}. */
     String functionProblem() {
         return functionProblem != null ? functionProblem : problem;
+    }
+
+    /** Whether {@code [start, end)} of the line is an expression of any type. */
+    boolean isExpression(int start, int end) {
+        return expression(start, end, Expected.OBJECTS) != null;
     }
 
     /** A problem found while parsing, reported if the line doesn't parse at all. */

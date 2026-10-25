@@ -143,6 +143,11 @@ public final class ScriptCompiler {
                     if (!e.alreadyReported()) {
                         diagnostics.add(new Diagnostic(Severity.ERROR, name, e.line(), 0, 0, e.getMessage()));
                     }
+                    for (Throwable more : e.getSuppressed()) {
+                        if (more instanceof CompileException other && !other.alreadyReported()) {
+                            diagnostics.add(new Diagnostic(Severity.ERROR, name, other.line(), 0, 0, other.getMessage()));
+                        }
+                    }
                     if (testName != null) {
                         String reason = e.alreadyReported() ? parseProblems.get(e.line()) : e.getMessage();
                         unrunnableTests.put(testName, "line " + e.line() + ": " + reason);
@@ -442,6 +447,12 @@ public final class ScriptCompiler {
             } catch (CompileException e) {
                 if (!e.alreadyReported() && !e.getMessage().startsWith("NeoSkript can't")) {
                     messages.add(e.getMessage());
+                }
+                for (Throwable more : e.getSuppressed()) {
+                    if (more instanceof CompileException other && !other.alreadyReported()
+                            && !other.getMessage().startsWith("NeoSkript can't")) {
+                        messages.add(other.getMessage());
+                    }
                 }
             } catch (RuntimeException e) {
                 // Only problems with the script are results.

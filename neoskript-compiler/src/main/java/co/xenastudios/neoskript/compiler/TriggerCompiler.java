@@ -227,6 +227,10 @@ final class TriggerCompiler {
     private final java.util.Set<String> outerSections = new java.util.HashSet<>();
     /** Warnings from the last code compiled apart, for a {@code parse:} section's logs. */
     private final List<String> apartWarnings = new ArrayList<>();
+    /** The errors found in the statements so far, and how deep in statements compiling is. */
+    private final List<CompileException> errors = new ArrayList<>();
+    private int depth;
+
     /** Where warnings found while compiling go: the line and the message. */
     private java.util.function.BiConsumer<Integer, String> warnings = (line, message) -> {};
 
@@ -773,19 +777,56 @@ final class TriggerCompiler {
 
     // ---------------------------------------------------------------- statements
 
+    /**
+     * Compiles each statement. As in Skript, one that fails is reported and left out and the rest are still
+     * compiled, so every error is found; once the outermost statements are done, the errors are thrown, the
+     * first with the others suppressed in it.
+     */
     private void statements(List<Statement> statements) throws CompileException {
-        for (int i = 0; i < statements.size(); i++) {
-            Statement statement = statements.get(i);
-            try {
-                if (startsConditional(statement)) {
-                    i = conditional(statements, i) - 1;
-                } else {
-                    statement(statement);
+        depth++;
+        try {
+            for (int i = 0; i < statements.size(); i++) {
+                Statement statement = statements.get(i);
+                int open = blocks.size();
+                try {
+                    if (startsConditional(statement)) {
+                        i = conditional(statements, i) - 1;
+                    } else {
+                        statement(statement);
+                    }
+                } catch (co.xenastudios.neoskript.api.element.SyntaxError error) {
+                    // An element that matched but can't be used as written.
+                    failed(new CompileException(line, error.getMessage()), open);
+                } catch (CompileException e) {
+                    failed(e, open);
+                } catch (RuntimeException e) {
+                    if (errors.isEmpty()) {
+                        throw e;
+                    }
+                    // What's left after an earlier error may be half-built: the error is the problem.
+                    failed(null, open);
                 }
-            } catch (co.xenastudios.neoskript.api.element.SyntaxError error) {
-                // An element that matched but can't be used as written.
-                throw new CompileException(line, error.getMessage());
             }
+        } finally {
+            depth--;
+        }
+        if (depth == 0 && !errors.isEmpty()) {
+            CompileException first = errors.getFirst();
+            for (int i = 1; i < errors.size(); i++) {
+                first.addSuppressed(errors.get(i));
+            }
+            errors.clear();
+            throw first;
+        }
+    }
+
+    /** Notes {@code error} (if any) and closes the blocks the failed statement left open. */
+    private void failed(CompileException error, int open) {
+        if (error != null) {
+            errors.add(error);
+        }
+        while (blocks.size() > open) {
+            blocks.pop();
         }
     }
 
@@ -968,6 +1009,10 @@ final class TriggerCompiler {
                     method.visitInsn(POP);
                 });
             }
+            case Statement.Section section when section.line().key().strip().toLowerCase(Locale.ROOT).startsWith("else") ->
+                // The 'if' before it failed, so it isn't there.
+                throw new CompileException(line, Statement.orphanElse(
+                        section.line().key().strip().toLowerCase(Locale.ROOT)));
             case Statement.Section section -> throw unsupported("sections like '" + section.line().key() + "'");
             case Statement.Conditions conditions -> throw unsupported("'" + conditions.line().key() + "' here");
             case Statement.Parse parse -> {
@@ -1042,7 +1087,12 @@ final class TriggerCompiler {
                     co.xenastudios.neoskript.frontend.structure.Line conditionLine = conditions.conditionLines().get(c);
                     line = conditionLine.number();
                     source = conditionLine.text();
-                    condition(conditions.conditions().get(c));
+                    conditionLines = true;
+                    try {
+                        condition(conditions.conditions().get(c));
+                    } finally {
+                        conditionLines = false;
+                    }
                     method.visitJumpInsn(any ? IFNE : IFEQ, any ? then : next);
                 }
                 if (any) {
@@ -1052,8 +1102,8 @@ final class TriggerCompiler {
                 i++;
                 if (i >= statements.size() || !(statements.get(i) instanceof Statement.Section body)
                         || !body.line().key().strip().toLowerCase(Locale.ROOT).startsWith("then")) {
-                    throw new CompileException(statement.line().number(),
-                            "'" + statement.line().key() + "' has to be followed by a 'then' section");
+                    throw new CompileException(statement.line().number(), (any ? "'if any'" : "'if all'")
+                            + " has to be placed just before a 'then' section");
                 }
                 block(BlockKind.CONDITIONAL, chainEnd, body.body());
             } else if (statement instanceof Statement.Section section && key.equals("else")) {
@@ -1773,6 +1823,16 @@ final class TriggerCompiler {
     /** {@code set}, {@code add}, {@code remove} and {@code delete} on variables. */
     private void change(ParsedSyntax effect) throws CompileException {
         CoreSyntax.ChangeMode mode = CoreSyntax.ChangeMode.values()[effect.pattern()];
+        Expr outerChanger = changer;
+        changer = mode.value >= 0 && effect.match().values().get(mode.value) instanceof Expr value ? value : null;
+        try {
+            changeAll(effect, mode);
+        } finally {
+            changer = outerChanger;
+        }
+    }
+
+    private void changeAll(ParsedSyntax effect, CoreSyntax.ChangeMode mode) throws CompileException {
         Object target = effect.match().values().get(mode.target);
         // 'add 1 to {_a::*} and {_b::*}': each variable is changed.
         if (target instanceof Expr.ListOf list && list.items().stream().allMatch(Expr.Variable.class::isInstance)) {
@@ -2218,16 +2278,25 @@ final class TriggerCompiler {
 
     private void condition(ParsedSyntax condition) throws CompileException {
         List<Object> values = condition.match().values();
-        if (condition.syntax().id().equals("CondCompare") && values.size() == 2
-                && values.get(0) instanceof Expr.Unresolved && values.get(1) instanceof Expr.Unresolved) {
-            // Words on both sides that nothing reads: Skript's comparison quietly fails to initialise, so the line
-            // isn't understood ('this is not valid syntax').
+        if (condition.syntax().id().equals("CondCompare") && values.stream().anyMatch(v -> v instanceof Expr.Unresolved)) {
             try {
                 conditionChecked(condition, values);
             } catch (CompileException e) {
-                if (!e.getMessage().startsWith("Can't understand this expression")) {
+                if (!e.unknownWords() || textPart != null) {
                     throw e;
                 }
+                boolean typed = values.stream().anyMatch(v -> v instanceof Expr expr && !(expr instanceof Expr.Unresolved)
+                        && expr.type() != null && !expr.type().equals(SyntaxRegistry.OBJECT));
+                if (typed || values.size() > 2) {
+                    // Words nothing reads compared with something of a type: Skript's comparison says so.
+                    StringBuilder message = new StringBuilder("Can't compare ").append(compared(values.get(0)))
+                            .append(" with ").append(compared(values.get(1)));
+                    if (values.size() > 2) {
+                        message.append(" and ").append(compared(values.get(2)));
+                    }
+                    throw new CompileException(line, message.toString());
+                }
+                // Otherwise Skript's comparison quietly fails to initialise, so the line isn't understood.
                 String text = source.strip();
                 java.util.regex.Matcher header = java.util.regex.Pattern.compile("(?i)^(?:else )?if (.+?):?$").matcher(text);
                 throw new CompileException(line, header.matches()
@@ -2237,6 +2306,56 @@ final class TriggerCompiler {
             return;
         }
         conditionChecked(condition, values);
+    }
+
+    /** What's being compiled: a change effect's value, the code in a text's {@code %...%}, an 'if any:' line. */
+    private Expr changer;
+    private String textPart;
+    private boolean conditionLines;
+
+    private static final java.util.regex.Pattern IF_LINE = java.util.regex.Pattern.compile("(?i)^(?:else )?(?:parse )?if (.+?):?$");
+
+    /**
+     * Skript's error for words nothing understands, which depends on where they are: in a change effect's
+     * value, the value isn't understood; in a text's {@code %...%}, that code; in a condition or a loop, that;
+     * anywhere else, the whole line.
+     */
+    private String unknownWords(Expr.Unresolved unresolved) {
+        if (textPart != null) {
+            return "Can't understand this expression: " + textPart;
+        }
+        String text = source == null ? unresolved.text().strip() : source.strip();
+        if (changer != null && unresolved.start() >= changer.start() && unresolved.end() <= changer.end()) {
+            String value = outerArgument != null ? outerArgument : unresolved.text().strip();
+            if (!(changer instanceof Expr.ListOf)) {
+                return "Can't understand this expression: '" + value + "'";
+            }
+        }
+        if (conditionLines) {
+            return "Can't understand this condition: '" + text + "'";
+        }
+        java.util.regex.Matcher header = IF_LINE.matcher(text);
+        if (header.matches()) {
+            return "Can't understand this condition: '" + header.group(1) + "'";
+        }
+        if (text.regionMatches(true, 0, "loop ", 0, 5)) {
+            return "Can't understand this loop: '" + text.substring(5).replaceFirst(":$", "") + "'";
+        }
+        return "Can't understand this condition/effect: " + text;
+    }
+
+    /** A side of a comparison as Skript's errors name it: its type with an article, or as written if it has none. */
+    private String compared(Object value) {
+        if (value instanceof Expr.Unresolved unresolved) {
+            return "'" + unresolved.text().strip() + "'";
+        }
+        if (value instanceof Expr expr && expr.type() != null && !expr.type().equals(SyntaxRegistry.OBJECT)) {
+            TypeRef ref = registry.resolveType(expr.type());
+            if (ref != null) {
+                return article(ref.type().name()) + " " + ref.type().name();
+            }
+        }
+        return value instanceof Expr expr ? describe(expr) : String.valueOf(value);
     }
 
     private void conditionChecked(ParsedSyntax condition, List<Object> values) throws CompileException {
@@ -3551,9 +3670,7 @@ final class TriggerCompiler {
                     throw new CompileException(line, library.literalError(unresolved.text()));
                 }
                 if (value == null) {
-                    // Words nothing parses: Skript reports the whole argument they're in.
-                    throw new CompileException(line, "Can't understand this expression: '"
-                            + (outerArgument != null ? outerArgument : unresolved.text().strip()) + "'");
+                    throw new CompileException(line, unknownWords(unresolved), true);
                 }
                 constant(value, Object.class);
             }
@@ -3659,7 +3776,13 @@ final class TriggerCompiler {
                         false);
             }
             if (i < embedded.size()) {
-                expression(embedded.get(i));
+                String outerTextPart = textPart;
+                textPart = source.substring(embedded.get(i).start(), embedded.get(i).end());
+                try {
+                    expression(embedded.get(i));
+                } finally {
+                    textPart = outerTextPart;
+                }
                 method.visitMethodInsn(INVOKESTATIC, VALUES, name ? "nameText" : "text", "(" + OBJECT_DESC + ")"
                         + STRING_DESC, false);
                 method.visitMethodInsn(INVOKEVIRTUAL, builder, "append", "(" + STRING_DESC + ")Ljava/lang/StringBuilder;",

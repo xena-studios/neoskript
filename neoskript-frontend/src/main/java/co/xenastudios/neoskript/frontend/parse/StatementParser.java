@@ -21,6 +21,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -203,6 +204,11 @@ final class StatementParser {
             error(line, "A parse section must contain code");
             return new Statement.Invalid(line);
         }
+        String invalid = invalidLine(line.text());
+        if (invalid != null) {
+            error(line, invalid);
+            return new Statement.Invalid(line);
+        }
         LineParser parser = new LineParser(context, line.text());
         int end = line.text().length();
         Object parsed = simple(parser, end);
@@ -252,8 +258,121 @@ final class StatementParser {
         if (problem == null) {
             problem = parser.functionProblem();
         }
+        if (problem == null) {
+            problem = changerProblem(line.text());
+        }
         error(line, problem != null ? problem : "Can't understand this condition/effect: " + line.text());
         return new Statement.Invalid(line);
+    }
+
+    /** A one-line conditional's header, with its condition. */
+    private static final Pattern IF_HEADER = Pattern.compile("(?i)(?:else )?(?:parse )?if (.+)");
+
+    /** Skript's change effect's shapes, with what's changed and what it's changed by. */
+    private static final Pattern CHANGE = Pattern.compile(
+            "(?i)(?:(?<set>set) (?<t1>.+?) to (?<d1>.+)|(?:add|give) (?<d2>.+?) to (?<t2>.+)"
+                    + "|(?:remove (?:all |every )?|subtract )(?<d3>.+?) from (?<t3>.+)|(?:increase|reduce) (?<t4>.+?) by (?<d4>.+))");
+
+    /**
+     * For a change effect whose target is understood but not what it's changed by, Skript's error for that
+     * value: {@code set {_y} to 1 +} gives {@code Can't understand this expression: '1 +'}.
+     */
+    private String changerProblem(String text) {
+        Matcher matcher = CHANGE.matcher(text.strip());
+        if (!matcher.matches()) {
+            return null;
+        }
+        int offset = text.indexOf(text.strip());
+        for (int i = 1; i <= 4; i++) {
+            if (matcher.group("t" + i) == null) {
+                continue;
+            }
+            LineParser parser = new LineParser(context, text);
+            int targetStart = offset + matcher.start("t" + i);
+            int deltaStart = offset + matcher.start("d" + i);
+            String delta = matcher.group("d" + i).toLowerCase(Locale.ROOT);
+            if (delta.contains(",") || delta.contains(" and ") || delta.contains(" or ")) {
+                // A list isn't one value Skript can say it doesn't understand.
+                return null;
+            }
+            if (parser.isExpression(targetStart, offset + matcher.end("t" + i))
+                    && !parser.isExpression(deltaStart, offset + matcher.end("d" + i))) {
+                return "Can't understand this expression: '" + matcher.group("d" + i).strip() + "'";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Skript's check of a line before it's parsed ({@code SkriptParser.validateLine}): its error if the quotes
+     * don't pair up, or a text, variable or bracket isn't closed, else {@code null}.
+     */
+    static String invalidLine(String line) {
+        int quotes = 0;
+        for (int i = 0; i < line.length(); i++) {
+            if (line.charAt(i) == '"') {
+                quotes++;
+            }
+        }
+        if (quotes % 2 != 0) {
+            return "Invalid use of quotes (\"). If you want to use quotes in \"quoted text\", double them: \"\".";
+        }
+        for (int i = 0; i < line.length(); i = next(line, i)) {
+            if (i == -1) {
+                return "Invalid amount or placement of brackets. Please make sure that each opening bracket has a"
+                        + " corresponding closing bracket.";
+            }
+        }
+        return null;
+    }
+
+    /** Skript's {@code SkriptParser.next}: the index after the text, variable or bracket at {@code start}, or -1. */
+    private static int next(String line, int start) {
+        if (start >= line.length()) {
+            return -1;
+        }
+        switch (line.charAt(start)) {
+            case '"' -> {
+                boolean inExpression = false;
+                for (int i = start + 1; i < line.length(); i++) {
+                    char c = line.charAt(i);
+                    if (c == '"' && !inExpression) {
+                        if (i == line.length() - 1 || line.charAt(i + 1) != '"') {
+                            return i + 1;
+                        }
+                        i++;
+                    } else if (c == '%') {
+                        inExpression = !inExpression;
+                    }
+                }
+                return -1;
+            }
+            case '{' -> {
+                int depth = 0;
+                for (int i = start + 1; i < line.length(); i++) {
+                    if (line.charAt(i) == '}') {
+                        if (depth == 0) {
+                            return i + 1;
+                        }
+                        depth--;
+                    } else if (line.charAt(i) == '{') {
+                        depth++;
+                    }
+                }
+                return -1;
+            }
+            case '(' -> {
+                for (int i = start + 1; i >= 0 && i < line.length(); i = next(line, i)) {
+                    if (line.charAt(i) == ')') {
+                        return i + 1;
+                    }
+                }
+                return -1;
+            }
+            default -> {
+                return start + 1;
+            }
+        }
     }
 
     /** A line as a function call, else an effect, else a condition, or {@code null}. */
@@ -275,6 +394,11 @@ final class StatementParser {
     private Statement section(Node.Section section, Statement previous) {
         Line line = section.line();
         String key = line.key();
+        String invalid = invalidLine(key);
+        if (invalid != null) {
+            error(line, invalid);
+            return new Statement.Invalid(line);
+        }
         if (key.equalsIgnoreCase(PARSE_SECTION) && section.children().isEmpty()) {
             error(line, "A parse section must contain code");
             return new Statement.Invalid(line);
@@ -314,7 +438,14 @@ final class StatementParser {
                         + " there is no syntax in the line to manage it.");
                 return new Statement.Invalid(line);
             }
-            error(line, "Can't understand this section: " + key);
+            Matcher conditional = IF_HEADER.matcher(key);
+            if (conditional.matches()) {
+                error(line, "Can't understand this condition: '" + conditional.group(1) + "'");
+            } else if (key.regionMatches(true, 0, "loop ", 0, 5)) {
+                error(line, "Can't understand this loop: '" + key.substring(5) + "'");
+            } else {
+                error(line, "Can't understand this section: " + key);
+            }
             return new Statement.Invalid(line);
         }
         // What takes the section may refuse it, as Skript's section expressions, then its effect sections, do.
@@ -332,7 +463,7 @@ final class StatementParser {
         check(line, header);
         String lower = key.toLowerCase(Locale.ROOT);
         if (lower.startsWith("else") && !continuesConditional(previous)) {
-            error(line, "'else' has to be placed just after another 'if' or 'else if' section");
+            error(line, Statement.orphanElse(lower));
             return new Statement.Invalid(line);
         }
         if (lower.startsWith("then") && !(previous instanceof Statement.Conditions)) {
@@ -344,6 +475,10 @@ final class StatementParser {
                 .source().endsWith("<.+>")) {
             List<Line> lines = new ArrayList<>();
             List<ParsedSyntax> conditions = conditions(section.children(), lines);
+            if (conditions.size() < 2 && lines.size() == section.children().size()) {
+                error(line, (any(lower) ? "'if any'" : "'if all'") + " sections must contain at least two conditions");
+                return new Statement.Invalid(line);
+            }
             return new Statement.Conditions(line, header, conditions, lines);
         }
         if (PARSE_IF.matcher(key).matches()) {
@@ -375,6 +510,11 @@ final class StatementParser {
         }
         return new Statement.Section(line, header, sectionCode(header, () -> repeatable(section.children(),
                 header.syntax().id().equals("SecFor") ? header : null)));
+    }
+
+    /** Whether a multiline conditional is an {@code if any} one. */
+    private static boolean any(String lower) {
+        return lower.contains(" any") || lower.contains("at least one");
     }
 
     /** A {@code for} loop's code: its value variable may also be any of what the list holds. */
