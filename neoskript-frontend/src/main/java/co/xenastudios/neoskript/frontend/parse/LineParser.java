@@ -185,7 +185,15 @@ final class LineParser {
             if (!pattern.couldMatch(lower)) {
                 continue;
             }
-            MatchResult match = pattern.match(input, start, end, resolver(syntax, literalOnly, splitTokens, strictCode));
+            // First without placeholders that lean on unresolved words, so a split that needs none wins over an
+            // earlier one that does: 'draw X over 5 seconds at test-location' isn't 'draw X <over (5 seconds at
+            // test) - location>'. Only if a placeholder was turned down for them is it tried again with them.
+            boolean[] leaned = new boolean[1];
+            MatchResult match = pattern.match(input, start, end,
+                    resolver(syntax, literalOnly, splitTokens, strictCode, leaned));
+            if (match == null && leaned[0]) {
+                match = pattern.match(input, start, end, resolver(syntax, literalOnly, splitTokens, strictCode, null));
+            }
             if (match == null) {
                 continue;
             }
@@ -421,7 +429,12 @@ final class LineParser {
     /** Expressions that give one of their arguments' values. */
     private static final java.util.Set<String> CHOOSING = java.util.Set.of("ExprTernary", "ExprDefaultValue");
 
-    private PlaceholderResolver resolver(SyntaxInfo syntax, boolean literalOnly, boolean splitTokens, boolean strictCode) {
+    /**
+     * Resolves a pattern's placeholders and regexes. With {@code leaned} given, placeholders whose expression leans
+     * on unresolved words are turned down, and {@code leaned[0]} is set when one is.
+     */
+    private PlaceholderResolver resolver(SyntaxInfo syntax, boolean literalOnly, boolean splitTokens, boolean strictCode,
+            boolean[] leaned) {
         return new PlaceholderResolver() {
             @Override
             public Object resolve(String text, int start, int end, PlaceholderSpec spec) {
@@ -430,7 +443,12 @@ final class LineParser {
                     return null;
                 }
                 Expected expected = context.expected(spec);
-                return expression(start, end, literalOnly ? context.intern(expected.asLiteralOnly()) : expected);
+                Expr value = expression(start, end, literalOnly ? context.intern(expected.asLiteralOnly()) : expected);
+                if (leaned != null && value != null && countUnresolved(value) > 0) {
+                    leaned[0] = true;
+                    return null;
+                }
+                return value;
             }
 
             @Override

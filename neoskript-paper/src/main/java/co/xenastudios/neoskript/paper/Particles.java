@@ -483,17 +483,23 @@ final class Particles {
     }
 
     private static Particle particle(String name) {
-        try {
-            return Particle.valueOf(name);
-        } catch (IllegalArgumentException missing) {
-            return null;
-        }
+        return constant(Particle.class, name);
     }
 
     private static Effect gameEffect(String name) {
+        return constant(Effect.class, name);
+    }
+
+    /**
+     * The constant of {@code type} by its field's name, or {@code null} if this version has none. Old names that
+     * newer versions keep as deprecated fields, like {@code VILLAGER_PLANT_GROW}, aren't enum constants, so
+     * {@code valueOf} doesn't find them.
+     */
+    private static <T> T constant(Class<T> type, String name) {
         try {
-            return Effect.valueOf(name);
-        } catch (IllegalArgumentException missing) {
+            java.lang.reflect.Field field = type.getField(name);
+            return type.isInstance(field.get(null)) ? type.cast(field.get(null)) : null;
+        } catch (ReflectiveOperationException missing) {
             return null;
         }
     }
