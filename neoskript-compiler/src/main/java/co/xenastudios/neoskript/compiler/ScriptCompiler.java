@@ -109,7 +109,8 @@ public final class ScriptCompiler {
                             } else if (binding instanceof Library.Core core && core.id().equals(CoreSyntax.PERIODICAL)) {
                                 triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), null, null,
                                         period(header.number(), event), null, new TriggerCompiler(library, functions,
-                                                globals, script).compileTrigger(name, event.body())));
+                                                globals, script).compilePeriodical(name, event.body()),
+                                        worlds(header.number(), header.key(), event)));
                             } else {
                                 throw new CompileException(header.number(), "NeoSkript can't run this event yet: '"
                                         + header.key() + "'");
@@ -160,6 +161,29 @@ public final class ScriptCompiler {
             }
         }
         throw new CompileException(line, "'every' needs a timespan of at least a tick, like 'every 5 minutes'");
+    }
+
+    /**
+     * The names of the worlds a periodical event runs in ({@code every 5 seconds in "world" and "nether"}), or
+     * {@code null} if it doesn't say. {@code source} is the event's line, which the values' positions are in.
+     */
+    private static List<String> worlds(int line, String source, ParsedStructure.Event event) throws CompileException {
+        List<Object> values = event.event().match().values();
+        if (event.event().pattern() != 1 || values.size() < 2) {
+            return null;
+        }
+        List<String> names = new ArrayList<>();
+        Object worlds = values.get(1);
+        for (Object world : worlds instanceof Expr.ListOf list ? list.items() : List.of(worlds)) {
+            switch (world) {
+                case Expr.Text text when text.embedded().isEmpty() && text.end() <= source.length() ->
+                        names.add(source.substring(text.start() + 1, text.end() - 1).replace("\"\"", "\""));
+                case Expr.Literal literal -> names.add(literal.text());
+                default -> throw new CompileException(line, "The worlds of a periodical event must be given by name, "
+                        + "like 'every 5 seconds in \"world\"'");
+            }
+        }
+        return names;
     }
 
     /**

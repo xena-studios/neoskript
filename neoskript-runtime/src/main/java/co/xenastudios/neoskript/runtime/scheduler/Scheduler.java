@@ -19,6 +19,11 @@ public interface Scheduler {
     /** Runs {@code task} every {@code ticks} on the global thread, first after {@code ticks}. Returns what stops it. */
     Runnable runGlobalRepeating(long ticks, Runnable task);
 
+    /** Runs {@code task} every {@code ticks} on the global thread, first after {@code delay}. Returns what stops it. */
+    default Runnable runGlobalRepeating(long delay, long ticks, Runnable task) {
+        return runGlobalRepeating(ticks, task);
+    }
+
     /**
      * Runs {@code task} after {@code ticks} on the thread that owns {@code owner}: an entity's, or a
      * location's region, on Folia. Without an owner, or on Paper, it's the global thread.

@@ -16,6 +16,7 @@ import co.xenastudios.neoskript.frontend.source.Diagnostic;
 import co.xenastudios.neoskript.frontend.source.Severity;
 import co.xenastudios.neoskript.frontend.source.SourceFile;
 import co.xenastudios.neoskript.runtime.FunctionHandle;
+import co.xenastudios.neoskript.runtime.PeriodicalEvent;
 import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
 import co.xenastudios.neoskript.runtime.SimpleTriggerContext;
 import co.xenastudios.neoskript.runtime.scheduler.Scheduler;
@@ -251,8 +252,20 @@ final class ScriptManager {
                     } else {
                         scheduler.runGlobal(() -> run(trigger));
                     }
+                } else if (trigger.period() != null && trigger.worlds() != null) {
+                    // As in Skript, each world's runs come when its full time is a multiple of the period.
+                    long ticks = Math.max(trigger.period().ticks(), 1);
+                    for (String worldName : trigger.worlds()) {
+                        org.bukkit.World world = org.bukkit.Bukkit.getWorld(worldName);
+                        if (world != null) {
+                            PeriodicalEvent event = new PeriodicalEvent(world);
+                            stops.add(scheduler.runGlobalRepeating(ticks - Math.floorMod(world.getFullTime(), ticks),
+                                    ticks, () -> run(trigger, event)));
+                        }
+                    }
                 } else if (trigger.period() != null) {
-                    stops.add(scheduler.runGlobalRepeating(trigger.period().ticks(), () -> run(trigger)));
+                    PeriodicalEvent event = new PeriodicalEvent(null);
+                    stops.add(scheduler.runGlobalRepeating(trigger.period().ticks(), () -> run(trigger, event)));
                 }
             }
             periodic.put(name, stops);
@@ -461,8 +474,13 @@ final class ScriptManager {
     }
 
     private void run(CompiledScripts.CompiledTrigger trigger) {
+        run(trigger, null);
+    }
+
+    /** Runs {@code trigger} in {@code event}, which may be {@code null}. */
+    private void run(CompiledScripts.CompiledTrigger trigger, Object event) {
         try {
-            trigger.trigger().execute(new SimpleTriggerContext(null));
+            trigger.trigger().execute(new SimpleTriggerContext(event));
         } catch (ScriptRuntimeException e) {
             logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
         }

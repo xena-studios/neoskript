@@ -62,6 +62,7 @@ public final class StandardLibrary {
         EntityEvents.register(registrar);
         PlayerEvents.register(registrar);
         PickItems.register(registrar);
+        InputAndAttackEvents.register(registrar);
         ItemEvents.register(registrar);
         WorldEvents.register(registrar);
         EventExpressions.register(registrar);
