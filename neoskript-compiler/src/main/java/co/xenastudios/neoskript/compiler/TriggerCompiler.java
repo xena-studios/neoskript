@@ -2158,6 +2158,28 @@ final class TriggerCompiler {
 
     private void condition(ParsedSyntax condition) throws CompileException {
         List<Object> values = condition.match().values();
+        if (condition.syntax().id().equals("CondCompare") && values.size() == 2
+                && values.get(0) instanceof Expr.Unresolved && values.get(1) instanceof Expr.Unresolved) {
+            // Words on both sides that nothing reads: Skript's comparison quietly fails to initialise, so the line
+            // isn't understood ('this is not valid syntax').
+            try {
+                conditionChecked(condition, values);
+            } catch (CompileException e) {
+                if (!e.getMessage().contains("NeoSkript can't run this yet")) {
+                    throw e;
+                }
+                String text = source.strip();
+                java.util.regex.Matcher header = java.util.regex.Pattern.compile("(?i)^(?:else )?if (.+?):?$").matcher(text);
+                throw new CompileException(line, header.matches()
+                        ? "Can't understand this condition: '" + header.group(1) + "'"
+                        : "Can't understand this condition/effect: " + text);
+            }
+            return;
+        }
+        conditionChecked(condition, values);
+    }
+
+    private void conditionChecked(ParsedSyntax condition, List<Object> values) throws CompileException {
         if (!values.isEmpty() && values.getFirst() instanceof Expr.ListOf list && list.items().size() > 1
                 && ITEM_CONDITIONS.contains(baseId(condition.syntax().id()))) {
             // A list of what's checked is checked item by item, as Skript's expression lists are: '"" or {_x} is
