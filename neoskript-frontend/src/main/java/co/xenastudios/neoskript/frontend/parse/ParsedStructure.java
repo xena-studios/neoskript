@@ -106,6 +106,20 @@ public sealed interface ParsedStructure {
         }
     }
 
+    /**
+     * Skript's {@code auto reload} structure: the script reloads itself when its file changes.
+     *
+     * @param recipients the names or UUIDs of the players to tell about reloads, as written; empty to tell
+     *     those with {@code permission} instead
+     * @param permission what players need to be told about reloads, when there are no recipients
+     */
+    record AutoReload(Structure structure, List<String> recipients, String permission) implements ParsedStructure {
+
+        public AutoReload {
+            recipients = List.copyOf(recipients);
+        }
+    }
+
     /** {@code options:}, {@code variables:}, {@code aliases:} and {@code using}: data, no code. */
     record Data(Structure structure) implements ParsedStructure {}
 }

@@ -7,6 +7,7 @@ package co.xenastudios.neoskript.frontend.parse;
 import co.xenastudios.neoskript.frontend.registry.EventValues;
 import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
 import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
+import co.xenastudios.neoskript.frontend.registry.TypeInfo;
 import co.xenastudios.neoskript.frontend.registry.TypeRef;
 import co.xenastudios.neoskript.frontend.source.Diagnostic;
 import co.xenastudios.neoskript.frontend.source.Diagnostics;
@@ -145,6 +146,7 @@ public final class ScriptLoader {
         try {
             return switch (structure.kind()) {
                 case OPTIONS, VARIABLES, ALIASES, USING -> new ParsedStructure.Data(structure);
+                case AUTO_RELOAD -> autoReload(structure, context, diagnostics);
                 case FUNCTION -> function(structure, statements, diagnostics, diagnostics.file().name());
                 case COMMAND -> new CommandParser(registry, statements, diagnostics).parse(structure);
                 case EVENT -> structure.section().line().key().equalsIgnoreCase(PARSE_STRUCTURE)
@@ -153,6 +155,69 @@ public final class ScriptLoader {
             };
         } finally {
             context.eventScope(before);
+        }
+    }
+
+    /** Skript's default for {@code auto reload}'s {@code permission:} entry. */
+    private static final String AUTO_RELOAD_PERMISSION = "skript.reloadnotify";
+
+    /**
+     * Skript's {@code auto reload}, alone or with its {@code recipients:} (texts) and {@code permission:}
+     * entries. As in Skript, only the literal texts among the recipients count.
+     */
+    private ParsedStructure autoReload(Structure structure, ParserContext context, Diagnostics diagnostics) {
+        List<String> recipients = new ArrayList<>();
+        String permission = AUTO_RELOAD_PERMISSION;
+        if (structure.node() instanceof Node.Section section) {
+            Line header = section.line();
+            boolean ok = true;
+            boolean seenRecipients = false;
+            boolean seenPermission = false;
+            for (Node child : section.children()) {
+                Line line = child.line();
+                String text = line.text();
+                if (child instanceof Node.Simple && !seenRecipients && startsWithEntry(text, "recipients")) {
+                    seenRecipients = true;
+                    String value = text.substring("recipients: ".length());
+                    TypeInfo string = registry.type("string");
+                    Expr expr = string == null ? null : new LineParser(context, value)
+                            .expression(0, value.length(), context.expected(new TypeRef(string, true)));
+                    if (expr == null) {
+                        diagnostics.error(header.number(), header.column(), header.text().length(),
+                                "'" + value + "' is not a text");
+                        ok = false;
+                    } else {
+                        literalTexts(expr, value, recipients);
+                    }
+                } else if (child instanceof Node.Simple && !seenPermission && startsWithEntry(text, "permission")) {
+                    seenPermission = true;
+                    // A plain entry: its text as written, quotes and all.
+                    permission = text.substring("permission: ".length());
+                } else {
+                    ok = false;
+                    diagnostics.error(header.number(), header.column(), header.text().length(), "Unexpected entry '"
+                            + line.key() + "'. Check whether it's spelled correctly or remove it");
+                }
+            }
+            if (!ok) {
+                return null;
+            }
+        }
+        return new ParsedStructure.AutoReload(structure, recipients, permission);
+    }
+
+    /** Whether {@code text} is the entry {@code key}: {@code key: value}, the key in any case. */
+    private static boolean startsWithEntry(String text, String key) {
+        String prefix = key + ": ";
+        return text.regionMatches(true, 0, prefix, 0, prefix.length());
+    }
+
+    /** Adds the texts in {@code expr} that are literal, with no expressions in them, to {@code into}. */
+    private static void literalTexts(Expr expr, String source, List<String> into) {
+        if (expr instanceof Expr.Text text && text.embedded().isEmpty()) {
+            into.add(source.substring(text.start() + 1, text.end() - 1).replace("\"\"", "\""));
+        } else if (expr instanceof Expr.ListOf list) {
+            list.items().forEach(item -> literalTexts(item, source, into));
         }
     }
 

@@ -83,7 +83,7 @@ public final class SkriptRegistry {
 
     /** Structures the script parser handles itself, by their structure kind. */
     private static final Set<String> BUILT_IN_STRUCTURES = Set.of("StructAliases", "StructOptions", "StructVariables",
-            "StructUsing", "StructCommand", "StructEvent", "StructFunction");
+            "StructUsing", "StructCommand", "StructEvent", "StructFunction", "StructAutoReload");
 
     /** Types whose literals are open-ended (item and entity names depend on aliases). */
     private static final Set<String> OPEN_LITERAL_TYPES = Set.of("itemtype", "itemstack", "blockdata", "entitydata",
