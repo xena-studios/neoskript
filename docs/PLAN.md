@@ -589,6 +589,12 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **Comparisons before and after the event:** `was`, `were`, `will be` and `is turning into`, with Skript's time states on placeholders (literals can't have one; none after a delay).
     - **Command arguments:** Skript's errors for `the argument` in a command with several arguments, `the arguments` in script commands, and typed arguments (including its quirks: of two arguments of a type, the second; messages naming CLASSINFO).
 
+    **Batch 24 (2026-10-25): 862 of 862 tests still pass; time states and auto reload.**
+    - **Time states** as Skript's `setTime`: expressions declare the events they have a past or future state in (`Registrar.timeStates`), so `player's gamemode will be creative`, `past tool`, `former level of player` and `player's level was 3` read the event's old or new value: tool, hotbar slot, game mode, food level, level, weather, world, spawn, vehicle, passengers, spectator target, target, sign text and input keys. Food level is in bars (0 to 10), as in Skript.
+    - **`auto reload`:** a script with it reloads when its file changes, with Skript's messages to its recipients or those with the permission; a version with errors keeps the old one running.
+    - **Errors:** a comparison of words nothing reads isn't understood, as in Skript.
+    - Known differences: `auto reload` doesn't need async loading; event values read after a wait still come from the event.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.
