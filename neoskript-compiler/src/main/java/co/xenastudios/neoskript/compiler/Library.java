@@ -73,6 +73,8 @@ public final class Library implements Registrar {
     private final Map<String, Object> literalValues = new HashMap<>();
     /** Each named type's values, in the order registered, without repeats: what 'all colours' gives. */
     private final Map<String, List<Object>> namedValues = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Named types in the order they were registered. */
+    private final List<String> typeOrder = new java.util.concurrent.CopyOnWriteArrayList<>();
     /** Each built-in function's parameters' values when left out, as declared. */
     private final Map<FunctionInfo, List<java.util.function.Supplier<?>>> functionDefaults = new HashMap<>();
     private final VariableCodecs codecs = new VariableCodecs();
@@ -121,6 +123,9 @@ public final class Library implements Registrar {
         // A word several types have is the first's where nothing says which.
         values.forEach(literalValues::putIfAbsent);
         namedValues.put(id, List.copyOf(new java.util.LinkedHashSet<>(values.values())));
+        if (!typeOrder.contains(id)) {
+            typeOrder.add(id);
+        }
         Map<String, T> copy = Map.copyOf(values);
         parsers.put(id, text -> copy.get(text.strip().toLowerCase(java.util.Locale.ROOT)));
     }
@@ -349,6 +354,26 @@ public final class Library implements Registrar {
             }
         }
         return null;
+    }
+
+    /**
+     * The named types (like heal reasons) whose parser takes {@code words}, in the order they were registered,
+     * for Skript's warning about a word with several types.
+     */
+    List<String> namedTypesOf(String words) {
+        List<String> types = new ArrayList<>();
+        for (String id : namedValues.keySet()) {
+            java.util.function.Function<String, ?> parser = parsers.get(id);
+            try {
+                if (parser != null && parser.apply(words.strip()) != null) {
+                    types.add(id);
+                }
+            } catch (RuntimeException ignored) {
+                // A parser that needs a server isn't asked.
+            }
+        }
+        types.sort(java.util.Comparator.comparingInt(typeOrder::indexOf));
+        return types;
     }
 
     /** The literal parser of {@code typeId}, or {@code null}. */

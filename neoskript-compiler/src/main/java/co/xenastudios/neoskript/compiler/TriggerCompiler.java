@@ -225,6 +225,17 @@ final class TriggerCompiler {
     private boolean skriptErrors;
     /** For code compiled apart, the types of the sections around it, whose values it may use (as nothing). */
     private final java.util.Set<String> outerSections = new java.util.HashSet<>();
+    /** Warnings from the last code compiled apart, for a {@code parse:} section's logs. */
+    private final List<String> apartWarnings = new ArrayList<>();
+    /** Where warnings found while compiling go: the line and the message. */
+    private java.util.function.BiConsumer<Integer, String> warnings = (line, message) -> {};
+
+    /** Sends the warnings this compiler finds to {@code sink}. */
+    TriggerCompiler warnings(java.util.function.BiConsumer<Integer, String> sink) {
+        this.warnings = sink;
+        return this;
+    }
+
     /** How many lists the expression being compiled is in. */
     private int inList;
 
@@ -726,6 +737,7 @@ final class TriggerCompiler {
             apart.eventClasses = eventClasses;
             apart.eventName = eventName;
             apart.skriptErrors = true;
+            apart.warnings = (at, message) -> apartWarnings.add(message);
             for (Block block : blocks) {
                 if (block.kind() == BlockKind.SECTION && block.valueType() != null) {
                     apart.outerSections.add(block.valueType());
@@ -900,7 +912,13 @@ final class TriggerCompiler {
                 List<String> logs = new ArrayList<>(parse.captured().stream().map(d -> d.message()).toList());
                 logs.addAll(setupErrors(parse.body()));
                 // Compiling the code on its own finds what the parser couldn't, without running it.
+                apartWarnings.clear();
                 String compiled = compileError(parse.body());
+                for (String warning : apartWarnings) {
+                    if (!logs.contains(warning)) {
+                        logs.add(warning);
+                    }
+                }
                 if (compiled != null && !logs.contains(compiled)) {
                     logs.add(compiled);
                 }
@@ -1348,6 +1366,31 @@ final class TriggerCompiler {
         return null;
     }
 
+    /**
+     * Skript's warning for words with several types read where nothing says which: {@code set {_x} to unknown}
+     * ('unknown' is a heal reason, a damage cause and more).
+     */
+    private void multipleTypesWarning(String words) {
+        for (String name : literalTypes) {
+            TypeRef ref = registry.resolveType(name);
+            if (ref != null && !ref.type().id().equals(SyntaxRegistry.OBJECT)) {
+                return;
+            }
+        }
+        List<String> types = library.namedTypesOf(words);
+        if (types.size() <= 1) {
+            return;
+        }
+        List<String> names = new ArrayList<>();
+        for (String id : types) {
+            co.xenastudios.neoskript.frontend.registry.TypeInfo info = registry.type(id);
+            names.add(info == null ? id : info.name().toLowerCase(java.util.Locale.ROOT));
+        }
+        String joined = String.join(", ", names.subList(0, names.size() - 1)) + " and " + names.getLast();
+        warnings.accept(line, "'" + words + "' has multiple types (" + joined + "). Consider specifying which type to use: '"
+                + words + " (" + names.getFirst() + ")'");
+    }
+
     /** Whether code compiled apart is in a section around it whose values are of type {@code typeId}. */
     private boolean inOuterSection(String typeId) {
         for (String type : outerSections) {
@@ -1442,12 +1485,19 @@ final class TriggerCompiler {
                             : "The function " + function.name() + " doesn't return anything");
                 }
                 Expr returned = (Expr) effect.match().values().getFirst();
-                if (function.returnsPlural() && isKeyed(returned, true)) {
-                    // A list keeps its indices, for 'keyed f()'; other callers get the values alone.
-                    keyed(returned, true);
-                } else {
-                    expression(returned);
-                    convert(function.returnsPlural());
+                List<String> outerLiteralTypes = literalTypes;
+                // Words returned are read as the function's return type: 'return unknown' is a damage cause there.
+                literalTypes = List.of(function.returnType());
+                try {
+                    if (function.returnsPlural() && isKeyed(returned, true)) {
+                        // A list keeps its indices, for 'keyed f()'; other callers get the values alone.
+                        keyed(returned, true);
+                    } else {
+                        expression(returned);
+                        convert(function.returnsPlural());
+                    }
+                } finally {
+                    literalTypes = outerLiteralTypes;
                 }
                 method.visitInsn(ARETURN);
             }
@@ -3163,6 +3213,9 @@ final class TriggerCompiler {
                 }
                 if (value == null) {
                     value = library.literal(unresolved.text());
+                    if (value != null) {
+                        multipleTypesWarning(unresolved.text().strip());
+                    }
                 }
                 if (value == null && (inList > 0 || skriptErrors) && outerArgument != null && !outerArgument.contains("event-")) {
                     // Words nothing parses in a list: Skript reports the whole argument they're in. (An event value
