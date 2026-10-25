@@ -413,4 +413,9 @@ public final class Values {
         }
         return null;
     }
+
+    /** A section that runs later, as a {@link Runnable}: it carries on from {@code frame} in {@code code}. */
+    public static Object section(Resumable code, co.xenastudios.neoskript.api.element.TriggerContext context, Frame frame) {
+        return (Runnable) () -> code.resume(context, frame);
+    }
 }

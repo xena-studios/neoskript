@@ -142,6 +142,14 @@ final class Scripts {
         registrar.effect("EffTestExprList", info -> (context, args) -> {}, "test expr list %number/booleans%");
         registrar.expression("ExprTestStringLiteral", "string", info -> (context, args) -> args[0],
                 "test string literal %*string%");
+        // 'a new runnable:' is its section, to run later with 'run runnable X' (see the compiler).
+        registrar.expression("ExprSecRunnable", "object", info -> (context, args) -> null, "[a] new runnable");
+        registrar.deferredSectionExpression("ExprSecRunnable");
+        registrar.effect("EffRunRunnable", info -> (context, args) -> {
+            if (args[0] instanceof Runnable runnable) {
+                runnable.run();
+            }
+        }, "run runnable %object%");
         // Its values can't be peeked at with 'next loop-value' when disabled (see the compiler).
         registrar.expression("ExprTestLoopPeeking", "integer", info -> (context, args) -> new Object[] {1L, 2L, 3L, 4L, 5L},
                 "test loop peeking disabled", "test loop peeking enabled");

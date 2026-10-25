@@ -167,6 +167,10 @@ final class StatementParser {
             return new Statement.Call(line, call);
         }
         ParsedSyntax effect = parser.effect(0, end);
+        if (effect != null && !sectionOnly(effect).isEmpty()) {
+            error(line, "This expression requires a section.");
+            return new Statement.Invalid(line);
+        }
         if (effect != null) {
             check(line, effect);
             if (context.registry().suppressesWarnings(effect.syntax())) {
@@ -211,6 +215,11 @@ final class StatementParser {
         if (header == null) {
             // An effect whose expression takes a section: 'set {_bar} to a new boss bar:'.
             ParsedSyntax effect = parser.effect(0, key.length());
+            List<Expr.Syntax> claimants = sectionOnly(effect);
+            if (claimants.size() > 1) {
+                error(line, claimError(key, claimants.get(1), "'" + text(key, claimants.getFirst()) + "'"));
+                return new Statement.Invalid(line);
+            }
             if (effect != null && hasSectionExpression(effect)) {
                 return new Statement.Section(line, effect, repeatable(section.children()));
             }
@@ -224,6 +233,11 @@ final class StatementParser {
                 return new Statement.Invalid(line);
             }
             error(line, "Can't understand this section: " + key);
+            return new Statement.Invalid(line);
+        }
+        List<Expr.Syntax> claimants = sectionOnly(header);
+        if (!claimants.isEmpty()) {
+            error(line, claimError(key, claimants.getFirst(), "'" + key + "'"));
             return new Statement.Invalid(line);
         }
         check(line, header);
@@ -583,6 +597,52 @@ final class StatementParser {
                 check(line, inner.syntax());
             }
         }
+    }
+
+    /** The expressions in a parsed line that can only be used with a section, in order. */
+    private List<Expr.Syntax> sectionOnly(ParsedSyntax syntax) {
+        List<Expr.Syntax> found = new ArrayList<>();
+        if (syntax != null) {
+            sectionOnly(syntax, found);
+        }
+        return found;
+    }
+
+    private void sectionOnly(ParsedSyntax syntax, List<Expr.Syntax> found) {
+        for (Object value : syntax.match().values()) {
+            if (value instanceof Expr expr) {
+                sectionOnly(expr, found);
+            }
+        }
+        // The condition of 'if X:' and the like.
+        for (Object value : syntax.match().regexValues()) {
+            if (value instanceof ParsedSyntax inner) {
+                sectionOnly(inner, found);
+            }
+        }
+    }
+
+    private void sectionOnly(Expr expr, List<Expr.Syntax> found) {
+        switch (expr) {
+            case Expr.Syntax syntax -> {
+                if (context.registry().sectionOnly(syntax.syntax().syntax())) {
+                    found.add(syntax);
+                }
+                sectionOnly(syntax.syntax(), found);
+            }
+            case Expr.ListOf list -> list.items().forEach(item -> sectionOnly(item, found));
+            default -> {}
+        }
+    }
+
+    /** Skript's error for a second syntax claiming a line's section. */
+    private static String claimError(String key, Expr.Syntax claimant, String claimedBy) {
+        return "The syntax '" + text(key, claimant) + "' tried to claim the current section, but it was already claimed by "
+                + claimedBy + ". You cannot have two section-starters in the same line.";
+    }
+
+    private static String text(String key, Expr.Syntax syntax) {
+        return key.substring(syntax.start(), syntax.end()).strip();
     }
 
     /** Whether a parsed effect contains an expression that takes a section (an {@code ExprSec} element). */

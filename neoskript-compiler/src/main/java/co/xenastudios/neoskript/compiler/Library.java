@@ -66,6 +66,7 @@ public final class Library implements Registrar {
     private final Set<String> eventDefaults = new HashSet<>();
     private final Map<String, String> sectionTypes = new HashMap<>();
     private final Map<String, String> sectionExpressions = new HashMap<>();
+    private final java.util.Set<String> deferredSections = new java.util.HashSet<>();
     private final Map<String, java.util.function.Function<String, ?>> parsers = new HashMap<>();
     private final Map<String, java.util.function.Function<String, ?>> literalParsers = new java.util.LinkedHashMap<>();
     private SyntaxRegistry registry;
@@ -138,6 +139,19 @@ public final class Library implements Registrar {
     public void sectionExpression(String expressionId, String valueType) {
         checkOpen();
         sectionExpressions.put(expressionId, valueType);
+    }
+
+    @Override
+    public void deferredSectionExpression(String expressionId) {
+        checkOpen();
+        sectionExpressions.put(expressionId, SyntaxRegistry.OBJECT);
+        deferredSections.add(expressionId);
+        builder.sectionOnly(expressionId);
+    }
+
+    /** Whether expression {@code id}'s section runs later, its value being the section itself. */
+    boolean deferredSection(String id) {
+        return deferredSections.contains(id);
     }
 
     /** The type of value expression {@code id} runs a section for, or {@code null} if it doesn't take one. */

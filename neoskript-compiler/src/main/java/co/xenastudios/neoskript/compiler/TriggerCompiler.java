@@ -542,10 +542,10 @@ final class TriggerCompiler {
     }
 
     /**
-     * {@code wait %timespan%}: saves the frame (the state number, local variables and the loops around
-     * it), schedules the rest of the trigger, and returns. The rest starts at the label after it.
+     * Pushes a new frame to carry on from here (the state number, local variables and the loops around it),
+     * and returns the point it carries on from, whose label the caller places.
      */
-    private void waitFor(ParsedSyntax delay) throws CompileException {
+    private WaitPoint saveFrame() {
         String frame = Type.getInternalName(Frame.class);
         List<int[]> saved = new ArrayList<>();
         for (Block block : loops()) {
@@ -561,8 +561,6 @@ final class TriggerCompiler {
         int state = waits.size();
         waits.add(wait);
 
-        method.visitVarInsn(ALOAD, 0);
-        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         method.visitTypeInsn(NEW, frame);
         method.visitInsn(DUP);
         method.visitMethodInsn(INVOKESPECIAL, frame, "<init>", "()V", false);
@@ -590,6 +588,17 @@ final class TriggerCompiler {
             method.visitInsn(AASTORE);
         }
         method.visitFieldInsn(PUTFIELD, frame, "slots", OBJECTS);
+        return wait;
+    }
+
+    /**
+     * {@code wait %timespan%}: saves the frame (the state number, local variables and the loops around
+     * it), schedules the rest of the trigger, and returns. The rest starts at the label after it.
+     */
+    private void waitFor(ParsedSyntax delay) throws CompileException {
+        method.visitVarInsn(ALOAD, 0);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        WaitPoint wait = saveFrame();
         expression((Expr) delay.match().values().getFirst());
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "ticks", "(" + OBJECT_DESC + ")J", false);
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "schedule",
@@ -1120,6 +1129,10 @@ final class TriggerCompiler {
      */
     private void expressionSection(Statement.Section section) throws CompileException {
         Expr.Syntax made = sectionExpression(section);
+        if (library.deferredSection(made.syntax().syntax().id())) {
+            deferredSection(section, made);
+            return;
+        }
         int valuesSlot = nextSlot++;
         int indexSlot = nextSlot++;
         expression(made);
@@ -1143,6 +1156,41 @@ final class TriggerCompiler {
         method.visitIincInsn(indexSlot, 1);
         method.visitJumpInsn(GOTO, top);
         method.visitLabel(end);
+        lineOf(section, section.line().key());
+        precomputed.put(made, valuesSlot);
+        try {
+            effect(section.header());
+        } finally {
+            precomputed.remove(made);
+        }
+    }
+
+    /**
+     * An effect whose expression's section runs later ({@code set {_r} to a new runnable:}): the expression's
+     * value is a {@link Runnable} that carries on from the section's first line with this trigger's frame, as
+     * a wait does, and stops at the section's end.
+     */
+    private void deferredSection(Statement.Section section, Expr.Syntax made) throws CompileException {
+        int valuesSlot = nextSlot++;
+        Label after = new Label();
+        method.visitVarInsn(ALOAD, 0);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        WaitPoint start = saveFrame();
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "section",
+                "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + ")" + OBJECT_DESC, false);
+        method.visitVarInsn(ASTORE, valuesSlot);
+        pushInt(1);
+        method.visitTypeInsn(ANEWARRAY, OBJECT);
+        method.visitInsn(DUP);
+        method.visitInsn(ICONST_0);
+        method.visitVarInsn(ALOAD, valuesSlot);
+        method.visitInsn(AASTORE);
+        method.visitVarInsn(ASTORE, valuesSlot);
+        method.visitJumpInsn(GOTO, after);
+        method.visitLabel(start.resume());
+        statements(section.body());
+        exitTrigger();
+        method.visitLabel(after);
         lineOf(section, section.line().key());
         precomputed.put(made, valuesSlot);
         try {
@@ -1871,6 +1919,8 @@ final class TriggerCompiler {
                     eventValue(fallback);
                     convert(isPlural(specs[i]));
                     method.visitInsn(AASTORE);
+                } else {
+                    missingDefault(specs[i]);
                 }
                 continue;
             }
@@ -1960,6 +2010,35 @@ final class TriggerCompiler {
         return null;
     }
 
+    /**
+     * Fails when a placeholder left out has only the event's value to stand for it and the event has none, as
+     * Skript's event value default expressions do ({@code hide the particles} outside a potion effect's section).
+     */
+    private void missingDefault(PlaceholderSpec spec) throws CompileException {
+        if (spec.nullable() || eventClasses == null) {
+            return;
+        }
+        for (String name : spec.types()) {
+            TypeRef ref = registry.resolveType(name);
+            if (ref == null || !library.hasEventDefault(ref.type().id())) {
+                return;
+            }
+        }
+        TypeRef first = registry.resolveType(spec.types().getFirst());
+        if (first != null && !spec.types().isEmpty()) {
+            throw new CompileException(line, "There's no " + first.type().name() + " in " + eventDescription());
+        }
+    }
+
+    /** The trigger's event as Skript's errors name it: {@code an on test case event}. */
+    private String eventDescription() {
+        if (eventClasses == null) {
+            return function != null ? "a function" : "this event";
+        }
+        String name = "test".equals(eventName) ? "on test case" : eventName;
+        return article(name) + " " + name + " event";
+    }
+
     /** Pushes the value {@code getter} gets from the trigger's event. */
     private void eventValue(java.util.function.Function<Object, Object> getter) {
         constant(getter, java.util.function.Function.class);
@@ -1993,9 +2072,7 @@ final class TriggerCompiler {
         java.util.function.Function<Object, Object> getter =
                 eventClasses == null ? null : library.eventValue(eventClasses, ref.type().id());
         if (getter == null) {
-            String where = eventClasses == null ? (function != null ? "a function" : "this event")
-                    : article(eventName) + " " + eventName + " event";
-            throw new CompileException(line, "There's no " + ref.type().name() + " in " + where);
+            throw new CompileException(line, "There's no " + ref.type().name() + " in " + eventDescription());
         }
         eventValue(getter);
     }

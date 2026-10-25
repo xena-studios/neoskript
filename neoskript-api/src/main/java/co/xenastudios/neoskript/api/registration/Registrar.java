@@ -82,6 +82,13 @@ public interface Registrar {
     void sectionExpression(String expressionId, String valueType);
 
     /**
+     * Lets expression {@code expressionId} take a section that runs later, as Skript's test runnables do:
+     * {@code set {_r} to a new runnable:}. The expression's value is the section itself, a {@link Runnable}
+     * that runs the code under it with the local variables of the trigger it was made in.
+     */
+    void deferredSectionExpression(String expressionId);
+
+    /**
      * A property expression, {@code [the] <property> of %owners%} and {@code %owners%'[s] <property>}: the
      * value of {@code getter} for each owner of {@code ownerClass}. Owners of other classes, and
      * {@code null} results, are left out.

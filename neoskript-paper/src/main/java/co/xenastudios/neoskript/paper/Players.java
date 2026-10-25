@@ -322,7 +322,7 @@ final class Players {
                     }
                 }
             }
-        }, "play sound[s] %texts% [(at|with) volume %number%] [(and|at|with) pitch %number%] [(to|for) %players%] "
+        }, "play sound[s] %texts% [(at|with) volume %number%] [(and|at|with) pitch %number%] [(to|for) %-players%] "
                 + "[(at|on|from) %locations/entities%]");
     }
 
