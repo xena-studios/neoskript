@@ -30,4 +30,9 @@ public final class PaperScheduler implements Scheduler {
         long period = Math.max(ticks, 1);
         return plugin.getServer().getScheduler().runTaskTimer(plugin, task, period, period)::cancel;
     }
+
+    @Override
+    public Runnable runGlobalRepeating(long delay, long ticks, Runnable task) {
+        return plugin.getServer().getScheduler().runTaskTimer(plugin, task, Math.max(delay, 0), Math.max(ticks, 1))::cancel;
+    }
 }

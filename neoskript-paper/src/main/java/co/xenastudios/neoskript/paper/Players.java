@@ -221,34 +221,42 @@ final class Players {
                 Player.class, Object.class, player -> Messages.LEGACY_SECTION.serialize(player.playerListName()),
                 (player, name) -> player.playerListName(Messages.component(name)));
 
-        registrar.effect("EffDamage", info -> (context, args) -> {
-            if (!(args[0] instanceof LivingEntity attacker) || !(args[2] instanceof Number amount)) {
-                return;
-            }
-            if (Double.isNaN(amount.doubleValue()) || amount.doubleValue() <= 0) {
-                co.xenastudios.neoskript.runtime.RuntimeErrors.report("Cannot damage an entity by 0 or less. Consider healing instead.");
-                return;
-            }
-            if (Double.isInfinite(amount.doubleValue())) {
-                co.xenastudios.neoskript.runtime.RuntimeErrors.report("Cannot damage an entity by an infinite amount.");
-                return;
-            }
-            for (Object victim : (Object[]) args[1]) {
-                if (victim instanceof LivingEntity living) {
-                    living.damage(amount.doubleValue() * 2, attacker);
+        // Attacking uses the attacker's held item; damaging by an amount (of hearts) doesn't.
+        registrar.effect("EffForceAttack", info -> {
+            boolean byAmount = info.pattern() >= 2;
+            return (context, args) -> {
+                double amount = 0;
+                if (byAmount) {
+                    if (!(args[2] instanceof Number number)) {
+                        return;
+                    }
+                    amount = number.doubleValue();
+                    if (amount <= 0) {
+                        co.xenastudios.neoskript.runtime.RuntimeErrors.report(
+                                "Cannot damage an entity by 0 or less. Consider healing instead.");
+                        return;
+                    } else if (!Double.isFinite(amount)) {
+                        return;
+                    }
+                    amount *= 2;
                 }
-            }
-        }, "make %livingentity% damage %livingentities% by %number% [heart[s]]");
-        registrar.effect("EffForceAttack", info -> (context, args) -> {
-            if (!(args[1] instanceof org.bukkit.entity.Entity target)) {
-                return;
-            }
-            for (Object attacker : (Object[]) args[0]) {
-                if (attacker instanceof LivingEntity living) {
-                    living.attack(target);
+                Object[] attackers = co.xenastudios.neoskript.runtime.Values.array(args[0]);
+                for (Object victim : co.xenastudios.neoskript.runtime.Values.array(args[1])) {
+                    for (Object attacker : attackers) {
+                        if (!(attacker instanceof LivingEntity living) || !(victim instanceof org.bukkit.entity.Entity target)) {
+                            continue;
+                        }
+                        if (!byAmount) {
+                            living.attack(target);
+                        } else if (target instanceof org.bukkit.entity.Damageable damageable) {
+                            damageable.damage(amount, living);
+                        }
+                    }
                 }
-            }
-        }, "make %livingentities% attack %entity%", "force %livingentities% to attack %entity%");
+            };
+        }, "make %livingentities% attack %entities%", "force %livingentities% to attack %entities%",
+                "make %livingentities% damage %entities% by %number% [heart[s]]",
+                "force %livingentities% to damage %entities% by %number% [heart[s]]");
         registrar.expression("ExprLastDamage", "number", info -> new SettableProperty<>(LivingEntity.class, Number.class,
                 living -> living.getLastDamage() / 2, (living, damage) -> living.setLastDamage(damage.doubleValue() * 2)),
                 "[the] last damage [taken] (of|by) %livingentities%", "%livingentities%'[s] last damage [taken]");

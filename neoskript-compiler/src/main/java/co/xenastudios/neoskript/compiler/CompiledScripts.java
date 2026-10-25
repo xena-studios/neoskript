@@ -50,8 +50,16 @@ public record CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunct
     /**
      * A trigger and what runs it: an event NeoSkript fires itself, the classes of the server events it runs
      * for, how often it runs ({@code every 5 minutes}), or for a test ({@code test "name":}) its name. The
-     * others are {@code null}.
+     * others are {@code null}. A periodical trigger may run in {@code worlds}, by name
+     * ({@code every 5 seconds in "world"}); else they're {@code null}.
      */
     public record CompiledTrigger(String script, int line, ScriptEvent event, java.util.List<Class<?>> eventClasses,
-            co.xenastudios.neoskript.runtime.Timespan period, String testName, Trigger trigger) {}
+            co.xenastudios.neoskript.runtime.Timespan period, String testName, Trigger trigger,
+            java.util.List<String> worlds) {
+
+        public CompiledTrigger(String script, int line, ScriptEvent event, java.util.List<Class<?>> eventClasses,
+                co.xenastudios.neoskript.runtime.Timespan period, String testName, Trigger trigger) {
+            this(script, line, event, eventClasses, period, testName, trigger, null);
+        }
+    }
 }

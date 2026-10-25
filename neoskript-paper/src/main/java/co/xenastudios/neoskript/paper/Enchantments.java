@@ -60,19 +60,32 @@ final class Enchantments {
                 && (a.level() < 0 || b.level() < 0 || a.level() == b.level()));
         registrar.comparison(Enchantment.class, Levelled.class, (a, b) -> a.equals(b.enchantment()));
 
+        // 'enchant X at level 30' enchants as an enchanting table would at that level.
         registrar.effect("EffEnchant", info -> {
-            boolean disenchant = info.pattern() == 1;
+            int pattern = info.pattern();
+            boolean treasure = info.hasTag("treasure");
             return Update.of(0, (context, args) -> {
                 Object[] items = (Object[]) args[0];
+                int level = 0;
+                if (pattern == 1) {
+                    if (!(args[1] instanceof Number number) || number.intValue() < 0) {
+                        return items;
+                    }
+                    level = number.intValue();
+                }
                 Object[] changed = new Object[items.length];
                 for (int i = 0; i < items.length; i++) {
-                    changed[i] = items[i] instanceof ItemType item
-                            ? disenchant ? item.withMeta(meta -> meta.removeEnchantments()) : enchanted(item, (Object[]) args[1])
-                            : items[i];
+                    changed[i] = !(items[i] instanceof ItemType item) ? items[i] : switch (pattern) {
+                        case 0 -> enchanted(item, (Object[]) args[1]);
+                        case 1 -> atLevel(item, level, treasure);
+                        default -> item.withMeta(meta -> meta.removeEnchantments());
+                    };
                 }
                 return changed;
             });
-        }, "enchant %~objects% with %enchantmenttypes%", "disenchant %~objects%");
+        }, "enchant %~objects% with %enchantmenttypes%",
+                "[naturally|randomly] enchant %~objects% at level %number%[treasure:[,] allowing treasure enchant[ment]s]",
+                "disenchant %~objects%");
         registrar.expression("ExprEnchantmentLevel", "integer", info -> new Level(),
                 "[the] [enchant[ment]] level[s] of %enchantments% (on|of) %itemtypes%",
                 "[the] %enchantments% [enchant[ment]] level[s] (on|of) %itemtypes%",
@@ -120,6 +133,16 @@ final class Enchantments {
     }
 
     /** A copy of {@code item} with the enchantments added; one with no level given gets level 1. */
+    /** {@code item} enchanted at random as at {@code level} of an enchanting table, as Skript's EffEnchant. */
+    private static ItemType atLevel(ItemType item, int level, boolean treasure) {
+        org.bukkit.inventory.ItemStack stack = item.stack();
+        if (stack == null) {
+            return item;
+        }
+        return new ItemType(org.bukkit.Bukkit.getItemFactory().enchantWithLevels(stack, level, treasure,
+                java.util.concurrent.ThreadLocalRandom.current()), true);
+    }
+
     private static ItemType enchanted(ItemType item, Object[] enchantments) {
         return item.withMeta(meta -> {
             for (Object value : enchantments) {

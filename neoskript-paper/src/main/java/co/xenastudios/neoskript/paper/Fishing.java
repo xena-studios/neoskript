@@ -48,15 +48,18 @@ final class Fishing {
                 }
             };
         }, "lure enchantment bonus is (applied|active)", "lure enchantment bonus is(n't| not) (applied|active)");
+        // Skript 2.17's 'pull in hooked entity' (EffPullHookedEntity) registers this effect's class with its own
+        // pattern, so it's this effect at its first pattern: it applies the lure bonus rather than pulling.
         registrar.effect("EffFishingLure", info -> {
             fishing(info, "The 'fishing hook lure' effect can only be used in a fishing event.");
-            boolean apply = info.pattern() == 0;
+            boolean apply = info.pattern() != 1;
             return (context, args) -> {
                 if (context.event() instanceof PlayerFishEvent event) {
                     event.getHook().setApplyLure(apply);
                 }
             };
-        }, "apply [the] lure enchantment bonus", "remove [the] lure enchantment bonus");
+        }, "apply [the] lure enchantment bonus", "remove [the] lure enchantment bonus",
+                "(reel|pull) in [the] hook[ed] entity");
         registrar.expression("ExprFishingApproachAngle", "number", info -> {
             fishing(info, "The 'fishing approach angle' expression can only be used in a fishing event.");
             boolean min = info.hasTag("min");

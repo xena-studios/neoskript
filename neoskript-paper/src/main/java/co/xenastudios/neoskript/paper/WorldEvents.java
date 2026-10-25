@@ -186,6 +186,9 @@ final class WorldEvents {
                     && (worlds == null || Events.any(worlds, world -> world.equals(event.getWorld())));
         }, "at %time% [in %worlds%]");
         registrar.eventValue(EventBridges.ScheduledEvent.class, "world", EventBridges.ScheduledEvent::getWorld);
+        // 'every 5 seconds in "world"': the world it runs for; none without worlds.
+        registrar.eventValue(co.xenastudios.neoskript.runtime.PeriodicalEvent.class, "world",
+                co.xenastudios.neoskript.runtime.PeriodicalEvent::world);
 
         registrar.event("EvtRealTime", List.of(EventBridges.RealTimeEvent.class), info -> (context, args) -> {
             EventBridges.RealTimeEvent event = (EventBridges.RealTimeEvent) context.event();

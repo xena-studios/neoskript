@@ -85,11 +85,12 @@ final class BlockSyntax {
         registrar.expression("ExprCarryingBlockData", "blockdata", info -> new SettableProperty<>(
                 org.bukkit.entity.Enderman.class, Object.class, org.bukkit.entity.Enderman::getCarriedBlock, (enderman, block) -> {
                     org.bukkit.block.data.BlockData data = block instanceof org.bukkit.block.data.BlockData given ? given
+                            : block instanceof Block placed ? placed.getBlockData()
                             : block instanceof ItemType item && item.material().isBlock() ? item.material().createBlockData()
                             : null;
                     enderman.setCarriedBlock(data);
                 }).deleting(enderman -> enderman.setCarriedBlock(null)),
-                "[the] carr(ied|ying) block[ ]data of %livingentities%", "%livingentities%'[s] carr(ied|ying) block[ ]data");
+                "[the] carr(ied|ying) block[[ ]data] of %livingentities%", "%livingentities%'[s] carr(ied|ying) block[[ ]data]");
         registrar.parser("blockdata", BlockSyntax::blockData);
         registrar.text(BlockData.class, data -> data.getAsString().replaceFirst("^minecraft:", ""));
         registrar.converter(Block.class, BlockData.class, Block::getBlockData);

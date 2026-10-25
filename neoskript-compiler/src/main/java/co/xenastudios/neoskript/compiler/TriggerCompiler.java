@@ -269,6 +269,13 @@ final class TriggerCompiler {
         return (Trigger) define(generate(scriptName, () -> statements(body)));
     }
 
+    /** A periodical trigger ({@code every 5 seconds}), whose event is a {@link co.xenastudios.neoskript.runtime.PeriodicalEvent}. */
+    Trigger compilePeriodical(String scriptName, List<Statement> body) throws CompileException {
+        eventClasses = List.of(co.xenastudios.neoskript.runtime.PeriodicalEvent.class);
+        eventName = "periodical";
+        return compileTrigger(scriptName, body);
+    }
+
     /**
      * A trigger for a server event. If the event has a filter ({@code on break of stone}), the trigger
      * stops straight away when it fails.

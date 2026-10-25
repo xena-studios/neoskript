@@ -25,9 +25,12 @@ final class Literals {
             Pattern.compile(PART + "(?:(?:,? and |, | )" + PART + ")*", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME = Pattern.compile(
             "\\d{1,2}:\\d{2}(?: ?[ap]\\.?m\\.?)?|\\d{1,2} ?[ap]\\.?m\\.?", Pattern.CASE_INSENSITIVE);
-    /** Text that might name something: words, digits, and the punctuation item and entity names use. */
-    private static final Pattern WORDS =
-            Pattern.compile("(?=[^\\[]*\\p{L})(?![^\\[]*: )[\\p{L}\\p{N}_][\\p{L}\\p{N}_'.:\\- ]*(\\[[\\p{L}\\p{N}_=,;:. ]*\\])?");
+    /**
+     * Text that might name something: words, digits, and the punctuation item and entity names use, and currency
+     * symbols, for money ({@code $5}, {@code 20€}).
+     */
+    private static final Pattern WORDS = Pattern.compile("(?=[^\\[]*[\\p{L}\\p{Sc}])(?![^\\[]*: )[\\p{L}\\p{N}_\\p{Sc}]"
+            + "[\\p{L}\\p{N}_\\p{Sc}'.:\\- ]*(\\[[\\p{L}\\p{N}_=,;:. ]*\\])?");
     /**
      * {@code value (type)}, a literal whose type is spelled out: {@code black (wolf variant)}. The space before
      * the bracket keeps {@code f(player)} a function call.

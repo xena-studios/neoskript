@@ -227,7 +227,9 @@ final class CoreSyntax {
                 "(delete|clear|reset:reset) %~objects%");
 
         // 'every 5 minutes': runs on the global thread, from when the script loads.
-        library.core(SyntaxKind.EVENT, PERIODICAL, null, List.of(), "every %timespan%");
+        // In worlds, it runs for each, when the world's time is a multiple of the period.
+        library.core(SyntaxKind.EVENT, PERIODICAL, null, List.of(), "every %timespan%",
+                "every %timespan% in [world[s]] %worlds%");
 
         // 'copy {_a::*} into {_b::*}': lists with their indices and nested lists; 'recursive {_a::*}'.
         library.core(SyntaxKind.EFFECT, COPY, null, List.of(), "copy %~objects% [in]to %~objects%");

@@ -3,6 +3,8 @@ version: '${version}'
 main: co.xenastudios.neoskript.plugin.NeoSkriptPlugin
 api-version: '1.21.4'
 folia-supported: true
+# Plugins NeoSkript hooks into, as Skript does, so they're enabled first.
+softdepend: [Vault, WorldGuard, GriefPrevention]
 description: A fast, modern drop-in replacement for Skript.
 website: https://xenastudios.co
 authors: [Xena Studios]
