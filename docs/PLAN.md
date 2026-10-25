@@ -555,6 +555,11 @@ Types, converters, aliases, events, effects, expressions, conditions, commands (
     - **Items:** equippable components, custom model data, enchantment glint overrides, skull textures, armour, body armour and saddle slots by Skript's names, `all items` and `all blocks`, removing all of an item from inventories, and item comparisons as Skript makes them.
     - **Literals that say their type** (`unknown (heal reason)`) are read with that type's parser.
 
+    **Batch 18 (2026-10-25): 841 → 855 tests pass (of 862).**
+    - **Text components** as Skript 2.17's module has them (its tag parser, safe and unsafe tags, `raw`, `resolved for`), names and lore as components, and **damage sources** (`a custom damage source:` and its parts, with Skript's errors).
+    - **Directions** as Skript's `Direction` and `ExprDirection`: relative and absolute ones, diagonals, `in the direction of`, chains, storable in variables; block lines and cuboids as Skript's `ExprBlocks`.
+    - **Language:** Skript's variable name checks and single-colon warning, its pretty quotes error, its warning for words with several types (`'unknown' has multiple types (...)`), function call errors as Skript gives them (unreadable arguments as `?`, the function probably meant), a time unit alone (`wait tick`), hyphenated words kept whole (`loop-value - 1`), block displays of block data, and warnings logged as warnings.
+
 **M5: Folia hardening + tooling**
 Region-ownership enforcement, `run on` section, Folia-specific differential tests, migration CLI.
 *Exit:* the corpus runs on Folia without thread violations, and the CLI is released.
