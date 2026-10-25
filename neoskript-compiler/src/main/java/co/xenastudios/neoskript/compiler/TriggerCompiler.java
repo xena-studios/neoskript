@@ -1695,7 +1695,8 @@ final class TriggerCompiler {
                     method.visitMethodInsn(INVOKEVIRTUAL, STORE, "removeFromList", "(" + STRING_DESC + OBJECTS + "Z)V",
                             false);
                 } else {
-                    method.visitMethodInsn(INVOKEVIRTUAL, STORE, "subtract", nameValues, false);
+                    method.visitMethodInsn(INVOKEVIRTUAL, STORE,
+                            mode == CoreSyntax.ChangeMode.REMOVE_ALL ? "subtractAll" : "subtract", nameValues, false);
                 }
             }
             case DELETE -> {
@@ -1883,6 +1884,9 @@ final class TriggerCompiler {
                 case RESET -> " can't be reset";
             });
         }
+        if (mode.value >= 0) {
+            checkChanger((Expr) effect.match().values().get(mode.value), accepted, changeMode, target);
+        }
         constant(element, Changeable.class);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(syntax);
@@ -1904,6 +1908,110 @@ final class TriggerCompiler {
         constant(changeMode, Changeable.Mode.class);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Changeable.class), "change",
                 "(" + CONTEXT + OBJECTS + OBJECTS + Type.getDescriptor(Changeable.Mode.class) + ")V", true);
+    }
+
+    /**
+     * Fails as Skript's change effect does when what's given is known to be of a type the target can't take:
+     * {@code "hello" can't be added to date data tag "date" of {_item} because the former is not a time span}.
+     * Values whose type is only known when it runs (variables, unresolved words) are let through, as are
+     * targets that take anything.
+     */
+    private void checkChanger(Expr changer, Class<?>[] accepted, Changeable.Mode mode, Expr target)
+            throws CompileException {
+        if (accepted.length == 0 || java.util.Arrays.asList(accepted).contains(Object.class)) {
+            return;
+        }
+        List<String> acceptedTypes = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        for (Class<?> type : accepted) {
+            List<String> ids = library.typesOf(new Class<?>[] {type});
+            if (ids.isEmpty()) {
+                // A class scripts have no type for: nothing to tell the user, so nothing to check.
+                return;
+            }
+            acceptedTypes.addAll(ids);
+            // Named as the type that is that class, or else the first one under it.
+            String named = ids.stream().filter(id -> library.javaClass(id) == type).findFirst().orElse(ids.getFirst());
+            TypeRef ref = registry.resolveType(named);
+            names.add(ref == null ? named : ref.type().name());
+        }
+        if (changerFits(changer, acceptedTypes)) {
+            return;
+        }
+        StringBuilder not = new StringBuilder("is ");
+        if (names.size() == 1) {
+            not.append("not ").append(article(names.getFirst())).append(' ').append(names.getFirst());
+        } else {
+            not.append("neither ");
+            for (int i = 0; i < names.size(); i++) {
+                if (i > 0) {
+                    not.append(i == names.size() - 1 ? " nor " : ", ");
+                }
+                not.append(article(names.get(i))).append(' ').append(names.get(i));
+            }
+        }
+        String what = describe(target);
+        String given = describe(changer);
+        throw new CompileException(line, switch (mode) {
+            case ADD -> given + " can't be added to " + what + " because the former " + not;
+            case SET -> what + " can't be set to " + given + " because the latter " + not;
+            default -> given + " can't be removed from " + what + " because the former " + not;
+        });
+    }
+
+    /** Whether {@code changer} could give values of one of {@code types}, as far as is known before it runs. */
+    private boolean changerFits(Expr changer, List<String> types) {
+        if (changer instanceof Expr.ListOf list) {
+            for (Expr item : list.items()) {
+                if (!changerFits(item, types)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (!(changer instanceof Expr.Text || changer instanceof Expr.Literal || changer instanceof Expr.Syntax)) {
+            return true;
+        }
+        String type = changer.type();
+        if (type == null || type.equals(SyntaxRegistry.OBJECT)) {
+            return true;
+        }
+        for (String wanted : types) {
+            // Its type, one it converts to, or one under it, which it might be when it runs.
+            if (registry.isAssignable(type, wanted) || registry.isSubtype(wanted, type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * An expression as Skript's errors write it: its text, with variables saying what they hold when testing,
+     * as Skript's debug text does.
+     */
+    private String describe(Expr expr) {
+        String text = source.substring(expr.start(), expr.end());
+        if (!library.testing()) {
+            return text;
+        }
+        List<Integer> ends = new ArrayList<>();
+        variableEnds(expr, ends);
+        StringBuilder described = new StringBuilder(text);
+        ends.sort(java.util.Comparator.reverseOrder());
+        for (int end : ends) {
+            described.insert(end - expr.start(), " (as java.lang.Object)");
+        }
+        return described.toString();
+    }
+
+    private static void variableEnds(Object value, List<Integer> ends) {
+        switch (value) {
+            case Expr.Variable variable -> ends.add(variable.end());
+            case Expr.ListOf list -> list.items().forEach(item -> variableEnds(item, ends));
+            case Expr.FunctionCall call -> call.arguments().forEach(argument -> variableEnds(argument, ends));
+            case Expr.Syntax syntax -> syntax.syntax().match().values().forEach(inner -> variableEnds(inner, ends));
+            case null, default -> { }
+        }
     }
 
     // ---------------------------------------------------------------- elements

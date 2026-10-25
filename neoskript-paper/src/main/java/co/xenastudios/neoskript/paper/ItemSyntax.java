@@ -172,6 +172,16 @@ final class ItemSyntax {
             }
             return all.toArray();
         }, "[all [[of] the]|the|every] item[ ]types");
+        // 'remove all items from {_inventory}': one of every item there is, as Skript's item type lists them.
+        registrar.expression("ExprSets-items", "itemstack", info -> (context, args) -> {
+            List<Object> all = new ArrayList<>();
+            for (Material material : Material.values()) {
+                if (!material.isLegacy() && material.isItem()) {
+                    all.add(new ItemStack(material));
+                }
+            }
+            return all.toArray();
+        }, "[all [[of] the]|the] (items|item[ ]stacks)", "every item[[ ]stack]");
     }
 
     /** Whether all of {@code values}, or with {@code all} false any of them, pass {@code test}. */

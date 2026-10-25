@@ -109,6 +109,27 @@ public final class Arithmetic {
         DEFAULTS.put(type, value);
     }
 
+    /**
+     * What can go on the right of {@code operator} with a value of {@code left} on its left, as Skript's
+     * arithmetic change types are: numbers for numbers, texts added to texts, timespans for dates.
+     */
+    public static java.util.List<Class<?>> rightTypes(char operator, Class<?> left) {
+        java.util.List<Class<?>> types = new java.util.ArrayList<>();
+        if (Number.class.isAssignableFrom(left) && (operator == '+' || operator == '-')) {
+            types.add(Number.class);
+        }
+        if (left == String.class && operator == '+') {
+            types.add(String.class);
+        }
+        for (Operation operation : OPERATIONS) {
+            if (operation.operator() == operator && operation.left().isAssignableFrom(left)
+                    && !types.contains(operation.right())) {
+                types.add(operation.right());
+            }
+        }
+        return types;
+    }
+
     /** A registered operation's result, or {@code null} if none applies. */
     private static Object other(char operator, Object a, Object b) {
         if (a == null && b != null) {

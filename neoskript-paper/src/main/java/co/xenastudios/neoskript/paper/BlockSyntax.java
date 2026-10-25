@@ -110,7 +110,7 @@ final class BlockSyntax {
             List<Object> types = new ArrayList<>();
             for (Object value : (Object[]) args[0]) {
                 Object type = switch (value) {
-                    case ItemType item -> new ItemType(new org.bukkit.inventory.ItemStack(item.material()), false);
+                    case ItemType item -> baseType(item);
                     case BlockData data -> data.getMaterial().createBlockData();
                     // A block's type is its item, or its block data if it has no item, like water.
                     case org.bukkit.block.Block block -> block.getType().isItem()
@@ -155,6 +155,36 @@ final class BlockSyntax {
     }
 
     /** Block data written as {@code campfire[lit=false]} or {@code minecraft:stone[]}, or {@code null}. */
+    /**
+     * An item's kind, as Skript's base type: just its material, but a potion keeps what potion it is and a horn
+     * its instrument ('type of potion of fire resistance' isn't a water bottle).
+     */
+    private static ItemType baseType(ItemType item) {
+        org.bukkit.inventory.ItemStack stack = item.alternatives().getFirst().stack();
+        org.bukkit.inventory.ItemStack base = new org.bukkit.inventory.ItemStack(item.material());
+        if (stack.getItemMeta() instanceof org.bukkit.inventory.meta.PotionMeta potion
+                && base.getItemMeta() instanceof org.bukkit.inventory.meta.PotionMeta copy) {
+            if (potion.hasBasePotionType()) {
+                copy.setBasePotionType(potion.getBasePotionType());
+            }
+            for (org.bukkit.potion.PotionEffect effect : potion.getCustomEffects()) {
+                copy.addCustomEffect(effect, false);
+            }
+            if (potion.hasColor()) {
+                copy.setColor(potion.getColor());
+            }
+            if (potion.hasCustomPotionName()) {
+                copy.setCustomPotionName(potion.getCustomPotionName());
+            }
+            base.setItemMeta(copy);
+        } else if (stack.getItemMeta() instanceof org.bukkit.inventory.meta.MusicInstrumentMeta music
+                && base.getItemMeta() instanceof org.bukkit.inventory.meta.MusicInstrumentMeta copy) {
+            copy.setInstrument(music.getInstrument());
+            base.setItemMeta(copy);
+        }
+        return new ItemType(base, false);
+    }
+
     static BlockData blockData(String text) {
         String words = text.strip().toLowerCase(Locale.ROOT).replaceFirst("^(?:an?|the) ", "");
         if (words.isEmpty()) {

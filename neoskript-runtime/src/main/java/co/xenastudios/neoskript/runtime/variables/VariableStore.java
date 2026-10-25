@@ -211,6 +211,19 @@ public final class VariableStore {
     }
 
     /** Subtracts {@code values} from the number in {@code {name}}. */
+    /**
+     * {@code remove all X from {name}}: all of them out of the value with its class's changer ('remove all
+     * diamonds from {_inventory}'), or else as {@link #subtract}.
+     */
+    public void subtractAll(String name, Object[] values) {
+        Object current = get(name);
+        if (current != null && Values.changeValue(current, values, Changeable.Mode.REMOVE_ALL)) {
+            changed();
+            return;
+        }
+        subtract(name, values);
+    }
+
     public void subtract(String name, Object[] values) {
         Object current = get(name);
         if (current != null && Values.changeValue(current, values, Changeable.Mode.REMOVE)) {

@@ -148,6 +148,11 @@ final class Items {
 
     /** Whether one item is another: the same item, with the meta and amount the other was written with. */
     private static boolean isItem(ItemType item, ItemType pattern) {
+        return isItem(item, pattern, true);
+    }
+
+    /** {@link #isItem(ItemType, ItemType)}, with {@code amounts} false whatever amount the other was written with. */
+    private static boolean isItem(ItemType item, ItemType pattern, boolean amounts) {
         ItemStack wanted = pattern.alternatives().getFirst().stack();
         ItemStack actual = item.alternatives().getFirst().stack();
         if (pattern.plain() && !bare(actual)) {
@@ -155,8 +160,41 @@ final class Items {
             return false;
         }
         return item.alternatives().getFirst().material() == pattern.material() && actual.getType() == wanted.getType()
-                && (!wanted.hasItemMeta() || actual.isSimilar(wanted))
-                && (!pattern.amountGiven() || actual.getAmount() == wanted.getAmount());
+                && (!wanted.hasItemMeta() || hasAllOf(actual, wanted))
+                && (!amounts || !pattern.amountGiven() || actual.getAmount() == wanted.getAmount());
+    }
+
+    /**
+     * Whether {@code actual} has everything {@code wanted} was given, as Skript's item comparisons: it may have
+     * a name, lore, enchantments or flags the other hasn't, but not other ones, and the rest must be the same.
+     */
+    static boolean hasAllOf(ItemStack actual, ItemStack wanted) {
+        if (actual.isSimilar(wanted.asQuantity(actual.getAmount()))) {
+            return true;
+        }
+        org.bukkit.inventory.meta.ItemMeta ours = actual.getItemMeta();
+        org.bukkit.inventory.meta.ItemMeta theirs = wanted.getItemMeta();
+        if (ours == null || theirs == null
+                || theirs.hasDisplayName() && !(ours.hasDisplayName() && ours.displayName().equals(theirs.displayName()))
+                || theirs.hasLore() && !(ours.hasLore() && java.util.Objects.equals(ours.lore(), theirs.lore()))
+                || !theirs.getEnchants().isEmpty() && !ours.getEnchants().equals(theirs.getEnchants())
+                || !theirs.getItemFlags().isEmpty() && !ours.getItemFlags().equals(theirs.getItemFlags())) {
+            return false;
+        }
+        ours = strip(ours.clone());
+        theirs = strip(theirs.clone());
+        return ours.equals(theirs);
+    }
+
+    /** {@code meta} without what {@link #hasAllOf} lets one item have more of. */
+    private static org.bukkit.inventory.meta.ItemMeta strip(org.bukkit.inventory.meta.ItemMeta meta) {
+        meta.displayName(null);
+        meta.lore(null);
+        for (org.bukkit.enchantments.Enchantment enchantment : meta.getEnchants().keySet()) {
+            meta.removeEnchant(enchantment);
+        }
+        meta.removeItemFlags(meta.getItemFlags().toArray(org.bukkit.inventory.ItemFlag[]::new));
+        return meta;
     }
 
     private static void slotNames(Map<String, EquipmentSlot> slots, EquipmentSlot slot, String... names) {
@@ -216,9 +254,17 @@ final class Items {
         // Before naming items, so 'chest inventory with 2 rows named "x"' is one chest inventory, not a named one.
         registerInventories(registrar);
 
-        // 'items of type any boots': each item an item type stands for.
+        // 'items of type any boots': each item an item type stands for; 'all blocks': every kind of block.
         registrar.expression("ExprItems", "itemtype", info -> (context, args) -> {
             List<Object> items = new ArrayList<>();
+            if (info.pattern() < 2) {
+                for (org.bukkit.Material material : org.bukkit.Material.values()) {
+                    if (!material.isLegacy() && material.isBlock() && material.isItem()) {
+                        items.add(new ItemType(new ItemStack(material), false));
+                    }
+                }
+                return items.toArray();
+            }
             for (Object value : (Object[]) args[0]) {
                 if (value instanceof ItemType type) {
                     for (ItemType each : type.alternatives()) {
@@ -229,7 +275,8 @@ final class Items {
                 }
             }
             return items.toArray();
-        }, "[all [[of] the]|the|every] item[s] of type[s] %itemtypes%",
+        }, "[all [[of] the]|the] block[[ ]type]s", "every block[[ ]type]",
+                "[all [[of] the]|the|every] item[s] of type[s] %itemtypes%",
                 "[all [[of] the]|the|every] block:block[s] of type[s] %itemtypes%");
         registrar.expression("ExprNamed", "itemtype", info -> (context, args) -> args[0] instanceof ItemType item
                 ? item.withMeta(meta -> meta.displayName(Messages.component(args[1]))) : null,
@@ -273,6 +320,32 @@ final class Items {
         registrar.changer(Inventory.class, Changeable.Mode.ADD, (inventory, items) -> inventory.addItem(stacks(items)));
         registrar.changer(InventoryHolder.class, Changeable.Mode.REMOVE, (holder, items) -> remove(holder.getInventory(), items));
         registrar.changer(Inventory.class, Changeable.Mode.REMOVE, Items::remove);
+        // 'remove all diamonds from X': every stack that is one of the items, named or not.
+        registrar.changer(InventoryHolder.class, Changeable.Mode.REMOVE_ALL, (holder, items) -> removeAll(holder.getInventory(), items));
+        registrar.changer(Inventory.class, Changeable.Mode.REMOVE_ALL, Items::removeAll);
+    }
+
+    /** Takes every stack that is one of {@code items} out of {@code inventory}, as Skript's 'remove all'. */
+    static void removeAll(Inventory inventory, Object[] items) {
+        List<ItemType> wanted = new ArrayList<>();
+        for (Object item : items) {
+            switch (item) {
+                case ItemType type -> wanted.addAll(type.alternatives());
+                case ItemStack stack -> wanted.add(new ItemType(stack, false));
+                case null, default -> { }
+            }
+        }
+        ItemStack[] contents = inventory.getContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            ItemStack held = contents[slot];
+            if (held == null || held.getType().isAir()) {
+                continue;
+            }
+            ItemType actual = new ItemType(held, true);
+            if (wanted.stream().anyMatch(type -> isItem(actual, type, false))) {
+                inventory.setItem(slot, null);
+            }
+        }
     }
 
     private static void registerMore(Registrar registrar) {
