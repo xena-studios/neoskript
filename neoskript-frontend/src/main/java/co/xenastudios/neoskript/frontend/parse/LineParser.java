@@ -631,7 +631,8 @@ final class LineParser {
         if (Literals.isBoolean(text) && expected.accepts("boolean", registry)) {
             return new Expr.Literal(start, end, "boolean", text);
         }
-        if (Literals.isTimespan(text) && expected.accepts("timespan", registry)) {
+        if (Literals.isTimespan(text) && expected.accepts("timespan", registry)
+                && (!Literals.isBareUnit(text) || expected.hasType("timespan"))) {
             return new Expr.Literal(start, end, "timespan", text);
         }
         if (Literals.isTime(text) && expected.accepts("time", registry)) {
