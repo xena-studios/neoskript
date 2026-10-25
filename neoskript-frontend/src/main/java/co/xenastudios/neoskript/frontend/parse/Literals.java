@@ -19,7 +19,8 @@ final class Literals {
     private static final String AMOUNT = "(?:\\d+(?:\\.\\d+)?|an?|one|two|three|four|five|six|seven|eight|nine|ten)";
     private static final String UNIT =
             "(?:(?:real|rl|irl|minecraft|mc) )?(?:milliseconds?|ticks?|seconds?|minutes?|hours?|days?|weeks?|months?|years?)";
-    private static final String PART = AMOUNT + " ?" + UNIT;
+    // A unit alone is one of it, as Skript reads "wait tick".
+    private static final String PART = "(?:" + AMOUNT + " ?)?" + UNIT;
     private static final Pattern TIMESPAN =
             Pattern.compile(PART + "(?:(?:,? and |, | )" + PART + ")*", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIME = Pattern.compile(
@@ -49,6 +50,13 @@ final class Literals {
 
     static boolean isTimespan(String text) {
         return TIMESPAN.matcher(text).matches();
+    }
+
+    private static final Pattern BARE_UNIT = Pattern.compile(UNIT, Pattern.CASE_INSENSITIVE);
+
+    /** A time unit alone ({@code tick}), which is one of it only where a timespan is what's wanted. */
+    static boolean isBareUnit(String text) {
+        return BARE_UNIT.matcher(text).matches();
     }
 
     static boolean isTime(String text) {

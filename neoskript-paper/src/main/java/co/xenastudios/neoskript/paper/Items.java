@@ -412,7 +412,7 @@ final class Items {
         });
 
 
-        registrar.expression("ExprLore", "string", info -> new Lore(info.pattern() >= 2),
+        registrar.expression("ExprLore", "textcomponent", info -> new Lore(info.pattern() >= 2),
                 "[the] lore of %itemtype/slot%", "%itemtype/slot%'[s] lore",
                 "[the] line %number% of [the] lore of %itemtype/slot%", "[the] line %number% of %itemtype/slot%'[s] lore",
                 "[the] %number%(st|nd|rd|th) line of [the] lore of %itemtype/slot%",
@@ -697,12 +697,10 @@ final class Items {
             if (stack == null || stack.getItemMeta() == null || stack.getItemMeta().lore() == null) {
                 return null;
             }
-            List<String> lines = new ArrayList<>();
-            for (Component component : stack.getItemMeta().lore()) {
-                lines.add(Messages.tagged(component));
-            }
+            // Its lines, as text components, as Skript gives them.
+            List<Component> lines = stack.getItemMeta().lore();
             if (!line) {
-                return String.join("\n", lines);
+                return lines.toArray();
             }
             int n = arguments[0] instanceof Number number ? co.xenastudios.neoskript.runtime.Values.toInt(number.doubleValue()) : 0;
             return n >= 1 && n <= lines.size() ? lines.get(n - 1) : null;
@@ -710,26 +708,31 @@ final class Items {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
-            return mode == Mode.SET || mode == Mode.ADD || mode == Mode.DELETE ? new Class<?>[] {String.class} : null;
+            return mode == Mode.SET || mode == Mode.ADD || mode == Mode.DELETE
+                    ? new Class<?>[] {String.class, Component.class} : null;
         }
 
         @Override
         public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
             editStack(line ? arguments[1] : arguments[0], stack -> stack.editMeta(meta -> {
                 List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
-                String text = delta == null || delta.length == 0 ? null : Values.text(delta[0]);
+                Object value = delta == null || delta.length == 0 ? null : delta[0];
+                String text = value == null || value instanceof Component ? null : Values.text(value);
                 if (line) {
                     int n = arguments[0] instanceof Number number ? co.xenastudios.neoskript.runtime.Values.toInt(number.doubleValue()) : 0;
                     while (lore.size() < n) {
                         lore.add(Component.empty());
                     }
                     if (n >= 1) {
-                        lore.set(n - 1, text == null ? Component.empty() : Messages.component(text));
+                        lore.set(n - 1, value == null ? Component.empty() : Messages.component(value));
                     }
                 } else if (mode == Mode.DELETE) {
                     lore.clear();
-                } else if (mode == Mode.ADD && text != null) {
-                    lore.add(Messages.component(text));
+                } else if (mode == Mode.ADD && value != null) {
+                    lore.add(Messages.component(value));
+                } else if (value instanceof Component component) {
+                    lore.clear();
+                    lore.add(component);
                 } else if (text != null) {
                     lore.clear();
                     for (String part : text.split("\n", -1)) {
@@ -1018,11 +1021,11 @@ final class Items {
             }
             return holders.size() == 1 ? holders.getFirst() : holders.toArray();
         }, "[the] holder[s] of %inventories%", "%inventories%'[s] holder[s]");
-        // Where an inventory's holder is: a block's centre, as for blocks; a double chest's left half.
+        // Where an inventory's holder is: its block's location, as for blocks; a double chest's left half.
         registrar.converter(InventoryHolder.class, org.bukkit.Location.class, holder -> switch (holder) {
-            case org.bukkit.block.BlockState state -> state.getLocation().add(0.5, 0.5, 0.5);
+            case org.bukkit.block.BlockState state -> Direction.blockLocation(state.getBlock());
             case org.bukkit.block.DoubleChest chest when chest.getLeftSide() instanceof org.bukkit.block.BlockState left ->
-                    left.getLocation().add(0.5, 0.5, 0.5);
+                    Direction.blockLocation(left.getBlock());
             case org.bukkit.entity.Entity entity -> entity.getLocation();
             default -> null;
         });

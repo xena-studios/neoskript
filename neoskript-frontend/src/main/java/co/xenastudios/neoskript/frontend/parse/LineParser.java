@@ -238,7 +238,8 @@ final class LineParser {
      * the hyphen is part of a word, not a minus sign.
      */
     private boolean splitsToken(int position) {
-        return position >= 2 && position < input.length() && Character.isDigit(input.charAt(position))
+        // ...or of a hyphenated word, as the 'value' of 'loop-value': only if nothing else parses is it split there.
+        return position >= 2 && position < input.length() && Character.isLetterOrDigit(input.charAt(position))
                 && input.charAt(position - 1) == '-' && Character.isLetter(input.charAt(position - 2));
     }
 
@@ -496,6 +497,13 @@ final class LineParser {
         if (start >= end) {
             return null;
         }
+        char first = input.charAt(start);
+        char last = input.charAt(end - 1);
+        if (first == '\u201C' || first == '\u201D' || last == '\u201C' || last == '\u201D') {
+            // As Skript's parser refuses them where an expression starts or ends.
+            problem("Pretty quotes are not allowed, change to regular quotes (\")");
+            return null;
+        }
         Expr expr = single(start, end, expected);
         if (expr != null && !(expr instanceof Expr.Unresolved) && hasUnresolved(expr)) {
             // Words a type's parser takes whole are that literal, not syntax leaning on unresolved words, as
@@ -623,7 +631,8 @@ final class LineParser {
         if (Literals.isBoolean(text) && expected.accepts("boolean", registry)) {
             return new Expr.Literal(start, end, "boolean", text);
         }
-        if (Literals.isTimespan(text) && expected.accepts("timespan", registry)) {
+        if (Literals.isTimespan(text) && expected.accepts("timespan", registry)
+                && (!Literals.isBareUnit(text) || expected.hasType("timespan"))) {
             return new Expr.Literal(start, end, "timespan", text);
         }
         if (Literals.isTime(text) && expected.accepts("time", registry)) {
@@ -714,7 +723,7 @@ final class LineParser {
         List<int[]> embedded = new ArrayList<>();
         Scanner.braceEnd(input, start, end, embedded);
         String name = input.substring(start + 1, end - 1);
-        if (name.isBlank()) {
+        if (name.isBlank() || !validVariableName(name)) {
             return null;
         }
         List<Expr> parts = new ArrayList<>();
@@ -726,6 +735,64 @@ final class LineParser {
             parts.add(expr);
         }
         return new Expr.Variable(start, end, name, name.startsWith("_"), name.endsWith("::*"), parts);
+    }
+
+    /** Warnings found while parsing the line, as Skript gives them, for the statement parser to report. */
+    private final java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
+
+    java.util.Set<String> warnings() {
+        return warnings;
+    }
+
+    /**
+     * Whether a variable's name is one, as Skript's parser checks: no braces outside its expressions, and
+     * the separator {@code ::} and list asterisk where they can go (else the problem is kept for the line's
+     * error). A single {@code :} is only warned about.
+     */
+    private boolean validVariableName(String raw) {
+        // Text outside the expressions in it ('%...%'), where braces aren't allowed.
+        StringBuilder outside = new StringBuilder();
+        boolean inExpression = false;
+        int depth = 0;
+        for (char c : raw.toCharArray()) {
+            if (c == '%' && depth == 0) {
+                inExpression = !inExpression;
+                continue;
+            }
+            if (inExpression) {
+                if (c == '{') {
+                    depth++;
+                } else if (c == '}') {
+                    depth--;
+                }
+            } else if (c == '{' || c == '}') {
+                return false;
+            } else {
+                outside.append(c);
+            }
+        }
+        String name = raw.startsWith("_") ? raw.substring(1).strip() : raw.strip();
+        if (name.startsWith("::") || name.endsWith("::")) {
+            problem("A variable's name must neither start nor end with the separator '::' (error in variable {" + name + "})");
+            return false;
+        }
+        String plain = outside.toString();
+        int asterisks = (int) plain.chars().filter(c -> c == '*').count();
+        if (asterisks > 0 && !(asterisks == 1 && name.endsWith("::*"))) {
+            problem("A variable's name must not contain any asterisks except at the end after '::' to denote a list"
+                    + " variable, e.g. {variable::*} (error in variable {" + name + "})");
+            return false;
+        }
+        if (name.contains("::::")) {
+            problem("A variable's name must not contain the separator '::' multiple times in a row (error in variable {"
+                    + name + "})");
+            return false;
+        }
+        if (name.replace("::", "").contains(":")) {
+            warnings.add("colon:If you meant to make the variable {" + name + "} a list, its name should contain '::'."
+                    + " Having a single ':' does nothing!");
+        }
+        return true;
     }
 
     /**
@@ -790,8 +857,46 @@ final class LineParser {
                         && overloads.stream().anyMatch(f -> parameterIndex(f.parameters(), n) >= 0));
         functionProblem(problem != null && !onlyUnknownNames
                 ? problem
-                : "The function " + name + "(" + describe(pieces) + ") does not exist");
+                : "The function " + name + "(" + describe(pieces) + ") does not exist." + intended(overloads, pieces));
         return null;
+    }
+
+    /**
+     * Skript's guess at the function meant, for its error: of those whose parameters take every argument whose
+     * type is known, the one whose number of parameters is closest to the number of arguments.
+     */
+    private String intended(List<FunctionInfo> overloads, List<int[]> pieces) {
+        List<String> known = new ArrayList<>();
+        for (int[] piece : pieces) {
+            String named = argumentName(piece);
+            int valueStart = named == null ? piece[0] : input.indexOf(':', piece[0]) + 1;
+            Expr value = expression(valueStart, piece[1], Expected.OBJECTS);
+            if (value != null && countUnresolved(value) == 0 && value.type() != null && !value.type().equals(SyntaxRegistry.OBJECT)) {
+                known.add(value.type());
+            }
+        }
+        FunctionInfo best = null;
+        for (FunctionInfo function : overloads) {
+            List<String> left = new ArrayList<>(known);
+            for (FunctionInfo.Parameter parameter : function.parameters()) {
+                left.stream().filter(type -> registry.isAssignable(type, parameter.type())).findFirst().ifPresent(left::remove);
+            }
+            if (left.isEmpty() && (best == null || Math.abs(pieces.size() - function.parameters().size())
+                    < Math.abs(pieces.size() - best.parameters().size()))) {
+                best = function;
+            }
+        }
+        if (best == null) {
+            return "";
+        }
+        List<String> parameters = new ArrayList<>();
+        for (FunctionInfo.Parameter parameter : best.parameters()) {
+            co.xenastudios.neoskript.frontend.registry.TypeInfo info = registry.type(parameter.type());
+            String type = info == null ? parameter.type() : info.name().toLowerCase(java.util.Locale.ROOT);
+            parameters.add(parameter.name() + ": " + (parameter.plural() ? SyntaxRegistry.plural(type) : type));
+        }
+        return " Did you mean to use the function '" + (best.localTo() != null ? "local " : "") + best.name() + "("
+                + String.join(", ", parameters) + ")'?";
     }
 
     @SuppressWarnings("unchecked")
@@ -816,6 +921,18 @@ final class LineParser {
             int[] last = {pieces.get(parameters.size() - 1)[0], inner[1]};
             pieces = new ArrayList<>(pieces.subList(0, parameters.size() - 1));
             pieces.add(last);
+        }
+        java.util.Set<String> names = new java.util.HashSet<>();
+        for (int[] piece : pieces) {
+            String named = argumentName(piece);
+            if (named != null && !names.add(named)) {
+                // Checked first, as Skript does, whichever function it would be.
+                return "A value has already been assigned to parameter '" + named + "'";
+            }
+        }
+        if (pieces.size() > parameters.size()) {
+            // More arguments than it takes: not this function, as Skript skips it before parsing any.
+            return null;
         }
         if (mixesNamedAndUnnamed(pieces, parameters)) {
             return "Mixing named and unnamed arguments is not allowed";
@@ -851,11 +968,6 @@ final class LineParser {
                 String written = input.substring(valueStart, piece[1]).strip();
                 if (written.startsWith("(") && written.indexOf('(', 1) > 0) {
                     // A list with a list in it: no function takes that, so there's no such function.
-                    return null;
-                }
-                Expr anything = expression(valueStart, piece[1], Expected.OBJECTS);
-                if (anything != null && !(anything instanceof Expr.Unresolved)) {
-                    // It's a value, just not of this parameter's type: no such overload.
                     return null;
                 }
                 String typeName = ref == null ? parameter.type() : ref.type().name().toLowerCase(java.util.Locale.ROOT);
@@ -954,7 +1066,8 @@ final class LineParser {
             int valueStart = named == null ? piece[0] : input.indexOf(':', piece[0]) + 1;
             Expr value = expression(valueStart, piece[1], Expected.OBJECTS);
             String type;
-            if (value == null) {
+            if (value == null || countUnresolved(value) > 0) {
+                // What can't be read, as Skript writes it.
                 type = "?";
             } else {
                 co.xenastudios.neoskript.frontend.registry.TypeInfo info = registry.type(value.type());

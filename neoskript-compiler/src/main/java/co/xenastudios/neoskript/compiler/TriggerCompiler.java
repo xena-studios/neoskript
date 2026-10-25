@@ -218,6 +218,24 @@ final class TriggerCompiler {
     private String outerArgument;
     /** Values left-out placeholders of a type get, from Skript's custom default test sections, innermost first. */
     private final java.util.Deque<Map.Entry<String, Expr>> customDefaults = new java.util.ArrayDeque<>();
+    /**
+     * Whether words nothing parses get Skript's error rather than NeoSkript's, as in a test's {@code parse:}
+     * section, whose errors are what's being tested.
+     */
+    private boolean skriptErrors;
+    /** For code compiled apart, the types of the sections around it, whose values it may use (as nothing). */
+    private final java.util.Set<String> outerSections = new java.util.HashSet<>();
+    /** Warnings from the last code compiled apart, for a {@code parse:} section's logs. */
+    private final List<String> apartWarnings = new ArrayList<>();
+    /** Where warnings found while compiling go: the line and the message. */
+    private java.util.function.BiConsumer<Integer, String> warnings = (line, message) -> {};
+
+    /** Sends the warnings this compiler finds to {@code sink}. */
+    TriggerCompiler warnings(java.util.function.BiConsumer<Integer, String> sink) {
+        this.warnings = sink;
+        return this;
+    }
+
     /** How many lists the expression being compiled is in. */
     private int inList;
 
@@ -718,6 +736,14 @@ final class TriggerCompiler {
             TriggerCompiler apart = new TriggerCompiler(library, functions, globals, script);
             apart.eventClasses = eventClasses;
             apart.eventName = eventName;
+            apart.skriptErrors = true;
+            apart.warnings = (at, message) -> apartWarnings.add(message);
+            for (Block block : blocks) {
+                if (block.kind() == BlockKind.SECTION && block.valueType() != null) {
+                    apart.outerSections.add(block.valueType());
+                }
+            }
+            apart.outerSections.addAll(outerSections);
             apart.compileTrigger(constantsScript, statements);
             return null;
         } catch (CompileException e) {
@@ -886,7 +912,13 @@ final class TriggerCompiler {
                 List<String> logs = new ArrayList<>(parse.captured().stream().map(d -> d.message()).toList());
                 logs.addAll(setupErrors(parse.body()));
                 // Compiling the code on its own finds what the parser couldn't, without running it.
+                apartWarnings.clear();
                 String compiled = compileError(parse.body());
+                for (String warning : apartWarnings) {
+                    if (!logs.contains(warning)) {
+                        logs.add(warning);
+                    }
+                }
                 if (compiled != null && !logs.contains(compiled)) {
                     logs.add(compiled);
                 }
@@ -1334,6 +1366,41 @@ final class TriggerCompiler {
         return null;
     }
 
+    /**
+     * Skript's warning for words with several types read where nothing says which: {@code set {_x} to unknown}
+     * ('unknown' is a heal reason, a damage cause and more).
+     */
+    private void multipleTypesWarning(String words) {
+        for (String name : literalTypes) {
+            TypeRef ref = registry.resolveType(name);
+            if (ref != null && !ref.type().id().equals(SyntaxRegistry.OBJECT)) {
+                return;
+            }
+        }
+        List<String> types = library.namedTypesOf(words);
+        if (types.size() <= 1) {
+            return;
+        }
+        List<String> names = new ArrayList<>();
+        for (String id : types) {
+            co.xenastudios.neoskript.frontend.registry.TypeInfo info = registry.type(id);
+            names.add(info == null ? id : info.name().toLowerCase(java.util.Locale.ROOT));
+        }
+        String joined = String.join(", ", names.subList(0, names.size() - 1)) + " and " + names.getLast();
+        warnings.accept(line, "'" + words + "' has multiple types (" + joined + "). Consider specifying which type to use: '"
+                + words + " (" + names.getFirst() + ")'");
+    }
+
+    /** Whether code compiled apart is in a section around it whose values are of type {@code typeId}. */
+    private boolean inOuterSection(String typeId) {
+        for (String type : outerSections) {
+            if (type.equals(typeId) || registry.isSubtype(type, typeId) || registry.isSubtype(typeId, type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The innermost library section whose values are of a type {@code typeId} is a kind of, or {@code null}. */
     private Block widerSection(String typeId) {
         for (Block block : blocks) {
@@ -1418,12 +1485,19 @@ final class TriggerCompiler {
                             : "The function " + function.name() + " doesn't return anything");
                 }
                 Expr returned = (Expr) effect.match().values().getFirst();
-                if (function.returnsPlural() && isKeyed(returned, true)) {
-                    // A list keeps its indices, for 'keyed f()'; other callers get the values alone.
-                    keyed(returned, true);
-                } else {
-                    expression(returned);
-                    convert(function.returnsPlural());
+                List<String> outerLiteralTypes = literalTypes;
+                // Words returned are read as the function's return type: 'return unknown' is a damage cause there.
+                literalTypes = List.of(function.returnType());
+                try {
+                    if (function.returnsPlural() && isKeyed(returned, true)) {
+                        // A list keeps its indices, for 'keyed f()'; other callers get the values alone.
+                        keyed(returned, true);
+                    } else {
+                        expression(returned);
+                        convert(function.returnsPlural());
+                    }
+                } finally {
+                    literalTypes = outerLiteralTypes;
                 }
                 method.visitInsn(ARETURN);
             }
@@ -2126,8 +2200,24 @@ final class TriggerCompiler {
                 single |= 1L << i;
             }
         }
+        long defaults = 0;
+        for (int i = 0; i < values.size() && i < 64; i++) {
+            Object value = values.get(i);
+            if (value == null || (value instanceof Expr.Syntax inner && (isCore(inner.syntax(), CoreSyntax.EVENT_VALUE)
+                    || isCore(inner.syntax(), CoreSyntax.EVENT_VALUE_ENTITY)))) {
+                defaults |= 1L << i;
+            }
+        }
+        String sectionType = null;
+        for (Block block : blocks) {
+            if (block.kind() == BlockKind.SECTION) {
+                sectionType = block.valueType();
+                break;
+            }
+        }
         return new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags(), or, lists, types,
-                argumentTypes, single, literals, eventName, eventClasses == null ? List.of() : eventClasses);
+                argumentTypes, single, literals, eventName, eventClasses == null ? List.of() : eventClasses,
+                sectionType, defaults);
     }
 
     /** Pushes the element, the trigger context and the element's arguments, ready to call it. */
@@ -2161,7 +2251,8 @@ final class TriggerCompiler {
      */
     private List<String> literalTypesFor(ParsedSyntax syntax, List<Object> values, int i, PlaceholderSpec spec) {
         if (syntax.syntax().id().equals("CondCompare") && values.size() >= 2 && values.get(i) instanceof Expr.Unresolved
-                && values.get(1 - Math.min(i, 1)) instanceof Expr.Syntax other && other.type() != null
+                && values.get(1 - Math.min(i, 1)) instanceof Expr other && !(other instanceof Expr.Unresolved)
+                && other.type() != null
                 && !other.type().equals(SyntaxRegistry.OBJECT)) {
             return List.of(other.type());
         }
@@ -2198,6 +2289,9 @@ final class TriggerCompiler {
                     element(section.valuesSlot(), section.indexSlot(), 0);
                     convert(isPlural(specs[i]));
                     method.visitInsn(AASTORE);
+                    continue;
+                }
+                if (specs[i].types().stream().map(registry::resolveType).anyMatch(r -> r != null && inOuterSection(r.type().id()))) {
                     continue;
                 }
                 if (specs[i].types().contains("script")) {
@@ -2480,6 +2574,10 @@ final class TriggerCompiler {
         if (section != null) {
             // 'entity' in 'spawn a pig:' is the pig.
             element(section.valuesSlot(), section.indexSlot(), 0);
+            return;
+        }
+        if (inOuterSection(ref.type().id())) {
+            method.visitInsn(ACONST_NULL);
             return;
         }
         Block wider = widerSection(ref.type().id());
@@ -3116,8 +3214,11 @@ final class TriggerCompiler {
                 }
                 if (value == null) {
                     value = library.literal(unresolved.text());
+                    if (value != null) {
+                        multipleTypesWarning(unresolved.text().strip());
+                    }
                 }
-                if (value == null && inList > 0 && outerArgument != null && !outerArgument.contains("event-")) {
+                if (value == null && (inList > 0 || skriptErrors) && outerArgument != null && !outerArgument.contains("event-")) {
                     // Words nothing parses in a list: Skript reports the whole argument they're in. (An event value
                     // NeoSkript doesn't have yet is something it can't run, not a mistake.)
                     throw new CompileException(line, "Can't understand this expression: '" + outerArgument + "'");

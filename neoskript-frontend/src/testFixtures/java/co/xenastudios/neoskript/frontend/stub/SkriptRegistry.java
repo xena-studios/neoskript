@@ -66,7 +66,16 @@ public final class SkriptRegistry {
      * name as a regex with the type role rather than a {@code %*type%} placeholder.
      */
     private static final Map<String, List<String>> PATTERN_REPLACEMENTS = Map.of(
-            "ExprValueWithin", List.of("[the] (<.+>|value[s]) (within|in) %~objects%"));
+            "ExprValueWithin", List.of("[the] (<.+>|value[s]) (within|in) %~objects%"),
+            // With Skript's tags, which the docs leave out, for which warnings are suppressed.
+            "EffSecSuppressWarnings", List.of(
+                    "[local[ly]] [stop:un]suppress [the] (conflict:conflict|save:variable save|conjunction:[missing] conjunction"
+                            + "|starting:starting [with] expression[s]|colon:variable[ name][s] contain[s|ing] colon[s]"
+                            + "|deprecated:deprecated syntax|unreachable:unreachable code|constant:constant condition[s]) warning[s]",
+                    "[start|stop:stop] [local[ly]] suppressing [the] (conflict:conflict|save:variable save"
+                            + "|conjunction:[missing] conjunction|starting:starting [with] expression[s]"
+                            + "|colon:variable[ name][s] contain[s|ing] colon[s]|deprecated:deprecated syntax"
+                            + "|unreachable:unreachable code|constant:constant condition[s]) warning[s]"));
 
     private static final Map<String, List<String>> PATTERN_FIXES = Map.of(
             "CondIsDivisibleBy", List.of("%numbers% can [evenly] be divided by %number% [with [a] tolerance [of] %number%]",
@@ -120,6 +129,8 @@ public final class SkriptRegistry {
                 .filter(e -> e.id().startsWith("EffSec") || e.id().equals("Delay"))
                 .toList());
         add(builder, SyntaxKind.EFFECT, syntax.effects());
+        builder.suppressesWarnings(SyntaxKind.EFFECT, "EffSecSuppressWarnings");
+        builder.suppressesWarnings(SyntaxKind.SECTION, "EffSecSuppressWarnings");
         add(builder, SyntaxKind.CONDITION, syntax.conditions());
         add(builder, SyntaxKind.EXPRESSION, syntax.expressions());
         SyntaxRegistry types = builder.build();

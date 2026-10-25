@@ -97,10 +97,10 @@ public final class ScriptCompiler {
                             Object binding = library.binding(event.event().syntax());
                             if (binding instanceof ScriptEvent scriptEvent) {
                                 triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), scriptEvent, null,
-                                        null, null, new TriggerCompiler(library, functions, globals, script)
+                                        null, null, new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> diagnostics.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message)))
                                                 .compileTrigger(name, event.body())));
                             } else if (binding instanceof Library.ServerEvent serverEvent) {
-                                TriggerCompiler compiler = new TriggerCompiler(library, functions, globals, script);
+                                TriggerCompiler compiler = new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> diagnostics.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message)));
                                 co.xenastudios.neoskript.runtime.Trigger trigger = compiler.compileTrigger(name, event,
                                         serverEvent);
                                 // The filter may have narrowed the classes listened to.
@@ -117,12 +117,12 @@ public final class ScriptCompiler {
                         }
                         case ParsedStructure.Function function -> bodies.add(new CompiledScripts.CompiledFunctionBody(name,
                                 functions.get(function.signature()),
-                                new TriggerCompiler(library, functions, globals, script).compileFunction(name, function)));
+                                new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> diagnostics.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message))).compileFunction(name, function)));
                         case ParsedStructure.Custom custom when library.binding(custom.syntax().syntax())
                                 instanceof Library.Core core && core.id().equals(CoreSyntax.EXAMPLE) -> {}
                         case ParsedStructure.Custom custom when testName != null -> triggers.add(
                                 new CompiledScripts.CompiledTrigger(name, header.number(), null, null, null, testName,
-                                        new TriggerCompiler(library, functions, globals, script).compileTest(name, custom)));
+                                        new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> diagnostics.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message))).compileTest(name, custom)));
                         case ParsedStructure.Command command -> commands.add(command(name, script, functions, command));
                         case ParsedStructure.Data data -> defaultVariables(data);
                         case ParsedStructure.Parse parse -> parseResults(parse, name, script, functions);
@@ -374,10 +374,13 @@ public final class ScriptCompiler {
             try {
                 if (code instanceof ParsedStructure.Event event
                         && library.binding(event.event().syntax()) instanceof Library.ServerEvent serverEvent) {
-                    new TriggerCompiler(library, functions, globals, script).compileTrigger(name, event, serverEvent);
+                    new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> messages.add(message)).compileTrigger(name, event, serverEvent);
+                } else if (code instanceof ParsedStructure.Function function) {
+                    new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> messages.add(message))
+                            .compileFunction(name, function);
                 } else if (code instanceof ParsedStructure.Event event
                         && library.binding(event.event().syntax()) instanceof ScriptEvent) {
-                    new TriggerCompiler(library, functions, globals, script).compileTrigger(name, event.body());
+                    new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> messages.add(message)).compileTrigger(name, event.body());
                 }
             } catch (CompileException e) {
                 if (!e.alreadyReported() && !e.getMessage().startsWith("NeoSkript can't")) {

@@ -339,6 +339,16 @@ final class Logic {
             return Condition.check(containers, containersAnd, inventory -> Condition.check(values, valuesAnd,
                     item -> Items.contains((Inventory) inventory, item)));
         }
+        if (java.util.Arrays.stream(containers).allMatch(net.kyori.adventure.text.Component.class::isInstance)) {
+            // A component contains what's in it as it's written: 'line 1 of lore of X contains "<red>Hello"'.
+            TextComponentParser parser = TextComponentParser.instance();
+            return Condition.check(containers, containersAnd, container -> Condition.check(values, valuesAnd, value -> {
+                String needle = value instanceof net.kyori.adventure.text.Component component ? parser.toString(component)
+                        : value instanceof String text ? parser.toString(parser.parse(text)) : null;
+                return needle != null && parser.toString((net.kyori.adventure.text.Component) container)
+                        .toLowerCase(java.util.Locale.ROOT).contains(needle.toLowerCase(java.util.Locale.ROOT));
+            }));
+        }
         if (java.util.Arrays.stream(containers).allMatch(String.class::isInstance)
                 && Condition.check(containers, containersAnd, container -> Condition.check(values, valuesAnd,
                         value -> value instanceof String text && ((String) container).toLowerCase(java.util.Locale.ROOT)

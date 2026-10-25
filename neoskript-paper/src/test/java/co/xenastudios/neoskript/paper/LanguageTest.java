@@ -32,6 +32,7 @@ class LanguageTest {
         Library library = new Library();
         StandardLibrary.register(library);
         library.effect("TestSay", info -> (context, args) -> said.add(Values.text(args[0])), "say %objects%");
+        library.expression("TestLoc", "location", info -> (context, args) -> new org.bukkit.Location(null, 1, 2, 3), "testloc");
         List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk", script)));
         assertEquals(List.of(), parsed.getFirst().diagnostics(), "parse problems");
         CompiledScripts compiled = new ScriptCompiler(library, globals).compile(parsed);
@@ -376,6 +377,47 @@ class LanguageTest {
                 \tsay whether now was less than 1 minute ago
                 \tsay whether now was more than 1 minute ago
                 \tsay vector projection of vector(2, 3, 0) onto vector(1, 0, 0)
+                """));
+    }
+
+    @Test
+    void directionsReadAndPointAsInSkript() {
+        assertEquals(List.of("north", "5 meters north", "2 meters east and 2 meters north", "5 meters east and north",
+                "at", "0 meters in front of and to the right of", "x: 0, y: 0, z: -1", "x: 1, y: 0, z: 0",
+                "x: 0, y: 1, z: 0", "x: 1, y: 0, z: -1", "true", "false", "2 meters above"), run("""
+                on load:
+                \tsay north
+                \tsay 5 meters north
+                \tsay 2 meters north east
+                \tsay north 5 east
+                \tsay at
+                \tsay left
+                \tsay vector from left
+                \tsay forwards vector
+                \tsay vector from upwards
+                \tsay northeastern vector
+                \tsay whether north is north
+                \tsay whether north is south
+                \tsay 2 above
+                """));
+    }
+
+    @Test
+    void directionsMoveLocations() {
+        assertEquals(List.of("x: 1, y: 2, z: 3, yaw: 0, pitch: 0", "x: 1, y: 4, z: 3, yaw: 0, pitch: 0",
+                "x: 1, y: 2, z: 2, yaw: 0, pitch: 0", "x: 4, y: 2, z: 1, yaw: 0, pitch: 0",
+                "x: 1, y: 2, z: 6, yaw: 0, pitch: 0", "x: 1, y: 2, z: 2, yaw: 0, pitch: 0",
+                "x: -2, y: 4, z: 3, yaw: 0, pitch: 0"), run("""
+                on load:
+                \tset {_l} to testloc
+                \tsay {_l}
+                \tsay location 2 above {_l}
+                \tsay location north of {_l}
+                \tsay location 2 meters north 3 meters east of {_l}
+                \tset {_d} to 3 south
+                \tsay location {_d} {_l}
+                \tsay location 1 meter horizontally behind {_l}
+                \tsay location 2 meters above and 3 meters to the right of {_l}
                 """));
     }
 }

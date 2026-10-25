@@ -148,8 +148,8 @@ final class BlockProperties {
             int pattern = info.pattern();
             return (context, args) -> {
                 Entity entity = pattern == 1 && args[0] instanceof Entity given ? given : null;
-                BlockFace face = args[pattern + 1] instanceof WorldSyntax.Direction direction
-                        ? horizontalFacing(direction.from(null)) : null;
+                BlockFace face = args[pattern + 1] instanceof Direction direction
+                        ? Direction.getFacing(direction.getDirection(), true) : null;
                 for (Object value : Property.of(args[pattern])) {
                     if (value instanceof Block block && block.getState(false) instanceof Bell bell) {
                         bell.ring(entity, face);
@@ -157,21 +157,6 @@ final class BlockProperties {
                 }
             };
         }, "ring %blocks% [from [the]] [%-direction%]", "(make|let) %entity% ring %blocks% [from [the]] [%-direction%]");
-    }
-
-    /**
-     * The horizontal face {@code vector} points at, by Skript's reckoning: east for angles up to 45 degrees
-     * (including all negative ones), then south, west and north.
-     */
-    private static BlockFace horizontalFacing(org.bukkit.util.Vector vector) {
-        double yaw = Math.atan2(vector.getZ(), vector.getX());
-        if (yaw < Math.PI / 4 || yaw >= Math.PI * 7 / 4) {
-            return BlockFace.EAST;
-        }
-        if (yaw < Math.PI * 3 / 4) {
-            return BlockFace.SOUTH;
-        }
-        return yaw < Math.PI * 5 / 4 ? BlockFace.WEST : BlockFace.NORTH;
     }
 
     private static void registerExpressions(Registrar registrar) {

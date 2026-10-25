@@ -135,13 +135,46 @@ final class Biomes {
         registrar.parser("biome", Biomes::parse);
         registrar.text(Biome.class, Biomes::name);
         // The biome at a location, which can be set.
-        registrar.expression("ExprBiome", "biome", info -> new SettableProperty<>(Object.class, Biome.class,
-                owner -> owner instanceof Location location && location.getWorld() != null
-                        ? location.getBlock().getBiome() : null, (owner, biome) -> {
-                    if (owner instanceof Location location && location.getWorld() != null) {
-                        location.getBlock().setBiome(biome);
-                    }
-                }), "[the] biome (of|at) %locations%", "%locations%'[s] biome");
+        registrar.expression("ExprBiome", "biome", info -> {
+            SettableProperty<Object, Biome> biome = new SettableProperty<>(Object.class, Biome.class,
+                    owner -> owner instanceof Location location && location.getWorld() != null
+                            ? location.getBlock().getBiome() : null, (owner, value) -> {
+                        if (owner instanceof Location location && location.getWorld() != null) {
+                            location.getBlock().setBiome(value);
+                        }
+                    });
+            return info.pattern() == 1 ? biome : new Located(biome);
+        }, "[the] biome [(of|%direction%) %locations%]", "%locations%'[s] biome");
+    }
+
+    /**
+     * {@code the biome 2 above X}: the biome of the locations the direction (if any) combines with the locations,
+     * or with the event's location without any.
+     */
+    private record Located(SettableProperty<Object, Biome> biome)
+            implements co.xenastudios.neoskript.api.element.Expression, co.xenastudios.neoskript.api.element.Changeable {
+
+        private static Object[] places(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments) {
+            Object locations = arguments[1] == null ? WorldProperties.eventLocation(context.event()) : arguments[1];
+            Object places = arguments[0] == null ? locations : Direction.combine(arguments[0], locations).toArray();
+            return new Object[] {places};
+        }
+
+        @Override
+        public Object get(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments) {
+            return biome.get(context, places(context, arguments));
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return biome.acceptChange(mode);
+        }
+
+        @Override
+        public void change(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments,
+                Object[] delta, Mode mode) {
+            biome.change(context, places(context, arguments), delta, mode);
+        }
     }
 
     /** The biome {@code text} names, by Skript's name or its key ({@code minecraft:plains}), or {@code null}. */

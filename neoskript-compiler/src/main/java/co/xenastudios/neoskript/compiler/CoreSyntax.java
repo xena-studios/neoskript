@@ -135,6 +135,17 @@ final class CoreSyntax {
                 "assert [unsafely] <.+> to fail [with [error] %string%[, expected %objects%][, got %objects%]]");
         library.core(SyntaxKind.EXPRESSION, PARSE_LOGS, "string", List.of(), "[the] [last] parse logs");
         library.core(SyntaxKind.SECTION, RETURNABLE, null, List.of(), "returnable [:plural] %*classinfo% section");
+        // An effect section that refuses a section, with the error it's given or none (EffSecErrorWhenSection), and a
+        // section expression that does (ExprSecErroringSectionExpression).
+        library.section("EffSecErrorWhenSection", "object", info -> (context, args) -> new Object[0],
+                "error [%-*string%] when using [a] section [with %-object%]");
+        library.sectionCheck(SyntaxKind.SECTION, "EffSecErrorWhenSection",
+                (match, delay) -> match.values().getFirst() instanceof co.xenastudios.neoskript.frontend.parse.Expr
+                        ? co.xenastudios.neoskript.frontend.registry.ParseCheck.ARGUMENT_TEXT + 0 : "");
+        library.expression("ExprSecErroringSectionExpression", "object", info -> (context, args) -> new Object[0],
+                "erroring section expression");
+        library.sectionCheck(SyntaxKind.EXPRESSION, "ExprSecErroringSectionExpression",
+                (match, delay) -> "erroring section expression");
         // Skript's custom test operators (CustomTestOperators), with the priorities it gives them.
         library.core(SyntaxKind.EXPRESSION, CUSTOM_ARITHMETIC, "object", List.of(),
                 CUSTOM_OPERATORS.stream().map(op -> "%object%[ ]" + op.sign() + "[ ]%object%").toArray(String[]::new));

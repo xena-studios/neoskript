@@ -363,8 +363,7 @@ final class EntityEvents {
         registrar.eventValueExcluded(ProjectileHitEvent.class, "entity", "Use 'projectile' and/or 'shooter' in projectile hit events");
         registrar.eventValue(ProjectileHitEvent.class, "entity", Projectile.class, 0, ProjectileHitEvent::getEntity);
         registrar.eventValue(ProjectileHitEvent.class, "direction", event -> event.getHitBlockFace() == null ? null
-                : new WorldSyntax.Direction(new org.bukkit.util.Vector(event.getHitBlockFace().getModX(),
-                        event.getHitBlockFace().getModY(), event.getHitBlockFace().getModZ()), false));
+                : new Direction(event.getHitBlockFace(), 1));
         registrar.eventValueExcluded(ProjectileLaunchEvent.class, "entity", "Use 'projectile' and/or 'shooter' in shoot events");
         registrar.eventValue(ProjectileLaunchEvent.class, "entity", Projectile.class, 0, ProjectileLaunchEvent::getEntity);
         var collide = com.destroystokyo.paper.event.entity.ProjectileCollideEvent.class;

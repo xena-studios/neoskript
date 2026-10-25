@@ -193,13 +193,13 @@ final class EntityProperties {
     private static void registerEffects(Registrar registrar) {
         registrar.effect("EffKnockback", info -> (context, args) -> {
             // No direction is no direction at all, as Skript's default for one.
-            WorldSyntax.Direction direction = args[1] instanceof WorldSyntax.Direction given ? given : null;
+            Direction direction = args[1] instanceof Direction given ? given : null;
             double strength = args[2] instanceof Number number ? number.doubleValue() : 1;
             for (Object value : Property.of(args[0])) {
                 if (!(value instanceof LivingEntity living)) {
                     continue;
                 }
-                Vector push = direction == null ? new Vector() : direction.from(living.getLocation());
+                Vector push = direction == null ? new Vector() : direction.getDirection(living);
                 // Knockback takes the direction it comes from, not the one it goes in.
                 push.multiply(-1);
                 living.knockback(strength, push.getX(), push.getZ());
@@ -299,8 +299,8 @@ final class EntityProperties {
             boolean start = info.pattern() == 0;
             return (context, args) -> {
                 Location location = null;
-                if (start && args[1] instanceof WorldSyntax.Direction direction && args[2] instanceof Location at) {
-                    location = at.clone().add(direction.from(at));
+                if (start && args[1] instanceof Direction direction && args[2] instanceof Location at) {
+                    location = direction.getRelative(at);
                 }
                 long ticks = start && args[3] instanceof Timespan time ? time.ticks() : 0;
                 for (Object value : Property.of(args[0])) {
@@ -398,10 +398,10 @@ final class EntityProperties {
                 "make %livingentities% teleport [randomly] towards %entity%",
                 "force %livingentities% to teleport [randomly] towards %entity%");
         registrar.effect("EffWardenDisturbance", info -> (context, args) -> {
-            if (!(args[1] instanceof WorldSyntax.Direction direction) || !(args[2] instanceof Location at)) {
+            if (!(args[1] instanceof Direction direction) || !(args[2] instanceof Location at)) {
                 return;
             }
-            Location location = at.clone().add(direction.from(at));
+            Location location = direction.getRelative(at);
             for (Object value : Property.of(args[0])) {
                 if (value instanceof org.bukkit.entity.Warden warden) {
                     warden.setDisturbanceLocation(location);

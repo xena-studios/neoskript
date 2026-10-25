@@ -167,6 +167,7 @@ final class StatementParser {
             return new Statement.Call(line, call);
         }
         ParsedSyntax effect = parser.effect(0, end);
+        warn(line, parser);
         if (effect != null && !sectionOnly(effect).isEmpty()) {
             error(line, "This expression requires a section.");
             return new Statement.Invalid(line);
@@ -238,6 +239,13 @@ final class StatementParser {
                 return new Statement.Invalid(line);
             }
             error(line, "Can't understand this section: " + key);
+            return new Statement.Invalid(line);
+        }
+        // What takes the section may refuse it, as Skript's section expressions, then its effect sections, do.
+        String refused = argumentText(key, header, sectionRefusal(header));
+        if (refused != null) {
+            error(line, refused.isEmpty() ? "The line '" + key + "' is a valid statement but cannot function as a section (:)"
+                    + " because there is no syntax in the line to manage it." : refused);
             return new Statement.Invalid(line);
         }
         List<Expr.Syntax> claimants = sectionOnly(header);
@@ -539,6 +547,17 @@ final class StatementParser {
         }
     }
 
+    /** Reports the warnings the line's parser found ({@code tag:message}), unless they're suppressed. */
+    private void warn(Line line, LineParser parser) {
+        for (String warning : parser.warnings()) {
+            int colon = warning.indexOf(':');
+            if (!suppressed.contains(warning.substring(0, colon))) {
+                diagnostics.warning(line.number(), line.column(), line.text().length(), warning.substring(colon + 1));
+            }
+        }
+        parser.warnings().clear();
+    }
+
     private boolean stops(List<Statement> body) {
         for (Statement statement : body) {
             if (statement instanceof Statement.Effect effect
@@ -602,6 +621,34 @@ final class StatementParser {
                 check(line, inner.syntax());
             }
         }
+    }
+
+    /** {@code problem}, or for {@link ParseCheck#ARGUMENT_TEXT} and an index, the text written for that argument. */
+    private static String argumentText(String key, ParsedSyntax syntax, String problem) {
+        if (problem == null || !problem.startsWith(ParseCheck.ARGUMENT_TEXT)) {
+            return problem;
+        }
+        int index = Integer.parseInt(problem.substring(ParseCheck.ARGUMENT_TEXT.length()));
+        Object value = index < syntax.match().values().size() ? syntax.match().values().get(index) : null;
+        if (!(value instanceof Expr.Text text)) {
+            return "";
+        }
+        return key.substring(text.start() + 1, text.end() - 1).replace("\"\"", "\"");
+    }
+
+    /** Why the line's syntax won't take the section under it, or {@code null} if it does. */
+    private String sectionRefusal(ParsedSyntax header) {
+        for (Object value : header.match().values()) {
+            if (value instanceof Expr.Syntax inner) {
+                ParseCheck check = context.registry().sectionCheck(inner.syntax().syntax());
+                String problem = check == null ? null : check.check(inner.syntax().match(), delay);
+                if (problem != null) {
+                    return problem;
+                }
+            }
+        }
+        ParseCheck check = context.registry().sectionCheck(header.syntax());
+        return check == null ? null : check.check(header.match(), delay);
     }
 
     /** The expressions in a parsed line that can only be used with a section, in order. */

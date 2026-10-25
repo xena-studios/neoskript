@@ -201,10 +201,10 @@ final class LootTables {
 
         // 'a loot context at X:': its section sets the context up, which can't be changed afterwards.
         registrar.expression("ExprSecCreateLootContext", "lootcontext", info -> (context, args) -> {
-            if (!(args[0] instanceof WorldSyntax.Direction direction) || !(args[1] instanceof Location location)) {
+            if (!(args[0] instanceof Direction direction) || !(args[1] instanceof Location location)) {
                 return null;
             }
-            return new Context(location.clone().add(direction.from(location)), null, null, 0, true);
+            return new Context(direction.getRelative(location), null, null, 0, true);
         }, "[a] loot context %direction% %location%");
         registrar.sectionExpression("ExprSecCreateLootContext", "lootcontext");
 

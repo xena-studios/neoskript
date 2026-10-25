@@ -155,9 +155,9 @@ final class PlayerEvents {
                 ? event.getPlayer().getInventory().getItemInOffHand() : null);
         registrar.eventValue(PlayerInteractEvent.class, "itemstack", PlayerInteractEvent::getItem);
         registrar.eventValue(PlayerInteractEvent.class, "block", PlayerInteractEvent::getClickedBlock);
-        registrar.eventValue(PlayerInteractEvent.class, "direction", event -> new WorldSyntax.Direction(
-                new org.bukkit.util.Vector(event.getBlockFace().getModX(), event.getBlockFace().getModY(),
-                        event.getBlockFace().getModZ()), false));
+        registrar.eventValue(PlayerInteractEvent.class, "direction", event -> new Direction(
+                new double[] {event.getBlockFace().getModX(), event.getBlockFace().getModY(),
+                        event.getBlockFace().getModZ()}));
 
         // Stepping on pressure plates and tripwires.
         registrar.event("EvtPressurePlate", List.of(PlayerInteractEvent.class), info -> {

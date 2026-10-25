@@ -15,6 +15,7 @@ import co.xenastudios.neoskript.api.storage.BinaryWriter;
 import co.xenastudios.neoskript.api.storage.VariableCodec;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.Map;
@@ -25,6 +26,7 @@ import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
@@ -34,36 +36,6 @@ import org.bukkit.util.Vector;
 final class WorldSyntax {
 
     private WorldSyntax() {}
-
-    /** The tags of {@code ExprDirection}'s directions. */
-    private static final java.util.Map<String, Boolean> DIRECTION_TAGS = java.util.Map.of("north", true, "south", true,
-            "east", true, "west", true, "up", true, "down", true);
-
-    /**
-     * Skript's {@code direction}: an offset, like {@code 5 below}.
-     *
-     * @param explicit whether a distance was written ({@code 5 below}), which {@code blocks below} uses
-     */
-    record Direction(Vector offset, boolean explicit, java.util.function.Function<Location, Vector> relative) {
-
-        Direction(Vector offset, boolean explicit) {
-            this(offset, explicit, null);
-        }
-
-        /** The offset from {@code origin}: relative directions, like {@code left}, depend on where it faces. */
-        Vector from(Location origin) {
-            Vector total = offset.clone();
-            if (relative != null && origin != null) {
-                total.add(relative.apply(origin));
-            }
-            return total;
-        }
-
-        @Override
-        public String toString() {
-            return Values.text(offset);
-        }
-    }
 
     /** Who shot what isn't a projectile, like a pig, for {@code the shooter} in {@code shoot a pig:}. */
     private static final Map<Entity, org.bukkit.entity.LivingEntity> SHOOTERS =
@@ -82,7 +54,7 @@ final class WorldSyntax {
         Vector velocity;
         if (shooter instanceof org.bukkit.entity.LivingEntity living) {
             Location from = living.getLocation();
-            velocity = (direction == null ? from.getDirection() : direction.from(from)).multiply(speed);
+            velocity = direction.getDirection(from).multiply(speed);
             if (type != null && org.bukkit.entity.Fireball.class.isAssignableFrom(type)) {
                 Location at = living.getEyeLocation().add(velocity.clone().normalize().multiply(0.5));
                 entity = living.getWorld().spawn(at, type);
@@ -99,7 +71,7 @@ final class WorldSyntax {
                 }
             }
         } else if (shooter instanceof Location location) {
-            velocity = (direction == null ? location.getDirection() : direction.from(location)).multiply(speed);
+            velocity = direction.getDirection(location).multiply(speed);
             entity = kind.spawn(location);
         } else {
             return null;
@@ -208,9 +180,13 @@ final class WorldSyntax {
                         && args[2] instanceof org.bukkit.World world
                         ? world.getChunkAt((int) Math.floor(x.doubleValue()), (int) Math.floor(z.doubleValue()), false) : null;
             }
+            int pattern = info.pattern();
             return (context, args) -> {
                 List<Object> chunks = new ArrayList<>();
-                for (Object value : (Object[]) args[0]) {
+                // 'chunk 16 north of {_loc}': the directions combined with the locations.
+                Object[] values = pattern == 0 ? (args[0] == null ? Values.array(args[1])
+                        : Direction.combine(args[0], args[1]).toArray()) : (Object[]) args[0];
+                for (Object value : values) {
                     if (loaded && value instanceof org.bukkit.World world) {
                         chunks.addAll(List.of(world.getLoadedChunks()));
                     } else if (!loaded && value instanceof Location location && location.getWorld() != null) {
@@ -219,7 +195,7 @@ final class WorldSyntax {
                 }
                 return chunks.size() == 1 ? chunks.getFirst() : chunks.toArray();
             };
-        }, "[(all [[of] the]|the)] chunk[s] (of|at) %locations%", "%locations%'[s] chunk[s]",
+        }, "[(all [[of] the]|the)] chunk[s] (of|%-directions%) %locations%", "%locations%'[s] chunk[s]",
                 "[(all [[of] the]|the)] loaded chunks (of|in) %worlds%",
                 "[the] chunk [at] %number%, %number% (in|of) %world%");
         registrar.expression("ExprMidpoint", "object", info -> {
@@ -258,7 +234,9 @@ final class WorldSyntax {
             boolean negated = info.hasTag("not");
             int pattern = info.pattern();
             return (context, args) -> {
-                Object[] values = (Object[]) args[0];
+                // 'chunk at {_loc} is loaded': the directions combined with the locations, or the event's.
+                Object[] values = pattern == 0 ? Direction.combine(args[0], args[1] == null
+                        ? WorldProperties.eventLocation(context.event()) : args[1]).toArray() : (Object[]) args[0];
                 // Nothing isn't loaded: 'world("fake-world") is not loaded' holds.
                 if (values.length == 0) {
                     return negated;
@@ -278,7 +256,7 @@ final class WorldSyntax {
                 }
                 return true;
             };
-        }, "chunk[s] (at|of) %locations% (is|are)[not:(n't| not)] loaded", "%chunks/worlds% (is|are)[not:(n't| not)] loaded",
+        }, "chunk[s] %directions% [%locations%] (is|are)[not:(n't| not)] loaded", "%chunks/worlds% (is|are)[not:(n't| not)] loaded",
                 "world[s] %worlds% (is|are)[not:(n't| not)] loaded");
 
         registerEntities(registrar);
@@ -295,7 +273,7 @@ final class WorldSyntax {
                     if (!(args[0] instanceof Experience experience) || args[2] == null) {
                         return spawned.toArray();
                     }
-                    for (Object place : WorldProperties.locations(args[1], args[2])) {
+                    for (Object place : Direction.combine(args[1], args[2])) {
                         if (place instanceof Location location && location.getWorld() != null) {
                             Entity orb = location.getWorld().spawn(location, org.bukkit.entity.ExperienceOrb.class,
                                     created -> created.setExperience(experience.xp()));
@@ -311,7 +289,7 @@ final class WorldSyntax {
                 int amount = counted && args[0] instanceof Number n ? co.xenastudios.neoskript.runtime.Values.toInt(n.doubleValue()) : 1;
                 Object[] types = (Object[]) args[counted ? 1 : 0];
                 int at = counted ? 2 : 1;
-                Object[] locations = WorldProperties.locations(args[at], args[at + 1]).toArray();
+                Object[] locations = Direction.combine(args[at], args[at + 1]).toArray();
                 List<Object> spawned = new ArrayList<>();
                 for (Object place : locations) {
                     if (!(place instanceof Location location) || location.getWorld() == null) {
@@ -349,19 +327,21 @@ final class WorldSyntax {
         // 'shoot an arrow from the player', 'make {_loc} shoot a pig at speed 2': its code runs for each one shot.
         registrar.section("EffSecShoot", "entity", info -> {
             int typesAt = info.pattern() == 0 ? 0 : 1;
+            boolean directionWritten = !info.isDefault(3);
             return (context, args) -> {
                 Object[] types = Values.array(args[typesAt]);
                 Object[] shooters = Values.array(args[1 - typesAt]);
                 double speed = args[2] == null ? 5 : Values.single(args[2]) instanceof Number n ? n.doubleValue() : Double.NaN;
-                Object direction = Values.single(args[3]);
+                // Without a direction, where the shooter faces: Skript's Direction.IDENTITY.
+                Object direction = directionWritten ? Values.single(args[3]) : Direction.IDENTITY;
                 List<Object> shot = new ArrayList<>();
-                if (Double.isNaN(speed)) {
+                if (Double.isNaN(speed) || !(direction instanceof Direction)) {
                     return shot.toArray();
                 }
                 for (Object shooter : shooters) {
                     for (Object type : types) {
                         if (type instanceof EntityKind kind) {
-                            Entity entity = shoot(kind, shooter, speed, direction instanceof Direction d ? d : null);
+                            Entity entity = shoot(kind, shooter, speed, (Direction) direction);
                             if (entity != null) {
                                 LAST_SPAWNED.set(entity);
                                 shot.add(entity);
@@ -371,8 +351,8 @@ final class WorldSyntax {
                 }
                 return shot.toArray();
             };
-        }, "shoot %entitytypes% [from %livingentities/locations%] [(at|with) (speed|velocity) %-number%] [%direction%]",
-                "(make|let) %livingentities/locations% shoot %entitytypes% [(at|with) (speed|velocity) %-number%] [%direction%]");
+        }, "shoot %entitytypes% [from %livingentities/locations%] [(at|with) (speed|velocity) %-number%] [%-direction%]",
+                "(make|let) %livingentities/locations% shoot %entitytypes% [(at|with) (speed|velocity) %-number%] [%-direction%]");
         // The shooter of a projectile, or in 'shoot a pig:', of what was shot.
         registrar.expression("ExprShooter", "livingentity", info -> new SettableProperty<>(Entity.class,
                 org.bukkit.entity.LivingEntity.class, entity -> entity instanceof org.bukkit.entity.Projectile projectile
@@ -494,75 +474,161 @@ final class WorldSyntax {
      * X' is the size of the blocks above X, not '(size of blocks) above X'.
      */
     static void registerLate(Registrar registrar) {
-        registrar.expression("ExprDirection", "direction", info -> (context, args) -> {
-            Vector unit = switch (info.tags().stream().filter(DIRECTION_TAGS::containsKey).findFirst().orElse("up")) {
-                case "north" -> new Vector(0, 0, -1);
-                case "south" -> new Vector(0, 0, 1);
-                case "east" -> new Vector(1, 0, 0);
-                case "west" -> new Vector(-1, 0, 0);
-                case "down" -> new Vector(0, -1, 0);
-                default -> new Vector(0, 1, 0);
-            };
-            boolean explicit = args[0] instanceof Number;
-            double amount = explicit ? ((Number) args[0]).doubleValue() : 1;
-            Vector offset = unit.multiply(amount);
-            if (args[1] instanceof Direction then) {
-                offset.add(then.offset());
-                explicit |= then.explicit();
-            }
-            return new Direction(offset, explicit);
-        }, "[%-number% [(block|met(er|re))[s]] [to the]] (north:north|south:south|east:east|west:west|up:above|up:over"
-                + "|up:up[ward[s]]|down:down[ward[s]]|down:below|down:under[neath]|down:beneath) [of] [%direction%]");
-        // Directions that depend on where something faces or is: 'left', 'forwards', 'towards {_loc}', 'along {_v}'.
-        registrar.expression("ExprDirection-relative", "direction", info -> {
+        // Skript's ExprDirection. Pattern 0's marks pick a face of BY_MARK, combined by XOR ('north' 2 and 'east'
+        // 4 make north east, 6); 'north 5 east' chains two absolute directions.
+        registrar.expression("ExprDirection", "direction", info -> {
             int pattern = info.pattern();
-            boolean flip = info.hasTag("right") || info.hasTag("backward") || info.hasTag("away");
+            int mark = info.mark();
+            boolean amountWritten = !info.isDefault(0);
+            boolean nextWritten = pattern == 0 && !info.isDefault(1);
+            // Skript only chains a direction expression, never a variable.
+            boolean nextChains = nextWritten && info.argumentType(1) != null;
+            BlockFace face = pattern == 0 ? BY_MARK[mark] : null;
+            boolean horizontal = (pattern == 1 || pattern == 2) ? mark % 2 != 0 : pattern == 4;
+            boolean facing = (pattern == 1 || pattern == 2) && mark >= 2;
+            double yaw = Math.PI / 2 * mark;
             return (context, args) -> {
-                double amount = pattern < 3 && args[0] instanceof Number n ? n.doubleValue() : 1;
-                java.util.function.Function<Location, Vector> relative = switch (pattern) {
-                    case 0 -> origin -> {
-                        // Facing south (yaw 0), left is east.
-                        double yaw = Math.toRadians(origin.getYaw());
-                        return new Vector(Math.cos(yaw), 0, Math.sin(yaw)).multiply(flip ? -amount : amount);
-                    };
-                    case 1 -> origin -> origin.getDirection().multiply(flip ? -amount : amount);
-                    case 2 -> {
-                        if (!(args[1] instanceof Location target)) {
-                            yield null;
+                Object amount = args[0];
+                if (amountWritten && !(amount instanceof Number)) {
+                    return null;
+                }
+                double length = amount instanceof Number n ? n.doubleValue() : 1;
+                Number written = amountWritten ? (Number) amount : null;
+                Direction direction = switch (pattern) {
+                    case 0 -> {
+                        Vector v = new Vector(face.getModX(), face.getModY(), face.getModZ()).multiply(length);
+                        if (nextWritten) {
+                            // Only another absolute direction expression can follow, as Skript parses it.
+                            if (!nextChains || !(args[1] instanceof Direction next) || !next.chainable()) {
+                                yield null;
+                            }
+                            v.add(next.getDirection());
                         }
-                        // The whole way there: 'towards' a point 3 blocks away is 3 blocks.
-                        yield origin -> target.toVector().subtract(origin.toVector()).multiply(flip ? -amount : amount);
+                        yield new Direction(v);
                     }
-                    default -> args[0] instanceof Vector along ? origin -> along.clone() : null;
+                    case 1, 2 -> relativeTo(args[1], length, horizontal, facing);
+                    default -> new Direction(horizontal ? Direction.IGNORE_PITCH : 0, yaw, length);
                 };
-                return relative == null ? null : new Direction(new Vector(), pattern < 3 && args[0] instanceof Number, relative);
+                return direction == null ? null : direction.written(written, pattern == 0);
             };
-        }, "[%-number% [(block|met(er|re))[s]]] [to the] (left|right:right)",
-                "[%-number% [(block|met(er|re))[s]]] (forward[s]|in front|backward:(backward[s]|behind))",
-                "[%-number% [(block|met(er|re))[s]]] (towards|away:away from) %location%",
-                "along %vector%");
+        }, "[%-number% [(block|met(er|re))[s]] [to the]] ("
+                        + "2¦north[(-| |)(4¦east|5¦west)][(ward(s|ly|)|er(n|ly|))] [of]"
+                        + "|3¦south[(-| |)(11¦east|10¦west)][(ward(s|ly|)|er(n|ly|))] [of]"
+                        + "|(4¦east|5¦west)[(ward(s|ly|)|er(n|ly|))] [of]"
+                        + "|0¦above|0¦over|(0¦up|1¦down)[ward(s|ly|)]|1¦below|1¦under[neath]|1¦beneath"
+                        + ") [%-direction%]",
+                "[%-number% [(block|met(er|re))[s]]] in [the] (0¦direction|1¦horizontal direction|2¦facing"
+                        + "|3¦horizontal facing) of %entity/block% (of|from|)",
+                "[%-number% [(block|met(er|re))[s]]] in %entity/block%'[s] (0¦direction|1¦horizontal direction"
+                        + "|2¦facing|3¦horizontal facing) (of|from|)",
+                "[%-number% [(block|met(er|re))[s]]] (0¦in[ ]front [of]|0¦forward[s]|2¦behind|2¦backwards"
+                        + "|[to the] (1¦right|-1¦left) [of])",
+                "[%-number% [(block|met(er|re))[s]]] horizontal[ly] (0¦in[ ]front [of]|0¦forward[s]|2¦behind"
+                        + "|2¦backwards|to the (1¦right|-1¦left) [of])");
+    }
+
+    /** ExprDirection's faces, by parse mark. */
+    private static final BlockFace[] BY_MARK = {BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH, BlockFace.SOUTH,
+            BlockFace.EAST, BlockFace.WEST, BlockFace.NORTH_EAST, BlockFace.NORTH_WEST, BlockFace.SOUTH_EAST,
+            BlockFace.SOUTH_WEST};
+
+    /** ExprDirection's {@code in the (horizontal) direction/facing of X}, {@code length} long. */
+    private static Direction relativeTo(Object of, double length, boolean horizontal, boolean facing) {
+        if (of instanceof Block block) {
+            BlockFace face = Direction.getFacing(block);
+            if (face == BlockFace.SELF || horizontal && (face == BlockFace.UP || face == BlockFace.DOWN)) {
+                return Direction.ZERO;
+            }
+            return new Direction(face, length);
+        }
+        if (!(of instanceof Entity entity)) {
+            return null;
+        }
+        Location location = entity.getLocation();
+        if (!horizontal) {
+            if (!facing) {
+                return new Direction(location.getDirection().normalize().multiply(length));
+            }
+            double pitch = Direction.pitchToRadians(location.getPitch());
+            if (pitch > Math.PI / 4) {
+                return new Direction(new double[] {0, length, 0});
+            }
+            if (pitch < -Math.PI / 4) {
+                return new Direction(new double[] {0, -length, 0});
+            }
+        }
+        double yaw = Direction.yawToRadians(location.getYaw());
+        if (horizontal && !facing) {
+            return new Direction(new double[] {Math.cos(yaw) * length, 0, Math.sin(yaw) * length});
+        }
+        yaw = ((yaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        if (yaw >= Math.PI / 4 && yaw < 3 * Math.PI / 4) {
+            return new Direction(new double[] {0, 0, length});
+        }
+        if (yaw >= 3 * Math.PI / 4 && yaw < 5 * Math.PI / 4) {
+            return new Direction(new double[] {-length, 0, 0});
+        }
+        if (yaw >= 5 * Math.PI / 4 && yaw < 7 * Math.PI / 4) {
+            return new Direction(new double[] {0, 0, -length});
+        }
+        return new Direction(new double[] {length, 0, 0});
     }
 
     private static void registerBlocks(Registrar registrar) {
         registrar.type("direction", "direction", Direction.class);
         registrar.text(Direction.class, Direction::toString);
+        registrar.storage("direction", Direction.class, Direction.CODEC);
+        // A direction left out is 'at', Skript's default expression for directions.
+        registrar.defaultValue("direction", Direction.ZERO);
         // A vector is a direction: 'blocks vector(1, 0, 0) {_loc}'.
-        registrar.converter(Vector.class, Direction.class, vector -> new Direction(vector.clone(), false));
-        registrar.effect("EffPush", info -> (context, args) -> {
-            if (!(args[1] instanceof Direction direction)) {
-                return;
-            }
-            for (Object value : (Object[]) args[0]) {
-                if (value instanceof Entity entity) {
-                    Vector push = direction.from(entity.getLocation());
-                    // A speed sets how hard, in the direction's direction.
-                    if (args[2] instanceof Number speed && push.lengthSquared() > 0) {
-                        push.normalize().multiply(speed.doubleValue());
+        registrar.converter(Vector.class, Direction.class, Direction::new);
+        registrar.effect("EffPush", info -> {
+            boolean along = info.pattern() == 0;
+            boolean away = info.hasTag("away");
+            boolean speedWritten = !info.isDefault(2);
+            return (context, args) -> {
+                Object speed = args[2];
+                if (speedWritten && !(speed instanceof Number)) {
+                    return;
+                }
+                java.util.function.Function<Entity, Vector> towards;
+                if (along) {
+                    if (!(args[1] instanceof Direction direction)) {
+                        return;
+                    }
+                    towards = direction::getDirection;
+                } else {
+                    if (!(args[1] instanceof Location target)) {
+                        return;
+                    }
+                    // Skript subtracts from the one target vector, so each entity after the first is pushed from
+                    // what's left of it.
+                    Vector targetVector = target.toVector();
+                    towards = entity -> {
+                        Vector direction = targetVector.subtract(entity.getLocation().toVector());
+                        if (away) {
+                            direction.multiply(-1);
+                        }
+                        return direction;
+                    };
+                }
+                for (Object value : Values.array(args[0])) {
+                    if (!(value instanceof Entity entity)) {
+                        continue;
+                    }
+                    Vector push = towards.apply(entity);
+                    if (speed instanceof Number n) {
+                        push.normalize().multiply(n.doubleValue());
+                    }
+                    if (!(Double.isFinite(push.getX()) && Double.isFinite(push.getY()) && Double.isFinite(push.getZ()))) {
+                        return;
                     }
                     entity.setVelocity(entity.getVelocity().add(push));
                 }
-            }
-        }, "(push|thrust|pull) %entities% %direction% [(at|with) (speed|velocity|force) %-number%]");
+            };
+        }, "(push|thrust|pull) %entities% [along] %direction% [(at|with) [a] (speed|velocity|force) [of] %-number%]",
+                "(push|thrust|pull) %entities% (towards|away:away from) %location% [(at|with) [a] (speed|velocity|force) "
+                        + "[of] %-number%]");
         registrar.expression("ExprBlock-2", "block", info -> {
             int pattern = info.pattern();
             return (context, args) -> {
@@ -576,58 +642,95 @@ final class WorldSyntax {
                     }
                     return blocks.size() == 1 ? blocks.getFirst() : blocks.toArray();
                 }
-                Location location = args[1] instanceof Location l ? l : null;
-                if (location == null || location.getWorld() == null) {
-                    return null;
-                }
-                return args[0] instanceof Direction direction ? location.clone().add(direction.from(location)).getBlock() : null;
+                // Skript's ExprBlock: 'the block above', the direction combined with the location (the event's
+                // without one).
+                Object location = args[1] == null ? WorldProperties.eventLocation(context.event()) : args[1];
+                List<Location> moved = Direction.combine(args[0], location);
+                return moved.isEmpty() || moved.getFirst().getWorld() == null ? null : moved.getFirst().getBlock();
             };
-        }, "[the] block[s] (at|of) %locations%", "[the] block %direction% %location%");
+        }, "[the] block[s] (at|of) %locations%", "[the] block %direction% [%location%]");
         // 'the location 2 meters above {_loc}'; without a location, the event's.
         registrar.expression("ExprLocation", "location", info -> (context, args) -> {
             Object location = args[1] == null ? WorldProperties.eventLocation(context.event()) : args[1];
-            List<Location> moved = WorldProperties.locations(args[0], location);
+            List<Location> moved = Direction.combine(args[0], location);
             return moved.isEmpty() ? null : moved.getFirst();
         }, "[the] (location|position) %directions% [%location%]");
         registrar.expression("ExprBlocks", "block", info -> {
             int pattern = info.pattern();
+            int directionAt = pattern == 1 ? 1 : 0;
+            int fromAt = 1 - directionAt;
+            // Skript reads a written distance off its direction expression, not off a variable.
+            boolean expression = info.argumentType(directionAt) != null;
+            boolean pluralFrom = pattern == 0 && info.isList(1);
             return (context, args) -> {
                 List<Object> blocks = new ArrayList<>();
-                if (pattern == 0) {
-                    if (!(args[0] instanceof Direction direction)) {
-                        return new Object[0];
+                switch (pattern) {
+                    case 0, 1 -> {
+                        Object fromValue = pattern == 0 && args[1] == null
+                                ? WorldProperties.eventLocation(context.event()) : args[fromAt];
+                        Object[] from = Values.array(fromValue);
+                        if (!(Values.single(args[directionAt]) instanceof Direction direction)) {
+                            return new Object[0];
+                        }
+                        if (pluralFrom || from.length != 1) {
+                            // Several places: the block in the direction from each.
+                            for (Object place : from) {
+                                if (place instanceof Location location && location.isWorldLoaded()) {
+                                    blocks.add(direction.getRelative(location).getBlock());
+                                }
+                            }
+                            return blocks.toArray();
+                        }
+                        Location location = from[0] instanceof Location l ? l
+                                : from[0] instanceof Block block ? block.getLocation().add(0.5, 0.5, 0.5) : null;
+                        if (location == null || location.getWorld() == null) {
+                            return new Object[0];
+                        }
+                        Vector vector = from[0] instanceof Block block ? direction.getDirection(block)
+                                : direction.getDirection(location);
+                        if (vector.getX() == 0 && vector.getY() == 0 && vector.getZ() == 0) {
+                            return new Object[0];
+                        }
+                        // The start block and as many more as the maximum target block distance, less one.
+                        int distance = 100 - 1;
+                        if (expression && direction.writtenAmount() != null) {
+                            distance = direction.writtenAmount().intValue();
+                        }
+                        lineFrom(location, location.clone().add(vector.clone().normalize().multiply(distance)), blocks);
                     }
-                    for (Object place : args[1] == null ? new Object[0] : (Object[]) args[1]) {
-                        if (place instanceof Location location && location.getWorld() != null) {
-                            // The blocks a line from the location passes through, as far as the direction says, or
-                            // 100 blocks without a number.
-                            Vector offset = direction.from(location);
-                            if (offset.lengthSquared() == 0) {
-                                continue;
-                            }
-                            double distance = direction.explicit() ? offset.length() : 100;
-                            int limit = direction.explicit() ? (int) Math.floor(distance) + 1 : 100;
-                            org.bukkit.util.BlockIterator line = new org.bukkit.util.BlockIterator(location.getWorld(),
-                                    location.toVector(), offset, 0, (int) Math.ceil(distance));
-                            while (line.hasNext() && blocks.size() < limit) {
-                                blocks.add(line.next());
-                            }
+                    case 2, 3, 4 -> {
+                        if (!(args[0] instanceof Location a) || !(args[1] instanceof Location b)
+                                || a.getWorld() != b.getWorld() || a.getWorld() == null) {
+                            return new Object[0];
+                        }
+                        if (pattern == 4) {
+                            cuboid(a.getWorld(), Math.min(a.getBlockX(), b.getBlockX()),
+                                    Math.min(a.getBlockY(), b.getBlockY()), Math.min(a.getBlockZ(), b.getBlockZ()),
+                                    Math.max(a.getBlockX(), b.getBlockX()), Math.max(a.getBlockY(), b.getBlockY()),
+                                    Math.max(a.getBlockZ(), b.getBlockZ()), blocks);
+                        } else {
+                            lineFrom(a.getBlock().getLocation().toCenterLocation(),
+                                    b.getBlock().getLocation().toCenterLocation(), blocks);
                         }
                     }
-                } else if (args[0] instanceof Location a && args[1] instanceof Location b && a.getWorld() == b.getWorld()
-                        && a.getWorld() != null) {
-                    for (int x = Math.min(a.getBlockX(), b.getBlockX()); x <= Math.max(a.getBlockX(), b.getBlockX()); x++) {
-                        for (int y = Math.min(a.getBlockY(), b.getBlockY()); y <= Math.max(a.getBlockY(), b.getBlockY()); y++) {
-                            for (int z = Math.min(a.getBlockZ(), b.getBlockZ()); z <= Math.max(a.getBlockZ(), b.getBlockZ()); z++) {
-                                blocks.add(a.getWorld().getBlockAt(x, y, z));
-                            }
+                    default -> {
+                        if (!(args[0] instanceof org.bukkit.Chunk chunk)) {
+                            return new Object[0];
                         }
+                        World world = chunk.getWorld();
+                        Block low = chunk.getBlock(0, world.getMinHeight(), 0);
+                        Block high = chunk.getBlock(15, world.getMaxHeight() - 1, 15);
+                        cuboid(world, low.getX(), low.getY(), low.getZ(), high.getX(), high.getY(), high.getZ(), blocks);
                     }
                 }
                 return blocks.toArray();
             };
         }, "[(all [[of] the]|the)] blocks %direction% [%locations%]",
-                "[(all [[of] the]|the)] blocks (between|within|from) %location% (and|to) %location%");
+                "[(all [[of] the]|the)] blocks from %location% [on] %direction%",
+                "[(all [[of] the]|the)] blocks from %location% to %location%",
+                "[(all [[of] the]|the)] blocks between %location% and %location%",
+                "[(all [[of] the]|the)] blocks within %location% and %location%",
+                "[(all [[of] the]|the)] blocks (in|within) %chunk%");
         // 'set block at X to stone': blocks become the item's block.
         registrar.changer(Block.class, Changeable.Mode.SET, (block, values) -> {
             for (Object value : values) {
@@ -699,6 +802,71 @@ final class WorldSyntax {
         }, "update %blocks% (as|to be) %blockdata% [physics:without [neighbo[u]r[ing]|adjacent] [physics] update[s]]");
     }
 
+    /**
+     * Skript's {@code BlockLineIterator}: the blocks a ray from {@code start} to {@code end} passes through, both
+     * ends included, added to {@code blocks}.
+     */
+    static void lineFrom(Location start, Location end, List<Object> blocks) {
+        World world = start.getWorld();
+        double[] current = {start.getX(), start.getY(), start.getZ()};
+        double[] last = {end.getX(), end.getY(), end.getZ()};
+        double[] lastCentre = centred(last);
+        double[] step = {last[0] - current[0], last[1] - current[1], last[2] - current[2]};
+        // JOML's normalize: times the inverse length.
+        double inverse = 1.0 / Math.sqrt(step[0] * step[0] + (step[1] * step[1] + step[2] * step[2]));
+        for (int i = 0; i < 3; i++) {
+            step[i] *= inverse;
+        }
+        while (true) {
+            // Overshot the end: stop, as Skript's iterator does by throwing.
+            double back = (last[0] - current[0]) * step[0] + (last[1] - current[1]) * step[1]
+                    + (last[2] - current[2]) * step[2];
+            if (back < -1) {
+                return;
+            }
+            double[] centre = centred(current);
+            blocks.add(world.getBlockAt((int) Math.floor(centre[0]), (int) Math.floor(centre[1]),
+                    (int) Math.floor(centre[2])));
+            if (Arrays.equals(centre, lastCentre)) {
+                return;
+            }
+            double[] needed = new double[3];
+            for (int i = 0; i < 3; i++) {
+                needed[i] = (Math.signum(step[i]) * 0.5 + centre[i] - current[i]) / step[i];
+                if (Double.isNaN(needed[i])) {
+                    needed[i] = Double.POSITIVE_INFINITY;
+                }
+            }
+            // JOML's minComponent, by absolute value.
+            double ax = Math.abs(needed[0]);
+            double ay = Math.abs(needed[1]);
+            double az = Math.abs(needed[2]);
+            double t = ax < ay && ax < az ? needed[0] : ay < az ? needed[1] : needed[2];
+            // Skript adds Math.ulp(1), the float one.
+            t += Math.ulp(1f);
+            for (int i = 0; i < 3; i++) {
+                // JOML adds without a fused multiply-add by default.
+                current[i] = t * step[i] + current[i];
+            }
+        }
+    }
+
+    private static double[] centred(double[] point) {
+        return new double[] {Math.floor(point[0]) + 0.5, Math.floor(point[1]) + 0.5, Math.floor(point[2]) + 0.5};
+    }
+
+    /** Skript's {@code AABB} iterator: the blocks from the low corner to the high one, x fastest, then z, then y. */
+    private static void cuboid(World world, int minX, int minY, int minZ, int maxX, int maxY, int maxZ,
+            List<Object> blocks) {
+        for (int y = minY; y <= maxY; y++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                for (int x = minX; x <= maxX; x++) {
+                    blocks.add(world.getBlockAt(x, y, z));
+                }
+            }
+        }
+    }
+
     /** Skript's tree types: kinds of tree or huge mushroom, by Bukkit's tree types, grown at random among them. */
     record TreeKind(String name, List<String> types) {
         @Override
@@ -761,10 +929,10 @@ final class WorldSyntax {
                 Object[] directions = Values.array(args[1]);
                 for (Object value : (Object[]) args[2]) {
                     if (value instanceof Location location && location.getWorld() != null) {
-                        Location at = location.clone();
+                        Location at = location;
                         for (Object direction : directions) {
                             if (direction instanceof Direction d) {
-                                at.add(d.from(at));
+                                at = d.getRelative(at);
                             }
                         }
                         grow(tree, at);

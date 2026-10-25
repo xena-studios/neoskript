@@ -298,18 +298,30 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
             String display = words.substring(0, of).replaceFirst(" entity$", "");
             // An item display's item may have more to it: 'item display of a diamond sword of sharpness'.
             ItemType shown = display.startsWith("block") ? null : ItemType.parse(words.substring(of + 4));
-            Material material = shown != null ? shown.material()
-                    : ItemType.alias(words.substring(of + 4).replaceFirst("^(?:an?|the) ", ""));
+            String what = words.substring(of + 4).replaceFirst("^(?:an?|the) ", "");
+            Material material = shown != null ? shown.material() : ItemType.alias(what);
+            // A block display may be of block data, as Skript's is: 'block display of minecraft:stone'.
+            org.bukkit.block.data.BlockData data = null;
+            if (material == null && display.startsWith("block")) {
+                try {
+                    data = org.bukkit.Bukkit.createBlockData(what);
+                    material = data.getMaterial();
+                } catch (IllegalArgumentException | NullPointerException notData) {
+                    return null;
+                }
+            }
             if (material == null) {
                 return null;
             }
+            Material shownMaterial = material;
+            org.bukkit.block.data.BlockData blockData = data;
             ItemStack stack = shown != null ? shown.stack().clone() : new ItemStack(material);
             variants.add(display.startsWith("block")
                     ? new Variant("display=" + material, e -> e instanceof BlockDisplay block
-                            && block.getBlock().getMaterial() == material,
-                            e -> ((BlockDisplay) e).setBlock(material.createBlockData()))
+                            && block.getBlock().getMaterial() == shownMaterial,
+                            e -> ((BlockDisplay) e).setBlock(blockData != null ? blockData.clone() : shownMaterial.createBlockData()))
                     : new Variant("display=" + material, e -> e instanceof ItemDisplay item
-                            && item.getItemStack() != null && item.getItemStack().getType() == material,
+                            && item.getItemStack() != null && item.getItemStack().getType() == shownMaterial,
                             e -> ((ItemDisplay) e).setItemStack(stack.clone())));
             words = words.substring(0, of);
         }
