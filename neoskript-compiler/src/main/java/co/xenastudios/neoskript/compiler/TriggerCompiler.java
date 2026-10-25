@@ -202,11 +202,8 @@ final class TriggerCompiler {
     private String constantsScript;
     /** The classes of the event a trigger runs for, or {@code null} outside server events. */
     private List<Class<?>> eventClasses;
-    /** The calls into syntax elements so far, with where they are, for runtime errors (see {@link #site}). */
-    private final List<Label> siteLabels = new ArrayList<>();
+    /** The calls into syntax elements so far, with their lines, for runtime errors (see {@link #site}). */
     private final List<co.xenastudios.neoskript.runtime.errors.ErrorSites.Site> sites = new ArrayList<>();
-    /** Whether the class just generated is small enough that its labels' offsets are final. */
-    private boolean sitesExact;
 
     /** The classes the last server event trigger compiled listens to: its event's, or those its filter chose. */
     List<Class<?>> eventClasses() {
@@ -295,10 +292,10 @@ final class TriggerCompiler {
                     // 'on player move' listens to player moves only; its code is checked against those.
                     eventClasses = List.copyOf(narrowing.eventClasses());
                 }
+                site(syntax, filter.getClass());
                 constant(filter, Condition.class);
                 method.visitVarInsn(ALOAD, CONTEXT_SLOT);
                 arguments(syntax);
-                site(syntax);
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Condition.class), "check",
                         "(" + CONTEXT + OBJECTS + ")Z", true);
                 Label run = new Label();
@@ -432,7 +429,6 @@ final class TriggerCompiler {
      */
     private byte[] generate(String scriptName, Body body) throws CompileException {
         constantsScript = scriptName;
-        siteLabels.clear();
         sites.clear();
         boolean trigger = function == null;
         String className = PACKAGE + (trigger ? "Trigger" : "Function");
@@ -558,23 +554,17 @@ final class TriggerCompiler {
         method.visitMaxs(0, 0);
         method.visitEnd();
         writer.visitEnd();
-        byte[] bytes = writer.toByteArray();
-        // A method over 32 KiB may have had its jumps widened after the labels were placed, moving the code.
-        sitesExact = bytes.length <= Short.MAX_VALUE;
-        return bytes;
+        return writer.toByteArray();
     }
 
     /**
-     * Marks the call into {@code syntax}'s element that's emitted next, so a runtime error it reports can say
-     * where it came from. Costs nothing when the code runs: a label has no instructions.
+     * Records a call into {@code syntax}'s element, of class {@code element}, on the current line, so a
+     * runtime error it reports can say where it came from. Nothing is added to the code that runs.
      */
-    private void site(ParsedSyntax syntax) {
-        Label at = new Label();
-        method.visitLabel(at);
+    private void site(ParsedSyntax syntax, Class<?> element) {
         String code = currentLine != null ? currentLine.text() : source;
-        siteLabels.add(at);
         sites.add(new co.xenastudios.neoskript.runtime.errors.ErrorSites.Site(kindName(syntax.syntax().kind()),
-                syntax.syntax().id(), constantsScript, line, code));
+                syntax.syntax().id(), element, constantsScript, line, code));
     }
 
     /** Skript's {@code getSyntaxTypeName}: events are structures. */
@@ -588,25 +578,10 @@ final class TriggerCompiler {
         };
     }
 
-    /** Records where the class's element calls are, now that it's defined. */
+    /** Records the class's element calls, now that it's defined. */
     private void registerSites(Class<?> compiled) {
-        List<int[]> placed = new ArrayList<>();
-        for (int i = 0; i < siteLabels.size(); i++) {
-            try {
-                placed.add(new int[] {siteLabels.get(i).getOffset(), i});
-            } catch (IllegalStateException notWritten) {
-                // Compiled only to see whether it compiles; not in the class.
-            }
-        }
-        placed.sort(java.util.Comparator.comparingInt(p -> p[0]));
-        int[] offsets = new int[placed.size()];
-        var found = new co.xenastudios.neoskript.runtime.errors.ErrorSites.Site[placed.size()];
-        for (int i = 0; i < placed.size(); i++) {
-            offsets[i] = placed.get(i)[0];
-            found[i] = sites.get(placed.get(i)[1]);
-        }
-        co.xenastudios.neoskript.runtime.errors.ErrorSites.register(compiled, offsets, found, sitesExact);
-        siteLabels.clear();
+        co.xenastudios.neoskript.runtime.errors.ErrorSites.register(compiled,
+                sites.toArray(co.xenastudios.neoskript.runtime.errors.ErrorSites.Site[]::new));
         sites.clear();
     }
 
@@ -1258,7 +1233,6 @@ final class TriggerCompiler {
         int valuesSlot = nextSlot++;
         int indexSlot = nextSlot++;
         callThrough(header, co.xenastudios.neoskript.api.element.Section.class);
-        site(header);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(co.xenastudios.neoskript.api.element.Section.class),
                 "run", "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
         convert(true);
@@ -1558,7 +1532,6 @@ final class TriggerCompiler {
         }
         if (!(library.binding(effect.syntax()) instanceof Library.Core core)) {
             callThrough(effect, Effect.class);
-            site(effect);
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Effect.class), "execute",
                     "(" + CONTEXT + OBJECTS + ")V", true);
             return;
@@ -1921,10 +1894,10 @@ final class TriggerCompiler {
             variableStore(list);
             variableName(list);
             method.visitVarInsn(ALOAD, keys);
+            site(effect, update.getClass());
             constant(update, Update.class);
             method.visitVarInsn(ALOAD, CONTEXT_SLOT);
             arguments(effect);
-            site(effect);
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Update.class), "update",
                     "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
             PlaceholderSpec spec = placeholderSpecs(effect.syntax().patterns().get(effect.pattern()))[update.target()];
@@ -1942,10 +1915,10 @@ final class TriggerCompiler {
                 && list.items().stream().allMatch(item -> item instanceof Expr.Variable variable && !variable.list())) {
             // 'replace "1" in {_a}, {_b} and {_c} with "x"': each result goes back to the variable it came from.
             int results = nextSlot++;
+            site(effect, update.getClass());
             constant(update, Update.class);
             method.visitVarInsn(ALOAD, CONTEXT_SLOT);
             arguments(effect);
-            site(effect);
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Update.class), "update",
                     "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
             method.visitMethodInsn(INVOKESTATIC, VALUES, "array", "(" + OBJECT_DESC + ")" + OBJECTS, false);
@@ -1963,10 +1936,10 @@ final class TriggerCompiler {
             return;
         }
         setTo(target, () -> {
+            site(effect, update.getClass());
             constant(update, Update.class);
             method.visitVarInsn(ALOAD, CONTEXT_SLOT);
             arguments(effect);
-            site(effect);
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Update.class), "update",
                     "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
         });
@@ -1993,6 +1966,7 @@ final class TriggerCompiler {
         if (accepted == null) {
             throw new CompileException(line, source.substring(target.start(), target.end()) + " can't be set to anything");
         }
+        site(parsed, element.getClass());
         constant(element, Changeable.class);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(parsed);
@@ -2000,7 +1974,6 @@ final class TriggerCompiler {
         constant(accepted, Class[].class);
         method.visitMethodInsn(INVOKESTATIC, VALUES, "narrow", "(" + OBJECT_DESC + "[Ljava/lang/Class;)" + OBJECTS, false);
         constant(Changeable.Mode.SET, Changeable.Mode.class);
-        site(parsed);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Changeable.class), "change",
                 "(" + CONTEXT + OBJECTS + OBJECTS + Type.getDescriptor(Changeable.Mode.class) + ")V", true);
     }
@@ -2015,12 +1988,12 @@ final class TriggerCompiler {
         if (!(element instanceof SettableCondition)) {
             throw new CompileException(line, "'" + source.substring(whether.start(), whether.end()) + "' can't be set");
         }
+        site(condition, element.getClass());
         constant(element, SettableCondition.class);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(condition);
         expression((Expr) effect.match().values().get(1));
         method.visitMethodInsn(INVOKESTATIC, VALUES, "isTrue", "(" + OBJECT_DESC + ")Z", false);
-        site(condition);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(SettableCondition.class), "set",
                 "(" + CONTEXT + OBJECTS + "Z)V", true);
     }
@@ -2113,6 +2086,7 @@ final class TriggerCompiler {
         if (mode.value >= 0) {
             checkChanger((Expr) effect.match().values().get(mode.value), accepted, changeMode, target);
         }
+        site(syntax, element.getClass());
         constant(element, Changeable.class);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(syntax);
@@ -2132,7 +2106,6 @@ final class TriggerCompiler {
             method.visitInsn(ACONST_NULL);
         }
         constant(changeMode, Changeable.Mode.class);
-        site(syntax);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Changeable.class), "change",
                 "(" + CONTEXT + OBJECTS + OBJECTS + Type.getDescriptor(Changeable.Mode.class) + ")V", true);
     }
@@ -2318,7 +2291,6 @@ final class TriggerCompiler {
 
     private void checkOne(ParsedSyntax condition) throws CompileException {
         callThrough(condition, Condition.class);
-        site(condition);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Condition.class), "check",
                 "(" + CONTEXT + OBJECTS + ")Z", true);
     }
@@ -2420,6 +2392,7 @@ final class TriggerCompiler {
             throw unsupported(syntax.syntax().id());
         }
         Object element = factory.create(info(syntax));
+        site(syntax, element.getClass());
         constant(element, type);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(syntax, keyed, implicit);
@@ -2982,7 +2955,7 @@ final class TriggerCompiler {
         method.visitJumpInsn(IFEQ, fine);
         // A warning in Skript, from the reduce expression.
         method.visitLdcInsn("The reduce expression returned null for one or more elements, which were skipped.");
-        site(syntax);
+        site(syntax, co.xenastudios.neoskript.runtime.RuntimeErrors.class);
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(co.xenastudios.neoskript.runtime.RuntimeErrors.class),
                 "warning", "(" + STRING_DESC + ")V", false);
         method.visitLabel(fine);
@@ -3544,7 +3517,6 @@ final class TriggerCompiler {
             case Expr.Syntax syntax -> {
                 boolean keyAware = keyAware(syntax);
                 callThrough(syntax.syntax(), Expression.class, keyAware, keyAware && implicitKeys(syntax));
-                site(syntax.syntax());
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Expression.class), "get",
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
                 if (keyAware) {
@@ -4131,7 +4103,6 @@ final class TriggerCompiler {
             }
             case Expr.Syntax syntax when keyAware(syntax) -> {
                 callThrough(syntax.syntax(), Expression.class, true, implicit || implicitKeys(syntax));
-                site(syntax.syntax());
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Expression.class), "get",
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
             }
