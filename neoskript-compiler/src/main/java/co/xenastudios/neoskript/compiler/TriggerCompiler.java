@@ -3378,6 +3378,10 @@ final class TriggerCompiler {
                         multipleTypesWarning(unresolved.text().strip());
                     }
                 }
+                if (value == null && library.literalError(unresolved.text()) != null) {
+                    // Words Skript has a clearer error for: 'dust particle' needs its colour.
+                    throw new CompileException(line, library.literalError(unresolved.text()));
+                }
                 if (value == null && (inList > 0 || skriptErrors) && outerArgument != null && !outerArgument.contains("event-")) {
                     // Words nothing parses in a list: Skript reports the whole argument they're in. (An event value
                     // NeoSkript doesn't have yet is something it can't run, not a mistake.)

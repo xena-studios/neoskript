@@ -188,6 +188,13 @@ public interface Registrar {
     void literalParser(String typeId, java.util.function.Function<String, ?> parser);
 
     /**
+     * What's wrong with words written as a value that no literal parser understands, for an error clearer than
+     * Skript's "can't understand", as Skript gives for some: {@code dust particle} needs its colour. {@code problem}
+     * returns the error, or {@code null} if it has nothing to say about the words.
+     */
+    void literalError(java.util.function.Function<String, String> problem);
+
+    /**
      * How text people type, such as a command's arguments, becomes a value of {@code typeId}. The parser
      * returns {@code null} for text that isn't one.
      */
