@@ -31,6 +31,8 @@ final class CoreSyntax {
     static final String ASSERT = "EffAssert";
     /** Skript's test section whose code can {@code return} values, for {@code the last return values}. */
     static final String RETURNABLE = "SecReturnable";
+    /** Skript's test section that changes what a left-out value of a type is, for the code in it. */
+    static final String CUSTOM_DEFAULT = "SecCustomDefault";
     /** {@code assert X to fail} where X isn't a condition at all: as in Skript, that has failed as expected. */
     static final String ASSERT_UNPARSED = "EffAssertUnparsed";
     static final String PARSE_LOGS = "ExprLastParseLogs";
@@ -118,6 +120,8 @@ final class CoreSyntax {
                 "assert [unsafely] <.+> to fail [with [error] %string%[, expected %objects%][, got %objects%]]");
         library.core(SyntaxKind.EXPRESSION, PARSE_LOGS, "string", List.of(), "[the] [last] parse logs");
         library.core(SyntaxKind.SECTION, RETURNABLE, null, List.of(), "returnable [:plural] %*classinfo% section");
+        library.core(SyntaxKind.SECTION, CUSTOM_DEFAULT, null, List.of(),
+                "run with custom default value %*object% for %*classinfo%");
 
         // Whether the trigger may have waited at this point: true, false or unknown.
         library.literalType("kleenean", "kleenean", java.util.Set.of("unknown"), word -> word);

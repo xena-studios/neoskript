@@ -206,12 +206,12 @@ final class Logic {
                         && (meaningful && Math.abs(Math.IEEEremainder(n.doubleValue(), divisor.doubleValue())) <= tolerance)
                                 != negated);
             };
-        }, "%numbers% (is|are) evenly divisible by %number% [with [a] tolerance [of] %number%]",
-                "%numbers% (isn't|is not|aren't|are not) evenly divisible by %number% [with [a] tolerance [of] %number%]",
-                "%numbers% can be [evenly] divided by %number% [with [a] tolerance [of] %number%]",
-                "%numbers% (can't|cannot|can not) be [evenly] divided by %number% [with [a] tolerance [of] %number%]",
-                "%numbers% can be evenly divided by %number% [with [a] tolerance [of] %number%]",
-                "%numbers% (can't|can[ ]not) be evenly divided by %number% [with [a] tolerance [of] %number%]");
+        }, "%numbers% (is|are) evenly divisible by %number% [with [a] tolerance [of] %-number%]",
+                "%numbers% (isn't|is not|aren't|are not) evenly divisible by %number% [with [a] tolerance [of] %-number%]",
+                "%numbers% can be [evenly] divided by %number% [with [a] tolerance [of] %-number%]",
+                "%numbers% (can't|cannot|can not) be [evenly] divided by %number% [with [a] tolerance [of] %-number%]",
+                "%numbers% can be evenly divided by %number% [with [a] tolerance [of] %-number%]",
+                "%numbers% (can't|can[ ]not) be evenly divided by %number% [with [a] tolerance [of] %-number%]");
         registrar.expression("ExprExcept", "object", info -> (context, args) -> {
             List<Object> kept = new java.util.ArrayList<>();
             for (Object value : (Object[]) args[0]) {

@@ -216,6 +216,8 @@ final class TriggerCompiler {
     private final Map<Expr, Integer> precomputed = new java.util.IdentityHashMap<>();
     /** The text of the statement's argument being compiled, for errors about words in it nothing parses. */
     private String outerArgument;
+    /** Values left-out placeholders of a type get, from Skript's custom default test sections, innermost first. */
+    private final java.util.Deque<Map.Entry<String, Expr>> customDefaults = new java.util.ArrayDeque<>();
     /** How many lists the expression being compiled is in. */
     private int inList;
 
@@ -824,6 +826,21 @@ final class TriggerCompiler {
             case Statement.Section section when isCore(section.header(), CoreSyntax.LOOP) -> loop(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.FOR) -> forLoop(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.WHILE) -> whileLoop(section);
+            case Statement.Section section when isCore(section.header(), CoreSyntax.CUSTOM_DEFAULT) -> {
+                // Left-out values of the type are this one in the code under it, as in Skript's test section.
+                Expr value = (Expr) section.header().match().values().getFirst();
+                String type = returnableType(new ParsedSyntax(section.header().syntax(), section.header().pattern(),
+                        new co.xenastudios.neoskript.frontend.pattern.MatchResult(0, java.util.Set.of(),
+                                List.of(section.header().match().values().get(1)), List.of(), List.of(), List.of())));
+                customDefaults.push(Map.entry(type, value));
+                Label end = new Label();
+                try {
+                    block(BlockKind.CONDITIONAL, end, section.body());
+                } finally {
+                    customDefaults.pop();
+                }
+                method.visitLabel(end);
+            }
             case Statement.Section section when isCore(section.header(), CoreSyntax.RETURNABLE) -> {
                 Label end = new Label();
                 String type = returnableType(section.header());
@@ -2050,7 +2067,25 @@ final class TriggerCompiler {
                     method.visitInsn(AASTORE);
                     continue;
                 }
+                Expr custom = customDefault(specs[i]);
+                if (custom != null) {
+                    method.visitInsn(DUP);
+                    pushInt(i);
+                    expression(custom);
+                    convert(isPlural(specs[i]));
+                    method.visitInsn(AASTORE);
+                    continue;
+                }
                 java.util.function.Function<Object, Object> fallback = eventDefault(specs[i]);
+                Object literalDefault = fallback == null ? literalDefault(specs[i]) : null;
+                if (literalDefault != null) {
+                    method.visitInsn(DUP);
+                    pushInt(i);
+                    constant(literalDefault, Object.class);
+                    convert(isPlural(specs[i]));
+                    method.visitInsn(AASTORE);
+                    continue;
+                }
                 if (fallback != null) {
                     method.visitInsn(DUP);
                     pushInt(i);
@@ -2146,6 +2181,31 @@ final class TriggerCompiler {
             }
         }
         return null;
+    }
+
+    /** A custom default value for the placeholder's type, from a section around this code, or {@code null}. */
+    private Expr customDefault(PlaceholderSpec spec) {
+        if (spec.nullable() || customDefaults.isEmpty()) {
+            return null;
+        }
+        for (Map.Entry<String, Expr> custom : customDefaults) {
+            for (String name : spec.types()) {
+                TypeRef ref = registry.resolveType(name);
+                if (ref != null && ref.type().id().equals(custom.getKey())) {
+                    return custom.getValue();
+                }
+            }
+        }
+        return null;
+    }
+
+    /** The literal a left-out placeholder of its type is, as Skript's default expressions (a number is 1). */
+    private Object literalDefault(PlaceholderSpec spec) {
+        if (spec.nullable() || spec.types().size() != 1) {
+            return null;
+        }
+        TypeRef ref = registry.resolveType(spec.types().getFirst());
+        return ref == null ? null : library.defaultValue(ref.type().id());
     }
 
     /**

@@ -142,6 +142,8 @@ final class Scripts {
         registrar.effect("EffTestExprList", info -> (context, args) -> {}, "test expr list %number/booleans%");
         registrar.expression("ExprTestStringLiteral", "string", info -> (context, args) -> args[0],
                 "test string literal %*string%");
+        // A number, or a left-out one: 1, or the custom default around it.
+        registrar.expression("ExprDefaultNumberValue", "number", info -> (context, args) -> args[0], "default number [%number%]");
         // What the last 'returnable ... section' returned (see the compiler).
         registrar.expression("ExprLastReturnValues", "object", info -> (context, args) -> {
             Object values = co.xenastudios.neoskript.runtime.Values.takeReturned();

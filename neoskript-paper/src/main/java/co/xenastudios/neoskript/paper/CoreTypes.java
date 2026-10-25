@@ -92,6 +92,9 @@ final class CoreTypes {
         registrar.subtype("integer", "number");
         // Numbers can be used where whole numbers are expected; they're rounded when they're used.
         registrar.subtype("number", "integer");
+        // Left out, a number is 1, as Skript's number types default to.
+        registrar.defaultValue("number", 1L);
+        registrar.defaultValue("integer", 1L);
         registrar.alias("integer", "int", "ints");
 
         registrar.type("audience", "audience", Audience.class);

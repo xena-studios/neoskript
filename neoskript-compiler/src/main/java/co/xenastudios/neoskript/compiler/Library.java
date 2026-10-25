@@ -366,6 +366,19 @@ public final class Library implements Registrar {
         eventDefaults.add(typeId);
     }
 
+    private final Map<String, Object> defaultValues = new HashMap<>();
+
+    @Override
+    public void defaultValue(String typeId, Object value) {
+        checkOpen();
+        defaultValues.put(typeId, value);
+    }
+
+    /** The value a left-out placeholder of {@code typeId} gets when nothing else gives one, or {@code null}. */
+    Object defaultValue(String typeId) {
+        return defaultValues.get(typeId);
+    }
+
     /** Whether unused optional placeholders of {@code typeId} get the event's value of that type. */
     boolean hasEventDefault(String typeId) {
         return eventDefaults.contains(typeId);

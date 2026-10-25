@@ -780,7 +780,7 @@ final class Items {
                 return name == null ? Bukkit.createInventory(null, size)
                         : Bukkit.createInventory(null, size, Messages.component(name));
             };
-        }, "[a] [new] chest inventory (named|with name) %text% [with %number% row[s]]",
+        }, "[a] [new] chest inventory (named|with name) %text% [with %-number% row[s]]",
                 "[a] [new] chest inventory with %number% row[s] [(named|with name) %text%]");
         registrar.expression("ExprAmountOfItems", "integer", info -> (context, args) -> {
             long count = 0;
