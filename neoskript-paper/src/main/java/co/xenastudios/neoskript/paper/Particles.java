@@ -751,11 +751,6 @@ final class Particles {
     // Drawing
 
     private static void registerEffects(Registrar registrar) {
-        // 'at', the direction nowhere: 'draw a flame particle at the player'.
-        registrar.expression("LitAt", "direction", info -> {
-            WorldSyntax.Direction at = new WorldSyntax.Direction(new Vector(), false);
-            return (context, args) -> at;
-        }, "at");
         registrar.effect("EffPlayEffect", info -> {
             int pattern = info.pattern();
             boolean force = info.hasTag("force");
