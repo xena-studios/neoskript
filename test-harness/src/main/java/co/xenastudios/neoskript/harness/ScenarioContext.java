@@ -58,6 +58,11 @@ public final class ScenarioContext {
                 referenceSkript.jarUrl(), referenceSkript.jarSha256(), "Skript-" + referenceSkript.version() + ".jar");
     }
 
+    /** A pinned file, such as another plugin's jar, downloaded into the cache and checked against its SHA-256. */
+    public Path download(String url, String sha256, String fileName) throws IOException, InterruptedException {
+        return downloads.fetch(url, sha256, fileName);
+    }
+
     /** Reads a script from {@code test-harness/scripts}. */
     public String script(String name) throws IOException {
         return Files.readString(config.scriptsDir().resolve(name));
