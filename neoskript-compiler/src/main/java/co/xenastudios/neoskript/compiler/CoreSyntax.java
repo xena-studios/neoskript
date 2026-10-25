@@ -94,8 +94,21 @@ final class CoreSyntax {
         }
     }
 
-    /** {@link #ARITHMETIC} operators, by pattern index, from the lowest precedence. */
-    static final char[] OPERATORS = {'+', '-', '*', '/', '^'};
+    /**
+     * An arithmetic operator: its sign, how tightly it binds (higher first, as Skript's priorities), and
+     * whether a chain of it groups from the right ({@code 2^3^2} is {@code 2^(3^2)}).
+     */
+    record Operator(String sign, int priority, boolean fromRight) {}
+
+    /** {@link #ARITHMETIC} operators, by pattern index. */
+    static final List<Operator> OPERATORS = List.of(new Operator("+", 10, false), new Operator("-", 10, false),
+            new Operator("*", 20, false), new Operator("/", 20, false), new Operator("^", 30, true));
+
+    /** Skript's test-only custom operators, by pattern index of {@link #CUSTOM_ARITHMETIC}. */
+    static final List<Operator> CUSTOM_OPERATORS = List.of(new Operator("bar!", 10, false),
+            new Operator("foo!1", 5, false), new Operator("foo!2", 25, false), new Operator("blob!", 10, false));
+
+    static final String CUSTOM_ARITHMETIC = "ExprArithmetic-custom";
 
     private CoreSyntax() {}
 
@@ -120,6 +133,17 @@ final class CoreSyntax {
                 "assert [unsafely] <.+> to fail [with [error] %string%[, expected %objects%][, got %objects%]]");
         library.core(SyntaxKind.EXPRESSION, PARSE_LOGS, "string", List.of(), "[the] [last] parse logs");
         library.core(SyntaxKind.SECTION, RETURNABLE, null, List.of(), "returnable [:plural] %*classinfo% section");
+        // Skript's custom test operators (CustomTestOperators), with the priorities it gives them.
+        library.core(SyntaxKind.EXPRESSION, CUSTOM_ARITHMETIC, "object", List.of(),
+                CUSTOM_OPERATORS.stream().map(op -> "%object%[ ]" + op.sign() + "[ ]%object%").toArray(String[]::new));
+        co.xenastudios.neoskript.runtime.Arithmetic.registerCustom("bar!", String.class, String.class,
+                (a, b) -> a + " bar " + b);
+        co.xenastudios.neoskript.runtime.Arithmetic.registerCustom("foo!1", Number.class, Number.class,
+                (a, b) -> (long) (a.intValue() + 2 * b.intValue()));
+        co.xenastudios.neoskript.runtime.Arithmetic.registerCustom("foo!2", Number.class, Number.class,
+                (a, b) -> (long) (a.intValue() + 2 * b.intValue()));
+        co.xenastudios.neoskript.runtime.Arithmetic.registerCustom("blob!", String.class, Number.class,
+                (a, b) -> a + (b.intValue() + 1));
         library.core(SyntaxKind.SECTION, CUSTOM_DEFAULT, null, List.of(),
                 "run with custom default value %*object% for %*classinfo%");
 

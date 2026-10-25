@@ -2805,7 +2805,7 @@ final class TriggerCompiler {
                 }
             }
             case Expr.FunctionCall call -> call(call);
-            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARITHMETIC) -> arithmetic(syntax);
+            case Expr.Syntax syntax when isArithmetic(syntax) -> arithmetic(syntax);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.LOOP_VALUE) -> loopValue(syntax.syntax());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE)
                     || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY)
@@ -3186,13 +3186,18 @@ final class TriggerCompiler {
      */
     private void arithmetic(Expr.Syntax syntax) throws CompileException {
         List<Expr> operands = new ArrayList<>();
-        List<Character> operators = new ArrayList<>();
+        List<CoreSyntax.Operator> operators = new ArrayList<>();
         flatten(syntax, operands, operators);
         emitArithmetic(operands, operators, 0, operands.size() - 1);
     }
 
-    private void flatten(Expr expr, List<Expr> operands, List<Character> operators) {
-        if (expr instanceof Expr.Syntax syntax && isCore(syntax.syntax(), CoreSyntax.ARITHMETIC)) {
+    private boolean isArithmetic(Expr expr) {
+        return expr instanceof Expr.Syntax syntax && (isCore(syntax.syntax(), CoreSyntax.ARITHMETIC)
+                || isCore(syntax.syntax(), CoreSyntax.CUSTOM_ARITHMETIC));
+    }
+
+    private void flatten(Expr expr, List<Expr> operands, List<CoreSyntax.Operator> operators) {
+        if (expr instanceof Expr.Syntax syntax && isArithmetic(syntax)) {
             ParsedSyntax parsed = syntax.syntax();
             for (int side = 0; side < 2; side++) {
                 Expr operand = (Expr) parsed.match().values().get(side);
@@ -3205,7 +3210,8 @@ final class TriggerCompiler {
                     flatten(operand, operands, operators);
                 }
                 if (side == 0) {
-                    operators.add(CoreSyntax.OPERATORS[parsed.pattern()]);
+                    operators.add((isCore(parsed, CoreSyntax.ARITHMETIC) ? CoreSyntax.OPERATORS : CoreSyntax.CUSTOM_OPERATORS)
+                            .get(parsed.pattern()));
                 }
             }
             return;
@@ -3214,33 +3220,40 @@ final class TriggerCompiler {
     }
 
     /** Emits operands {@code [from, to]} with the operators between them, by precedence. */
-    private void emitArithmetic(List<Expr> operands, List<Character> operators, int from, int to)
+    private void emitArithmetic(List<Expr> operands, List<CoreSyntax.Operator> operators, int from, int to)
             throws CompileException {
         if (from == to) {
             expression(operands.get(from));
             return;
         }
-        // Split at the operator that binds loosest: the last + or -, else the last * or /, else the first ^.
-        int split = -1;
-        for (String group : new String[] {"+-", "*/"}) {
-            for (int i = to - 1; i >= from && split < 0; i--) {
-                if (group.indexOf(operators.get(i)) >= 0) {
-                    split = i;
-                }
-            }
+        // Split at the operator that binds loosest: its last one, or its first if it groups from the right.
+        int loosest = Integer.MAX_VALUE;
+        for (int i = from; i < to; i++) {
+            loosest = Math.min(loosest, operators.get(i).priority());
         }
-        if (split < 0) {
-            split = from;
+        int split = -1;
+        for (int i = from; i < to; i++) {
+            CoreSyntax.Operator operator = operators.get(i);
+            if (operator.priority() == loosest && (split < 0 || !operator.fromRight())) {
+                split = i;
+            }
         }
         emitArithmetic(operands, operators, from, split);
         emitArithmetic(operands, operators, split + 1, to);
-        String operation = switch (operators.get(split)) {
-            case '+' -> "add";
-            case '-' -> "subtract";
-            case '*' -> "multiply";
-            case '/' -> "divide";
-            default -> "power";
+        String operation = switch (operators.get(split).sign()) {
+            case "+" -> "add";
+            case "-" -> "subtract";
+            case "*" -> "multiply";
+            case "/" -> "divide";
+            case "^" -> "power";
+            default -> null;
         };
+        if (operation == null) {
+            method.visitLdcInsn(operators.get(split).sign());
+            method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Arithmetic.class), "custom",
+                    "(" + OBJECT_DESC + OBJECT_DESC + STRING_DESC + ")" + OBJECT_DESC, false);
+            return;
+        }
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Arithmetic.class), operation,
                 "(" + OBJECT_DESC + OBJECT_DESC + ")" + OBJECT_DESC, false);
     }
