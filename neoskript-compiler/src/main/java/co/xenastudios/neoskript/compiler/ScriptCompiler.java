@@ -345,10 +345,8 @@ public final class ScriptCompiler {
         }
         Timespan cooldown = null;
         if (entries.containsKey("cooldown")) {
+            // As in Skript, one that isn't a timespan is no cooldown.
             cooldown = Timespan.parse(entries.get("cooldown"));
-            if (cooldown == null) {
-                throw new CompileException(line, "'" + entries.get("cooldown") + "' is not a timespan");
-            }
         }
         List<String> aliases = new ArrayList<>();
         if (entries.containsKey("aliases")) {

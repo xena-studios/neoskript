@@ -19,6 +19,9 @@ class CommandParserTest {
 
     private static final ScriptLoader LOADER = new ScriptLoader(SkriptRegistry.get());
     private static final String MISSING_TRIGGER = "You must have a 'trigger' entry if there are no subcommands!";
+    private static final String EMPTY_SECTION = "Empty configuration section! You might want to indent one or more of"
+            + " the subsequent lines to make them belong to this section or remove the colon at the end of the line if"
+            + " you don't want this line to start a section.";
 
     private static ParsedScript load(String text) {
         return LOADER.load(List.of(new SourceFile("test.sk", text))).getFirst();
@@ -90,8 +93,8 @@ class CommandParserTest {
 
     @Test
     void skriptsSubcommandErrors() {
-        assertEquals(List.of(MISSING_TRIGGER), errors("command /e:\n"));
-        assertEquals(List.of(MISSING_TRIGGER, MISSING_TRIGGER), errors("command /e:\n\tsubcommand test:\n"));
+        assertEquals(List.of(EMPTY_SECTION, MISSING_TRIGGER), errors("command /e:\n"));
+        assertEquals(List.of(EMPTY_SECTION, MISSING_TRIGGER, MISSING_TRIGGER), errors("command /e:\n\tsubcommand test:\n"));
         assertEquals(List.of("It is not possible to restrict execution to the console as the parent command is only "
                 + "executable by players."), errors("command /e:\n\texecutable by: players\n\ttrigger:\n\t\tstop\n"
                 + "\tsubcommand test:\n\t\texecutable by: console\n\t\ttrigger:\n\t\t\tstop\n"));

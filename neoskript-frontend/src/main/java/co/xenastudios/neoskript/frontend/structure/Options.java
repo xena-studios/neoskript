@@ -105,7 +105,7 @@ public final class Options {
             out.append(text, copied, start);
             if (value == null) {
                 diagnostics.error(line.number(), line.column() + start, end + 1 - start,
-                        "Undefined option {@" + name + "}");
+                        "undefined option {@" + name + "}");
                 out.append(text, start, end + 1);
             } else {
                 out.append(value);

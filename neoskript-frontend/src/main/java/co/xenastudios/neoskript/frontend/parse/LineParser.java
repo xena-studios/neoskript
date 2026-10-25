@@ -872,11 +872,12 @@ final class LineParser {
         }
         String name = input.substring(start, open);
         List<FunctionInfo> overloads = context.functions(name);
-        if (overloads.isEmpty()) {
-            return null;
-        }
         int[] inner = trim(open + 1, end - 1);
         List<int[]> pieces = inner[0] >= inner[1] ? List.of() : Scanner.split(input, inner[0], inner[1], ',');
+        if (overloads.isEmpty()) {
+            functionProblem("The function " + name + "(" + describe(pieces) + ") does not exist.");
+            return null;
+        }
         List<Expr.FunctionCall> matches = new ArrayList<>();
         String problem = null;
         for (FunctionInfo function : overloads) {

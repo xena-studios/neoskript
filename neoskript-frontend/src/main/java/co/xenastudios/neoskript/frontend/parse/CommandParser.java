@@ -120,6 +120,7 @@ final class CommandParser {
         List<Statement> suggestions = null;
         Line suggestionsLine = null;
         List<Node.Section> children = new ArrayList<>();
+        boolean unexpected = false;
         for (Node child : section.children()) {
             Line entry = child.line();
             String key = entry.key().strip().toLowerCase(Locale.ROOT);
@@ -148,9 +149,14 @@ final class CommandParser {
                     messages.put(name, message);
                 }
             } else {
-                report(entry, (child instanceof Node.Section ? "Invalid section in command: " : "Invalid entry in command: ")
-                        + entry.text());
+                // As Skript's entry validator: each is reported, then the command isn't loaded.
+                report(entry, "Unexpected entry '" + entry.key().strip() + "'. Check whether it's spelled correctly or"
+                        + " remove it");
+                unexpected = true;
             }
+        }
+        if (unexpected) {
+            return null;
         }
 
         Set<Executor> own = executors;
@@ -387,7 +393,7 @@ final class CommandParser {
             candidate = candidate.substring(0, space).strip();
         }
         if (type == null) {
-            throw new PatternException("'" + typeText + "' is not a type");
+            throw new PatternException("'" + typeText + "' is not a known type.");
         }
 
         Double min = null;
@@ -413,7 +419,7 @@ final class CommandParser {
                     } else if ((m = MAX.matcher(clause)).matches()) {
                         max = number(m.group(1), typeText);
                     } else {
-                        throw new PatternException("'" + typeText + "' is not a type");
+                        throw new PatternException("'" + typeText + "' is not a known type.");
                     }
                 }
             }

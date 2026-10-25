@@ -35,7 +35,7 @@ public final class ScriptLoader {
             "(local\\s+)?function\\s+([\\p{L}_][\\p{L}\\p{N}_]*)\\s*\\((.*)\\)\\s*(?:(?:::|->|returns)\\s*(.+))?",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern PARAMETER =
-            Pattern.compile("\\s*([\\p{L}_][\\p{L}\\p{N}_]*)\\s*:\\s*(.+?)(?:\\s*=\\s*(.+))?\\s*");
+            Pattern.compile("^\\s*([^:(){}\",]+?)\\s*:\\s*([a-zA-Z ]+?)\\s*(?:\\s*=\\s*(.+))?\\s*$");
     /** Skript's test-only top-level {@code parse:} block, whose {@code code:} holds structures. */
     private static final String PARSE_STRUCTURE = "parse";
     private static final Pattern EVENT_MODIFIERS = Pattern.compile(
@@ -284,7 +284,7 @@ public final class ScriptLoader {
             event = eventHeader(context, key, EVENT_MODIFIERS);
         }
         if (event == null) {
-            diagnostics.error(line.number(), line.column(), key.length(), "Can't understand this event: '" + key + "'");
+            diagnostics.error(line.number(), line.column(), key.length(), "Can't understand this structure: " + key);
             return null;
         }
         context.eventScope(values == null ? null : values.event(event.syntax()));
@@ -363,9 +363,15 @@ public final class ScriptLoader {
             for (int[] piece : Scanner.split(list, 0, list.length(), ',')) {
                 String text = list.substring(piece[0], piece[1]);
                 Matcher parameter = PARAMETER.matcher(text);
-                TypeRef type = parameter.matches() ? registry.resolveType(parameter.group(2)) : null;
+                if (!parameter.matches()) {
+                    int n = parameters.size() + 1;
+                    report(diagnostics, line, "The " + n + ordinalSuffix(n) + " argument's definition is invalid. It"
+                            + " should look like 'name: type' or 'name: type = default value'.");
+                    return null;
+                }
+                TypeRef type = registry.resolveType(parameter.group(2));
                 if (type == null) {
-                    report(diagnostics, line, "Invalid function parameter: '" + text.strip() + "'");
+                    report(diagnostics, line, "Cannot recognise the type '" + parameter.group(2).strip() + "'");
                     return null;
                 }
                 parameters.add(new FunctionInfo.Parameter(parameter.group(1), type.type().id(), type.plural(),
@@ -377,7 +383,7 @@ public final class ScriptLoader {
         if (header.group(4) != null) {
             TypeRef type = registry.resolveType(header.group(4));
             if (type == null) {
-                report(diagnostics, line, "Invalid function return type: '" + header.group(4).strip() + "'");
+                report(diagnostics, line, "Cannot recognise the type '" + header.group(4).strip() + "'");
                 return null;
             }
             returnType = type.type().id();
@@ -406,5 +412,18 @@ public final class ScriptLoader {
         if (diagnostics != null) {
             diagnostics.error(line.number(), line.column(), line.text().length(), message);
         }
+    }
+
+    /** {@code st}, {@code nd}, {@code rd} or {@code th}, as Skript's {@code fancyOrderNumber}. */
+    private static String ordinalSuffix(int n) {
+        if (n % 100 / 10 == 1) {
+            return "th";
+        }
+        return switch (n % 10) {
+            case 1 -> "st";
+            case 2 -> "nd";
+            case 3 -> "rd";
+            default -> "th";
+        };
     }
 }

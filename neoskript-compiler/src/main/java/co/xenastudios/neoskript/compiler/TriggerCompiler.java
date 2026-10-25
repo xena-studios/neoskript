@@ -1611,8 +1611,9 @@ final class TriggerCompiler {
                 }
                 if (function == null || function.returnType() == null) {
                     throw new CompileException(line, function == null
-                            ? "'return' can only be used in a function"
-                            : "The function " + function.name() + " doesn't return anything");
+                            ? "The return statement cannot be used here"
+                            : "function " + function.name() + " (simple event) doesn't return any value. Please use"
+                                    + " 'stop' or 'exit' if you want to stop the trigger.");
                 }
                 Expr returned = (Expr) effect.match().values().getFirst();
                 List<String> outerLiteralTypes = literalTypes;

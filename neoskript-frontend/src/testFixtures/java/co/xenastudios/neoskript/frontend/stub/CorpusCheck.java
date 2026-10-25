@@ -8,6 +8,7 @@ import co.xenastudios.neoskript.frontend.parse.ParsedScript;
 import co.xenastudios.neoskript.frontend.parse.ParsedStructure;
 import co.xenastudios.neoskript.frontend.parse.Statement;
 import co.xenastudios.neoskript.frontend.source.Diagnostic;
+import co.xenastudios.neoskript.frontend.source.Severity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -53,7 +54,8 @@ public final class CorpusCheck {
         long lines = 0;
         for (ParsedScript script : scripts) {
             lines += script.file().lines().size();
-            falseErrors.addAll(script.diagnostics());
+            // Warnings don't stop code loading; Skript gives some for its own tests too (empty sections).
+            script.diagnostics().stream().filter(d -> d.severity() == Severity.ERROR).forEach(falseErrors::add);
             structures(script, script.structures(), counter);
         }
         return new Result(scripts.size(), lines, falseErrors, counter.expectedErrors, counter.caughtErrors,
