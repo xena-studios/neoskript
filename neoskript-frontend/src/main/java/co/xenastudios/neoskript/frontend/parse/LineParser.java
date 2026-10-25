@@ -406,37 +406,13 @@ final class LineParser {
         PlaceholderSpec[] specs = null;
         for (int i = 0; i < values.size(); i++) {
             if (values.get(i) == null) {
-                specs = specs != null ? specs : placeholderSpecs.computeIfAbsent(pattern, LineParser::specs);
+                specs = specs != null ? specs : context.specs(pattern);
                 if (i < specs.length && specs[i] != null && !eventScope.allowsLeftOut(syntax, specs[i])) {
                     return false;
                 }
             }
         }
         return true;
-    }
-
-    /** The placeholders of each pattern (compared by identity), as left-out ones are looked up. */
-    private final Map<CompiledPattern, PlaceholderSpec[]> placeholderSpecs = new HashMap<>();
-
-    private static PlaceholderSpec[] specs(CompiledPattern pattern) {
-        PlaceholderSpec[] specs = new PlaceholderSpec[pattern.placeholderCount()];
-        collectSpecs(pattern.root(), specs);
-        return specs;
-    }
-
-    private static void collectSpecs(co.xenastudios.neoskript.frontend.pattern.PatternElement element,
-            PlaceholderSpec[] specs) {
-        switch (element) {
-            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Placeholder placeholder ->
-                    specs[placeholder.index()] = placeholder.spec();
-            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Sequence sequence ->
-                    sequence.elements().forEach(e -> collectSpecs(e, specs));
-            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Choice choice ->
-                    choice.alternatives().forEach(a -> collectSpecs(a.body(), specs));
-            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Optional optional ->
-                    collectSpecs(optional.choice(), specs);
-            default -> {}
-        }
     }
 
     /** Whether {@code parsed}, if it's an event value, is one the line can use. */

@@ -109,8 +109,7 @@ final class LibraryEventValues implements EventValues {
         public boolean allowsLeftOut(SyntaxInfo syntax, PlaceholderSpec spec) {
             // As the compiler fills in a library element's: unless nothing but the event's value can, and the event
             // has none. (Outside events nothing is filled in, and nothing fails.)
-            if (spec.nullable() || classes.isEmpty() || spec.types().isEmpty() || spec.types().contains("script")
-                    || !(library.binding(syntax) instanceof ElementFactory<?>)) {
+            if (spec.nullable() || classes.isEmpty() || spec.types().isEmpty()) {
                 return true;
             }
             SyntaxRegistry registry = library.registry();
@@ -119,6 +118,9 @@ final class LibraryEventValues implements EventValues {
                 if (ref == null || !library.hasEventDefault(ref.type().id())) {
                     return true;
                 }
+            }
+            if (spec.types().contains("script") || !(library.binding(syntax) instanceof ElementFactory<?>)) {
+                return true;
             }
             if (spec.types().size() == 1 && library.defaultValue(registry.resolveType(spec.types().getFirst())
                     .type().id()) != null) {

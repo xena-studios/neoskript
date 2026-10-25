@@ -29,6 +29,11 @@ final class ParserContext {
     private static final Map<SyntaxRegistry, Map<PlaceholderSpec, Expected>> PLACEHOLDERS =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
+    /** Per registry: each pattern's placeholders by index, worked out as they're asked for. */
+    private static final Map<SyntaxRegistry, Map<CompiledPattern, PlaceholderSpec[]>> SPECS =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private final Map<CompiledPattern, PlaceholderSpec[]> specs;
+
     /** What each placeholder of every registered pattern accepts, by placeholder identity. Read-only. */
     private final Map<PlaceholderSpec, Expected> byPlaceholder;
     private final Map<Expected, Expected> interned = new ConcurrentHashMap<>();
@@ -45,6 +50,7 @@ final class ParserContext {
         this.scriptFunctions = Map.copyOf(scriptFunctions);
         this.localFunctions = Map.copyOf(localFunctions);
         this.byPlaceholder = PLACEHOLDERS.computeIfAbsent(registry, this::placeholders);
+        this.specs = SPECS.computeIfAbsent(registry, r -> new ConcurrentHashMap<>());
         byPlaceholder.values().forEach(this::intern);
     }
 
@@ -66,6 +72,26 @@ final class ParserContext {
             case PatternElement.Sequence sequence -> sequence.elements().forEach(e -> collect(e, result));
             case PatternElement.Choice choice -> choice.alternatives().forEach(a -> collect(a.body(), result));
             case PatternElement.Optional optional -> collect(optional.choice(), result);
+            default -> {}
+        }
+    }
+
+    /** A registered pattern's placeholders, by index ({@code null} where an index has none). Don't change it. */
+    PlaceholderSpec[] specs(CompiledPattern pattern) {
+        // (Patterns are compared by identity.)
+        return specs.computeIfAbsent(pattern, p -> {
+            PlaceholderSpec[] result = new PlaceholderSpec[p.placeholderCount()];
+            collectSpecs(p.root(), result);
+            return result;
+        });
+    }
+
+    private static void collectSpecs(PatternElement element, PlaceholderSpec[] specs) {
+        switch (element) {
+            case PatternElement.Placeholder placeholder -> specs[placeholder.index()] = placeholder.spec();
+            case PatternElement.Sequence sequence -> sequence.elements().forEach(e -> collectSpecs(e, specs));
+            case PatternElement.Choice choice -> choice.alternatives().forEach(a -> collectSpecs(a.body(), specs));
+            case PatternElement.Optional optional -> collectSpecs(optional.choice(), specs);
             default -> {}
         }
     }
