@@ -240,6 +240,29 @@ final class TriggerCompiler {
         return this;
     }
 
+    /** The warnings given so far, as line and message, each given once though elements may be set up again. */
+    private final java.util.Set<String> warned = new java.util.HashSet<>();
+    /** The header of the structure being compiled, for warnings given before its code. */
+    private co.xenastudios.neoskript.frontend.structure.Line headerLine;
+
+    /**
+     * A warning at the current line, unless the script suppresses warnings tagged {@code tag} there (a
+     * {@code null} tag can't be suppressed).
+     */
+    private void warn(String tag, String message) {
+        if (inArguments > 0 || tag != null && suppresses(tag)) {
+            return;
+        }
+        if (warned.add(line + ":" + message)) {
+            warnings.accept(line, message);
+        }
+    }
+
+    /** Whether the script suppresses warnings tagged {@code tag} at the line being compiled. */
+    private boolean suppresses(String tag) {
+        return script.suppresses(currentLine != null ? currentLine : headerLine, tag);
+    }
+
     /** How many lists the expression being compiled is in. */
     private int inList;
 
@@ -309,6 +332,7 @@ final class TriggerCompiler {
     Trigger compileTrigger(String scriptName, ParsedStructure.Event event, Library.ServerEvent binding)
             throws CompileException {
         eventClasses = binding.classes();
+        headerLine = event.structure().node().line();
         String key = event.structure().node().line().key();
         eventName = key.regionMatches(true, 0, "on ", 0, 3) ? key.substring(3).strip() : key.strip();
         eventLabel = "on " + eventName;
@@ -426,6 +450,7 @@ final class TriggerCompiler {
         eventClasses = List.of(co.xenastudios.neoskript.runtime.testing.TestEvent.class);
         eventName = "test";
         eventLabel = "on test case";
+        headerLine = test.structure().node().line();
         byte[] bytes = generate(scriptName, () -> {
             if (test.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition) {
                 line = test.structure().node().line().number();
@@ -444,6 +469,7 @@ final class TriggerCompiler {
 
     CompiledFunction compileFunction(String scriptName, ParsedStructure.Function parsed) throws CompileException {
         function = parsed.signature();
+        headerLine = parsed.structure().node().line();
         byte[] bytes = generate(scriptName, () -> {
                     parameters(parsed);
                     statements(parsed.body());
@@ -556,7 +582,24 @@ final class TriggerCompiler {
         method.visitTypeInsn(ANEWARRAY, OBJECT);
         method.visitVarInsn(ASTORE, PARSE_LOGS_SLOT);
         method.visitLabel(start);
-        body.emit();
+        // Elements set up while compiling give their warnings here, as Skript's do from init.
+        co.xenastudios.neoskript.api.element.Warnings.Sink outer =
+                co.xenastudios.neoskript.api.element.Warnings.install(new co.xenastudios.neoskript.api.element.Warnings.Sink() {
+                    @Override
+                    public void warn(String tag, String message) {
+                        TriggerCompiler.this.warn(tag, message);
+                    }
+
+                    @Override
+                    public boolean suppresses(String tag) {
+                        return TriggerCompiler.this.suppresses(tag);
+                    }
+                });
+        try {
+            body.emit();
+        } finally {
+            co.xenastudios.neoskript.api.element.Warnings.install(outer);
+        }
         exitTrigger();
         method.visitLabel(end);
         // catch (Throwable t) { throw t instanceof ScriptRuntimeException ? t : new ScriptRuntimeException(...); }
@@ -4095,6 +4138,19 @@ final class TriggerCompiler {
 
     /** Calls a function; {@code keyed} keeps the indices of a list it returns ({@link KeyedValues}). */
     private void call(Expr.FunctionCall call, boolean keyed) throws CompileException {
+        // As in Skript, which parses function arguments with their warnings thrown away.
+        inArguments++;
+        try {
+            callArguments(call, keyed);
+        } finally {
+            inArguments--;
+        }
+    }
+
+    /** How many function calls' arguments are being compiled, whose elements' warnings are dropped. */
+    private int inArguments;
+
+    private void callArguments(Expr.FunctionCall call, boolean keyed) throws CompileException {
         FunctionInfo info = call.function();
         Function builtIn = library.builtIn(info);
         if (builtIn != null) {

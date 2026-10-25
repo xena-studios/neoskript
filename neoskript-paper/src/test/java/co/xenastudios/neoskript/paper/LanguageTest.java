@@ -34,12 +34,19 @@ class LanguageTest {
         library.effect("TestSay", info -> (context, args) -> said.add(Values.text(args[0])), "say %objects%");
         library.expression("TestLoc", "location", info -> (context, args) -> new org.bukkit.Location(null, 1, 2, 3), "testloc");
         List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk", script)));
-        assertEquals(List.of(), parsed.getFirst().diagnostics(), "parse problems");
+        assertEquals(List.of(), errors(parsed.getFirst().diagnostics()), "parse problems");
         CompiledScripts compiled = new ScriptCompiler(library, globals).compile(parsed);
-        assertEquals(List.of(), compiled.diagnostics(), "compile problems");
+        assertEquals(List.of(), errors(compiled.diagnostics()), "compile problems");
         compiled.linkFunctions();
         compiled.triggers().forEach(t -> t.trigger().execute(new SimpleTriggerContext(null)));
         return said;
+    }
+
+    /** The errors among {@code diagnostics}: warnings, as Skript gives for some of what's tested, don't count. */
+    private static List<co.xenastudios.neoskript.frontend.source.Diagnostic> errors(
+            List<co.xenastudios.neoskript.frontend.source.Diagnostic> diagnostics) {
+        return diagnostics.stream()
+                .filter(d -> d.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR).toList();
     }
 
     @Test

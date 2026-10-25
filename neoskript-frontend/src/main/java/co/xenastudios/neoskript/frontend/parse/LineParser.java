@@ -339,6 +339,67 @@ final class LineParser {
         return count;
     }
 
+    /** Skript's warnings about the lists in what was parsed of this line, added to the line's warnings. */
+    void listWarnings(Object parsed) {
+        listWarnings(input, parsed, warnings);
+    }
+
+    /**
+     * Skript's warnings about the lists in {@code parsed}, whose positions are in {@code input}: a list of more
+     * than one value joined only by commas, which is an 'and' list, and one with both 'and' and 'or'.
+     */
+    static void listWarnings(String input, Object parsed, java.util.Set<String> into) {
+        switch (parsed) {
+            case ParsedSyntax syntax -> {
+                syntax.match().values().forEach(value -> listWarnings(input, value, into));
+                syntax.match().regexValues().forEach(value -> listWarnings(input, value, into));
+            }
+            case Expr.Syntax syntax -> listWarnings(input, syntax.syntax(), into);
+            case Expr.ListOf list -> {
+                listWarning(input, list, into);
+                list.items().forEach(item -> listWarnings(input, item, into));
+            }
+            // Skript throws away the warnings parsing function arguments gives.
+            case Expr.FunctionCall call -> {}
+            case Expr.Text text -> text.embedded().forEach(part -> listWarnings(input, part, into));
+            case Expr.Variable variable -> variable.embedded().forEach(part -> listWarnings(input, part, into));
+            case null, default -> {}
+        }
+    }
+
+    /** Skript's {@code parseExpressionList} warnings for one list, from the words between its items. */
+    private static void listWarning(String input, Expr.ListOf list, java.util.Set<String> into) {
+        List<Expr> items = list.items();
+        if (items.size() < 2 || list.end() > input.length()) {
+            return;
+        }
+        String text = input.substring(list.start(), list.end()).strip();
+        Boolean and = null;
+        for (int i = 1; i < items.size(); i++) {
+            int from = items.get(i - 1).end();
+            int to = items.get(i).start();
+            if (from > to || to > input.length()) {
+                return;
+            }
+            // Brackets around an item aren't part of the delimiter.
+            String delimiter = input.substring(from, to).replaceAll("^[\\s)]+|[\\s(]+$", "").toLowerCase(Locale.ROOT);
+            if (delimiter.equals(",")) {
+                continue;
+            }
+            boolean or = !delimiter.endsWith("nor") && delimiter.endsWith("or");
+            if (and == null) {
+                and = !or;
+            } else if (and != !or) {
+                into.add(":List has multiple 'and' or 'or', will default to 'and'. Use brackets if you want to define"
+                        + " multiple lists. List: " + text);
+                and = true;
+            }
+        }
+        if (and == null) {
+            into.add("conjunction:List is missing 'and' or 'or', defaulting to 'and': " + text);
+        }
+    }
+
     static int countUnresolved(Expr expr) {
         return switch (expr) {
             // Words a type's parser has accepted are as good as resolved.
@@ -796,7 +857,31 @@ final class LineParser {
             }
             parts.add(expr);
         }
+        variableWarnings(name.strip());
         return new Expr.Variable(start, end, name, name.startsWith("_"), name.endsWith("::*"), parts);
+    }
+
+    /** The characters Skript reserves at the start of variables' names. */
+    private static final String RESERVED_TOKENS = "~.+$!&^*";
+
+    /** Skript's warnings about a variable's name as it makes the variable ({@code Variable.newInstance}). */
+    private void variableWarnings(String name) {
+        if (name.isEmpty()) {
+            return;
+        }
+        char first = name.charAt(0);
+        if (RESERVED_TOKENS.indexOf(first) >= 0) {
+            warnings.add(":The character '" + first + "' is reserved at the start of variable names, "
+                    + "and may be restricted in future versions");
+        }
+        String stripped = name.startsWith("_") || name.startsWith("-") ? name.substring(1) : name;
+        if (stripped.startsWith("%")) {
+            String script = context.scriptName();
+            // The script's name without '.sk', as Skript cuts it.
+            String prefix = script.length() >= 3 ? script.substring(0, script.length() - 3) : "";
+            warnings.add("starting:Starting a variable's name with an expression is discouraged ({" + name + "}). "
+                    + "You could prefix it with the script's name: {" + prefix + "::" + name + "}");
+        }
     }
 
     /** Warnings found while parsing the line, as Skript gives them, for the statement parser to report. */
@@ -865,6 +950,16 @@ final class LineParser {
      * the line's error.
      */
     private Expr.FunctionCall functionCall(int start, int end, boolean needsValue) {
+        // As in Skript, which parses function arguments with their warnings thrown away.
+        java.util.Set<String> before = new java.util.HashSet<>(warnings);
+        try {
+            return parseFunctionCall(start, end, needsValue);
+        } finally {
+            warnings.retainAll(before);
+        }
+    }
+
+    private Expr.FunctionCall parseFunctionCall(int start, int end, boolean needsValue) {
         int open = input.indexOf('(', start);
         if (open <= start || open >= end || !FUNCTION_NAME.matcher(input.substring(start, open)).matches()
                 || Scanner.parenEnd(input, open, end) != end) {

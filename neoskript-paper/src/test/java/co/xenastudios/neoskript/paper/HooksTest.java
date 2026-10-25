@@ -41,6 +41,8 @@ import org.junit.jupiter.api.Test;
 class HooksTest {
 
     private final List<String> said = new ArrayList<>();
+    /** The warnings compiling the last script gave. */
+    private final List<String> warnings = new ArrayList<>();
     private final Map<Object, Double> balances = new HashMap<>();
 
     private final OfflinePlayer notch = player("Notch");
@@ -96,13 +98,21 @@ class HooksTest {
         library.expression("TestLocation", "location", info -> (context, args) -> new Location(null, 1, 2, 3),
                 "test location");
         List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk", script)));
-        List<String> errors = new ArrayList<>(parsed.getFirst().diagnostics().stream().map(Diagnostic::message).toList());
+        List<String> errors = new ArrayList<>(parsed.getFirst().diagnostics().stream()
+                .filter(d -> d.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR)
+                .map(Diagnostic::message).toList());
         if (!errors.isEmpty()) {
             return errors;
         }
         CompiledScripts compiled = new ScriptCompiler(library, new VariableStore()).compile(parsed);
-        if (!compiled.diagnostics().isEmpty()) {
-            return compiled.diagnostics().stream().map(Diagnostic::message).toList();
+        warnings.clear();
+        compiled.diagnostics().stream().filter(d -> d.severity() == co.xenastudios.neoskript.frontend.source.Severity.WARNING)
+                .forEach(d -> warnings.add(d.message()));
+        List<String> compileErrors = compiled.diagnostics().stream()
+                .filter(d -> d.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR)
+                .map(Diagnostic::message).toList();
+        if (!compileErrors.isEmpty()) {
+            return compileErrors;
         }
         compiled.linkFunctions();
         if (execute) {
@@ -313,5 +323,19 @@ class HooksTest {
                 on entering of region "spawn":
                 \tsay player
                 """, false));
+    }
+
+    @Test
+    void regionSyntaxIsDeprecated() {
+        // As Skript 2.17.0 warns wherever its region syntax is used, unless the script suppresses it.
+        String deprecated = "[Deprecated] " + Regions.DEPRECATION_MESSAGE;
+        assertEquals(List.of(), run(this::regions, """
+                on region enter:
+                \tsay regions at test location
+                \tsay whether test player is a member of test region
+                \tsuppress deprecated syntax warnings
+                \tsay blocks in test region
+                """, false));
+        assertEquals(List.of(deprecated, deprecated, deprecated), warnings);
     }
 }

@@ -50,6 +50,8 @@ final class StatementParser {
     private DelayState delay = DelayState.NOT_DELAYED;
     /** The warnings the script suppresses so far, by the tag naming them ({@code unreachable}). */
     private final java.util.Set<String> suppressed = new java.util.HashSet<>();
+    /** What was suppressed at each statement's and structure's line, for the compiler's warnings (by identity). */
+    private final Map<Line, java.util.Set<String>> suppressions = new IdentityHashMap<>();
 
     /** The {@code if} chain being parsed in the current block. */
     private static final class Chain {
@@ -70,6 +72,16 @@ final class StatementParser {
     /** The delay state before each line parsed so far, by line. */
     Map<Line, DelayState> delays() {
         return delays;
+    }
+
+    /** The warnings suppressed at each line noted so far, by line. */
+    Map<Line, java.util.Set<String>> suppressions() {
+        return suppressions;
+    }
+
+    /** Notes what's suppressed at {@code line}: a statement's, or a structure's header. */
+    void note(Line line) {
+        suppressions.put(line, java.util.Set.copyOf(suppressed));
     }
 
     /** Parses a trigger's or function's code, which starts with no delay. */
@@ -122,6 +134,7 @@ final class StatementParser {
 
     private Statement line(Node node, Statement previous) {
         delays.put(node.line(), delay);
+        note(node.line());
         EventValues.Scope scope = context.eventScope();
         if (scope == null || !(node instanceof Node.Section)) {
             // (A line on its own tries that itself.)
@@ -234,6 +247,9 @@ final class StatementParser {
         }
         ParsedSyntax effect = parsed instanceof ParsedSyntax syntax && syntax.syntax().kind() == SyntaxKind.EFFECT
                 ? syntax : null;
+        if (parsed != null) {
+            parser.listWarnings(parsed);
+        }
         warn(line, parser);
         if (effect != null && !sectionOnly(effect).isEmpty()) {
             error(line, "This expression requires a section.");
@@ -242,7 +258,7 @@ final class StatementParser {
         if (effect != null) {
             check(line, effect);
             if (context.registry().suppressesWarnings(effect.syntax())) {
-                suppress(effect);
+                suppress(line, effect);
             }
             hint(effect);
             if (context.registry().delays(effect.syntax())) {
@@ -422,6 +438,8 @@ final class StatementParser {
                 return new Statement.Invalid(line);
             }
             if (effect != null && hasSectionExpression(effect)) {
+                parser.listWarnings(effect);
+                warn(line, parser);
                 return new Statement.Section(line, effect, sectionCode(null, () -> repeatable(section.children())));
             }
             Expr.FunctionCall call = parser.call(0, key.length());
@@ -461,6 +479,8 @@ final class StatementParser {
             return new Statement.Invalid(line);
         }
         check(line, header);
+        parser.listWarnings(header);
+        warn(line, parser);
         String lower = key.toLowerCase(Locale.ROOT);
         if (lower.startsWith("else") && !continuesConditional(previous)) {
             error(line, Statement.orphanElse(lower));
@@ -502,7 +522,7 @@ final class StatementParser {
         if (context.registry().suppressesWarnings(header.syntax())) {
             // Only for the section's code.
             java.util.Set<String> before = java.util.Set.copyOf(suppressed);
-            suppress(header);
+            suppress(line, header);
             List<Statement> body = repeatable(section.children());
             suppressed.clear();
             suppressed.addAll(before);
@@ -750,7 +770,11 @@ final class StatementParser {
     }
 
     /** {@code suppress unreachable code warnings}, or {@code unsuppress}: changes what's suppressed from here on. */
-    private void suppress(ParsedSyntax syntax) {
+    private void suppress(Line line, ParsedSyntax syntax) {
+        if (syntax.match().tags().contains("conflict")) {
+            diagnostics.warning(line.number(), line.column(), line.text().length(),
+                    "Variable conflict warnings no longer need suppression, as they have been removed altogether");
+        }
         boolean allow = syntax.match().tags().contains("stop");
         for (String tag : syntax.match().tags()) {
             if (!tag.equals("stop")) {
@@ -765,13 +789,18 @@ final class StatementParser {
 
     /** Reports the warnings the line's parser found ({@code tag:message}), unless they're suppressed. */
     private void warn(Line line, LineParser parser) {
-        for (String warning : parser.warnings()) {
+        warn(line, parser.warnings());
+    }
+
+    /** Reports {@code warnings} ({@code tag:message}) at {@code line}, unless they're suppressed, and clears them. */
+    void warn(Line line, java.util.Set<String> warnings) {
+        for (String warning : warnings) {
             int colon = warning.indexOf(':');
             if (!suppressed.contains(warning.substring(0, colon))) {
                 diagnostics.warning(line.number(), line.column(), line.text().length(), warning.substring(colon + 1));
             }
         }
-        parser.warnings().clear();
+        warnings.clear();
     }
 
     private boolean stops(List<Statement> body) {
@@ -805,6 +834,7 @@ final class StatementParser {
         for (Node node : nodes) {
             Line line = node.line();
             delays.put(line, delay);
+            note(line);
             LineParser parser = new LineParser(context, line.text());
             ParsedSyntax condition = node instanceof Node.Simple ? parser.condition(0, line.text().length()) : null;
             if (node instanceof Node.Simple && context.eventScope() != null && parser.refusedEventValues()
@@ -824,6 +854,8 @@ final class StatementParser {
                 error(line, "Can't understand this condition: " + line.text());
             } else {
                 check(line, condition);
+                parser.listWarnings(condition);
+                warn(line, parser);
                 conditions.add(condition);
                 lines.add(line);
             }

@@ -32,6 +32,8 @@ public final class ScriptCompiler {
     private final Library library;
     private final VariableStore globals;
     private final Map<FunctionInfo, FunctionHandle> handles;
+    /** Where the warnings found while compiling go, as {@link #compile} collects them. */
+    private List<Diagnostic> warnings = new ArrayList<>();
 
     /** @param globals where global variables live; generated code refers to it directly */
     public ScriptCompiler(Library library, VariableStore globals) {
@@ -51,6 +53,7 @@ public final class ScriptCompiler {
     public CompiledScripts compile(List<ParsedScript> scripts) {
         List<CompiledScripts.CompiledTrigger> triggers = new ArrayList<>();
         List<Diagnostic> diagnostics = new ArrayList<>();
+        warnings = diagnostics;
         Map<String, String> unrunnableTests = new java.util.LinkedHashMap<>();
         Map<FunctionInfo, FunctionHandle> functions = handles;
         List<CompiledScripts.CompiledFunctionBody> bodies = new ArrayList<>();
@@ -97,10 +100,10 @@ public final class ScriptCompiler {
                             Object binding = library.binding(event.event().syntax());
                             if (binding instanceof ScriptEvent scriptEvent) {
                                 triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), scriptEvent, null,
-                                        null, null, new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> diagnostics.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message)))
+                                        null, null, compiler(functions, script)
                                                 .compileScriptTrigger(name, event.body())));
                             } else if (binding instanceof Library.ServerEvent serverEvent) {
-                                TriggerCompiler compiler = new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> diagnostics.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message)));
+                                TriggerCompiler compiler = compiler(functions, script);
                                 co.xenastudios.neoskript.runtime.Trigger trigger = compiler.compileTrigger(name, event,
                                         serverEvent);
                                 // The filter may have narrowed the classes listened to.
@@ -108,8 +111,7 @@ public final class ScriptCompiler {
                                         compiler.eventClasses(), null, null, trigger));
                             } else if (binding instanceof Library.Core core && core.id().equals(CoreSyntax.PERIODICAL)) {
                                 triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), null, null,
-                                        period(header.number(), event), null, new TriggerCompiler(library, functions,
-                                                globals, script).compilePeriodical(name, event.body()),
+                                        period(header.number(), event), null, compiler(functions, script).compilePeriodical(name, event.body()),
                                         worlds(header.number(), header.key(), event)));
                             } else {
                                 throw new CompileException(header.number(), "NeoSkript can't run this event yet: '"
@@ -118,12 +120,12 @@ public final class ScriptCompiler {
                         }
                         case ParsedStructure.Function function -> bodies.add(new CompiledScripts.CompiledFunctionBody(name,
                                 functions.get(function.signature()),
-                                new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> diagnostics.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message))).compileFunction(name, function)));
+                                compiler(functions, script).compileFunction(name, function)));
                         case ParsedStructure.Custom custom when library.binding(custom.syntax().syntax())
                                 instanceof Library.Core core && core.id().equals(CoreSyntax.EXAMPLE) -> {}
                         case ParsedStructure.Custom custom when testName != null -> triggers.add(
                                 new CompiledScripts.CompiledTrigger(name, header.number(), null, null, null, testName,
-                                        new TriggerCompiler(library, functions, globals, script).warnings((at, message) -> diagnostics.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message))).compileTest(name, custom)));
+                                        compiler(functions, script).compileTest(name, custom)));
                         case ParsedStructure.Command command -> commands.add(command(name, script, functions, command));
                         case ParsedStructure.Data data -> defaultVariables(data);
                         // Watched by the plugin, which reloads the script when its file changes.
@@ -205,6 +207,14 @@ public final class ScriptCompiler {
         } catch (RuntimeException e) {
             return new CompiledLine(null, List.of("NeoSkript couldn't compile this (" + e + "). Please report it."));
         }
+    }
+
+    /** A compiler for code in {@code script}, whose warnings are reported with the other problems. */
+    private TriggerCompiler compiler(Map<FunctionInfo, FunctionHandle> functions, ParsedScript script) {
+        String name = script.file().name();
+        List<Diagnostic> into = warnings;
+        return new TriggerCompiler(library, functions, globals, script)
+                .warnings((at, message) -> into.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message)));
     }
 
     /** How often an {@code every <timespan>} event runs: its timespan, which has to be written out. */
@@ -398,7 +408,7 @@ public final class ScriptCompiler {
             CommandPattern.arguments(pattern, arguments);
             List<CommandPattern.Choice> choices = new ArrayList<>();
             CommandPattern.choices(pattern, choices);
-            Trigger trigger = new TriggerCompiler(library, functions, globals, script)
+            Trigger trigger = compiler(functions, script)
                     .compileCommand(name, node.line().number(), header, arguments, choices.size(), node.trigger());
             routes.add(new CompiledCommand.Route(pattern, executors, permission, trigger,
                     new CompiledCommand.Matcher(pattern, arguments, choices, library::parser)));
@@ -417,7 +427,7 @@ public final class ScriptCompiler {
         List<CommandPattern.Choice> choices = new ArrayList<>();
         CommandPattern.choices(pattern, choices);
         Set<Integer> suggesting = new java.util.TreeSet<>();
-        Trigger trigger = new TriggerCompiler(library, functions, globals, script).compileSuggestions(name,
+        Trigger trigger = compiler(functions, script).compileSuggestions(name,
                 node.suggestionsLine().number(), node.suggestionsLine().key(), arguments, choices.size(),
                 node.suggestions(), suggesting);
         CompiledCommand.Suggester suggester = new CompiledCommand.Suggester(trigger, arguments, choices.size());
@@ -455,7 +465,7 @@ public final class ScriptCompiler {
         }
         int line = root.line().number();
         String value = root.entries().get(entry);
-        return new TriggerCompiler(library, functions, globals, script).compileCommandMessage(name, line,
+        return compiler(functions, script).compileCommandMessage(name, line,
                 '"' + value.replace("\"", "\"\"") + '"', message);
     }
 

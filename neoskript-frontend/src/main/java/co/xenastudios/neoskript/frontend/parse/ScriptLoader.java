@@ -140,6 +140,7 @@ public final class ScriptLoader {
             }
         }
         context.itemAliases(aliases);
+        context.scriptName(result.file().name());
         boolean hinted = false;
         for (Structure structure : result.structures()) {
             if (structure.kind() == Structure.Kind.USING && structure.node().line().text().strip()
@@ -156,7 +157,7 @@ public final class ScriptLoader {
                 parsed.add(p);
             }
         }
-        return new ParsedScript(result.file(), parsed, diagnostics.all(), statements.delays());
+        return new ParsedScript(result.file(), parsed, diagnostics.all(), statements.delays(), statements.suppressions());
     }
 
     private ParsedStructure structure(Structure structure, ParserContext context, StatementParser statements,
@@ -168,6 +169,7 @@ public final class ScriptLoader {
             case COMMAND -> values == null ? null : values.command();
             default -> null;
         });
+        statements.note(structure.node().line());
         try {
             return switch (structure.kind()) {
                 case OPTIONS, VARIABLES, ALIASES, USING -> new ParsedStructure.Data(structure);
@@ -287,6 +289,9 @@ public final class ScriptLoader {
             diagnostics.error(line.number(), line.column(), key.length(), "Can't understand this structure: " + key);
             return null;
         }
+        java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
+        LineParser.listWarnings(key, event, warnings);
+        statements.warn(line, warnings);
         context.eventScope(values == null ? null : values.event(event.syntax()));
         return new ParsedStructure.Event(structure, event, statements.body(section.children()));
     }
