@@ -57,6 +57,7 @@ public final class StandardLibrary {
         PlayerEvents.register(registrar);
         ItemEvents.register(registrar);
         WorldEvents.register(registrar);
+        EventExpressions.register(registrar);
         Collections.register(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);

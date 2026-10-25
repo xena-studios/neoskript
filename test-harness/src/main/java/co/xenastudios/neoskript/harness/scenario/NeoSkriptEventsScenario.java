@@ -56,6 +56,15 @@ public final class NeoSkriptEventsScenario implements Scenario {
 
             server.command("nsk-wait");
             server.await(Pattern.compile("\\[harness] events after wait: .*console$"), mark, WAIT);
+            // Entity events. On Folia a console command runs on the global thread, which can't spawn entities.
+            boolean folia = context.environment().platform() == Environment.Platform.FOLIA;
+            if (!folia) {
+                server.command("nsk-pig");
+                server.await(line("[harness] events spawned pig"), mark, WAIT);
+                server.await(line("[harness] events damage 1 by custom"), mark, WAIT);
+                server.await(line("[harness] events death of pig"), mark, WAIT);
+                server.await(Pattern.compile("\\[harness] events weather in .* to rain$"), mark, WAIT);
+            }
             // Counted before stopping, as 'stop' is a command too.
             int anyCommand = server.linesMatching(line("[harness] events any command")).size();
             server.stop();
@@ -66,8 +75,11 @@ public final class NeoSkriptEventsScenario implements Scenario {
             if (!server.linesMatching(line("[harness] events wrong filter ran")).isEmpty()) {
                 throw new HarnessFailure("A trigger ran for a command its filter excludes. See " + server.logFile());
             }
-            if (anyCommand != 3) {
-                throw new HarnessFailure("'on command' should have run once per command (3). See " + server.logFile());
+            if (!server.linesMatching(line("[harness] events wrong spawn filter ran")).isEmpty()) {
+                throw new HarnessFailure("A spawn trigger ran for an entity its filter excludes. See " + server.logFile());
+            }
+            if (anyCommand != (folia ? 3 : 4)) {
+                throw new HarnessFailure("'on command' should have run once per command. See " + server.logFile());
             }
         }
     }
