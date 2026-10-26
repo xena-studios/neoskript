@@ -8,6 +8,12 @@
       "enabled": false
     },
     {
+      "description": "Third-party actions run with the repo's secrets, so they're pinned to a commit (CodeQL flags tags, which can be moved); Renovate keeps the pins current. GitHub's own actions stay on tags.",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["!actions/**", "!github/**"],
+      "pinDigests": true
+    },
+    {
       "description": "Nothing is released yet and CI covers the build, so small updates merge themselves once it passes. Majors wait for a review.",
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "automerge": true
