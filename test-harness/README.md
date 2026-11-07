@@ -1,6 +1,6 @@
 # Test harness
 
-Boots real Paper and Folia servers, installs NeoSkript or the reference Skript, and runs scenarios against them. CI runs it on every push. You can also run it locally.
+Boots real Paper and Folia servers, installs NeoSkript or the reference Skript, and runs scenarios against them. CI runs the smoke group on every pull request and push to `main`, and the baseline group on Paper 26.3 weekly and when the harness changes. You can also run it locally. References like D12 are the plan's [locked decisions](../docs/PLAN.md#2-locked-decisions).
 
 Needs JDK 21 and JDK 25 installed. Gradle finds them automatically.
 
@@ -12,7 +12,7 @@ Needs JDK 21 and JDK 25 installed. Gradle finds them automatically.
 ./gradlew :test-harness:harness -Pharness.echo=true               # stream server consoles
 ```
 
-Reports go to `build/harness/reports/`, and each run's server directory and `harness-console.log` go to `build/harness/runs/<env>/<scenario>/`. Downloaded jars and unpacked servers are cached in `.harness-cache/` at the repo root.
+Reports go to `test-harness/build/harness/reports/`, and each run's server directory and `harness-console.log` go to `test-harness/build/harness/runs/<env>/<scenario>/`. Downloaded jars and unpacked servers are cached in `.harness-cache/` at the repo root.
 
 ## Scenarios
 
@@ -23,6 +23,8 @@ Reports go to `build/harness/reports/`, and each run's server directory and `har
 | `neoskript-language` | smoke | all | NeoSkript runs `scripts/neoskript-language.sk`: variables, arithmetic, loops, conditionals and functions |
 | `neoskript-skript-tests` | smoke | all | M2's exit check: NeoSkript runs Skript's own control-flow and function tests in test mode. The must-pass tests have to pass; the pending ones need later milestones (listed with reasons in the scenario) |
 | `neoskript-reload` | smoke | all | `/sk reload`: changed scripts switch over, a script with errors keeps its last version (D12), and one script can be reloaded on its own |
+| `neoskript-auto-reload` | smoke | all | A script with `auto reload` reloads itself when its file changes, with Skript's messages. A version with errors keeps the old one running |
+| `neoskript-runtime-errors` | smoke | all | Runtime errors print as Skript prints them, with its per-frame limits and timeouts |
 | `neoskript-events` | smoke | all | Server events, driven by console commands: triggers and their filters run for the right events, `cancel event` stops the command, a message without `to` goes to the event's sender, and a trigger that waits carries on |
 | `neoskript-commands` | smoke | all | Script commands, run from the console: arguments, aliases, subcommands, choices, default values, named arguments, `executable by`, usage messages, `execute command`, and a reload that changes one command and removes the others |
 | `neoskript-real-world-corpus` | smoke | all | NeoSkript loads the real-world corpus without problems and every script's self-test passes |
