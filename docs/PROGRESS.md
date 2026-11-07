@@ -12,7 +12,7 @@ What each milestone in the [plan](PLAN.md#6-roadmap) delivered, in order. Add ea
 | [M3: Variables and storage](#m3-variables-and-storage) | Done 2026-10-22 |
 | [M4: Standard library](#m4-standard-library) | In progress: Skript's whole test suite passes (862 of 862); the exit also needs the 95% differential check |
 
-Skript's own test suite, run by NeoSkript, through the long tail (step 6 of M4):
+Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4](#step-6-the-long-tail)):
 
 | Batch | Date | Tests passing | Focus |
 |---|---|---|---|
@@ -49,7 +49,7 @@ Skript's own test suite, run by NeoSkript, through the long tail (step 6 of M4):
 
 ## M1: Frontend
 
-**Done 2026-10-22.** The frontend parses the whole corpus with **zero false errors** against the stub registry: Skript's own tests (537 files, 17,705 lines), the real-world corpus (13 files) and the generated benchmark scripts (40 files, 6,000 lines). The `neoskript-parse-corpus` harness scenario checks this on every CI run.
+**Done 2026-10-22.** The frontend parses the whole corpus with **zero false errors** against the stub registry: Skript's own tests (537 files, 17,705 lines), the real-world corpus (12 scripts and their assert helper) and the generated benchmark scripts (40 files, 6,000 lines). The `neoskript-parse-corpus` harness scenario checks this on every CI run.
 - **Parse time** (median of 5 warm runs on an Apple Silicon dev machine): the 6,000-line benchmark in **40 ms**, the real-world corpus in 17 ms, Skript's tests in about 2 s. Skript takes ~1.7 s to load the benchmark scripts at startup. That's not a like-for-like comparison yet: Skript's number covers its whole load, and NeoSkript's covers parsing only, until M2 adds compilation.
 - **What's built:** the structure parser; the pattern compiler, matcher and index; the registry (types, syntax, functions, type relations); and the expression, statement and script parsers.
   - Matching is memoized by span and expected type, filtered per line by the literals a pattern needs, anchored for a pattern's final placeholder, and prefers fully resolved parses over ones that need unresolved word literals.
@@ -80,10 +80,10 @@ Skript's own test suite, run by NeoSkript, through the long tail (step 6 of M4):
   - A script with errors keeps its last version, and its functions keep their old code (D12). Function handles last across reloads.
   - Replies use Skript's wording. A two-script reload takes about 2 ms (`neoskript-reload`).
 - **Test mode** (`-Dneoskript.testing.enabled=true`): it runs Skript's test syntax and writes JSON results like Skript's runner.
+- **Parse check:** still zero false errors, and it now catches 30 of the 90 errors Skript reports in its tests (up from 21).
 - **Left for later:**
   - Waits in functions, and resuming on entity or region schedulers on Folia, come with events in M4.
   - Saving global variables is M3.
-  - The harness's parse check still has zero false errors, and now catches 30 of the 90 errors Skript reports in its tests (up from 21).
 
 ## M3: Variables and storage
 
@@ -145,7 +145,7 @@ In progress. One PR per step. The order comes from `syntaxUsage` in the `neoskri
 - **Matching:** the first route that what's typed fits wins, subcommands before their command. Arguments take as few words as they can, so the last text argument gets the rest, and optional arguments are skipped when the next one fits.
 - **Entries:** aliases, description, usage, permission and permission message, executable by, cooldown with its message and bypass permission. `cooldown storage` is a compile error for now (it needs dates).
 - **Syntax:** `arg-1` and every other form of `ExprArgument`, choice arguments, `the [full] command`, `execute command`, cooldown info and `cancel the cooldown`, command info (`the description of command "x"`), `is a script command`, `all [script] commands`, and `X ? Y`.
-- **Registration:** in the server's command map under `skript:` (see 3.5), replaced on every reload, then each online player gets the new command list.
+- **Registration:** in the server's command map under `skript:` (see [plan 3.5](PLAN.md#35-standard-library-neoskript-paper)), replaced on every reload, then each online player gets the new command list.
 - **Parser changes:** arithmetic and event values are tried after every library element, and a placeholder can't start inside a token like `arg-1` unless nothing else parses. So `arg-1 ? "x"` and `arg-1 * arg-2` mean what they say.
 - **Tested by:**
   - Unit tests (`CommandParserTest`, `CommandsTest`).
@@ -161,7 +161,7 @@ The text, player, time and location syntax it uses, and converters between types
 - **Converters:** `Registrar.converter(from, to, f)`. A placeholder whose type something converts to gets values converted at run time: an entity or block where a location is expected is its location.
 - **`Update` effects:** effects that set one of their placeholders, like `replace "a" in {_x} with "b"`, compiled into a `set` through the same path as `set`.
 - **Syntax:**
-  - Text: case, length, join and split, parts of text, character counts, `matches`, `replace`, new lines, colors, `parsed as`.
+  - Text: case, length, join and split, parts of text, character counts, `matches`, `replace`, new lines, colours, `parsed as`.
   - Lists: `indices of` (sorted too) and `sort`.
   - Time: `now`, `difference between`, Unix timestamps.
   - Places: `location of`, spawn points, worlds by name, `distance between`, `teleport`, and the `location()` and `world()` functions.
@@ -229,7 +229,7 @@ Entities and spawning, blocks, locations and vectors, worlds, potions.
 - **Next, in 5b:** potions, world borders, entity data, persistent data, block data, chunks.
 
 **5b done 2026-10-23.**
-- **World borders:** a world's or player's border, its size (diameter or radius), center, damage buffer and amount, warning distance and time, all settable, and expanding or shrinking it, optionally over time.
+- **World borders:** a world's or player's border, its size (diameter or radius), centre, damage buffer and amount, warning distance and time, all settable, and expanding or shrinking it, optionally over time.
 - **Potions:**
   - Potion effect types, by name or Skript's old names (`confusion`, `fast digging`...).
   - Potion effects (`potion effect of speed of tier 2 for 10 seconds`, infinite ones, ones based on another), applying them.
@@ -258,8 +258,8 @@ Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the mo
 **127 → 159 tests pass.**
 - **Entity variants, as Skript names them:**
   - Age (`baby`, `adult`, `kid`, and babies' names like `kitten`, `calf`, `pup`).
-  - Variants from Paper's registries: axolotls, cats, foxes, frogs, wolves, parrots, llamas, rabbits, mooshrooms, salmon, villager and zombie villager professions, tropical fish patterns and colors, sheep and shulker colors.
-  - States: angry/happy bees with or without nectar, powered creepers, angry/peaceful wolves with collar colors, screaming goats, shivering striders, saddled pigs and striders, panda genes (`lazy-aggressive panda`).
+  - Variants from Paper's registries: axolotls, cats, foxes, frogs, wolves, parrots, llamas, rabbits, mooshrooms, salmon, villager and zombie villager professions, tropical fish patterns and colours, sheep and shulker colours.
+  - States: angry/happy bees with or without nectar, powered creepers, angry/peaceful wolves with collar colours, screaming goats, shivering striders, saddled pigs and striders, panda genes (`lazy-aggressive panda`).
   - `dropped <item>`, `falling <block>`, `enderman holding <block>`, displays `of <block or item>`, minecart kinds.
   - Spawning a variant makes it, and `is` follows Skript: `lucy axolotl is axolotl`, `{_entity} is {_data}`.
 - **API:**
@@ -294,7 +294,7 @@ Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the mo
 **166 → 177 tests pass.**
 - **Language:**
   - Decimals within 1e-10 of each other are equal, as in Skript.
-  - Locations compare with their yaw and pitch normalized.
+  - Locations compare with their yaw and pitch normalised.
   - `round` with negative places rounds to a whole number first, as Skript does (1044.5 to 1045 to 1050).
   - Timespans can be written short (`1d`, `2h`, `30m`).
 - **Syntax:**
@@ -563,7 +563,7 @@ Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the mo
 
 **862 of 862 tests still pass; time states and auto reload.**
 - **Time states** as Skript's `setTime`: expressions declare the events they have a past or future state in (`Registrar.timeStates`), so `player's gamemode will be creative`, `past tool`, `former level of player` and `player's level was 3` read the event's old or new value: tool, hotbar slot, game mode, food level, level, weather, world, spawn, vehicle, passengers, spectator target, target, sign text and input keys. Food level is in bars (0 to 10), as in Skript.
-- **`auto reload`:** a script with it reloads when its file changes, with Skript's messages to its recipients or those with the permission; a version with errors keeps the old one running.
+- **`auto reload`:** a script with it reloads when its file changes, with Skript's messages to its recipients or those with the permission; a version with errors keeps the old one running (`neoskript-auto-reload`).
 - **Errors:** a comparison of words nothing reads isn't understood, as in Skript.
 - Known differences: `auto reload` doesn't need async loading; event values read after a wait still come from the event.
 
@@ -580,7 +580,7 @@ Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the mo
 - **Errors:** every bad line in a trigger is reported, not only the first. Each message matches Skript's: words nothing understands (in a change, a text's `%...%`, a condition, a loop, or the line), `Can't compare`, `else` with no `if`, `if any` without `then` or with one condition, unclosed quotes and brackets, structures, indentation (one unit per structure, set by its first indented line), command entries, function parameters and return types, functions that don't exist, `return` where nothing returns, command argument types and options. The empty section warning is ported.
 - **Event values** as Skript resolves them: subclasses and superclasses checked when they run, converters and chains of them, and Skript's errors. Left-out placeholders use the event's value for the same types as Skript (`fuel slot` in a smelt event). The command, script load and vehicle events gained Skript's values.
 - **Warnings:** Skript's parse-time warnings from elements, with its suppression: deprecations (regions, MD5, `permission message` and more), lists missing `and`/`or`, variable names, values that can't be saved, constant conditions, a text inside `%...%`, loops and delays, experiments, default variables and `on server start`. Region names that don't exist are errors.
-- **Runtime errors** print as Skript prints them, with its per-frame limits (config.yml `runtime-errors`) and `skript.see_runtime_errors`.
+- **Runtime errors** print as Skript prints them, with its per-frame limits (`config.yml` → `runtime-errors`) and `skript.see_runtime_errors` (`neoskript-runtime-errors`).
 - **Effect commands:** `!effect` from the console and chat, with Skript's options, permission, messages, `me` and a cancellable `EffectCommandEvent`. Moving over from Skript copies the options.
 - **Hooks** tested against the real WorldGuard, Vault, EssentialsX and LuckPerms (`neoskript-hooks`, baseline). Money with money is money; `add 1 to {_money}` leaves it, as in Skript.
 - Known differences: Skript 2.17's warning frames never reset because of a bug, and NeoSkript resets them as intended. The code under a section whose header fails is still checked, so its errors show too. Event names in errors are as the script writes them.

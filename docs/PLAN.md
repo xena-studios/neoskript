@@ -1,6 +1,6 @@
 # NeoSkript: Design & Roadmap
 
-Status: v1 (decisions locked) · M0 to M3 done, M4 in progress · see [PROGRESS.md](PROGRESS.md)
+Version 1, with the decisions locked. Where each milestone stands is in [PROGRESS.md](PROGRESS.md).
 
 ## 1. Goal
 
@@ -16,8 +16,8 @@ A fast, modern, **clean-room** replacement for Skript. Existing `.sk` scripts ru
 | # | Decision | Choice | Why |
 |---|----------|--------|-----|
 | D1 | Compatibility scope | Core Skript syntax at 1.0. Skript-addon shim (`ch.njol.skript.*`) in 1.x. Modern NeoSkript addon API from day one. | Ships sooner. The modern API gets proven because our own stdlib is built on it. |
-| D2 | Codebase | Clean-room rewrite. Skript's *behavior* is the spec. | Skript's architecture (regex-style pattern trials, `Object[]` everywhere, single-thread assumptions) is the thing we're replacing. |
-| D3 | License | **GPL-3.0** | Matches the ecosystem. It also lets us legally reuse Skript's GPL data (aliases, lang files, test scripts) with attribution. The code stays ours. |
+| D2 | Codebase | Clean-room rewrite. Skript's *behaviour* is the spec. | Skript's architecture (regex-style pattern trials, `Object[]` everywhere, single-thread assumptions) is the thing we're replacing. |
+| D3 | Licence | **GPL-3.0-or-later** | Matches the ecosystem. It also lets us legally reuse Skript's GPL data (aliases, lang files, test scripts) with attribution. The code stays ours. |
 | D4 | Execution | Compile each trigger to **JVM bytecode** (ASM), loaded as hidden classes | The JIT can inline across syntax elements. Hidden classes unload cleanly on reload. |
 | D5 | Platforms | Paper **and** Folia at 1.0 | Folia is the differentiator, so the threading model is designed for it from the start. |
 | D6 | Versions | MC **1.21.4+**, **Java 21**, ASM. Move to the JDK ClassFile API when the floor is Java 25. | Modern Paper APIs (Brigadier lifecycle commands, data components, registries) and a large audience. |
@@ -30,7 +30,7 @@ A fast, modern, **clean-room** replacement for Skript. Existing `.sk` scripts ru
 | D13 | Team / timeline | Solo, no fixed dates | Milestones are ordered by dependency, not dated. |
 | D14 | Distribution | Modrinth + GitHub Releases. Docs are a separate Starlight site, outside this plan. | |
 | D15 | Telemetry & updates | bStats, with `metrics: false` in config to turn it off. A Modrinth update checker, with `update-checker: false` to turn it off. | Usage data and update notices, both opt-out. |
-| D16 | License header | `GPL-3.0-or-later` (SPDX header on every source file, checked by Spotless) | Same terms as Skript. |
+| D16 | Licence header | `GPL-3.0-or-later` (SPDX header on every source file, checked by Spotless) | Same terms as Skript. |
 | D17 | Test servers | Pinned to exact Paper/Folia builds and SHA-256 hashes, bumped on purpose | Paper ships daily, and build 211 of 26.3 broke Skript 2.17.0 the day it came out. |
 | D18 | Where the Skript baseline runs | Paper 26.x only. Skript doesn't support Folia, and Skript 2.17.0 needs 1.21.5 or newer. NeoSkript-only checks run on all four servers. | |
 | D19 | Moving over from Skript | NeoSkript uses `plugins/NeoSkript`. On its first start it copies `scripts/` and `variables.csv` from `plugins/Skript`, then leaves a marker so it never copies again. It copies rather than moves, so Skript's folder stays as it was. Skript's `config.sk` isn't copied. | Swapping the jar just works, and switching back is safe. |
@@ -63,12 +63,12 @@ Skript loads slowly because it tries each line against every registered pattern.
 2. **Pattern compiler:** every syntax pattern (`[the] (health|hp) of %livingentities%`) is compiled once into a shared automaton. Patterns are indexed by their leading literal keywords, so a line is checked against only a handful of candidates.
 3. **Packrat matching:** placeholder sub-parses (`%type%`) are memoized by `(span, expected type)`. Nested expressions don't re-parse exponentially.
 4. **Ambiguity resolution:** deterministic and **matching Skript's choice** (Skript resolves by registration order and priority). Each syntax element gets an explicit priority and order so the result is reproducible. The differential corpus enforces this.
-5. **Type checking:** static types wherever inference works (most cases). Otherwise we fall back to dynamic `Object` with runtime conversion, so behavior still matches Skript's loose typing. Plurality (single vs. list), `and`/`or` lists, default expressions (`event-player`), and time states (`past`/`future`) are all modeled.
+5. **Type checking:** static types wherever inference works (most cases). Otherwise we fall back to dynamic `Object` with runtime conversion, so behaviour still matches Skript's loose typing. Plurality (single vs. list), `and`/`or` lists, default expressions (`event-player`), and time states (`past`/`future`) are all modelled.
 6. **Diagnostics:** errors use Skript's wording and line format, so existing tutorials and forum answers still apply. They also carry precise spans, which the LSP and CLI need.
 
 ### 3.2 Compiler (runtime speed)
 
-- **IR:** a typed, SSA-ish IR with explicit control flow (if/else, loops, return, stop, exit). Optimizations: constant folding (including `{@options}`), dead branch removal, condition short-circuiting, and caching invariant lookups.
+- **IR:** a typed, SSA-ish IR with explicit control flow (if/else, loops, return, stop, exit). Optimisations: constant folding (including `{@options}`), dead branch removal, condition short-circuiting, and caching invariant lookups.
 - **Codegen:** each trigger or function becomes one hidden class. Local variables `{_x}` become JVM locals when they don't live across a `wait`, and a frame slot when they do.
 - **Two ways a syntax element gets into bytecode:**
   1. *Intrinsic:* the element emits bytecode directly through a codegen hook. This is for hot core syntax (math, comparisons, locals, `send`, `set`, loops).
@@ -115,10 +115,10 @@ Rules on Folia:
 
 ## 4. Quality: corpus, differential testing, benchmarks
 
-- **Corpus:** Skript's own test scripts (GPL, reusable) plus our own real-world scripts in `test-harness/corpus/real-world`. They're written like typical server scripts (economy, homes, chat, punishments and so on), and each has a self-test whose results on Skript are the expected behavior. Scripts contributed by the community can join later, with permission.
-- **Differential runner:** runs the same script on headless real Skript and on NeoSkript, on both Paper and Folia, then diffs messages sent, variable state, and world effects. This runs in CI on every PR.
-- **Compat dashboard:** % of the corpus that parses, % that behaves identically, and the list of missing syntax. Published publicly.
-- **Benchmarks:** JMH microbenchmarks (expressions, variables, loops), plus server benchmarks for script load time, `/sk reload` time, per-event cost under simulated players, and variable save time. Every run compares against Skript. Results are published so the "lose the lag" claim is backed up.
+- **Corpus:** Skript's own test scripts (GPL, reusable) plus our own real-world scripts in [`test-harness/corpus/real-world`](../test-harness/corpus/real-world). They're written like typical server scripts (economy, homes, chat, punishments and so on), and each has a self-test whose results on Skript are the expected behaviour. Scripts contributed by the community can join later, with permission.
+- **Differential runner:** runs the same script on headless real Skript and on NeoSkript, on both Paper and Folia, then diffs messages sent, variable state, and world effects. It's due by the end of M4 (its 95% check) and will run in CI on every PR. Until then, differential probes compare scripts line by line against a real Skript server ([batch 26](PROGRESS.md#batch-26-2026-10-25)).
+- **Compat dashboard:** % of the corpus that parses, % that behaves identically, and the list of missing syntax, published publicly.
+- **Benchmarks:** JMH microbenchmarks (expressions, variables, loops), plus server benchmarks for script load time, `/sk reload` time, per-event cost under simulated players, and variable save time. Every run compares against Skript. Results are published so the "lose the lag" claim is backed up. So far the harness times Skript's load and reload (`skript-load-benchmark`); the rest comes by M6.
 
 ## 5. Tooling
 
@@ -127,18 +127,18 @@ Rules on Folia:
 
 ## 6. Roadmap
 
-Milestones are ordered by dependency, not dated. A milestone is done when its exit criterion holds. What each one delivered, step by step, is in [PROGRESS.md](PROGRESS.md).
+Milestones are ordered by dependency, not dated. A milestone is done when its exit criterion holds. Where each one stands, and what it delivered step by step, is in [PROGRESS.md](PROGRESS.md).
 
-| | Milestone | Scope | Exit criterion | Status |
-|---|---|---|---|---|
-| **M0** | Foundations | Gradle modules, CI, licence headers, the pinned reference Skript, headless Paper and Folia test servers, the benchmark harness with a Skript baseline, the corpus | CI boots Paper, Folia and the reference Skript, and runs one script on each | Done 2026-10-21 |
-| **M1** | Frontend | Structure parser, pattern compiler and matcher, type system, AST, diagnostics, a stub registry from Skript's syntax list | The whole corpus parses with zero false errors against the stub registry, and parse time is measured | Done 2026-10-22 |
-| **M2** | Compiler and runtime core | IR, ASM backend, control flow, locals, functions, options, waits as state machines, the scheduler on Paper and Folia, reload with an atomic swap | Skript's control-flow and function tests pass on Paper **and** Folia | Done 2026-10-22 |
-| **M3** | Variables and storage | Global and list variables, the concurrent store, Skript's binary value format, `variables.csv` (databases deferred, D20) | Real `variables.csv` files from Skript round-trip byte for byte | Done 2026-10-22 |
-| **M4** | Standard library | Types, converters, aliases, events, effects, expressions, conditions and commands, most-used first | ≥95% of the corpus behaves identically under differential testing, and all of Skript's own tests pass | In progress: all 862 of Skript's tests pass |
-| **M5** | Folia hardening and tooling | Region-ownership enforcement, the `run on` section, Folia differential tests, the migration CLI | The corpus runs on Folia without thread violations, and the CLI is released | |
-| **M6** | Beta → 1.0 | Public beta on Modrinth and GitHub Releases, published benchmarks, a syntax-docs export for the docs site, bStats and the update checker (both can be turned off), bug burn-down | 1.0 is released | |
-| **1.x** | After 1.0 | LSP and VS Code extension, the Skript-addon shim (SkBee first), the addon API declared stable, an optional native variable backend, opt-in language extensions | | |
+| | Milestone | Scope | Exit criterion |
+|---|---|---|---|
+| **M0** | Foundations | Gradle modules, CI, licence headers, the pinned reference Skript, headless Paper and Folia test servers, the benchmark harness with a Skript baseline, the corpus | CI boots Paper, Folia and the reference Skript, and runs one script on each |
+| **M1** | Frontend | Structure parser, pattern compiler and matcher, type system, AST, diagnostics, a stub registry from Skript's syntax list | The whole corpus parses with zero false errors against the stub registry, and parse time is measured |
+| **M2** | Compiler and runtime core | IR, ASM backend, control flow, locals, functions, options, waits as state machines, the scheduler on Paper and Folia, reload with an atomic swap | Skript's control-flow and function tests pass on Paper **and** Folia |
+| **M3** | Variables and storage | Global and list variables, the concurrent store, Skript's binary value format, `variables.csv` (databases deferred, D20) | Real `variables.csv` files from Skript round-trip byte for byte |
+| **M4** | Standard library | Types, converters, aliases, events, effects, expressions, conditions and commands, most-used first | ≥95% of the corpus behaves identically under differential testing, and all of Skript's own tests pass |
+| **M5** | Folia hardening and tooling | Region-ownership enforcement, the `run on` section, Folia differential tests, the migration CLI | The corpus runs on Folia without thread violations, and the CLI is released |
+| **M6** | Beta → 1.0 | Public beta on Modrinth and GitHub Releases, published benchmarks, a syntax-docs export for the docs site, bStats and the update checker (both can be turned off), bug burn-down | 1.0 is released |
+| **1.x** | After 1.0 | LSP and VS Code extension, the Skript-addon shim (SkBee first), the addon API declared stable, an optional native variable backend, opt-in language extensions | |
 
 ## 7. Top risks
 
@@ -150,4 +150,4 @@ Milestones are ordered by dependency, not dated. A milestone is done when its ex
 
 ## 8. Open questions
 
-None right now. Every earlier question is resolved and recorded as D9 to D15. As a solo project with no fixed dates, the work goes milestone by milestone, and each one ends at its exit criteria.
+None right now. The earlier ones are resolved and recorded as D9 to D15.
