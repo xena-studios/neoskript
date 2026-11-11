@@ -1,0 +1,20 @@
+---
+// Where the reference comes from, on every /syntax page.
+import External from "../External.astro";
+import { syntax, total, documented } from "../../lib/syntax";
+---
+<p class="source">
+  Generated from NeoSkript {syntax.neoskript}'s registry on {syntax.server}. Descriptions and examples from{" "}
+  <a href="https://docs.skriptlang.org">Skript's documentation<External /></a> ({syntax.skript}), GPL-3.0.{" "}
+  {documented} of {total} entries matched one of its entries by id, event name or pattern; the rest show only
+  their patterns.
+</p>
+<style>
+  .source {
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    max-width: 72ch;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>

@@ -1,0 +1,9 @@
+---
+// A Skript example from Skript's docs, highlighted line by line (src/lib/skript.ts).
+import { tokens } from "../../lib/skript";
+interface Props { code: string }
+const lines = Astro.props.code.split("\n");
+---
+<pre class="example"><code>{lines.map((line, i) => (
+  <>{tokens(line).map((t) => (t.kind === "text" ? t.text : <span class={t.kind}>{t.text}</span>))}{i < lines.length - 1 ? "\n" : ""}</>
+))}</code></pre>

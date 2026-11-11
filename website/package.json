@@ -9,6 +9,7 @@
     "build": "astro build && node scripts/headers.mjs",
     "preview": "astro preview",
     "brand:sync": "node scripts/sync-brand.mjs",
+    "syntax:sync": "node scripts/syntax.mjs",
     "deploy": "pnpm build && wrangler deploy"
   },
   "engines": {
