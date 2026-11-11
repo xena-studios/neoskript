@@ -1,0 +1,165 @@
+/* The syntax reference's entries (src/components/syntax): hairline-ruled rows, patterns and examples on raised
+   night. Unscoped, under .entry, so the pages' thousands of elements carry no scoping classes. */
+
+.entry {
+  padding-block: clamp(1.75rem, 1.25rem + 1.5vw, 2.5rem);
+  border-top: 1px solid var(--rule);
+  scroll-margin-top: 1rem;
+}
+.entry[hidden] {
+  display: none;
+}
+.entry h2 {
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+.entry h2 a {
+  text-decoration: none;
+}
+.entry h2 a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--magenta);
+}
+.entry:target h2 a {
+  color: var(--magenta);
+}
+.entry .flag {
+  margin-top: 0.5rem;
+}
+
+/* Patterns: words as typed, marks muted, %type% slots magenta, <regex> pale. */
+.entry .patterns {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.85rem 1.1rem;
+  background: var(--raised);
+  border-left: 1px solid var(--magenta);
+}
+.pattern {
+  display: block;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pattern .p {
+  color: var(--muted);
+}
+.pattern .s {
+  color: var(--magenta);
+}
+.pattern .r {
+  color: var(--string);
+}
+
+.entry .description {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.6rem;
+  max-width: 68ch;
+}
+.entry .description code,
+.entry .meta code {
+  font-size: 0.875em;
+}
+.entry .description a {
+  color: var(--text);
+}
+.entry .description ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.entry .description,
+.entry .undocumented {
+  color: var(--muted);
+}
+.entry .undocumented {
+  margin-top: 1rem;
+  font-size: 0.9375rem;
+}
+
+.entry .meta {
+  margin-top: 1.25rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.entry .meta > div {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: baseline;
+}
+.entry .meta dt {
+  font-size: 0.6875rem;
+}
+.entry .meta dd {
+  font-size: 0.9375rem;
+}
+.entry .meta a {
+  color: var(--text);
+}
+.entry .values,
+.entry .params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.entry .params {
+  flex-direction: column;
+}
+.entry details {
+  font-size: 0.9375rem;
+}
+.entry summary {
+  cursor: pointer;
+  color: var(--muted);
+  width: fit-content;
+}
+.entry summary:hover {
+  color: var(--text);
+}
+.entry details[open] summary {
+  margin-bottom: 0.5rem;
+}
+.entry .muted,
+.entry .id {
+  color: var(--muted);
+}
+
+.entry .examples {
+  margin-top: 1.25rem;
+  display: grid;
+  /* minmax(0, 1fr), not auto: a long line scrolls inside its example
+     instead of widening the page. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+.example {
+  margin: 0;
+  padding: 0.85rem 1.1rem;
+  background: var(--raised);
+  border-left: 1px solid var(--rule);
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  tab-size: 4;
+  overflow-x: auto;
+}
+
+@media (max-width: 36rem) {
+  .entry .meta > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.1rem;
+  }
+}
+
+/* Some names and formats are slash-joined lists ("Enderman/Sheep/Silverfish/
+   Falling Block", "ticks/seconds/minutes/...") with nowhere to wrap at phone
+   width. */
+.entry h2,
+.entry .meta dd {
+  overflow-wrap: break-word;
+}

@@ -1,0 +1,61 @@
+---
+// The syntax reference's categories, with how many of each there are.
+import { categories } from "../../lib/syntax";
+interface Props { current?: string }
+const { current } = Astro.props;
+---
+<nav class="cats" aria-label="Syntax categories">
+  <ul>
+    {categories.map((c) => (
+      <li>
+        <a href={`/syntax/${c.path}/`} aria-current={c.path === current ? "page" : undefined}>
+          <span>{c.label}</span><span class="n">{c.count}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>
+<style>
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  a {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.3rem 0;
+    color: var(--muted);
+    font-size: 0.9375rem;
+    text-decoration: none;
+  }
+  a:hover,
+  a[aria-current="page"] {
+    color: var(--text);
+  }
+  a[aria-current="page"] span:first-child {
+    text-decoration: underline;
+    text-decoration-color: var(--magenta);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.35em;
+  }
+  .n {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+  @media (max-width: 60rem) {
+    ul {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 1.25rem;
+    }
+    a {
+      gap: 0.4rem;
+      padding: 0.5rem 0;
+      min-height: 44px;
+      align-items: center;
+    }
+  }
+</style>

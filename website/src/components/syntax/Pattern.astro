@@ -1,0 +1,8 @@
+---
+// One Skript pattern in Geist Mono: words as typed, optional and alternative marks muted, %type% slots
+// magenta, <regex> parts pale (src/lib/pattern.ts). Styled in src/styles/syntax.css.
+import { parts } from "../../lib/pattern";
+interface Props { pattern: string }
+const { pattern } = Astro.props;
+---
+<code class="pattern">{parts(pattern).map((p) => (p.kind === "word" ? p.text : <span class={p.kind[0]}>{p.text}</span>))}</code>

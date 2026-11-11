@@ -10,6 +10,7 @@ const url = new URL(path, Astro.site).href;
 const og = new URL("/og.png", Astro.site).href;
 const nav = [
   { href: "/docs/", label: "Docs" },
+  { href: "/syntax/", label: "Syntax" },
   { href: "/download/", label: "Download" },
 ];
 ---
@@ -43,7 +44,7 @@ const nav = [
             {nav.map((item) => (
               <li><a href={item.href} aria-current={path.startsWith(item.href) ? "page" : undefined}>{item.label}</a></li>
             ))}
-            <li><a href="https://github.com/xena-studios/neoskript">GitHub<External /></a></li>
+            <li class="gh"><a href="https://github.com/xena-studios/neoskript">GitHub<External /></a></li>
           </ul>
         </nav>
       </div>
@@ -56,6 +57,7 @@ const nav = [
         <a class="xena" href="https://xenastudios.co" aria-label="Xena Studios"><Logo name="xena" label="Xena" /></a>
         <ul>
           <li><a href="/docs/">Docs</a></li>
+          <li><a href="/syntax/">Syntax</a></li>
           <li><a href="/download/">Download</a></li>
           <li><a href="https://github.com/xena-studios/neoskript">Source<External /></a></li>
           <li><a href="https://github.com/xena-studios/neoskript/issues/new/choose">Report a bug<External /></a></li>
@@ -110,6 +112,7 @@ const nav = [
     color: var(--muted);
     font-size: 0.9375rem;
     text-decoration: none;
+    white-space: nowrap;
   }
   nav a:hover,
   nav a[aria-current="page"] {
@@ -159,6 +162,10 @@ const nav = [
     }
     nav a {
       font-size: 0.875rem;
+    }
+    /* Four links don't fit beside the logo on a phone; the footer links the source. */
+    nav .gh {
+      display: none;
     }
   }
 </style>

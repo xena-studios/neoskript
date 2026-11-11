@@ -7,10 +7,14 @@ package co.xenastudios.neoskript.harness;
 /** One thing the harness checks or measures on a server. */
 public interface Scenario {
 
-    /** Quick checks run on every CI build, or slower baseline runs (Skript's test suite, benchmarks). */
+    /**
+     * Quick checks run on every CI build, slower baseline runs (Skript's test suite, benchmarks), or tools run
+     * on purpose by name, which no group selects (the syntax export).
+     */
     enum Group {
         SMOKE,
-        BASELINE
+        BASELINE,
+        MANUAL
     }
 
     String name();

@@ -150,6 +150,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             if (hooks) {
                 co.xenastudios.neoskript.paper.Hooks.hookServices(getSLF4JLogger());
             }
+            exportSyntax(library);
             try {
                 scripts.loadAll();
             } catch (IOException e) {
@@ -168,6 +169,28 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
         // D10: NeoSkript takes over /skript and /sk, with /neoskript as an alias.
         getCommand("skript").setExecutor(new SkriptCommand(this, scripts, this::reloadSettings));
+    }
+
+    /**
+     * With {@code -Dneoskript.syntaxExport=<file>}, writes every registered syntax element, type and function to
+     * that file as JSON, for neoskript.dev's syntax reference. The harness's {@code syntax-export} scenario sets it.
+     */
+    private void exportSyntax(Library library) {
+        String file = System.getProperty("neoskript.syntaxExport");
+        if (file == null || file.isBlank()) {
+            return;
+        }
+        try {
+            java.nio.file.Path path = java.nio.file.Path.of(file);
+            if (path.getParent() != null) {
+                java.nio.file.Files.createDirectories(path.getParent());
+            }
+            String server = Platform.detect().displayName() + " " + getServer().getMinecraftVersion();
+            java.nio.file.Files.writeString(path, library.export(getPluginMeta().getVersion(), server).toJson());
+            getSLF4JLogger().info("Wrote the syntax export to {}", path.toAbsolutePath());
+        } catch (IOException | RuntimeException e) {
+            getSLF4JLogger().error("Couldn't write the syntax export", e);
+        }
     }
 
     /**

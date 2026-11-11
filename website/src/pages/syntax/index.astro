@@ -1,0 +1,206 @@
+---
+// The syntax reference's front page: a search over everything, and the categories.
+import Base from "../../layouts/Base.astro";
+import Attribution from "../../components/syntax/Attribution.astro";
+import { categories, total } from "../../lib/syntax";
+
+const labels = JSON.stringify(Object.fromEntries(categories.map((c) => [c.path, c.label.replace(/s$/, "")])));
+---
+<Base
+  title="Syntax reference: NeoSkript"
+  description={`All ${total} events, conditions, effects, expressions, types, sections, structures and functions NeoSkript registers, with patterns, descriptions and examples.`}
+  path="/syntax/"
+>
+  <section class="page">
+    <div class="wrap">
+      <h1>Syntax reference</h1>
+      <p class="lead">
+        Everything NeoSkript's core library registers, made from its own registry, so a pattern here is a pattern
+        NeoSkript accepts.
+      </p>
+
+      <div class="search" role="search">
+        <label class="label" for="search">Search all syntax</label>
+        <div class="field">
+          <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="Name, id or pattern" aria-describedby="search-status" aria-controls="results" data-labels={labels} />
+          <kbd aria-hidden="true">/</kbd>
+        </div>
+        <p id="search-status" class="status" aria-live="polite"></p>
+        <ol id="results" class="results" aria-label="Search results" hidden></ol>
+      </div>
+
+      <ul class="cats">
+        {categories.map((c) => (
+          <li>
+            <a href={`/syntax/${c.path}/`}>{c.label}</a>
+            <span class="n">{c.count}</span>
+            <p>{c.blurb}</p>
+          </li>
+        ))}
+      </ul>
+
+      <Attribution />
+    </div>
+  </section>
+</Base>
+
+<script>
+  import "../../scripts/syntax-search";
+</script>
+
+<style>
+  .page {
+    padding-block: clamp(3.5rem, 2rem + 5vw, 6rem) clamp(4rem, 2.5rem + 5vw, 7rem);
+  }
+  h1 {
+    font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+    letter-spacing: -0.035em;
+  }
+  .lead {
+    margin-top: 1.25rem;
+  }
+  .search {
+    margin-top: clamp(2rem, 1.5rem + 2vw, 3rem);
+    max-width: 44rem;
+    display: grid;
+    gap: 0.6rem;
+  }
+  .search .label {
+    font-size: 0.6875rem;
+  }
+  .field {
+    position: relative;
+  }
+  input {
+    width: 100%;
+    min-height: 52px;
+    padding: 0 3rem 0 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--night);
+    color: var(--text);
+    font: inherit;
+    font-size: 1.0625rem;
+    transition: border-color 180ms var(--ease);
+  }
+  input::placeholder {
+    color: var(--muted);
+    opacity: 1;
+  }
+  input:hover {
+    border-color: color-mix(in srgb, var(--magenta) 60%, var(--rule));
+  }
+  input:focus-visible {
+    outline: 2px solid var(--magenta);
+    outline-offset: 2px;
+    border-radius: 999px;
+  }
+  input::-webkit-search-cancel-button {
+    display: none;
+  }
+  kbd {
+    position: absolute;
+    right: 1.1rem;
+    top: 50%;
+    translate: 0 -50%;
+    min-width: 1.5rem;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    color: var(--muted);
+    font-size: 0.8125rem;
+    text-align: center;
+    pointer-events: none;
+  }
+  input:focus + kbd,
+  input:not(:placeholder-shown) + kbd {
+    display: none;
+  }
+  .status {
+    min-height: 1.4em;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+  .status:empty {
+    display: none;
+  }
+  .results {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+  }
+  .results :global(li) {
+    border-bottom: 1px solid var(--rule);
+  }
+  .results :global(a) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.2rem 1rem;
+    padding: 0.7rem 0.75rem;
+    text-decoration: none;
+  }
+  .results :global(a:hover),
+  .results :global(a:focus-visible) {
+    background: color-mix(in srgb, var(--magenta) 7%, transparent);
+  }
+  .results :global(a:focus-visible) {
+    outline-offset: -2px;
+  }
+  .results :global(.r-name) {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .results :global(.r-kind) {
+    font-size: 0.6875rem;
+    align-self: center;
+  }
+  .results :global(.r-pattern) {
+    grid-column: 1 / -1;
+    color: var(--muted);
+    font-size: 0.8125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cats {
+    margin: clamp(2.5rem, 2rem + 2vw, 3.5rem) 0 clamp(2.5rem, 2rem + 2vw, 3.5rem);
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+  }
+  .cats li {
+    display: grid;
+    grid-template-columns: minmax(0, 14rem) 4rem minmax(0, 1fr);
+    gap: 0.25rem 2rem;
+    align-items: baseline;
+    padding-block: 1.1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .cats a {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .n {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .cats p {
+    color: var(--muted);
+  }
+  /* The attribution's own top rule would double the last row's. */
+  .cats + :global(.source) {
+    border-top: 0;
+    padding-top: 0;
+  }
+  @media (max-width: 44rem) {
+    .cats li {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .cats p {
+      grid-column: 1 / -1;
+    }
+  }
+</style>
