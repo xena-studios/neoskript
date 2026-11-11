@@ -11,6 +11,7 @@ What each milestone in the [plan](PLAN.md#6-roadmap) delivered, in order. Add ea
 | [M2: Compiler and runtime core](#m2-compiler-and-runtime-core) | Done 2026-10-22 |
 | [M3: Variables and storage](#m3-variables-and-storage) | Done 2026-10-22 |
 | [M4: Standard library](#m4-standard-library) | In progress: Skript's whole test suite passes (862 of 862); the exit also needs the 95% differential check |
+| [M5: Folia and migration](#m5-folia-and-migration) | In progress: the migration CLI |
 
 Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4](#step-6-the-long-tail)):
 
@@ -584,3 +585,16 @@ Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the mo
 - **Effect commands:** `!effect` from the console and chat, with Skript's options, permission, messages, `me` and a cancellable `EffectCommandEvent`. Moving over from Skript copies the options.
 - **Hooks** tested against the real WorldGuard, Vault, EssentialsX and LuckPerms (`neoskript-hooks`, baseline). Money with money is money; `add 1 to {_money}` leaves it, as in Skript.
 - Known differences: Skript 2.17's warning frames never reset because of a bug, and NeoSkript resets them as intended. The code under a section whose header fails is still checked, so its errors show too. Event names in errors are as the script writes them.
+
+## M5: Folia and migration
+
+### Step 1: The migration CLI
+
+**`neoskript-cli check <scripts>`** reports what NeoSkript makes of a server's scripts before it's installed.
+- **How it checks:** item, block and entity names come from a live server's registries, so the CLI starts a throwaway headless Paper server with NeoSkript in a check mode (`-Dneoskript.check`, `-Dneoskript.check.report`). The server is the build the harness pins, checked against its SHA-256 and cached in `~/.neoskript/cache`. The scripts are parsed and compiled with the real standard library and nothing runs. Then the report is written and the server stops.
+- **What it reports:**
+  - **Errors and warnings:** as on load.
+  - **Folia hints:** global events, reads of entities and blocks that may be in another region, entity changes (which run on the entity's region), and read-modify-write of global variables.
+  - **Performance hints:** `every` periods under a second that loop players or entities, `all entities`, and busy `while` loops.
+- **Tested** by the `neoskript-cli` harness scenario. The corpus loads cleanly, and a script with known hazards gets exactly its hints.
+

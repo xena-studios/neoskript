@@ -18,6 +18,17 @@ Needs JDK 21, plus JDK 25 for the test harness's 26.x servers.
 
 The plugin jar ends up in `neoskript-plugin/build/libs/`. The real-server tests are in the [test harness](test-harness/README.md).
 
+## Checking your scripts
+
+Before switching, see what NeoSkript makes of your scripts:
+
+```sh
+./gradlew :neoskript-cli:shadowJar
+java -jar neoskript-cli/build/libs/neoskript-cli-*.jar check plugins/Skript/scripts
+```
+
+It starts a throwaway headless Paper server (downloaded once into `~/.neoskript/cache` and checked against its SHA-256), loads the scripts there without running them, and lists each line NeoSkript won't load, Skript's warnings, and hints on what may behave differently on Folia or cost a lot of server time. Options: `--json <file>`, `--hints-only`, `--quiet`, `--minecraft 26.3|1.21.4`, `--verbose`. It exits with 0 when every script loads, 1 when some don't, and 2 when the check couldn't run.
+
 ## What's here
 
 ```
@@ -27,7 +38,7 @@ neoskript-compiler   compiles scripts to JVM bytecode
 neoskript-runtime    variables, storage, scheduling, waits
 neoskript-paper      the standard library: Skript's syntax on Paper
 neoskript-plugin     the plugin: /sk, config, reload
-neoskript-cli        offline migration and diagnostics tool (M5, not started)
+neoskript-cli        checks a scripts folder before you switch (M5)
 test-harness         real Paper and Folia servers, run against Skript
 ```
 

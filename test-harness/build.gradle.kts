@@ -11,12 +11,17 @@ val neoskriptPlugin = configurations.create("neoskriptPlugin") {
     isCanBeConsumed = false
     isTransitive = false
 }
+val neoskriptCli = configurations.create("neoskriptCli") {
+    isCanBeConsumed = false
+    isTransitive = false
+}
 
 dependencies {
     implementation(libs.gson)
     // The frontend with the stub registry from the reference Skript's docs, for parse checks without a server.
     implementation(testFixtures(project(":neoskript-frontend")))
     neoskriptPlugin(project(path = ":neoskript-plugin", configuration = "shadowRuntimeElements"))
+    neoskriptCli(project(path = ":neoskript-cli", configuration = "shadowRuntimeElements"))
 }
 
 // The harness bot: a plugin the harness installs next to NeoSkript or Skript, whose console commands
@@ -116,6 +121,8 @@ tasks.register<JavaExec>("harness") {
 
     val pluginJar: FileCollection = neoskriptPlugin
     inputs.files(pluginJar)
+    val cliJar: FileCollection = neoskriptCli
+    inputs.files(cliJar)
     val botJarFile = botJar.flatMap { it.archiveFile }
     inputs.file(botJarFile)
     // Servers on 1.21.x run on Java 21, and 26.x needs Java 25.
@@ -131,6 +138,7 @@ tasks.register<JavaExec>("harness") {
             "-Dharness.java.21=" + java21.get().metadata.installationPath.asFile.absolutePath,
             "-Dharness.java.25=" + java25.get().metadata.installationPath.asFile.absolutePath,
             "-Dharness.neoskriptJar=" + pluginJar.singleFile.absolutePath,
+            "-Dharness.cliJar=" + cliJar.singleFile.absolutePath,
             "-Dharness.botJar=" + botJarFile.get().asFile.absolutePath,
             "-Dharness.environments=" + projectDir.dir("environments").asFile.absolutePath,
             "-Dharness.scripts=" + projectDir.dir("scripts").asFile.absolutePath,

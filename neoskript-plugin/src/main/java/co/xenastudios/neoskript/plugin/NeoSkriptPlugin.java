@@ -102,6 +102,17 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             }
         });
         StandardLibrary.usePlayerUuidsInVariableNames(getConfig().getBoolean("variables.player-uuids-in-names", true));
+        if (co.xenastudios.neoskript.plugin.check.CheckMode.requested()) {
+            // Started by NeoSkript's CLI to check scripts: check them, write the report, and stop.
+            try {
+                co.xenastudios.neoskript.plugin.check.CheckMode.run(library);
+                getSLF4JLogger().info("Checked the scripts; stopping the server");
+            } catch (IOException | RuntimeException e) {
+                getSLF4JLogger().error("Couldn't check the scripts", e);
+            }
+            getServer().getGlobalRegionScheduler().run(this, task -> getServer().shutdown());
+            return;
+        }
         if (TestRunner.enabled()) {
             StandardLibrary.registerTesting(library);
             // As Skript's test mode does: the chunks tests use stay loaded and ticking.

@@ -6,6 +6,7 @@ package co.xenastudios.neoskript.harness;
 
 import co.xenastudios.neoskript.harness.scenario.DifferentialScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptBootScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptCliScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptEventsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptLanguageScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptLoadBenchmark;
@@ -65,7 +66,8 @@ public final class HarnessMain {
             new SkriptTestSuiteScenario(),
             new SkriptLoadBenchmark(),
             new NeoSkriptLoadBenchmark(),
-            new DifferentialScenario());
+            new DifferentialScenario(),
+            new NeoSkriptCliScenario());
 
     record Result(String environment, String scenario, boolean passed, Duration duration, String message,
             Map<String, Object> summary) {}

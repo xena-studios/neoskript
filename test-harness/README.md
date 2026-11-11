@@ -39,6 +39,9 @@ Reports go to `test-harness/build/harness/reports/`, and each run's server direc
 | `neoskript-parse-corpus` | smoke | Skript envs | NeoSkript's frontend parses Skript's tests, the real-world corpus and the benchmark scripts with zero false errors against the stub registry, and times it. No server needed |
 | `skript-test-suite` | baseline | Skript envs | Runs Skript's own test suite in Skript's test mode and records the results |
 | `skript-load-benchmark` | baseline | Skript envs | Times Skript loading and reloading 40 generated scripts (600 structures) |
+| `neoskript-player-events` | smoke | 26.3 | Real players from the harness bot (`src/bot`): join, chat, commands and quit run their triggers, messages reach the players, and on Paper the same script behaves the same on the reference Skript |
+| `differential` | baseline | Skript envs, Folia 26.3 | M4's exit check: Skript's documentation examples, the checks and probes in `corpus/differential` and the real-world corpus, on the reference Skript and on NeoSkript. Each script's load messages, the probes' output and the saved variables are compared; at least 95% must match, and any difference `corpus/differential/known-differences.txt` doesn't list fails. Folia is compared with Skript on Paper |
+| `neoskript-cli` | smoke | Paper 26.3 | `neoskript-cli check` loads the real-world corpus cleanly, and gives the Folia and performance hints for a script with known hazards |
 
 ## Pins
 
