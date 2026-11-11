@@ -1,0 +1,14 @@
+---
+// Starlight's footer (edit link, last updated, previous and next), then the
+// site footer the custom pages have: the XENA endorsement and licence line.
+import Default from "@astrojs/starlight/components/Footer.astro";
+import SiteFooter from "../SiteFooter.astro";
+---
+<Default />
+<div class="site-footer-wrap"><SiteFooter /></div>
+
+<style>
+  .site-footer-wrap {
+    margin-top: 3rem;
+  }
+</style>

@@ -18,6 +18,18 @@ typography:
     fontWeight: 700
     lineHeight: 1
     letterSpacing: "-0.035em"
+  page-title:
+    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontSize: "clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem)"
+    fontWeight: 700
+    lineHeight: 1
+    letterSpacing: "-0.035em"
+  category-title:
+    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontSize: "clamp(2.25rem, 1.6rem + 2.6vw, 3.5rem)"
+    fontWeight: 700
+    lineHeight: 1.05
+    letterSpacing: "-0.03em"
   headline:
     fontFamily: "Geist Variable, system-ui, sans-serif"
     fontSize: "clamp(1.75rem, 1.3rem + 1.9vw, 2.75rem)"
@@ -46,14 +58,33 @@ typography:
     fontWeight: 500
     letterSpacing: "-0.02em"
     fontFeature: "tnum"
+  figure:
+    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontSize: "clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem)"
+    fontWeight: 700
+    letterSpacing: "-0.03em"
+    fontFeature: "tnum"
+  ui:
+    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontSize: "0.9375rem"
+    fontWeight: 500
   mono:
     fontFamily: "Geist Mono Variable, ui-monospace, monospace"
     fontSize: "0.875rem"
     fontWeight: 400
     fontFeature: "liga 0, calt 0"
+  mono-small:
+    fontFamily: "Geist Mono Variable, ui-monospace, monospace"
+    fontSize: "0.8125rem"
+    fontWeight: 400
   label:
     fontFamily: "JetBrains Mono Variable, ui-monospace, monospace"
     fontSize: "0.75rem"
+    fontWeight: 500
+    letterSpacing: "0.14em"
+  label-small:
+    fontFamily: "JetBrains Mono Variable, ui-monospace, monospace"
+    fontSize: "0.6875rem"
     fontWeight: 500
     letterSpacing: "0.14em"
 rounded:
@@ -106,7 +137,7 @@ neoskript.dev is NeoSkript's own brand on night, laid out with xenastudios.co's 
 
 The signature is the staff: the same script (or the same measured job) runs down a raised centre column between two magenta rails, with Skript's result mirrored on its left and NeoSkript's on its right, one grid row per line so the two sides always line up. The landing page leads with a performance staff whose bars share one scale, so a bar's length is the time it took, then a differential staff that prints what each server output for the same probe. The rest of the site is hairline rows, plain claims and links to source.
 
-Two surfaces share one palette. The custom pages (landing, download) are dark only (`color-scheme: dark`) and styled by `src/styles/site.css`. The guides are Starlight, mapped onto the same tokens in `src/styles/theme.css`, with a light theme in ink and magenta-daylight.
+Two surfaces share one palette. The custom pages (landing, download, the syntax reference and the parser) are dark only (`color-scheme: dark`) and styled by `src/styles/site.css`, with `src/styles/syntax.css` for the reference. The guides are Starlight, mapped onto the same tokens in `src/styles/theme.css`. They follow the visitor's system theme (Starlight's Auto), with a light theme in ink and magenta-daylight: going from the dark landing to light guides is deliberate, for people who read docs in light mode. Both surfaces share the header links and the footer (`src/lib/nav.ts`, `SiteFooter.astro`), so they read as one site.
 
 **Key Characteristics:**
 - Neo Magenta on near-black, aubergine-tinted night; magenta marks meaning, never decoration.
@@ -151,14 +182,16 @@ A restrained palette: tinted night neutrals carry almost everything, and Neo Mag
 **Character:** A crisp grotesk doing the talking in bold, tightly tracked headlines, with two monos split by job: Geist Mono for anything that is script or output, JetBrains Mono (Xena's family) only for small uppercase metadata.
 
 ### Hierarchy
-- **Display** (`display`): the landing hero, capped at 16ch, balanced. The download page's h1 uses the same weight and tracking at a smaller clamp (2.5rem to 4.5rem).
+- **Display** (`display`): the landing hero, capped at 16ch, balanced.
+- **Page title** (`page-title`): the h1 of download, the syntax index and the parser: display's weight and tracking at a smaller clamp. The syntax categories' h1 is a step down (`category-title`).
 - **Headline** (`headline`): section headings, capped at 22ch, balanced.
 - **Title** (`title`): the download page's "Development build" heading. The staff's measure names sit near this level at 1.0625rem, tracked -0.01em.
 - **Lead** (`lead`): the paragraph under a heading, in muted, capped at 62ch (52ch in the hero).
 - **Body** (`body`): prose, `text-wrap: pretty`; download definitions cap at 66ch.
-- **Numeral** (`numeral`): benchmark times and the facts row's figures (the facts use 1.5rem to 2.25rem, -0.03em), always tabular.
-- **Mono** (`mono`): staff rows, inline code, the measured-job descriptions (0.8125rem), the SHA-256.
-- **Label** (`label`): uppercase. Staff column heads, the "N× faster" and "Same" marks, the footer licence line, and the per-cell server names on narrow screens (0.6875rem).
+- **Numeral** (`numeral`): benchmark times, always tabular. The facts row's figures are `figure`.
+- **UI** (`ui`): nav links, buttons, the footer and chips, at 0.9375rem.
+- **Mono** (`mono`): staff rows, inline code, the SHA-256. `mono-small` (0.8125rem) for the measured-job descriptions, examples and patterns in lists.
+- **Label** (`label`): uppercase. Staff column heads, the "N× faster" and "Same" marks, the footer licence line, and, at `label-small` (0.6875rem), the per-cell server names on narrow screens and the syntax reference's term labels.
 
 ### Named Rules
 **The Label Is Metadata Rule.** Uppercase JetBrains Mono labels name columns, servers, marks and licences. They never sit above a heading as an eyebrow.
@@ -175,7 +208,8 @@ Breakpoints, as built:
 - **Under 60rem** the staff becomes one column: the script line first, then each server's output under it, each cell a small grid of server name, value and mark. The magenta rails move to the staff's outer edges and the column heads hide.
 - **Under 52rem** the facts row, the three steps and the footer collapse to one column.
 - **Under 44rem** download rows and build facts stack their term over their definition.
-- **Under 30rem** the header tightens (logo 1.375rem, nav at 0.875rem, no wrap).
+- **Under 30rem** the header tightens: wordmark 1.375rem, nav at 0.875rem with no wrap, and Docs and GitHub leave the header (both are in the footer, and the landing links the guides).
+- **Under 22rem** the `.sk` tile stands in for the wordmark.
 
 Actions sit in a wrapping row with a 0.75rem gap. The header is 4.5rem tall.
 
@@ -200,8 +234,9 @@ Pills, quiet and certain.
 - **Secondary:** transparent with a `night-rule` hairline and text colour ("How we test", "Read the docs", "On GitHub").
 
 ### Navigation
-- **Header:** the NeoSkript logo (1.75rem tall) left; Docs, Download and GitHub right in muted 0.9375rem, turning text on hover and when `aria-current="page"`. A hairline under the bar.
-- **Footer:** the XENA mark in text colour, the same links plus "Report a bug", and a label-styled licence line ("GPL-3.0-only · Not affiliated with SkriptLang"). A hairline above.
+- **Header:** the NeoSkript logo (1.75rem tall) left; Docs, Syntax, Parser, Download and GitHub right in muted 0.9375rem, turning text on hover and when `aria-current="page"`. A hairline under the bar. The links come from `src/lib/nav.ts`; the guides show the same links in Starlight's header and mobile menu (`components/starlight/SocialIcons.astro`), with search and the theme select beside them.
+- **Footer:** `SiteFooter.astro`, on every page, the guides included (after Starlight's edit link and previous/next): the XENA mark in text colour, the same links plus Source and "Report a bug", and a label-styled licence line ("GPL-3.0-only · Not affiliated with SkriptLang"). A hairline above. It lays out by its own width (a container query), so it stacks inside a guide's column.
+- **Guides:** the current guide in the sidebar is text colour with a 1px magenta rail, not a filled pill; asides are hairline-ruled notes with no coloured stripe or fill; previous/next is a hairline row, not boxes.
 - **Skip link:** a magenta pill that drops in at the top-left gutter on focus.
 
 ### Links
@@ -220,6 +255,9 @@ The site's only icon (`src/components/External.astro`): an authored 10x10 SVG up
 
 ### Facts row and steps
 Hairline-topped rows of three, not cards. Facts lead with a large tabular figure in text, a muted sentence, and a source link. Steps number themselves with a magenta JetBrains Mono counter above a bold first sentence.
+
+### Parser diagnostics
+The one place magenta means "error": an error's label, its line's rail and its wavy underline are magenta, a warning's are String Pink. That keeps to magenta's rule (it marks where to act), and colour is never alone: every problem has an ERROR or WARNING label, a line number, and its message.
 
 ### Definition rows (download)
 A `<dl>` of hairline-separated rows: bold term in a 14rem column, muted definition in the rest. The build block above them is a hairline-bounded band with its own small term/definition grid, not a card.

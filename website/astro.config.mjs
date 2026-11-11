@@ -26,7 +26,11 @@ export default defineConfig({
         themes: ["github-dark-default", "github-light-default"],
         styleOverrides: { borderRadius: "12px" },
       },
-      social: [{ icon: "github", label: "Source code", href: "https://github.com/xena-studios/neoskript" }],
+      // The site's nav in the header and mobile menu, and the site footer under each guide.
+      components: {
+        SocialIcons: "./src/components/starlight/SocialIcons.astro",
+        Footer: "./src/components/starlight/Footer.astro",
+      },
       editLink: { baseUrl: "https://github.com/xena-studios/neoskript/edit/main/website/" },
       lastUpdated: true,
       // Custom pages (src/pages) can't be validated; the rest of the site is.

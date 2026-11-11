@@ -3,17 +3,13 @@
 import "../styles/site.css";
 import Logo from "../components/Logo.astro";
 import External from "../components/External.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import { current, nav, repo } from "../lib/nav";
 
 interface Props { title: string; description: string; path: string }
 const { title, description, path } = Astro.props;
 const url = new URL(path, Astro.site).href;
 const og = new URL("/og.png", Astro.site).href;
-const nav = [
-  { href: "/docs/", label: "Docs" },
-  { href: "/syntax/", label: "Syntax" },
-  { href: "/parser/", label: "Parser" },
-  { href: "/download/", label: "Download" },
-];
 ---
 <!doctype html>
 <html lang="en">
@@ -43,9 +39,9 @@ const nav = [
         <nav aria-label="Main">
           <ul>
             {nav.map((item) => (
-              <li><a href={item.href} aria-current={path.startsWith(item.href) ? "page" : undefined}>{item.label}</a></li>
+              <li class={item.href === "/docs/" ? "docs" : undefined}><a href={item.href} aria-current={current(path, item.href) ? "page" : undefined}>{item.label}</a></li>
             ))}
-            <li class="gh"><a href="https://github.com/xena-studios/neoskript">GitHub<External /></a></li>
+            <li class="gh"><a href={repo}>GitHub<External /></a></li>
           </ul>
         </nav>
       </div>
@@ -53,20 +49,7 @@ const nav = [
     <main id="main">
       <slot />
     </main>
-    <footer class="site-footer">
-      <div class="wrap foot">
-        <a class="xena" href="https://xenastudios.co" aria-label="Xena Studios"><Logo name="xena" label="Xena" /></a>
-        <ul>
-          <li><a href="/docs/">Docs</a></li>
-          <li><a href="/syntax/">Syntax</a></li>
-          <li><a href="/parser/">Parser</a></li>
-          <li><a href="/download/">Download</a></li>
-          <li><a href="https://github.com/xena-studios/neoskript">Source<External /></a></li>
-          <li><a href="https://github.com/xena-studios/neoskript/issues/new/choose">Report a bug<External /></a></li>
-        </ul>
-        <p class="label">GPL-3.0-only · Not affiliated with SkriptLang</p>
-      </div>
-    </footer>
+    <SiteFooter />
   </body>
 </html>
 <style>
@@ -101,8 +84,7 @@ const nav = [
     height: 1.75rem;
     width: auto;
   }
-  nav ul,
-  .foot ul {
+  nav ul {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem 1.75rem;
@@ -120,51 +102,15 @@ const nav = [
   nav a[aria-current="page"] {
     color: var(--text);
   }
-  .site-footer {
-    border-top: 1px solid var(--rule);
-    padding-block: 2.5rem 3rem;
-    color: var(--muted);
-    font-size: 0.9375rem;
-  }
-  .foot {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 1.5rem 2.5rem;
-  }
-  .xena {
-    display: inline-flex;
-    color: var(--text);
-  }
-  .xena :global(.logo) {
-    height: 0.9rem;
-    width: auto;
-  }
-  .foot a {
-    text-decoration: none;
-  }
-  .foot a:hover {
-    color: var(--text);
-  }
   .home :global(.tile) {
     display: none;
-  }
-  @media (max-width: 52rem) {
-    .foot {
-      grid-template-columns: 1fr;
-    }
   }
   @media (max-width: 30rem) {
     .bar {
       gap: 1rem;
     }
-    /* The wordmark and four links don't fit; the .sk tile alone does. */
     .home :global(.wordmark) {
-      display: none;
-    }
-    .home :global(.tile) {
-      display: block;
-      height: 1.75rem;
+      height: 1.375rem;
     }
     nav ul {
       flex-wrap: nowrap;
@@ -173,9 +119,21 @@ const nav = [
     nav a {
       font-size: 0.875rem;
     }
-    /* Four links don't fit beside the logo on a phone; the footer links the source. */
-    nav .gh {
+    /* The wordmark and three links fit on a phone. Docs and GitHub are in the
+       footer, and the landing links the guides too. */
+    nav .gh,
+    nav .docs {
       display: none;
+    }
+  }
+  /* Narrower than any current phone: the .sk tile stands in for the wordmark. */
+  @media (max-width: 22rem) {
+    .home :global(.wordmark) {
+      display: none;
+    }
+    .home :global(.tile) {
+      display: block;
+      height: 1.75rem;
     }
   }
 </style>

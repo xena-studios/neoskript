@@ -1,0 +1,84 @@
+---
+// The site footer: the XENA endorsement, the site's links and the licence
+// line. Used by the custom pages (Base.astro) and, after Starlight's own
+// footer, by the guides (components/starlight/Footer.astro). Its colours come
+// from the brand tokens both stylesheets load, with the guides' theme colours
+// first where there are any, so it follows the guides' light theme too.
+import Logo from "./Logo.astro";
+import External from "./External.astro";
+import { nav, repo } from "../lib/nav";
+---
+<footer class="site-footer">
+  <div class="foot">
+    <a class="xena" href="https://xenastudios.co" aria-label="Xena Studios"><Logo name="xena" label="Xena" /></a>
+    <ul>
+      {nav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+      <li><a href={repo}>Source<External /></a></li>
+      <li><a href={`${repo}/issues/new/choose`}>Report a bug<External /></a></li>
+    </ul>
+    <p class="licence">GPL-3.0-only · Not affiliated with SkriptLang</p>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    --f-rule: var(--sl-color-hairline, var(--neoskript-night-rule));
+    --f-muted: var(--sl-color-gray-3, var(--neoskript-muted));
+    --f-text: var(--sl-color-white, var(--neoskript-text));
+    border-top: 1px solid var(--f-rule);
+    padding-block: 2.5rem 3rem;
+    color: var(--f-muted);
+    font-size: 0.9375rem;
+    /* Laid out by its own width: full width on the custom pages, the guide's
+       column in the guides. */
+    container-type: inline-size;
+  }
+  .foot {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 1.5rem 2.5rem;
+    max-width: var(--max, none);
+    margin-inline: auto;
+    padding-inline: var(--gutter, 0);
+  }
+  ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  li {
+    margin: 0;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--f-text);
+  }
+  .xena {
+    display: inline-flex;
+    color: var(--f-text);
+  }
+  .xena :global(.logo) {
+    height: 0.9rem;
+    width: auto;
+  }
+  .licence {
+    margin: 0;
+    font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  @container (max-width: 52rem) {
+    .foot {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -59,6 +59,9 @@
   --sl-color-black: white;
   --sl-color-bg-sidebar: color-mix(in srgb, var(--neoskript-ink) 3%, white);
   --sl-color-bg-nav: color-mix(in srgb, var(--neoskript-ink) 3%, white);
+  --sl-color-hairline: var(--sl-color-gray-5);
+  --sl-color-hairline-light: var(--sl-color-gray-5);
+  --sl-color-hairline-shade: var(--sl-color-gray-6);
 
   --sl-color-accent-low: color-mix(in srgb, var(--neoskript-magenta-daylight) 12%, white);
   --sl-color-accent: var(--neoskript-magenta-daylight);
@@ -92,4 +95,42 @@ h1#_top {
 :focus-visible {
   outline: 2px solid var(--sl-color-accent);
   outline-offset: 3px;
+}
+
+/* Asides as hairline-ruled notes, as the custom pages set notes: no coloured
+   side stripe or fill. The icon and title keep the text colour. */
+.starlight-aside {
+  --sl-color-asides-text-accent: var(--sl-color-white);
+  --sl-color-asides-border: var(--sl-color-hairline);
+  border-inline-start: 0;
+  border-block: 1px solid var(--sl-color-hairline);
+  background: transparent;
+  padding-inline: 0;
+}
+.starlight-aside :is(.starlight-aside__title, .starlight-aside__icon) {
+  color: var(--sl-color-white);
+}
+
+/* The current guide: text colour and a 1px magenta rail, as the custom nav
+   marks the current page with colour alone. String pink is for strings. */
+.sidebar-content .top-level a[aria-current="page"],
+.sidebar-content .top-level a[aria-current="page"]:hover,
+.sidebar-content .top-level a[aria-current="page"]:focus {
+  background: transparent;
+  color: var(--sl-color-white);
+  font-weight: 600;
+  box-shadow: inset 1px 0 var(--sl-color-accent);
+}
+
+/* Previous and next as a hairline row, not boxes. */
+.pagination-links a {
+  border: 0;
+  border-top: 1px solid var(--sl-color-hairline);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* The header as tall as the custom pages'. */
+:root {
+  --sl-nav-height: 4.5rem;
 }
