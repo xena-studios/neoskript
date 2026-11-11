@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.parse;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import co.xenastudios.neoskript.frontend.registry.DelayState;
 import co.xenastudios.neoskript.frontend.registry.EventValues;
 import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
@@ -106,7 +107,7 @@ final class StatementParser {
                 diagnostics.warning(node.line().number(), node.line().column(), node.line().text().length(),
                         "Unreachable code. The previous statement stops further execution.");
             }
-            String key = node.line().key().strip().toLowerCase(Locale.ROOT);
+            String key = Text.lower(node.line().key().strip());
             boolean section = node instanceof Node.Section;
             boolean continuesChain = section && (key.startsWith("else") || key.startsWith("then"));
             if (chain != null && !continuesChain) {
@@ -196,7 +197,7 @@ final class StatementParser {
 
     /** One section of an {@code if} chain: an {@code if}, {@code else if}, {@code else} or {@code then}. */
     private Statement branch(Node.Section section, Statement previous, Chain chain) {
-        String key = section.line().key().strip().toLowerCase(Locale.ROOT);
+        String key = Text.lower(section.line().key().strip());
         if (!key.startsWith("then")) {
             // Every branch is parsed from the state before the chain, including its condition.
             delay = chain.before;
@@ -327,7 +328,7 @@ final class StatementParser {
             LineParser parser = new LineParser(context, text);
             int targetStart = offset + matcher.start("t" + i);
             int deltaStart = offset + matcher.start("d" + i);
-            String delta = matcher.group("d" + i).toLowerCase(Locale.ROOT);
+            String delta = Text.lower(matcher.group("d" + i));
             if (delta.contains(",") || delta.contains(" and ") || delta.contains(" or ")) {
                 // A list isn't one value Skript can say it doesn't understand.
                 return null;
@@ -515,7 +516,7 @@ final class StatementParser {
         check(line, header);
         parser.listWarnings(header);
         warn(line, parser);
-        String lower = key.toLowerCase(Locale.ROOT);
+        String lower = Text.lower(key);
         if (lower.startsWith("else") && !continuesConditional(previous)) {
             error(line, Statement.orphanElse(lower));
             return new Statement.Invalid(line);
@@ -1022,7 +1023,7 @@ final class StatementParser {
             return true;
         }
         if (previous instanceof Statement.Section section) {
-            String key = section.line().key().toLowerCase(Locale.ROOT);
+            String key = Text.lower(section.line().key());
             if (key.startsWith("then")) {
                 return true;
             }

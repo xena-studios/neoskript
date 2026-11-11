@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.pattern;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -61,7 +62,7 @@ public final class PatternIndex<T> {
 
     /** The entries filed under a prefix of the first word of {@code line}, in registration order. */
     public List<Entry<T>> indexed(String line) {
-        String text = line.strip().toLowerCase(Locale.ROOT);
+        String text = Text.lower(line.strip());
         int wordEnd = 0;
         while (wordEnd < text.length() && !Character.isWhitespace(text.charAt(wordEnd))) {
             wordEnd++;

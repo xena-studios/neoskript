@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.parse;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
@@ -154,6 +155,6 @@ final class TypeHints {
     }
 
     private static String key(String variable) {
-        return variable.toLowerCase(java.util.Locale.ROOT);
+        return Text.lower(variable);
     }
 }

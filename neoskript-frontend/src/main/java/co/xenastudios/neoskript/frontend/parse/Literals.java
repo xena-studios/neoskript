@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.parse;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -29,8 +30,9 @@ final class Literals {
      * Text that might name something: words, digits, and the punctuation item and entity names use, and currency
      * symbols, for money ({@code $5}, {@code 20€}).
      */
-    private static final Pattern WORDS = Pattern.compile("(?=[^\\[]*[\\p{L}\\p{Sc}])(?![^\\[]*: )[\\p{L}\\p{N}_\\p{Sc}]"
-            + "[\\p{L}\\p{N}_\\p{Sc}'.:\\- ]*(\\[[\\p{L}\\p{N}_=,;:. ]*\\])?");
+    // \p{N} spelled out as its three categories: TeaVM (the browser parser) has no \p{N}.
+    private static final Pattern WORDS = Pattern.compile("(?=[^\\[]*[\\p{L}\\p{Sc}])(?![^\\[]*: )[\\p{L}\\p{Nd}\\p{Nl}\\p{No}_\\p{Sc}]"
+            + "[\\p{L}\\p{Nd}\\p{Nl}\\p{No}_\\p{Sc}'.:\\- ]*(\\[[\\p{L}\\p{Nd}\\p{Nl}\\p{No}_=,;:. ]*\\])?");
     /**
      * {@code value (type)}, a literal whose type is spelled out: {@code black (wolf variant)}. The space before
      * the bracket keeps {@code f(player)} a function call.
@@ -72,7 +74,7 @@ final class Literals {
 
     /** Lower case, single-spaced, without a leading article: how closed-set literals are looked up. */
     static String normalize(String text) {
-        String lower = text.strip().toLowerCase(Locale.ROOT);
+        String lower = Text.lower(text.strip());
         if (lower.indexOf("  ") >= 0 || lower.indexOf('\t') >= 0) {
             lower = lower.replaceAll("\\s+", " ");
         }

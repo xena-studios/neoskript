@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.parse;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import co.xenastudios.neoskript.frontend.registry.EventValues;
 import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
 import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
@@ -31,8 +32,9 @@ import java.util.regex.Pattern;
  */
 public final class ScriptLoader {
 
+    // \p{N} spelled out as its three categories: TeaVM (the browser parser) has no \p{N}.
     private static final Pattern FUNCTION_HEADER = Pattern.compile(
-            "(local\\s+)?function\\s+([\\p{L}_][\\p{L}\\p{N}_]*)\\s*\\((.*)\\)\\s*(?:(?:::|->|returns)\\s*(.+))?",
+            "(local\\s+)?function\\s+([\\p{L}_][\\p{L}\\p{Nd}\\p{Nl}\\p{No}_]*)\\s*\\((.*)\\)\\s*(?:(?:::|->|returns)\\s*(.+))?",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern PARAMETER =
             Pattern.compile("^\\s*([^:(){}\",]+?)\\s*:\\s*([a-zA-Z ]+?)\\s*(?:\\s*=\\s*(.+))?\\s*$");
@@ -92,7 +94,7 @@ public final class ScriptLoader {
     }
 
     public List<ParsedScript> load(List<SourceFile> files) {
-        List<ScriptParser.Result> results = files.parallelStream().map(ScriptParser::parse).toList();
+        List<ScriptParser.Result> results = parallel(files).map(ScriptParser::parse).toList();
         Map<String, List<FunctionInfo>> functions = new HashMap<>();
         Map<String, Map<String, List<FunctionInfo>>> locals = new HashMap<>();
         Map<Line, String> duplicates = new java.util.IdentityHashMap<>();
@@ -122,10 +124,18 @@ public final class ScriptLoader {
         this.duplicates = duplicates;
         this.registered = registered;
         this.functions = functions;
-        return results.parallelStream()
+        return parallel(results)
                 .map(result -> parse(result, new ParserContext(registry, functions,
                         locals.getOrDefault(result.file().name(), Map.of()))))
                 .toList();
+    }
+
+    /**
+     * {@code list.parallelStream()}, spelled as the JDK implements it: TeaVM, which builds the browser
+     * parser, has no {@code parallelStream} but runs this sequentially.
+     */
+    private static <T> java.util.stream.Stream<T> parallel(List<T> list) {
+        return java.util.stream.StreamSupport.stream(list.spliterator(), true);
     }
 
     private ParsedScript parse(ScriptParser.Result result, ParserContext context) {
@@ -322,7 +332,7 @@ public final class ScriptLoader {
                     + " in script" + (duplicateIn == null ? "" : " '" + duplicateIn + "'"));
             return null;
         }
-        boolean local = line.key().strip().toLowerCase(java.util.Locale.ROOT).startsWith("local");
+        boolean local = Text.lower(line.key().strip()).startsWith("local");
         List<String> defaultTexts = defaultTexts(line);
         List<Expr> defaults = new ArrayList<>();
         for (int i = 0; i < signature.parameters().size(); i++) {

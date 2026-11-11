@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.parse;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import co.xenastudios.neoskript.frontend.pattern.CompiledPattern;
 import co.xenastudios.neoskript.frontend.pattern.MatchResult;
 import co.xenastudios.neoskript.frontend.pattern.PatternIndex;
@@ -36,7 +37,8 @@ final class LineParser {
 
     private static final Object IN_PROGRESS = new Object();
     private static final Object FAILED = new Object();
-    private static final Pattern FUNCTION_NAME = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*");
+    // \p{N} spelled out as its three categories: TeaVM (the browser parser) has no \p{N}.
+    private static final Pattern FUNCTION_NAME = Pattern.compile("[\\p{L}_][\\p{L}\\p{Nd}\\p{Nl}\\p{No}_]*");
 
     private final ParserContext context;
     private final SyntaxRegistry registry;
@@ -93,7 +95,7 @@ final class LineParser {
         this.registry = context.registry();
         this.eventScope = context.eventScope();
         this.input = input;
-        this.lowerInput = input.toLowerCase(Locale.ROOT);
+        this.lowerInput = Text.lower(input);
     }
 
     String input() {
@@ -363,12 +365,12 @@ final class LineParser {
         // Things with components, but none on this axis: 'w of vector(1, 2, 3)'.
         if (axes) {
             return "None of the types returned by " + expressionText(owners) + " have an "
-                    + name.toLowerCase(java.util.Locale.ROOT) + " axis component.";
+                    + Text.lower(name) + " axis component.";
         }
         List<String> names = new ArrayList<>();
         for (String type : lacking) {
             TypeInfo info = registry.type(type);
-            names.add(info == null ? type : info.name().toLowerCase(java.util.Locale.ROOT));
+            names.add(info == null ? type : Text.lower(info.name()));
         }
         String joined = names.size() <= 1 ? String.join("", names)
                 : String.join(", ", names.subList(0, names.size() - 1)) + " and " + names.getLast();
@@ -530,7 +532,7 @@ final class LineParser {
                 return;
             }
             // Brackets around an item aren't part of the delimiter.
-            String delimiter = input.substring(from, to).replaceAll("^[\\s)]+|[\\s(]+$", "").toLowerCase(Locale.ROOT);
+            String delimiter = Text.lower(input.substring(from, to).replaceAll("^[\\s)]+|[\\s(]+$", ""));
             if (delimiter.equals(",")) {
                 continue;
             }
@@ -599,7 +601,7 @@ final class LineParser {
         if (!name.matches()) {
             return false;
         }
-        String word = name.group(1).toLowerCase(java.util.Locale.ROOT);
+        String word = Text.lower(name.group(1));
         return word.equals("value") || word.equals("index") || word.equals("counter") || word.equals("iteration")
                 || registry.resolveType(word) != null;
     }
@@ -830,7 +832,7 @@ final class LineParser {
             if (i > 0) {
                 names.append(i == types.size() - 1 ? " or " : ", ");
             }
-            names.append(types.get(i).name().toLowerCase(java.util.Locale.ROOT));
+            names.append(Text.lower(types.get(i).name()));
         }
         return names.toString();
     }
@@ -1061,7 +1063,7 @@ final class LineParser {
         List<String> names = new ArrayList<>();
         for (String id : ids) {
             TypeInfo info = registry.type(id);
-            String name = info == null ? id : info.name().toLowerCase(java.util.Locale.ROOT);
+            String name = info == null ? id : Text.lower(info.name());
             names.add(name.equals("boolean") ? "boolean (yes/no)" : name);
         }
         String joined = names.size() == 1 ? names.getFirst()
@@ -1315,7 +1317,7 @@ final class LineParser {
         List<String> parameters = new ArrayList<>();
         for (FunctionInfo.Parameter parameter : best.parameters()) {
             co.xenastudios.neoskript.frontend.registry.TypeInfo info = registry.type(parameter.type());
-            String type = info == null ? parameter.type() : info.name().toLowerCase(java.util.Locale.ROOT);
+            String type = info == null ? parameter.type() : Text.lower(info.name());
             parameters.add(parameter.name() + ": " + (parameter.plural() ? SyntaxRegistry.plural(type) : type));
         }
         return " Did you mean to use the function '" + (best.localTo() != null ? "local " : "") + best.name() + "("
@@ -1393,7 +1395,7 @@ final class LineParser {
                     // A list with a list in it: no function takes that, so there's no such function.
                     return null;
                 }
-                String typeName = ref == null ? parameter.type() : ref.type().name().toLowerCase(java.util.Locale.ROOT);
+                String typeName = ref == null ? parameter.type() : Text.lower(ref.type().name());
                 return "Can't understand the argument for the parameter '" + parameter.name() + "' with type '"
                         + typeName + "': " + input.substring(valueStart, piece[1]).strip() + ".";
             }
@@ -1410,9 +1412,9 @@ final class LineParser {
             }
             if (!parameter.plural() && Plurality.plural(argument, registry)) {
                 // Several values for a parameter that takes one, as Skript checks when it parses the call.
-                String expectedName = ref == null ? parameter.type() : ref.type().name().toLowerCase(java.util.Locale.ROOT);
+                String expectedName = ref == null ? parameter.type() : Text.lower(ref.type().name());
                 TypeInfo given = argument.type() == null ? null : registry.type(argument.type());
-                String givenName = given == null ? "objects" : SyntaxRegistry.plural(given.name().toLowerCase(java.util.Locale.ROOT));
+                String givenName = given == null ? "objects" : SyntaxRegistry.plural(Text.lower(given.name()));
                 return "Expected type " + expectedName + " for argument '" + parameter.name() + "', but "
                         + input.substring(valueStart, piece[1]).strip() + " is of type " + givenName + ".";
             }
@@ -1494,7 +1496,7 @@ final class LineParser {
                 type = "?";
             } else {
                 co.xenastudios.neoskript.frontend.registry.TypeInfo info = registry.type(value.type());
-                String typeName = info == null ? value.type() : info.name().toLowerCase(java.util.Locale.ROOT);
+                String typeName = info == null ? value.type() : Text.lower(info.name());
                 type = value instanceof Expr.ListOf ? SyntaxRegistry.plural(typeName) : typeName;
             }
             types.add(named == null ? type : named + ": " + type);
@@ -1611,7 +1613,7 @@ final class LineParser {
     /** {@code [start, end)} as one verified literal of an open type, if it looks like a list but a parser takes it whole. */
     private Expr wholeLiteral(int start, int end, Expected expected) {
         String text = input.substring(start, end);
-        String lower = text.toLowerCase(Locale.ROOT);
+        String lower = Text.lower(text);
         if (!Literals.isWords(text) || (!lower.contains(" and ") && !lower.contains(",") && !lower.contains(" or "))) {
             return null;
         }

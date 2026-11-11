@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.pattern;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -61,7 +62,7 @@ public final class PatternCompiler {
             if (tagEnd == pos) {
                 autoTag = true;
             } else {
-                tag = source.substring(pos, tagEnd).toLowerCase(Locale.ROOT);
+                tag = Text.lower(source.substring(pos, tagEnd));
             }
             pos = tagEnd + 1;
         }
@@ -73,7 +74,7 @@ public final class PatternCompiler {
                 // ':(a|b)' is '(a:a|b:b)', as in Skript.
                 body = first == body ? tagged : replaceFirst((PatternElement.Sequence) body, tagged);
             } else {
-                String text = literalText(body).toLowerCase(Locale.ROOT);
+                String text = Text.lower(literalText(body));
                 tag = text.isEmpty() ? null : text;
             }
         }
@@ -96,7 +97,7 @@ public final class PatternCompiler {
             // Alternatives with marks or tags of their own, or more than text to them, are left as they are.
             alternatives.add(text == null || text.isEmpty() || alternative.mark() != 0 || alternative.tag() != null
                     ? alternative
-                    : new PatternElement.Alternative(alternative.body(), 0, text.toLowerCase(Locale.ROOT)));
+                    : new PatternElement.Alternative(alternative.body(), 0, Text.lower(text)));
         }
         PatternElement.Choice tagged = new PatternElement.Choice(alternatives);
         return element instanceof PatternElement.Optional ? new PatternElement.Optional(tagged) : tagged;
