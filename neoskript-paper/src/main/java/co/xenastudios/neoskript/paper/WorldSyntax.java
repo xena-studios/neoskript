@@ -147,6 +147,8 @@ final class WorldSyntax {
         // '{_entity} is a pig', 'lucy axolotl is axolotl'.
         registrar.comparison(Entity.class, EntityKind.class, (entity, kind) -> kind.matches(entity));
         registrar.comparison(EntityKind.class, EntityKind.class, (kind, other) -> other.includes(kind));
+        // 'projectile is an arrow' with the arrow item, as Skript's entity type and item type comparator.
+        registrar.comparison(EntityKind.class, ItemType.class, EntityKind::isItem);
         registrar.condition("CondIsSpawnable", info -> {
             boolean negated = info.pattern() >= 2;
             return (context, args) -> {

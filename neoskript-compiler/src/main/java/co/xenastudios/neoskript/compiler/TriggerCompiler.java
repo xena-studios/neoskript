@@ -3538,11 +3538,11 @@ final class TriggerCompiler {
      * other side gives, as Skript reads them: 'bill-boarding of X is fixed' is the billboard.
      */
     private List<String> literalTypesFor(ParsedSyntax syntax, List<Object> values, int i, PlaceholderSpec spec) {
-        if (syntax.syntax().id().equals("CondCompare") && values.size() >= 2 && values.get(i) instanceof Expr.Unresolved
-                && values.get(1 - Math.min(i, 1)) instanceof Expr other && !(other instanceof Expr.Unresolved)
-                && other.type() != null
-                && !other.type().equals(SyntaxRegistry.OBJECT)) {
-            return List.of(other.type());
+        if (syntax.syntax().id().equals("CondCompare") && values.size() >= 2) {
+            List<String> compared = comparedLiteralTypes(values, i);
+            if (compared != null) {
+                return compared;
+            }
         }
         if (spec.types().size() < 2) {
             return spec.types();
@@ -3555,6 +3555,160 @@ final class TriggerCompiler {
             return ref == null ? Integer.MAX_VALUE : registry.typeOrder(ref.type().id());
         }));
         return ordered;
+    }
+
+    /**
+     * The types words on side {@code i} of a comparison are read as, as Skript's comparison reads them
+     * ({@link #comparedWordTypes}), then any object, or {@code null} if that side isn't words.
+     */
+    private List<String> comparedLiteralTypes(List<Object> values, int i) {
+        String[] types = comparedWordTypes(values);
+        return types == null || types[i] == null ? null : List.of(types[i], SyntaxRegistry.OBJECT);
+    }
+
+    /**
+     * The words a side of a comparison is: words nothing reads, or an element that can't be set up there and
+     * is read as its words ({@link #eventLiteral}), or {@code null}.
+     */
+    private String comparisonWords(Object side) {
+        if (side instanceof Expr.Unresolved words) {
+            return words.text();
+        }
+        if (side instanceof Expr.Syntax syntax && eventLiteral(syntax) != null) {
+            return source.substring(syntax.start(), syntax.end());
+        }
+        return null;
+    }
+
+    /**
+     * For a comparison with words on a side, the type each side's words are read as ({@code null} for a side
+     * that isn't words, or words nothing reads), as Skript's comparison reads them ({@code CondCompare.init}).
+     * The first side is read against the second, and the others against the first
+     * ({@code attemptReconstruction}): words are the first of Skript's types, in its order, that the other side
+     * can be compared with, else the other side's type, else, as words compared with words are, any type in
+     * Skript's order. Then if the two can't be compared, the second side's words are read as the first's type,
+     * or the first's as the second's. So 'projectile is an arrow' compares the entity type with the arrow item.
+     * {@code null} if no side is words.
+     */
+    private String[] comparedWordTypes(List<Object> values) {
+        String[] words = new String[values.size()];
+        String[] typed = new String[values.size()];
+        boolean any = false;
+        for (int i = 0; i < values.size(); i++) {
+            words[i] = comparisonWords(values.get(i));
+            any |= words[i] != null;
+            if (words[i] == null && values.get(i) instanceof Expr expr && expr.type() != null
+                    && !expr.type().equals(SyntaxRegistry.OBJECT) && !(expr instanceof Expr.Variable)) {
+                TypeRef ref = registry.resolveType(expr.type());
+                typed[i] = ref == null ? null : ref.type().id();
+            }
+        }
+        if (!any) {
+            return null;
+        }
+        String[] types = new String[values.size()];
+        // Words compared with a value of any type are read as any type, as everywhere else (with Skript's warning
+        // when they're several types' words); only words compared with words or with a type are read here.
+        if (words[0] != null && (typed[1] != null || words[1] != null)) {
+            types[0] = reconstructed(words[0], typed[1]);
+        }
+        String first = types[0] != null ? types[0] : typed[0];
+        for (int i = 1; i < values.size(); i++) {
+            if (words[i] != null && first != null) {
+                types[i] = reconstructed(words[i], first);
+                if (words[0] != null && wordsAs(words[i], List.of(types[i])) == null) {
+                    // Words compared with words they can't be read like are read as any type, in Skript's order.
+                    String anyType = wordsType(words[i], skriptTypeOrder());
+                    if (anyType != null) {
+                        types[i] = anyType;
+                    }
+                }
+            }
+        }
+        if (values.size() == 2 && types[0] != null && types[1] != null && !comparable(types[0], types[1])) {
+            if (wordsAs(words[1], List.of(types[0])) != null) {
+                types[1] = types[0];
+            } else if (wordsAs(words[0], List.of(types[1])) != null) {
+                types[0] = types[1];
+            }
+        }
+        return types;
+    }
+
+    /** The type {@code words} compared with a value of type {@code other} ({@code null}: words too) are read as. */
+    private String reconstructed(String words, String other) {
+        if (other != null) {
+            Class<?> otherClass = library.javaClass(other);
+            if (otherClass != null) {
+                for (String type : skriptTypeOrder()) {
+                    Class<?> c = library.javaClass(type);
+                    if (c != null && co.xenastudios.neoskript.runtime.Comparison.hasEquality(otherClass, c)
+                            && wordsAs(words, List.of(type)) != null) {
+                        return type;
+                    }
+                }
+            }
+            // Else as the other side's type, then as any value, as words are read elsewhere.
+            return other;
+        }
+        return wordsType(words, skriptTypeOrder());
+    }
+
+    /** Whether values of types {@code a} and {@code b} can be compared, as Skript has a comparator for them. */
+    private boolean comparable(String a, String b) {
+        Class<?> x = library.javaClass(a);
+        Class<?> y = library.javaClass(b);
+        return x != null && y != null && (x.equals(y) || co.xenastudios.neoskript.runtime.Comparison.hasEquality(x, y));
+    }
+
+    /** The first of {@code types} whose parser reads {@code words}, or {@code null}. */
+    private String wordsType(String words, List<String> types) {
+        for (String type : types) {
+            if (wordsAs(words, List.of(type)) != null) {
+                return type;
+            }
+        }
+        return null;
+    }
+
+    /** The registry's types in the order Skript tries its own, then those Skript doesn't have. */
+    private List<String> skriptTypeOrder() {
+        List<String> known = skriptTypeOrder;
+        if (known == null) {
+            java.util.LinkedHashSet<String> order = new java.util.LinkedHashSet<>();
+            for (String id : SKRIPT_TYPE_ORDER) {
+                if (registry.type(id) != null) {
+                    order.add(id);
+                }
+            }
+            for (co.xenastudios.neoskript.frontend.registry.TypeInfo type : registry.types()) {
+                order.add(type.id());
+            }
+            known = List.copyOf(order);
+            skriptTypeOrder = known;
+        }
+        return known;
+    }
+
+    private List<String> skriptTypeOrder;
+
+    /** Skript's types in the order it tries them, by NeoSkript's ids. */
+    private static final List<String> SKRIPT_TYPE_ORDER = loadLines("skript-type-order.txt");
+
+    private static List<String> loadLines(String resource) {
+        List<String> lines = new ArrayList<>();
+        try (java.io.InputStream in = TriggerCompiler.class.getResourceAsStream(resource)) {
+            if (in != null) {
+                for (String line : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).split("\n")) {
+                    if (!line.isBlank() && !line.startsWith("#")) {
+                        lines.add(line.strip());
+                    }
+                }
+            }
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        return List.copyOf(lines);
     }
 
     private void arguments(ParsedSyntax syntax) throws CompileException {
@@ -4064,7 +4218,14 @@ final class TriggerCompiler {
             return null;
         }
         // An event value's words may be another value ('entity' is the entity type); an element's only its type.
-        Object value = isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE) ? library.literal(words) : null;
+        Object value = null;
+        if (isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE)) {
+            // As the types its words are first tried as, where there are any: in a comparison, what Skript reads.
+            value = literalTypes == null ? null : wordsAs(words, literalTypes);
+            if (value == null) {
+                value = library.literal(words);
+            }
+        }
         if (value != null) {
             return value;
         }

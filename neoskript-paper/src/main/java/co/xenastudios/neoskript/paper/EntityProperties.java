@@ -651,21 +651,8 @@ final class EntityProperties {
                         default -> setKnockback(arrow, strength);
                     }
                 }), Patterns.property("arrow knockback strength", "entities"));
-        // Arrows pierce up to 127 entities.
-        registrar.expression("ExprArrowPierceLevel", "integer", info -> new Property<>(Entity.class,
-                entity -> entity instanceof AbstractArrow arrow ? (long) arrow.getPierceLevel() : null, Number.class,
-                Property.modes(Mode.SET, Mode.RESET, Mode.REMOVE, Mode.ADD), (entity, delta, mode) -> {
-                    if (!(entity instanceof AbstractArrow arrow)) {
-                        return;
-                    }
-                    int level = delta == null ? 0 : Math.max(Property.intOf(delta[0]), 0);
-                    int value = switch (mode) {
-                        case ADD -> arrow.getPierceLevel() + level;
-                        case REMOVE -> arrow.getPierceLevel() - level;
-                        default -> level;
-                    };
-                    arrow.setPierceLevel(Math.max(0, Math.min(127, value)));
-                }), Patterns.property("arrow pierce level", "entities"));
+        // No arrow pierce level: Skript registers it only where Arrow declares getPierceLevel itself, which no Paper it
+        // runs on does (it's AbstractArrow's), so 'arrow pierce level of X' is read as something else.
         registrar.expression("ExprProjectileCriticalState", "boolean", info -> new Property<>(Entity.class,
                 entity -> entity instanceof AbstractArrow arrow ? arrow.isCritical() : null, Boolean.class,
                 Property.modes(Mode.SET), (entity, delta, mode) -> {

@@ -275,7 +275,8 @@ final class Items {
             if (entity instanceof org.bukkit.entity.Item dropped) {
                 return co.xenastudios.neoskript.runtime.Comparison.equal(new ItemType(dropped.getItemStack(), true), item);
             }
-            return item.material() == org.bukkit.Material.matchMaterial(entity.getType().getKey().getKey());
+            // As Skript, as the entity's type: a spruce boat is a boat, any of them.
+            return EntityKind.of(entity.getType()).isItem(item);
         });
         // An item standing for several (an alias like 'any boots') is another if each of its items is.
         registrar.comparison(ItemType.class, ItemType.class, (item, pattern) -> item.alternatives().stream()

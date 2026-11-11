@@ -60,6 +60,35 @@ final class AliasFiles {
         return known.get(name);
     }
 
+    private static final Pattern RELATED = Pattern.compile("minecraft:([a-z0-9_]+)\\[relatedEntity=([^\\]]+)\\]");
+
+    private static volatile Map<String, String> related;
+
+    /**
+     * The entity the default aliases relate the item with Minecraft id {@code id} to ({@code relatedEntity}), as
+     * Skript's {@code Aliases.getRelatedEntity}, or {@code null}: {@code primed tnt} for {@code tnt}.
+     */
+    static String relatedEntity(String id) {
+        Map<String, String> known = related;
+        if (known == null) {
+            known = new HashMap<>();
+            for (String file : FILES) {
+                try (InputStream in = AliasFiles.class.getResourceAsStream("/aliases-english/" + file)) {
+                    if (in != null) {
+                        Matcher matcher = RELATED.matcher(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+                        while (matcher.find()) {
+                            known.putIfAbsent(matcher.group(1), matcher.group(2).strip());
+                        }
+                    }
+                } catch (IOException e) {
+                    // A broken file relates none of its items.
+                }
+            }
+            related = known;
+        }
+        return known.get(id);
+    }
+
     /** The item a Minecraft id with components stands for, or {@code null}: {@code minecraft:potion[...]}. */
     static ItemStack item(String id) {
         try {

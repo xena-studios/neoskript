@@ -44,6 +44,7 @@ Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4]
 | 25 | 2026-10-25 | 862 | Skript's /skript command |
 | 26 | 2026-10-25 | 862 | Checked line by line against a real Skript server |
 | 27 | 2026-11-11 | 862 | 98.8% of the differential identical to Skript; M4 done |
+| 28 | 2026-11-11 | 862 | 99.0% of the differential identical; comparisons and parse errors in Skript's order |
 
 ## M0: Foundations
 
@@ -617,6 +618,19 @@ Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the mo
   - `the entity` and `the player` as the event's value.
 - **Variables:** entity types are saved as Skript's entity data, byte for byte. The bytes for each type come from a real Skript server.
 - **Known differences:** 20 units where Skript's parser picks a different reading or error are listed as still to do. A few of them give different messages from one Skript run to the next.
+
+#### Batch 28 (2026-11-11)
+
+**862 of 862 tests pass; 99.0% of the differential identical (1,598 of 1,613 units).**
+- **Comparisons read words as Skript does** (`CondCompare.attemptReconstruction`). Words are read as the first of Skript's types, in its order, that the other side can be compared with, then as the other side's type. Words compared with words are read as any type in Skript's order. This was a runtime bug: `projectile is an arrow` was false. It is now true, because the entity type is compared with the arrow item.
+- **Entity types and items** compare as Skript's do. A simple entity type is the item it's registered with, `arrow` is the arrow item, and a category is an item if one of its entity types registered before it is. Other entity types use their alias's related entity (`skript-simple-entities.tsv`, from Skript 2.17.0). An entity compares with an item through its type, so a spruce boat is a `boat`.
+- **Parse errors in Skript's order:**
+  - a pattern's rest is matched before its placeholder is parsed, so a later placeholder's error is the line's;
+  - Skript's best error is kept: the first of the best quality;
+  - an event value (`event-x`) or another expression of any type that isn't of the type wanted gives Skript's `X is not a Y`;
+  - text isn't said to be the wrong type where only a literal goes.
+- **No arrow pierce level:** Skript registers it only where `Arrow` declares `getPierceLevel` itself, which no Paper it runs on does. So `arrow pierce level of X` is read as something else, as in Skript.
+- **Fixed in the differential:** ExprEntity-4, ExprArrowPierceLevel-1, CondCanAge-1, EffGenerateLoot-2. The reasons for the units still to do are now more precise.
 
 ## M5: Folia and migration
 

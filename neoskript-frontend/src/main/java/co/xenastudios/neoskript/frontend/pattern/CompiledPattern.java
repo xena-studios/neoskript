@@ -263,11 +263,14 @@ public final class CompiledPattern {
                 if (followedBy != null && !followedAt(to, followedBy)) {
                     continue;
                 }
-                Object value = resolver.resolve(input, pos, to, placeholder.spec());
-                if (value != null) {
-                    State result = next.next(to, state.withCapture(false, placeholder.index(), pos, to, value));
-                    if (result != null) {
-                        return result;
+                // As Skript's parser, the rest of the pattern is matched before what this placeholder covers is
+                // parsed, so an error in a later placeholder comes first: 'arrow pierce level of event-projectile'
+                // is about the projectile not being an item type, whatever 'arrow pierce' is.
+                State result = next.next(to, state);
+                if (result != null) {
+                    Object value = resolver.resolve(input, pos, to, placeholder.spec());
+                    if (value != null) {
+                        return result.withCapture(false, placeholder.index(), pos, to, value);
                     }
                 }
             }

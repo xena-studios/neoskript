@@ -1,0 +1,145 @@
+# Skript 2.17's simple entity types (SimpleEntityData), in the order it registers them: the entity's class (in
+# org.bukkit.entity), whether it's a single entity or a category of them (a super type), and the item it is, if
+# any (itemTypeComparator). Taken from Skript 2.17.0's SimpleEntityData.register(). A category is also an item
+# when one registered before it, of its class, is ('projectile is an arrow').
+Arrow	simple	ARROW
+CaveSpider	simple	
+DragonFireball	simple	
+Egg	simple	EGG
+EnderCrystal	simple	END_CRYSTAL
+EnderDragon	simple	
+EnderPearl	simple	ENDER_PEARL
+FishHook	simple	
+Ghast	simple	
+Giant	simple	
+LargeFireball	simple	
+LightningStrike	simple	
+Player	simple	
+SmallFireball	simple	FIRE_CHARGE
+Spider	simple	
+Squid	simple	
+TNTPrimed	simple	TNT
+Zombie	simple	
+Blaze	simple	
+EnderSignal	simple	ENDER_EYE
+MagmaCube	simple	
+Slime	simple	
+Snowball	simple	SNOWBALL
+Snowman	simple	
+IronGolem	simple	
+Ocelot	simple	
+PigZombie	simple	
+ThrownExpBottle	simple	
+Bat	simple	
+Firework	simple	FIREWORK_ROCKET
+ItemFrame	simple	ITEM_FRAME
+Painting	simple	PAINTING
+Witch	simple	
+Wither	simple	
+WitherSkeleton	simple	
+WitherSkull	simple	WITHER_SKELETON_SKULL
+Donkey	simple	
+Horse	simple	
+LeashHitch	simple	
+Mule	simple	
+SkeletonHorse	simple	
+ZombieHorse	simple	
+ArmorStand	simple	ARMOR_STAND
+ElderGuardian	simple	
+Endermite	simple	
+Guardian	simple	
+Silverfish	simple	
+TippedArrow	simple	TIPPED_ARROW
+AreaEffectCloud	simple	
+ShulkerBullet	simple	
+SpectralArrow	simple	SPECTRAL_ARROW
+Husk	simple	
+PolarBear	simple	
+Stray	simple	
+Evoker	simple	
+EvokerFangs	simple	
+LlamaSpit	simple	
+Vex	simple	
+Vindicator	simple	
+Illusioner	simple	
+Cod	simple	COD
+Dolphin	simple	
+Drowned	simple	
+Phantom	simple	
+PufferFish	simple	PUFFERFISH
+Trident	simple	TRIDENT
+Turtle	simple	
+Pillager	simple	
+Ravager	simple	
+WanderingTrader	simple	
+Hoglin	simple	
+Piglin	simple	
+PiglinBrute	simple	
+Zoglin	simple	
+GlowItemFrame	simple	GLOW_ITEM_FRAME
+GlowSquid	simple	
+Marker	simple	
+Allay	simple	
+Camel	simple	
+Interaction	simple	
+Sniffer	simple	
+Tadpole	simple	
+Warden	simple	
+Armadillo	simple	
+Bogged	simple	
+Breeze	simple	
+WindCharge	simple	WIND_CHARGE
+Creaking	simple	
+boat.AcaciaBoat	simple	ACACIA_BOAT
+boat.BambooRaft	simple	BAMBOO_RAFT
+boat.BirchBoat	simple	BIRCH_BOAT
+boat.CherryBoat	simple	CHERRY_BOAT
+boat.DarkOakBoat	simple	DARK_OAK_BOAT
+boat.JungleBoat	simple	JUNGLE_BOAT
+boat.MangroveBoat	simple	MANGROVE_BOAT
+boat.OakBoat	simple	OAK_BOAT
+boat.PaleOakBoat	simple	PALE_OAK_BOAT
+boat.SpruceBoat	simple	SPRUCE_BOAT
+boat.AcaciaChestBoat	simple	ACACIA_CHEST_BOAT
+boat.BambooChestRaft	simple	BAMBOO_CHEST_RAFT
+boat.BirchChestBoat	simple	BIRCH_CHEST_BOAT
+boat.CherryChestBoat	simple	CHERRY_CHEST_BOAT
+boat.DarkOakChestBoat	simple	DARK_OAK_CHEST_BOAT
+boat.JungleChestBoat	simple	JUNGLE_CHEST_BOAT
+boat.MangroveChestBoat	simple	MANGROVE_CHEST_BOAT
+boat.OakChestBoat	simple	OAK_CHEST_BOAT
+boat.PaleOakChestBoat	simple	PALE_OAK_CHEST_BOAT
+boat.SpruceChestBoat	simple	SPRUCE_CHEST_BOAT
+HappyGhast	simple	DRIED_GHAST
+CopperGolem	simple	COPPER_GOLEM_STATUE
+Mannequin	simple	
+CamelHusk	simple	
+Parched	simple	
+SulfurCube	simple	
+boat.PoplarBoat	simple	POPLAR_BOAT
+boat.PoplarChestBoat	simple	POPLAR_CHEST_BOAT
+Animals	super	
+AbstractHorse	super	
+Boat	super	
+ChestBoat	super	
+ChestedHorse	super	
+Creature	super	
+Damageable	super	
+Enemy	super	
+Entity	super	
+Fireball	super	FIRE_CHARGE
+Fish	super	TROPICAL_FISH
+Golem	super	
+Guardian	super	
+HumanEntity	super	
+Illager	super	
+LivingEntity	super	
+Mob	super	
+Monster	super	
+Projectile	super	
+Raider	super	
+Skeleton	super	
+Spellcaster	super	
+Tameable	super	
+WaterMob	super	
+AbstractNautilus	super	

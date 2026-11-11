@@ -151,6 +151,98 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
         return base && other.variants.containsAll(variants);
     }
 
+    /** One of Skript's simple entity types: its class, whether it's a category, and the item it is, if any. */
+    private record SimpleEntity(Class<?> entityClass, boolean category, Material item) {}
+
+    private static volatile List<SimpleEntity> simpleEntities;
+
+    /** Skript's simple entity types, in the order it registers them ({@code skript-simple-entities.tsv}). */
+    private static List<SimpleEntity> simpleEntities() {
+        List<SimpleEntity> known = simpleEntities;
+        if (known == null) {
+            known = new ArrayList<>();
+            try (java.io.InputStream in = EntityKind.class.getResourceAsStream("/skript-simple-entities.tsv")) {
+                if (in != null) {
+                    for (String line : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).split("\n")) {
+                        if (line.isBlank() || line.startsWith("#")) {
+                            continue;
+                        }
+                        String[] parts = line.split("\t", -1);
+                        try {
+                            Class<?> c = Class.forName("org.bukkit.entity." + parts[0]);
+                            Material item = parts.length > 2 && !parts[2].isBlank() ? Material.matchMaterial(parts[2].strip()) : null;
+                            known.add(new SimpleEntity(c, parts[1].equals("super"), item));
+                        } catch (ClassNotFoundException missing) {
+                            // Not in this version of Minecraft, as Skript leaves it out.
+                        }
+                    }
+                }
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+            known = List.copyOf(known);
+            simpleEntities = known;
+        }
+        return known;
+    }
+
+    /** The class this kind's entities have: its entity type's, or its category's. */
+    private Class<?> baseClass() {
+        return type != null && !includesSubtypes(type) && type.getEntityClass() != null ? type.getEntityClass() : entityClass;
+    }
+
+    /**
+     * Whether this kind is {@code item}, as Skript compares an entity type with an item type: one of its simple
+     * entity types is the item it's registered with ({@code arrow} is the arrow item), and a category is if one
+     * of its entity types registered before it is ({@code projectile} is an arrow). Its other entity types are
+     * the entity their item's alias relates it to ({@code minecart}).
+     */
+    public boolean isItem(ItemType item) {
+        Class<?> c = baseClass();
+        List<SimpleEntity> simple = simpleEntities();
+        int index = -1;
+        for (int i = 0; i < simple.size() && index < 0; i++) {
+            if (simple.get(i).entityClass() == c && simple.get(i).category() == (type == null)) {
+                index = i;
+            }
+        }
+        for (int i = 0; i < simple.size() && index < 0; i++) {
+            if (simple.get(i).entityClass() == c) {
+                index = i;
+            }
+        }
+        if (index >= 0) {
+            SimpleEntity own = simple.get(index);
+            if (!own.category()) {
+                return own.item() != null && isItem(own.item(), item);
+            }
+            for (int i = 0; i <= index; i++) {
+                SimpleEntity each = simple.get(i);
+                if (each.item() != null && c.isAssignableFrom(each.entityClass()) && isItem(each.item(), item)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        for (ItemType each : item.alternatives()) {
+            String name = AliasFiles.relatedEntity(each.material().getKey().getKey());
+            EntityKind related = name == null ? null : parse(name);
+            if (related != null && related.baseClass().isAssignableFrom(c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isItem(Material material, ItemType item) {
+        for (ItemType each : item.alternatives()) {
+            if (each.material() == material) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Whether this kind can be spawned: it's one entity type that can. */
     public boolean spawnable() {
         return type != null && (type.isSpawnable() || type == EntityType.ITEM || type == EntityType.FALLING_BLOCK);

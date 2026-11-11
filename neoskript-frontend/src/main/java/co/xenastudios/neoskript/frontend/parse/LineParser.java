@@ -263,18 +263,14 @@ final class LineParser {
                     && parsed.match().values().get(1) instanceof Expr haystack) {
                 String words = input.substring(haystack.start(), haystack.end()).strip();
                 if (Plurality.single(haystack, registry)) {
-                    if (problem == null) {
-                        problem = "'" + words + "' can only ever have one value at most, thus the 'indices of x in"
-                                + " list' expression has no effect.";
-                    }
+                    problem("'" + words + "' can only ever have one value at most, thus the 'indices of x in"
+                            + " list' expression has no effect.");
                     continue;
                 }
                 if (candidate.pattern() == 2 && !(haystack instanceof Expr.Variable || haystack instanceof Expr.Syntax
                         || haystack instanceof Expr.FunctionCall)) {
-                    if (problem == null) {
-                        problem = "'" + words + "' is not a keyed expression. You can only get the indices of a keyed"
-                                + " expression.";
-                    }
+                    problem("'" + words + "' is not a keyed expression. You can only get the indices of a keyed"
+                            + " expression.");
                     continue;
                 }
             }
@@ -286,6 +282,14 @@ final class LineParser {
             Object result = parsed;
             String type = expected == null ? null : returnType(parsed);
             if (expected != null && !expected.accepts(type, registry)) {
+                // An expression of any type that turns out not to be one wanted: Skript parses it, then can't
+                // convert it ('the clicked block is not a living entity'). An event value is one of any type
+                // written 'event-x'; a bare entity's name is Skript's entity expression, only ever an entity.
+                boolean anyType = hasTypeRole(syntax) ? Text.lower(text.strip()).replaceFirst("^the ", "").startsWith("event-")
+                        : SyntaxRegistry.OBJECT.equals(syntax.returnType());
+                if (anyType && !expected.literalOnly() && !expected.types().isEmpty() && !hasUnresolved(parsed)) {
+                    problem(text.strip() + " is " + notOfType(expected), NOT_AN_EXPRESSION);
+                }
                 continue;
             }
             // Experimental syntax only exists for scripts using its experiment, as in Skript.
@@ -304,9 +308,7 @@ final class LineParser {
                 result = new Expr.Syntax(start, end, parsed, type);
                 // Several values can't go where one does: 'test location' isn't the entities called 'test'.
                 if (expected.onlyOne() && Plurality.plural((Expr) result, registry)) {
-                    if (problem == null) {
-                        problem = "'" + text.strip() + "' can only be a single " + typeNames(expected) + ", not more.";
-                    }
+                    problem("'" + text.strip() + "' can only be a single " + typeNames(expected) + ", not more.");
                     continue;
                 }
             }
@@ -968,8 +970,9 @@ final class LineParser {
         if (!expected.accepts("string", registry) && !expected.hasType("world")) {
             // Skript parses it as text all the same, then says it's not what's wanted. (Code in it may not
             // parse, which Skript's text then fails on instead, so only plain text is said to be.)
-            if (!expected.types().isEmpty() && embedded.isEmpty()) {
-                problem(input.substring(start, end) + " is " + notOfType(expected));
+            // Not where only a literal goes, which Skript reads without parsing an expression.
+            if (!expected.types().isEmpty() && embedded.isEmpty() && !expected.literalOnly()) {
+                problem(input.substring(start, end) + " is " + notOfType(expected), NOT_AN_EXPRESSION);
             }
             return null;
         }
@@ -1688,8 +1691,24 @@ final class LineParser {
 
     /** A problem found while parsing, reported if the line doesn't parse at all. */
     private void problem(String found) {
-        if (problem == null) {
+        problem(found, SEMANTIC_ERROR);
+    }
+
+    /** Skript's error qualities ({@code ErrorQuality}): a value that isn't of the type wanted is a lesser error. */
+    private static final int NOT_AN_EXPRESSION = 1;
+    private static final int SEMANTIC_ERROR = 2;
+
+    /** The quality of {@link #problem}. */
+    private int problemQuality;
+
+    /**
+     * A problem found while parsing, of a quality, kept as Skript's parse log keeps its error: the first of the
+     * best quality.
+     */
+    private void problem(String found, int quality) {
+        if (problem == null || quality > problemQuality) {
             problem = found;
+            problemQuality = quality;
         }
     }
 

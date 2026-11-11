@@ -27,6 +27,20 @@ public final class Comparison {
         EQUALITIES.add(new Equality(left, right, (java.util.function.BiPredicate<Object, Object>) test));
     }
 
+    /**
+     * Whether what {@code is} means between values of {@code a} and {@code b} was registered, either way round, as
+     * Skript has a comparator for them.
+     */
+    public static boolean hasEquality(Class<?> a, Class<?> b) {
+        for (Equality equality : EQUALITIES) {
+            if (equality.left().isAssignableFrom(a) && equality.right().isAssignableFrom(b)
+                    || equality.left().isAssignableFrom(b) && equality.right().isAssignableFrom(a)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean isWhole(Number value) {
         return value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte;
     }
