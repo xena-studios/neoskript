@@ -82,6 +82,7 @@ public final class ScriptCheck {
         parsed.forEach(script -> diagnostics.addAll(script.diagnostics()));
         try {
             CompiledScripts compiled = new ScriptCompiler(library, new VariableStore()).compile(parsed);
+            diagnostics.removeIf(compiled::unparsed);
             diagnostics.addAll(compiled.diagnostics());
         } catch (RuntimeException | LinkageError e) {
             // Some of what the compiler checks needs a running server; the parse's problems still stand.

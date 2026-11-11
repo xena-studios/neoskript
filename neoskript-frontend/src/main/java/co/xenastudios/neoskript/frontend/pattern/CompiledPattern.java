@@ -259,6 +259,7 @@ public final class CompiledPattern {
         private State placeholder(PatternElement.Placeholder placeholder, int pos, State state, Continuation next) {
             List<String> followedBy = placeholder.followedBy();
             int[] ends = placeholder.atEnd() ? endIfBalanced(pos) : Spans.candidateEnds(input, pos, end);
+            State backup = null;
             for (int to : ends) {
                 if (followedBy != null && !followedAt(to, followedBy)) {
                     continue;
@@ -270,11 +271,28 @@ public final class CompiledPattern {
                 if (result != null) {
                     Object value = resolver.resolve(input, pos, to, placeholder.spec());
                     if (value != null) {
-                        return result.withCapture(false, placeholder.index(), pos, to, value);
+                        result = result.withCapture(false, placeholder.index(), pos, to, value);
+                        // A later placeholder that's words no type takes: longer text is tried for this one, and the
+                        // first such match is kept for if none comes without, as in Skript.
+                        if (!unparsedAfter(result, placeholder.index())) {
+                            return result;
+                        }
+                        if (backup == null) {
+                            backup = result;
+                        }
                     }
                 }
             }
-            return null;
+            return backup;
+        }
+
+        private boolean unparsedAfter(State state, int index) {
+            for (Capture c = state.captures(); c != null; c = c.previous()) {
+                if (!c.regex() && c.index() > index && resolver.unparsed(c.value())) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static int[] reversed(int[] ends) {

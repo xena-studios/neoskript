@@ -316,6 +316,13 @@ public interface Registrar {
      */
     default void describe(String id, Describer describer) {}
 
+    /**
+     * What expression {@code id} gives, by how it's matched, where it's registered as giving any type: as Skript's
+     * {@code getReturnType} once set up ({@code the clicked block} is a block). {@code type} returns a type's id, or
+     * {@code null} for any type.
+     */
+    default void returnType(String id, java.util.function.Function<co.xenastudios.neoskript.api.element.ElementInfo, String> type) {}
+
     /** Writes an element as Skript's {@code toString} does. */
     @FunctionalInterface
     interface Describer {

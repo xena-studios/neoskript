@@ -131,8 +131,8 @@ final class BlockSyntax {
                 }
             }
             return types.size() == 1 ? types.getFirst() : types.toArray();
-        }, "[the] type of %entitytypes/itemtypes/skriptpotioneffects/blockdatas/entities/blocks%",
-                "%entitytypes/itemtypes/skriptpotioneffects/blockdatas/entities/blocks%'[s] type");
+        }, "[the] type of %entitytypes/itemtypes/inventories/skriptpotioneffects/blockdatas/entities/blocks%",
+                "%entitytypes/itemtypes/inventories/skriptpotioneffects/blockdatas/entities/blocks%'[s] type");
 
         registrar.expression("ExprVersion", "string", info -> {
             boolean skript = info.hasTag("skript");

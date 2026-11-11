@@ -36,6 +36,10 @@ import java.util.regex.Pattern;
  * and the checks in {@code corpus/differential/checks} (load only), the probes in {@code corpus/differential} (each runs its {@code probe_<name>()}) and the
  * real-world corpus (each runs its self-test). Variables left at the end are compared too.
  *
+ * <p>Some of Skript's results vary between runs, so it's run {@code -Pharness.differential.skriptRuns} times (3 by
+ * default), and a unit is identical when NeoSkript gives what Skript gave in any of them. The report lists the units
+ * that vary in Skript.
+ *
  * <p>Skript doesn't run on Folia, so Folia is compared with Skript on Paper of the same Minecraft
  * version. Skript's results are cached by their inputs in {@code .harness-cache/differential}.
  *
@@ -107,17 +111,22 @@ public final class DifferentialScenario implements Scenario {
         Path runs = context.config().runsDir().resolve(context.environment().name()).resolve(name());
 
         String key = cacheKey(context, referenceEnv, inputs);
-        Path cached = context.config().cacheDir().resolve("differential").resolve(key + ".json");
         Gson gson = new Gson();
-        Results skript;
-        if (Files.exists(cached)) {
-            skript = gson.fromJson(Files.readString(cached), Results.class);
-        } else {
-            Implementation implementation =
-                    new Implementation("Skript", "Skript", context.skriptJar());
-            skript = gather(context, referenceEnv, implementation, inputs, runs.resolve("skript"));
+        // Some of Skript's results vary between runs (it iterates hash sets and maps), so it's run several times,
+        // each run cached, and NeoSkript matches a unit if it gives what Skript gave in any of them.
+        List<Results> skriptRuns = new ArrayList<>();
+        for (int run = 1; run <= skriptRuns(); run++) {
+            Path cached = context.config().cacheDir().resolve("differential")
+                    .resolve(key + (run == 1 ? "" : ".run" + run) + ".json");
+            if (Files.exists(cached)) {
+                skriptRuns.add(gson.fromJson(Files.readString(cached), Results.class));
+                continue;
+            }
+            Implementation implementation = new Implementation("Skript", "Skript", context.skriptJar());
+            Results skript = gather(context, referenceEnv, implementation, inputs, runs.resolve("skript"));
             Files.createDirectories(cached.getParent());
             Files.writeString(cached, gson.toJson(skript));
+            skriptRuns.add(skript);
         }
         Implementation neoskript = new Implementation("NeoSkript", "NeoSkript", context.neoskriptJar());
         Results neo = gather(context, context.environment(), neoskript, inputs, runs.resolve("neoskript"));
@@ -125,15 +134,28 @@ public final class DifferentialScenario implements Scenario {
         List<String> units = new ArrayList<>(inputs.loadOnly().keySet());
         units.addAll(inputs.running().keySet());
         Map<String, Object> differences = new TreeMap<>();
+        List<String> varying = new ArrayList<>();
         for (String unit : units) {
-            Map<String, Object> difference = difference(
-                    skript.messages().getOrDefault(unit, List.of()), neo.messages().getOrDefault(unit, List.of()),
-                    skript.output().get(unit), neo.output().get(unit));
-            if (!difference.isEmpty()) {
+            // The difference from Skript's first run, unless NeoSkript gives what Skript gave in another.
+            Map<String, Object> difference = null;
+            for (Results skript : skriptRuns) {
+                Map<String, Object> found = difference(skript.messages().getOrDefault(unit, List.of()),
+                        neo.messages().getOrDefault(unit, List.of()), skript.output().get(unit), neo.output().get(unit));
+                if (difference == null || found.isEmpty()) {
+                    difference = found;
+                }
+                if (found.isEmpty()) {
+                    break;
+                }
+            }
+            if (variesBetween(skriptRuns, unit)) {
+                varying.add(unit);
+            }
+            if (difference != null && !difference.isEmpty()) {
                 differences.put(unit, difference);
             }
         }
-        boolean variablesMatch = skript.variables().equals(neo.variables());
+        boolean variablesMatch = skriptRuns.stream().anyMatch(skript -> skript.variables().equals(neo.variables()));
         int total = units.size() + 1;
         int identical = total - differences.size() - (variablesMatch ? 0 : 1);
         double percent = 100.0 * identical / total;
@@ -151,8 +173,10 @@ public final class DifferentialScenario implements Scenario {
         report.put("percent", Math.floor(percent * 10) / 10);
         report.put("unexpected", unexpected);
         report.put("knownAndNowIdentical", fixed);
+        report.put("skriptRuns", skriptRuns.size());
+        report.put("varyInSkript", varying);
         if (!variablesMatch) {
-            report.put("variables", Map.of("skript", skript.variables(), "neoskript", neo.variables()));
+            report.put("variables", Map.of("skript", skriptRuns.getFirst().variables(), "neoskript", neo.variables()));
         }
         report.put("differences", differences);
         Path reportFile = context.writeReport(name(), report);
@@ -160,6 +184,7 @@ public final class DifferentialScenario implements Scenario {
         context.summary("identical", identical);
         context.summary("percent", Math.floor(percent * 10) / 10);
         context.summary("unexpected", unexpected.size());
+        context.summary("varyInSkript", varying.size());
 
         if (percent < REQUIRED || !unexpected.isEmpty() || !variablesMatch) {
             throw new HarnessFailure(String.format(
@@ -167,6 +192,23 @@ public final class DifferentialScenario implements Scenario {
                     percent, total, REQUIRED, unexpected.size(), variablesMatch ? "" : ", and the variables differ",
                     unexpected.stream().limit(20).toList(), reportFile));
         }
+    }
+
+    /** How many times to run the reference Skript: {@code -Pharness.differential.skriptRuns=N}, 3 by default. */
+    private static int skriptRuns() {
+        return Math.max(1, Integer.parseInt(System.getProperty("harness.differential.skriptRuns", "3").strip()));
+    }
+
+    /** Whether Skript's messages or output for the unit differ between its runs. */
+    private static boolean variesBetween(List<Results> runs, String unit) {
+        for (Results run : runs.subList(1, runs.size())) {
+            if (!eventListsSorted(run.messages().getOrDefault(unit, List.of()))
+                            .equals(eventListsSorted(runs.getFirst().messages().getOrDefault(unit, List.of())))
+                    || !java.util.Objects.equals(run.output().get(unit), runs.getFirst().output().get(unit))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Map<String, Object> difference(

@@ -263,6 +263,7 @@ public final class Library implements Registrar {
     public void timeStates(String expressionId, java.util.function.Predicate<co.xenastudios.neoskript.api.element.ElementInfo> accepts) {
         checkOpen();
         timeStates.put(expressionId, accepts);
+        builder.timeStates(expressionId);
     }
 
     /**
@@ -748,6 +749,22 @@ public final class Library implements Registrar {
      * resolved for it, as in Skript; one having it is enough. Else Skript's error for it, about
      * {@code eventDescription} ({@code an on join event}); without a description, just that there's none.
      */
+    /** Errors of excluded event values the parser used up, by event classes, class and type: see {@link #parserAsked}. */
+    private final Map<String, String> parserAsked = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * The parser used up the error of an excluded event value ({@code Use 'attacker' and/or 'victim'...}), as Skript's
+     * event value does when it's set up: the compiler asking for it next gets it, once ({@link #takeParserAsked}).
+     */
+    void parserAsked(List<Class<?>> eventClasses, Class<?> valueClass, String type, String error) {
+        parserAsked.put(eventClasses + "/" + valueClass.getName() + "/" + type, error);
+    }
+
+    /** The error {@link #parserAsked} kept for this value, now taken, or {@code null}. */
+    String takeParserAsked(List<Class<?>> eventClasses, Class<?> valueClass, String type) {
+        return parserAsked.remove(eventClasses + "/" + valueClass.getName() + "/" + type);
+    }
+
     EventValueLookup eventValue(List<Class<?>> eventClasses, Class<?> valueClass, String type, int time,
             String eventDescription) {
         EventValueResolver resolver = resolver();
@@ -1358,10 +1375,82 @@ public final class Library implements Registrar {
         return List.copyOf(values);
     }
 
+    private final Map<String, java.util.function.Function<co.xenastudios.neoskript.api.element.ElementInfo, String>> returnTypes =
+            new java.util.HashMap<>();
+
+    @Override
+    public void returnType(String id, java.util.function.Function<co.xenastudios.neoskript.api.element.ElementInfo, String> type) {
+        checkOpen();
+        returnTypes.put(id, type);
+    }
+
+    /** An element as the parser matched it, for what describes it or says what it gives before it's set up. */
+    private co.xenastudios.neoskript.api.element.ElementInfo parsedInfo(int pattern,
+            co.xenastudios.neoskript.frontend.pattern.MatchResult match) {
+        List<String> types = new ArrayList<>();
+        List<String> literals = new ArrayList<>();
+        for (Object value : match.values()) {
+            String type = value instanceof co.xenastudios.neoskript.frontend.parse.Expr expr
+                    && !(value instanceof co.xenastudios.neoskript.frontend.parse.Expr.Variable) ? expr.type() : null;
+            types.add(type == null || type.equals(SyntaxRegistry.OBJECT) ? null : type);
+            literals.add(switch (value) {
+                case co.xenastudios.neoskript.frontend.parse.Expr.Literal literal -> literal.text();
+                case co.xenastudios.neoskript.frontend.parse.Expr.Unresolved words -> words.text();
+                case null, default -> null;
+            });
+        }
+        List<co.xenastudios.neoskript.api.element.ElementInfo.TypeArgument> typeArguments = new ArrayList<>();
+        for (Object value : match.regexValues()) {
+            if (value instanceof co.xenastudios.neoskript.frontend.registry.TypeRef ref) {
+                typeArguments.add(new co.xenastudios.neoskript.api.element.ElementInfo.TypeArgument(ref.type().id(),
+                        ref.type().name(), ref.plural(), javaClass(ref.type().id())));
+            }
+        }
+        return new co.xenastudios.neoskript.api.element.ElementInfo(pattern, match.mark(), match.tags(), 0, 0,
+                typeArguments, types, singles(match), literals);
+    }
+
+    /** Which of {@code match}'s arguments are one value, as {@link co.xenastudios.neoskript.api.element.ElementInfo} has it. */
+    private long singles(co.xenastudios.neoskript.frontend.pattern.MatchResult match) {
+        long single = 0;
+        for (int i = 0; i < match.values().size() && i < 64; i++) {
+            if (match.values().get(i) instanceof co.xenastudios.neoskript.frontend.parse.Expr expr
+                    && co.xenastudios.neoskript.frontend.parse.Plurality.single(expr, registry)) {
+                single |= 1L << i;
+            }
+        }
+        return single;
+    }
+
     /** The syntax registry for the frontend. Nothing can be registered after this is called. */
     public synchronized SyntaxRegistry registry() {
         if (registry == null) {
             CoreSyntax.registerLast(this);
+            // A type whose values' class is under another's is that type too, as Skript's class infos are by class:
+            // an entity is a command sender, a player a living entity.
+            javaClasses.forEach((sub, subClass) -> javaClasses.forEach((sup, supClass) -> {
+                if (!sub.equals(sup) && subClass != Object.class && supClass != Object.class && supClass != subClass
+                        && supClass.isAssignableFrom(subClass)) {
+                    builder.assignable(sub, sup);
+                }
+            }));
+            SkriptOrder.conversions(javaClasses.keySet(), builder);
+            builder.describer((syntax, pattern, match, arguments) -> {
+                Describer described = describers.get(syntax.id());
+                return described == null ? null : described.describe(parsedInfo(pattern, match), arguments);
+            });
+            builder.typer((syntax, pattern, match) -> {
+                var type = returnTypes.get(syntax.id());
+                return type == null ? null : type.apply(parsedInfo(pattern, match));
+            });
+            for (Key key : bindings.keySet()) {
+                if (key.kind() == SyntaxKind.EXPRESSION && SkriptOrder.anyType(key.id())) {
+                    builder.anyType(key.id());
+                }
+            }
+            for (SyntaxKind kind : SyntaxKind.values()) {
+                builder.order(kind, syntaxes -> SkriptOrder.sort(kind, syntaxes));
+            }
             registry = builder.eventValues(new LibraryEventValues(this)).build();
         }
         return registry;

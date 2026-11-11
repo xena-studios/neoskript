@@ -108,7 +108,8 @@ final class WorldSyntax {
     static void registerCountedEntityTypes(Registrar registrar) {
         registrar.type("countedentitytype", "entity type", EntityKind.class);
         registrar.subtype("countedentitytype", "entitytype");
-        registrar.literalParser("countedentitytype", text -> EntityKind.counted(text) ? EntityKind.parse(text) : null);
+        // As Skript's entity type, with an amount or not; entity types without one are read as the others first.
+        registrar.literalParser("countedentitytype", EntityKind::parse);
     }
 
     static void register(Registrar registrar) {
@@ -338,7 +339,7 @@ final class WorldSyntax {
             };
         }, "(spawn|summon) %entitytypes/entitysnapshots% [%directions% %locations%]",
                 "(spawn|summon) %number% of %entitytypes/entitysnapshots% [%directions% %locations%]",
-                "(spawn|summon) %number% %entitytypes% [%directions% %locations%]",
+                "(spawn|summon) %*number% %*entitytypes% [%directions% %locations%]",
                 "(spawn|summon) %experience% [%directions% %locations%]");
         // 'shoot an arrow from the player', 'make {_loc} shoot a pig at speed 2': its code runs for each one shot.
         registrar.section("EffSecShoot", "entity", info -> {
@@ -476,7 +477,7 @@ final class WorldSyntax {
                 "(all [[of] the]|the) entities of type[s] %entitytypes% in radius %number% (of|around) %location%",
                 "(all [[of] the]|the) %*pluralentitytypes% within %location% and %location%",
                 "%*pluralentitytypes%");
-        registrar.describe("ExprEntities", (info, args) -> "all entities of type " + args.get(0) + switch (info.pattern()) {
+        registrar.describe("ExprEntities", (info, args) -> "all entities of type " + singular(args.get(0)) + switch (info.pattern()) {
             case 0, 1 -> args.get(1) != null ? " in " + args.get(1) : args.get(2) != null ? " in " + args.get(2) : "";
             case 2, 3 -> " in radius " + args.get(1) + " around " + args.get(2);
             case 4 -> " within " + args.get(1) + " and " + args.get(2);
@@ -566,6 +567,13 @@ final class WorldSyntax {
             BlockFace.SOUTH_WEST};
 
     /** ExprDirection's {@code in the (horizontal) direction/facing of X}, {@code length} long. */
+    /** An entity type as Skript's entity data writes itself: by its name, in the singular ('pig' for 'pigs'). */
+    private static String singular(String written) {
+        EntityKind kind = written == null ? null : EntityKind.parse(written);
+        return kind != null && kind.type() != null && kind.variants().isEmpty() && kind.amount() == 1
+                ? EntityKind.name(kind.type()) : written;
+    }
+
     private static Direction relativeTo(Object of, double length, boolean horizontal, boolean facing) {
         if (of instanceof Block block) {
             BlockFace face = Direction.getFacing(block);

@@ -650,7 +650,7 @@ final class EntityProperties {
                         }
                         default -> setKnockback(arrow, strength);
                     }
-                }), Patterns.property("arrow knockback strength", "entities"));
+                }), Patterns.property("arrow knockback strength", "projectiles"));
         // No arrow pierce level: Skript registers it only where Arrow declares getPierceLevel itself, which no Paper it
         // runs on does (it's AbstractArrow's), so 'arrow pierce level of X' is read as something else.
         registrar.expression("ExprProjectileCriticalState", "boolean", info -> new Property<>(Entity.class,
@@ -681,7 +681,7 @@ final class EntityProperties {
                 }
                 return Property.single(new ArrayList<>(blocks));
             };
-        }, Patterns.property("(attached|hit) block[multiple:s]", "entities"));
+        }, Patterns.property("(attached|hit) block[multiple:s]", "projectiles"));
     }
 
     @SuppressWarnings("removal")

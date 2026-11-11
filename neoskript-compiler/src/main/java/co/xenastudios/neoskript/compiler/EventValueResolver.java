@@ -104,7 +104,7 @@ final class EventValueResolver {
 
     /**
      * {@link #resolve} without using up an excluded value's error, for the parser checking what code can have
-     * before the script is set up: the error still comes the first time the code asks for it.
+     * before the script is set up (and what it would say): the error still comes the first time the code asks for it.
      */
     Resolution peek(Class<?> eventClass, Class<?> valueClass, String type, int time, int flags) {
         if (time == 0) {
@@ -118,7 +118,8 @@ final class EventValueResolver {
         if (!resolution.errored()) {
             cache.put(new Key(eventClass, valueClass, type, time, flags), resolution);
         }
-        return resolution.errored() ? Resolution.ABORTED : resolution;
+        // An excluded value's error is told, but not kept: the code asking still gets it.
+        return resolution;
     }
 
     private Resolution resolveNew(Class<?> event, Class<?> valueClass, String type, int time, int flags) {

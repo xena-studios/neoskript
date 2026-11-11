@@ -1,0 +1,432 @@
+# Skript 2.17's types (by code name) and which of them its parser takes where another is wanted: 'sub' where one's
+# class is under the other's, 'conv' where Skript has a converter between them (Converters.converterExists, its
+# chained converters and the filtered ones that cast included). Taken from Skript's registry on a server, as: kind,
+# from, to. A 'type' line names a type with nothing to convert to or from.
+conv	long	double
+conv	long	float
+conv	long	short
+conv	long	byte
+conv	long	integer
+sub	long	number
+conv	double	long
+conv	double	float
+conv	double	short
+conv	double	byte
+conv	double	integer
+sub	double	number
+conv	float	long
+conv	float	double
+conv	float	short
+conv	float	byte
+conv	float	integer
+sub	float	number
+conv	short	long
+conv	short	double
+conv	short	float
+conv	short	byte
+conv	short	integer
+sub	short	number
+conv	byte	long
+conv	byte	double
+conv	byte	float
+conv	byte	short
+conv	byte	integer
+sub	byte	number
+conv	string	world
+conv	string	textcomponent
+conv	string	metadataholder
+conv	string	audience
+conv	uuid	string
+conv	uuid	world
+conv	uuid	textcomponent
+conv	uuid	metadataholder
+conv	uuid	audience
+conv	experience	long
+conv	experience	double
+conv	experience	float
+conv	experience	short
+conv	experience	byte
+conv	experience	integer
+conv	experience	number
+conv	experience	entitydata
+conv	experience	entitytype
+conv	config	node
+sub	config	named
+sub	node	named
+sub	function	executable
+sub	function	named
+conv	projectile	inventory
+conv	projectile	location
+conv	projectile	player
+conv	projectile	display
+conv	projectile	livingentity
+sub	projectile	entity
+conv	projectile	offlineplayer
+sub	projectile	commandsender
+conv	projectile	inventoryholder
+sub	projectile	metadataholder
+sub	projectile	nameable
+sub	projectile	audience
+conv	projectile	entitydata
+sub	world	metadataholder
+sub	world	audience
+conv	itementity	inventory
+conv	itementity	location
+conv	itementity	player
+conv	itementity	display
+conv	itementity	livingentity
+sub	itementity	entity
+conv	itementity	offlineplayer
+sub	itementity	commandsender
+conv	itementity	inventoryholder
+sub	itementity	metadataholder
+sub	itementity	nameable
+sub	itementity	audience
+conv	itementity	entitydata
+conv	entitysnapshot	entitydata
+conv	entitysnapshot	entitytype
+conv	vehicle	inventory
+conv	vehicle	location
+conv	vehicle	player
+conv	vehicle	display
+conv	vehicle	livingentity
+sub	vehicle	entity
+conv	vehicle	offlineplayer
+sub	vehicle	commandsender
+conv	vehicle	inventoryholder
+sub	vehicle	metadataholder
+sub	vehicle	nameable
+sub	vehicle	audience
+conv	vehicle	entitydata
+conv	script	config
+conv	script	node
+sub	script	named
+sub	queue	numbered
+conv	block	inventory
+conv	block	location
+conv	block	inventoryholder
+sub	block	metadataholder
+conv	block	itemtype
+conv	block	named
+conv	block	numbered
+conv	block	itemstack
+conv	block	equippablecomponent
+conv	block	itemcomponent
+conv	player	block
+conv	player	inventory
+conv	player	location
+conv	player	display
+sub	player	livingentity
+sub	player	entity
+sub	player	offlineplayer
+sub	player	commandsender
+sub	player	inventoryholder
+sub	player	metadataholder
+sub	player	nameable
+sub	player	audience
+conv	player	entitydata
+conv	slot	itemtype
+sub	slot	named
+sub	slot	numbered
+conv	slot	itemstack
+conv	slot	equippablecomponent
+conv	slot	itemcomponent
+conv	vector	direction
+sub	keyedbossbar	bossbar
+conv	enchantment	enchantmenttype
+conv	enchantmentoffer	enchantmenttype
+conv	display	inventory
+conv	display	location
+conv	display	player
+conv	display	livingentity
+sub	display	entity
+conv	display	offlineplayer
+sub	display	commandsender
+conv	display	inventoryholder
+sub	display	metadataholder
+sub	display	nameable
+sub	display	audience
+conv	display	entitydata
+sub	convergingparticle	particle
+sub	directionalparticle	particle
+sub	scalableparticle	particle
+conv	skriptpotioneffect	potioneffect
+conv	skriptpotioneffect	potioneffecttype
+conv	potioneffect	skriptpotioneffect
+conv	potioneffecttype	skriptpotioneffect
+conv	textcomponent	string
+conv	textcomponent	world
+conv	textcomponent	metadataholder
+conv	textcomponent	audience
+conv	integer	long
+conv	integer	double
+conv	integer	float
+conv	integer	short
+conv	integer	byte
+sub	integer	number
+conv	livingentity	inventory
+conv	livingentity	location
+conv	livingentity	player
+conv	livingentity	display
+sub	livingentity	entity
+conv	livingentity	offlineplayer
+sub	livingentity	commandsender
+conv	livingentity	inventoryholder
+sub	livingentity	metadataholder
+sub	livingentity	nameable
+sub	livingentity	audience
+conv	livingentity	entitydata
+conv	entity	inventory
+conv	entity	location
+conv	entity	player
+conv	entity	display
+conv	entity	livingentity
+conv	entity	offlineplayer
+sub	entity	commandsender
+conv	entity	inventoryholder
+sub	entity	metadataholder
+sub	entity	nameable
+sub	entity	audience
+conv	entity	entitydata
+conv	offlineplayer	inventory
+conv	offlineplayer	location
+conv	offlineplayer	player
+conv	offlineplayer	display
+conv	offlineplayer	livingentity
+conv	offlineplayer	entity
+conv	offlineplayer	commandsender
+conv	offlineplayer	inventoryholder
+conv	offlineplayer	metadataholder
+conv	offlineplayer	nameable
+conv	offlineplayer	audience
+conv	offlineplayer	entitydata
+conv	number	long
+conv	number	double
+conv	number	float
+conv	number	short
+conv	number	byte
+conv	number	integer
+conv	commandsender	block
+conv	commandsender	inventory
+conv	commandsender	location
+conv	commandsender	player
+conv	commandsender	display
+conv	commandsender	livingentity
+conv	commandsender	entity
+conv	commandsender	offlineplayer
+conv	commandsender	inventoryholder
+conv	commandsender	metadataholder
+conv	commandsender	nameable
+sub	commandsender	audience
+conv	commandsender	entitydata
+conv	inventoryholder	block
+conv	inventoryholder	location
+conv	inventoryholder	entity
+conv	inventoryholder	commandsender
+conv	inventoryholder	metadataholder
+conv	inventoryholder	nameable
+conv	inventoryholder	audience
+conv	metadataholder	inventory
+conv	metadataholder	location
+conv	metadataholder	player
+conv	metadataholder	display
+conv	metadataholder	livingentity
+conv	metadataholder	entity
+conv	metadataholder	offlineplayer
+conv	metadataholder	commandsender
+conv	metadataholder	inventoryholder
+conv	metadataholder	nameable
+conv	metadataholder	audience
+conv	metadataholder	entitydata
+sub	itemtype	named
+sub	itemtype	numbered
+conv	itemtype	itemstack
+conv	itemtype	equippablecomponent
+conv	itemtype	itemcomponent
+conv	nameable	inventory
+conv	nameable	location
+conv	nameable	player
+conv	nameable	display
+conv	nameable	livingentity
+conv	nameable	entity
+conv	nameable	offlineplayer
+conv	nameable	commandsender
+conv	nameable	inventoryholder
+conv	nameable	metadataholder
+conv	nameable	audience
+conv	nameable	entitydata
+conv	audience	block
+conv	audience	inventory
+conv	audience	location
+conv	audience	player
+conv	audience	display
+conv	audience	livingentity
+conv	audience	entity
+conv	audience	offlineplayer
+conv	audience	commandsender
+conv	audience	inventoryholder
+conv	audience	metadataholder
+conv	audience	nameable
+conv	audience	entitydata
+conv	entitydata	long
+conv	entitydata	double
+conv	entitydata	float
+conv	entitydata	short
+conv	entitydata	byte
+conv	entitydata	experience
+conv	entitydata	integer
+conv	entitydata	number
+conv	entitydata	entitytype
+conv	named	config
+conv	named	node
+conv	named	itemtype
+conv	named	numbered
+conv	named	itemstack
+conv	named	equippablecomponent
+conv	named	itemcomponent
+conv	numbered	itemtype
+conv	numbered	named
+conv	numbered	itemstack
+conv	numbered	equippablecomponent
+conv	numbered	itemcomponent
+conv	itemstack	itemtype
+conv	itemstack	named
+conv	itemstack	numbered
+conv	itemstack	equippablecomponent
+conv	itemstack	itemcomponent
+sub	equippablecomponent	itemcomponent
+type	long
+type	double
+type	float
+type	boolean
+type	short
+type	byte
+type	string
+type	uuid
+type	weathertype
+type	time
+type	timeperiod
+type	date
+type	direction
+type	color
+type	treetype
+type	experience
+type	gamerulevalue
+type	config
+type	node
+type	function
+type	valued
+type	containing
+type	projectile
+type	world
+type	inventoryaction
+type	clicktype
+type	inventorytype
+type	gamemode
+type	itementity
+type	material
+type	teleportcause
+type	spawnreason
+type	respawnreason
+type	cachedservericon
+type	fireworktype
+type	fireworkeffect
+type	difficulty
+type	resourcepackstate
+type	soundcategory
+type	healreason
+type	gamerule
+type	attributetype
+type	environment
+type	moonphase
+type	quitreason
+type	inventoryclosereason
+type	transformreason
+type	unleashreason
+type	itemflag
+type	experiencecooldownchangereason
+type	villagerprofession
+type	entitysnapshot
+type	bannerpattern
+type	bannerpatterntype
+type	vehicle
+type	equipmentslot
+type	villagercareerchangereason
+type	script
+type	quaternion
+type	queue
+type	block
+type	chunk
+type	inventory
+type	location
+type	player
+type	slot
+type	vector
+type	keyedbossbar
+type	bossbarstyle
+type	damagesource
+type	damagetype
+type	enchantment
+type	enchantmenttype
+type	enchantmentoffer
+type	teleportflag
+type	display
+type	billboard
+type	textalignment
+type	itemdisplaytransform
+type	fishingstate
+type	inputkey
+type	itemrarity
+type	loottable
+type	lootcontext
+type	gameeffect
+type	entityeffect
+type	bukkitparticle
+type	convergingparticle
+type	directionalparticle
+type	scalableparticle
+type	skriptpotioneffect
+type	potioneffect
+type	potioneffecttype
+type	potioncause
+type	potionaction
+type	potioneffecttypecategory
+type	minecrafttag
+type	textcomponent
+type	worldborder
+type	cattype
+type	chickenvariant
+type	cowvariant
+type	frogvariant
+type	gene
+type	pigvariant
+type	wolfvariant
+type	zombienautilusvariant
+type	integer
+type	timespan
+type	executable
+type	livingentity
+type	entity
+type	offlineplayer
+type	bossbar
+type	particle
+type	number
+type	commandsender
+type	inventoryholder
+type	metadataholder
+type	itemtype
+type	nameable
+type	audience
+type	entitydata
+type	entitytype
+type	classinfo
+type	named
+type	numbered
+type	blockdata
+type	itemstack
+type	equippablecomponent
+type	damagecause
+type	itemcomponent
+type	biome
+type	villagertype
+type	object

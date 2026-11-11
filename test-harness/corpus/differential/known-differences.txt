@@ -4,19 +4,8 @@
 folia: probes/world # The console runs on Folia's global thread, which can't read the world's regions.
 
 # Not matched yet: still to do, not impossible.
-examples/CondPotionHasParticles-1 # Skript then reads 'has particles' as having the particle type, which isn't an item type; NeoSkript stops at 'the potion effect' outside its section
-examples/EffChange-2 # Skript reads 'the data value of the clicked block' through an expression of living entities; NeoSkript doesn't understand the line
-examples/EffOpenInventory-1 # Skript's 'show' effect reads 'the player' first, and there's none in a damage event; NeoSkript's stricter types turn the inventory down before that
-examples/ExprAttachedBlock-1 # Skript's 'last shot arrow' is an entity, which can't go where projectiles do (no converter); NeoSkript's types are looser and read it as the projectile
-examples/ExprClicked-1 # Skript says the inventory is neither a game effect nor a particle; NeoSkript's stricter types don't understand the line
-examples/ExprColored-2 # Skript reads 'the player argument' as an argument of a type and says what it isn't; NeoSkript doesn't understand the expression
-examples/ExprElement-6 # Skript takes the first split its parser tries, 'broadcast <the 1st element> in <{queue}>' with the words kept unparsed, and then can't initialise it; NeoSkript prefers a split without unparsed words
-examples/ExprElement-7 # Skript takes the first split its parser tries, 'broadcast <the first 3 elements> in <{queue}>' with the words kept unparsed, and then can't initialise it; NeoSkript prefers a split without unparsed words
-examples/ExprItemCompCopy-1 # Skript drops the inner expression's experiment error when the outer experimental expression is refused; NeoSkript gives it
-examples/ExprLocationAt-1 # Skript's error quotes 'the world arg-4', read as a typed argument; NeoSkript's quotes 'arg-4' (Skript's own result varies between runs)
-examples/ExprNumberOfCharacters-1 # Skript's chat message is a text component, which can't be divided; NeoSkript's is a text, so the line isn't understood
-examples/ExprPassenger-1 # Skript names its EntityData class and the type 'pig' for 'pigs' in its errors, and its line 5 error varies between runs
-examples/ExprPersistentData-1 # Skript says there's no player in a damage event for 'player's tool'; NeoSkript reads the slot first and turns down the value
-examples/ExprSecCreateLootContext-1 # Skript says the loot items can't be given to a player; NeoSkript turns down the event's loot, several values, where one goes
-examples/ExprTagContents-2 # Skript reads 'first element of player's tool's block tags' as the block tags of the first element of the tool, several tags where one goes in the brackets; NeoSkript reads the first of the tool's tags
-examples/ExprLowestHighestSolidBlock-2 # Skript's own result varies between runs: it sometimes can't set the location of the highest solid block
+examples/CondPotionHasParticles-1 # Skript's error is that 'particles' (all of the particles) isn't an item type, a lesser error than the one for 'the potion effect' outside its section, which Skript doesn't give here; why it isn't tried, or is dropped, is still to find
+examples/ExprItemCompCopy-1 # both expressions need the experiment; Skript gives no error for the outer one and drops the inner one's, so the value is an unparsed literal it can't understand; NeoSkript gives the inner error
+examples/ExprLocationAt-1 # Skript's result varies between runs, about half each: 'the world arg-4' (a typed argument, the more common in 15 runs) or 'arg-4'; NeoSkript gives 'arg-4', one of Skript's results. Which one depends on Skript's expression parse cache and its order of syntax by hash code
+examples/ExprNumberOfCharacters-1 # the chat message is now a text component, as in Skript; Skript's error comes from reading the colonless 'if' line's words again (CondCompare's reconstruction of its unparsed literal), which tries 'number of uppercase chars in (message / length of message)'; NeoSkript says it can't compare the words
+examples/ExprSecCreateLootContext-1 # Skript makes the value an unparsed literal (quotes, variable and all) and says it can't be given to a player; NeoSkript only makes words and bracketed words unparsed literals, as doing so for any text changes other units' errors

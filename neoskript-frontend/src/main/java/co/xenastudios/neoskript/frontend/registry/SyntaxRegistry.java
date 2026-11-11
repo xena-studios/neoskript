@@ -95,6 +95,14 @@ public final class SyntaxRegistry {
         this.functions = Frozen.map(functions);
         this.supertypes = closure(builder.supertypes);
         this.strictTypes = Frozen.set(builder.strictTypes);
+        this.skriptTypes = Frozen.set(builder.skriptTypes);
+        Map<String, Set<String>> skriptConversions = new HashMap<>();
+        builder.skriptConversions.forEach((from, to) -> skriptConversions.put(from, Frozen.set(to)));
+        this.skriptConversions = Frozen.map(skriptConversions);
+        this.timed = Frozen.set(builder.timed);
+        this.anyTyped = Frozen.set(builder.anyTyped);
+        this.describer = builder.describer;
+        this.typer = builder.typer;
         this.enumerableTypes = Frozen.set(builder.enumerableTypes);
         this.literalChecks = Frozen.map(builder.literalChecks);
         this.parseChecks = Frozen.map(builder.parseChecks);
@@ -147,6 +155,66 @@ public final class SyntaxRegistry {
     /** Whether the expression can only be used with a section under it, as Skript's section-only expressions. */
     public boolean sectionOnly(SyntaxInfo syntax) {
         return sectionOnly.contains(syntax.id());
+    }
+
+    private final Set<String> timed;
+    private final Set<String> anyTyped;
+    private final Describer describer;
+    private final Typer typer;
+
+    /** What syntax gives, by how it's matched: see {@link Builder#typer}. */
+    @FunctionalInterface
+    public interface Typer {
+        String type(SyntaxInfo syntax, int pattern, co.xenastudios.neoskript.frontend.pattern.MatchResult match);
+    }
+
+    /** The type of what {@code syntax}, registered as giving any type, gives as matched, or {@code null}. */
+    public String typeOf(SyntaxInfo syntax, int pattern, co.xenastudios.neoskript.frontend.pattern.MatchResult match) {
+        if (typer == null) {
+            return null;
+        }
+        try {
+            String type = typer.type(syntax, pattern, match);
+            return type == null || type(type) == null ? null : type;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** How syntax writes itself in errors: see {@link Builder#describer}. */
+    @FunctionalInterface
+    public interface Describer {
+        String describe(SyntaxInfo syntax, int pattern, co.xenastudios.neoskript.frontend.pattern.MatchResult match,
+                List<String> arguments);
+    }
+
+    /** {@code syntax} as it writes itself in errors, or {@code null} for the text as written. */
+    public String describe(SyntaxInfo syntax, int pattern, co.xenastudios.neoskript.frontend.pattern.MatchResult match,
+            List<String> arguments) {
+        if (describer == null) {
+            return null;
+        }
+        try {
+            return describer.describe(syntax, pattern, match, arguments);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Whether Skript registers expression {@code id} as returning any type ({@link Builder#anyType}). */
+    public boolean isAnyTyped(String id) {
+        return anyTyped.contains(id);
+    }
+    /** Skript's types, by NeoSkript's ids, between which {@link #skriptConversions} says what's taken as what. */
+    private final Set<String> skriptTypes;
+    private final Map<String, Set<String>> skriptConversions;
+
+    /**
+     * Whether expression {@code id} may have a past or future state ({@code past tool}), as Skript's
+     * {@code setTime}; event values aren't asked.
+     */
+    public boolean hasTimeStates(String id) {
+        return timed.contains(id);
     }
 
     /** The check the syntax element makes while it's parsed, or {@code null} if it makes none. */
@@ -307,9 +375,10 @@ public final class SyntaxRegistry {
 
     /**
      * Whether a value of type {@code from} can be used where {@code to} is expected: the same type, a
-     * subtype, an {@code object}, or a registered conversion. Two types with no known relation are allowed
-     * unless one of them is strict (numbers, text, booleans and the like), so missing relations between
-     * game types don't cause false errors.
+     * subtype, an {@code object}, or a registered conversion. Between two of Skript's types, as Skript's parser
+     * takes them ({@link Builder#skriptConversion}): one under the other or with a converter between them. Two types
+     * with no known relation, one of them not Skript's, are allowed unless one of them is strict (numbers, text,
+     * booleans and the like), so missing relations between game types don't cause false errors.
      */
     public boolean isAssignable(String from, String to) {
         if (from == null || to == null || from.equals(to) || from.equals(OBJECT) || to.equals(OBJECT)) {
@@ -318,6 +387,10 @@ public final class SyntaxRegistry {
         Set<String> supers = supertypes.get(from);
         if (supers != null && supers.contains(to)) {
             return true;
+        }
+        if (skriptTypes.contains(from) && skriptTypes.contains(to)) {
+            Set<String> targets = skriptConversions.get(from);
+            return targets != null && targets.contains(to);
         }
         if (convertsTo(from, to) || (supers != null && supers.stream().anyMatch(s -> convertsTo(s, to)))) {
             return true;
@@ -514,9 +587,24 @@ public final class SyntaxRegistry {
 
         private final List<Before> befores = new ArrayList<>();
 
+        private final Map<SyntaxKind, java.util.function.Function<List<SyntaxInfo>, List<SyntaxInfo>>> orders =
+                new EnumMap<>(SyntaxKind.class);
+
+        /**
+         * Orders the syntax of {@code kind} before it's tried: {@code order} is given it in the order it was added,
+         * and returns it in the order to try it. {@link #before} still applies after.
+         */
+        public Builder order(SyntaxKind kind, java.util.function.Function<List<SyntaxInfo>, List<SyntaxInfo>> order) {
+            orders.put(kind, order);
+            return this;
+        }
+
         /** The syntax of {@code kind} in the order it's tried. */
         private List<SyntaxInfo> ordered(SyntaxKind kind) {
             List<SyntaxInfo> list = new ArrayList<>(syntaxes.getOrDefault(kind, List.of()));
+            if (orders.containsKey(kind)) {
+                list = new ArrayList<>(orders.get(kind).apply(List.copyOf(list)));
+            }
             for (Before before : befores) {
                 if (before.kind() != kind) {
                     continue;
@@ -729,6 +817,64 @@ public final class SyntaxRegistry {
         }
 
         /** Types that only accept themselves and registered conversions, like numbers and text. */
+
+        /**
+         * Marks expression {@code id} as one Skript registers as returning any type: it's tried wherever a value
+         * goes, and if what it gives then isn't wanted, that's the error and nothing else is tried there.
+         */
+        public Builder anyType(String id) {
+            anyTyped.add(id);
+            return this;
+        }
+
+        private final Set<String> anyTyped = new HashSet<>();
+
+        /**
+         * How syntax writes itself in errors, as Skript's {@code toString}: given a syntax element, how it was
+         * matched and its arguments as written so, it returns its text, or {@code null} for the text as written.
+         */
+        public Builder describer(Describer describer) {
+            this.describer = describer;
+            return this;
+        }
+
+        private Describer describer;
+
+        /** What syntax registered as giving any type gives, by how it's matched, or {@code null} if it can't tell. */
+        public Builder typer(Typer typer) {
+            this.typer = typer;
+            return this;
+        }
+
+        private Typer typer;
+
+        /** Marks expression {@code id} as one that may have a past or future state ({@code past tool}). */
+        public Builder timeStates(String id) {
+            timed.add(id);
+            return this;
+        }
+
+        private final Set<String> timed = new HashSet<>();
+
+        /** Type {@code id} is one of Skript's, which is only taken as another of Skript's as it says. */
+        public Builder skriptType(String id) {
+            skriptTypes.add(id);
+            return this;
+        }
+
+        /**
+         * Skript's parser takes values of its type {@code from} where its type {@code to} is wanted: one is under the
+         * other, or Skript has a converter between them.
+         */
+        public Builder skriptConversion(String from, String to) {
+            skriptTypes.add(from);
+            skriptTypes.add(to);
+            skriptConversions.computeIfAbsent(from, k -> new HashSet<>()).add(to);
+            return this;
+        }
+
+        private final Set<String> skriptTypes = new HashSet<>();
+        private final Map<String, Set<String>> skriptConversions = new HashMap<>();
 
         public Builder strict(String... types) {
             strictTypes.addAll(List.of(types));

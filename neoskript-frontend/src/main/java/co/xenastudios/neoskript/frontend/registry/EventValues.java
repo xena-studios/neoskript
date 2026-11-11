@@ -47,5 +47,13 @@ public interface EventValues {
         default boolean allowsLeftOut(SyntaxInfo syntax, co.xenastudios.neoskript.frontend.pattern.PlaceholderSpec spec) {
             return true;
         }
+
+        /**
+         * Skript's error for an event value {@link #allows} turns down, as its event value expression's init gives
+         * it ({@code There's no player in an on damage event.}), or {@code null} if it can't tell.
+         */
+        default String missing(SyntaxInfo syntax, TypeRef type, String words) {
+            return null;
+        }
     }
 }

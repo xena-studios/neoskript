@@ -93,6 +93,26 @@ class PatternTest {
     }
 
     @Test
+    void laterUnparsedWordsMakeAPlaceholderTryLongerText() {
+        // As Skript's TypePatternElement: words no type takes after a placeholder make it try longer text first...
+        PlaceholderResolver words = new PlaceholderResolver() {
+            @Override
+            public Object resolve(String input, int start, int end, PlaceholderSpec spec) {
+                return input.substring(start, end);
+            }
+
+            @Override
+            public boolean unparsed(Object value) {
+                return value.toString().contains("junk");
+            }
+        };
+        CompiledPattern pattern = PatternCompiler.compile("set %objects% to %objects%");
+        assertEquals(List.of("a to junk", "b"), pattern.match("set a to junk to b", words).values());
+        // ...and the first match is kept if every one has them.
+        assertEquals(List.of("a", "junk to junk"), pattern.match("set a to junk to junk", words).values());
+    }
+
+    @Test
     void choicesWithMarksCombineByXor() {
         String pattern = "(1¦add|2¦remove|3¦set) %number% [(4¦twice)]";
         assertEquals(1, match(pattern, "add 5").mark());

@@ -81,11 +81,17 @@ public sealed interface Expr {
      * entity names. The standard library resolves or rejects it later.
      *
      * @param verified whether a type's literal parser accepted it while parsing, so it's a real literal
+     * @param problem the best error found while trying to read the words as something else, which Skript's unparsed
+     *     literal keeps and gives if nothing can make sense of it, or {@code null}
      */
-    record Unresolved(int start, int end, String text, boolean verified) implements Expr {
+    record Unresolved(int start, int end, String text, boolean verified, String problem) implements Expr {
 
         public Unresolved(int start, int end, String text) {
             this(start, end, text, false);
+        }
+
+        public Unresolved(int start, int end, String text, boolean verified) {
+            this(start, end, text, verified, null);
         }
 
         @Override

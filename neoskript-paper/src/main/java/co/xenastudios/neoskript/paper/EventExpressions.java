@@ -522,11 +522,11 @@ final class EventExpressions {
                 "[the] (unknown|non-existent) command message");
     }
 
-    /** An event's message, as text, which {@code set} and {@code delete} change. */
+    /** An event's message, a text component as in Skript 2.17, which {@code set} and {@code delete} change. */
     private static void message(Registrar registrar, String id, String written, Class<?> eventClass,
             Function<Object, net.kyori.adventure.text.Component> getter,
             BiConsumer<Object, net.kyori.adventure.text.Component> setter, String pattern) {
-        registrar.expression(id, "string", info -> {
+        registrar.expression(id, "textcomponent", info -> {
             restrict(info, written, eventClass);
             return new EventMessage(eventClass, getter, setter);
         }, pattern);
@@ -540,8 +540,7 @@ final class EventExpressions {
             if (!eventClass.isInstance(context.event())) {
                 return null;
             }
-            net.kyori.adventure.text.Component message = getter.apply(context.event());
-            return message == null ? null : Messages.LEGACY_SECTION.serialize(message);
+            return getter.apply(context.event());
         }
 
         @Override
@@ -596,6 +595,17 @@ final class EventExpressions {
 
     /** {@code the clicked block}, {@code the clicked entity}, {@code the clicked slot}... */
     private static void registerClicked(Registrar registrar) {
+        // As Skript's getReturnType: 'the clicked block' is a block, 'the clicked zombie' an entity.
+        registrar.returnType("ExprClicked", info -> switch (Events.mark(info)) {
+            case 1 -> "number";
+            case 2 -> info.argumentType(0) != null && info.argumentType(0).contains("entitytype")
+                    || info.argumentLiteral(0) != null && EntityKind.parse(info.argumentLiteral(0)) != null ? "entity" : "block";
+            case 3 -> "slot";
+            case 4 -> "inventory";
+            case 5 -> "clicktype";
+            case 6 -> "inventoryaction";
+            default -> null;
+        });
         registrar.expression("ExprClicked", "object", info -> {
             int clicked = Events.mark(info);
             switch (clicked) {

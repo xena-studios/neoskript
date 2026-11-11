@@ -39,6 +39,8 @@ final class LineParser {
     private static final Object FAILED = new Object();
     // \p{N} spelled out as its three categories: TeaVM (the browser parser) has no \p{N}.
     private static final Pattern FUNCTION_NAME = Pattern.compile("[\\p{L}_][\\p{L}\\p{Nd}\\p{Nl}\\p{No}_]*");
+    /** Words with a bracketed part first, as in {@code (first element of X)'s tag contents}. */
+    private static final Pattern BRACKETED_WORDS = Pattern.compile("\\([\\p{L}\\p{Nd}' ()\\-+*/^.]*");
 
     private final ParserContext context;
     private final SyntaxRegistry registry;
@@ -217,6 +219,11 @@ final class LineParser {
             // An event value the code can't have isn't one, so another reading is tried, as Skript's fails to
             // initialize: 'amount of slots of {_inv}' in 'on load' is the inventory's number of slots.
             if (eventScope != null && hasTypeRole(syntax) && !eventValueAllowed(parsed, text)) {
+                // Skript's event value expression fails to set up, with its error, where Skript has one for it.
+                String missing = skriptEventValue(parsed, text) ? missingEventValue(parsed, text) : null;
+                if (missing != null) {
+                    problem(missing);
+                }
                 refusedEventValues = true;
                 refusedSkriptValues |= skriptEventValue(parsed, text);
                 continue;
@@ -242,6 +249,12 @@ final class LineParser {
                 }
                 continue;
             }
+            // Words no type reads can't be an operand, as Skript's arithmetic can't convert its unparsed literal to
+            // any operation's type and fails to set up.
+            if (syntax.id().equals("ExprArithmetic") && parsed.match().values().stream()
+                    .anyMatch(value -> value instanceof Expr.Unresolved words && !words.verified() && !anyLiteral(words.text()))) {
+                continue;
+            }
             if (syntax.id().equals("ExprArithmetic") && !arithmeticOperands(parsed)) {
                 arithmeticProblem(parsed);
                 continue;
@@ -250,6 +263,42 @@ final class LineParser {
             // in world "world"' is a loop over those players.
             if (syntax.id().equals("SecFor") && !parsed.match().values().subList(0, parsed.match().values().size() - 1)
                     .stream().allMatch(Expr.Variable.class::isInstance)) {
+                continue;
+            }
+            // 'past X' only for what can have that state, as Skript's init refuses the rest: 'future xp level - past exp
+            // level' is the difference of two levels. (Which event values have one is for the compiler to say.)
+            if (syntax.id().equals("ExprTimeState") && parsed.match().values().getFirst() instanceof Expr timed
+                    && !mayHaveTimeState(timed)) {
+                problem(input.substring(timed.start(), timed.end()).strip() + " does not have a "
+                        + (candidate.pattern() >= 2 ? "future" : "past") + " state");
+                continue;
+            }
+            // A direction after a direction word is another one written out, as Skript's init refuses anything else:
+            // 'size of blocks 3 below location below {_l}' isn't '(size of ...) below {_l}'.
+            if (syntax.id().equals("ExprDirection") && candidate.pattern() == 0 && parsed.match().values().size() > 1
+                    && parsed.match().values().get(1) instanceof Expr next
+                    && !(next instanceof Expr.Syntax direction && direction.syntax().syntax().id().equals("ExprDirection")
+                            && direction.syntax().pattern() == 0)) {
+                continue;
+            }
+            // Excluding values from one value isn't, as Skript's init refuses it: 'size of {_l::*} except 5' is the
+            // size of the list without 5.
+            if (syntax.id().equals("ExprExcept") && parsed.match().values().getFirst() instanceof Expr source
+                    && !(source instanceof Expr.ListOf) && Plurality.single(source, registry)) {
+                problem("Must provide a list containing more than one object to exclude objects from.");
+                continue;
+            }
+            // An inventory of items in an inventory isn't one, as Skript's init refuses it (its issue 6290): 'items in
+            // the player's inventory' are the items.
+            if (syntax.id().equals("ExprInventory") && parsed.match().values().getFirst() instanceof Expr.Syntax holders
+                    && holders.syntax().syntax().id().equals("ExprItemsIn")) {
+                continue;
+            }
+            // 'recursive X' only for what can give nested lists, as Skript's init refuses the rest: 'recursive size of
+            // {_l::*}' is the list's recursive size.
+            if (syntax.id().equals("ExprRecursive") && parsed.match().values().getFirst() instanceof Expr nested
+                    && !nestable(nested)) {
+                problem(input.substring(nested.start(), nested.end()).strip() + " does not support nested structures.");
                 continue;
             }
             // 'all colours' only for types whose values can be listed; 'all players' is something else's.
@@ -279,16 +328,37 @@ final class LineParser {
                     && Plurality.single(filtered, registry)) {
                 continue;
             }
+            // Arithmetic with no operation for its operands' types isn't, as Skript's init refuses it: '{_l} * 1 second'.
+            List<String> arithmetic = syntax.id().equals("ExprArithmetic") ? arithmeticTypes(parsed) : null;
+            if (arithmetic != null && arithmetic.isEmpty()) {
+                // With Skript's error when both types are known: 'division can't be performed on a text component
+                // and an integer'.
+                arithmeticProblem(parsed);
+                continue;
+            }
             Object result = parsed;
             String type = expected == null ? null : returnType(parsed);
+            if (expected != null && arithmetic != null && !expected.anything() && !expected.literalOnly()
+                    && arithmetic.stream().noneMatch(each -> expected.accepts(each, registry))) {
+                // Arithmetic whose values can't be any type wanted can't be converted to one: Skript then tries
+                // nothing else here. 'health of {_e} / max health of {_e}' is the health divided.
+                if (!hasUnresolved(parsed)) {
+                    problem(text.strip() + " is " + notOfType(expected), NOT_AN_EXPRESSION);
+                    break;
+                }
+                continue;
+            }
             if (expected != null && !expected.accepts(type, registry)) {
                 // An expression of any type that turns out not to be one wanted: Skript parses it, then can't
                 // convert it ('the clicked block is not a living entity'). An event value is one of any type
                 // written 'event-x'; a bare entity's name is Skript's entity expression, only ever an entity.
-                boolean anyType = hasTypeRole(syntax) ? Text.lower(text.strip()).replaceFirst("^the ", "").startsWith("event-")
-                        : SyntaxRegistry.OBJECT.equals(syntax.returnType());
+                boolean anyType = registry.isAnyTyped(syntax.id()) || (hasTypeRole(syntax)
+                        ? Text.lower(text.strip()).replaceFirst("^the ", "").startsWith("event-")
+                        : SyntaxRegistry.OBJECT.equals(syntax.returnType()));
                 if (anyType && !expected.literalOnly() && !expected.types().isEmpty() && !hasUnresolved(parsed)) {
-                    problem(text.strip() + " is " + notOfType(expected), NOT_AN_EXPRESSION);
+                    problem(described(parsed, text) + " is " + notOfType(expected), NOT_AN_EXPRESSION);
+                    // Skript takes the first expression that initialises, then can't convert it: no other is tried.
+                    break;
                 }
                 continue;
             }
@@ -309,6 +379,11 @@ final class LineParser {
                 // Several values can't go where one does: 'test location' isn't the entities called 'test'.
                 if (expected.onlyOne() && Plurality.plural((Expr) result, registry)) {
                     problem("'" + text.strip() + "' can only be a single " + typeNames(expected) + ", not more.");
+                    // As Skript checks this after taking the first expression that initialises, no other is tried:
+                    // '(first element of player's tool's block tags)' is the block tags of the first element.
+                    if (!hasUnresolved(parsed)) {
+                        break;
+                    }
                     continue;
                 }
             }
@@ -325,6 +400,33 @@ final class LineParser {
             }
         }
         return propertyRefused && fallbackUnresolved > 0 ? null : fallback;
+    }
+
+    /** Whether {@code expr} might have a past or future state: an event value, or syntax that may have one. */
+    private boolean mayHaveTimeState(Expr expr) {
+        return switch (expr) {
+            case Expr.Syntax syntax -> hasTypeRole(syntax.syntax().syntax())
+                    || registry.hasTimeStates(syntax.syntax().syntax().id())
+                    || syntax.syntax().syntax().id().equals("ExprTimeState");
+            case Expr.ListOf list -> list.items().stream().anyMatch(this::mayHaveTimeState);
+            default -> false;
+        };
+    }
+
+    /**
+     * Whether {@code expr} can give nested lists, as Skript's {@code returnNestedStructures}: a list variable, or the
+     * indices of one, keyed or not.
+     */
+    private static boolean nestable(Expr expr) {
+        return switch (expr) {
+            case Expr.Variable variable -> variable.list();
+            case Expr.Syntax syntax -> switch (syntax.syntax().syntax().id()) {
+                case "ExprIndices", "ExprKeyed", "ExprRecursive" -> syntax.syntax().match().values().getFirst() instanceof Expr inner
+                        && nestable(inner);
+                default -> false;
+            };
+            default -> false;
+        };
     }
 
     /**
@@ -684,6 +786,16 @@ final class LineParser {
         return true;
     }
 
+    /** Skript's error for the event value {@code parsed} the line can't use, or {@code null}. */
+    private String missingEventValue(ParsedSyntax parsed, String text) {
+        for (Object value : parsed.match().regexValues()) {
+            if (value instanceof TypeRef ref) {
+                return eventScope.missing(parsed.syntax(), ref, text.strip());
+            }
+        }
+        return null;
+    }
+
     /** Whether {@code parsed}, if it's an event value, is one the line can use. */
     private boolean eventValueAllowed(ParsedSyntax parsed, String text) {
         for (Object value : parsed.match().regexValues()) {
@@ -708,7 +820,8 @@ final class LineParser {
 
     private boolean returnTypeFits(SyntaxInfo syntax, Expected expected) {
         // Expressions whose type comes from a regex (event-<type>) are checked after matching.
-        return syntax.returnType() == null || hasTypeRole(syntax) || expected.accepts(syntax.returnType(), registry);
+        return syntax.returnType() == null || hasTypeRole(syntax) || registry.isAnyTyped(syntax.id())
+                || expected.accepts(syntax.returnType(), registry);
     }
 
     private static boolean hasTypeRole(SyntaxInfo syntax) {
@@ -716,18 +829,39 @@ final class LineParser {
                 || syntax.regexRoles().contains(RegexRole.BARE_ENTITY);
     }
 
-    private static String returnType(ParsedSyntax parsed) {
+    private String returnType(ParsedSyntax parsed) {
         for (Object value : parsed.match().regexValues()) {
             if (value instanceof TypeRef ref) {
                 return ref.type().id();
             }
         }
+        if (parsed.syntax().id().equals("ExprArithmetic") && parsed.match().values().size() == 2) {
+            return arithmeticType(parsed);
+        }
         String type = parsed.syntax().returnType();
+        if (SyntaxRegistry.OBJECT.equals(type)) {
+            String typed = registry.typeOf(parsed.syntax(), parsed.pattern(), parsed.match());
+            if (typed != null) {
+                return typed;
+            }
+        }
         Integer typedBy = ARGUMENT_TYPED.get(parsed.syntax().id());
         if (typedBy != null && typedBy < parsed.match().values().size()
                 && parsed.match().values().get(typedBy) instanceof Expr argument
                 && !(argument instanceof Expr.Variable) && argument.type() != null) {
-            // '3 of stone': its argument's values, with an amount, as Skript's return type is its argument's.
+            // '3 of stone': its argument's values, with an amount, as Skript's return type is its argument's. Words
+            // a type's parser took are of the first type the placeholder wants that takes them.
+            if (argument instanceof Expr.Unresolved words && words.verified()) {
+                PlaceholderSpec[] specs = context.specs(parsed.syntax().patterns().get(parsed.pattern()));
+                if (typedBy < specs.length && specs[typedBy] != null) {
+                    for (String name : specs[typedBy].types()) {
+                        TypeRef ref = registry.resolveType(name);
+                        if (ref != null && ref.type().openLiterals() && registry.isLiteral(ref.type(), words.text())) {
+                            return ref.type().id();
+                        }
+                    }
+                }
+            }
             return argument.type();
         }
         if (CHOOSING.contains(parsed.syntax().id())) {
@@ -743,6 +877,78 @@ final class LineParser {
             return shared == null ? SyntaxRegistry.OBJECT : shared;
         }
         return type == null ? SyntaxRegistry.OBJECT : type;
+    }
+
+    /**
+     * Skript's arithmetic operations (its DefaultOperations, the text module's and Vault's money), by operator as
+     * {@code ExprArithmetic}'s patterns have them: the left type, the right type and the result's type.
+     */
+    private static final String[][][] SKRIPT_OPERATIONS = {
+        {{"number", "number", "number"}, {"timespan", "timespan", "timespan"}, {"date", "timespan", "date"},
+            {"vector", "vector", "vector"}, {"string", "string", "string"}, {"textcomponent", "textcomponent", "textcomponent"},
+            {"textcomponent", "string", "textcomponent"}, {"string", "textcomponent", "textcomponent"},
+            {"money", "money", "money"}},
+        {{"number", "number", "number"}, {"timespan", "timespan", "timespan"}, {"date", "timespan", "date"},
+            {"vector", "vector", "vector"}, {"money", "money", "money"}},
+        {{"number", "number", "number"}, {"timespan", "number", "timespan"}, {"number", "timespan", "timespan"},
+            {"vector", "vector", "vector"}, {"vector", "number", "vector"}, {"number", "vector", "vector"},
+            {"money", "money", "money"}},
+        {{"number", "number", "number"}, {"timespan", "number", "timespan"}, {"timespan", "timespan", "number"},
+            {"vector", "vector", "vector"}, {"vector", "number", "vector"}, {"money", "money", "money"}},
+        {{"number", "number", "number"}},
+    };
+
+    /**
+     * The type of arithmetic's values, as Skript's {@code ExprArithmetic} works it out: one type if its operations can
+     * only give one, else any type.
+     */
+    private String arithmeticType(ParsedSyntax parsed) {
+        List<String> types = arithmeticTypes(parsed);
+        return types == null || types.size() != 1 ? SyntaxRegistry.OBJECT : types.getFirst();
+    }
+
+    /**
+     * The types arithmetic's values can be, as Skript's {@code ExprArithmetic} works them out (its return type and
+     * {@code knownReturnTypes}): of the operation for its operands' types; with one of any type, of the operations
+     * with the other's type; with both of any type, of any operation with the operator. Whole numbers added, taken
+     * away or multiplied are a whole number. Empty if no operation fits, {@code null} if it can't be told.
+     */
+    private List<String> arithmeticTypes(ParsedSyntax parsed) {
+        if (parsed.pattern() >= SKRIPT_OPERATIONS.length || parsed.match().values().size() != 2) {
+            return null;
+        }
+        String[] types = new String[2];
+        for (int i = 0; i < 2; i++) {
+            Object operand = parsed.match().values().get(i);
+            if (operand instanceof Expr.Unresolved) {
+                // Words are read as what the operation takes, so they say nothing yet.
+                return null;
+            }
+            String type = operand instanceof Expr expr ? expr.type() : null;
+            types[i] = type == null || registry.type(type) == null ? SyntaxRegistry.OBJECT : type;
+        }
+        boolean leftKnown = !types[0].equals(SyntaxRegistry.OBJECT);
+        boolean rightKnown = !types[1].equals(SyntaxRegistry.OBJECT);
+        List<String> results = new ArrayList<>();
+        for (String[] operation : SKRIPT_OPERATIONS[parsed.pattern()]) {
+            if (leftKnown && !isOperand(types[0], operation[0]) || rightKnown && !isOperand(types[1], operation[1])) {
+                continue;
+            }
+            String result = operation[2].equals("number") && parsed.pattern() < 3 && types[0].equals("integer")
+                    && types[1].equals("integer") ? "integer" : operation[2];
+            if (registry.type(result) != null && !results.contains(result)) {
+                results.add(result);
+            }
+            if (leftKnown && rightKnown) {
+                break;
+            }
+        }
+        return results;
+    }
+
+    /** Whether a value of {@code type} can be an operand of {@code wanted}: it is one, or converts to one. */
+    private boolean isOperand(String type, String wanted) {
+        return type.equals(wanted) || registry.isSubtype(type, wanted) || registry.isConvertible(type, wanted);
     }
 
     /** Expressions that give one of their arguments' values. */
@@ -766,11 +972,19 @@ final class LineParser {
                 }
                 Expected expected = context.expected(spec);
                 Expr value = expression(start, end, literalOnly ? context.intern(expected.asLiteralOnly()) : expected);
-                if (leaned != null && value != null && countUnresolved(value) > 0) {
+                // Words alone where any value goes are Skript's unparsed literal, which its parser takes at the first
+                // split it tries, as the placeholder's own reading: 'broadcast <the 1st element> in <{queue}>'.
+                if (leaned != null && value != null && countUnresolved(value) > 0
+                        && !(value instanceof Expr.Unresolved && expected.anything())) {
                     leaned[0] = true;
                     return null;
                 }
                 return value;
+            }
+
+            @Override
+            public boolean unparsed(Object value) {
+                return value instanceof Expr.Unresolved words && !words.verified() && !anyLiteral(words.text());
             }
 
             @Override
@@ -820,6 +1034,20 @@ final class LineParser {
         };
     }
 
+    /** Whether some type's parser takes {@code words}, as Skript's {@code Classes.parse(words, Object.class)}. */
+    private boolean anyLiteral(String words) {
+        if (context.isItemAlias(words)) {
+            return true;
+        }
+        String normalized = Literals.normalize(words);
+        for (TypeInfo type : registry.types()) {
+            if (type.openLiterals() ? registry.isLiteral(type, words) : type.literals().contains(normalized)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** A type name or entity name, as in {@code event-player} or {@code the zombie}. */
     private TypeRef typeName(int start, int end) {
         String name = Literals.normalize(input.substring(start, end));
@@ -844,6 +1072,25 @@ final class LineParser {
         if (start >= end) {
             return null;
         }
+        // The best error found reading this text, as Skript's parse log for it keeps: an unparsed literal keeps it.
+        String[] frame = {null, "0"};
+        frames.push(frame);
+        Expr expr;
+        try {
+            expr = parseExpressionLogged(start, end, expected);
+        } finally {
+            frames.pop();
+        }
+        if (expr instanceof Expr.Unresolved words && !words.verified() && frame[0] != null && expected.anything()) {
+            return new Expr.Unresolved(words.start(), words.end(), words.text(), false, frame[0]);
+        }
+        return expr;
+    }
+
+    /** The errors of the texts being read, innermost first: see {@link #parseExpression}. */
+    private final java.util.Deque<String[]> frames = new java.util.ArrayDeque<>();
+
+    private Expr parseExpressionLogged(int start, int end, Expected expected) {
         char first = input.charAt(start);
         char last = input.charAt(end - 1);
         if (first == '\u201C' || first == '\u201D' || last == '\u201C' || last == '\u201D') {
@@ -880,6 +1127,12 @@ final class LineParser {
         if (expr == null) {
             expr = unresolved(start, end, expected);
         }
+        if (expr == null && expected.anything() && !expected.literalOnly() && BRACKETED_WORDS.matcher(input).region(start, end).matches()
+                && Scanner.listSeparators(input, start, end, new boolean[1]).isEmpty()) {
+            // Where only any value goes, Skript makes words it can't read an unparsed literal, brackets and all, for
+            // the syntax to make sense of: '(first element of player's tool's block tags)'s tag contents'.
+            expr = new Expr.Unresolved(start, end, input.substring(start, end), false);
+        }
         if (expr != null && expected.changeable() && !isChangeable(expr)) {
             return null;
         }
@@ -894,6 +1147,17 @@ final class LineParser {
             return null;
         }
         return expr;
+    }
+
+    /** {@code parsed}, written as {@code text}, as Skript's {@code toString} writes it in errors. */
+    private String described(ParsedSyntax parsed, String text) {
+        List<String> arguments = new ArrayList<>();
+        for (Object value : parsed.match().values()) {
+            arguments.add(value instanceof Expr.Syntax inner ? described(inner.syntax(), input.substring(inner.start(), inner.end()))
+                    : value instanceof Expr expr ? input.substring(expr.start(), expr.end()).strip() : null);
+        }
+        String described = registry.describe(parsed.syntax(), parsed.pattern(), parsed.match(), arguments);
+        return described != null ? described : text.strip();
     }
 
     /** Skript's {@code notOfType}: {@code not a loot table}, {@code neither a text nor a number}. */
@@ -1709,6 +1973,12 @@ final class LineParser {
         if (problem == null || quality > problemQuality) {
             problem = found;
             problemQuality = quality;
+        }
+        for (String[] frame : frames) {
+            if (frame[0] == null || quality > Integer.parseInt(frame[1])) {
+                frame[0] = found;
+                frame[1] = Integer.toString(quality);
+            }
         }
     }
 

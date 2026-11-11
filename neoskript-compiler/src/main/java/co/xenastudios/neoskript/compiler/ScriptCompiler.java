@@ -29,6 +29,9 @@ import java.util.Set;
  */
 public final class ScriptCompiler {
 
+    /** The lines, as {@code file:line}, of sections whose header failed: see {@link CompiledScripts#unparsed}. */
+    private java.util.Set<String> unparsedLines = new java.util.HashSet<>();
+
     private final Library library;
     private final VariableStore globals;
     private final Map<FunctionInfo, FunctionHandle> handles;
@@ -54,6 +57,7 @@ public final class ScriptCompiler {
         List<CompiledScripts.CompiledTrigger> triggers = new ArrayList<>();
         List<Diagnostic> diagnostics = new ArrayList<>();
         warnings = diagnostics;
+        unparsedLines = new java.util.HashSet<>();
         Map<String, String> unrunnableTests = new java.util.LinkedHashMap<>();
         Map<FunctionInfo, FunctionHandle> functions = handles;
         List<CompiledScripts.CompiledFunctionBody> bodies = new ArrayList<>();
@@ -176,7 +180,7 @@ public final class ScriptCompiler {
             }
         }
         co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(null);
-        return new CompiledScripts(triggers, bodies, diagnostics, unrunnableTests, commands);
+        return new CompiledScripts(triggers, bodies, diagnostics, unrunnableTests, commands, unparsedLines);
     }
 
     /** One line of code compiled on its own, for Skript's effect commands: its trigger, or else its errors. */
@@ -231,8 +235,10 @@ public final class ScriptCompiler {
     private TriggerCompiler compiler(Map<FunctionInfo, FunctionHandle> functions, ParsedScript script) {
         String name = script.file().name();
         List<Diagnostic> into = warnings;
+        java.util.Set<String> skipped = unparsedLines;
         return new TriggerCompiler(library, functions, globals, script)
-                .warnings((at, message) -> into.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message)));
+                .warnings((at, message) -> into.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message)))
+                .unparsed(line -> skipped.add(name + ":" + line));
     }
 
     /** How often an {@code every <timespan>} event runs: its timespan, which has to be written out. */

@@ -175,7 +175,10 @@ final class Particles {
             }
         });
         registrar.literalError(Particles::dataError);
-        registrar.namedType("particle", "particle effect", ParticleEffect.class, particles);
+        registrar.namedType("particle", "particle", ParticleEffect.class, particles);
+        // Skript's type is called a particle, and is read as a particle effect too.
+        registrar.alias("particle", "particle", "particles");
+        registrar.alias("particle", "particle effect", "particle effects");
         registrar.alias("particle", "particle", "particles");
         registrar.literalParser("particle", text -> parseParticle(text, ParticleEffect.class));
         registrar.namedType("convergingparticle", "converging particle effect", ParticleEffect.Converging.class, converging);

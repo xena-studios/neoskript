@@ -172,8 +172,8 @@ class TimeStatesTest {
                 on world spawn change:
                 \tsay past spawn
                 """));
-        // As in Skript, 'on death' is any entity's death, not a player's, so the level has no future state there.
-        assertEquals(List.of("level of player does not have a future state"), errors("""
+        // As in Skript, 'on death' is any entity's death, not a player's: there's no player to have a level.
+        assertEquals(List.of("Use 'attacker' and/or 'victim' in damage/death events"), errors("""
                 on death:
                 \tset future level of player to {_x}
                 """));

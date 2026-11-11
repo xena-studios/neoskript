@@ -12,6 +12,15 @@ on join:
 
 on chat:
 	send "[harness] player chat %player%: %message%" to console
+	# The message is a text component, as in Skript 2.17: how it reads as text, in a variable, and compared.
+	set {_message} to message
+	send "[harness] player chat as text: %length of message%, %{_message}% (%message in upper case%)" to console
+	if message contains "there":
+		send "[harness] player chat contains there" to console
+	if "%message%" is "hello there":
+		send "[harness] player chat text is hello there" to console
+	if {_message} is "HELLO THERE":
+		send "[harness] player chat variable compared ignoring case" to console
 	if message is "secret":
 		cancel event
 		send "Your secret is safe" to player

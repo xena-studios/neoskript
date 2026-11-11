@@ -51,13 +51,14 @@ class LanguageTest {
 
     @Test
     void valuesReadAsInSkript() {
+        // Not '1.5 rounded down': Skript reads that as '(1.5 rounded) down', 2 meters below.
         assertEquals(List.of("-2", "1", "2", "5", "7", "abc", "-0", "1.01",
                 "1 day and 1 hour and 33 minutes and 31.15 seconds", "1 year and 1 month and 1 week", "1.5 seconds",
                 "6:00", "18:30", "5 and 7"), run("""
                 on load:
                 \tsay round(-2.5)
-                \tsay 1.5 rounded down
-                \tsay 1.5 rounded up
+                \tsay 1.5 floored
+                \tsay 1.5 ceiled
                 \tset {_t} to "Hello World"
                 \tsay index of "o" in {_t}
                 \tsay last index of "o" in {_t}

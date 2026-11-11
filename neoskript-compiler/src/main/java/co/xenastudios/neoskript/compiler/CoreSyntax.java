@@ -317,6 +317,9 @@ final class CoreSyntax {
         library.core(SyntaxKind.EXPRESSION, TYPED_ARGUMENT, "object", List.of(RegexRole.TYPE, RegexRole.ANY),
                 "[the] <.+>( |-)arg[ument][( |-)<\\d+>]",
                 "[the] arg[ument]( |-)<.+>[( |-)<\\d+>]");
+        // As Skript's ExprArgument writes itself in errors: 'the player argument ', with its number if it has one.
+        library.describe(TYPED_ARGUMENT, (info, arguments) -> info.types().isEmpty() ? null
+                : "the " + info.types().getFirst().name() + " argument ");
         // The text typed for a choice, '(give|take)': 'the first choice argument'.
         library.core(SyntaxKind.EXPRESSION, CHOICE_ARGUMENT, "object", List.of(),
                 "[the] choice arg[ument] <(\\d+)>",

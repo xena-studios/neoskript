@@ -20,9 +20,24 @@ import java.util.List;
  * @param unrunnableTests in test mode, the tests that couldn't be compiled, by name, with the reason
  */
 public record CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunctionBody> functions,
-        List<Diagnostic> diagnostics, java.util.Map<String, String> unrunnableTests, List<CompiledCommand> commands) {
+        List<Diagnostic> diagnostics, java.util.Map<String, String> unrunnableTests, List<CompiledCommand> commands,
+        java.util.Set<String> unparsedLines) {
+
+    public CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunctionBody> functions,
+            List<Diagnostic> diagnostics, java.util.Map<String, String> unrunnableTests, List<CompiledCommand> commands) {
+        this(triggers, functions, diagnostics, unrunnableTests, commands, java.util.Set.of());
+    }
+
+    /**
+     * Whether a problem found parsing is in a section whose header failed to compile: Skript doesn't read what's in
+     * such a section, so it isn't reported.
+     */
+    public boolean unparsed(Diagnostic parsed) {
+        return unparsedLines.contains(parsed.file() + ":" + parsed.line());
+    }
 
     public CompiledScripts {
+        unparsedLines = java.util.Set.copyOf(unparsedLines);
         commands = List.copyOf(commands);
         triggers = List.copyOf(triggers);
         functions = List.copyOf(functions);

@@ -130,6 +130,8 @@ tasks.register<JavaExec>("harness") {
     val java25 = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
     // -Pharness.echo=true streams server consoles to the build output.
     val echo = providers.gradleProperty("harness.echo").orElse("false")
+    // -Pharness.differential.skriptRuns=N runs the reference Skript N times for the differential (each run cached).
+    val skriptRuns = providers.gradleProperty("harness.differential.skriptRuns").orElse("3")
     val projectDir = layout.projectDirectory
     val buildDir = layout.buildDirectory
     val cacheDir = layout.settingsDirectory.dir(".harness-cache")
@@ -151,6 +153,7 @@ tasks.register<JavaExec>("harness") {
             "-Dharness.output=" + buildDir.dir("harness").get().asFile.absolutePath,
             "-Dharness.cache=" + cacheDir.asFile.absolutePath,
             "-Dharness.echo=" + echo.get(),
+            "-Dharness.differential.skriptRuns=" + skriptRuns.get(),
         )
     })
 

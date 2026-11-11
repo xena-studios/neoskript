@@ -946,12 +946,17 @@ final class Items {
                     }
                     case EntityKind kind -> values.add(new EntityKind(amount + " " + EntityKind.withoutAmount(kind.name()),
                             kind.type(), kind.entityClass(), kind.variants(), amount));
+                    case ParticleEffect particle -> {
+                        ParticleEffect copy = particle.copy();
+                        copy.count(Math.abs(amount));
+                        values.add(copy);
+                    }
                     // Anything else has no amount: 1 of 5 is nothing.
                     default -> {}
                 }
             }
             return values.size() == 1 ? values.getFirst() : values.toArray();
-        }, "%number% of %itemstacks/itemtypes/entitytypes%");
+        }, "%number% of %itemstacks/itemtypes/countedentitytypes/particles%");
     }
 
     private static void registerInventories(Registrar registrar) {
@@ -1178,6 +1183,7 @@ final class Items {
             }
             return indices.size() == 1 ? indices.getFirst() : indices.toArray();
         }, "[the] [(raw|unique)] index of %slots%", "%slots%'[s] [(raw|unique)] index");
+        registrar.describe("ExprInventory", (info, args) -> "inventor" + (info.isSingle(0) ? "y" : "ies") + " of " + args.get(0));
         registrar.expression("ExprInventory", "inventory", info -> (context, args) -> {
             List<Object> inventories = new ArrayList<>();
             for (Object holder : (Object[]) args[0]) {

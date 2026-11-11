@@ -263,6 +263,24 @@ final class TriggerCompiler {
         return this;
     }
 
+    /** Where the lines of sections whose header fails go: Skript doesn't parse them, so their problems aren't. */
+    private java.util.function.IntConsumer unparsed = line -> { };
+
+    TriggerCompiler unparsed(java.util.function.IntConsumer sink) {
+        this.unparsed = sink;
+        return this;
+    }
+
+    /** Tells {@link #unparsed} the lines of {@code body}, and of what's in it. */
+    private void unparsed(List<Statement> body) {
+        for (Statement statement : body) {
+            unparsed.accept(statement.line().number());
+            if (statement instanceof Statement.Section section && section.body() != null) {
+                unparsed(section.body());
+            }
+        }
+    }
+
     /** The warnings given so far, as line and message, each given once though elements may be set up again. */
     private final java.util.Set<String> warned = new java.util.HashSet<>();
     /** The header of the structure being compiled, for warnings given before its code. */
@@ -1041,8 +1059,17 @@ final class TriggerCompiler {
                     }
                 } catch (co.xenastudios.neoskript.api.element.SyntaxError error) {
                     // An element that matched but can't be used as written.
+                    if (statement instanceof Statement.Section section && section.body() != null
+                            && line == section.line().number()) {
+                        unparsed(section.body());
+                    }
                     failed(new CompileException(line, error.getMessage()), open);
                 } catch (CompileException e) {
+                    // A section whose header fails isn't one: as in Skript, what's in it isn't read.
+                    if (statement instanceof Statement.Section section && section.body() != null
+                            && e.line() == section.line().number()) {
+                        unparsed(section.body());
+                    }
                     failed(e, open);
                 } catch (RuntimeException e) {
                     if (errors.isEmpty()) {
@@ -2281,9 +2308,41 @@ final class TriggerCompiler {
         Expr outerChanger = changer;
         changer = mode.value >= 0 && effect.match().values().get(mode.value) instanceof Expr value ? value : null;
         try {
+            // Skript's parser sets up every value before the change effect checks what's given: an event value that
+            // isn't there is the line's error first, the last written first ('set ... of player's tool to 10').
+            List<Object> values = effect.match().values();
+            for (int i = values.size() - 1; i >= 0; i--) {
+                checkEventValues(values.get(i));
+            }
             changeAll(effect, mode);
         } finally {
             changer = outerChanger;
+        }
+    }
+
+    /** Fails as Skript does if {@code value} has an event value the trigger's event doesn't have. */
+    private void checkEventValues(Object value) throws CompileException {
+        switch (value) {
+            case Expr.Syntax syntax when (isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE)
+                    || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY))
+                    && syntax.syntax().match().regexValues().getFirst() instanceof TypeRef ref -> {
+                String type = ref.type().id();
+                if (sectionFor(type) == null && !inOuterSection(type) && widerSection(type) == null) {
+                    lookup(syntax, ref, 0);
+                }
+            }
+            case Expr.Syntax syntax -> {
+                List<Object> inner = syntax.syntax().match().values();
+                for (int i = inner.size() - 1; i >= 0; i--) {
+                    checkEventValues(inner.get(i));
+                }
+            }
+            case Expr.ListOf list -> {
+                for (Expr item : list.items()) {
+                    checkEventValues(item);
+                }
+            }
+            case null, default -> { }
         }
     }
 
@@ -2925,6 +2984,9 @@ final class TriggerCompiler {
      * ({@code cook time of {_block}}), the event's block, location or entity as {@code the block}, else as
      * {@link #describe} has it.
      */
+    /** Literals Skript writes as they're written, not as their value's name. */
+    private static final java.util.Set<String> NUMERIC_LITERALS = java.util.Set.of("integer", "number", "boolean");
+
     private String skriptText(Expr expr) {
         if (expr instanceof Expr.Syntax syntax) {
             ParsedSyntax parsed = syntax.syntax();
@@ -2935,7 +2997,10 @@ final class TriggerCompiler {
                 List<String> arguments = new ArrayList<>(values.size());
                 for (int i = 0; i < values.size(); i++) {
                     Object written = values.get(i) instanceof Expr.Unresolved words && i < specs.length
-                            ? wordsAs(words.text(), specs[i].types()) : null;
+                            ? wordsAs(words.text(), specs[i].types())
+                            : values.get(i) instanceof Expr.Literal literal && i < specs.length
+                                    && !NUMERIC_LITERALS.contains(literal.type())
+                                    ? wordsAs(literal.text(), specs[i].types()) : null;
                     // A literal is written as its value: 'pigs' is 'pig'.
                     arguments.add(written != null ? Values.text(written)
                             : values.get(i) instanceof Expr value ? skriptText(value) : null);
@@ -3143,6 +3208,12 @@ final class TriggerCompiler {
                 }
                 boolean typed = values.stream().anyMatch(v -> v instanceof Expr expr && !(expr instanceof Expr.Unresolved)
                         && valueType(expr) != null && !valueType(expr).equals(SyntaxRegistry.OBJECT));
+                for (Object value : values) {
+                    if (value instanceof Expr.Unresolved words && words.problem() != null) {
+                        // Skript's comparison first tries to read its unparsed literal, which gives the error it kept.
+                        throw new CompileException(line, words.problem());
+                    }
+                }
                 if (typed || values.size() > 2) {
                     // Words nothing reads compared with something of a type: Skript's comparison says so.
                     String first = compared(values.get(0));
@@ -3199,7 +3270,10 @@ final class TriggerCompiler {
         if (changer != null && unresolved.start() >= changer.start() && unresolved.end() <= changer.end()) {
             String value = outerArgument != null ? outerArgument : unresolved.text().strip();
             if (!(changer instanceof Expr.ListOf)) {
-                return "Can't understand this expression: '" + value + "'";
+                // Skript's unparsed literal gives the error it kept from reading its words, if it has one.
+                return unresolved.problem() != null && unresolved.start() == changer.start()
+                        && unresolved.end() == changer.end() ? unresolved.problem()
+                        : "Can't understand this expression: '" + value + "'";
             }
         }
         if (conditionLines) {
@@ -4268,6 +4342,11 @@ final class TriggerCompiler {
             }
         }
         if (lookup.getter() == null) {
+            String asked = time == 0 ? library.takeParserAsked(eventClasses == null ? List.of() : eventClasses,
+                    request.valueClass(), request.type()) : null;
+            if (asked != null) {
+                throw new CompileException(line, asked);
+            }
             // Skript tries 'event-zombie' as a value named so first, whose error is kept.
             throw new CompileException(line, request.words() != null
                     ? "There's no " + request.words() + " in " + eventDescription() + "." : lookup.error());
@@ -4770,7 +4849,7 @@ final class TriggerCompiler {
         method.visitMethodInsn(INVOKESTATIC, COMMAND_EVENT, "choice", "(" + CONTEXT + "I)" + OBJECT_DESC, false);
     }
 
-    private static String article(String word) {
+    static String article(String word) {
         String own = ARTICLES.get(word);
         if (own != null) {
             return own;

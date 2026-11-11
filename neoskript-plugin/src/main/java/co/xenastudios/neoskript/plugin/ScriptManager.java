@@ -238,7 +238,7 @@ final class ScriptManager {
         Map<String, SourceFile> byName = new HashMap<>();
         files.forEach(file -> byName.put(file.name(), file));
         List<Diagnostic> diagnostics = new ArrayList<>();
-        parsed.forEach(script -> diagnostics.addAll(script.diagnostics()));
+        parsed.forEach(script -> script.diagnostics().stream().filter(d -> !compiled.unparsed(d)).forEach(diagnostics::add));
         diagnostics.addAll(compiled.diagnostics());
         // Each script's problems in the order of their lines, as Skript gives them while it goes through the
         // script, though NeoSkript finds some while parsing and others while compiling. Problems with the file's

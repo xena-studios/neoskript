@@ -45,6 +45,7 @@ Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4]
 | 26 | 2026-10-25 | 862 | Checked line by line against a real Skript server |
 | 27 | 2026-11-11 | 862 | 98.8% of the differential identical to Skript; M4 done |
 | 28 | 2026-11-11 | 862 | 99.0% of the differential identical; comparisons and parse errors in Skript's order |
+| 29 | 2026-11-11 | 862 | 99.7% of the differential identical; Skript's syntax order, types and init checks |
 
 ## M0: Foundations
 
@@ -631,6 +632,20 @@ Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the mo
   - text isn't said to be the wrong type where only a literal goes.
 - **No arrow pierce level:** Skript registers it only where `Arrow` declares `getPierceLevel` itself, which no Paper it runs on does. So `arrow pierce level of X` is read as something else, as in Skript.
 - **Fixed in the differential:** ExprEntity-4, ExprArrowPierceLevel-1, CondCanAge-1, EffGenerateLoot-2. The reasons for the units still to do are now more precise.
+
+#### Batch 29 (2026-11-11)
+
+**862 of 862 tests pass; 99.7% of the differential identical (1,609 of 1,613 units, against 3 runs of Skript).**
+- **Skript's results that vary:** Skript breaks ties in its syntax order by identity hash codes, so a few units differ from run to run. The differential now runs Skript several times (`-Pharness.differential.skriptRuns=N`, 3 by default, each run cached) and a unit is identical if NeoSkript gives what Skript gave in any of them. The report lists the units that vary: 3 (`ExprLocationAt-1`, `ExprLowestHighestSolidBlock-2`, `ExprPassenger-1`). NeoSkript gives the more common result of 15 runs for the last two; `ExprLocationAt-1` is about half each.
+- **Syntax in Skript's order** (`SyntaxRegister.SET_COMPARATOR`): by priority level, then by the complexity of the most complex pattern (`skript-syntax-order.txt`, from Skript's registry), effect sections before effects. Ties keep NeoSkript's registration order. NeoSkript's event values stay last, as they match any type's name.
+- **Skript's unparsed literals:** words where only any value goes are taken at the first split Skript's parser tries ('broadcast <the 1st element> in <{queue}>'). A placeholder before one that no type reads tries longer text first, keeping the first match (`TypePatternElement.hasUnparsedLiterals`). Words with brackets are one too. The literal keeps the best error found reading it, which is the error when nothing can use it.
+- **Types as Skript takes them:** between Skript's types, a value is taken where another type goes only if its class is under the other's or Skript has a converter (`skript-conversions.txt`, from `Converters.converterExists`), not loosely: 'last shot arrow' isn't a projectile. Types are under others by their Java classes. Arithmetic's values have the types `ExprArithmetic` works out from Skript's operations.
+- **Expressions of any type:** those Skript registers as returning `Object` are tried wherever a value goes, and say what they give once set up (`Registrar.returnType`, as `getReturnType`). One that then isn't wanted is the error, written as its `toString` (`Registrar.describe` now reaches the parser), and nothing else is tried there. So is a plural expression where one value goes.
+- **Init checks:** what Skript's `init` turns down is turned down while parsing, so another reading is tried: time states of what has none, `recursive` of what can't nest, a direction after a non-direction, `except` on one value, an inventory of `items in`, arithmetic on words no type reads. An event value that isn't there gives Skript's error as it's tried, and before a change effect checks what it's given.
+- **Text components:** the chat, join, quit, death, kick, broadcast and unknown command messages and the MOTD are text components, as in Skript 2.17. The player-events scenario now checks the chat message as text, in a variable and compared, and matches Skript.
+- **Section headers that fail:** as Skript doesn't read the code in them, its problems aren't reported.
+- **Fixed in the differential:** ExprElement-6, ExprElement-7, ExprTagContents-2, ExprAttachedBlock-1, ExprPassenger-1, ExprLowestHighestSolidBlock-2, EffOpenInventory-1, ExprPersistentData-1, ExprClicked-1, EffChange-2, ExprColored-2. Also two of Skript's own tests NeoSkript expected wrongly: Skript reads `1.5 rounded down` as 2 meters below.
+- **Still to do:** CondPotionHasParticles-1, ExprItemCompCopy-1, ExprNumberOfCharacters-1 (the message is a text component now; Skript's error comes from re-reading the line's words), ExprSecCreateLootContext-1, and ExprLocationAt-1's more common result. The committed website syntax export predates these type changes; `pnpm syntax:export` remakes it.
 
 ## M5: Folia and migration
 

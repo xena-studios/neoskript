@@ -10,7 +10,6 @@ import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Values;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.server.ServerListPingEvent;
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -113,10 +112,13 @@ final class ServerEvents {
                 + event.substring(1) + " event cannot be cancelled");
     }
 
-    /** The messages events show, which triggers can change: chat, join and quit messages, the MOTD. */
+    /**
+     * The messages events show, which triggers can change: chat, join and quit messages, the MOTD. As in Skript
+     * 2.17, they're text components, which become text where text is wanted.
+     */
     static void registerMessages(Registrar registrar) {
-        registrar.expression("ExprChatMessage", "string", info -> new EventMessage<>(AsyncChatEvent.class,
-                event -> PLAIN.serialize(event.message()), (event, text) -> event.message(Messages.component(text))),
+        registrar.expression("ExprChatMessage", "textcomponent", info -> new EventMessage<>(AsyncChatEvent.class,
+                AsyncChatEvent::message, (event, text) -> event.message(Messages.component(text))),
                 "[the] [chat( |-)]message");
         registrar.expression("ExprChatFormat", "string", info -> new EventMessage<>(AsyncChatEvent.class,
                 event -> "<[player]> [message]", (event, text) -> {
@@ -126,21 +128,20 @@ final class ServerEvents {
                             .replaceText(b -> b.matchLiteral("[display name]").replacement(displayName))
                             .replaceText(b -> b.matchLiteral("[message]").replacement(message)));
                 }), "[the] (message|chat) format[ting]");
-        registrar.expression("ExprJoinMessage", "string", info -> new EventMessage<>(PlayerJoinEvent.class,
-                event -> event.joinMessage() == null ? null : Messages.LEGACY_SECTION.serialize(event.joinMessage()),
+        registrar.expression("ExprJoinMessage", "textcomponent", info -> new EventMessage<>(PlayerJoinEvent.class,
+                PlayerJoinEvent::joinMessage,
                 (event, text) -> event.joinMessage(text == null ? null : Messages.component(text))),
                 "[the] (join|log[ ]in)( |-)message");
-        registrar.expression("ExprQuitMessage", "string", info -> new EventMessage<>(PlayerQuitEvent.class,
-                event -> event.quitMessage() == null ? null : Messages.LEGACY_SECTION.serialize(event.quitMessage()),
+        registrar.expression("ExprQuitMessage", "textcomponent", info -> new EventMessage<>(PlayerQuitEvent.class,
+                PlayerQuitEvent::quitMessage,
                 (event, text) -> event.quitMessage(text == null ? null : Messages.component(text))),
                 "[the] (quit|leave|log[ ]out)( |-)message");
-        registrar.expression("ExprMOTD", "string", info -> new EventMessage<>(ServerListPingEvent.class,
-                event -> Messages.LEGACY_SECTION.serialize(event.motd()),
+        registrar.expression("ExprMOTD", "textcomponent", info -> new EventMessage<>(ServerListPingEvent.class,
+                ServerListPingEvent::motd,
                 (event, text) -> event.motd(text == null ? Component.empty() : Messages.component(text))),
                 "[the] [default|shown|displayed] (MOTD|message of [the] day)");
     }
 
-    private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
     /** An event's message, which {@code set} and {@code delete} change. */
     private record EventMessage<E>(Class<E> eventClass, java.util.function.Function<E, Object> getter,

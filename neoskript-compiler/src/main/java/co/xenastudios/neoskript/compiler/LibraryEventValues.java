@@ -46,8 +46,16 @@ final class LibraryEventValues implements EventValues {
     @Override
     public Scope event(SyntaxInfo event) {
         List<Class<?>> classes = eventClasses(event);
-        return classes == null ? null : scope(classes);
+        if (classes == null) {
+            return null;
+        }
+        String name = library.eventName(event.id());
+        return name == null ? scope(classes)
+                : named.computeIfAbsent(List.copyOf(classes) + "/" + name, k -> new EventScope(List.copyOf(classes), name));
     }
+
+    /** The scopes of events Skript has a name for, which can say what it says when a value isn't there. */
+    private final Map<String, Scope> named = new ConcurrentHashMap<>();
 
     /** The classes of the events code under {@code event} runs for, or {@code null} if unknown. */
     List<Class<?>> eventClasses(SyntaxInfo event) {
@@ -125,18 +133,44 @@ final class LibraryEventValues implements EventValues {
 
     /** What code in events of {@code classes} can use. */
     Scope scope(List<Class<?>> classes) {
-        return scopes.computeIfAbsent(List.copyOf(classes), EventScope::new);
+        return scopes.computeIfAbsent(List.copyOf(classes), c -> new EventScope(c, null));
     }
 
     /** The event values of events of some classes (none outside events). */
     private final class EventScope implements Scope {
 
         private final List<Class<?>> classes;
+        /** Skript's name for the event, as its errors call it, or {@code null} if unknown. */
+        private final String name;
         /** Whether each value asked for, by type, plurality and kind, is had. */
         private final Map<String, Boolean> known = new ConcurrentHashMap<>();
 
-        EventScope(List<Class<?>> classes) {
+        EventScope(List<Class<?>> classes, String name) {
             this.classes = classes;
+            this.name = name;
+        }
+
+        @Override
+        public String missing(SyntaxInfo syntax, TypeRef type, String words) {
+            if (name == null || !isEventValue(syntax) || classes.isEmpty()) {
+                return null;
+            }
+            // As the compiler says it, without using up a value's own error ('Use 'attacker' and/or 'victim'...').
+            Library.EventValueRequest request = library.request(type, words);
+            Library.EventValueLookup lookup = library.eventValue(classes, request.valueClass(), request.type(), 0, null);
+            if (lookup.getter() != null || "multiple".equals(lookup.error())) {
+                return null;
+            }
+            if (!"none".equals(lookup.error())) {
+                // Skript's event value uses up its error when it's set up, whatever else is tried after: the parser
+                // does now, and the compiler, asking for it next, still gives it.
+                library.eventValue(classes, request.valueClass(), request.type(), 0, "");
+                library.parserAsked(classes, request.valueClass(), request.type(), lookup.error());
+                return lookup.error();
+            }
+            String description = TriggerCompiler.article(name) + " " + name + " event";
+            return request.words() != null ? "There's no " + request.words() + " in " + description + "."
+                    : library.eventValue(classes, request.valueClass(), request.type(), 0, description).error();
         }
 
         @Override

@@ -21,6 +21,15 @@ public interface PlaceholderResolver {
      * Checks the text a {@code <regex>} matched, e.g. that the {@code <.+>} in {@code if <.+>} is a
      * condition. Returns what it parses to, or {@code null} to reject it. By default any match is accepted.
      */
+    /**
+     * Whether {@code value}, what a placeholder resolved to, is Skript's unparsed literal that no type's parser
+     * takes. A placeholder before it then tries longer text, as Skript's {@code TypePatternElement} does, and the
+     * first match with one is kept only if none comes without.
+     */
+    default boolean unparsed(Object value) {
+        return false;
+    }
+
     default Object resolveRegex(String input, int start, int end, int index, java.util.regex.MatchResult match) {
         return match;
     }
