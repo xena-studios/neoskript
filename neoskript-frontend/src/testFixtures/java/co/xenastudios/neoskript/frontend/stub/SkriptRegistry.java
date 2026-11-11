@@ -111,7 +111,7 @@ public final class SkriptRegistry {
         return build(SkriptSyntax.load(), extra);
     }
 
-    static SyntaxRegistry build(SkriptSyntax syntax) {
+    public static SyntaxRegistry build(SkriptSyntax syntax) {
         return build(syntax, builder -> {});
     }
 

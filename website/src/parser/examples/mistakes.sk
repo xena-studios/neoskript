@@ -1,0 +1,13 @@
+# Welcomes players, and gives new ones a starter kit. A few lines here have mistakes.
+on join:
+	if player has played before:
+		send "Welcome back, %player%! to player
+	else:
+		broadcast "Say hello to %player%, who's new here!"
+		give player a stone sword, 16 bread
+
+command /spawn:
+	description: Takes you to spawn.
+	trigger:
+		teleport player to spawn of world "world"
+		sned "Off you go." to player

@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.parse;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
 import co.xenastudios.neoskript.frontend.registry.TypeRef;
 import co.xenastudios.neoskript.frontend.source.Diagnostics;
@@ -32,7 +33,8 @@ final class CommandParser {
     /** The {@code suggestions:} entry, which can also be written {@code tab completions:} or {@code tab complete:}. */
     private static final Set<String> SUGGESTIONS = Set.of("suggestions", "tab completions", "tab complete");
     private static final Pattern SUBCOMMAND = Pattern.compile("subcommand(?:\\s+(.*))?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ARGUMENT_NAME = Pattern.compile("\\s*([\\p{L}_][\\p{L}\\p{N}_]*)\\s*:(.*)",
+    // \p{N} spelled out as its three categories: TeaVM (the browser parser) has no \p{N}.
+    private static final Pattern ARGUMENT_NAME = Pattern.compile("\\s*([\\p{L}_][\\p{L}\\p{Nd}\\p{Nl}\\p{No}_]*)\\s*:(.*)",
             Pattern.DOTALL);
     private static final Pattern BETWEEN = Pattern.compile("between\\s+(\\S+)\\s+and\\s+(\\S+)");
     private static final Pattern MIN = Pattern.compile("(?:above|over|greater than|more than|at least)\\s+(\\S+)");
@@ -123,7 +125,7 @@ final class CommandParser {
         boolean unexpected = false;
         for (Node child : section.children()) {
             Line entry = child.line();
-            String key = entry.key().strip().toLowerCase(Locale.ROOT);
+            String key = Text.lower(entry.key().strip());
             if (child instanceof Node.Section s && (key.equals("trigger") || key.equals("subcommands")
                     || SUGGESTIONS.contains(key) || SUBCOMMAND.matcher(key).matches())) {
                 if (SUGGESTIONS.contains(key)) {
@@ -138,7 +140,7 @@ final class CommandParser {
                 continue;
             }
             int separator = entry.text().indexOf(':');
-            String name = separator <= 0 ? "" : entry.text().substring(0, separator).strip().toLowerCase(Locale.ROOT);
+            String name = separator <= 0 ? "" : Text.lower(entry.text().substring(0, separator).strip());
             String value = separator <= 0 ? "" : entry.text().substring(separator + 1).strip();
             if (ENTRIES.contains(name) && !(group && name.equals("aliases"))) {
                 entries.put(name, value);
@@ -239,7 +241,7 @@ final class CommandParser {
     /** An {@code executable by} entry, checked against what the parent allows. */
     private Set<Executor> executors(Line line, String value, Set<Executor> parent) {
         Set<Executor> executors = EnumSet.noneOf(Executor.class);
-        for (String word : LIST_SEPARATOR.split(value.strip().toLowerCase(Locale.ROOT))) {
+        for (String word : LIST_SEPARATOR.split(Text.lower(value.strip()))) {
             Executor executor = switch (word.strip()) {
                 case "player", "players" -> Executor.PLAYERS;
                 case "console", "the console" -> Executor.CONSOLE;
@@ -389,7 +391,7 @@ final class CommandParser {
         if (named.matches()) {
             name = named.group(1);
             inner = named.group(2);
-            if (!names.add(name.toLowerCase(Locale.ROOT))) {
+            if (!names.add(Text.lower(name))) {
                 throw new PatternException("The argument name '" + name + "' was already used.");
             }
         }
@@ -417,12 +419,12 @@ final class CommandParser {
         if (!rest.isEmpty()) {
             String id = type.type().id();
             if (!id.equals("number") && !id.equals("integer") && !id.equals("long")) {
-                throw new PatternException(type.type().name().toLowerCase(Locale.ROOT) + " arguments do not support minimum or maximum values.");
+                throw new PatternException(Text.lower(type.type().name()) + " arguments do not support minimum or maximum values.");
             }
             if (type.plural()) {
                 throw new PatternException("Only single number arguments support minimum or maximum values.");
             }
-            String range = rest.toLowerCase(Locale.ROOT);
+            String range = Text.lower(rest);
             Matcher between = BETWEEN.matcher(range);
             if (between.matches()) {
                 min = number(between.group(1), typeText);

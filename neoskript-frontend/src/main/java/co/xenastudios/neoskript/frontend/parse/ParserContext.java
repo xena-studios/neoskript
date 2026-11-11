@@ -4,8 +4,10 @@
  */
 package co.xenastudios.neoskript.frontend.parse;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import co.xenastudios.neoskript.frontend.pattern.PlaceholderSpec;
 import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
+import co.xenastudios.neoskript.frontend.registry.Frozen;
 import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
 import co.xenastudios.neoskript.frontend.registry.TypeRef;
 import co.xenastudios.neoskript.frontend.pattern.CompiledPattern;
@@ -47,8 +49,8 @@ final class ParserContext {
     ParserContext(SyntaxRegistry registry, Map<String, List<FunctionInfo>> scriptFunctions,
             Map<String, List<FunctionInfo>> localFunctions) {
         this.registry = registry;
-        this.scriptFunctions = Map.copyOf(scriptFunctions);
-        this.localFunctions = Map.copyOf(localFunctions);
+        this.scriptFunctions = Frozen.map(scriptFunctions);
+        this.localFunctions = Frozen.map(localFunctions);
         this.byPlaceholder = PLACEHOLDERS.computeIfAbsent(registry, this::placeholders);
         this.specs = SPECS.computeIfAbsent(registry, r -> new ConcurrentHashMap<>());
         byPlaceholder.values().forEach(this::intern);
@@ -142,14 +144,14 @@ final class ParserContext {
     }
 
     void itemAliases(java.util.Set<String> names) {
-        itemAliases = java.util.Set.copyOf(names);
+        itemAliases = Frozen.set(names);
     }
 
     /** The experiments the script being parsed is using, by code name. */
     private java.util.Set<String> experiments = java.util.Set.of();
 
     void experiments(java.util.Set<String> codeNames) {
-        experiments = java.util.Set.copyOf(codeNames);
+        experiments = Frozen.set(codeNames);
     }
 
     /** Whether the script being parsed is using the experiment with this code name. */
@@ -173,7 +175,7 @@ final class ParserContext {
         if (itemAliases.isEmpty()) {
             return false;
         }
-        String name = words.strip().toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+", " ")
+        String name = Text.lower(words.strip()).replaceAll("\\s+", " ")
                 .replaceFirst("^\\d+ (?:of )?", "").replaceFirst("^(?:an?|all|every|plain) ", "");
         int brackets = name.indexOf('[');
         return itemAliases.contains(brackets < 0 ? name : name.substring(0, brackets).strip());

@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.registry;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import co.xenastudios.neoskript.frontend.pattern.PatternIndex;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -72,8 +73,8 @@ public final class SyntaxRegistry {
         for (String id : typesById.keySet()) {
             orders.put(id, orders.size());
         }
-        this.typeOrders = Map.copyOf(orders);
-        this.typeNames = Map.copyOf(builder.typeNames);
+        this.typeOrders = Frozen.map(orders);
+        this.typeNames = Frozen.map(builder.typeNames);
         Map<SyntaxKind, List<SyntaxInfo>> syntaxes = new EnumMap<>(SyntaxKind.class);
         Map<SyntaxKind, PatternIndex<Candidate>> indexes = new EnumMap<>(SyntaxKind.class);
         for (SyntaxKind kind : SyntaxKind.values()) {
@@ -91,29 +92,29 @@ public final class SyntaxRegistry {
         this.indexes = Collections.unmodifiableMap(indexes);
         Map<String, List<FunctionInfo>> functions = new HashMap<>();
         builder.functions.forEach((name, overloads) -> functions.put(name, List.copyOf(overloads)));
-        this.functions = Map.copyOf(functions);
+        this.functions = Frozen.map(functions);
         this.supertypes = closure(builder.supertypes);
-        this.strictTypes = Set.copyOf(builder.strictTypes);
-        this.enumerableTypes = Set.copyOf(builder.enumerableTypes);
-        this.literalChecks = Map.copyOf(builder.literalChecks);
-        this.parseChecks = Map.copyOf(builder.parseChecks);
+        this.strictTypes = Frozen.set(builder.strictTypes);
+        this.enumerableTypes = Frozen.set(builder.enumerableTypes);
+        this.literalChecks = Frozen.map(builder.literalChecks);
+        this.parseChecks = Frozen.map(builder.parseChecks);
         Map<String, Set<String>> conversions = new HashMap<>();
-        builder.conversions.forEach((from, to) -> conversions.put(from, Set.copyOf(to)));
-        this.conversions = Map.copyOf(conversions);
-        this.entityNames = Set.copyOf(builder.entityNames);
-        this.delaying = Set.copyOf(builder.delaying);
-        this.stopping = Set.copyOf(builder.stopping);
-        this.ending = Set.copyOf(builder.ending);
-        this.suppressing = Set.copyOf(builder.suppressing);
-        this.sectionOnly = Set.copyOf(builder.sectionOnly);
-        this.checks = Map.copyOf(builder.checks);
-        this.experimental = Map.copyOf(builder.experimental);
+        builder.conversions.forEach((from, to) -> conversions.put(from, Frozen.set(to)));
+        this.conversions = Frozen.map(conversions);
+        this.entityNames = Frozen.set(builder.entityNames);
+        this.delaying = Frozen.set(builder.delaying);
+        this.stopping = Frozen.set(builder.stopping);
+        this.ending = Frozen.set(builder.ending);
+        this.suppressing = Frozen.set(builder.suppressing);
+        this.sectionOnly = Frozen.set(builder.sectionOnly);
+        this.checks = Frozen.map(builder.checks);
+        this.experimental = Frozen.map(builder.experimental);
         this.experimentNames = builder.experimentNames;
         Map<String, Set<String>> propertyTypes = new HashMap<>();
-        builder.propertyTypes.forEach((property, types) -> propertyTypes.put(property, Set.copyOf(types)));
-        this.propertyTypes = Map.copyOf(propertyTypes);
-        this.propertySyntaxes = Map.copyOf(builder.propertySyntaxes);
-        this.placeholderConversions = Set.copyOf(builder.placeholderConversions);
+        builder.propertyTypes.forEach((property, types) -> propertyTypes.put(property, Frozen.set(types)));
+        this.propertyTypes = Frozen.map(propertyTypes);
+        this.propertySyntaxes = Frozen.map(builder.propertySyntaxes);
+        this.placeholderConversions = Frozen.set(builder.placeholderConversions);
         this.eventValues = builder.eventValues;
     }
 
@@ -241,7 +242,7 @@ public final class SyntaxRegistry {
     }
 
     public TypeInfo type(String id) {
-        return typesById.get(id.toLowerCase(Locale.ROOT));
+        return typesById.get(Text.lower(id));
     }
 
     /** Where type {@code id} was registered among the types, earliest first, or a large number if it wasn't. */
@@ -295,7 +296,7 @@ public final class SyntaxRegistry {
     /** Whether {@code all <type>} can list the values of type {@code id}: a closed set, or values listed later. */
     public boolean isEnumerable(String id) {
         TypeInfo type = type(id);
-        return type != null && (!type.literals().isEmpty() || enumerableTypes.contains(type.id().toLowerCase(Locale.ROOT)));
+        return type != null && (!type.literals().isEmpty() || enumerableTypes.contains(Text.lower(type.id())));
     }
 
     /** Whether {@code from} converts directly to {@code to}. */
@@ -406,7 +407,7 @@ public final class SyntaxRegistry {
     }
 
     static String normalize(String name) {
-        String lower = name.strip().toLowerCase(Locale.ROOT);
+        String lower = Text.lower(name.strip());
         if (lower.indexOf("  ") < 0 && lower.indexOf('\t') < 0) {
             return lower;
         }
@@ -436,9 +437,9 @@ public final class SyntaxRegistry {
                     queue.addAll(direct.getOrDefault(next, Set.of()));
                 }
             }
-            result.put(type, Set.copyOf(seen));
+            result.put(type, Frozen.set(seen));
         }
-        return Map.copyOf(result);
+        return Frozen.map(result);
     }
 
     public static final class Builder {
@@ -462,7 +463,7 @@ public final class SyntaxRegistry {
         private final Map<String, ParseCheck> checks = new HashMap<>();
         private final Map<String, Experimental> experimental = new HashMap<>();
         private java.util.function.UnaryOperator<String> experimentNames =
-                name -> name.strip().toLowerCase(Locale.ROOT);
+                name -> Text.lower(name.strip());
         private EventValues eventValues;
 
         /** Makes the syntax elements with this id need an experiment. */
@@ -484,7 +485,7 @@ public final class SyntaxRegistry {
         public Builder typeProperty(String property, String... types) {
             Set<String> owners = propertyTypes.computeIfAbsent(property, p -> new HashSet<>());
             for (String type : types) {
-                owners.add(type.toLowerCase(Locale.ROOT));
+                owners.add(Text.lower(type));
             }
             return this;
         }
@@ -550,7 +551,7 @@ public final class SyntaxRegistry {
 
         /** Another name for a type: {@code alias} singular and {@code plural} for the plural. */
         public Builder alias(String typeId, String alias, String plural) {
-            TypeInfo type = typesById.get(typeId.toLowerCase(Locale.ROOT));
+            TypeInfo type = typesById.get(Text.lower(typeId));
             if (type == null) {
                 throw new IllegalArgumentException("Unknown type: " + typeId);
             }
@@ -564,7 +565,7 @@ public final class SyntaxRegistry {
          * irregular plurals, write them as {@code name/plural}).
          */
         public Builder type(TypeInfo type, String... aliases) {
-            String id = type.id().toLowerCase(Locale.ROOT);
+            String id = Text.lower(type.id());
             typesById.put(id, type);
             nameType(id, type);
             nameType(normalize(type.name()), type);
@@ -584,23 +585,23 @@ public final class SyntaxRegistry {
          * where a value of the type is expected for the compiler to resolve.
          */
         public Builder openLiterals(String id, java.util.function.Predicate<String> check) {
-            literalChecks.put(id.toLowerCase(Locale.ROOT), check);
+            literalChecks.put(Text.lower(id), check);
             return openLiterals(id);
         }
 
         /** The type's parser, for literals that say their type. */
         public Builder parses(String id, java.util.function.Predicate<String> check) {
-            parseChecks.put(id.toLowerCase(Locale.ROOT), check);
+            parseChecks.put(Text.lower(id), check);
             return this;
         }
 
         public Builder openLiterals(String id) {
-            TypeInfo old = typesById.get(id.toLowerCase(Locale.ROOT));
+            TypeInfo old = typesById.get(Text.lower(id));
             if (old == null || old.openLiterals()) {
                 return this;
             }
             TypeInfo open = new TypeInfo(old.id(), old.name(), old.literals(), true);
-            typesById.put(id.toLowerCase(Locale.ROOT), open);
+            typesById.put(Text.lower(id), open);
             typeNames.replaceAll((name, ref) -> ref.type().id().equals(old.id()) ? new TypeRef(open, ref.plural()) : ref);
             return this;
         }
@@ -648,7 +649,7 @@ public final class SyntaxRegistry {
 
         /** Lets {@code all <type>} list the values of type {@code id}, as for biomes. */
         public Builder enumerable(String id) {
-            enumerableTypes.add(id.toLowerCase(Locale.ROOT));
+            enumerableTypes.add(Text.lower(id));
             return this;
         }
 

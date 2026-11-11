@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.parse;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import co.xenastudios.neoskript.frontend.structure.Node;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -23,7 +24,7 @@ public final class AliasNames {
             String line = child.line().text().strip();
             int equals = line.indexOf('=');
             if (!(child instanceof Node.Section) && equals > 0) {
-                names.addAll(forms(line.substring(0, equals).strip().toLowerCase(Locale.ROOT)));
+                names.addAll(forms(Text.lower(line.substring(0, equals).strip())));
             }
         }
         return names;

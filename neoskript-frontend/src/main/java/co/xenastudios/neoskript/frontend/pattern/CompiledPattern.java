@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.pattern;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -326,7 +327,7 @@ public final class CompiledPattern {
     private static Edge edge(PatternElement element, boolean leading) {
         return switch (element) {
             case PatternElement.Literal literal ->
-                    new Edge(new HashSet<>(Set.of(literal.text().toLowerCase(Locale.ROOT))), false, false);
+                    new Edge(new HashSet<>(Set.of(Text.lower(literal.text()))), false, false);
             case PatternElement.Whitespace whitespace -> new Edge(new HashSet<>(), true, false);
             case PatternElement.Placeholder placeholder -> new Edge(new HashSet<>(), false, true);
             case PatternElement.Regex regex -> new Edge(new HashSet<>(), false, true);
@@ -366,7 +367,7 @@ public final class CompiledPattern {
     /** Lower-case literals that every match contains. */
     private static Set<String> required(PatternElement element) {
         return switch (element) {
-            case PatternElement.Literal literal -> new HashSet<>(Set.of(literal.text().toLowerCase(Locale.ROOT)));
+            case PatternElement.Literal literal -> new HashSet<>(Set.of(Text.lower(literal.text())));
             case PatternElement.Sequence sequence -> {
                 Set<String> all = new HashSet<>();
                 sequence.elements().forEach(e -> all.addAll(required(e)));

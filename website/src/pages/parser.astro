@@ -1,0 +1,392 @@
+---
+// The in-browser parser: NeoSkript's frontend, compiled to JavaScript by TeaVM
+// (neoskript-web/), runs in a Web Worker and checks the script as you type.
+// The page's behaviour is in src/scripts/parser-page.ts.
+import Base from "../layouts/Base.astro";
+
+const examples = [
+  { id: "mistakes", label: "A few mistakes" },
+  { id: "warps", label: "Warps" },
+  { id: "tpa", label: "Teleport requests" },
+];
+---
+<Base
+  title="Parser · NeoSkript"
+  description="Paste a Skript script and see its errors and warnings, from NeoSkript's own parser running in your browser. Nothing is uploaded."
+  path="/parser/"
+>
+  <section class="page" aria-labelledby="parser-title">
+    <div class="wrap">
+      <h1 id="parser-title">Parser</h1>
+      <p class="lead">
+        Paste a script to find its errors and warnings. This is NeoSkript's own parser, running in your browser: the
+        script stays on your device.
+      </p>
+      <p class="source">
+        For now it checks against <span id="about">Skript 2.17.0 syntax</span>, the syntax in Skript's documentation,
+        not yet NeoSkript's own list. <a href="/docs/parser-checks/">What it checks and what it can't</a>
+      </p>
+
+      <div class="toolbar">
+        <div class="examples" role="group" aria-labelledby="examples-label">
+          <span class="label" id="examples-label">Examples</span>
+          {examples.map((e) => <button type="button" class="chip" data-example={e.id}>{e.label}</button>)}
+        </div>
+        <div class="share">
+          <span class="share-status" id="share-status" role="status"></span>
+          <button type="button" class="btn btn-secondary" id="share">Copy link</button>
+        </div>
+      </div>
+
+      <div class="workspace">
+        <div class="editor-column">
+          <div class="editor" id="editor">
+            <div class="gutter" id="gutter" aria-hidden="true"></div>
+            <div class="stack">
+              <pre class="highlight" id="highlight" aria-hidden="true"></pre>
+              <textarea
+                id="source"
+                aria-label="Script"
+                aria-describedby="editor-help"
+                spellcheck="false"
+                autocapitalize="off"
+                autocomplete="off"
+                wrap="off"
+              ></textarea>
+            </div>
+          </div>
+          <p class="help" id="editor-help">
+            <kbd>Tab</kbd> indents and <kbd>Shift</kbd>+<kbd>Tab</kbd> outdents. To leave the editor from the keyboard,
+            press <kbd>Esc</kbd>, then <kbd>Tab</kbd>.
+          </p>
+        </div>
+
+        <div class="results">
+          <div class="results-head">
+            <h2 id="problems-title">Problems</h2>
+            <span class="timing" id="timing"></span>
+          </div>
+          <p class="status" id="status" role="status">Loading the parser…</p>
+          <ol class="list" id="problems" aria-labelledby="problems-title"></ol>
+
+          <h2 id="outline-title">Outline</h2>
+          <ol class="list" id="outline" aria-labelledby="outline-title"></ol>
+          <p class="empty" id="no-outline" hidden>No structures yet: events, commands, functions and options show here.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import "../scripts/parser-page.ts";
+</script>
+
+<style>
+  .page {
+    padding-block: clamp(3rem, 2rem + 4vw, 5rem) clamp(4rem, 2.5rem + 5vw, 7rem);
+  }
+  h1 {
+    font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+    letter-spacing: -0.035em;
+  }
+  .lead {
+    margin-top: 1.25rem;
+  }
+  .source {
+    margin-top: 0.75rem;
+    max-width: 62ch;
+    color: var(--muted);
+    font-size: 0.9375rem;
+  }
+  .source a {
+    color: var(--text);
+  }
+
+  .toolbar {
+    margin-top: clamp(2rem, 1.5rem + 2vw, 3rem);
+    padding-block: 0.75rem;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+  }
+  .examples {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 1.25rem;
+  }
+  /* Quiet text buttons, 44px tall for touch. No side padding, so a wrapped
+     row lines up with the label. */
+  .chip {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.9375rem;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--text) 35%, transparent);
+    text-underline-offset: 0.25em;
+    cursor: pointer;
+    transition: text-decoration-color 180ms var(--ease);
+  }
+  .chip:hover {
+    text-decoration-color: var(--magenta);
+  }
+  .share {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+  }
+  .share-status:empty {
+    display: none;
+  }
+  .share-status {
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+  .share .btn {
+    background: transparent;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(17rem, 26rem);
+    gap: 2rem 2.5rem;
+    align-items: start;
+  }
+
+  /* The editor: script on raised night, as the landing's staff centre. */
+  .editor {
+    --lh: 1.5rem;
+    --pad: 0.75rem;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: 22rem;
+    max-height: min(72vh, 52rem);
+    overflow: auto;
+    background: var(--raised);
+    border: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 0.875rem;
+    line-height: var(--lh);
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "calt" 0;
+    tab-size: 4;
+    overscroll-behavior: contain;
+  }
+  .editor:focus-within {
+    outline: 2px solid var(--magenta);
+    outline-offset: 3px;
+  }
+  .gutter {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    padding: var(--pad) 0.625rem var(--pad) 0.75rem;
+    background: var(--raised);
+    border-right: 1px solid var(--rule);
+    color: var(--muted);
+    text-align: right;
+    user-select: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .gutter :global(.n) {
+    display: block;
+    min-width: 3ch;
+    padding-right: 0.375rem;
+    border-right: 2px solid transparent;
+  }
+  /* Error and warning lines differ by more than colour: a solid or dashed rail. */
+  .gutter :global(.n.error) {
+    color: var(--magenta);
+    font-weight: 600;
+    border-right: 2px solid var(--magenta);
+  }
+  .gutter :global(.n.warning) {
+    color: var(--string);
+    border-right: 2px dashed var(--string);
+  }
+  .stack {
+    display: grid;
+    min-width: max-content;
+  }
+  .highlight,
+  textarea {
+    grid-area: 1 / 1;
+    margin: 0;
+    padding: var(--pad) 1rem;
+    border: 0;
+    font: inherit;
+    line-height: inherit;
+    letter-spacing: 0;
+    tab-size: inherit;
+    white-space: pre;
+    overflow-wrap: normal;
+  }
+  .highlight {
+    color: var(--text);
+    pointer-events: none;
+  }
+  .highlight :global(.line) {
+    display: block;
+    min-height: var(--lh);
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+  }
+  .highlight :global(.line.has-error) {
+    background: color-mix(in srgb, var(--magenta) 9%, transparent);
+  }
+  .highlight :global(.line.has-warning) {
+    background: color-mix(in srgb, var(--string) 6%, transparent);
+  }
+  .highlight :global(.line.current) {
+    background: color-mix(in srgb, var(--magenta) 18%, transparent);
+  }
+  .highlight :global(.comment) {
+    color: var(--muted);
+  }
+  .highlight :global(.mark-error) {
+    text-decoration: underline wavy var(--magenta);
+    text-decoration-skip-ink: none;
+    text-underline-offset: 0.3em;
+  }
+  .highlight :global(.mark-warning) {
+    text-decoration: underline dotted var(--string);
+    text-decoration-thickness: 2px;
+    text-decoration-skip-ink: none;
+    text-underline-offset: 0.3em;
+  }
+  textarea {
+    width: 100%;
+    min-height: 100%;
+    resize: none;
+    overflow: hidden;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--text);
+    outline: none;
+  }
+  textarea::selection {
+    color: transparent;
+    background: color-mix(in srgb, var(--magenta) 35%, transparent);
+  }
+  .help {
+    margin-top: 0.75rem;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+  kbd {
+    font-size: 0.8125rem;
+    color: var(--text);
+  }
+
+  /* Results: hairline-ruled rows, no cards. */
+  .results h2 {
+    font-size: 1.25rem;
+    letter-spacing: -0.02em;
+  }
+  .results-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .timing {
+    color: var(--muted);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .status {
+    margin-top: 0.5rem;
+    font-size: 0.9375rem;
+  }
+  #outline-title {
+    margin-top: 2.5rem;
+  }
+  .list {
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+  }
+  .list:empty {
+    border-top: 0;
+  }
+  .list :global(li) {
+    border-bottom: 1px solid var(--rule);
+  }
+  .list :global(.jump) {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.125rem 0.75rem;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.625rem 0.5rem;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.9375rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 180ms var(--ease);
+  }
+  .list :global(.jump:hover) {
+    background: color-mix(in srgb, var(--magenta) 7%, transparent);
+  }
+  .list :global(.label) {
+    align-self: center;
+  }
+  .list :global(.error .sev) {
+    color: var(--magenta);
+  }
+  .list :global(.warning .sev) {
+    color: var(--string);
+  }
+  .list :global(.where) {
+    color: var(--muted);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    justify-self: end;
+  }
+  .list :global(.message) {
+    grid-column: 1 / -1;
+    overflow-wrap: anywhere;
+  }
+  .list :global(code.message) {
+    font-size: 0.8125rem;
+    white-space: pre;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .empty {
+    margin-top: 0.75rem;
+    color: var(--muted);
+    font-size: 0.9375rem;
+  }
+
+  @media (max-width: 60rem) {
+    .workspace {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .editor {
+      min-height: 16rem;
+      max-height: 60vh;
+    }
+  }
+  @media (max-width: 30rem) {
+    .share {
+      margin-left: 0;
+    }
+  }
+</style>

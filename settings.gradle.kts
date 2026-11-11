@@ -41,5 +41,6 @@ include(
     "neoskript-paper",
     "neoskript-plugin",
     "neoskript-cli",
+    "neoskript-web",
     "test-harness",
 )

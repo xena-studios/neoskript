@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.frontend.structure;
 
+import co.xenastudios.neoskript.frontend.source.Text;
 import java.util.Locale;
 
 /**
@@ -61,11 +62,11 @@ public record Structure(Kind kind, Node node) {
         if (isAutoReload(line.text())) {
             return Kind.AUTO_RELOAD;
         }
-        return line.text().toLowerCase(Locale.ROOT).startsWith("using ") ? Kind.USING : null;
+        return Text.lower(line.text()).startsWith("using ") ? Kind.USING : null;
     }
 
     public static Kind kindOf(Line header) {
-        String key = header.key().toLowerCase(Locale.ROOT);
+        String key = Text.lower(header.key());
         return switch (key) {
             case "options" -> Kind.OPTIONS;
             case "variables" -> Kind.VARIABLES;

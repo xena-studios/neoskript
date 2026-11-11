@@ -6,11 +6,12 @@
   "packageManager": "pnpm@12.6.0",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build && node scripts/headers.mjs",
+    "build": "node scripts/parser.mjs && astro build && node scripts/headers.mjs",
     "preview": "astro preview",
     "brand:sync": "node scripts/sync-brand.mjs",
     "syntax:sync": "node scripts/syntax.mjs",
-    "deploy": "pnpm build && wrangler deploy"
+    "deploy": "pnpm build && wrangler deploy",
+    "parser": "cd .. && ./gradlew :neoskript-web:website"
   },
   "engines": {
     "node": ">=24"
