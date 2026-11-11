@@ -1,0 +1,33 @@
+{
+  "source": "test-harness DifferentialScenario, paper-26.3",
+  "reference": "Skript 2.17.0 on paper-26.3",
+  "date": "2026-11-10",
+  "units": 1613,
+  "identical": 1495,
+  "percent": 92.6,
+  "probe": "probes/text",
+  "file": "test-harness/corpus/differential/text.sk",
+  "setup": "set {_t} to \"Hello World\"",
+  "rows": [
+    {
+      "line": "show(\"length\", length of {_t})",
+      "output": "length: 11"
+    },
+    {
+      "line": "show(\"split\", {_t} split at \" \")",
+      "output": "split: Hello and World"
+    },
+    {
+      "line": "show(\"repeated\", \"ab\" repeated 3 times)",
+      "output": "repeated: ababab"
+    },
+    {
+      "line": "show(\"replaced\", {_t} where \"o\" is replaced with \"0\")",
+      "output": "replaced: Hell0 W0rld"
+    },
+    {
+      "line": "show(\"matches\", (whether \"hello\" matches \"h.*o\", whether \"hello\" matches \"h\"))",
+      "output": "matches: true and false"
+    }
+  ]
+}

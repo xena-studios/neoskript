@@ -1,0 +1,369 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-10T00:00:00Z",
+  "title": "Design System: NeoSkript website",
+  "extensions": {
+    "colorMeta": {
+      "magenta": {
+        "role": "primary",
+        "displayName": "Neo Magenta",
+        "canonical": "#FF4D9D",
+        "oklch": "oklch(69.1% 0.223 357.2)",
+        "tonalRamp": [
+          "#21000B",
+          "#500025",
+          "#840041",
+          "#B2005F",
+          "#D9267E",
+          "#EA6F9F",
+          "#F8AAC5",
+          "#FFE7EF"
+        ]
+      },
+      "magenta-daylight": {
+        "role": "primary",
+        "displayName": "Magenta Daylight",
+        "canonical": "#D61F78",
+        "oklch": "oklch(57.9% 0.220 358.6)",
+        "tonalRamp": [
+          "#21000B",
+          "#500023",
+          "#84003E",
+          "#B2005C",
+          "#D9287B",
+          "#EA6F9D",
+          "#F7AAC3",
+          "#FFE8EE"
+        ]
+      },
+      "string": {
+        "role": "secondary",
+        "displayName": "String Pink",
+        "canonical": "#FFC2DD",
+        "oklch": "oklch(87.6% 0.077 350.5)",
+        "tonalRamp": [
+          "#14060D",
+          "#351A27",
+          "#5B3044",
+          "#7F4B63",
+          "#A06A83",
+          "#BA91A3",
+          "#D6BCC7",
+          "#F4ECEF"
+        ]
+      },
+      "night": {
+        "role": "neutral",
+        "displayName": "Night",
+        "canonical": "#110B13",
+        "oklch": "oklch(16.2% 0.019 317.6)",
+        "tonalRamp": [
+          "#0E0910",
+          "#28212A",
+          "#443D46",
+          "#625A65",
+          "#827A85",
+          "#A39BA6",
+          "#C9C0CC",
+          "#F4EBF7"
+        ]
+      },
+      "night-raised": {
+        "role": "neutral",
+        "displayName": "Raised Night",
+        "canonical": "#1B1320",
+        "oklch": "oklch(20.3% 0.028 312.0)",
+        "tonalRamp": [
+          "#0F0814",
+          "#29202E",
+          "#453C4B",
+          "#635969",
+          "#83798A",
+          "#A49AAB",
+          "#CABFD2",
+          "#F5EAFD"
+        ]
+      },
+      "night-rule": {
+        "role": "neutral",
+        "displayName": "Night Rule",
+        "canonical": "#30243A",
+        "oklch": "oklch(28.4% 0.043 308.8)",
+        "tonalRamp": [
+          "#100619",
+          "#2A1E34",
+          "#463A51",
+          "#655770",
+          "#857791",
+          "#A698B3",
+          "#CCBDDA",
+          "#F7E7FF"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "canonical": "#F7F1F6",
+        "oklch": "oklch(96.4% 0.009 330.9)",
+        "tonalRamp": [
+          "#0D0A0D",
+          "#272226",
+          "#433E42",
+          "#615C60",
+          "#817B80",
+          "#A29CA1",
+          "#C8C2C7",
+          "#F2ECF1"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#A898A9",
+        "oklch": "oklch(69.9% 0.030 324.1)",
+        "tonalRamp": [
+          "#110712",
+          "#2B1F2C",
+          "#483A49",
+          "#675867",
+          "#877788",
+          "#A898A9",
+          "#CEBECF",
+          "#F9E8FA"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#1A1219",
+        "oklch": "oklch(19.6% 0.019 330.5)",
+        "tonalRamp": [
+          "#10080F",
+          "#292128",
+          "#463C44",
+          "#645A63",
+          "#847983",
+          "#A69AA4",
+          "#CCC0CA",
+          "#F6EAF4"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The landing hero headline; the download h1 at a smaller clamp."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section headings, capped at 22ch."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Sub-headings such as the download page's Development build."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "The muted paragraph under a heading, 52-62ch."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose and definitions."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Benchmark times and fact figures, tabular."
+      },
+      "mono": {
+        "displayName": "Mono (Geist Mono)",
+        "purpose": "Script lines, server output, code, hashes; ligatures off."
+      },
+      "label": {
+        "displayName": "Label (JetBrains Mono)",
+        "purpose": "Uppercase metadata: staff column heads, Same / N× faster marks, licence line. Never an eyebrow."
+      }
+    },
+    "shadows": [
+      {
+        "name": "none",
+        "value": "none",
+        "purpose": "The system is flat; Starlight's --sl-shadow-sm/md/lg are set to none. Depth is tone and hairlines."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The one curve for every transition and animation."
+      },
+      {
+        "name": "state",
+        "value": "180ms",
+        "purpose": "Hover and focus transitions: link underline, pill background and border, staff row tint, arrow nudge."
+      },
+      {
+        "name": "settle",
+        "value": "700ms, translateY(6px) to 0, 60ms stagger from 120ms",
+        "purpose": "Differential staff rows enter once, top to bottom."
+      },
+      {
+        "name": "draw",
+        "value": "1100ms scaleX(0) to 1, second row delayed 160ms",
+        "purpose": "Benchmark bars draw out from the staff."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation and transition durations and delays 0s",
+        "purpose": "prefers-reduced-motion: reduce shows everything at its end state."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "header-tight",
+        "value": "30rem"
+      },
+      {
+        "name": "rows-stack",
+        "value": "44rem"
+      },
+      {
+        "name": "single-column",
+        "value": "52rem"
+      },
+      {
+        "name": "staff-stack",
+        "value": "60rem"
+      }
+    ],
+    "focus": {
+      "value": "outline: 2px solid magenta; outline-offset: 3px; border-radius: 4px",
+      "purpose": "Every focusable element."
+    },
+    "selection": {
+      "value": "color-mix(in srgb, magenta 35%, transparent)"
+    },
+    "csp": "Stylesheets are emitted as files (inlineStylesheets: never, assetsInlineLimit: 0); authored code uses no inline <style> or style attributes; inline scripts run only by SHA-256 hash (public/_headers, scripts/headers.mjs); fonts self-hosted, font-src 'self'. style-src keeps 'unsafe-inline' only for the style attributes Starlight writes."
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one main action in an action row: solid Neo Magenta pill, night text.",
+      "html": "<a class=\"ds-btn ds-btn-primary\" href=\"#\">Download the dev build</a>",
+      "css": ".ds-btn{--m:var(--neoskript-magenta,#FF4D9D);--n:var(--neoskript-night,#110B13);--r:var(--neoskript-night-rule,#30243A);--t:var(--neoskript-text,#F7F1F6);--mu:var(--neoskript-muted,#A898A9);--rz:var(--neoskript-night-raised,#1B1320);display:inline-flex;align-items:center;gap:.5em;min-height:44px;padding:0 1.375rem;border-radius:999px;font-family:'Geist Variable',system-ui,sans-serif;font-size:.9375rem;font-weight:500;text-decoration:none;white-space:nowrap;transition:background-color 180ms cubic-bezier(0.16, 1, 0.3, 1),border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),color 180ms cubic-bezier(0.16, 1, 0.3, 1);}.ds-btn:focus-visible{outline:2px solid var(--m);outline-offset:3px;}.ds-btn-primary{background:var(--m);color:var(--n);}.ds-btn-primary:hover{background:color-mix(in srgb,var(--m) 85%,white);}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Every other action: hairline pill whose border warms toward magenta on hover.",
+      "html": "<a class=\"ds-btn ds-btn-secondary\" href=\"#\">How we test</a>",
+      "css": ".ds-btn{--m:var(--neoskript-magenta,#FF4D9D);--n:var(--neoskript-night,#110B13);--r:var(--neoskript-night-rule,#30243A);--t:var(--neoskript-text,#F7F1F6);--mu:var(--neoskript-muted,#A898A9);--rz:var(--neoskript-night-raised,#1B1320);display:inline-flex;align-items:center;gap:.5em;min-height:44px;padding:0 1.375rem;border-radius:999px;font-family:'Geist Variable',system-ui,sans-serif;font-size:.9375rem;font-weight:500;text-decoration:none;white-space:nowrap;transition:background-color 180ms cubic-bezier(0.16, 1, 0.3, 1),border-color 180ms cubic-bezier(0.16, 1, 0.3, 1),color 180ms cubic-bezier(0.16, 1, 0.3, 1);}.ds-btn:focus-visible{outline:2px solid var(--m);outline-offset:3px;}.ds-btn-secondary{border:1px solid var(--r);color:var(--t);}.ds-btn-secondary:hover{border-color:color-mix(in srgb,var(--m) 60%,var(--r));}"
+    },
+    {
+      "name": "Header Navigation",
+      "kind": "nav",
+      "description": "Muted links that turn text on hover and for the current page; outbound links carry the arrow.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\" aria-current=\"page\">Docs</a><a href=\"#\">Download</a><a href=\"#\">GitHub<svg class=\"ds-external\" viewBox=\"0 0 10 10\" width=\"10\" height=\"10\" aria-hidden=\"true\"><path d=\"M2.5 7.5 7.5 2.5M3.5 2.5h4v4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></a></nav>",
+      "css": ".ds-nav{--m:var(--neoskript-magenta,#FF4D9D);--n:var(--neoskript-night,#110B13);--r:var(--neoskript-night-rule,#30243A);--t:var(--neoskript-text,#F7F1F6);--mu:var(--neoskript-muted,#A898A9);--rz:var(--neoskript-night-raised,#1B1320);display:flex;gap:1.75rem;padding:1.5rem 0;border-bottom:1px solid var(--r);background:var(--n);font-family:'Geist Variable',system-ui,sans-serif;}.ds-nav a{color:var(--mu);font-size:.9375rem;text-decoration:none;}.ds-nav a:hover,.ds-nav a[aria-current=page]{color:var(--t);}.ds-nav a:focus-visible{outline:2px solid var(--m);outline-offset:3px;border-radius:4px;}.ds-external{width:.62em;height:.62em;margin-left:.3em;vertical-align:.05em;transition:transform 180ms cubic-bezier(0.16, 1, 0.3, 1);}.ds-nav a:hover>.ds-external{transform:translate(1px,-1px);}"
+    },
+    {
+      "name": "External Link",
+      "kind": "custom",
+      "description": "The only icon: an authored SVG up-right arrow in currentColor that nudges on hover and focus. Underline turns magenta on hover.",
+      "html": "<a class=\"ds-link\" href=\"#\">test harness<svg class=\"ds-external\" viewBox=\"0 0 10 10\" width=\"10\" height=\"10\" aria-hidden=\"true\"><path d=\"M2.5 7.5 7.5 2.5M3.5 2.5h4v4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></a>",
+      "css": ".ds-link{--m:var(--neoskript-magenta,#FF4D9D);--n:var(--neoskript-night,#110B13);--r:var(--neoskript-night-rule,#30243A);--t:var(--neoskript-text,#F7F1F6);--mu:var(--neoskript-muted,#A898A9);--rz:var(--neoskript-night-raised,#1B1320);color:var(--t);font-family:'Geist Variable',system-ui,sans-serif;text-decoration-color:color-mix(in srgb,var(--t) 35%,transparent);text-underline-offset:.25em;transition:text-decoration-color 180ms cubic-bezier(0.16, 1, 0.3, 1);}.ds-link:hover{text-decoration-color:var(--m);}.ds-link:focus-visible{outline:2px solid var(--m);outline-offset:3px;border-radius:4px;}.ds-external{width:.62em;height:.62em;margin-left:.3em;vertical-align:.05em;transition:transform 180ms cubic-bezier(0.16, 1, 0.3, 1);}.ds-link:hover>.ds-external,.ds-link:focus-visible>.ds-external{transform:translate(1px,-1px);}"
+    },
+    {
+      "name": "Differential Staff",
+      "kind": "custom",
+      "refersTo": "staff-script-cell",
+      "description": "The signature: a script line on raised night between magenta rails, Skript's output mirrored left in muted, NeoSkript's right with a magenta SAME mark. Hovering a row lights it across both servers.",
+      "html": "<div class=\"ds-staff\"><div class=\"ds-row ds-head\"><span class=\"ds-label ds-sk\">Skript 2.17.0 · Paper 1.21.4</span><span class=\"ds-label ds-sc\">probe.sk</span><span class=\"ds-label\">NeoSkript · Paper 1.21.4</span></div><div class=\"ds-row ds-line\"><span class=\"ds-sk\">10</span><span class=\"ds-sc\"><span class=\"ds-kw\">broadcast</span> <span class=\"ds-str\">\"%5 * 2%\"</span></span><span class=\"ds-neo\">10<span class=\"ds-label ds-same\">Same</span></span></div></div>",
+      "css": ".ds-staff{--m:var(--neoskript-magenta,#FF4D9D);--n:var(--neoskript-night,#110B13);--r:var(--neoskript-night-rule,#30243A);--t:var(--neoskript-text,#F7F1F6);--mu:var(--neoskript-muted,#A898A9);--rz:var(--neoskript-night-raised,#1B1320);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,36rem) minmax(0,1fr);border-top:1px solid var(--r);background:var(--n);color:var(--t);font-family:'Geist Mono Variable',ui-monospace,monospace;font-size:.875rem;}.ds-row{display:grid;grid-column:1/-1;grid-template-columns:subgrid;}.ds-row>*{padding:.7rem 1.25rem;border-bottom:1px solid var(--r);}.ds-head>*{padding-block:.9rem;}.ds-sc{background:var(--rz);border-inline:1px solid var(--m);}.ds-sk{text-align:right;}.ds-neo{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;}.ds-label{font-family:'JetBrains Mono Variable',ui-monospace,monospace;font-size:.75rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--mu);}.ds-same{color:var(--m);}.ds-kw{color:var(--m);}.ds-str{color:var(--neoskript-string,#FFC2DD);}.ds-line>*{transition:background-color 180ms cubic-bezier(0.16, 1, 0.3, 1);}.ds-line:hover>*{background-color:color-mix(in srgb,var(--m) 7%,transparent);}.ds-line:hover>.ds-sc{background-color:color-mix(in srgb,var(--m) 10%,var(--rz));}"
+    },
+    {
+      "name": "Performance Staff Row",
+      "kind": "custom",
+      "description": "One measured job: Skript's time and muted bar growing left, the measure on raised night between magenta rails, NeoSkript's magenta bar, time and N× faster mark. Bars share one scale and draw out once.",
+      "html": "<div class=\"ds-perf\"><span class=\"ds-out ds-sk\"><span class=\"ds-time\">4.80 s</span><svg class=\"ds-bar\" viewBox=\"0 0 100 10\" preserveAspectRatio=\"none\" aria-hidden=\"true\"><rect class=\"ds-track\" width=\"100\" height=\"10\"/><rect class=\"ds-fill\" width=\"100\" height=\"10\"/></svg></span><span class=\"ds-sc\"><strong>Startup load</strong><span class=\"ds-what\">example measure</span></span><span class=\"ds-out ds-neo\"><svg class=\"ds-bar\" viewBox=\"0 0 100 10\" preserveAspectRatio=\"none\" aria-hidden=\"true\"><rect class=\"ds-track\" width=\"100\" height=\"10\"/><rect class=\"ds-fill\" width=\"25\" height=\"10\"/></svg><span><span class=\"ds-time\">1.20 s</span><br><span class=\"ds-mark\">4.0× faster</span></span></span></div>",
+      "css": ".ds-perf{--m:var(--neoskript-magenta,#FF4D9D);--n:var(--neoskript-night,#110B13);--r:var(--neoskript-night-rule,#30243A);--t:var(--neoskript-text,#F7F1F6);--mu:var(--neoskript-muted,#A898A9);--rz:var(--neoskript-night-raised,#1B1320);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,20rem) minmax(0,1fr);border-block:1px solid var(--r);background:var(--n);color:var(--t);}.ds-perf>*{padding:1.25rem;}.ds-out{display:flex;align-items:center;gap:1rem;}.ds-sk{justify-content:flex-end;}.ds-sc{display:grid;gap:.15rem;align-content:center;background:var(--rz);border-inline:1px solid var(--m);font-family:'Geist Variable',system-ui,sans-serif;}.ds-sc strong{font-size:1.0625rem;letter-spacing:-.01em;}.ds-what{color:var(--mu);font-size:.8125rem;font-family:'Geist Mono Variable',ui-monospace,monospace;}.ds-bar{flex:none;width:8rem;height:.75rem;}.ds-sk .ds-bar{transform:scaleX(-1);}.ds-track{fill:var(--r);}.ds-sk .ds-fill{fill:var(--mu);}.ds-neo .ds-fill{fill:var(--m);}.ds-fill{transform-box:fill-box;transform-origin:left center;animation:ds-draw 1100ms cubic-bezier(0.16, 1, 0.3, 1) both;}@keyframes ds-draw{from{transform:scaleX(0);}}.ds-time{font-family:'Geist Variable',system-ui,sans-serif;font-size:1.5rem;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.02em;}.ds-sk .ds-time{color:var(--mu);}.ds-mark{font-family:'JetBrains Mono Variable',ui-monospace,monospace;font-size:.75rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--m);}@media (prefers-reduced-motion:reduce){.ds-fill{animation:none;}}"
+    },
+    {
+      "name": "Definition Rows",
+      "kind": "custom",
+      "description": "Hairline-ruled term/definition rows instead of cards: bold term, muted definition.",
+      "html": "<dl class=\"ds-rows\"><div><dt>Requirements</dt><dd>Paper or Folia, Minecraft 1.21.4 or newer, Java 21 or newer.</dd></div><div><dt>Releases</dt><dd>None yet.</dd></div></dl>",
+      "css": ".ds-rows{--m:var(--neoskript-magenta,#FF4D9D);--n:var(--neoskript-night,#110B13);--r:var(--neoskript-night-rule,#30243A);--t:var(--neoskript-text,#F7F1F6);--mu:var(--neoskript-muted,#A898A9);--rz:var(--neoskript-night-raised,#1B1320);margin:0;border-top:1px solid var(--r);background:var(--n);color:var(--t);font-family:'Geist Variable',system-ui,sans-serif;}.ds-rows>div{display:grid;grid-template-columns:minmax(0,14rem) minmax(0,1fr);gap:.5rem 3rem;padding-block:1.25rem;border-bottom:1px solid var(--r);}.ds-rows dt{font-weight:700;}.ds-rows dd{margin:0;color:var(--mu);max-width:66ch;}"
+    },
+    {
+      "name": "Numbered Steps",
+      "kind": "custom",
+      "description": "Three steps on one hairline, numbered by a magenta JetBrains Mono counter.",
+      "html": "<ol class=\"ds-steps\"><li><strong>Take out Skript.jar.</strong> Leave its folder where it is.</li><li><strong>Put in NeoSkript.jar.</strong> Paper or Folia.</li><li><strong>Start the server.</strong> Your scripts are copied over.</li></ol>",
+      "css": ".ds-steps{--m:var(--neoskript-magenta,#FF4D9D);--n:var(--neoskript-night,#110B13);--r:var(--neoskript-night-rule,#30243A);--t:var(--neoskript-text,#F7F1F6);--mu:var(--neoskript-muted,#A898A9);--rz:var(--neoskript-night-raised,#1B1320);margin:0;padding:0;list-style:none;counter-reset:step;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--r);background:var(--n);font-family:'Geist Variable',system-ui,sans-serif;}.ds-steps li{counter-increment:step;padding:1.5rem 1.5rem 0 0;color:var(--mu);}.ds-steps li::before{content:counter(step);display:block;margin-bottom:.75rem;font-family:'JetBrains Mono Variable',ui-monospace,monospace;font-size:.75rem;color:var(--m);}.ds-steps strong{display:block;color:var(--t);margin-bottom:.25rem;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Two servers, one staff",
+    "overview": "neoskript.dev is NeoSkript's own brand on night, laid out with xenastudios.co's grammar: hairlines, pills, one column of ideas, no cards. Every colour, logo and scene comes from xena-studios/brand (tokens/neoskript.*, synced into src/brand/ by pnpm brand:sync); the site composes them with exact type, hairline rules and space. Xena frames the product with the planet horizon and the XENA endorsement in the footer, and nothing else.\n\nThe signature is the staff: the same script (or the same measured job) runs down a raised centre column between two magenta rails, with Skript's result mirrored on its left and NeoSkript's on its right, one grid row per line so the two sides always line up. The landing page leads with a performance staff whose bars share one scale, so a bar's length is the time it took, then a differential staff that prints what each server output for the same probe. The rest of the site is hairline rows, plain claims and links to source.\n\nTwo surfaces share one palette. The custom pages (landing, download) are dark only (color-scheme: dark) and styled by src/styles/site.css. The guides are Starlight, mapped onto the same tokens in src/styles/theme.css, with a light theme in ink and magenta-daylight.",
+    "keyCharacteristics": [
+      "Neo Magenta on near-black, aubergine-tinted night; magenta marks meaning, never decoration.",
+      "Geist Bold headlines at tight negative tracking; Geist Mono for script and output; JetBrains Mono uppercase labels for metadata.",
+      "Hairline rules instead of cards; flat, no shadows anywhere.",
+      "44px pills for actions; one authored SVG arrow is the only icon.",
+      "One authored motion moment (bars draw out, rows settle once); reduced motion shows everything at once."
+    ],
+    "rules": [
+      {
+        "name": "The Brand Repo Rule",
+        "body": "Colours are the synced --neoskript-* custom properties, aliased as --night, --raised, --rule, --text, --muted, --magenta, --string. Never type a new hex; resync from the brand repo.",
+        "section": "colors"
+      },
+      {
+        "name": "The sRGB Mix Rule",
+        "body": "Every translucent or derived colour is color-mix(in srgb, ...): Starlight's greys from text and night, the hover tints, the selection. oklch mixing drifts the hue.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Sides Rule",
+        "body": "On a staff, NeoSkript's side is magenta and Skript's is muted. Skript is never shown in magenta, and NeoSkript never in muted.",
+        "section": "colors"
+      },
+      {
+        "name": "The Label Is Metadata Rule",
+        "body": "Uppercase JetBrains Mono labels name columns, servers, marks and licences. They never sit above a heading as an eyebrow.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono Means Code Rule",
+        "body": "Geist Mono is for script lines, server output, file names, hashes and commands. Words and numbers people read are Geist.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline Rule",
+        "body": "Separation is a 1px night-rule line, never a box. Rows, sections, the download build block and the steps are ruled, not carded.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do take every colour, logo and scene from the brand repo (`pnpm brand:sync`), and use the aliased tokens.",
+      "Do separate with 1px `night-rule` hairlines and tone; keep everything flat.",
+      "Do put the same thing on both sides of a staff: Skript muted on the left, NeoSkript magenta on the right, one row per line, one scale for every bar.",
+      "Do carry the authored External arrow on every link to another site.",
+      "Do keep pills at 44px, one primary per action row.",
+      "Do honour `prefers-reduced-motion: reduce`: every animation and transition collapses to its end state, and nothing depends on an animation to become visible.",
+      "Do emit styles as files: authored code has no `<style>` inlined into the page and no `style` attributes (`inlineStylesheets: \"never\"`, no inlined assets), and scripts run only from files or hashed inline blocks, per the CSP in `public/_headers`."
+    ],
+    "donts": [
+      "Don't use cards or card grids; facts, steps and rows are hairline rows.",
+      "Don't put an uppercase label above a heading as an eyebrow.",
+      "Don't use Unicode or emoji arrows or icons; the SVG arrow is the only icon.",
+      "Don't add shadows, glows or gradient text, or any atmosphere beyond the Xena horizon.",
+      "Don't use magenta decoratively, or Xena's Ion Blue anywhere.",
+      "Don't recolour the NeoSkript logo.",
+      "Don't mix colours in oklch."
+    ]
+  }
+}

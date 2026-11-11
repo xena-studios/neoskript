@@ -1,0 +1,46 @@
+{
+  "title": "neoskript.dev landing: choose the layout",
+  "question": "The look is set by NeoSkript's brand and the xenastudios.co site. These are three ways to lay out the first screen for Skript server owners. Pick one, steer it, or re-roll.",
+  "options": [
+    {
+      "id": "horizon-door",
+      "label": "Horizon front door",
+      "kicker": "THE ROLL",
+      "lineage": "xenastudios.co's own hero, in NeoSkript's colours",
+      "thesis": "The Xena front door at full commitment: the headline owns the screen, a real script beside it, the magenta horizon rising underneath.",
+      "palette": ["#110B13", "#1B1320", "#30243A", "#F7F1F6", "#FF4D9D"],
+      "materials": ["Geist Bold headline", "raised code box", "magenta planet limb"],
+      "viewport": "Headline at 104px left, join.sk in a raised box right, download + docs pills with the honest status line, horizon across the bottom.",
+      "risk": "Closest to the other Xena sites, so it proves the least on its own: the drop-in claim is a sentence, not a demonstration.",
+      "html": ".impeccable/mocks/decision/horizon-door.html"
+    },
+    {
+      "id": "two-servers",
+      "label": "Two servers, one script",
+      "lineage": "the differential test harness, drawn as a score",
+      "thesis": "Prove the drop-in claim in the first screen: one script down a centre staff, Skript's results on the left, NeoSkript's mirrored on the right, row for row.",
+      "palette": ["#110B13", "#1B1320", "#30243A", "#F7F1F6", "#FF4D9D"],
+      "materials": ["centre staff in magenta hairlines", "mono result rows", "same-height mirrored columns"],
+      "viewport": "Centred headline and two pills, then a three-column staff: Skript output | the script | NeoSkript output, each row marked SAME.",
+      "risk": "The result rows are an illustration until the harness exports real runs; they must be labelled as an example, or wired to real harness output.",
+      "raised": [{ "from": "notation-diagram-systems-labanotation", "raise": "A centre staff is the layout law: the two servers mirror across it, every row the same height, so a mismatch would show as a break in symmetry." }],
+      "html": ".impeccable/mocks/decision/two-servers.html"
+    },
+    {
+      "id": "jar-swap",
+      "label": "The jar swap",
+      "lineage": "a server's plugins folder",
+      "thesis": "Show the whole migration as the one thing server owners actually do: Skript.jar out, NeoSkript in, scripts copied, Skript's folder untouched.",
+      "palette": ["#110B13", "#1B1320", "#30243A", "#F7F1F6", "#FF4D9D"],
+      "materials": ["file tree in Geist Mono", "struck-through Skript.jar", "hairline proof row"],
+      "viewport": "Headline and pills left, the plugins/ tree right with each change annotated, a three-part proof row under the fold line.",
+      "risk": "Speaks to the switch, not the speed; the 'lose the lag' half waits for published benchmarks.",
+      "html": ".impeccable/mocks/decision/jar-swap.html"
+    },
+    { "id": "challenger-automata", "label": "Paper automata", "verdict": "declined", "case": "Server owners don't identify with cut-paper mechanisms.", "kept": "One continuous mechanism driving the page, not scattered effects." },
+    { "id": "challenger-rietveld", "label": "Rietveld sliding house", "verdict": "declined", "case": "Sliding planes would hide the offer behind interaction.", "kept": "Honest joints: every claim's source visible." },
+    { "id": "challenger-ascii", "label": "ASCII live render", "verdict": "declined", "case": "A glyph scene is spectacle; the brand bans decoration beyond the horizon.", "kept": "The mono grid as structure." }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "steer": true
+}

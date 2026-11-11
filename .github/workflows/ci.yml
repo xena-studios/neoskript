@@ -65,3 +65,44 @@ jobs:
             test-harness/build/harness/reports
             test-harness/build/harness/runs/**/harness-console.log
           if-no-files-found: ignore
+
+  # Every push to main that passes the build and all four harness servers is
+  # published as the rolling "dev" prerelease: the development build the
+  # download page (neoskript.dev/download) offers until real releases exist.
+  # The tag moves to each new commit; the jar keeps its version (a SNAPSHOT)
+  # and the release notes name the commit.
+  dev-build:
+    name: Publish development build
+    needs: [build, harness]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'xena-studios/neoskript' }}
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    concurrency:
+      group: dev-build
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: NeoSkript
+          path: dist
+      - name: Checksum
+        working-directory: dist
+        run: sha256sum NeoSkript-*.jar > SHA256SUMS
+      - name: Publish the dev prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          short=$(echo "$GITHUB_SHA" | cut -c1-7)
+          notes=$(printf 'Development build of [%s](https://github.com/%s/commit/%s), built %s.\n\nNot a release: for testing on a server you can afford to break. Every push to main that passes CI replaces it.' \
+            "$short" "$GH_REPO" "$GITHUB_SHA" "$(date -u +%Y-%m-%d)")
+          if gh release view dev >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$GH_REPO/git/refs/tags/dev" -f sha="$GITHUB_SHA" -F force=true
+            gh release edit dev --prerelease --title "Development build ($short)" --notes "$notes"
+            # Replace the jar: its name only changes with the version.
+            for asset in $(gh release view dev --json assets -q '.assets[].name'); do gh release delete-asset dev "$asset" -y; done
+          else
+            gh release create dev --prerelease --target "$GITHUB_SHA" --title "Development build ($short)" --notes "$notes"
+          fi
+          gh release upload dev dist/NeoSkript-*.jar dist/SHA256SUMS --clobber

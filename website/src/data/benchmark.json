@@ -1,0 +1,19 @@
+{
+  "source": "test-harness: skript-load-benchmark and neoskript-load-benchmark, paper-26.3",
+  "date": "2026-11-10",
+  "machine": "an Apple M1 Pro laptop",
+  "skript": "Skript 2.17.0",
+  "scripts": 40,
+  "lines": 5960,
+  "reloads": 5,
+  "startup": {
+    "skriptMs": 1780,
+    "neoskriptMs": 713,
+    "note": "as each plugin logs its own startup load"
+  },
+  "reload": {
+    "skriptMs": 1311,
+    "neoskriptMs": 237,
+    "note": "median wall time of /sk reload scripts, measured by the harness"
+  }
+}

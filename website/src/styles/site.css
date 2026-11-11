@@ -1,0 +1,171 @@
+/* The custom pages (landing, download): NeoSkript's brand on night, laid out
+   with xenastudios.co's grammar: hairlines, pills, one column of ideas, no
+   cards. Colours come from src/brand/neoskript.css (synced from the brand
+   repo); translucent mixes are in sRGB. */
+@import "../brand/neoskript.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/jetbrains-mono";
+
+:root {
+  --night: var(--neoskript-night);
+  --raised: var(--neoskript-night-raised);
+  --rule: var(--neoskript-night-rule);
+  --text: var(--neoskript-text);
+  --muted: var(--neoskript-muted);
+  --magenta: var(--neoskript-magenta);
+  --string: var(--neoskript-string);
+
+  --sans: "Geist Variable", system-ui, sans-serif;
+  --mono: "Geist Mono Variable", ui-monospace, monospace;
+  --label: "JetBrains Mono Variable", ui-monospace, monospace;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --gutter: clamp(1rem, 0.4rem + 3vw, 4rem);
+  --max: 90rem;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  background: var(--night);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 100%;
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+  scrollbar-color: var(--rule) var(--night);
+}
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+main {
+  flex: 1;
+}
+h1,
+h2,
+h3,
+p,
+dl,
+dd,
+pre,
+figure {
+  margin: 0;
+}
+h1,
+h2,
+h3 {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
+a {
+  color: inherit;
+  text-decoration-color: color-mix(in srgb, var(--text) 35%, transparent);
+  text-underline-offset: 0.25em;
+  transition: text-decoration-color 180ms var(--ease), color 180ms var(--ease);
+}
+a:hover {
+  text-decoration-color: var(--magenta);
+}
+::selection {
+  background: color-mix(in srgb, var(--magenta) 35%, transparent);
+}
+:focus-visible {
+  outline: 2px solid var(--magenta);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+code,
+pre,
+kbd {
+  font-family: var(--mono);
+  font-variant-ligatures: none;
+}
+
+.wrap {
+  width: 100%;
+  max-width: var(--max);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+.label {
+  font-family: var(--label);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lead {
+  font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+  line-height: 1.7;
+  color: var(--muted);
+  max-width: 62ch;
+}
+
+/* Pills, 44px, as on xenastudios.co. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  min-height: 44px;
+  padding: 0 1.375rem;
+  border-radius: 999px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease);
+}
+.btn-primary {
+  background: var(--magenta);
+  color: var(--night);
+}
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--magenta) 85%, white);
+}
+.btn-secondary {
+  border: 1px solid var(--rule);
+  color: var(--text);
+}
+.btn-secondary:hover {
+  border-color: color-mix(in srgb, var(--magenta) 60%, var(--rule));
+}
+
+/* Script syntax, as the brand sets code: keywords magenta, strings pale. */
+.kw {
+  color: var(--magenta);
+}
+.str {
+  color: var(--string);
+}
+.punct {
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    transition-duration: 0s !important;
+  }
+}

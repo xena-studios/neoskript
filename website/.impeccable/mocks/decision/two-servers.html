@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=Geist+Mono:wght@400;500&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet"><style>
+*{box-sizing:border-box;margin:0}html,body{width:1440px;height:900px;overflow:hidden;background:#110B13;color:#F7F1F6;font-family:Geist,sans-serif}
+.k{font-family:"JetBrains Mono",monospace;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:#A898A9}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:28px 64px;border-bottom:1px solid #30243A}
+.logo{display:flex;align-items:center;gap:12px;font-weight:700;font-size:22px;letter-spacing:-.03em}.tile{width:34px;height:34px;border-radius:7px;background:#FF4D9D;color:#110B13;font-weight:700;font-size:17px;display:grid;place-items:center;letter-spacing:-.02em}
+.links{display:flex;gap:32px;font-size:15px;color:#A898A9}.links b{color:#F7F1F6;font-weight:500}
+.btn{display:inline-flex;align-items:center;height:44px;padding:0 22px;border-radius:999px;font-size:15px;font-weight:500}.p{background:#FF4D9D;color:#110B13}.s{border:1px solid #30243A;color:#F7F1F6}
+pre,code{font-family:"Geist Mono",monospace}.kw{color:#FF4D9D}.st{color:#FFC2DD}.mu{color:#A898A9}
+</style></head><body><div class="nav"><div class="logo"><div class="tile">.sk</div>NeoSkript</div><div class="links"><b>Docs</b><span>Syntax</span><span>Parser</span><span>Download</span><span>GitHub</span></div></div>
+<style>.wrap{padding:56px 64px 0}h1{font-size:76px;line-height:1.02;letter-spacing:-.035em;font-weight:700;text-align:center}h1 em{font-style:normal;color:#FF4D9D}
+.sub{text-align:center;margin-top:16px;color:#A898A9;font-size:19px}.act{display:flex;gap:12px;justify-content:center;margin-top:26px}
+.staff{margin-top:44px;display:grid;grid-template-columns:1fr 520px 1fr;border-top:1px solid #30243A}
+.col{padding:18px 28px}.mid{border-left:1px solid #FF4D9D;border-right:1px solid #FF4D9D;background:#1B1320;padding:18px 28px;font-size:16px;line-height:2.1}
+.row{display:flex;justify-content:space-between;font-family:"Geist Mono";font-size:14px;line-height:2.4;border-bottom:1px solid #30243A;color:#F7F1F6}.row i{font-style:normal;color:#A898A9}
+.left .row{flex-direction:row-reverse;text-align:right}.ok{color:#FF4D9D;font-family:"JetBrains Mono";font-size:12px;letter-spacing:.12em}</style>
+<div class="wrap"><div class="k" style="text-align:center">// The same script on two servers</div><h1 style="margin-top:18px">Keep your scripts. <em>Lose the lag.</em></h1>
+<p class="sub">Our harness runs every script on real Skript and on NeoSkript, and compares what each one does.</p>
+<div class="act"><span class="btn p">Download the dev build</span><span class="btn s">How we test</span></div>
+<div class="staff"><div class="col left"><div class="k" style="text-align:right;margin-bottom:8px">Skript 2.17 · Paper 26.3</div>
+<div class="row"><i>chat</i><span>Welcome, Steve!</span></div><div class="row"><i>broadcast</i><span>Steve is new here</span></div><div class="row"><i>{visits::…}</i><span>1</span></div><div class="row"><i>chat</i><span>Welcome, Alex!</span></div></div>
+<div class="mid"><div class="k" style="margin-bottom:6px">join.sk</div><pre><span class="kw">on</span> join<span class="mu">:</span>
+    <span class="kw">send</span> <span class="st">"Welcome, %player%!"</span>
+    <span class="kw">if</span> {visits::%uuid of player%} <span class="kw">is not set</span><span class="mu">:</span>
+        <span class="kw">broadcast</span> <span class="st">"%player% is new here"</span>
+    <span class="kw">add</span> 1 <span class="kw">to</span> {visits::%uuid of player%}</pre></div>
+<div class="col"><div class="k" style="margin-bottom:8px">NeoSkript · Paper 26.3</div>
+<div class="row"><span>Welcome, Steve!</span><i class="ok">same</i></div><div class="row"><span>Steve is new here</span><i class="ok">same</i></div><div class="row"><span>1</span><i class="ok">same</i></div><div class="row"><span>Welcome, Alex!</span><i class="ok">same</i></div></div></div></div></body></html>

@@ -1,0 +1,164 @@
+---
+// The custom pages' shell: head, header, footer. The guides are Starlight's.
+import "../styles/site.css";
+import Logo from "../components/Logo.astro";
+import External from "../components/External.astro";
+
+interface Props { title: string; description: string; path: string }
+const { title, description, path } = Astro.props;
+const url = new URL(path, Astro.site).href;
+const og = new URL("/og.png", Astro.site).href;
+const nav = [
+  { href: "/docs", label: "Docs" },
+  { href: "/download", label: "Download" },
+];
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={url} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <meta name="theme-color" content="#110B13" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="NeoSkript" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={url} />
+    <meta property="og:image" content={og} />
+    <meta property="og:image:alt" content="NeoSkript: Keep your scripts. Lose the lag." />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="wrap bar">
+        <a class="home" href="/" aria-label="NeoSkript home"><Logo name="neoskript" label="NeoSkript" /></a>
+        <nav aria-label="Main">
+          <ul>
+            {nav.map((item) => (
+              <li><a href={item.href} aria-current={path.startsWith(item.href) ? "page" : undefined}>{item.label}</a></li>
+            ))}
+            <li><a href="https://github.com/xena-studios/neoskript">GitHub<External /></a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="wrap foot">
+        <a class="xena" href="https://xenastudios.co" aria-label="Xena Studios"><Logo name="xena" label="Xena" /></a>
+        <ul>
+          <li><a href="/docs">Docs</a></li>
+          <li><a href="/download">Download</a></li>
+          <li><a href="https://github.com/xena-studios/neoskript">Source<External /></a></li>
+          <li><a href="https://github.com/xena-studios/neoskript/issues/new/choose">Report a bug<External /></a></li>
+        </ul>
+        <p class="label">GPL-3.0-only · Not affiliated with SkriptLang</p>
+      </div>
+    </footer>
+  </body>
+</html>
+<style>
+  .skip {
+    position: absolute;
+    left: var(--gutter);
+    top: -4rem;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    background: var(--magenta);
+    color: var(--night);
+    text-decoration: none;
+    z-index: 10;
+  }
+  .skip:focus {
+    top: 1rem;
+  }
+  .site-header {
+    border-bottom: 1px solid var(--rule);
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    min-height: 4.5rem;
+  }
+  .home {
+    display: inline-flex;
+  }
+  .home :global(.logo) {
+    height: 1.75rem;
+    width: auto;
+  }
+  nav ul,
+  .foot ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  nav a {
+    color: var(--muted);
+    font-size: 0.9375rem;
+    text-decoration: none;
+  }
+  nav a:hover,
+  nav a[aria-current="page"] {
+    color: var(--text);
+  }
+  .site-footer {
+    border-top: 1px solid var(--rule);
+    padding-block: 2.5rem 3rem;
+    color: var(--muted);
+    font-size: 0.9375rem;
+  }
+  .foot {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 1.5rem 2.5rem;
+  }
+  .xena {
+    display: inline-flex;
+    color: var(--text);
+  }
+  .xena :global(.logo) {
+    height: 0.9rem;
+    width: auto;
+  }
+  .foot a {
+    text-decoration: none;
+  }
+  .foot a:hover {
+    color: var(--text);
+  }
+  @media (max-width: 52rem) {
+    .foot {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 30rem) {
+    .bar {
+      gap: 1rem;
+    }
+    .home :global(.logo) {
+      height: 1.375rem;
+    }
+    nav ul {
+      flex-wrap: nowrap;
+      gap: 1rem;
+    }
+    nav a {
+      font-size: 0.875rem;
+    }
+  }
+</style>

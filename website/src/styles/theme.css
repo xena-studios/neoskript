@@ -1,0 +1,95 @@
+/* The guides' Starlight theme in NeoSkript's colours (xena-studios/brand,
+   tokens/neoskript.*, synced into src/brand/): Neo Magenta on night in the
+   dark, ink and magenta-daylight in the light. Geist for words, Geist Mono for
+   code, JetBrains Mono for the uppercase labels, as across Xena. Neutrals are
+   mixed from the brand's text and night in sRGB (xenastudios.co's rule:
+   oklch mixing drifts the hue). */
+@import "../brand/neoskript.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/jetbrains-mono";
+
+:root {
+  --sl-font: "Geist Variable", system-ui, sans-serif;
+  --sl-font-mono: "Geist Mono Variable", ui-monospace, monospace;
+
+  --night: var(--neoskript-night);
+  --raised: var(--neoskript-night-raised);
+  --rule: var(--neoskript-night-rule);
+  --text: var(--neoskript-text);
+  --muted: var(--neoskript-muted);
+  --magenta: var(--neoskript-magenta);
+  --string: var(--neoskript-string);
+}
+
+/* Dark: night. */
+:root,
+::backdrop {
+  --sl-color-white: var(--text);
+  --sl-color-gray-1: color-mix(in srgb, var(--text) 92%, var(--night));
+  --sl-color-gray-2: color-mix(in srgb, var(--text) 80%, var(--night));
+  --sl-color-gray-3: var(--muted);
+  --sl-color-gray-4: color-mix(in srgb, var(--muted) 55%, var(--night));
+  --sl-color-gray-5: var(--rule);
+  --sl-color-gray-6: var(--raised);
+  --sl-color-black: var(--night);
+  --sl-color-bg-sidebar: var(--night);
+  --sl-color-bg-nav: var(--night);
+  --sl-color-hairline: var(--rule);
+  --sl-color-hairline-light: var(--rule);
+  --sl-color-hairline-shade: var(--night);
+
+  --sl-color-accent-low: color-mix(in srgb, var(--magenta) 18%, var(--night));
+  --sl-color-accent: var(--magenta);
+  --sl-color-accent-high: var(--string);
+  --on-accent: var(--night);
+}
+
+/* Light: ink on a pale night tint, magenta-daylight for contrast. */
+:root[data-theme="light"],
+[data-theme="light"] ::backdrop {
+  --sl-color-white: var(--neoskript-ink);
+  --sl-color-gray-1: color-mix(in srgb, var(--neoskript-ink) 90%, white);
+  --sl-color-gray-2: color-mix(in srgb, var(--neoskript-ink) 78%, white);
+  --sl-color-gray-3: color-mix(in srgb, var(--neoskript-ink) 66%, white);
+  --sl-color-gray-4: color-mix(in srgb, var(--neoskript-ink) 42%, white);
+  --sl-color-gray-5: color-mix(in srgb, var(--neoskript-ink) 14%, white);
+  --sl-color-gray-6: color-mix(in srgb, var(--neoskript-ink) 5%, white);
+  --sl-color-gray-7: color-mix(in srgb, var(--neoskript-ink) 3%, white);
+  --sl-color-black: white;
+  --sl-color-bg-sidebar: color-mix(in srgb, var(--neoskript-ink) 3%, white);
+  --sl-color-bg-nav: color-mix(in srgb, var(--neoskript-ink) 3%, white);
+
+  --sl-color-accent-low: color-mix(in srgb, var(--neoskript-magenta-daylight) 12%, white);
+  --sl-color-accent: var(--neoskript-magenta-daylight);
+  --sl-color-accent-high: color-mix(in srgb, var(--neoskript-magenta-daylight) 80%, var(--neoskript-ink));
+  --on-accent: white;
+}
+
+/* Flat: depth from tone and hairlines, no shadows. */
+:root {
+  --sl-shadow-sm: none;
+  --sl-shadow-md: none;
+  --sl-shadow-lg: none;
+}
+
+/* Headings as the brand sets them: Geist Bold, tight tracking, balanced. */
+.sl-markdown-content :is(h1, h2, h3, h4),
+h1#_top {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.sl-markdown-content p,
+.sl-markdown-content li {
+  text-wrap: pretty;
+}
+
+/* The browser's own surfaces, themed like xenastudios.co's. */
+::selection {
+  background: color-mix(in srgb, var(--sl-color-accent) 35%, transparent);
+}
+:focus-visible {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: 3px;
+}

@@ -1,0 +1,7 @@
+---
+// One line of Skript, highlighted (src/lib/skript.ts).
+import { tokens } from "../lib/skript";
+interface Props { line: string }
+const { line } = Astro.props;
+---
+<code>{tokens(line).map((t) => (t.kind === "text" ? t.text : <span class={t.kind}>{t.text}</span>))}</code>

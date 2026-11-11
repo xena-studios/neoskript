@@ -1,0 +1,16 @@
+// neoskript.dev: the site's build (dist/) as a Cloudflare Worker with static
+// assets only, no Worker code, the same setup as xenastudios.co and Raptor's
+// sites. Headers, the CSP among them, are in public/_headers.
+{
+  "name": "neoskript-website",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  // Only the custom domain (neoskript.dev, attached once by hand): no
+  // workers.dev or preview addresses, and the deploy token never needs DNS access.
+  "workers_dev": false,
+  "preview_urls": false
+}

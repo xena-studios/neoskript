@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=Geist+Mono:wght@400;500&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet"><style>
+*{box-sizing:border-box;margin:0}html,body{width:1440px;height:900px;overflow:hidden;background:#110B13;color:#F7F1F6;font-family:Geist,sans-serif}
+.k{font-family:"JetBrains Mono",monospace;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:#A898A9}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:28px 64px;border-bottom:1px solid #30243A}
+.logo{display:flex;align-items:center;gap:12px;font-weight:700;font-size:22px;letter-spacing:-.03em}.tile{width:34px;height:34px;border-radius:7px;background:#FF4D9D;color:#110B13;font-weight:700;font-size:17px;display:grid;place-items:center;letter-spacing:-.02em}
+.links{display:flex;gap:32px;font-size:15px;color:#A898A9}.links b{color:#F7F1F6;font-weight:500}
+.btn{display:inline-flex;align-items:center;height:44px;padding:0 22px;border-radius:999px;font-size:15px;font-weight:500}.p{background:#FF4D9D;color:#110B13}.s{border:1px solid #30243A;color:#F7F1F6}
+pre,code{font-family:"Geist Mono",monospace}.kw{color:#FF4D9D}.st{color:#FFC2DD}.mu{color:#A898A9}
+</style></head><body><div class="nav"><div class="logo"><div class="tile">.sk</div>NeoSkript</div><div class="links"><b>Docs</b><span>Syntax</span><span>Parser</span><span>Download</span><span>GitHub</span></div></div>
+<style>.hero{position:relative;height:812px;padding:96px 64px 0;overflow:hidden}
+h1{font-size:104px;line-height:1;letter-spacing:-.035em;font-weight:700;max-width:900px}h1 em{font-style:normal;color:#FF4D9D}
+.lead{margin-top:28px;font-size:21px;line-height:1.6;color:#A898A9;max-width:620px}.act{margin-top:36px;display:flex;gap:12px;align-items:center}
+.status{margin-left:18px;font-size:14px;color:#A898A9}.code{position:absolute;right:64px;top:150px;width:470px;background:#1B1320;border:1px solid #30243A;border-radius:12px;padding:22px 26px;font-size:17px;line-height:1.75}
+.hz{position:absolute;left:-10%;right:-10%;bottom:-1880px;height:2000px;border-radius:50%;background:radial-gradient(closest-side,#1B1320 97%,transparent);box-shadow:0 -2px 0 #FF4D9D,0 -30px 90px -20px rgba(255,77,157,.35)}
+.end{position:absolute;left:64px;bottom:40px}</style>
+<div class="hero"><div class="k">// Skript, rebuilt · by Xena Studios</div><h1 style="margin-top:22px">Keep your scripts. <em>Lose the lag.</em></h1>
+<p class="lead">A fast, modern drop-in replacement for Skript. Your .sk scripts run unchanged, compiled to JVM bytecode, on Paper and Folia.</p>
+<div class="act"><span class="btn p">Download the dev build</span><span class="btn s">Read the docs</span><span class="status">In development · 862 of 862 Skript tests pass</span></div>
+<div class="code"><div class="k" style="margin-bottom:12px">join.sk · runs as-is</div><pre><span class="kw">on</span> join<span class="mu">:</span>
+    <span class="kw">send</span> <span class="st">"Welcome, %player%!"</span> <span class="kw">to</span> player
+    <span class="kw">if</span> {visits::%uuid of player%} <span class="kw">is not set</span><span class="mu">:</span>
+        <span class="kw">broadcast</span> <span class="st">"%player% is new here"</span>
+    <span class="kw">add</span> 1 <span class="kw">to</span> {visits::%uuid of player%}</pre></div>
+<div class="hz"></div></div></body></html>

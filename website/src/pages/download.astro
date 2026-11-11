@@ -1,0 +1,152 @@
+---
+// Downloads. Until the public beta, that's the development build CI publishes
+// from main (src/lib/release.ts); the page says plainly what it is.
+import Base from "../layouts/Base.astro";
+import External from "../components/External.astro";
+import { devBuild } from "../lib/release";
+
+const repo = "https://github.com/xena-studios/neoskript";
+const build = await devBuild();
+const date = build?.published.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+const size = build ? `${(build.jar.size / 1024 / 1024).toFixed(1)} MB` : "";
+---
+<Base
+  title="Download NeoSkript"
+  description="The NeoSkript development build: the latest commit on main that passed CI. For Paper and Folia, Minecraft 1.21.4+, Java 21."
+  path="/download"
+>
+  <section class="page">
+    <div class="wrap">
+      <h1>Download</h1>
+      <p class="lead">
+        NeoSkript isn't released yet. The development build is the latest commit on main that passed CI on real Paper
+        and Folia servers. Use it on a test server, not your live one.
+      </p>
+
+      <div class="build" aria-labelledby="dev-title">
+        <h2 id="dev-title">Development build</h2>
+        {build ? (
+          <>
+            <dl class="facts">
+              <div><dt>File</dt><dd><code>{build.jar.name}</code> · {size}</dd></div>
+              <div><dt>Built from</dt><dd><a href={`${repo}/commit/${build.commit}`}><code>{build.commit.slice(0, 7)}</code><External /></a> on {date}</dd></div>
+              {build.sha256 && <div><dt>SHA-256</dt><dd><code class="hash">{build.sha256}</code></dd></div>}
+            </dl>
+            <div class="actions">
+              <a class="btn btn-primary" href={build.jar.url}>Download {build.jar.name}</a>
+              <a class="btn btn-secondary" href={`${repo}/releases/tag/dev`}>On GitHub<External /></a>
+            </div>
+          </>
+        ) : (
+          <p class="none">
+            There's no development build yet: CI publishes one from the next commit on main that passes. Until then,
+            build it from source below.
+          </p>
+        )}
+      </div>
+
+      <dl class="rows">
+        <div>
+          <dt>Requirements</dt>
+          <dd>Paper or Folia, Minecraft 1.21.4 or newer, Java 21 or newer. Take Skript out first: NeoSkript won't start next to it.</dd>
+        </div>
+        <div>
+          <dt>Installing</dt>
+          <dd>Put the jar in <code>plugins/</code> and start the server. <a href="/docs/install">Install</a> and <a href="/docs/moving-from-skript">moving from Skript</a> have the details.</dd>
+        </div>
+        <div>
+          <dt>Releases</dt>
+          <dd>None yet. The public beta will be on Modrinth and GitHub Releases.</dd>
+        </div>
+        <div>
+          <dt>From source</dt>
+          <dd>
+            With JDK 21: <code>./gradlew build</code> in <a href={repo}>the repository<External /></a>. The jar is in{" "}
+            <code>neoskript-plugin/build/libs/</code>.
+          </dd>
+        </div>
+        <div>
+          <dt>Found a difference?</dt>
+          <dd>
+            If a script behaves differently than on Skript, <a href={`${repo}/issues/new/choose`}>open an issue<External /></a>{" "}
+            with the script and what each one did.
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .page {
+    padding-block: clamp(3.5rem, 2rem + 5vw, 6rem) clamp(4rem, 2.5rem + 5vw, 7rem);
+  }
+  h1 {
+    font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+    letter-spacing: -0.035em;
+  }
+  .lead {
+    margin-top: 1.25rem;
+  }
+  /* A hairline-ruled block, as the landing's rows: no card. */
+  .build {
+    margin-top: clamp(2.5rem, 2rem + 2vw, 3.5rem);
+    padding-block: clamp(1.5rem, 1rem + 2vw, 2.25rem);
+    border-block: 1px solid var(--rule);
+  }
+  h2 {
+    font-size: 1.5rem;
+    letter-spacing: -0.02em;
+  }
+  .facts {
+    margin-block: 1.25rem 1.75rem;
+    display: grid;
+    gap: 0.6rem;
+  }
+  .facts div {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr);
+    gap: 1rem;
+  }
+  .facts dt {
+    color: var(--muted);
+  }
+  .hash {
+    overflow-wrap: anywhere;
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+  .none {
+    margin-top: 0.75rem;
+    color: var(--muted);
+    max-width: 62ch;
+  }
+  /* The build block's bottom rule is this list's top rule. */
+  .rows {
+    margin-top: 0;
+  }
+  .rows > div {
+    display: grid;
+    grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+    gap: 0.5rem 3rem;
+    padding-block: 1.25rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .rows dt {
+    font-weight: 700;
+  }
+  .rows dd {
+    color: var(--muted);
+    max-width: 66ch;
+  }
+  .rows a {
+    color: var(--text);
+  }
+  @media (max-width: 44rem) {
+    .rows > div,
+    .facts div {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.25rem;
+    }
+  }
+</style>

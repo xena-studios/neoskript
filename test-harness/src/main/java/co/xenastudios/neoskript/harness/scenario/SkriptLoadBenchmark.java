@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 
 /**
  * Measures how long the reference Skript takes to load and reload the generated benchmark scripts.
- * NeoSkript runs the same measurement once it can load scripts.
+ * {@link NeoSkriptLoadBenchmark} runs the same measurement on NeoSkript.
  */
 public final class SkriptLoadBenchmark implements Scenario {
 

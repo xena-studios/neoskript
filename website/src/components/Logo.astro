@@ -1,0 +1,19 @@
+---
+// A brand logo, inlined so it scales with the text. The files come from the
+// brand repo (pnpm brand:sync); their exported clear space is cropped by the
+// viewBox trim below, as xenastudios.co's Logo does.
+import neoskript from "../brand/logo-dark.svg?raw";
+import xena from "../brand/xena.svg?raw";
+interface Props { name: "neoskript" | "xena"; label: string; class?: string }
+const { name, label, class: className } = Astro.props;
+const raw = name === "neoskript" ? neoskript : xena;
+// Both exports carry 50 units of clear space on every side (scripts/build.mjs
+// in the brand repo); the page spaces the logo itself. The Xena endorsement
+// takes the text colour; NeoSkript's own colours are never changed.
+const [, w, h] = raw.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/) ?? [];
+const pad = 50;
+let inner = raw.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+if (name === "xena") inner = inner.replace(/fill="#[0-9A-Fa-f]{6}"/g, 'fill="currentColor"');
+const viewBox = `${pad} ${pad} ${Number(w) - 2 * pad} ${Number(h) - 2 * pad}`;
+---
+<svg class:list={["logo", className]} viewBox={viewBox} role="img" aria-label={label} set:html={inner} />

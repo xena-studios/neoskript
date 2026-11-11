@@ -1,0 +1,19 @@
+---
+// The Xena horizon in NeoSkript's colours (night sky, magenta limb), from the
+// brand repo's scene (pnpm brand:sync recolours it). It sits at the bottom of
+// an isolation: isolate section, and its planet body fades into the page.
+import raw from "../brand/horizon.svg?raw";
+const inner = raw.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "").replace(/<rect[^>]*\/>/, "");
+---
+<svg class="horizon" viewBox="0 0 2400 900" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false" set:html={inner} />
+<style>
+  .horizon {
+    position: absolute;
+    inset: auto 0 0 0;
+    width: 100%;
+    height: clamp(14rem, 30vw, 26rem);
+    z-index: -1;
+    pointer-events: none;
+    mask-image: linear-gradient(to bottom, black 55%, transparent);
+  }
+</style>
