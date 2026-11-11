@@ -19,6 +19,7 @@ public record HarnessConfig(
         Path referenceSkriptFile,
         Path skriptCorpus,
         Path realWorldCorpus,
+        Path skillDir,
         Path outputDir,
         Path cacheDir,
         boolean echo) {
@@ -35,6 +36,7 @@ public record HarnessConfig(
                 path("harness.referenceSkript"),
                 path("harness.corpus.skript"),
                 path("harness.corpus.realWorld"),
+                path("harness.skill"),
                 path("harness.output"),
                 path("harness.cache"),
                 Boolean.parseBoolean(System.getProperty("harness.echo", "false")));

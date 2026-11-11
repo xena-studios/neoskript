@@ -30,9 +30,9 @@ export default defineConfig({
       editLink: { baseUrl: "https://github.com/xena-studios/neoskript/edit/main/website/" },
       lastUpdated: true,
       // Custom pages (src/pages) can't be validated; the rest of the site is.
-      plugins: [starlightLinksValidator({ exclude: ["/", "/download/", "/syntax/", "/syntax/**", "/parser/"] })],
+      plugins: [starlightLinksValidator({ exclude: ["/", "/download/", "/syntax/", "/syntax/**", "/parser/", "/llms.txt"] })],
       sidebar: [
-        { label: "Start here", items: ["docs", "docs/install", "docs/moving-from-skript"] },
+        { label: "Start here", items: ["docs", "docs/install", "docs/moving-from-skript", "docs/ai"] },
         { label: "Parser", items: ["docs/parser", "docs/parser-checks"] },
       ],
     }),

@@ -6,9 +6,9 @@ name: Website
 on:
   push:
     branches: [main]
-    paths: [website/**, neoskript-api/**, neoskript-frontend/**, neoskript-web/**, gradle/**, .github/workflows/website.yml]
+    paths: [website/**, neoskript-api/**, neoskript-frontend/**, neoskript-web/**, plugins/skript/**, gradle/**, .github/workflows/website.yml]
   pull_request:
-    paths: [website/**, neoskript-api/**, neoskript-frontend/**, neoskript-web/**, gradle/**, .github/workflows/website.yml]
+    paths: [website/**, neoskript-api/**, neoskript-frontend/**, neoskript-web/**, plugins/skript/**, gradle/**, .github/workflows/website.yml]
   workflow_run:
     workflows: [CI]
     types: [completed]

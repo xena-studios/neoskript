@@ -40,6 +40,8 @@ neoskript-paper      the standard library: Skript's syntax on Paper
 neoskript-plugin     the plugin: /sk, config, reload
 neoskript-cli        checks a scripts folder before you switch (M5)
 test-harness         real Paper and Folia servers, run against Skript
+website              neoskript.dev
+plugins/skript       the AI skill for writing Skript (Claude Code, Codex)
 ```
 
 | Doc | What's in it |
@@ -47,6 +49,16 @@ test-harness         real Paper and Folia servers, run against Skript
 | [Plan](docs/PLAN.md) | Goals, locked decisions, architecture, roadmap |
 | [Progress](docs/PROGRESS.md) | What each milestone and batch delivered |
 | [Test harness](test-harness/README.md) | Running the real-server tests, scenarios, pins |
+
+## Writing scripts with AI
+
+The `skript` skill teaches coding agents to write Skript that loads on Skript and NeoSkript. In Claude Code:
+
+```
+/plugin install skript --marketplace xena-studios/neoskript
+```
+
+For Codex and other agents, see [Writing scripts with AI](https://neoskript.dev/docs/ai/).
 
 ## Contributing
 

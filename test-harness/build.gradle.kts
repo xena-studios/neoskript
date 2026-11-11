@@ -133,6 +133,7 @@ tasks.register<JavaExec>("harness") {
     val projectDir = layout.projectDirectory
     val buildDir = layout.buildDirectory
     val cacheDir = layout.settingsDirectory.dir(".harness-cache")
+    val skillDir = layout.settingsDirectory.dir("plugins/skript/skills/skript")
     jvmArgumentProviders.add(CommandLineArgumentProvider {
         listOf(
             "-Dharness.java.21=" + java21.get().metadata.installationPath.asFile.absolutePath,
@@ -145,6 +146,8 @@ tasks.register<JavaExec>("harness") {
             "-Dharness.referenceSkript=" + projectDir.file("reference-skript.properties").asFile.absolutePath,
             "-Dharness.corpus.skript=" + buildDir.dir("corpus/skript").get().asFile.absolutePath,
             "-Dharness.corpus.realWorld=" + projectDir.dir("corpus/real-world").asFile.absolutePath,
+            // The AI skill (plugins/skript), whose example scripts the skill-examples scenario loads.
+            "-Dharness.skill=" + skillDir.asFile.absolutePath,
             "-Dharness.output=" + buildDir.dir("harness").get().asFile.absolutePath,
             "-Dharness.cache=" + cacheDir.asFile.absolutePath,
             "-Dharness.echo=" + echo.get(),

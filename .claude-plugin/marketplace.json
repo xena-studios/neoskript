@@ -1,0 +1,12 @@
+{
+  "name": "neoskript",
+  "description": "NeoSkript's plugins for Claude Code.",
+  "owner": { "name": "Xena Studios", "url": "https://neoskript.dev" },
+  "plugins": [
+    {
+      "name": "skript",
+      "source": "./plugins/skript",
+      "description": "Write, fix and review Skript scripts for Skript and NeoSkript servers."
+    }
+  ]
+}

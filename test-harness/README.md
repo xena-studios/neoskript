@@ -29,6 +29,8 @@ Reports go to `test-harness/build/harness/reports/`, and each run's server direc
 | `neoskript-commands` | smoke | all | Script commands, run from the console: arguments, aliases, subcommands, choices, default values, named arguments, `executable by`, usage messages, `execute command`, and a reload that changes one command and removes the others |
 | `neoskript-real-world-corpus` | smoke | all | NeoSkript loads the real-world corpus without problems and every script's self-test passes, with no thread violations or cross-region errors in the log (M5's Folia check) |
 | `neoskript-regions` | smoke | all | Region ownership, with two pigs in different regions: on Folia, reading one from another region's thread is a runtime error naming the line, changes reach each pig's own thread, and `run on` runs code on its thread in order with the rest of the trigger. On Paper the same script runs with no errors |
+| `neoskript-real-world-corpus` | smoke | all | NeoSkript loads the real-world corpus without problems and every script's self-test passes |
+| `skill-examples` | smoke | all | Every example script in the AI skill (`plugins/skript`) loads without errors or warnings on NeoSkript, and on the reference Skript in Skript envs |
 | `neoskript-items` | smoke | all | Items and inventories, with the server's registries: item literals with amounts, plurals and enchantments, names and lore, items parsed from text, and chest inventory slots |
 | `neoskript-hooks` | baseline | Paper 26.x | Skript's plugin hooks against the real plugins, pinned by SHA-256: WorldGuard 7.0.20 (with WorldEdit 7.4.6) regions written into its `regions.yml`, Vault 1.7.3 with EssentialsX 2.22.0 money and balances, and LuckPerms 5.5.71 groups. Baseline, as it downloads about 16 MB of plugins |
 | `neoskript-skript-suite` | baseline | all | Every one of Skript's own tests, run by NeoSkript: reports how many pass, fail and can't run yet (M4's progress measure). Only fails if no results come back |
@@ -44,6 +46,7 @@ Reports go to `test-harness/build/harness/reports/`, and each run's server direc
 | `differential` | baseline | Skript envs, Folia 26.3 | M4's exit check: Skript's documentation examples, the checks and probes in `corpus/differential` and the real-world corpus, on the reference Skript and on NeoSkript. Each script's load messages, the probes' output and the saved variables are compared; at least 95% must match, and any difference `corpus/differential/known-differences.txt` doesn't list fails. Folia is compared with Skript on Paper |
 | `neoskript-cli` | smoke | Paper 26.3 | `neoskript-cli check` loads the real-world corpus cleanly, and gives the Folia and performance hints for a script with known hazards |
 | `syntax-export` | manual | Skript envs | Not a check: writes the data for neoskript.dev's syntax reference. NeoSkript's registry (`-Dneoskript.syntaxExport`) as `syntax-export.json` and the reference Skript's `sk gen-docs` output as `skript-docs.json`. Run it by name; `pnpm syntax:sync` in `website/` turns them into the site's data |
+| `neoskript-load-benchmark` | baseline | Skript envs | The same measurement on NeoSkript, for the comparison on neoskript.dev |
 
 ## Pins
 

@@ -1,0 +1,26 @@
+# NeoSkript
+
+> NeoSkript is a drop-in replacement for Skript, the Minecraft server plugin whose scripts (.sk files) read like English. Existing scripts run unchanged on NeoSkript, compiled to JVM bytecode, on Paper and Folia (Minecraft 1.21.4+, Java 21+). It's in development: there's a development build, no release yet. NeoSkript is GPL-3.0-only, by Xena Studios, and not affiliated with SkriptLang.
+
+Scripts written for Skript 2.17 with no addons run on both Skript and NeoSkript. When writing Skript, use only syntax listed in the syntax reference; Skript rejects any line that isn't one of its registered patterns.
+
+## Docs
+
+- [What NeoSkript is](https://neoskript.dev/docs/): what it does, what's done and what isn't
+- [Install](https://neoskript.dev/docs/install/): requirements, where scripts go, configuration
+- [Moving from Skript](https://neoskript.dev/docs/moving-from-skript/): switching a server from Skript, and what's copied
+- [Using the parser](https://neoskript.dev/docs/parser/): checking a script in the browser and sharing a link to the result
+- [What the parser checks](https://neoskript.dev/docs/parser-checks/): what it finds, what it can't know, and which syntax it checks against
+- [Writing scripts with AI](https://neoskript.dev/docs/ai/): the skill for Claude Code, Codex and other agents
+
+## Tools
+
+- [Syntax reference](https://neoskript.dev/syntax/): every event, condition, effect, expression, type, section, structure and function NeoSkript registers, with patterns and examples
+- [Syntax index, JSON](https://neoskript.dev/syntax/search.json): every element's name, category, anchor and patterns, for looking syntax up without loading the pages
+- [Parser](https://neoskript.dev/parser/): NeoSkript's parser in the browser; paste a script to see its errors
+- [Skript skill](https://neoskript.dev/skill/SKILL.md): instructions for coding agents writing Skript
+
+## Optional
+
+- [Download](https://neoskript.dev/download/): the development build
+- [Source code](https://github.com/xena-studios/neoskript): the repository, issues and progress

@@ -1,0 +1,10 @@
+{
+  "name": "skript",
+  "description": "Write, fix and review Skript scripts (.sk) for Minecraft servers running Skript or NeoSkript.",
+  "version": "0.1.0",
+  "author": { "name": "Xena Studios", "url": "https://neoskript.dev" },
+  "homepage": "https://neoskript.dev/docs/ai/",
+  "repository": "https://github.com/xena-studios/neoskript",
+  "license": "GPL-3.0-only",
+  "keywords": ["skript", "neoskript", "minecraft"]
+}
