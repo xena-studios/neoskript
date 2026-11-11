@@ -79,6 +79,9 @@ import co.xenastudios.neoskript.runtime.Resumable;
 import co.xenastudios.neoskript.runtime.KeyedValues;
 import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.Waits;
+import co.xenastudios.neoskript.runtime.region.RegionAccess;
+import co.xenastudios.neoskript.runtime.region.RegionalElements;
+import co.xenastudios.neoskript.runtime.region.Regions;
 import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
 import co.xenastudios.neoskript.runtime.Trigger;
 import co.xenastudios.neoskript.runtime.Values;
@@ -184,6 +187,15 @@ final class TriggerCompiler {
         }
     }
 
+    /**
+     * A {@code run on X:} being compiled for Folia: the slot X is kept in, and the sections around it, which its
+     * code can't jump to as the rest of the trigger runs on another thread.
+     */
+    private record RunOn(int slot, java.util.Set<Block> outside) {}
+
+    /** The {@code run on} sections around the code being compiled for Folia, innermost first. */
+    private final Deque<RunOn> runOns = new ArrayDeque<>();
+
     /** A {@code wait}: where the trigger carries on, and the loop state it saves. */
     private record WaitPoint(Label resume, int line, List<int[]> savedSlots) {}
 
@@ -192,6 +204,7 @@ final class TriggerCompiler {
     private static final int SAVED_INDICES = 1;
     private static final int SAVED_INDEX = 2;
     private static final int SAVED_QUEUE = 3;
+    private static final int SAVED_OBJECT = 4;
 
     private final ParsedScript script;
     private final List<WaitPoint> waits = new ArrayList<>();
@@ -681,10 +694,45 @@ final class TriggerCompiler {
      * Records a call into {@code syntax}'s element, of class {@code element}, on the current line, so a
      * runtime error it reports can say where it came from. Nothing is added to the code that runs.
      */
-    private void site(ParsedSyntax syntax, Class<?> element) {
+    private co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site(ParsedSyntax syntax, Class<?> element) {
         String code = currentLine != null ? currentLine.text() : source;
-        sites.add(new co.xenastudios.neoskript.runtime.errors.ErrorSites.Site(kindName(syntax.syntax().kind()),
-                syntax.syntax().id(), element, constantsScript, line, code));
+        co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site = new co.xenastudios.neoskript.runtime.errors.ErrorSites.Site(
+                kindName(syntax.syntax().kind()), syntax.syntax().id(), element, constantsScript, line, code);
+        sites.add(site);
+        return site;
+    }
+
+    /**
+     * {@code element}, to be called as {@code type}, as code compiled for Folia calls it: wrapped to check the
+     * region ownership of the entities, blocks and locations its placeholders take ({@link RegionalElements}).
+     * Without region checks (on Paper), or for elements that only read what's safe anywhere, it's the element.
+     */
+    private Object regional(Object element, Class<?> type, ParsedSyntax syntax,
+            co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site) {
+        RegionAccess access = Regions.access();
+        if (access == null || Regions.exempt(syntax.syntax().id())) {
+            return element;
+        }
+        PlaceholderSpec[] specs = placeholderSpecs(syntax.syntax().patterns().get(syntax.pattern()));
+        long reads = 0;
+        int entity = -1;
+        int place = -1;
+        for (int i = 0; i < specs.length; i++) {
+            for (String typeName : specs[i].types()) {
+                TypeRef ref = registry.resolveType(typeName);
+                RegionAccess.Kind kind = ref == null ? RegionAccess.Kind.NONE
+                        : access.kindOf(library.javaClass(ref.type().id()));
+                if (kind == RegionAccess.Kind.ENTITY && entity < 0) {
+                    entity = i;
+                } else if (kind != RegionAccess.Kind.NONE && kind != RegionAccess.Kind.ENTITY && place < 0) {
+                    place = i;
+                }
+                if ((kind == RegionAccess.Kind.ENTITY || kind == RegionAccess.Kind.BLOCK) && i < 64) {
+                    reads |= 1L << i;
+                }
+            }
+        }
+        return RegionalElements.wrap(element, type, site, reads, entity >= 0 ? entity : place);
     }
 
     /** Skript's {@code getSyntaxTypeName}: events are structures. */
@@ -749,6 +797,7 @@ final class TriggerCompiler {
                         method.visitTypeInsn(CHECKCAST, "java/util/Queue");
                         method.visitVarInsn(ASTORE, slot);
                     }
+                    case SAVED_OBJECT -> method.visitVarInsn(ASTORE, slot);
                     default -> {
                         method.visitTypeInsn(CHECKCAST, "java/lang/Integer");
                         method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false);
@@ -785,6 +834,9 @@ final class TriggerCompiler {
                 saved.add(new int[] {block.indexSlot(), SAVED_INDEX});
             }
         }
+        for (RunOn runOn : runOns) {
+            saved.add(new int[] {runOn.slot(), SAVED_OBJECT});
+        }
         WaitPoint wait = new WaitPoint(new Label(), line, saved);
         int state = waits.size();
         waits.add(wait);
@@ -816,6 +868,12 @@ final class TriggerCompiler {
             method.visitInsn(AASTORE);
         }
         method.visitFieldInsn(PUTFIELD, frame, "slots", OBJECTS);
+        if (!runOns.isEmpty()) {
+            // In 'run on X:', a wait carries on on X's thread.
+            method.visitInsn(DUP);
+            method.visitVarInsn(ALOAD, runOns.peek().slot());
+            method.visitFieldInsn(PUTFIELD, frame, "owner", OBJECT_DESC);
+        }
         return wait;
     }
 
@@ -1196,6 +1254,7 @@ final class TriggerCompiler {
                 method.visitLabel(end);
             }
             case Statement.Section section when isCore(section.header(), CoreSyntax.FILTER_SECTION) -> filterSection(section);
+            case Statement.Section section when isCore(section.header(), CoreSyntax.RUN_ON) -> runOn(section);
             case Statement.Section section when isCore(section.header(), CoreSyntax.CATCH_ERRORS) -> {
                 String errors = Type.getInternalName(co.xenastudios.neoskript.runtime.RuntimeErrors.class);
                 Label end = new Label();
@@ -1808,6 +1867,7 @@ final class TriggerCompiler {
             case CoreSyntax.EXIT -> exit(effect);
             case CoreSyntax.CONTINUE -> {
                 Block loop = effect.pattern() == 0 ? innermostLoop() : loopNumber(regexNumber(effect));
+                leaving(loop);
                 method.visitJumpInsn(GOTO, loop.next());
             }
             case CoreSyntax.RETURN -> {
@@ -2003,7 +2063,73 @@ final class TriggerCompiler {
             throw new CompileException(line, "Can't stop " + count + " " + names + " as there are only "
                     + matching.size() + " " + names + " present");
         }
+        leaving(matching.get(count - 1));
         method.visitJumpInsn(GOTO, matching.get(count - 1).end());
+    }
+
+    /** Fails if jumping to {@code target} would leave a {@code run on} section, whose end must run. */
+    private void leaving(Block target) throws CompileException {
+        for (RunOn runOn : runOns) {
+            if (runOn.outside().contains(target)) {
+                throw new CompileException(line, "Can't leave a 'run on' section this way, as the rest of the trigger"
+                        + " runs on another thread. Use 'exit section' to leave it.");
+            }
+        }
+    }
+
+    /**
+     * {@code run on %entity/location%:} (NeoSkript only): runs its code on the thread that owns the entity or
+     * location, then the trigger carries on on its own thread after it. On Paper, where one thread owns everything,
+     * the code just runs. On Folia, getting there and back are like waits: the trigger stops, and carries on on
+     * the other thread, at once if this thread already owns it, else on the next tick. With nothing to run on, the
+     * code doesn't run.
+     */
+    private void runOn(Statement.Section section) throws CompileException {
+        int slot = nextSlot++;
+        expression((Expr) section.header().match().values().getFirst());
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "single", "(" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+        method.visitVarInsn(ASTORE, slot);
+        Label skip = new Label();
+        method.visitVarInsn(ALOAD, slot);
+        method.visitJumpInsn(IFNULL, skip);
+        Label end = new Label();
+        // Paper keeps the same rules, so a script that loads there loads on Folia too.
+        boolean hops = Regions.enabled();
+        RunOn outer = runOns.peek();
+        runOns.push(new RunOn(slot, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>())));
+        runOns.peek().outside().addAll(blocks);
+        try {
+            if (hops) {
+                hop(slot);
+            }
+            block(BlockKind.CONDITIONAL, end, section.body());
+            method.visitLabel(end);
+        } finally {
+            runOns.pop();
+        }
+        if (hops) {
+            // Back to the thread of the 'run on' around this one, or the trigger's own.
+            hop(outer == null ? -1 : outer.slot());
+        }
+        method.visitLabel(skip);
+    }
+
+    /** Carries on on the thread that owns what's in {@code slot} (or with -1, the trigger's own): a wait, on Folia. */
+    private void hop(int slot) {
+        method.visitVarInsn(ALOAD, 0);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        WaitPoint wait = saveFrame();
+        if (slot < 0) {
+            method.visitInsn(ACONST_NULL);
+        } else {
+            method.visitVarInsn(ALOAD, slot);
+        }
+        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "hop",
+                "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + OBJECT_DESC + ")Z", false);
+        // Not scheduled: this thread owns it already, so the trigger carries straight on.
+        method.visitJumpInsn(IFEQ, wait.resume());
+        exitTrigger();
+        method.visitLabel(wait.resume());
     }
 
     private static int regexNumber(ParsedSyntax syntax) {
@@ -2271,8 +2397,7 @@ final class TriggerCompiler {
         if (accepted == null) {
             throw new CompileException(line, source.substring(target.start(), target.end()) + " can't be set to anything");
         }
-        site(parsed, element.getClass());
-        constant(element, Changeable.class);
+        constant(regional(element, Changeable.class, parsed, site(parsed, element.getClass())), Changeable.class);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(parsed);
         value.emit();
@@ -2293,8 +2418,8 @@ final class TriggerCompiler {
         if (!(element instanceof SettableCondition)) {
             throw new CompileException(line, "'" + source.substring(whether.start(), whether.end()) + "' can't be set");
         }
-        site(condition, element.getClass());
-        constant(element, SettableCondition.class);
+        constant(regional(element, SettableCondition.class, condition, site(condition, element.getClass())),
+                SettableCondition.class);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(condition);
         expression((Expr) effect.match().values().get(1));
@@ -2325,7 +2450,8 @@ final class TriggerCompiler {
             method.visitInsn(ACONST_NULL);
         }
         constant(changeMode(effect, mode), Changeable.Mode.class);
-        method.visitMethodInsn(INVOKESTATIC, VALUES, "changeValues",
+        // On Folia, each value is changed on the thread that owns it.
+        method.visitMethodInsn(INVOKESTATIC, Regions.enabled() ? Type.getInternalName(Regions.class) : VALUES, "changeValues",
                 "(" + OBJECT_DESC + OBJECT_DESC + Type.getDescriptor(Changeable.Mode.class) + ")V", false);
     }
 
@@ -2391,8 +2517,7 @@ final class TriggerCompiler {
         if (mode.value >= 0) {
             checkChanger((Expr) effect.match().values().get(mode.value), accepted, changeMode, target);
         }
-        site(syntax, element.getClass());
-        constant(element, Changeable.class);
+        constant(regional(element, Changeable.class, syntax, site(syntax, element.getClass())), Changeable.class);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(syntax);
         if (mode.value >= 0) {
@@ -2767,8 +2892,8 @@ final class TriggerCompiler {
             throw unsupported(syntax.syntax().id());
         }
         Object element = factory.create(info(syntax));
-        site(syntax, element.getClass());
-        constant(element, type);
+        co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site = site(syntax, element.getClass());
+        constant(regional(element, type, syntax, site), type);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(syntax, keyed, implicit);
     }

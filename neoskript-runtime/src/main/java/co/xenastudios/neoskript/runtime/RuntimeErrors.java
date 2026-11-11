@@ -78,22 +78,27 @@ public final class RuntimeErrors {
 
     /** Reports a runtime error. */
     public static void report(String message) {
-        emit(Level.ERROR, message, null);
+        emit(Level.ERROR, message, null, null);
     }
 
     /** Reports a runtime error, highlighting the first match of the regular expression {@code highlight} in its line. */
     public static void report(String message, String highlight) {
-        emit(Level.ERROR, message, highlight);
+        emit(Level.ERROR, message, highlight, null);
+    }
+
+    /** Reports a runtime error from {@code source}, wherever it's reported from. */
+    public static void report(ErrorSource source, String message) {
+        emit(Level.ERROR, message, null, source);
     }
 
     /** Reports a runtime warning. */
     public static void warning(String message) {
-        emit(Level.WARNING, message, null);
+        emit(Level.WARNING, message, null, null);
     }
 
     /** Reports a runtime warning, highlighting the first match of {@code highlight} in its line. */
     public static void warning(String message, String highlight) {
-        emit(Level.WARNING, message, highlight);
+        emit(Level.WARNING, message, highlight, null);
     }
 
     /** Where an error reported now comes from: the element running in the innermost compiled code. */
@@ -103,7 +108,7 @@ public final class RuntimeErrors {
     }
 
     /** Catches an error, or counts it in its frame and prints it if the frame's limits allow. */
-    private static void emit(Level level, String message, String highlight) {
+    private static void emit(Level level, String message, String highlight, ErrorSource at) {
         Deque<List<String>> catching = CATCHING.get();
         if (!catching.isEmpty()) {
             // As Skript's catcher, which keeps at most 1000.
@@ -117,7 +122,7 @@ public final class RuntimeErrors {
         if (to == null) {
             return;
         }
-        ErrorSource source = source();
+        ErrorSource source = at != null ? at : source();
         RuntimeError error = new RuntimeError(level,
                 source == null ? ErrorSource.unknown("syntax", "-unknown-") : source, message, highlight);
         if ((level == Level.WARNING ? warningFrame : errorFrame).add(error)) {

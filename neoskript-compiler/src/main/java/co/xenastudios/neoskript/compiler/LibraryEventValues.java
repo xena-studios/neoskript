@@ -30,7 +30,7 @@ final class LibraryEventValues implements EventValues {
 
     /** Core sections whose code has only the event values of the code around them. */
     private static final Set<String> KEEPING = Set.of(CoreSyntax.CONDITIONAL, CoreSyntax.LOOP, CoreSyntax.FOR,
-            CoreSyntax.WHILE, CoreSyntax.CATCH_ERRORS, CoreSyntax.SUPPRESS_HINTS, CoreSyntax.SUPPRESS_WARNINGS);
+            CoreSyntax.WHILE, CoreSyntax.CATCH_ERRORS, CoreSyntax.RUN_ON, CoreSyntax.SUPPRESS_HINTS, CoreSyntax.SUPPRESS_WARNINGS);
     /** The expressions that are the event's value of a type. */
     private static final Set<String> EVENT_VALUES = Set.of(CoreSyntax.EVENT_VALUE, CoreSyntax.EVENT_VALUE_ENTITY,
             CoreSyntax.EVENT_ENTITY_BARE);

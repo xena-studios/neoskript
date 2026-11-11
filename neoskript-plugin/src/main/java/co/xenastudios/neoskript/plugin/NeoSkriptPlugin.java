@@ -127,13 +127,19 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         Scheduler scheduler = platform == Platform.FOLIA ? new FoliaScheduler(this) : new PaperScheduler(this);
         // Runtime errors go to the console as Skript prints them, limited per frame by config.yml.
         runtimeErrorFrames = RuntimeErrorConsole.start(getConfig().getConfigurationSection("runtime-errors"), scheduler);
-        Waits.install(scheduler, e -> {
+        java.util.function.Consumer<co.xenastudios.neoskript.runtime.ScriptRuntimeException> laterErrors = e -> {
             // A command failed after a wait just stops, as there's no one left to tell.
             if (!(e.getCause() instanceof co.xenastudios.neoskript.runtime.command.CommandEvent.Failed)) {
                 getSLF4JLogger().error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(),
                         e.getCause());
             }
-        });
+        };
+        Waits.install(scheduler, laterErrors);
+        if (platform == Platform.FOLIA) {
+            // Code compiled from now on checks region ownership (plan 3.3); on Paper it never does.
+            co.xenastudios.neoskript.runtime.region.Regions.install(
+                    new co.xenastudios.neoskript.runtime.region.FoliaRegionAccess(this), laterErrors);
+        }
         EventDispatcher events = new EventDispatcher(this, getSLF4JLogger(), eventPriority(),
                 getConfig().getBoolean("events.listen-to-cancelled", false));
         commands = new ScriptCommands(this, getSLF4JLogger(), scheduler);
@@ -264,6 +270,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             scripts.unloadAll();
         }
         getServer().getAsyncScheduler().cancelTasks(this);
+        co.xenastudios.neoskript.runtime.region.Regions.uninstall();
         if (commands != null) {
             commands.unregister(getServer().getCommandMap());
         }

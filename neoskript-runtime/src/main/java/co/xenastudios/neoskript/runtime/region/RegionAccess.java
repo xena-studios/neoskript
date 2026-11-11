@@ -1,0 +1,32 @@
+/*
+ * Copyright (c) 2026 Xena Studios
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+package co.xenastudios.neoskript.runtime.region;
+
+/** What the server knows of regions: which values live in one, which thread owns it, and how to run code there. */
+public interface RegionAccess {
+
+    /** What lives in a region: entities (players too), blocks and locations. */
+    enum Kind {
+        NONE,
+        ENTITY,
+        BLOCK,
+        LOCATION
+    }
+
+    /** What values of {@code type} are, for a placeholder of that type. */
+    Kind kindOf(Class<?> type);
+
+    /** What {@code value} is. */
+    Kind kind(Object value);
+
+    /** Whether the current thread owns the region of {@code value}; for {@code null}, whether it's the global one. */
+    boolean owns(Object value);
+
+    /** Runs {@code task} soon on the thread that owns {@code value}'s region, without waiting for it. */
+    void execute(Object value, Runnable task);
+
+    /** How a runtime error names {@code value}: {@code the player Notch}, {@code a zombie}. */
+    String describe(Object value);
+}

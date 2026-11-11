@@ -53,7 +53,9 @@ public final class FoliaScheduler implements Scheduler {
             if (entity.getScheduler().runDelayed(plugin, scheduled -> task.run(), () -> runGlobal(task), delay) == null) {
                 runGlobalLater(ticks, task);
             }
-        } else if (owner instanceof Location location) {
+        } else if (owner instanceof org.bukkit.block.Block block) {
+            plugin.getServer().getRegionScheduler().runDelayed(plugin, block.getLocation(), scheduled -> task.run(), delay);
+        } else if (owner instanceof Location location && location.getWorld() != null) {
             plugin.getServer().getRegionScheduler().runDelayed(plugin, location, scheduled -> task.run(), delay);
         } else {
             runGlobalLater(ticks, task);

@@ -1,0 +1,35 @@
+# Region ownership (plan 3.3), driven by console commands, which run on Folia's global region thread.
+# Two pigs, 4096 blocks apart: on Folia each is in its own region, owned by its own thread.
+on load:
+	send "[regiontest] loaded" to console
+
+command /regiontest <text>:
+	trigger:
+		if arg-1 is "spawn":
+			run on location(8, 80, 8, world "world"):
+				spawn a pig at location(8, 80, 8, world "world")
+				set {regiontest::near} to last spawned entity
+			run on location(4104, 80, 4104, world "world"):
+				spawn a pig at location(4104, 80, 4104, world "world")
+				set {regiontest::far} to last spawned entity
+			if {regiontest::far} is set:
+				send "[regiontest] spawned" to console
+		else if arg-1 is "read":
+			# Another region's thread owns the pig: a runtime error on Folia, and nothing read.
+			set {_health} to health of {regiontest::near}
+			send "[regiontest] read %{_health}%" to console
+		else if arg-1 is "change":
+			# Sent to each pig's own thread on Folia: the trigger doesn't wait for them.
+			set health of {regiontest::far} to 3
+			damage {regiontest::near} by 1
+			send "[regiontest] changed" to console
+		else if arg-1 is "check":
+			run on {regiontest::far}:
+				send "[regiontest] far health %health of {regiontest::far}%" to console
+				set {_cross} to health of {regiontest::near}
+				send "[regiontest] cross %{_cross}%" to console
+				wait 1 tick
+				send "[regiontest] far after wait %health of {regiontest::far}%" to console
+			run on {regiontest::near}:
+				send "[regiontest] near health %health of {regiontest::near}%" to console
+			send "[regiontest] after run on" to console

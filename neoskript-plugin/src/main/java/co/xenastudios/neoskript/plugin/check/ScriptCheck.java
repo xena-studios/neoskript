@@ -60,12 +60,10 @@ public final class ScriptCheck {
     /** Types of things that live in a region on Folia: their state can only be read on its thread. */
     private static final Set<String> ENTITY_TYPES = Set.of("player", "entity", "livingentity");
     private static final Set<String> PLACE_TYPES = Set.of("block", "location", "chunk");
-    /** What can be read of a player or entity from anywhere on Folia. */
-    private static final Set<String> SAFE_READS = Set.of("ExprUUID", "PropExprName", "ExprRawName", "ExprIP",
-            "ExprPermissions", "ExprWorld", "ExprDisplayName", "ExprOnlinePlayersCount");
+    /** What can be read of a player or entity from anywhere on Folia: what the runtime doesn't check. */
+    private static final Set<String> SAFE_READS = co.xenastudios.neoskript.runtime.region.Regions.SAFE_READS;
     /** Effects that only send something, which Folia allows from anywhere. */
-    private static final Set<String> SENDING = Set.of("EffMessage", "EffBroadcast", "EffActionBar", "EffSendTitle",
-            "EffLog", "EffPlaySound", "EffSendResourcePack", "EffKick");
+    private static final Set<String> SENDING = co.xenastudios.neoskript.runtime.region.Regions.SENDING;
     private static final Pattern PERIOD = Pattern.compile("(?i)^every (?:(?:a|an|one|1)\\s+)?(\\d*(?:\\.\\d+)?)\\s*"
             + "(tick|ticks|second|seconds|real seconds?)\\b");
     private static final Pattern READ_MODIFY_WRITE = Pattern.compile("(?i)^set (\\{[^_][^}]*\\}) to \\1 [-+*/] ");
@@ -179,7 +177,7 @@ public final class ScriptCheck {
                 if (!changes && readsRegions(syntax)) {
                     findings.add(new Finding(Kind.FOLIA, statement.line().number(), "Reads a player's, an entity's or"
                             + " a block's state in a trigger that runs on Folia's global region, where it can't be"
-                            + " read."));
+                            + " read. 'run on' runs code on its thread."));
                 } else if (changes) {
                     findings.add(new Finding(Kind.FOLIA, statement.line().number(), "Changes players or entities from"
                             + " Folia's global region. NeoSkript sends the change to their region, so it happens a"

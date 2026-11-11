@@ -41,7 +41,7 @@ public final class Waits {
         if (current == null) {
             throw new IllegalStateException("Waiting isn't available: no scheduler is installed");
         }
-        Object owner = context instanceof SimpleTriggerContext simple ? simple.owner() : null;
+        Object owner = frame.owner != null ? frame.owner : owner(context);
         current.runLater(owner, ticks, () -> {
             delay(context.event());
             try {
@@ -50,6 +50,43 @@ public final class Waits {
                 errors.accept(e);
             }
         });
+    }
+
+    /** What the trigger's event happened to, whose thread it runs on (Folia). */
+    private static Object owner(TriggerContext context) {
+        return context instanceof SimpleTriggerContext simple ? simple.owner() : null;
+    }
+
+    /**
+     * Called by code compiled for Folia at the start and the end of {@code run on X:}: carries on with
+     * {@code frame} on the thread that owns {@code to}, or with {@code null}, the trigger's own thread. Whether it
+     * was scheduled; if not, this thread already owns it, and the caller carries straight on.
+     */
+    public static boolean hop(Resumable trigger, TriggerContext context, Frame frame, Object to) {
+        Object target = Values.single(to);
+        if (target == null) {
+            target = owner(context);
+        }
+        co.xenastudios.neoskript.runtime.region.RegionAccess access = co.xenastudios.neoskript.runtime.region.Regions.access();
+        if (access != null && access.owns(target)) {
+            return false;
+        }
+        Object owner = target;
+        Frame carried = frame;
+        carried.owner = null;
+        Scheduler current = scheduler;
+        if (current == null) {
+            throw new IllegalStateException("Waiting isn't available: no scheduler is installed");
+        }
+        current.runLater(owner, 0, () -> {
+            delay(context.event());
+            try {
+                trigger.resume(context, carried);
+            } catch (ScriptRuntimeException e) {
+                errors.accept(e);
+            }
+        });
+        return true;
     }
 
     /** The events whose triggers have waited, as Skript's {@code Delay}: kept only while the event is. */

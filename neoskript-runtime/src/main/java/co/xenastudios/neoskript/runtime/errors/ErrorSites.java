@@ -58,6 +58,30 @@ public final class ErrorSites {
         }
     }
 
+    /**
+     * A class whose frames errors look through, as if its caller had called what it calls: a wrapper around a
+     * syntax element, like the region checks on Folia.
+     */
+    public interface Transparent {}
+
+    /** The element code running off the compiled code's stack stands for, as an effect run on another thread. */
+    private static final ThreadLocal<Site> WITHIN = new ThreadLocal<>();
+
+    /** Runs {@code task} with errors it reports outside compiled code placed at {@code site}. */
+    public static void within(Site site, Runnable task) {
+        Site outer = WITHIN.get();
+        WITHIN.set(site);
+        try {
+            task.run();
+        } finally {
+            if (outer == null) {
+                WITHIN.remove();
+            } else {
+                WITHIN.set(outer);
+            }
+        }
+    }
+
     private static final Map<Class<?>, Site[]> SITES = Collections.synchronizedMap(new WeakHashMap<>());
     private static final StackWalker WALKER = StackWalker.getInstance(
             EnumSet.of(StackWalker.Option.RETAIN_CLASS_REFERENCE, StackWalker.Option.SHOW_HIDDEN_FRAMES));
@@ -74,7 +98,7 @@ public final class ErrorSites {
 
     /** The element running now in the innermost compiled code on this thread's stack, or null if none. */
     public static Site current() {
-        return WALKER.walk(frames -> {
+        Site site = WALKER.walk(frames -> {
             Class<?> callee = null;
             for (java.util.Iterator<StackWalker.StackFrame> it = frames.iterator(); it.hasNext(); ) {
                 StackWalker.StackFrame frame = it.next();
@@ -85,10 +109,13 @@ public final class ErrorSites {
                         return found;
                     }
                 }
-                callee = frame.getDeclaringClass();
+                if (!Transparent.class.isAssignableFrom(frame.getDeclaringClass())) {
+                    callee = frame.getDeclaringClass();
+                }
             }
             return null;
         });
+        return site != null ? site : WITHIN.get();
     }
 
     /**

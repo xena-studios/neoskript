@@ -11,7 +11,7 @@ What each milestone in the [plan](PLAN.md#6-roadmap) delivered, in order. Add ea
 | [M2: Compiler and runtime core](#m2-compiler-and-runtime-core) | Done 2026-10-22 |
 | [M3: Variables and storage](#m3-variables-and-storage) | Done 2026-10-22 |
 | [M4: Standard library](#m4-standard-library) | In progress: Skript's whole test suite passes (862 of 862); the exit also needs the 95% differential check |
-| [M5: Folia and migration](#m5-folia-and-migration) | In progress: the migration CLI |
+| [M5: Folia and migration](#m5-folia-and-migration) | In progress: the migration CLI, region ownership and `run on` on Folia |
 
 Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4](#step-6-the-long-tail)):
 
@@ -597,4 +597,14 @@ Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the mo
   - **Folia hints:** global events, reads of entities and blocks that may be in another region, entity changes (which run on the entity's region), and read-modify-write of global variables.
   - **Performance hints:** `every` periods under a second that loop players or entities, `all entities`, and busy `while` loops.
 - **Tested** by the `neoskript-cli` harness scenario. The corpus loads cleanly, and a script with known hazards gets exactly its hints.
+
+### Step 2: Region ownership on Folia
+
+What [plan 3.3](PLAN.md#33-runtime--threading-paper--folia) says Folia does, done:
+- **Checks only on Folia:** on Folia the compiler wraps each call into a syntax element in a check (`RegionalElements`). What the check looks at comes from the element's placeholder types (entities, blocks, locations). Elements that only read what's safe anywhere, or only send something, are exempt (`Regions.SAFE_READS`, `Regions.SENDING`, which the CLI's hints share). On Paper nothing is wrapped and the generated code is unchanged.
+- **Reads from another region:** an expression or condition given an entity or block that another region's thread owns reports a runtime error with the line, as Skript prints them: `A pig is in another region, which only that region's thread can read on Folia. Use 'run on' to run code there.` The read gives nothing and the trigger carries on. Anything Folia's own thread checks refuse is reported the same way, never as a stack trace.
+- **Effects and changes in another region** run on the entity's scheduler, or the block's or location's region, and the trigger doesn't wait for them. An effect on several entities is split by owner. Errors in an effect run elsewhere still name its line.
+- **`run on %entity/location%:`** (NeoSkript only): its code runs on the thread that owns the entity or location, and the trigger waits for it, like `wait`, then goes back to its own thread. A `wait` inside it stays on that thread. On Paper the code just runs.
+- **Tested:** unit tests (`RegionOwnershipTest`, against a pretend server) and the `neoskript-regions` harness scenario on all four servers. Two pigs 4096 blocks apart are each in their own region. From the global region, reading one is the runtime error, and changes reach both. `run on` reads each on its own thread, in order with the rest of the trigger, and a read across regions inside it is an error too. On Paper the same script reads and changes everything with no errors. The real-world corpus scenario now also fails on any thread violation in the log, and passes on Folia.
+- **Still to come:** D11's config option for a blocking hop for reads.
 

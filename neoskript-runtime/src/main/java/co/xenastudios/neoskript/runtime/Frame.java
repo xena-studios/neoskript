@@ -16,4 +16,9 @@ public final class Frame {
     public VariableStore locals;
     public Object parseLogs;
     public Object[] slots;
+    /**
+     * On Folia, inside {@code run on X:}, what the trigger carries on on after this wait: X. Otherwise
+     * {@code null}, and it carries on on the trigger's own thread.
+     */
+    public Object owner;
 }

@@ -106,6 +106,9 @@ public final class NeoSkriptCorpusScenario implements Scenario {
             context.summary("passed", passed.size());
 
             List<String> unexpected = new ArrayList<>(problems);
+            // On Folia, M5's check: nothing the corpus does breaks Folia's thread rules or reads another region.
+            unexpected.addAll(server.linesMatching(NeoSkriptRegionsScenario.THREAD_VIOLATION));
+            unexpected.addAll(server.linesMatching(Pattern.compile("in another region, which only|touches another region")));
             failures.forEach((suite, lines) -> unexpected.add(suite + ": " + lines));
             missing.forEach(suite -> unexpected.add(suite + ": no result"));
             if (!unexpected.isEmpty()) {

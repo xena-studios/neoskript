@@ -60,6 +60,8 @@ final class CoreSyntax {
     static final String PARSE_PATTERN = "ExprParse-pattern";
     static final String WHETHER = "ExprWhether";
     static final String CATCH_ERRORS = "SecCatchErrors";
+    /** NeoSkript's {@code run on %entity/location%:}, for Folia. */
+    static final String RUN_ON = "SecRunOn";
     /** {@code suppress unreachable code warnings}, alone or as a section: handled while parsing. */
     static final String SUPPRESS_WARNINGS = "EffSecSuppressWarnings";
     static final String SUPPRESS_HINTS = "EffSecSuppressTypeHints";
@@ -352,6 +354,9 @@ final class CoreSyntax {
 
     /** Syntax tried after everything else, so the library's elements win: event values match any type name. */
     static void registerLast(Library library) {
+        // 'run on player:' (NeoSkript only): its code runs on the thread that owns the entity or location, on Folia.
+        boolean places = library.javaClass("entity") != Object.class && library.javaClass("location") != Object.class;
+        library.core(SyntaxKind.SECTION, RUN_ON, null, List.of(), places ? "run on %entity/location%" : "run on %object%");
         // 'all colours': every value of a type that has a fixed set of them.
         library.core(SyntaxKind.EXPRESSION, SETS, "object", List.of(RegexRole.TYPE), "(all [[of] the]|every) <.+>");
         // 'X is a color': a type as a value, which a value is if it's of that type.
