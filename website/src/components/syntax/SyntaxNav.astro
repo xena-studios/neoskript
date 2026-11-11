@@ -8,7 +8,7 @@ const { current } = Astro.props;
   <ul>
     {categories.map((c) => (
       <li>
-        <a href={`/syntax/${c.path}`} aria-current={c.path === current ? "page" : undefined}>
+        <a href={`/syntax/${c.path}/`} aria-current={c.path === current ? "page" : undefined}>
           <span>{c.label}</span><span class="n">{c.count}</span>
         </a>
       </li>

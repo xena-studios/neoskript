@@ -6,6 +6,8 @@ import { focusOnSlash, split } from "./search-helpers";
 type Row = { n: string; c: string; s: string; p: string[]; i: string };
 type Indexed = Row & { name: string; nameWords: string[]; words: string[] };
 const LIMIT = 40;
+// Words that patterns have and names don't: "location of" should find Location first.
+const SMALL = new Set(["a", "an", "the", "of", "to", "in", "on", "at", "is", "are", "and", "or"]);
 
 const input = document.querySelector<HTMLInputElement>("#search");
 const list = document.querySelector<HTMLOListElement>("#results");
@@ -32,9 +34,11 @@ if (input && list && status) {
 
   const score = (row: Indexed, q: string, query: string[]) => {
     if (!query.every((w) => row.words.some((x) => x.startsWith(w)))) return -1;
-    if (row.name === q) return 0;
+    const content = query.filter((w) => !SMALL.has(w));
+    if (row.name === q || (content.length > 0 && row.name === content.join(" "))) return 0;
     if (row.name.startsWith(q)) return 1;
     if (query.every((w) => row.nameWords.some((x) => x.startsWith(w)))) return 2;
+    if (content.length > 0 && content.every((w) => row.nameWords.some((x) => x.startsWith(w)))) return 2.5;
     if (row.p.some((p) => p.toLowerCase().includes(q))) return 3;
     return 4;
   };
@@ -60,7 +64,7 @@ if (input && list && status) {
     for (const { row } of found.slice(0, LIMIT)) {
       const li = document.createElement("li");
       const a = document.createElement("a");
-      a.href = `/syntax/${row.c}#${row.s}`;
+      a.href = `/syntax/${row.c}/#${row.s}`;
       const name = document.createElement("span");
       name.className = "r-name";
       name.textContent = row.n;

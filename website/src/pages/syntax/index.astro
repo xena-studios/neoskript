@@ -9,7 +9,7 @@ const labels = JSON.stringify(Object.fromEntries(categories.map((c) => [c.path, 
 <Base
   title="Syntax reference: NeoSkript"
   description={`All ${total} events, conditions, effects, expressions, types, sections, structures and functions NeoSkript registers, with patterns, descriptions and examples.`}
-  path="/syntax"
+  path="/syntax/"
 >
   <section class="page">
     <div class="wrap">
@@ -32,7 +32,7 @@ const labels = JSON.stringify(Object.fromEntries(categories.map((c) => [c.path, 
       <ul class="cats">
         {categories.map((c) => (
           <li>
-            <a href={`/syntax/${c.path}`}>{c.label}</a>
+            <a href={`/syntax/${c.path}/`}>{c.label}</a>
             <span class="n">{c.count}</span>
             <p>{c.blurb}</p>
           </li>

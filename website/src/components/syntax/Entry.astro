@@ -26,7 +26,7 @@ if (props.kind === "element") {
   patterns = [signature(props.item)];
   search.push(...patterns);
 }
-const typeHref = (slug: string | null) => (slug ? `/syntax/types#${slug}` : null);
+const typeHref = (slug: string | null) => (slug ? `/syntax/types/#${slug}` : null);
 const sinceText = item.since.join(", ");
 ---
 <article class="entry" id={item.slug} data-search={search.join("\n").toLowerCase()}>
@@ -38,7 +38,7 @@ const sinceText = item.since.join(", ");
   )}
 
   {item.description.length > 0 ? (
-    <div class="description">{item.description.map((p) => <p set:html={p} />)}</div>
+    <div class="description">{item.description.map((p) => (p.startsWith("<ul>") ? <Fragment set:html={p} /> : <p set:html={p} />))}</div>
   ) : (
     <p class="undocumented">No matching entry in Skript's documentation.</p>
   )}

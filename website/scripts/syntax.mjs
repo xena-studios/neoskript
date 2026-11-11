@@ -164,11 +164,21 @@ function html(text) {
   }
   return outHtml;
 }
-const paragraphs = (description) =>
-  (description ?? [])
-    .flatMap((d) => d.split(/\n+/))
-    .map((d) => d.trim())
-    .filter(Boolean);
+// One paragraph per line, except that list items (Skript spreads a list over several lines, sometimes after
+// an empty <ul></ul>) are gathered into one <ul> block.
+const paragraphs = (description) => {
+  const blocks = [];
+  const lines = (description ?? []).flatMap((d) => d.split(/\n+/)).map((d) => d.trim());
+  for (const line of lines) {
+    const bare = line.replace(/<\/?ul>/gi, "").trim();
+    if (!bare) continue;
+    if (/^<li\b/i.test(bare)) {
+      if (blocks.at(-1)?.startsWith("<ul>")) blocks[blocks.length - 1] = blocks.at(-1).replace(/<\/ul>$/, "") + bare + "</ul>";
+      else blocks.push(`<ul>${bare}</ul>`);
+    } else blocks.push(line.replace(/<ul>\s*<\/ul>/gi, ""));
+  }
+  return blocks.filter(Boolean);
+};
 const examples = (list) => (list ?? []).map((e) => e.replace(/\s+$/, "")).filter(Boolean);
 const since = (s) => (s == null ? [] : Array.isArray(s) ? s : [s]);
 
@@ -201,13 +211,13 @@ const joined = neo.elements.map((el) => {
   return { el, d, slug };
 });
 for (const { el, d, slug } of joined) {
-  if (d && !anchors.has(d.id)) anchors.set(d.id, `/syntax/${PLURAL[el.kind]}#${slug}`);
+  if (d && !anchors.has(d.id)) anchors.set(d.id, `/syntax/${PLURAL[el.kind]}/#${slug}`);
 }
 const typeSlug = (id) => slugify(id);
-for (const t of neo.types) anchors.set(t.id, `/syntax/types#${typeSlug(t.id)}`);
+for (const t of neo.types) anchors.set(t.id, `/syntax/types/#${typeSlug(t.id)}`);
 // Skript's docs link events by name too, as in #entity transform.
 for (const { el, d, slug } of joined) {
-  if (el.kind === "event" && d) anchors.set(d.name.toLowerCase().replace(/^on /, ""), `/syntax/events#${slug}`);
+  if (el.kind === "event" && d) anchors.set(d.name.toLowerCase().replace(/^on /, ""), `/syntax/events/#${slug}`);
 }
 
 const typeRef = (id) => (id && types.has(id) ? { id, name: types.get(id).name, slug: typeSlug(id) } : id ? { id, name: id, slug: null } : null);

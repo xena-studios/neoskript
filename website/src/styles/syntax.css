@@ -133,6 +133,9 @@
 .entry .examples {
   margin-top: 1.25rem;
   display: grid;
+  /* minmax(0, 1fr), not auto: a long line scrolls inside its example
+     instead of widening the page. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
 }
 .example {
@@ -151,4 +154,12 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 0.1rem;
   }
+}
+
+/* Some names and formats are slash-joined lists ("Enderman/Sheep/Silverfish/
+   Falling Block", "ticks/seconds/minutes/...") with nowhere to wrap at phone
+   width. */
+.entry h2,
+.entry .meta dd {
+  overflow-wrap: break-word;
 }
