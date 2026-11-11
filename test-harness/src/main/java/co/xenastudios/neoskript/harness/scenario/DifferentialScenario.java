@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026 Xena Studios
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 package co.xenastudios.neoskript.harness.scenario;
 
