@@ -35,6 +35,7 @@ tasks.shadowJar {
     archiveClassifier = ""
     manifest {
         attributes["Main-Class"] = "co.xenastudios.neoskript.cli.NeoSkriptCli"
+        attributes["Implementation-Version"] = project.version.toString()
     }
 }
 

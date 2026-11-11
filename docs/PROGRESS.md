@@ -11,7 +11,7 @@ What each milestone in the [plan](PLAN.md#6-roadmap) delivered, in order. Add ea
 | [M2: Compiler and runtime core](#m2-compiler-and-runtime-core) | Done 2026-10-22 |
 | [M3: Variables and storage](#m3-variables-and-storage) | Done 2026-10-22 |
 | [M4: Standard library](#m4-standard-library) | Done 2026-11-11 |
-| [M5: Folia and migration](#m5-folia-and-migration) | In progress: the migration CLI, region ownership and `run on` on Folia |
+| [M5: Folia and migration](#m5-folia-and-migration) | Done 2026-11-11 |
 
 Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4](#step-6-the-long-tail)):
 
@@ -620,6 +620,8 @@ Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the mo
 
 ## M5: Folia and migration
 
+**Done 2026-11-11.** The real-world corpus runs on Folia with no thread violations, reads from another region are a clear error with `run on` as the explicit way across, and the migration CLI is released.
+
 ### Step 1: The migration CLI
 
 **`neoskript-cli check <scripts>`** reports what NeoSkript makes of a server's scripts before it's installed.
@@ -638,5 +640,9 @@ What [plan 3.3](PLAN.md#33-runtime--threading-paper--folia) says Folia does, don
 - **Effects and changes in another region** run on the entity's scheduler, or the block's or location's region, and the trigger doesn't wait for them. An effect on several entities is split by owner. Errors in an effect run elsewhere still name its line.
 - **`run on %entity/location%:`** (NeoSkript only): its code runs on the thread that owns the entity or location, and the trigger waits for it, like `wait`, then goes back to its own thread. A `wait` inside it stays on that thread. On Paper the code just runs.
 - **Tested:** unit tests (`RegionOwnershipTest`, against a pretend server) and the `neoskript-regions` harness scenario on all four servers. Two pigs 4096 blocks apart are each in their own region. From the global region, reading one is the runtime error, and changes reach both. `run on` reads each on its own thread, in order with the rest of the trigger, and a read across regions inside it is an error too. On Paper the same script reads and changes everything with no errors. The real-world corpus scenario now also fails on any thread violation in the log, and passes on Folia.
-- **Still to come:** D11's config option for a blocking hop for reads.
+- **No blocking hop for reads (D11, decided 2026-11-11):** it could deadlock two regions, and even from the global thread each read would wait a tick for the other region. Reads across regions stay an error, and `run on` is the escape hatch.
+
+### Step 3: The CLI's first release
+
+**`neoskript-cli` 0.1.0** is on the [releases](https://github.com/xena-studios/neoskript/releases) as a jar with its SHA-256. `neoskript-cli --version` prints the version, from the jar's manifest. With this, M5's exit is met: the corpus runs on Folia without thread violations (`neoskript-real-world-corpus` fails on any), and the CLI is released.
 

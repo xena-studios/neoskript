@@ -38,6 +38,7 @@ public final class NeoSkriptCli {
 
     private static final String USAGE = """
             Usage: neoskript-cli check <scripts folder or .sk file> [options]
+                   neoskript-cli --version
 
               Checks the scripts as NeoSkript loads them, without running them, and reports:
                 error        lines NeoSkript won't load (Skript's error, or syntax NeoSkript doesn't have)
@@ -67,6 +68,10 @@ public final class NeoSkriptCli {
     }
 
     static int run(String[] args, PrintStream out, PrintStream err) {
+        if (args.length == 1 && (args[0].equals("--version") || args[0].equals("version"))) {
+            out.println("neoskript-cli " + version());
+            return 0;
+        }
         if (args.length < 2 || !args[0].equals("check")) {
             err.print(USAGE);
             return 2;
@@ -140,6 +145,12 @@ public final class NeoSkriptCli {
             }
         }
         return 0;
+    }
+
+    /** This CLI's version, from its jar's manifest ({@code dev} when run from the build's classes). */
+    static String version() {
+        String version = NeoSkriptCli.class.getPackage().getImplementationVersion();
+        return version == null ? "dev" : version;
     }
 
     /** The newest server that Java {@code java} runs, or the one asked for if it runs it. */

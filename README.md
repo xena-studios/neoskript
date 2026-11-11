@@ -22,10 +22,13 @@ The plugin jar ends up in `neoskript-plugin/build/libs/`. The real-server tests 
 
 Before switching, see what NeoSkript makes of your scripts:
 
+Download `neoskript-cli-<version>.jar` from the [releases](https://github.com/xena-studios/neoskript/releases?q=cli&expanded=true) (it needs Java 21, or 25 to check against Minecraft 26.3), then:
+
 ```sh
-./gradlew :neoskript-cli:shadowJar
-java -jar neoskript-cli/build/libs/neoskript-cli-*.jar check plugins/Skript/scripts
+java -jar neoskript-cli-0.1.0.jar check plugins/Skript/scripts
 ```
+
+To build it yourself: `./gradlew :neoskript-cli:shadowJar`, and the jar is in `neoskript-cli/build/libs/`.
 
 It starts a throwaway headless Paper server (downloaded once into `~/.neoskript/cache` and checked against its SHA-256), loads the scripts there without running them, and lists each line NeoSkript won't load, Skript's warnings, and hints on what may behave differently on Folia or cost a lot of server time. Options: `--json <file>`, `--hints-only`, `--quiet`, `--minecraft 26.3|1.21.4`, `--verbose`. It exits with 0 when every script loads, 1 when some don't, and 2 when the check couldn't run.
 
