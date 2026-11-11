@@ -39,7 +39,7 @@ const nav = [
     <a class="skip" href="#main">Skip to content</a>
     <header class="site-header">
       <div class="wrap bar">
-        <a class="home" href="/" aria-label="NeoSkript home"><Logo name="neoskript" label="NeoSkript" /></a>
+        <a class="home" href="/" aria-label="NeoSkript home"><Logo name="neoskript" label="NeoSkript" class="wordmark" /><Logo name="icon" label="NeoSkript" class="tile" /></a>
         <nav aria-label="Main">
           <ul>
             {nav.map((item) => (
@@ -146,6 +146,9 @@ const nav = [
   .foot a:hover {
     color: var(--text);
   }
+  .home :global(.tile) {
+    display: none;
+  }
   @media (max-width: 52rem) {
     .foot {
       grid-template-columns: 1fr;
@@ -155,8 +158,13 @@ const nav = [
     .bar {
       gap: 1rem;
     }
-    .home :global(.logo) {
-      height: 1.375rem;
+    /* The wordmark and four links don't fit; the .sk tile alone does. */
+    .home :global(.wordmark) {
+      display: none;
+    }
+    .home :global(.tile) {
+      display: block;
+      height: 1.75rem;
     }
     nav ul {
       flex-wrap: nowrap;
