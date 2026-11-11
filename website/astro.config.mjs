@@ -33,6 +33,7 @@ export default defineConfig({
       plugins: [starlightLinksValidator({ exclude: ["/", "/download/", "/syntax/", "/syntax/**", "/parser/"] })],
       sidebar: [
         { label: "Start here", items: ["docs", "docs/install", "docs/moving-from-skript"] },
+        { label: "Parser", items: ["docs/parser", "docs/parser-checks"] },
       ],
     }),
   ],
