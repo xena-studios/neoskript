@@ -61,8 +61,8 @@ public final class NeoSkriptCommandsScenario implements Scenario {
             expect(server, mark, "nsk-calc 5 double", "[harness] commands double 10");
             expect(server, mark, "nsk-calc 5 inc", "[harness] commands calc 6");
             expect(server, mark, "nsk-calc 5 dec 3", "[harness] commands calc 2");
-            expect(server, mark, "nsk-say", "[harness] commands said nothing by the console");
-            expect(server, mark, "nsk-say hello there", "[harness] commands said hello there by the console");
+            expect(server, mark, "nsk-say", "[harness] commands said nothing by CONSOLE");
+            expect(server, mark, "nsk-say hello there", "[harness] commands said hello there by CONSOLE");
 
             // Arguments that don't fit: the usage is shown and the trigger doesn't run.
             server.command("nsk-add one 2");
@@ -71,7 +71,7 @@ public final class NeoSkriptCommandsScenario implements Scenario {
             server.await(Pattern.compile("This command can't be used by the console$"), mark, WAIT);
 
             expect(server, mark, "nsk-run", "[harness] commands sum 5 via nsk-add");
-            server.await(line("[harness] commands said from execute by the console"), mark, WAIT);
+            server.await(line("[harness] commands said from execute by CONSOLE"), mark, WAIT);
 
             expect(server, mark, "nsk-info", "[harness] commands listed");
             server.await(line("[harness] commands nsk-add is a script command"), mark, WAIT);
@@ -120,7 +120,7 @@ public final class NeoSkriptCommandsScenario implements Scenario {
         expect(server, mark, "!send \"[harness] commands effcmd doubled %{effcmd::doubled}%\" to console",
                 "[harness] commands effcmd doubled 42");
         expect(server, mark, "!send \"[harness] commands effcmd sender %command sender%, player %player%, me %me%\""
-                + " to console", "[harness] commands effcmd sender the console, player <none>, me <none>");
+                + " to console", "[harness] commands effcmd sender CONSOLE, player <none>, me <none>");
         // Local variables don't outlast the effect.
         server.command("!set {_effcmd} to 1");
         expect(server, mark, "!send \"[harness] commands effcmd local %{_effcmd}%\" to console",

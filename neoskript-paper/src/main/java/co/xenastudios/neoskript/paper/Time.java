@@ -29,7 +29,7 @@ final class Time {
 
     static void register(Registrar registrar) {
         // date(year, month, day, ...): fields that spill over carry into the next one, as in Skript; a left out
-        // time zone or DST offset is NaN, which Skript sets as 0.
+        // time zone or DST offset is NaN, and the server's are used, as on Skript.
         registrar.function("date", java.util.List.of(Parameter.of("year", "number"), Parameter.of("month", "number"),
                 Parameter.of("day", "number"), Parameter.defaulting("hour", "number", () -> 0L),
                 Parameter.defaulting("minute", "number", () -> 0L), Parameter.defaulting("second", "number", () -> 0L),
@@ -48,6 +48,9 @@ final class Time {
                     for (int i = 0; i < fields.length; i++) {
                         if (!(args[i] instanceof Number number)) {
                             return null;
+                        }
+                        if (Double.isNaN(number.doubleValue()) && i >= 7) {
+                            continue;
                         }
                         double value = number.doubleValue() * scale[i] + offsets[i] + carry;
                         int v = (int) (long) Math.floor(value + 1e-10);

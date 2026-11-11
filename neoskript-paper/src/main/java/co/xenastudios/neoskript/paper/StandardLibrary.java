@@ -21,8 +21,10 @@ public final class StandardLibrary {
      * region condition, not a comparison.
      */
     public static void register(Registrar registrar, java.util.function.Consumer<Registrar> hooks) {
+        SkriptEventNames.register(registrar);
         CoreTypes.register(registrar);
         UnsavableTypes.register(registrar);
+        TypeProperties.register(registrar);
         TextComponents.register(registrar);
         ScriptEvents.register(registrar);
         ServerEvents.register(registrar);

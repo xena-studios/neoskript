@@ -97,12 +97,11 @@ final class EventExpressions {
 
     /**
      * Fails parsing outside the events of {@code eventClasses}, as Skript does for syntax that only works in
-     * some: {@code 'the damage' can only be used in the damage event}.
+     * some: {@code 'the damage' can only be used in the on damage event, ...}, quoting the element as written,
+     * else as {@code written}.
      */
-    static void restrict(ElementInfo info, String written, String events, Class<?>... eventClasses) {
-        if (!isIn(info, eventClasses)) {
-            throw new SyntaxError("'" + written + "' can only be used in " + events);
-        }
+    static void restrict(ElementInfo info, String written, Class<?>... eventClasses) {
+        SkriptEventNames.restrict(info, info.textOr(written), eventClasses);
     }
 
     /** Whether the code is in an event of one of {@code eventClasses}. */
@@ -122,6 +121,10 @@ final class EventExpressions {
         return info.hasTag("the") ? "the " + written : written;
     }
 
+    /** The event value expressions that Skript also restricts to their events, which it checks first. */
+    private static final java.util.Set<String> RESTRICTED = java.util.Set.of("ExprUnleashReason",
+            "ExprInventoryCloseReason");
+
     /**
      * An expression of an event's value, as Skript's EventValueExpression: the value {@code getter} gives in
      * events of {@code eventClasses}, and else Skript's error that the event has none.
@@ -133,10 +136,11 @@ final class EventExpressions {
             withThe[i] = patterns[i].startsWith("[the] ") ? patterns[i] : "[the] " + patterns[i];
         }
         registrar.expression(id, type, info -> {
-            if (!isIn(info, eventClasses.toArray(Class<?>[]::new))) {
-                String event = info.eventName();
-                throw new SyntaxError("There's no " + typeName + " in " + (event == null ? "this event"
-                        : ("aeiou".indexOf(Character.toLowerCase(event.charAt(0))) >= 0 ? "an " : "a ") + event + " event"));
+            if (RESTRICTED.contains(id)) {
+                restrict(info, "the " + typeName, eventClasses.toArray(Class<?>[]::new));
+            }
+            if (!SkriptEventNames.related(info, eventClasses.toArray(Class<?>[]::new))) {
+                throw SkriptEventNames.noValue(info, typeName);
             }
             return (context, args) -> {
                 for (Class<?> eventClass : eventClasses) {
@@ -153,7 +157,7 @@ final class EventExpressions {
 
     private static void registerDamage(Registrar registrar) {
         registrar.expression("ExprDamage", "number", info -> {
-            restrict(info, the(info, "damage"), "the damage event, the vehicle damage event or the item damage event",
+            restrict(info, the(info, "damage"),
                     EntityDamageEvent.class, VehicleDamageEvent.class, PlayerItemDamageEvent.class);
             return new EventNumber(event -> switch (event) {
                 case VehicleDamageEvent vehicle -> vehicle.getDamage();
@@ -175,7 +179,7 @@ final class EventExpressions {
             }, false);
         }, "[the:the] damage");
         registrar.expression("ExprFinalDamage", "number", info -> {
-            restrict(info, the(info, "final damage"), "the damage event", EntityDamageEvent.class);
+            restrict(info, the(info, "final damage"), EntityDamageEvent.class);
             return (context, args) -> context.event() instanceof EntityDamageEvent event ? event.getFinalDamage() / 2 : null;
         }, "[the:the] final damage");
         eventValue(registrar, "ExprDamageCause", "damagecause", "damage cause", event -> switch (event) {
@@ -187,10 +191,8 @@ final class EventExpressions {
         // 'past damage cause' is the same cause: Skript lets it have a past state, not a future one.
         registrar.timeStates("ExprDamageCause", info -> info.time() < 0);
         registrar.condition("CondDamageCause", info -> {
-            if (!isIn(info, EntityDamageEvent.class, EntityDeathEvent.class)) {
-                String event = info.eventName();
-                throw new SyntaxError("There's no damage cause in " + (event == null ? "this event"
-                        : ("aeiou".indexOf(Character.toLowerCase(event.charAt(0))) >= 0 ? "an " : "a ") + event + " event"));
+            if (!SkriptEventNames.related(info, EntityDamageEvent.class, EntityDeathEvent.class)) {
+                throw SkriptEventNames.noValue(info, "damage cause");
             }
             boolean negated = Events.mark(info) == 1;
             return (context, args) -> {
@@ -209,14 +211,12 @@ final class EventExpressions {
         }, "[the] damage (was|is|has)(0¦|1¦n('|o)t) [been] (caused|done|made) by %damagecauses%");
 
         registrar.expression("ExprAttacker", "entity", info -> {
-            restrict(info, "the attacker", "the damage event, the death event, the vehicle damage event, the vehicle "
-                    + "destroy event or the attempt attack event", EntityDamageEvent.class, EntityDeathEvent.class,
+            restrict(info, "the attacker", EntityDamageEvent.class, EntityDeathEvent.class,
                     VehicleDamageEvent.class, VehicleDestroyEvent.class, io.papermc.paper.event.player.PrePlayerAttackEntityEvent.class);
             return (context, args) -> attacker(context.event());
         }, "[the] (attacker|damager)");
         registrar.expression("ExprAttacked", "entity", info -> {
-            restrict(info, "the victim", "the damage event, the death event, the vehicle damage event, the vehicle "
-                    + "destroy event, the projectile hit event or the attempt attack event", EntityDamageEvent.class,
+            restrict(info, "the victim", EntityDamageEvent.class,
                     EntityDeathEvent.class, VehicleDamageEvent.class, VehicleDestroyEvent.class, ProjectileHitEvent.class,
                     io.papermc.paper.event.player.PrePlayerAttackEntityEvent.class);
             return (context, args) -> {
@@ -288,13 +288,12 @@ final class EventExpressions {
 
     private static void registerDrops(Registrar registrar) {
         registrar.expression("ExprDrops", "itemtype", info -> {
-            restrict(info, the(info, "drops"), "the death event or the harvest block event", EntityDeathEvent.class,
+            restrict(info, the(info, "drops"), EntityDeathEvent.class,
                     PlayerHarvestBlockEvent.class);
             return new Drops(isIn(info, EntityDeathEvent.class));
         }, "[the:the] drops");
         registrar.effect("EffCancelDrops", info -> {
-            restrict(info, "cancel the drops", "the death event, the break event, the block drop event or the harvest "
-                    + "block event", EntityDeathEvent.class, BlockBreakEvent.class, BlockDropItemEvent.class,
+            restrict(info, "cancel the drops", EntityDeathEvent.class, BlockBreakEvent.class, BlockDropItemEvent.class,
                     PlayerHarvestBlockEvent.class);
             boolean items = !info.hasTag("xp");
             boolean experience = !info.hasTag("items");
@@ -325,8 +324,7 @@ final class EventExpressions {
                 "(cancel|clear|delete) [the] (items:item|xp:[e]xp[erience]) drops");
 
         registrar.expression("ExprExperience", "experience", info -> {
-            restrict(info, "the experience", "the experience spawn event, the break event, the experience change event, "
-                    + "the breed event or the fishing event", EventBridges.ExperienceSpawnEvent.class, BlockBreakEvent.class,
+            restrict(info, "the experience", EventBridges.ExperienceSpawnEvent.class, BlockBreakEvent.class,
                     PlayerExpChangeEvent.class, EntityBreedEvent.class, PlayerFishEvent.class);
             return new DroppedExperience();
         }, "[the] (spawned|dropped|) [e]xp[erience] [orb[s]]");
@@ -502,20 +500,20 @@ final class EventExpressions {
     // ---------------------------------------------------------------- messages
 
     private static void registerMessages(Registrar registrar) {
-        message(registrar, "ExprDeathMessage", "the death message", "the death event", EntityDeathEvent.class,
+        message(registrar, "ExprDeathMessage", "the death message", EntityDeathEvent.class,
                 event -> event instanceof PlayerDeathEvent death ? death.deathMessage() : null,
                 (event, message) -> {
                     if (event instanceof PlayerDeathEvent death) {
                         death.deathMessage(message);
                     }
                 }, "[the] death( |-)message");
-        message(registrar, "ExprKickMessage", "the kick message", "the kick event", PlayerKickEvent.class,
+        message(registrar, "ExprKickMessage", "the kick message", PlayerKickEvent.class,
                 event -> ((PlayerKickEvent) event).leaveMessage(),
                 (event, message) -> ((PlayerKickEvent) event).leaveMessage(message), "[the] kick( |-)message");
-        message(registrar, "ExprBroadcastMessage", "the broadcast message", "the broadcast event", BroadcastMessageEvent.class,
+        message(registrar, "ExprBroadcastMessage", "the broadcast message", BroadcastMessageEvent.class,
                 event -> ((BroadcastMessageEvent) event).message(),
                 (event, message) -> ((BroadcastMessageEvent) event).message(message), "[the] broadcast(-|[ed] )message");
-        message(registrar, "ExprUnknownCommandMessage", "the unknown command message", "the unknown command execution event",
+        message(registrar, "ExprUnknownCommandMessage", "the unknown command message",
                 org.bukkit.event.command.UnknownCommandEvent.class,
                 event -> ((org.bukkit.event.command.UnknownCommandEvent) event).message(),
                 (event, message) -> ((org.bukkit.event.command.UnknownCommandEvent) event).message(message),
@@ -523,11 +521,11 @@ final class EventExpressions {
     }
 
     /** An event's message, as text, which {@code set} and {@code delete} change. */
-    private static void message(Registrar registrar, String id, String written, String events, Class<?> eventClass,
+    private static void message(Registrar registrar, String id, String written, Class<?> eventClass,
             Function<Object, net.kyori.adventure.text.Component> getter,
             BiConsumer<Object, net.kyori.adventure.text.Component> setter, String pattern) {
         registrar.expression(id, "string", info -> {
-            restrict(info, written, events, eventClass);
+            restrict(info, written, eventClass);
             return new EventMessage(eventClass, getter, setter);
         }, pattern);
     }
@@ -664,7 +662,7 @@ final class EventExpressions {
 
     private static void registerBlocks(Registrar registrar) {
         registrar.expression("ExprPushedBlocks", "block", info -> {
-            restrict(info, "the moved blocks", "the piston extend event or the piston retract event",
+            restrict(info, "the moved blocks",
                     BlockPistonExtendEvent.class, BlockPistonRetractEvent.class);
             return (context, args) -> switch (context.event()) {
                 case BlockPistonExtendEvent extend -> extend.getBlocks().toArray();
@@ -673,21 +671,21 @@ final class EventExpressions {
             };
         }, "[the] moved blocks");
         registrar.expression("ExprAbsorbedBlocks", "block", info -> {
-            restrict(info, "the absorbed blocks", "the sponge absorb event", SpongeAbsorbEvent.class);
+            restrict(info, "the absorbed blocks", SpongeAbsorbEvent.class);
             return (context, args) -> context.event() instanceof SpongeAbsorbEvent event
                     ? event.getBlocks().stream().map(Events::stateBlock).toArray() : null;
         }, "[the] absorbed blocks");
         registrar.expression("ExprFertilizedBlocks", "block", info -> {
-            restrict(info, "the fertilized blocks", "the block fertilize event", BlockFertilizeEvent.class);
+            restrict(info, "the fertilized blocks", BlockFertilizeEvent.class);
             return (context, args) -> context.event() instanceof BlockFertilizeEvent event
                     ? event.getBlocks().stream().map(Events::stateBlock).toArray() : null;
         }, "[all] [the] fertilized blocks");
         registrar.expression("ExprSourceBlock", "block", info -> {
-            restrict(info, "the source block", "the spread event", BlockSpreadEvent.class);
+            restrict(info, "the source block", BlockSpreadEvent.class);
             return (context, args) -> context.event() instanceof BlockSpreadEvent event ? event.getSource() : null;
         }, "[the] source block");
         registrar.expression("ExprExplosionYield", "number", info -> {
-            restrict(info, "the explosion yield", "the explosion prime event", ExplosionPrimeEvent.class);
+            restrict(info, "the explosion yield", ExplosionPrimeEvent.class);
             return new EventNumber(event -> event instanceof ExplosionPrimeEvent prime ? (double) prime.getRadius() : null,
                     (event, value) -> {
                         if (value >= 0) {
@@ -696,7 +694,7 @@ final class EventExpressions {
                     }, false);
         }, "[the] explosion (yield|radius|size)", "[the] (yield|radius|size) of [the] explosion");
         registrar.expression("ExprExplosionBlockYield", "number", info -> {
-            restrict(info, "the explosion block yield", "the explode event", EntityExplodeEvent.class);
+            restrict(info, "the explosion block yield", EntityExplodeEvent.class);
             return new EventNumber(event -> event instanceof EntityExplodeEvent explode ? (double) explode.getYield() : null,
                     (event, value) -> {
                         if (value >= 0) {
@@ -713,7 +711,7 @@ final class EventExpressions {
                 "[the] event is cancel[l]ed", "[the] event (is not|isn't) cancel[l]ed");
 
         registrar.expression("ExprRespawnLocation", "location", info -> {
-            restrict(info, "the respawn location", "the respawn event", PlayerRespawnEvent.class);
+            restrict(info, "the respawn location", PlayerRespawnEvent.class);
             return new EventProperty(event -> event instanceof PlayerRespawnEvent respawn ? respawn.getRespawnLocation() : null,
                     Location.class, (event, value) -> {
                         Location location = (Location) value;
@@ -725,14 +723,14 @@ final class EventExpressions {
                     });
         }, "[the] respawn location");
         registrar.expression("ExprHealAmount", "number", info -> {
-            restrict(info, "the heal amount", "the heal event", EntityRegainHealthEvent.class);
+            restrict(info, "the heal amount", EntityRegainHealthEvent.class);
             return new EventNumber(event -> event instanceof EntityRegainHealthEvent heal ? heal.getAmount() : null,
                     (event, value) -> ((EntityRegainHealthEvent) event).setAmount(value), false);
         }, "[the] heal[ing] amount");
         // 'past heal amount' and 'future heal amount' in a heal event are the amount, as in Skript.
         registrar.timeStates("ExprHealAmount", -1, EntityRegainHealthEvent.class);
         registrar.expression("ExprMendingRepairAmount", "integer", info -> {
-            restrict(info, "the mending repair amount", "the item mend event", PlayerItemMendEvent.class);
+            restrict(info, "the mending repair amount", PlayerItemMendEvent.class);
             return new EventNumber(event -> event instanceof PlayerItemMendEvent mend ? (double) mend.getRepairAmount() : null,
                     (event, value) -> {
                         PlayerItemMendEvent mend = (PlayerItemMendEvent) event;
@@ -747,11 +745,11 @@ final class EventExpressions {
                     }, true, true);
         }, "[the] [mending] repair amount");
         registrar.expression("ExprAffectedEntities", "livingentity", info -> {
-            restrict(info, "the affected entities", "the area cloud effect event", AreaEffectCloudApplyEvent.class);
+            restrict(info, "the affected entities", AreaEffectCloudApplyEvent.class);
             return new AffectedEntities();
         }, "[the] affected entities");
         registrar.expression("ExprArmorChangeItem", "itemstack", info -> {
-            restrict(info, info.pattern() == 0 ? "old armor item" : "new armor item", "the armor change event",
+            restrict(info, info.pattern() == 0 ? "old armor item" : "new armor item",
                     com.destroystokyo.paper.event.player.PlayerArmorChangeEvent.class);
             boolean old = info.pattern() == 0;
             return (context, args) -> context.event() instanceof com.destroystokyo.paper.event.player.PlayerArmorChangeEvent event
@@ -776,7 +774,7 @@ final class EventExpressions {
             } : null;
         }, "[the] breeding mother", "[the] breeding father", "[the] [bred] (offspring|child)", "[the] breeder");
         registrar.expression("ExprConsumedItem", "itemstack", info -> {
-            restrict(info, "the consumed item", "the entity shoot bow event or the consume event", EntityShootBowEvent.class,
+            restrict(info, "the consumed item", EntityShootBowEvent.class,
                     PlayerItemConsumeEvent.class);
             return new EventProperty(event -> switch (event) {
                 case EntityShootBowEvent shoot -> shoot.getConsumable();
@@ -789,8 +787,7 @@ final class EventExpressions {
             });
         }, "[the] consumed item");
         registrar.expression("ExprHanging", "entity", info -> {
-            restrict(info, info.hasTag("remover") ? "the hanging remover" : "the hanging entity",
-                    "the break event or the place event", HangingBreakEvent.class, HangingPlaceEvent.class);
+            restrict(info, info.hasTag("remover") ? "the hanging remover" : "the hanging entity", HangingBreakEvent.class, HangingPlaceEvent.class);
             boolean remover = info.hasTag("remover");
             if (remover && !isIn(info, HangingBreakEvent.class)) {
                 throw new SyntaxError("The expression 'hanging remover' can only be used in break event");
@@ -803,32 +800,32 @@ final class EventExpressions {
             };
         }, "[the] hanging (entity|:remover)");
         registrar.expression("ExprEvtInitiator", "inventory", info -> {
-            restrict(info, "the initiator inventory", "the inventory item move event", InventoryMoveItemEvent.class);
+            restrict(info, "the initiator inventory", InventoryMoveItemEvent.class);
             return (context, args) -> context.event() instanceof InventoryMoveItemEvent move ? move.getInitiator() : null;
         }, "[the] [event-]initiator[( |-)inventory]");
         registrar.expression("ExprAppliedEffect", "potioneffecttype", info -> {
-            restrict(info, "the applied effect", "the beacon effect event",
+            restrict(info, "the applied effect",
                     com.destroystokyo.paper.event.block.BeaconEffectEvent.class);
             return (context, args) -> context.event() instanceof com.destroystokyo.paper.event.block.BeaconEffectEvent event
                     ? event.getEffect().getType() : null;
         }, "[the] applied [beacon] effect");
         registrar.expression("ExprReadiedArrow", "itemstack", info -> {
-            restrict(info, "the readied arrow", "the ready arrow event", com.destroystokyo.paper.event.player.PlayerReadyArrowEvent.class);
+            restrict(info, "the readied arrow", com.destroystokyo.paper.event.player.PlayerReadyArrowEvent.class);
             boolean arrow = info.hasTag("arrow");
             return (context, args) -> context.event() instanceof com.destroystokyo.paper.event.player.PlayerReadyArrowEvent event
                     ? arrow ? event.getArrow() : event.getBow() : null;
         }, "[the] (readied|selected|drawn) (:arrow|bow)");
         registrar.expression("ExprBarterInput", "itemtype", info -> {
-            restrict(info, "the barter input", "the piglin barter event", PiglinBarterEvent.class);
+            restrict(info, "the barter input", PiglinBarterEvent.class);
             return (context, args) -> context.event() instanceof PiglinBarterEvent barter
                     ? new ItemType(barter.getInput(), true) : null;
         }, "[the] [piglin] barter[ing] input");
         registrar.expression("ExprBarterDrops", "itemtype", info -> {
-            restrict(info, "the barter drops", "the piglin barter event", PiglinBarterEvent.class);
+            restrict(info, "the barter drops", PiglinBarterEvent.class);
             return new BarterDrops();
         }, "[the] [piglin] barter[ing] drops");
         registrar.expression("ExprEnchantItem", "itemtype", info -> {
-            restrict(info, "the enchanted item", "the enchant event or the enchant prepare event", EnchantItemEvent.class,
+            restrict(info, "the enchanted item", EnchantItemEvent.class,
                     PrepareItemEnchantEvent.class);
             if (!info.hasTag("ed")) {
                 co.xenastudios.neoskript.api.element.Warnings.deprecated("The 'enchant item' form of the enchanted item"
@@ -848,14 +845,14 @@ final class EventExpressions {
             });
         }, "[the] enchant[:ed] item");
         registrar.condition("CondElytraBoostConsume", info -> {
-            restrict(info, "the boosting firework will be consumed", "the elytra boost event",
+            restrict(info, "the boosting firework will be consumed",
                     com.destroystokyo.paper.event.player.PlayerElytraBoostEvent.class);
             boolean negated = info.pattern() == 1;
             return (context, args) -> context.event() instanceof com.destroystokyo.paper.event.player.PlayerElytraBoostEvent boost
                     && boost.shouldConsume() != negated;
         }, "[the] (boosting|used) firework will be consumed", "[the] (boosting|used) firework (will not|won't) be consumed");
         registrar.effect("EffElytraBoostConsume", info -> {
-            restrict(info, "consume the firework", "the elytra boost event",
+            restrict(info, "consume the firework",
                     com.destroystokyo.paper.event.player.PlayerElytraBoostEvent.class);
             boolean consume = info.pattern() == 1;
             return (context, args) -> {

@@ -106,8 +106,18 @@ public final class SkriptRegistry {
         return registry;
     }
 
+    /** A registry of its own, with {@code extra} added to the builder, for tests of what the stub doesn't have. */
+    public static SyntaxRegistry build(java.util.function.Consumer<SyntaxRegistry.Builder> extra) {
+        return build(SkriptSyntax.load(), extra);
+    }
+
     static SyntaxRegistry build(SkriptSyntax syntax) {
+        return build(syntax, builder -> {});
+    }
+
+    static SyntaxRegistry build(SkriptSyntax syntax, java.util.function.Consumer<SyntaxRegistry.Builder> extra) {
         SyntaxRegistry.Builder builder = SyntaxRegistry.builder();
+        extra.accept(builder);
         types(syntax, builder);
         relations(builder);
 

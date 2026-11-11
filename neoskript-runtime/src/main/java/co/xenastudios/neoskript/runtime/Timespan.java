@@ -138,25 +138,33 @@ public record Timespan(long millis) implements Comparable<Timespan> {
         if (isInfinite()) {
             return "forever";
         }
-        if (millis == 0) {
-            return "0 seconds";
-        }
-        List<String> parts = new ArrayList<>();
-        long left = millis;
-        for (int unit = 4; unit >= 1 && left > 0; unit--) {
-            long amount = left / UNIT_MILLIS[unit];
-            if (amount > 0) {
-                parts.add(amount + " " + UNITS[unit] + (amount == 1 ? "" : "s"));
-                left -= amount * UNIT_MILLIS[unit];
+        return text(millis);
+    }
+
+    /** The years to seconds Skript writes timespans in, largest first, with their names. */
+    private static final long[] TEXT_MILLIS = {31_536_000_000L, 2_592_000_000L, 604_800_000L, 86_400_000L, 3_600_000L,
+            60_000L, 1000L};
+    private static final String[] TEXT_UNITS = {"year", "month", "week", "day", "hour", "minute", "second"};
+
+    /**
+     * As Skript's Timespan.toString: the largest unit that fits, then what's left after {@code and}, unless
+     * that would read as 0 of the next unit: {@code 1 day and 1 hour and 31.15 seconds}, {@code 1.5 seconds}.
+     */
+    private static String text(long millis) {
+        for (int i = 0; i < TEXT_MILLIS.length - 1; i++) {
+            long unit = TEXT_MILLIS[i];
+            if (millis >= unit) {
+                long remainder = millis % unit;
+                if (!"0".equals(Values.decimal((double) remainder / TEXT_MILLIS[i + 1]))) {
+                    return withAmount(Math.floor((double) millis / unit), i) + " and " + text(remainder);
+                }
+                return withAmount((double) millis / unit, i);
             }
         }
-        if (left > 0) {
-            double seconds = left / 1000.0;
-            parts.add(Values.decimal(seconds) + " seconds");
-        }
-        if (parts.size() == 1) {
-            return parts.getFirst();
-        }
-        return String.join(", ", parts.subList(0, parts.size() - 1)) + " and " + parts.getLast();
+        return withAmount((double) millis / 1000, TEXT_UNITS.length - 1);
+    }
+
+    private static String withAmount(double amount, int unit) {
+        return Values.decimal(amount) + " " + TEXT_UNITS[unit] + (amount == 1 ? "" : "s");
     }
 }

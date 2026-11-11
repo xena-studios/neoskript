@@ -81,6 +81,17 @@ class ScriptParserTest {
     }
 
     @Test
+    void sectionsRunningToTheEndAreOnlyEmptyIfNothingFollows() {
+        // As Skript: comments, blank lines or wrongly indented lines before the end don't make it empty.
+        assertEquals(List.of(), errors(parse("on join:\n\t# nothing\n\n")));
+        assertEquals(List.of("3: indentation error: expected 2 tabs, but found 3 tabs"),
+                errors(parse("on join:\n\tif true:\n\t\t\tsend \"a\"\n")));
+        assertEquals(List.of("2: " + StructureParser.EMPTY_SECTION), errors(parse("on join:\n\tif true:\n")));
+        assertEquals(List.of("2: " + StructureParser.EMPTY_SECTION), errors(parse("on join:\n\tif true:")));
+        assertEquals(List.of("1: " + StructureParser.EMPTY_SECTION), errors(parse("on join:\n# nothing\non quit:\n\tstop\n")));
+    }
+
+    @Test
     void classifiesStructures() {
         ScriptParser.Result result = parse("""
                 options:
@@ -138,8 +149,7 @@ class ScriptParserTest {
                 """);
         // As Skript: the first indented line sets the indentation to two tabs.
         assertEquals(List.of("3: indentation error: expected 4 tabs, but found 3 tabs",
-                "4: indentation error: expected 4 tabs, but found 1 tab", "2: " + StructureParser.EMPTY_SECTION),
-                errors(result));
+                "4: indentation error: expected 4 tabs, but found 1 tab"), errors(result));
     }
 
     @Test

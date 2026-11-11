@@ -7,12 +7,10 @@ package co.xenastudios.neoskript.paper;
 import co.xenastudios.neoskript.api.element.Changeable;
 import co.xenastudios.neoskript.api.element.Condition;
 import co.xenastudios.neoskript.api.element.Expression;
-import co.xenastudios.neoskript.api.element.SyntaxError;
 import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.api.registration.Patterns;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.RuntimeErrors;
-import co.xenastudios.neoskript.runtime.ScriptFeatures;
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.datacomponent.item.Equippable;
 import io.papermc.paper.registry.RegistryKey;
@@ -207,13 +205,6 @@ final class ItemComponents {
         return components;
     }
 
-    /** Fails to parse, as Skript's experimental syntax does, if the script doesn't use the experiment. */
-    private static void experimental() {
-        if (!ScriptFeatures.compilingUses(EXPERIMENT)) {
-            throw new SyntaxError("This element is experimental. To use this, enable '" + EXPERIMENT + "'.");
-        }
-    }
-
     static void register(Registrar registrar) {
         registrar.type("itemcomponent", "item component", ItemComponent.class);
         registrar.type("equippablecomponent", "equippable component", EquippableComponent.class);
@@ -244,17 +235,15 @@ final class ItemComponents {
 
     private static void registerExpressions(Registrar registrar) {
         // 'a blank equippable component': a new one, which its section can set up.
-        registrar.expression("ExprSecBlankEquipComp", "equippablecomponent", info -> {
-            experimental();
-            return (context, args) -> new EquippableComponent(Equippable.equippable(EquipmentSlot.HEAD).build());
-        }, "a (blank|empty) equippable component");
+        registrar.experimental("ExprSecBlankEquipComp", EXPERIMENT);
+        registrar.expression("ExprSecBlankEquipComp", "equippablecomponent", info -> (context, args) ->
+                new EquippableComponent(Equippable.equippable(EquipmentSlot.HEAD).build()), "a (blank|empty) equippable component");
         registrar.sectionExpression("ExprSecBlankEquipComp", "equippablecomponent");
 
-        registrar.expression("ExprEquippableComponent", "equippablecomponent", info -> {
-            experimental();
-            return new EquippableOfItems();
-            // Item stacks too: an item stack in a variable is its own, not a copy made an item type, as in Skript.
-        }, Patterns.property("equippable component[s]", "slots/itemtypes/itemstacks"));
+        registrar.experimental("ExprEquippableComponent", EXPERIMENT);
+        // Item stacks too: an item stack in a variable is its own, not a copy made an item type, as in Skript.
+        registrar.expression("ExprEquippableComponent", "equippablecomponent", info -> new EquippableOfItems(),
+                Patterns.property("equippable component[s]", "slots/itemtypes/itemstacks"));
 
         keyProperty(registrar, "ExprEquipCompCameraOverlay", "camera overlay", Equippable::cameraOverlay,
                 (component, key) -> component.edit(builder -> builder.cameraOverlay(key)));
@@ -268,8 +257,8 @@ final class ItemComponents {
                     (component, key) -> component.edit(builder -> call(SET_SHEAR_SOUND, builder, key)));
         }
 
+        registrar.experimental("ExprEquipCompSlot", EXPERIMENT);
         registrar.expression("ExprEquipCompSlot", "equipmentslot", info -> {
-            experimental();
             return new ComponentProperty(component -> component.get().slot(), EquipmentSlot.class, false,
                     (component, values) -> {
                         if (values.length > 0 && values[0] instanceof EquipmentSlot slot) {
@@ -278,17 +267,16 @@ final class ItemComponents {
                     });
         }, Property.defaultPatterns("equipment slot", "equippablecomponents"));
 
-        registrar.expression("ExprEquipCompEntities", "entitytype", info -> {
-            experimental();
-            return new AllowedEntities();
-        }, Property.defaultPatterns("allowed entities", "equippablecomponents"));
+        registrar.experimental("ExprEquipCompEntities", EXPERIMENT);
+        registrar.expression("ExprEquipCompEntities", "entitytype", info -> new AllowedEntities(),
+                Property.defaultPatterns("allowed entities", "equippablecomponents"));
     }
 
     /** A property of components which is a namespaced key, as text: set and deleted. */
     private static void keyProperty(Registrar registrar, String id, String property, Function<Equippable, Key> getter,
             BiConsumer<EquippableComponent, Key> setter) {
+        registrar.experimental(id, EXPERIMENT);
         registrar.expression(id, "string", info -> {
-            experimental();
             return new ComponentProperty(component -> {
                 Key key = getter.apply(component.get());
                 return key == null ? null : key.toString();
@@ -308,8 +296,8 @@ final class ItemComponents {
     /** A property of components which is a sound, by its key: set and deleted. */
     private static void soundProperty(Registrar registrar, String id, String property, Function<Equippable, Key> getter,
             BiConsumer<EquippableComponent, Key> setter) {
+        registrar.experimental(id, EXPERIMENT);
         registrar.expression(id, "string", info -> {
-            experimental();
             return new ComponentProperty(component -> {
                 Key key = getter.apply(component.get());
                 return key == null ? null : key.toString();
@@ -546,8 +534,8 @@ final class ItemComponents {
 
     /** A condition on components, whose odd patterns are negated. */
     private static void condition(Registrar registrar, String id, Predicate<Equippable> test, String... patterns) {
+        registrar.experimental(id, EXPERIMENT);
         registrar.condition(id, info -> {
-            experimental();
             boolean negated = info.pattern() % 2 == 1;
             boolean and = info.and(0);
             return (context, args) -> {
@@ -597,8 +585,8 @@ final class ItemComponents {
     /** An effect turning a flag of components on or off, on by the patterns {@code on} accepts. */
     private static void effect(Registrar registrar, String id, java.util.function.IntPredicate on,
             BiConsumer<Equippable.Builder, Boolean> set, String... patterns) {
+        registrar.experimental(id, EXPERIMENT);
         registrar.effect(id, info -> {
-            experimental();
             boolean value = on.test(info.pattern());
             return (context, args) -> {
                 for (EquippableComponent component : components(args[0])) {

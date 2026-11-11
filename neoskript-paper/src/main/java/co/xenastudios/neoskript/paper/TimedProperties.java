@@ -9,6 +9,7 @@ import co.xenastudios.neoskript.api.element.ElementInfo;
 import co.xenastudios.neoskript.api.element.Expression;
 import co.xenastudios.neoskript.api.element.SyntaxError;
 import co.xenastudios.neoskript.api.element.TriggerContext;
+import co.xenastudios.neoskript.runtime.Waits;
 import java.util.ArrayList;
 import java.util.List;
 import org.bukkit.Bukkit;
@@ -25,7 +26,7 @@ import org.bukkit.event.player.PlayerLevelChangeEvent;
  * Player properties whose value in their own change event is the one the event is about, and that have a
  * past and future state there as Skript's: {@code past level of player} in a level change event is the old
  * level, {@code the future gamemode of player} the one changed to. As in Skript, the event's value is also the
- * present one: the player's own changes only once the event is over.
+ * present one: the player's own changes only once the event is over. After a wait, it's the player's own.
  */
 final class TimedProperties {
 
@@ -60,7 +61,8 @@ final class TimedProperties {
     private record GameModeOf(int time) implements Expression, Changeable {
 
         private Player eventPlayer(TriggerContext context) {
-            return time >= 0 && context.event() instanceof PlayerGameModeChangeEvent event ? event.getPlayer() : null;
+            return time >= 0 && context.event() instanceof PlayerGameModeChangeEvent event && !Waits.delayed(event)
+                    ? event.getPlayer() : null;
         }
 
         @Override
@@ -109,7 +111,7 @@ final class TimedProperties {
 
         private FoodLevelChangeEvent event(TriggerContext context, Player player) {
             return time >= 0 && context.event() instanceof FoodLevelChangeEvent event && player.equals(event.getEntity())
-                    ? event : null;
+                    && !Waits.delayed(event) ? event : null;
         }
 
         @Override
@@ -167,7 +169,7 @@ final class TimedProperties {
             List<Object> levels = new ArrayList<>();
             for (Player player : players(context, args[0])) {
                 levels.add(context.event() instanceof PlayerLevelChangeEvent event && event.getPlayer() == player
-                        ? (long) (info.time() < 0 ? event.getOldLevel() : event.getNewLevel()) : (long) player.getLevel());
+                        && !Waits.delayed(event) ? (long) (info.time() < 0 ? event.getOldLevel() : event.getNewLevel()) : (long) player.getLevel());
             }
             return single(levels);
         }
@@ -201,7 +203,7 @@ final class TimedProperties {
             int by = delta == null || delta.length == 0 ? 0 : ((Number) delta[0]).intValue();
             for (Player player : players(context, args[0])) {
                 PlayerDeathEvent death = info.time() > 0 && context.event() instanceof PlayerDeathEvent event
-                        && event.getEntity() == player ? event : null;
+                        && event.getEntity() == player && !Waits.delayed(event) ? event : null;
                 int level = death != null ? death.getNewLevel() : player.getLevel();
                 level = switch (mode) {
                     case SET -> by;

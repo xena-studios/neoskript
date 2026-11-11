@@ -242,8 +242,18 @@ final class StatementParser {
                 context.eventScope(scope);
             }
         }
+        if (parsed instanceof ParsedSyntax syntax && experimentalOnly(parser, syntax)) {
+            error(line, parser.experimentProblem());
+            return new Statement.Invalid(line);
+        }
         if (parsed instanceof Expr.FunctionCall call) {
             return new Statement.Call(line, call);
+        }
+        // A type property turned down for its values' type is the line's error, as in Skript, where else only
+        // words nothing understands would be read.
+        if (parser.propertyProblem(parsed) != null) {
+            error(line, parser.propertyProblem(parsed));
+            return new Statement.Invalid(line);
         }
         ParsedSyntax effect = parsed instanceof ParsedSyntax syntax && syntax.syntax().kind() == SyntaxKind.EFFECT
                 ? syntax : null;
@@ -275,10 +285,21 @@ final class StatementParser {
             problem = parser.functionProblem();
         }
         if (problem == null) {
+            problem = LineParser.oddPercents(line.text());
+        }
+        if (problem == null) {
             problem = changerProblem(line.text());
         }
         error(line, problem != null ? problem : "Can't understand this condition/effect: " + line.text());
         return new Statement.Invalid(line);
+    }
+
+    /**
+     * Whether the line only parsed by leaning on words nothing understands, where experimental syntax the script
+     * can't use would have gone: Skript reports the experiment then, as no literal is better than its error.
+     */
+    private static boolean experimentalOnly(LineParser parser, ParsedSyntax parsed) {
+        return parser.experimentProblem() != null && LineParser.countUnresolved(parsed) > 0;
     }
 
     /** A one-line conditional's header, with its condition. */
@@ -457,13 +478,21 @@ final class StatementParser {
                 return new Statement.Invalid(line);
             }
             Matcher conditional = IF_HEADER.matcher(key);
-            if (conditional.matches()) {
+            if (parser.experimentProblem() != null) {
+                error(line, parser.experimentProblem());
+            } else if (conditional.matches()) {
                 error(line, "Can't understand this condition: '" + conditional.group(1) + "'");
             } else if (key.regionMatches(true, 0, "loop ", 0, 5)) {
                 error(line, "Can't understand this loop: '" + key.substring(5) + "'");
             } else {
-                error(line, "Can't understand this section: " + key);
+                // 'set {_bar} to a keyed bossbar:': Skript's change effect's error for the value it can't understand.
+                String problem = changerProblem(key);
+                error(line, problem != null ? problem : "Can't understand this section: " + key);
             }
+            return new Statement.Invalid(line);
+        }
+        if (experimentalOnly(parser, header)) {
+            error(line, parser.experimentProblem());
             return new Statement.Invalid(line);
         }
         // What takes the section may refuse it, as Skript's section expressions, then its effect sections, do.
@@ -476,6 +505,11 @@ final class StatementParser {
         List<Expr.Syntax> claimants = sectionOnly(header);
         if (!claimants.isEmpty()) {
             error(line, claimError(key, claimants.getFirst(), "'" + key + "'"));
+            return new Statement.Invalid(line);
+        }
+        // As for a simple line: a type property turned down for its values' type is the error, not the words.
+        if (parser.propertyProblem(header) != null) {
+            error(line, parser.propertyProblem(header));
             return new Statement.Invalid(line);
         }
         check(line, header);
@@ -545,7 +579,7 @@ final class StatementParser {
         try {
             List<Object> values = loop.match().values();
             Object looped = values.getLast();
-            Object value = values.get(loop.pattern() == 0 ? 0 : 1);
+            Object value = loop.pattern() == 1 ? null : values.get(loop.pattern() == 0 ? 0 : 1);
             if (value instanceof Expr.Variable variable && simple(variable) && looped instanceof Expr list) {
                 java.util.Set<String> types = new java.util.LinkedHashSet<>(types(list));
                 if (!types.isEmpty()) {
@@ -850,8 +884,12 @@ final class StatementParser {
                     context.eventScope(scope);
                 }
             }
+            if (condition != null && experimentalOnly(parser, condition)) {
+                condition = null;
+            }
             if (condition == null) {
-                error(line, "Can't understand this condition: " + line.text());
+                error(line, parser.experimentProblem() != null ? parser.experimentProblem()
+                        : "Can't understand this condition: " + line.text());
             } else {
                 check(line, condition);
                 parser.listWarnings(condition);

@@ -99,10 +99,8 @@ final class Fishing {
             });
         }, "fish[ing] bit(e|ing) [wait] time");
         registrar.expression("ExprFishingHook", "entity", info -> {
-            if (!isIn(info, PlayerFishEvent.class)) {
-                String event = info.eventName();
-                throw new SyntaxError("There's no entity in " + (event == null ? "this event"
-                        : ("aeiou".indexOf(Character.toLowerCase(event.charAt(0))) >= 0 ? "an " : "a ") + event + " event"));
+            if (!SkriptEventNames.related(info, PlayerFishEvent.class)) {
+                throw SkriptEventNames.noValue(info, "entity");
             }
             return new EventChangeable<>(PlayerFishEvent.class, PlayerFishEvent::getHook);
         }, "[the] fish[ing] (hook|bobber)");

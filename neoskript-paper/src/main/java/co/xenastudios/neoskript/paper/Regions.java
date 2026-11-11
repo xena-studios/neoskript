@@ -56,37 +56,52 @@ public final class Regions {
             + " https://github.com/SkriptLang/skript-worldguard";
 
     /**
-     * Region syntax being set up: Skript's errors for a region named in quotes at one of {@code regionArguments}
-     * that doesn't exist, as its region parser gives them while loading, then its deprecation warning.
+     * Region syntax being set up: the regions named in quotes at {@code regionArguments}, found while loading as
+     * Skript's region parser finds them (so the script keeps using that region, whatever its name later), with
+     * its errors for one that doesn't exist; then its deprecation warning. The regions are by argument, with
+     * {@code null} for one that isn't named in quotes, found when the script runs.
      */
-    private static void used(ElementInfo info, int... regionArguments) {
+    private static Region[] used(ElementInfo info, int... regionArguments) {
+        Region[] found = new Region[java.util.Arrays.stream(regionArguments).max().orElse(-1) + 1];
         for (int index : regionArguments) {
             String name = info.argumentLiteral(index);
             if (name != null && "string".equals(info.argumentType(index))) {
-                check(name);
+                found[index] = find(name);
             }
         }
         Warnings.deprecated(DEPRECATION_MESSAGE);
+        return found;
     }
 
-    /** Skript's {@code Region.parse} with errors: the region must be in exactly one world. */
-    private static void check(String name) {
+    /** Argument {@code index}: the region found while loading, if it was named in quotes, else as given. */
+    private static Object regions(Region[] found, Object[] args, int index) {
+        return index < found.length && found[index] != null ? found[index] : args[index];
+    }
+
+    /**
+     * Skript's {@code Region.parse} with errors: the region must be in exactly one world. Without a regions plugin
+     * or a server (as in tests), {@code null}.
+     */
+    private static Region find(String name) {
         if (PLUGINS.isEmpty() || Bukkit.getServer() == null) {
-            return;
+            return null;
         }
-        int found = 0;
+        Region region = null;
         for (World world : Bukkit.getWorlds()) {
-            if (getRegion(world, name) != null) {
-                found++;
+            Region inWorld = getRegion(world, name);
+            if (inWorld == null) {
+                continue;
             }
+            if (region != null) {
+                throw new SyntaxError("Multiple regions with the name '" + name + "' exist");
+            }
+            region = inWorld;
         }
-        if (found > 1) {
-            throw new SyntaxError("Multiple regions with the name '" + name + "' exist");
-        }
-        if (found == 0) {
+        if (region == null) {
             throw new SyntaxError("Region '" + name + "' could not be found. Ensure that the region name is correct, in"
                     + " the proper world, and that the region data for that world is loaded.");
         }
+        return region;
     }
 
     /** A regions plugin NeoSkript is hooked into, as Skript's {@code RegionsPlugin}. */
@@ -255,13 +270,13 @@ public final class Regions {
                 "%players% (can('t|not)|(is|are)(n't| not) allowed to) build %directions% %locations%");
 
         registrar.condition("CondIsMember", info -> {
-            used(info, 1);
+            Region[] found = used(info, 1);
             boolean negated = info.pattern() == 1;
             boolean owner = info.mark() == 1;
             boolean playersAnd = info.and(0);
             boolean regionsAnd = info.and(1);
             return (context, args) -> Condition.check(Values.array(args[0]), playersAnd, player ->
-                    player instanceof OfflinePlayer p && check(Values.array(args[1]), regionsAnd, negated, region ->
+                    player instanceof OfflinePlayer p && check(Values.array(regions(found, args, 1)), regionsAnd, negated, region ->
                             region instanceof Region r && (owner ? r.isOwner(p) : r.isMember(p))));
         }, "%offlineplayers% (is|are) (0¦[a] member|1¦[(the|an)] owner) of [[the] region] %regions%",
                 "%offlineplayers% (is|are)(n't| not) (0¦[a] member|1¦[(the|an)] owner) of [[the] region] %regions%");
@@ -271,12 +286,12 @@ public final class Regions {
             // 'X contains Y' has a direction; 'Y is in X' doesn't.
             boolean directed = info.pattern() % 2 == 0;
             int regionsAt = directed ? 0 : 1;
-            used(info, regionsAt);
+            Region[] found = used(info, regionsAt);
             boolean regionsAnd = info.and(regionsAt);
             boolean locationsAnd = info.and(directed ? 2 : 0);
             return (context, args) -> {
                 Object[] locations = directed ? Direction.combine(args[1], args[2]).toArray() : Values.array(args[0]);
-                return Condition.check(Values.array(args[regionsAt]), regionsAnd, region -> region instanceof Region r
+                return Condition.check(Values.array(regions(found, args, regionsAt)), regionsAnd, region -> region instanceof Region r
                         && check(locations, locationsAnd, negated, location -> location instanceof Location l
                                 && r.contains(l)));
             };
@@ -286,10 +301,10 @@ public final class Regions {
                 "%locations% (is|are)(n't| not) (contained in|part of) [[the] region] %regions%");
 
         registrar.expression("ExprBlocksInRegion", "block", info -> {
-            used(info, 0);
+            Region[] found = used(info, 0);
             return (context, args) -> {
                 List<Object> blocks = new ArrayList<>();
-                for (Object region : Values.array(args[0])) {
+                for (Object region : Values.array(regions(found, args, 0))) {
                     if (region instanceof Region r) {
                         r.getBlocks().forEachRemaining(blocks::add);
                     }
@@ -299,11 +314,11 @@ public final class Regions {
         }, "[(all|the)] blocks (in|of) [[the] region[s]] %regions%");
 
         registrar.expression("ExprMembersOfRegion", "offlineplayer", info -> {
-            used(info, 0);
+            Region[] found = used(info, 0);
             boolean owners = info.mark() == 1;
             return (context, args) -> {
                 List<Object> players = new ArrayList<>();
-                for (Object region : Values.array(args[0])) {
+                for (Object region : Values.array(regions(found, args, 0))) {
                     if (region instanceof Region r) {
                         players.addAll(owners ? r.getOwners() : r.getMembers());
                     }
@@ -326,13 +341,13 @@ public final class Regions {
 
         // Skript's EvtRegionBorder.
         registrar.event("EvtRegionBorder", List.of(RegionBorderEvent.class), info -> {
-            used(info, 0);
+            Region[] found = used(info, 0);
             boolean enter = info.hasTag("enter");
             return (context, args) -> {
                 if (!(context.event() instanceof RegionBorderEvent event) || event.isEntering() != enter) {
                     return false;
                 }
-                Object[] regions = Events.values(args[0]);
+                Object[] regions = found[0] != null ? new Object[] {found[0]} : Events.values(args[0]);
                 return regions == null || Events.check(info, 0, regions, region -> event.getRegion().equals(
                         region instanceof String name ? parse(name) : region));
             };

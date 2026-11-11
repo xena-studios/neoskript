@@ -80,10 +80,17 @@ public record TimeOfDay(int ticks) implements Comparable<TimeOfDay> {
         return Integer.compare(ticks, other.ticks);
     }
 
-    /** As Skript writes times: {@code 06:00}. */
+    /** As Skript writes times: {@code 6:00}. */
     @Override
     public String toString() {
         int fromMidnight = ticksAfterMidnight();
-        return String.format(Locale.ROOT, "%02d:%02d", fromMidnight / 1000, fromMidnight % 1000 * 60 / 1000);
+        // As Skript's Time: hours without a leading zero, and minutes rounded.
+        int hours = fromMidnight / 1000;
+        int minutes = (int) Math.round((fromMidnight % 1000) / (1000 / 60.0));
+        if (minutes >= 60) {
+            hours = (hours + 1) % 24;
+            minutes -= 60;
+        }
+        return hours + ":" + (minutes < 10 ? "0" : "") + minutes;
     }
 }

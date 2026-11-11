@@ -147,11 +147,37 @@ final class Locations {
 
         registrar.effect("EffTeleport", info -> {
             boolean directed = info.pattern() == 1;
+            boolean force = info.hasTag("force");
             return (context, args) -> {
                 if (!(Values.single(args[directed ? 2 : 1]) instanceof Location given)) {
                     return;
                 }
                 Object direction = directed ? Values.single(args[1]) : null;
+                Object[] entities = (Object[]) args[0];
+                if (entities.length == 0) {
+                    return;
+                }
+                Object event = context.event();
+                // As Skript: until the trigger waits, teleporting the one player of a respawn or move event
+                // changes where the event takes them.
+                if (!co.xenastudios.neoskript.runtime.Waits.delayed(event) && entities.length == 1) {
+                    Location target = direction instanceof Direction d ? d.getRelative(given) : given;
+                    if (event instanceof org.bukkit.event.player.PlayerRespawnEvent respawn
+                            && entities[0].equals(respawn.getPlayer())) {
+                        if (target.isWorldLoaded()) {
+                            respawn.setRespawnLocation(target);
+                        }
+                        return;
+                    }
+                    if (event instanceof org.bukkit.event.player.PlayerMoveEvent move && entities[0].equals(move.getPlayer())) {
+                        if (!target.isWorldLoaded()) {
+                            target = target.clone();
+                            target.setWorld(move.getFrom().getWorld());
+                        }
+                        move.setTo(target);
+                        return;
+                    }
+                }
                 List<io.papermc.paper.entity.TeleportFlag> kept = new java.util.ArrayList<>();
                 for (Object value : Values.array(args[directed ? 3 : 2])) {
                     if (value instanceof TeleportFlags each) {
@@ -159,7 +185,11 @@ final class Locations {
                     }
                 }
                 io.papermc.paper.entity.TeleportFlag[] keep = kept.toArray(io.papermc.paper.entity.TeleportFlag[]::new);
-                for (Object entity : (Object[]) args[0]) {
+                // A teleport that isn't forced waits for the chunk in Skript, so the event is over after it.
+                if (!force) {
+                    co.xenastudios.neoskript.runtime.Waits.delay(event);
+                }
+                for (Object entity : entities) {
                     if (entity instanceof Entity e) {
                         Location target = given.clone();
                         // A location without a world is in the entity's world.
@@ -178,8 +208,8 @@ final class Locations {
                     }
                 }
             };
-        }, "[force] teleport %entities% to %location% [[while] retaining %teleportflags%]",
-                "[force] teleport %entities% %direction% %location% [[while] retaining %teleportflags%]");
+        }, "[:force] teleport %entities% to %location% [[while] retaining %teleportflags%]",
+                "[:force] teleport %entities% %direction% %location% [[while] retaining %teleportflags%]");
 
         registrar.function("location", List.of(Parameter.of("x", "number"), Parameter.of("y", "number"),
                 Parameter.of("z", "number"),
@@ -234,7 +264,8 @@ final class Locations {
     private record Spawn(int time) implements Expression, Changeable {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
-            if (time < 0 && context.event() instanceof org.bukkit.event.world.SpawnChangeEvent change) {
+            if (time < 0 && context.event() instanceof org.bukkit.event.world.SpawnChangeEvent change
+                    && !co.xenastudios.neoskript.runtime.Waits.delayed(change)) {
                 return change.getPreviousLocation();
             }
             List<Object> spawns = new ArrayList<>();

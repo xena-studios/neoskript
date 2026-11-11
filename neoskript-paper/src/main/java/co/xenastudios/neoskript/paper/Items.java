@@ -132,6 +132,10 @@ final class Items {
      * (the one left, before the event); in a bucket event, the hand the bucket is in.
      */
     private static Slot tool(Object event, LivingEntity entity, boolean off, int time) {
+        // Once the trigger has waited, the event is over: the hand's item, as in Skript.
+        if (co.xenastudios.neoskript.runtime.Waits.delayed(event)) {
+            return Slot.of(entity, off ? EquipmentSlot.OFF_HAND : EquipmentSlot.HAND);
+        }
         if (!off && event instanceof org.bukkit.event.player.PlayerItemHeldEvent held && held.getPlayer() == entity) {
             return new Slot(held.getPlayer().getInventory(), time >= 0 ? held.getNewSlot() : held.getPreviousSlot());
         }
@@ -232,6 +236,8 @@ final class Items {
 
     static void register(Registrar registrar) {
         registrar.type("itemtype", "item type", ItemType.class);
+        // As Skript's item type is also called: 'command /setblock <material>'.
+        registrar.alias("itemtype", "material", "materials");
         registrar.type("itemstack", "item", ItemStack.class);
         registrar.alias("itemstack", "item", "items");
         registrar.alias("itemstack", "item stack", "item stacks");

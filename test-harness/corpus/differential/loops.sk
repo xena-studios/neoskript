@@ -1,0 +1,39 @@
+# Probe: loops, their values and how they stop.
+
+function probe_loops():
+	loop 2 times:
+		loop 2 times:
+			show("nested", "%loop-number-1%/%loop-number-2%")
+	set {_l::*} to "a", "b" and "c"
+	loop {_l::*}:
+		if loop-value is "b":
+			exit loop
+		show("exit", loop-value)
+	loop {_l::*}:
+		show("iteration", loop-iteration)
+	loop 5 times:
+		if loop-number > 2:
+			stop loop
+		show("stop loop", loop-number)
+	set {_i} to 0
+	while {_i} < 10:
+		add 1 to {_i}
+		if {_i} is 3:
+			continue
+		if {_i} > 5:
+			exit 1 loop
+		show("while", {_i})
+	do while {_i} < 0:
+		show("do while", "ran once")
+	loop "x", "y" and "z":
+		show("literal list", loop-value)
+	loop integers between 3 and 1:
+		show("down", loop-integer)
+	loop 0 times:
+		show("zero", "never")
+	set {_m::a::1} to 1
+	set {_m::b::1} to 2
+	loop {_m::*}:
+		show("nested list", loop-index)
+	loop indices of {_l::*}:
+		show("indices", loop-value)

@@ -96,6 +96,18 @@ public interface Registrar {
     void deferredSectionExpression(String expressionId);
 
     /**
+     * Makes the elements registered as {@code id} experimental, as Skript's experimental syntax: only scripts
+     * {@code using} the experiment (by its code name, like {@code reflection}) can use them. Elsewhere they don't
+     * match, and if nothing else does, the line's error says to enable it.
+     */
+    default void experimental(String id, String experiment) {
+        experimental(id, experiment, false);
+    }
+
+    /** {@link #experimental(String, String)}, but if {@code silent}, without saying so in the line's error. */
+    default void experimental(String id, String experiment, boolean silent) {}
+
+    /**
      * Marks where the library's syntax that matches almost anything begins, as Skript's
      * {@code PATTERN_MATCHES_EVERYTHING} expressions ({@code 3 of stone}): what's registered after this is tried
      * after the built-in syntax Skript tries before those, as time states ({@code past level of player}).
@@ -143,6 +155,13 @@ public interface Registrar {
      * {@code on break of stone}.
      */
     void event(String id, List<Class<?>> eventClasses, ElementFactory<Condition> filter, String... patterns);
+
+    /**
+     * One of Skript's events, as Skript names it in errors ({@code On Break / Mine}), whether NeoSkript has it or
+     * not: a trigger of an event registered with the same patterns is {@code an on break / mine event} in errors,
+     * and syntax that only works in some events names those registered so, in the order they were registered.
+     */
+    default void eventName(String name, List<Class<?>> eventClasses, String... patterns) {}
 
     /**
      * A value triggers can get from events of {@code eventClass} (or its subclasses), as {@code event-<type>}
@@ -224,6 +243,31 @@ public interface Registrar {
     default void unsavable(String typeId, String named) {}
 
     /**
+     * Values of {@code type} (and its subclasses) aren't saved in variables files, even where they're also of a
+     * type that is, as Skript has a type for them that it can't save: money is a number, but isn't saved.
+     */
+    default void unsavable(Class<?> type) {}
+
+    /**
+     * Types that have Skript 2.17's type property {@code property} ({@code name}, {@code amount}...), as its types
+     * declare them, for {@link #propertySyntax}.
+     */
+    default void typeProperty(String property, String... typeIds) {}
+
+    /**
+     * Marks syntax {@code syntaxId} as one of Skript 2.17's type properties: where the values of its argument
+     * {@code argument} are of a type that can't have the property, it doesn't parse, with Skript's error
+     * ("The expression '5' returns the following types that do not have the name property: integer").
+     *
+     * @param property the property's name by the tags the syntax was written with, as Skript's errors name it
+     *     and {@link #typeProperty} registers the types that have it
+     * @param counts whether, given several values and not written in the plural ({@code amount of X and Y}), the
+     *     syntax counts them instead, as Skript's amount, size and number do
+     */
+    default void propertySyntax(String syntaxId, int argument, java.util.function.Function<java.util.Set<String>, String> property,
+            boolean counts) {}
+
+    /**
      * Words scripts can write as values of {@code typeId}, like item names ({@code 2 stone swords}). The
      * parser returns the value, or {@code null} for text that isn't one. Literals are compiled once and
      * shared, so values should be immutable or copied by the syntax that changes them.
@@ -285,6 +329,15 @@ public interface Registrar {
      */
     <T> void changer(Class<T> owner, co.xenastudios.neoskript.api.element.Changeable.Mode mode,
             java.util.function.BiConsumer<? super T, Object[]> change);
+
+    /**
+     * What a value of {@code owner} that's the target itself takes for {@code mode}, as Skript's type's changer
+     * says: what's given is checked against it when the script loads, with Skript's error if it can't be one
+     * ({@code 'a plank' can't be added to an inventory because the former is neither an item type nor an
+     * inventory}). Without it, what's given is only checked when it runs.
+     */
+    default void changerAccepts(Class<?> owner, co.xenastudios.neoskript.api.element.Changeable.Mode mode,
+            Class<?>... accepted) {}
 
     /**
      * How values of {@code type}, which can be changed in place, are copied when stored in a variable, as

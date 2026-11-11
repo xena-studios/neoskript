@@ -375,11 +375,15 @@ final class WorldSyntax {
             if (info.pattern() == 1) {
                 return (context, args) -> Fireworks.LAST_LAUNCHED.get();
             }
+            if (info.pattern() == 2) {
+                return (context, args) -> WorldProperties.LAST_STRUCK.get();
+            }
             return (context, args) -> {
                 Entity last = LAST_SPAWNED.get();
                 return last != null && (args[0] == null || (args[0] instanceof EntityKind kind && kind.matches(last))) ? last : null;
             };
-        }, "[the] [last[ly]] (spawned|shot) %*entitytype%", "[the] [last[ly]] (launched|deployed) firework");
+        }, "[the] [last[ly]] (spawned|shot) %*entitytype%", "[the] [last[ly]] (launched|deployed) firework",
+                "[the] [last[ly]] (created|struck) lightning");
 
         // Replaces the players-only version from step 4: 'all players', 'all zombies in world "world"'.
         registrar.expression("ExprEntities", "entity", info -> {
@@ -1121,8 +1125,8 @@ final class WorldSyntax {
             });
         }, "%locations/entities/blocks% (is|are) within %object% and %object%",
                 "%locations/entities/blocks% (isn't|is not|aren't|are not) within %object% and %object%",
-                "%locations/entities/blocks% (is|are) (within|inside [of]) %entities/chunks/worlds/worldborders/blocks%",
-                "%locations/entities/blocks% (isn't|is not|aren't|are not) (within|inside [of]) %entities/chunks/worlds/worldborders/blocks%");
+                "%locations/entities/blocks% (is|are) (within|in[side [of]]) %entities/chunks/worlds/worldborders/blocks%",
+                "%locations/entities/blocks% (isn't|is not|aren't|are not) (within|in[side [of]]) %entities/chunks/worlds/worldborders/blocks%");
         Map<String, World.Environment> environments = new java.util.LinkedHashMap<>();
         environments.put("normal", World.Environment.NORMAL);
         environments.put("overworld", World.Environment.NORMAL);

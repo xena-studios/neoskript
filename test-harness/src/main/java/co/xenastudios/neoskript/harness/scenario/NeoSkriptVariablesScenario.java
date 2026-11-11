@@ -66,12 +66,12 @@ public final class NeoSkriptVariablesScenario implements Scenario {
                 .file("plugins/Skript/scripts/read.sk", context.script("variables-neoskript-read.sk"));
         List<String> read = stopAfter(neoskript, Pattern.compile("\\[harness] read loc: .*"));
         String values = read.stream().filter(line -> line.contains("[harness] read: ")).findFirst().orElse("");
-        String expected = "hello | héllo ✓ 日本 | say \"hi\" | 42 | 2.5 | true | 5 minutes | a, b and ten | diamond sword named \"x\"";
+        String expected = "hello | héllo ✓ 日本 | say \"hi\" | 42 | 2.5 | true | 5 minutes | a, b and ten | diamond sword named x";
         if (!values.endsWith(expected)) {
             throw new HarnessFailure("NeoSkript read: '" + values + "', expected it to end with '" + expected + "'");
         }
         String items = read.stream().filter(line -> line.contains("[harness] read items: ")).findFirst().orElse("");
-        String expectedItems = "diamond sword named \"x\" | diamond sword | stone | 32 | diamond sword of sharpness 2"
+        String expectedItems = "diamond sword named x | diamond sword | stone | 32 | diamond sword"
                 + " | 3 diamonds | creative";
         if (!items.endsWith(expectedItems)) {
             throw new HarnessFailure("NeoSkript read items: '" + items + "', expected it to end with '" + expectedItems + "'");

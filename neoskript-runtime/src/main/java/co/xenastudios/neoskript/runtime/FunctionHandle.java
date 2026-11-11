@@ -60,7 +60,9 @@ public final class FunctionHandle {
     public Object callKeyed(TriggerContext caller, Object[] arguments) {
         CompiledFunction function = target;
         if (function == null) {
-            throw new IllegalStateException("The function " + name + " isn't loaded");
+            // As Skript, when the function's script didn't load: an error, and the call returns nothing.
+            RuntimeErrors.logError("Couldn't resolve call for '" + name + "'.");
+            return null;
         }
         Object owner = caller instanceof SimpleTriggerContext simple ? simple.owner() : null;
         return function.call(owner == null ? CONTEXT : new SimpleTriggerContext(null, owner), arguments);

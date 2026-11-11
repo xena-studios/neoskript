@@ -47,8 +47,8 @@ final class BlockSyntax {
                     }
                 }
             }).resettingTo(0L);
-        }, "[the] [max:max[imum]] (dusted stage|dusting progress) of %blocks/blockdatas%",
-                "%blocks/blockdatas%'[s] [max:max[imum]] (dusted stage|dusting progress)");
+        }, "[the] [max:max[imum]] (dust|brush)[ed|ing] (value|stage|progress[ion]) of %blocks/blockdatas%",
+                "%blocks/blockdatas%'[s] [max:max[imum]] (dust|brush)[ed|ing] (value|stage|progress[ion])");
         // The item buried in suspicious sand or gravel; air if there's none.
         registrar.expression("ExprBrushableItem", "itemtype", info -> new SettableProperty<>(Block.class, ItemType.class,
                 block -> block.getState() instanceof org.bukkit.block.BrushableBlock brushable

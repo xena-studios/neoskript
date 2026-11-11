@@ -41,6 +41,9 @@ import org.bukkit.util.Vector;
  */
 final class WorldProperties {
 
+    /** The lightning struck last on each thread, for {@code the last struck lightning}. */
+    static final ThreadLocal<org.bukkit.entity.Entity> LAST_STRUCK = new ThreadLocal<>();
+
     private WorldProperties() {}
 
     /** Skript's weather types: a world's is clear, rain, or a thunderstorm. */
@@ -296,11 +299,8 @@ final class WorldProperties {
                     if (location.getWorld() == null) {
                         continue;
                     }
-                    if (effect) {
-                        location.getWorld().strikeLightningEffect(location);
-                    } else {
-                        location.getWorld().strikeLightning(location);
-                    }
+                    LAST_STRUCK.set(effect ? location.getWorld().strikeLightningEffect(location)
+                            : location.getWorld().strikeLightning(location));
                 }
             };
         }, "(create|strike) lightning(1¦[ ]effect|) %directions% %locations%");

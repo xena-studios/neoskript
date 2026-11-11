@@ -89,6 +89,8 @@ final class VaultHook {
         registrar.text(Money.class, Money::toString);
         registrar.variableNameText(Money.class, Money::variableName);
         registrar.converter(Money.class, Double.class, Money::getAmount);
+        // Skript's money has no serializer, so it isn't saved in variables, though NeoSkript's is a number.
+        registrar.unsavable(Money.class);
         // Money with money is money, as in Skript; with a number it's a number, as money converts to one.
         registrar.arithmetic('+', Money.class, Money.class, (a, b) -> new Money(a.getAmount() + b.getAmount()));
         registrar.arithmetic('-', Money.class, Money.class, (a, b) -> new Money(a.getAmount() - b.getAmount()));

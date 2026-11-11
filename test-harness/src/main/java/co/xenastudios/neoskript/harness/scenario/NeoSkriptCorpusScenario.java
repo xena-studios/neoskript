@@ -29,8 +29,8 @@ public final class NeoSkriptCorpusScenario implements Scenario {
 
     private static final Pattern RESULT = Pattern.compile("\\[corpus] ([\\w-]+): (.*)$");
     private static final Pattern DONE = Pattern.compile("\\[corpus] done$");
-    private static final Pattern PROBLEM = Pattern.compile("\\[NeoSkript] Line \\d+: \\(corpus/([\\w-]+)\\.sk\\)");
-    private static final Pattern ANY_PROBLEM = Pattern.compile("\\[NeoSkript] Line \\d+: \\((.+)\\)");
+    private static final Pattern PROBLEM = Pattern.compile("\\[Skript] Line \\d+: \\(corpus/([\\w-]+)\\.sk\\)");
+    private static final Pattern ANY_PROBLEM = Pattern.compile("\\[Skript] Line \\d+: \\((.+)\\)");
     private static final Pattern LOADED = Pattern.compile("\\[NeoSkript] Loaded \\d+ scripts?");
     private static final Duration WAIT = Duration.ofMinutes(2);
 

@@ -19,6 +19,57 @@ dependencies {
     neoskriptPlugin(project(path = ":neoskript-plugin", configuration = "shadowRuntimeElements"))
 }
 
+// The harness bot: a plugin the harness installs next to NeoSkript or Skript, whose console commands
+// make players join, chat and run commands on a headless server. It compiles against a real Paper
+// server's classes, which the harness unpacks into .harness-cache, so it's built only for the harness
+// and never part of NeoSkript's jar.
+val bot: SourceSet = sourceSets.create("bot")
+val botEnvironment = "paper-26.3"
+val botServerDir = layout.settingsDirectory.dir(".harness-cache/bundler/$botEnvironment")
+
+val prepareBotServer = tasks.register<JavaExec>("prepareBotServer") {
+    description = "Unpacks the Paper server the harness bot compiles against into .harness-cache."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass = "co.xenastudios.neoskript.harness.ServerClasses"
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    val environmentFile = layout.projectDirectory.file("environments/$botEnvironment.json")
+    inputs.file(environmentFile)
+    // Paperclip runs on the server's own Java.
+    val java25 = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+    val (platform, version) = botEnvironment.split("-", limit = 2)
+    outputs.file(botServerDir.file("versions/$version/$platform-$version.jar"))
+    val cacheDir = layout.settingsDirectory.dir(".harness-cache")
+    argumentProviders.add(CommandLineArgumentProvider {
+        listOf(
+            environmentFile.asFile.absolutePath,
+            cacheDir.asFile.absolutePath,
+            java25.get().executablePath.asFile.absolutePath,
+        )
+    })
+}
+
+dependencies {
+    "botCompileOnly"(
+        fileTree(botServerDir) { include("versions/**/*.jar", "libraries/**/*.jar") }.builtBy(prepareBotServer)
+    )
+}
+
+tasks.named<JavaCompile>(bot.compileJavaTaskName) {
+    // The server's classes are Java 25 class files. The bot itself stays Java 21, so it loads on
+    // 1.21.x too and says there that it isn't supported.
+    javaCompiler = javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(25) }
+    // The server's libraries have annotations whose classes aren't on the classpath.
+    options.compilerArgs.add("-Xlint:-classfile")
+}
+
+val botJar = tasks.register<Jar>("botJar") {
+    description = "Builds the harness bot plugin."
+    archiveBaseName = "NeoSkriptHarnessBot"
+    from(bot.output)
+    // Compiled against Mojang's names, so Paper mustn't remap it as a Spigot-mapped plugin.
+    manifest { attributes("paperweight-mappings-namespace" to "mojang") }
+}
+
 val referenceSkript = Properties().apply {
     file("reference-skript.properties").reader().use { load(it) }
 }
@@ -40,10 +91,12 @@ val downloadSkriptSource = tasks.register("downloadSkriptSource") {
 
 val fetchSkriptTests = tasks.register<Sync>("fetchSkriptTests") {
     group = "verification"
-    description = "Extracts the reference Skript's own test scripts into the compatibility corpus."
+    description = "Extracts the reference Skript's own test scripts and sources into the compatibility corpus."
     dependsOn(downloadSkriptSource)
     from(skriptSourceArchive.map { tarTree(it.asFile) }) {
         include("*/src/test/skript/tests/**")
+        // Skript's sources, for the documentation examples the differential scenario loads.
+        include("*/src/main/java/**/*.java")
         // Strip "Skript-<version>/" but keep Skript's layout: some of its tests check script paths
         // relative to a server running in build/test_runners/<env>.
         eachFile { relativePath = RelativePath(true, *relativePath.segments.drop(1).toTypedArray()) }
@@ -63,6 +116,8 @@ tasks.register<JavaExec>("harness") {
 
     val pluginJar: FileCollection = neoskriptPlugin
     inputs.files(pluginJar)
+    val botJarFile = botJar.flatMap { it.archiveFile }
+    inputs.file(botJarFile)
     // Servers on 1.21.x run on Java 21, and 26.x needs Java 25.
     val java21 = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
     val java25 = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
@@ -76,6 +131,7 @@ tasks.register<JavaExec>("harness") {
             "-Dharness.java.21=" + java21.get().metadata.installationPath.asFile.absolutePath,
             "-Dharness.java.25=" + java25.get().metadata.installationPath.asFile.absolutePath,
             "-Dharness.neoskriptJar=" + pluginJar.singleFile.absolutePath,
+            "-Dharness.botJar=" + botJarFile.get().asFile.absolutePath,
             "-Dharness.environments=" + projectDir.dir("environments").asFile.absolutePath,
             "-Dharness.scripts=" + projectDir.dir("scripts").asFile.absolutePath,
             "-Dharness.referenceSkript=" + projectDir.file("reference-skript.properties").asFile.absolutePath,

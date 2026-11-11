@@ -13,6 +13,7 @@ import org.bukkit.inventory.Inventory;
 import co.xenastudios.neoskript.runtime.Comparison;
 import co.xenastudios.neoskript.runtime.KeyedValues;
 import co.xenastudios.neoskript.runtime.Values;
+import java.util.ArrayList;
 import java.util.List;
 
 /** Comparisons, whether something is set, and counting. */
@@ -85,9 +86,10 @@ final class Logic {
                 "%~objects% (not:do[es](n't| not) exist|not:(is|are)(n't| not) set)");
 
 
-        registrar.expression("ExprNumbers", "number", info -> (context, args) ->
-                range(((Number) args[0]).doubleValue(), ((Number) args[1]).doubleValue(), info.hasTag("integers")),
-                "[(all [[of] the]|the)] (numbers|integers:integers) (between|from) %number% (and|to) %number%");
+        registrar.expression("ExprNumbers", "number", info -> (context, args) -> info.hasTag("decimals")
+                        ? decimals((Number) args[0], ((Number) args[1]).doubleValue())
+                        : range(((Number) args[0]).doubleValue(), ((Number) args[1]).doubleValue(), info.hasTag("integers")),
+                "[(all [[of] the]|the)] (numbers|integers:integers|decimals:decimals) (between|from) %number% (and|to) %number%");
 
         // As Skript 2.17's PropCondContains: what's in each container (an inventory, a text...), falling back to
         // whether the values are among them; 'contains' after several only the latter, 'contents of' only the former.
@@ -302,12 +304,13 @@ final class Logic {
                 }
                 return rounded.size() == 1 ? rounded.getFirst() : rounded.toArray();
             };
-        }, "(a|the|) round[ed] (down:down|up:up) %numbers%", "(a|the|) round[ed] %numbers%",
-                "(down:floor[ed]|up:ceil[ed]|up:ceiling) %numbers%", "%numbers% (down:floor[ed]|rounded|up:ceil[ed])");
+        }, "[a|the] (down:round[ed] down|down:floored) %numbers%", "%numbers% (down:round[ed] down|down:floored)",
+                "[a|the] round[ed] %numbers%", "%numbers% round[ed]",
+                "[a|the] (up:round[ed] up|up:ceil[ing]ed) %numbers%", "%numbers% (up:round[ed] up|up:ceil[ing]ed)");
         registrar.expression("ExprIndicesOfValue", "object", info -> new IndicesOfValue(info.pattern(),
                 info.hasTag("first") ? 1 : info.hasTag("last") ? 2 : info.hasTag("all") ? 0
                         : info.hasTag("plural") ? 0 : 1),
-                "[the] [first:first|last:last|all:all] (position|plural:positions) of [[the] value] %strings% in %string%",
+                "[the] [first:first|last:last|all:all] (position|plural:positions|plural:indices|index|plural:indexes) of [[the] value] %strings% in %string%",
                 "[the] [first:first|last:last|all:all] (position|plural:positions) of [[the] value] %objects% in %~objects%",
                 "[the] [first:first|last:last|all:all] (index|plural:indices|plural:indexes) of [[the] value] %objects% in %~objects%");
 
@@ -523,6 +526,26 @@ final class Logic {
             numbers[i] = whole ? (Object) (long) value : (Object) value;
         }
         return numbers;
+    }
+
+    /**
+     * {@code decimals from 3.94 to 4}: the numbers between, in steps of the first's decimal places, at most
+     * two as Skript's default number accuracy: 3.94, 3.95 ... 4.
+     */
+    private static Object[] decimals(Number first, double to) {
+        double from = first.doubleValue();
+        String[] split = first.toString().split("\\.");
+        double multiplier = Math.pow(10, Math.min(split.length > 1 ? split[1].length() : 0, 2));
+        int low = (int) Math.ceil(Math.min(from, to) * multiplier);
+        int high = (int) Math.floor(Math.max(from, to) * multiplier);
+        List<Object> numbers = new ArrayList<>();
+        for (int i = low; i <= high && numbers.size() < 1_000_000; i++) {
+            numbers.add(i / multiplier);
+        }
+        if (from > to) {
+            java.util.Collections.reverse(numbers);
+        }
+        return numbers.toArray();
     }
 
     private static Relation relation(java.util.Set<String> tags) {
@@ -785,11 +808,15 @@ final class Logic {
     }
 
     /** Rounds as Skript does, allowing for floating point error: 100 lots of 0.1 floor to 10. */
+    /** Skript's {@code Skript.EPSILON}, against rounding errors when rounding. */
+    static final double EPSILON = 1e-10;
+
+    /** Skript's Math2: down (-1), up (1) or to the closest whole number, halves up (0). */
     static long round(double value, int mode) {
         return switch (mode) {
-            case -1 -> (long) Math.floor(value + 1e-10);
-            case 1 -> (long) Math.ceil(value - 1e-10);
-            default -> (long) Math.floor(value + 0.5);
+            case -1 -> (long) Math.floor(value + EPSILON);
+            case 1 -> (long) Math.ceil(value - EPSILON);
+            default -> Math.round(value + EPSILON);
         };
     }
 
@@ -816,9 +843,15 @@ final class Logic {
                     if (!(value instanceof String part) || part.isEmpty()) {
                         continue;
                     }
+                    // Without case, as Skript compares text by default.
                     List<Long> positions = new java.util.ArrayList<>();
-                    for (int at = text.indexOf(part); at >= 0; at = text.indexOf(part, at + 1)) {
+                    for (int at = indexOf(text, part, 0); at >= 0; at = indexOf(text, part, at + 1)) {
                         positions.add((long) at + 1);
+                    }
+                    if (which == 2 && !positions.isEmpty()) {
+                        // Skript 2.17 gives the last one counting from 0, unlike the others.
+                        found.add(positions.getLast() - 1);
+                        continue;
                     }
                     pick(positions, found);
                 }
@@ -835,6 +868,16 @@ final class Logic {
                 pick(matches, found);
             }
             return found.size() == 1 && which != 0 ? found.getFirst() : found.toArray();
+        }
+
+        /** Where {@code part} is in {@code text} from {@code from} on, without case, or -1. */
+        private static int indexOf(String text, String part, int from) {
+            for (int i = from; i + part.length() <= text.length(); i++) {
+                if (text.regionMatches(true, i, part, 0, part.length())) {
+                    return i;
+                }
+            }
+            return -1;
         }
 
         private void pick(List<?> matches, List<Object> into) {

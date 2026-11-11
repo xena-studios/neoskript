@@ -37,15 +37,23 @@ final class Potions {
 
     private static final String HIDDEN_ERROR = "Hidden potion effects cannot be changed";
 
-    /** Names Skript accepts besides the registry's, from before Minecraft renamed them. */
+    /**
+     * Names Skript accepts besides the registry's keys, from its {@code potion effect types} language entries.
+     * {@code unluck}'s first, {@code bad luck}, is also the name Skript shows it by.
+     */
     private static final Map<String, String> OLD_NAMES = Map.ofEntries(
-            Map.entry("confusion", "nausea"), Map.entry("damage resistance", "resistance"),
+            Map.entry("swiftness", "speed"), Map.entry("slow", "slowness"),
             Map.entry("fast digging", "haste"), Map.entry("fast mining", "haste"),
             Map.entry("slow digging", "mining_fatigue"), Map.entry("slow mining", "mining_fatigue"),
-            Map.entry("harm", "instant_damage"), Map.entry("damage", "instant_damage"),
-            Map.entry("heal", "instant_health"), Map.entry("healing", "instant_health"),
-            Map.entry("jump", "jump_boost"), Map.entry("slow", "slowness"), Map.entry("increase damage", "strength"),
-            Map.entry("bad luck", "unluck"), Map.entry("dolphin's grace", "dolphins_grace"));
+            Map.entry("increase damage", "strength"), Map.entry("increased damage", "strength"),
+            Map.entry("health", "instant_health"), Map.entry("damage", "instant_damage"),
+            Map.entry("jump", "jump_boost"), Map.entry("confusion", "nausea"),
+            Map.entry("damage resistance", "resistance"), Map.entry("fire immunity", "fire_resistance"),
+            Map.entry("reduce damage", "weakness"), Map.entry("reduced damage", "weakness"),
+            Map.entry("wither effect", "wither"), Map.entry("wither potion effect", "wither"),
+            Map.entry("max health boost", "health_boost"), Map.entry("maximum health boost", "health_boost"),
+            Map.entry("bad luck", "unluck"), Map.entry("floating", "levitation"),
+            Map.entry("slow fall", "slow_falling"), Map.entry("dolphin's grace", "dolphins_grace"));
 
     private static volatile Map<String, PotionEffectType> names;
 
@@ -128,7 +136,25 @@ final class Potions {
 
         @Override
         public String toString() {
-            return name(type) + " of tier " + (amplifier + 1) + (infinite ? " forever" : " for " + new Timespan(ticks * 50L));
+            // As Skript's SkriptPotionEffect.toString.
+            StringBuilder text = new StringBuilder();
+            if (infinite) {
+                text.append("infinite ");
+            }
+            if (ambient) {
+                text.append("ambient ");
+            }
+            text.append("potion effect of ").append(name(type)).append(' ').append(amplifier + 1);
+            if (!particles) {
+                text.append(" without particles");
+            }
+            if (!icon) {
+                text.append(" without an icon");
+            }
+            if (!infinite) {
+                text.append(" for ").append(new Timespan(ticks * 50L));
+            }
+            return text.toString();
         }
     }
 
@@ -748,7 +774,8 @@ final class Potions {
         if (known == null) {
             known = new HashMap<>();
             for (PotionEffectType type : RegistryAccess.registryAccess().getRegistry(RegistryKey.MOB_EFFECT)) {
-                known.put(name(type), type);
+                known.put(type.getKey().getKey().replace('_', ' '), type);
+                known.put(type.getKey().toString(), type);
             }
             for (Map.Entry<String, String> old : OLD_NAMES.entrySet()) {
                 PotionEffectType type = RegistryAccess.registryAccess().getRegistry(RegistryKey.MOB_EFFECT)
@@ -763,6 +790,7 @@ final class Potions {
     }
 
     static String name(PotionEffectType type) {
-        return type.getKey().getKey().replace('_', ' ');
+        String key = type.getKey().getKey();
+        return key.equals("unluck") ? "bad luck" : key.replace('_', ' ');
     }
 }

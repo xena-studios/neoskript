@@ -1,0 +1,37 @@
+# Probe: how values are written into text.
+
+function probe_formatting():
+	set {_n} to 1.23456
+	send "number: %{_n}%" to console
+	set {_l::*} to 1, 2 and 3
+	send "list: %{_l::*}%" to console
+	set {_b} to true
+	send "boolean: %{_b}%" to console
+	set {_t} to 90 minutes
+	send "timespan: %{_t}%" to console
+	set {_i} to 2 diamonds
+	send "item: %{_i}%" to console
+	set {_e} to zombie
+	send "entity type: %{_e}%" to console
+	set {_v} to vector(1, 0, 0.5)
+	send "vector: %{_v}%" to console
+	set {_c} to rgb(255, 0, 0)
+	send "color: %{_c}%" to console
+	send "unset: %{_nothing}%" to console
+	send "<red>colored &bthen legacy" to console
+	send "%% literal percent" to console
+	set {_neg} to -0.004
+	send "tiny negative: %{_neg}%" to console
+	set {_big} to 123456789012
+	send "big: %{_big}%" to console
+	set {_d} to 1.005
+	send "rounding: %{_d}%" to console
+	set {_half} to 0.125
+	send "half: %{_half}%" to console
+	set {_named} to diamond sword named "x"
+	send "named item: %{_named}%" to console
+	set {_ench} to diamond sword of sharpness 2
+	send "enchanted item: %{_ench}%" to console
+	set {_both} to diamond sword of sharpness 2 named "&aGreen"
+	send "both: %{_both}%" to console
+	send "sender: %console%" to console

@@ -15,6 +15,7 @@ import co.xenastudios.neoskript.api.registration.Patterns;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.Values;
+import co.xenastudios.neoskript.runtime.Waits;
 import com.destroystokyo.paper.ClientOption;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -262,9 +263,11 @@ final class PlayerSyntax {
             }
             boolean and = info.and(0);
             boolean keysAnd = info.and(1);
+            // After a wait (or where there may have been one), the player's own input, as in Skript.
+            boolean mayHaveWaited = co.xenastudios.neoskript.api.element.Warnings.delayed();
             return (context, args) -> {
                 Object[] wanted = owners(args[1]);
-                Object event = context.event();
+                Object event = mayHaveWaited || Waits.delayed(context.event()) ? null : context.event();
                 return negated != Condition.check(owners(args[0]), and, value -> {
                     if (!(value instanceof Player player)) {
                         return false;
@@ -948,19 +951,23 @@ final class PlayerSyntax {
         // Before an input event ('past input keys'), the keys the player pressed until then; there's no future state.
         registrar.timeStates("ExprCurrentInputKeys", info -> info.time() < 0
                 && info.isEvent(org.bukkit.event.player.PlayerInputEvent.class));
-        registrar.expression("ExprCurrentInputKeys", "inputkey", info -> (context, args) -> {
-            List<Object> pressed = new ArrayList<>();
-            Object event = info.time() == 0 ? context.event() : null;
-            each(args[0], Player.class, player -> {
-                Input input = event instanceof org.bukkit.event.player.PlayerInputEvent inputEvent && inputEvent.getPlayer().equals(player)
-                        ? inputEvent.getInput() : player.getCurrentInput();
-                for (InputKey key : InputKey.values()) {
-                    if (key.pressed(input)) {
-                        pressed.add(key);
+        registrar.expression("ExprCurrentInputKeys", "inputkey", info -> {
+            // After a wait (or where there may have been one), the player's own, as in Skript.
+            boolean mayHaveWaited = co.xenastudios.neoskript.api.element.Warnings.delayed();
+            return (context, args) -> {
+                List<Object> pressed = new ArrayList<>();
+                Object event = info.time() == 0 && !mayHaveWaited && !Waits.delayed(context.event()) ? context.event() : null;
+                each(args[0], Player.class, player -> {
+                    Input input = event instanceof org.bukkit.event.player.PlayerInputEvent inputEvent
+                            && inputEvent.getPlayer().equals(player) ? inputEvent.getInput() : player.getCurrentInput();
+                    for (InputKey key : InputKey.values()) {
+                        if (key.pressed(input)) {
+                            pressed.add(key);
+                        }
                     }
-                }
-            });
-            return pressed.toArray();
+                });
+                return pressed.toArray();
+            };
         }, Patterns.property("[current] (inputs|input keys)", "players"));
         // A player's open inventory, or their crafting grid when nothing's open.
         registrar.expression("ExprOpenedInventory", "inventory", info -> (context, args) -> map(args[0], Player.class,
@@ -999,6 +1006,10 @@ final class PlayerSyntax {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
             if (arguments[0] == null) {
+                // After a wait, nothing, as in Skript.
+                if (Waits.delayed(context.event())) {
+                    return null;
+                }
                 return switch (context.event()) {
                     case com.destroystokyo.paper.event.player.PlayerStartSpectatingEntityEvent start ->
                             time < 0 ? start.getCurrentSpectatorTarget() : start.getNewSpectatorTarget();

@@ -133,7 +133,7 @@ final class Commands {
             String message = info.argumentLiteral(0);
             EventExpressions.restrict(info, "fail " + (info.hasTag("the") ? "the " : "") + "command execution with "
                     + (info.hasTag("the2") ? "the " : "") + "error " + (info.hasTag("message") ? "message " : "")
-                    + (message == null ? "..." : "\"" + message + "\""), "", CommandEvent.class);
+                    + (message == null ? "..." : "\"" + message + "\""), CommandEvent.class);
             return (context, args) -> {
                 if (context.event() instanceof CommandEvent command && Values.single(args[0]) != null) {
                     command.fail(TextComponents.from(Values.single(args[0])));

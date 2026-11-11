@@ -1,0 +1,56 @@
+# Probe: list variables and loops.
+
+function probe_lists():
+	set {_l::*} to 3, 1 and 2
+	show("list", ({_l::*}, {_l::1}, size of {_l::*}))
+	show("indices", indices of {_l::*})
+	add 4 to {_l::*}
+	remove 1 from {_l::*}
+	show("after add remove", {_l::*})
+	show("indices", indices of {_l::*})
+	set {_l::x} to "named"
+	show("named", {_l::*})
+	show("indices", indices of {_l::*})
+	delete {_l::2}
+	show("deleted", indices of {_l::*})
+	loop {_l::*}:
+		show("loop %loop-index%", loop-value)
+	loop 3 times:
+		show("times", loop-number)
+	loop integers from 1 to 3:
+		if loop-integer is 2:
+			continue
+		show("int", loop-integer)
+	set {_m::a} to 1
+	set {_m::b::c} to 2
+	set {_m::b::d} to 3
+	show("nested", ({_m::*}, {_m::b::*}))
+	show("nested indices", indices of {_m::*})
+	set {_s::*} to "b", "a" and "c"
+	show("sorted", sorted {_s::*})
+	show("first last", (first element of {_s::*}, last element of {_s::*}))
+	show("filtered", {_s::*} where [input is not "a"])
+	set {_n::*} to 5, 10 and 15
+	add 1 to {_n::*}
+	show("added to list", {_n::*})
+	clear {_n::*}
+	show("cleared", (size of {_n::*}, whether {_n::*} is set))
+	set {_i} to 0
+	while {_i} < 3:
+		add 1 to {_i}
+	show("while", {_i})
+	set {_d::*} to 1, 1, 2 and 2
+	show("duplicates", {_d::*})
+	set {_e::*} to {_d::*}
+	remove all 1 from {_e::*}
+	show("remove all", {_e::*})
+	set {_big::*} to integers between 1 and 12
+	show("numeric order", indices of {_big::*})
+	set {_k::10} to "ten"
+	set {_k::9} to "nine"
+	set {_k::a} to "a"
+	set {_k::B} to "b"
+	show("key order", indices of {_k::*})
+	show("key values", {_k::*})
+	set {_x::*} to "one" and "two"
+	show("loop count", size of all integers between 1 and 100)

@@ -96,4 +96,12 @@ class ScriptCompilerTest {
         assertTrue(compiled.diagnostics().getFirst().message().equals("Can't understand this condition/effect: say diamond sword"),
                 compiled.diagnostics().toString());
     }
+
+    @Test
+    void compilesAWaitInALoopOverValues() {
+        // The loop's queue is saved with its values, so the loop carries on from it after the wait.
+        library.type("timespan", "timespan", co.xenastudios.neoskript.runtime.Timespan.class);
+        CompiledScripts compiled = compile("on load:\n\tloop 1, 2 and 3:\n\t\tsay \"%11 - loop-number%\"\n\t\twait 1 second\n");
+        assertEquals(List.of(), compiled.diagnostics());
+    }
 }

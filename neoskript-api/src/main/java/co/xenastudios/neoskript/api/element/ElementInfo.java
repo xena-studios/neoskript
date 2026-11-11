@@ -21,7 +21,8 @@ import java.util.Set;
  *     isn't a list
  * @param argumentLiterals each argument's value as written, if it's a literal or a text with nothing in it,
  *     else {@code null}
- * @param eventName the event the element is in, as written without {@code on} ({@code quit}), or {@code null}
+ * @param eventName what Skript calls the event the element is in, its current event name: {@code on quit},
+ *     {@code on break / mine}, {@code command}, {@code function}; or {@code null} if unknown
  * @param eventClasses the classes of that event, or none
  * @param sectionType the type id of the values of the innermost section the element is in whose code runs for
  *     values ({@code entity} in {@code spawn a pig:}, {@code worldborder} in {@code set {_b} to a worldborder:}),
@@ -31,11 +32,12 @@ import java.util.Set;
  * @param time the time state the element is wanted in: -1 before the event ({@code past tool}), 1 after it
  *     ({@code future gamemode}), 0 now. Only elements that take time states
  *     ({@link co.xenastudios.neoskript.api.registration.Registrar#timeStates}) are ever made with another
+ * @param text the element as written ({@code the drops}), as Skript's errors quote it, or {@code null} if unknown
  */
 public record ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,
         java.util.List<TypeArgument> types, java.util.List<String> argumentTypes, long singleArguments,
         java.util.List<String> argumentLiterals, String eventName, java.util.List<Class<?>> eventClasses,
-        String sectionType, long defaultArguments, int time) {
+        String sectionType, long defaultArguments, int time, String text) {
 
     /**
      * A type named in a pattern, as {@code strings} in {@code strings data tag "x" of {_item}}.
@@ -74,13 +76,18 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
             java.util.List<String> argumentLiterals, String eventName, java.util.List<Class<?>> eventClasses,
             String sectionType, long defaultArguments) {
         this(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments, argumentLiterals,
-                eventName, eventClasses, sectionType, defaultArguments, 0);
+                eventName, eventClasses, sectionType, defaultArguments, 0, null);
     }
 
     /** This element as it's wanted at {@code time}, a time state: -1 before the event, 1 after it, 0 now. */
     public ElementInfo withTime(int time) {
         return new ElementInfo(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments,
-                argumentLiterals, eventName, eventClasses, sectionType, defaultArguments, time);
+                argumentLiterals, eventName, eventClasses, sectionType, defaultArguments, time, text);
+    }
+
+    /** The element's text as written, or {@code written} where that isn't known. */
+    public String textOr(String written) {
+        return text != null ? text : written;
     }
 
     /**

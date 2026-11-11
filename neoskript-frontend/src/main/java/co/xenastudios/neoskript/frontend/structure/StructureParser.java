@@ -20,15 +20,21 @@ public final class StructureParser {
 
     private final List<Line> lines;
     private final Diagnostics diagnostics;
+    /** The number of the file's last line, blank or not, as Skript's reader reads it. */
+    private final int lastLine;
     private int next;
 
-    private StructureParser(List<Line> lines, Diagnostics diagnostics) {
+    private StructureParser(List<Line> lines, int lastLine, Diagnostics diagnostics) {
         this.lines = lines;
+        this.lastLine = lastLine;
         this.diagnostics = diagnostics;
     }
 
     public static List<Node> parse(SourceFile file, Diagnostics diagnostics) {
-        StructureParser parser = new StructureParser(lines(file), diagnostics);
+        List<String> raw = file.lines();
+        // A final line break doesn't start another line.
+        int lastLine = raw.getLast().isEmpty() ? raw.size() - 1 : raw.size();
+        StructureParser parser = new StructureParser(lines(file), lastLine, diagnostics);
         return parser.section(0, null);
     }
 
@@ -71,6 +77,10 @@ public final class StructureParser {
     /**
      * Skript's {@code SectionNode.load_i}: the lines at {@code level}, each with what's under it, returning at
      * a line of an outer level. A line indented wrongly is reported and left out on its own.
+     *
+     * <p>As in Skript, a section is only called empty when nothing follows its header at all, or when a line of
+     * an outer level ends it with no code in it. One that runs to the end of the file is never called empty
+     * once anything follows it, even if that's only comments, blank lines or lines indented wrongly.
      */
     private List<Node> section(int level, Line header) {
         List<Node> nodes = new ArrayList<>();
@@ -78,6 +88,7 @@ public final class StructureParser {
             // Each structure's first indented line sets it again (and it stays for those that indent nothing).
             unitSet = false;
         }
+        boolean outer = false;
         while (next < lines.size()) {
             Line line = lines.get(next);
             String indent = line.indent();
@@ -102,12 +113,13 @@ public final class StructureParser {
                     continue;
                 }
                 // A line of an outer level.
+                outer = true;
                 break;
             }
             next++;
             nodes.add(line.opensSection() ? new Node.Section(line, section(level + 1, line)) : new Node.Simple(line));
         }
-        if (header != null && nodes.isEmpty()) {
+        if (header != null && nodes.isEmpty() && (outer || header.number() >= lastLine)) {
             diagnostics.warning(header.number(), 0, header.indent().length(), EMPTY_SECTION);
         }
         return nodes;

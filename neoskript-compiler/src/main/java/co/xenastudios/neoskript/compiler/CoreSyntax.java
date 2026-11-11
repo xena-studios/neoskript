@@ -89,7 +89,8 @@ final class CoreSyntax {
         REMOVE_ALL(1, 0),
         REMOVE(1, 0),
         REDUCE(0, 1),
-        DELETE(0, -1);
+        DELETE(0, -1),
+        GIVE(0, 1);
 
         final int target;
         final int value;
@@ -188,13 +189,15 @@ final class CoreSyntax {
                 "[parse] if <.+>",
                 "then [run]",
                 "implicit:<.+>");
-        // 'for {_value} in X', 'for {_key}, {_value} in X': a loop that puts each value (and index) in variables.
-        library.core(SyntaxKind.SECTION, FOR, null, List.of(), "for [each] [value] %~object% in %objects%",
-                "for [each] [(key|index)] %~object%(,| and) [value] %~object% in %objects%",
-                "loop %~object%(,| and) %~object% in %objects%");
+        // 'for {_value} in X', 'for each key {_key} in X', 'for {_key}, {_value} in X': a loop that puts each value
+        // (or index, or both) in variables. Skript's patterns, by index: value, key, then key and value.
+        library.core(SyntaxKind.SECTION, FOR, null, List.of(), "(for [each]|loop) [value] %~object% in %objects%",
+                "(for [each]|loop) (key|index) %~object% in %objects%",
+                "(for [each]|loop) [key|index] %~object%(,| and) [value] %~object% in %objects%");
         library.core(SyntaxKind.SECTION, LOOP, null, List.of(), "loop %objects%");
         // Skript's 'example:' structure: code that's parsed, for its errors, but never run.
         library.core(SyntaxKind.STRUCTURE, EXAMPLE, null, List.of(), "example");
+        library.experimental(EXAMPLE, "examples");
         library.core(SyntaxKind.SECTION, WHILE, null, condition, "[do:do] while <.+>");
 
         // A count below 1 isn't understood, as Skript's init refuses it.
@@ -223,8 +226,10 @@ final class CoreSyntax {
                 "increase %~objects% by %objects%",
                 "remove (all|every) %objects% from %~objects%",
                 "(remove|subtract) %objects% from %~objects%",
-                "reduce %~objects% by %objects%",
-                "(delete|clear|reset:reset) %~objects%");
+                "(reduce|decrease) %~objects% by %objects%",
+                "(delete|clear|reset:reset) %~objects%",
+                // 'give player 1 stone': after 'give X to Y', as Skript tries them.
+                "give %~objects% %objects%");
 
         // 'every 5 minutes': runs on the global thread, from when the script loads.
         // In worlds, it runs for each, when the world's time is a multiple of the period.
@@ -260,6 +265,8 @@ final class CoreSyntax {
 
         // Runtime errors reported inside are collected for 'last caught runtime errors', not logged.
         library.core(SyntaxKind.SECTION, CATCH_ERRORS, null, List.of(), "catch [run[ ]time] error[s]");
+        // An experiment, which Skript's section checks without an error of its own.
+        library.experimental(CATCH_ERRORS, "catch runtime errors", true);
         String[] suppress = {"[local[ly]] [stop:un]suppress [the] (conflict:conflict|save:variable save|conjunction:[missing] conjunction|starting:starting [with] expression[s]|colon:variable[ name][s] contain[s|ing] colon[s]|deprecated:deprecated syntax|unreachable:unreachable code|constant:constant condition[s]) warning[s]",
                 "[start|stop:stop] [local[ly]] suppressing [the] (conflict:conflict|save:variable save|conjunction:[missing] conjunction|starting:starting [with] expression[s]|colon:variable[ name][s] contain[s|ing] colon[s]|deprecated:deprecated syntax|unreachable:unreachable code|constant:constant condition[s]) warning[s]"};
         library.core(SyntaxKind.EFFECT, SUPPRESS_WARNINGS, null, List.of(), suppress);
@@ -268,6 +275,7 @@ final class CoreSyntax {
                 "(start|stop:stop) suppressing [local variable] type hints"};
         library.core(SyntaxKind.EFFECT, SUPPRESS_HINTS, null, List.of(), suppressHints);
         library.core(SyntaxKind.SECTION, SUPPRESS_HINTS, null, List.of(), suppressHints);
+        library.experimental(SUPPRESS_HINTS, "type hints");
         library.core(SyntaxKind.SECTION, SUPPRESS_WARNINGS, null, List.of(), suppress);
         library.suppressesWarnings(SyntaxKind.EFFECT, SUPPRESS_WARNINGS);
         library.suppressesWarnings(SyntaxKind.SECTION, SUPPRESS_WARNINGS);

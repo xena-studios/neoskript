@@ -207,7 +207,13 @@ public final class VariableStore {
                 if (Arithmetic.unchangedBy('+', old, value)) {
                     continue; // 'add 1 to {_money}', as in Skript
                 }
-                result = result == null ? value : Arithmetic.add(result, value);
+                if (result == null) {
+                    result = value;
+                    continue;
+                }
+                // As Skript, a value the current one can't be added to is skipped: 'add 1 to {_text}' leaves it.
+                Object sum = Arithmetic.add(result, value);
+                result = sum == null ? result : sum;
             }
             return result;
         });
@@ -239,7 +245,8 @@ public final class VariableStore {
                 if (Arithmetic.unchangedBy('-', old, value)) {
                     continue;
                 }
-                result = Arithmetic.subtract(result, value);
+                Object difference = Arithmetic.subtract(result, value);
+                result = difference == null ? result : difference;
             }
             return result;
         });

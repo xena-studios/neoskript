@@ -192,4 +192,33 @@ class ScriptLoaderTest {
         assertEquals(List.of("1: Unexpected entry 'foo: bar'. Check whether it's spelled correctly or remove it"),
                 errors(load("auto reload the script:\n\tfoo: bar\n")));
     }
+
+    @Test
+    void aPercentSignStartingNoExpressionInAVariableIsReported() {
+        String error = "2: The percent sign is used for expressions (e.g. %player%). To insert a '%' type it twice: %%.";
+        assertEquals(List.of(error), errors(load("on load:\n\tbroadcast {_y::%%{_z}%}\n")));
+        assertEquals(List.of(error), errors(load("on load:\n\tset {_x} to {_y::%%{_z}%}\n")));
+        assertParses("on load:\n\tset {_x} to {_y::%%%{_z}%}\n");
+    }
+
+    @Test
+    void experimentalSyntaxNeedsItsExperiment() {
+        ScriptLoader loader = new ScriptLoader(SkriptRegistry.build(builder -> builder
+                .experimental("ExprQueue", "queues", false)
+                .experimental("SecCatchErrors", "catch runtime errors", true)));
+        String code = """
+                on load:
+                \tset {queue} to a new queue
+                \tbroadcast "%a new queue%"
+                \tcatch runtime errors:
+                \t\tbroadcast "x"
+                """;
+        ParsedScript without = loader.load(List.of(new SourceFile("a.sk", code))).getFirst();
+        assertEquals(List.of("2: This element is experimental. To use this, enable 'queues'.",
+                "3: This element is experimental. To use this, enable 'queues'.",
+                "4: Can't understand this section: catch runtime errors"), errors(without));
+        ParsedScript with = loader.load(List.of(new SourceFile("b.sk",
+                "using queues\nusing the experiment catch runtime errors\n" + code))).getFirst();
+        assertEquals(List.of(), errors(with));
+    }
 }

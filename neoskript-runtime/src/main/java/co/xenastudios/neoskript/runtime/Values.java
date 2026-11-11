@@ -263,14 +263,17 @@ public final class Values {
 
     /** Decimals as Skript shows them: at most two decimal places, without trailing zeros. */
     public static String decimal(double value) {
-        if (Double.isNaN(value) || Double.isInfinite(value)) {
-            return Double.toString(value);
+        // Skript's StringUtils.toString with its number accuracy of 2: '%.2f' without trailing zeros, so -0.004
+        // is -0 and 1.005 is 1.01.
+        String text = String.format(java.util.Locale.ENGLISH, "%.2f", value);
+        int end = text.length() - 1;
+        while (text.charAt(end) == '0') {
+            end--;
         }
-        double rounded = Math.round(value * 100) / 100.0;
-        if (rounded == Math.rint(rounded) && Math.abs(rounded) < 1e15) {
-            return Long.toString((long) rounded);
+        if (text.charAt(end) == '.') {
+            end--;
         }
-        return java.math.BigDecimal.valueOf(rounded).stripTrailingZeros().toPlainString();
+        return text.substring(0, end + 1);
     }
 
     private record Conversion(Class<?> from, Function<Object, Object> converter) {}

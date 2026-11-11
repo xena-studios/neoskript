@@ -141,14 +141,16 @@ public final class ScriptLoader {
         }
         context.itemAliases(aliases);
         context.scriptName(result.file().name());
-        boolean hinted = false;
+        java.util.Set<String> experiments = new java.util.HashSet<>();
         for (Structure structure : result.structures()) {
-            if (structure.kind() == Structure.Kind.USING && structure.node().line().text().strip()
-                    .toLowerCase(java.util.Locale.ROOT).matches("using (local variable )?type hints")) {
-                hinted = true;
+            String name = structure.kind() == Structure.Kind.USING ? Structure.usingName(structure.node().line()) : null;
+            if (name != null) {
+                experiments.add(registry.experimentName(name));
             }
         }
-        context.hints().enable(hinted);
+        context.experiments(experiments);
+        context.hints().enable(experiments.contains("type hints")
+                || experiments.stream().anyMatch(name -> name.matches("(local variable )?type hints")));
         StatementParser statements = new StatementParser(context, diagnostics);
         List<ParsedStructure> parsed = new ArrayList<>();
         for (Structure structure : result.structures()) {

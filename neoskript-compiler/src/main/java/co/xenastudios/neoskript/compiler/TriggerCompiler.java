@@ -163,15 +163,24 @@ final class TriggerCompiler {
      * A section being compiled, for exit, continue and loop values.
      *
      * @param valueType for a library section, the type of the values its code runs for
+     * @param queueSlot for a loop, the queue its values are taken from as it goes, or -1
      */
     /** Loops over values that can't be peeked at with {@code next loop-value}, with how their expression reads. */
     private final Map<Block, String> unpeekable = new java.util.IdentityHashMap<>();
 
+    /** What each loop loops, for which loop a {@code loop-<name>} is of. */
+    private final Map<Block, Expr> looped = new java.util.IdentityHashMap<>();
+
     private record Block(BlockKind kind, Label end, Label next, int valuesSlot, int indicesSlot, int indexSlot,
-            String valueType) {
+            String valueType, int queueSlot) {
 
         Block(BlockKind kind, Label end, Label next, int valuesSlot, int indicesSlot, int indexSlot) {
             this(kind, end, next, valuesSlot, indicesSlot, indexSlot, null);
+        }
+
+        Block(BlockKind kind, Label end, Label next, int valuesSlot, int indicesSlot, int indexSlot,
+                String valueType) {
+            this(kind, end, next, valuesSlot, indicesSlot, indexSlot, valueType, -1);
         }
     }
 
@@ -182,6 +191,7 @@ final class TriggerCompiler {
     private static final int SAVED_VALUES = 0;
     private static final int SAVED_INDICES = 1;
     private static final int SAVED_INDEX = 2;
+    private static final int SAVED_QUEUE = 3;
 
     private final ParsedScript script;
     private final List<WaitPoint> waits = new ArrayList<>();
@@ -285,8 +295,6 @@ final class TriggerCompiler {
 
     /** The types of the placeholder whose value is being compiled, which words are first tried as. */
     private List<String> literalTypes = List.of();
-    /** The event's name, for errors: {@code join} in {@code on join:}. */
-    private String eventName;
     /**
      * What Skript calls the code's event in errors, as its current event name: {@code on join}, {@code command};
      * {@code null} in a function.
@@ -322,7 +330,6 @@ final class TriggerCompiler {
     Trigger compileLine(String scriptName, Statement statement, List<Class<?>> classes, String eventName)
             throws CompileException {
         eventClasses = List.copyOf(classes);
-        this.eventName = eventName;
         eventLabel = eventName;
         return compileTrigger(scriptName, List.of(statement));
     }
@@ -337,7 +344,6 @@ final class TriggerCompiler {
     /** A periodical trigger ({@code every 5 seconds}), whose event is a {@link co.xenastudios.neoskript.runtime.PeriodicalEvent}. */
     Trigger compilePeriodical(String scriptName, List<Statement> body) throws CompileException {
         eventClasses = List.of(co.xenastudios.neoskript.runtime.PeriodicalEvent.class);
-        eventName = "periodical";
         eventLabel = "periodical";
         return compileTrigger(scriptName, body);
     }
@@ -351,8 +357,10 @@ final class TriggerCompiler {
         eventClasses = binding.classes();
         headerLine = event.structure().node().line();
         String key = event.structure().node().line().key();
-        eventName = key.regionMatches(true, 0, "on ", 0, 3) ? key.substring(3).strip() : key.strip();
-        eventLabel = "on " + eventName;
+        // Skript's name for the event, as its errors call it: 'on death' for 'on death of a zombie'.
+        String skriptName = library.eventName(event.event().syntax().id());
+        eventLabel = skriptName != null ? skriptName
+                : "on " + (key.regionMatches(true, 0, "on ", 0, 3) ? key.substring(3).strip() : key.strip());
         return (Trigger) define(generate(scriptName, () -> {
             if (binding.filter() != null) {
                 line = event.structure().node().line().number();
@@ -387,7 +395,6 @@ final class TriggerCompiler {
         commandArguments = arguments;
         commandChoices = choices;
         eventClasses = List.of(CommandEvent.class);
-        eventName = "command";
         eventLabel = "command";
         return (Trigger) define(generate(scriptName, () -> {
             line = headerLine;
@@ -436,7 +443,6 @@ final class TriggerCompiler {
         commandChoices = choices;
         suggestingArguments = suggesting;
         eventClasses = List.of(co.xenastudios.neoskript.runtime.command.CommandSuggestionEvent.class);
-        eventName = "command suggestions";
         eventLabel = "command suggestions";
         return (Trigger) define(generate(scriptName, () -> {
             line = entryLine;
@@ -451,7 +457,6 @@ final class TriggerCompiler {
      */
     Trigger compileCommandMessage(String scriptName, int entryLine, String text, Expr message) throws CompileException {
         eventClasses = List.of(CommandEvent.class);
-        eventName = "command";
         eventLabel = "command";
         return (Trigger) define(generate(scriptName, () -> {
             line = entryLine;
@@ -465,7 +470,6 @@ final class TriggerCompiler {
     /** A Skript test ({@code test "name" [when <condition>]:}): skipped if its condition is false. */
     Trigger compileTest(String scriptName, ParsedStructure.Custom test) throws CompileException {
         eventClasses = List.of(co.xenastudios.neoskript.runtime.testing.TestEvent.class);
-        eventName = "test";
         eventLabel = "on test case";
         headerLine = test.structure().node().line();
         byte[] bytes = generate(scriptName, () -> {
@@ -741,6 +745,10 @@ final class TriggerCompiler {
                         method.visitTypeInsn(CHECKCAST, "[Ljava/lang/String;");
                         method.visitVarInsn(ASTORE, slot);
                     }
+                    case SAVED_QUEUE -> {
+                        method.visitTypeInsn(CHECKCAST, "java/util/Queue");
+                        method.visitVarInsn(ASTORE, slot);
+                    }
                     default -> {
                         method.visitTypeInsn(CHECKCAST, "java/lang/Integer");
                         method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false);
@@ -770,6 +778,9 @@ final class TriggerCompiler {
                     saved.add(new int[] {block.indicesSlot(), SAVED_INDICES});
                 }
                 saved.add(new int[] {block.indexSlot(), SAVED_INDEX});
+                if (block.queueSlot() >= 0) {
+                    saved.add(new int[] {block.queueSlot(), SAVED_QUEUE});
+                }
             } else if (block.kind() == BlockKind.WHILE) {
                 saved.add(new int[] {block.indexSlot(), SAVED_INDEX});
             }
@@ -964,7 +975,6 @@ final class TriggerCompiler {
         try {
             TriggerCompiler apart = new TriggerCompiler(library, functions, globals, script);
             apart.eventClasses = eventClasses;
-            apart.eventName = eventName;
             apart.eventLabel = eventLabel;
             apart.warnings = (at, message) -> apartWarnings.add(message);
             for (Block block : blocks) {
@@ -1000,9 +1010,11 @@ final class TriggerCompiler {
     private List<String> setupErrors(List<Statement> statements) {
         List<String> errors = new ArrayList<>();
         String outer = source;
+        Statement outerStatement = currentStatement;
         for (Statement statement : statements) {
             // Positions in what was parsed are in the statement's own line.
             source = statement instanceof Statement.Section section ? section.line().key() : statement.line().text();
+            currentStatement = statement;
             switch (statement) {
                 case Statement.Effect effect -> setupErrors(effect.effect(), errors);
                 case Statement.Condition condition -> setupErrors(condition.condition(), errors);
@@ -1017,6 +1029,7 @@ final class TriggerCompiler {
             }
         }
         source = outer;
+        currentStatement = outerStatement;
         return errors;
     }
 
@@ -1052,7 +1065,84 @@ final class TriggerCompiler {
         }
     }
 
+    /** The statement being compiled, whose text {@link #source} is. */
+    private Statement currentStatement;
+
+    /**
+     * {@code target} as written in the statement being compiled, as Skript's errors quote an element: the whole
+     * statement for its effect or condition, else the part it was matched from; {@code null} if not known.
+     */
+    private String textOf(ParsedSyntax target) {
+        if (currentStatement == null || source == null) {
+            return null;
+        }
+        List<ParsedSyntax> roots = switch (currentStatement) {
+            case Statement.Effect effect -> List.of(effect.effect());
+            case Statement.Condition condition -> List.of(condition.condition());
+            case Statement.Section section -> section.header() == null ? List.of() : List.of(section.header());
+            case Statement.Conditions conditions -> conditions.conditions();
+            default -> List.of();
+        };
+        for (ParsedSyntax root : roots) {
+            if (root == target) {
+                return source.strip();
+            }
+            String found = textIn(root, target);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private String textIn(ParsedSyntax in, ParsedSyntax target) {
+        for (Object value : in.match().values()) {
+            String found = textIn(value, target);
+            if (found != null) {
+                return found;
+            }
+        }
+        for (Object value : in.match().regexValues()) {
+            String found = value instanceof ParsedSyntax inner ? textIn(inner, target) : textIn(value, target);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private String textIn(Object value, ParsedSyntax target) {
+        switch (value) {
+            case Expr.Syntax syntax -> {
+                if (syntax.syntax() == target) {
+                    return syntax.start() >= 0 && syntax.end() <= source.length() && syntax.start() <= syntax.end()
+                            ? source.substring(syntax.start(), syntax.end()) : null;
+                }
+                return textIn(syntax.syntax(), target);
+            }
+            case Expr.ListOf list -> {
+                for (Expr item : list.items()) {
+                    String found = textIn(item, target);
+                    if (found != null) {
+                        return found;
+                    }
+                }
+            }
+            case Expr.FunctionCall call -> {
+                for (Expr argument : call.arguments()) {
+                    String found = textIn(argument, target);
+                    if (found != null) {
+                        return found;
+                    }
+                }
+            }
+            case null, default -> {}
+        }
+        return null;
+    }
+
     private void lineOf(Statement statement, String text) {
+        currentStatement = statement;
         currentLine = statement.line();
         line = statement.line().number();
         source = text;
@@ -1266,7 +1356,6 @@ final class TriggerCompiler {
         try {
             TriggerCompiler apart = new TriggerCompiler(library, functions, globals, script);
             apart.eventClasses = eventClasses;
-            apart.eventName = eventName;
             apart.eventLabel = eventLabel;
             apart.function = function;
             apart.compileTrigger(constantsScript, statements);
@@ -1302,8 +1391,9 @@ final class TriggerCompiler {
     private void forLoop(Statement.Section section) throws CompileException {
         List<Object> values = section.header().match().values();
         Expr looped = (Expr) values.getLast();
-        Expr.Variable key = section.header().pattern() == 0 ? null : forVariable(values.get(0));
-        Expr.Variable value = forVariable(values.get(section.header().pattern() == 0 ? 0 : 1));
+        int pattern = section.header().pattern();
+        Expr.Variable key = pattern == 0 ? null : forVariable(values.get(0));
+        Expr.Variable value = pattern == 1 ? null : forVariable(values.get(pattern == 0 ? 0 : 1));
         loop(section, looped, key, value);
     }
 
@@ -1366,12 +1456,13 @@ final class TriggerCompiler {
         method.visitVarInsn(ALOAD, valuesSlot);
         method.visitInsn(ARRAYLENGTH);
         method.visitJumpInsn(IF_ICMPGE, end);
-        Block block = new Block(BlockKind.LOOP, end, next, valuesSlot, indicesSlot, indexSlot);
+        Block block = new Block(BlockKind.LOOP, end, next, valuesSlot, indicesSlot, indexSlot, null, queueSlot);
         if (looped instanceof Expr.Syntax syntax && syntax.syntax().syntax().id().equals("ExprTestLoopPeeking")
                 && syntax.syntax().pattern() == 0) {
             // Skript's test expression whose values can't be peeked at.
             unpeekable.put(block, "test loop peeking");
         }
+        this.looped.put(block, looped);
         blocks.push(block);
         if (value != null) {
             variableStore(value);
@@ -2042,7 +2133,7 @@ final class TriggerCompiler {
                 convert(list);
                 method.visitMethodInsn(INVOKEVIRTUAL, STORE, list ? "setList" : "set", list ? nameValues : nameValue, false);
             }
-            case ADD, INCREASE -> {
+            case ADD, INCREASE, GIVE -> {
                 convert(true);
                 method.visitMethodInsn(INVOKEVIRTUAL, STORE, list ? "addToList" : "add", nameValues, false);
             }
@@ -2073,14 +2164,20 @@ final class TriggerCompiler {
      * as its {@code EffChange} gives it.
      */
     private void saveWarning(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr.Variable variable) {
-        if (!(mode == CoreSyntax.ChangeMode.SET || variable.list() && mode == CoreSyntax.ChangeMode.ADD)
+        if (!(mode == CoreSyntax.ChangeMode.SET || variable.list() && (mode == CoreSyntax.ChangeMode.ADD || mode == CoreSyntax.ChangeMode.GIVE))
                 || variable.local() || variable.name().startsWith("-")
                 || effect.match().values().get(mode.target) != variable
                 || !(effect.match().values().get(mode.value) instanceof Expr changer)
                 || changer instanceof Expr.Variable) {
             return;
         }
-        String named = library.unsavable(changer.type());
+        String type = changer.type();
+        if (changer instanceof Expr.Unresolved words) {
+            // Words like 'red' are the value they read as: a color.
+            Object value = library.literal(words.text());
+            type = value == null ? type : library.superType(value.getClass());
+        }
+        String named = library.unsavable(type);
         if (named != null) {
             warn("save", named + " cannot be saved. That is, the contents of the variable "
                     + source.substring(variable.start(), variable.end()) + " will be lost when the server stops.");
@@ -2209,7 +2306,7 @@ final class TriggerCompiler {
     private static Changeable.Mode changeMode(ParsedSyntax effect, CoreSyntax.ChangeMode mode) {
         return switch (mode) {
             case SET -> Changeable.Mode.SET;
-            case ADD, INCREASE -> Changeable.Mode.ADD;
+            case ADD, INCREASE, GIVE -> Changeable.Mode.ADD;
             case REMOVE, REDUCE -> Changeable.Mode.REMOVE;
             case REMOVE_ALL -> Changeable.Mode.REMOVE_ALL;
             case DELETE -> effect.match().hasTag("reset") ? Changeable.Mode.RESET : Changeable.Mode.DELETE;
@@ -2269,7 +2366,7 @@ final class TriggerCompiler {
             TypeRef ref = target.type() == null ? null : registry.resolveType(target.type());
             String name = ref == null ? "value" : ref.type().name();
             throw new CompileException(line, ("aeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name + " can't be "
-                    + (mode == CoreSyntax.ChangeMode.SET ? "set to " : mode == CoreSyntax.ChangeMode.ADD ? "added to " : "changed by ")
+                    + (mode == CoreSyntax.ChangeMode.SET ? "set to " : mode == CoreSyntax.ChangeMode.ADD || mode == CoreSyntax.ChangeMode.GIVE ? "added to " : "changed by ")
                     + source.substring(call.start(), call.end()) + " because the function doesn't return anything");
         }
         Object element = library.binding(syntax.syntax()) instanceof ElementFactory<?> factory
@@ -2447,7 +2544,7 @@ final class TriggerCompiler {
                 // Otherwise Skript's comparison quietly fails to initialise, so the line isn't understood.
                 String text = source.strip();
                 java.util.regex.Matcher header = java.util.regex.Pattern.compile("(?i)^(?:else )?if (.+?):?$").matcher(text);
-                throw new CompileException(line, header.matches()
+                throw new CompileException(line, header.matches() && inSectionHeader()
                         ? "Can't understand this condition: '" + header.group(1) + "'"
                         : "Can't understand this condition/effect: " + text);
             }
@@ -2483,13 +2580,21 @@ final class TriggerCompiler {
             return "Can't understand this condition: '" + text + "'";
         }
         java.util.regex.Matcher header = IF_LINE.matcher(text);
-        if (header.matches()) {
+        if (header.matches() && inSectionHeader()) {
             return "Can't understand this condition: '" + header.group(1) + "'";
         }
         if (text.regionMatches(true, 0, "loop ", 0, 5)) {
             return "Can't understand this loop: '" + text.substring(5).replaceFirst(":$", "") + "'";
         }
         return "Can't understand this condition/effect: " + text;
+    }
+
+    /**
+     * Whether what's compiled is a section's header. Only there is {@code if} Skript's conditional: a line
+     * {@code if <condition>} without a colon is a condition or effect like any other, and not understood as one.
+     */
+    private boolean inSectionHeader() {
+        return currentLine == null || currentLine.opensSection();
     }
 
     /** A side of a comparison as Skript's errors name it: its type with an article, or as written if it has none. */
@@ -2636,8 +2741,9 @@ final class TriggerCompiler {
             }
         }
         return new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags(), or, lists, types,
-                argumentTypes, single, literals, eventName, eventClasses == null ? List.of() : eventClasses,
-                sectionType, defaults, syntax == timedSyntax ? timedTime : 0);
+                argumentTypes, single, literals, eventLabel != null ? eventLabel : "function",
+                eventClasses == null ? List.of() : eventClasses,
+                sectionType, defaults, syntax == timedSyntax ? timedTime : 0, textOf(syntax));
     }
 
     /** What a change's errors quote instead of its target: the time state around it ({@code past level of player}). */
@@ -3306,6 +3412,16 @@ final class TriggerCompiler {
         throw new CompileException(line, problem + ": '" + source + "'");
     }
 
+    /**
+     * For {@code recursive indices of {_x::*}}, the indices expression. Skript's indices pass {@code recursive}
+     * on to their list, but have already decided by then to give only the first part of each index, so it's
+     * the same as {@code indices of {_x::*}}.
+     */
+    private Expr recursiveIndices(ParsedSyntax syntax) {
+        return isCore(syntax, CoreSyntax.RECURSIVE) && syntax.match().values().getFirst() instanceof Expr.Syntax inner
+                && isCore(inner.syntax(), CoreSyntax.INDICES) ? inner : null;
+    }
+
     /** Whether {@code syntax} is {@code recursive} written around {@code keyed}: {@code recursive keyed {_x::*}}. */
     private static boolean recursiveOfKeyed(ParsedSyntax syntax) {
         return syntax.match().values().getFirst() instanceof Expr.Syntax keyed
@@ -3320,10 +3436,16 @@ final class TriggerCompiler {
         method.visitMethodInsn(INVOKESTATIC, COMMAND_EVENT, "argument", "(" + CONTEXT + "I)" + OBJECT_DESC, false);
     }
 
+    /** The Bukkit events command arguments can be used in, besides script commands, as Skript's ExprArgument. */
+    private static final String[] COMMAND_EVENTS = {"org.bukkit.event.player.PlayerCommandPreprocessEvent",
+            "org.bukkit.event.server.ServerCommandEvent", "org.bukkit.event.command.UnknownCommandEvent"};
+
     private List<CommandPattern.Argument> commandArguments(Expr.Syntax syntax) throws CompileException {
         if (commandArguments == null) {
+            // Skript's ExprArgument works in script commands and their suggestions, and in command events.
+            String events = library.eventNames(COMMAND_EVENTS);
             throw new CompileException(line, "'" + source.substring(syntax.start(), syntax.end())
-                    + "' can only be used in a command");
+                    + "' can only be used in " + (events.isEmpty() ? "a command" : events));
         }
         return commandArguments;
     }
@@ -3626,6 +3748,8 @@ final class TriggerCompiler {
                 method.visitInsn(I2L);
                 method.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
             }
+            case Expr.Syntax syntax when recursiveIndices(syntax.syntax()) != null ->
+                    expression(recursiveIndices(syntax.syntax()));
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RECURSIVE) -> {
                 Expr.Variable list = listVariable(syntax.syntax(), "Only list variables can be recursive");
                 variableStore(list);
@@ -3994,20 +4118,7 @@ final class TriggerCompiler {
             loopIteration(matcher.group(2));
             return;
         }
-        List<Block> loops = loops().stream().filter(b -> b.kind() == BlockKind.LOOP).toList();
-        if (loops.isEmpty()) {
-            throw new CompileException(line, "There's no loop for 'loop-" + text + "'");
-        }
-        Block loop;
-        if (matcher.group(2) != null) {
-            int n = Integer.parseInt(matcher.group(2));
-            if (n < 1 || n > loops.size()) {
-                throw new CompileException(line, "There's no loop number " + n + " for 'loop-" + text + "'");
-            }
-            loop = loops.get(n - 1);
-        } else {
-            loop = loops.getLast();
-        }
+        Block loop = matchingLoop(matcher.group(1), matcher.group(2) == null ? -1 : Integer.parseInt(matcher.group(2)));
         int offset = syntax.pattern() == 1 ? 1 : syntax.pattern() == 2 ? -1 : 0;
         if (offset == 1 && unpeekable.containsKey(loop)) {
             throw new CompileException(line, "The expression '" + unpeekable.get(loop)
@@ -4034,6 +4145,78 @@ final class TriggerCompiler {
      * {@code loop-iteration}, {@code loop-counter-2}: how many times a loop (a while loop too) has run, as
      * Skript's ExprLoopIteration picks the loop and refuses one that isn't clear.
      */
+    /** How surely a loop is the one a {@code loop-<name>} means. */
+    private enum LoopMatch { NO, MAYBE, YES }
+
+    /**
+     * The loop {@code loop-<name>} (or {@code loop-<name>-<depth>}) is of, as Skript's {@code ExprLoopValue}
+     * finds it: of the loops around it, outermost first, those whose values are of that type, or that say they
+     * are the loop of that name ({@code loop-value}, {@code loop-index} of a list, {@code loop-argument}); the
+     * {@code depth}th of them, else the only one.
+     *
+     * <p>Not every expression's type is known as exactly as Skript knows it, so a loop that may be of the type
+     * isn't ruled out: then the innermost such loop is taken, as Skript would if the types say so.
+     */
+    private Block matchingLoop(String name, int depth) throws CompileException {
+        List<Block> sure = new ArrayList<>();
+        List<Block> candidates = new ArrayList<>();
+        for (Block block : loops()) {
+            if (block.kind() != BlockKind.LOOP) {
+                continue;
+            }
+            LoopMatch match = loopMatch(block, name);
+            if (match == LoopMatch.YES) {
+                sure.add(block);
+            }
+            if (match != LoopMatch.NO) {
+                candidates.add(block);
+            }
+        }
+        if (depth >= 1 && depth <= candidates.size()) {
+            return candidates.get(depth - 1);
+        }
+        if (depth < 0 && sure.size() > 1) {
+            throw new CompileException(line, "There are multiple loops that match loop-" + name + ". Use loop-" + name
+                    + "-1/2/3/etc. to specify which loop's value you want.");
+        }
+        if (depth >= 1 || candidates.isEmpty()) {
+            throw new CompileException(line, "There's no loop that matches 'loop-" + name + "'");
+        }
+        return sure.size() == 1 ? sure.getFirst() : candidates.getLast();
+    }
+
+    private LoopMatch loopMatch(Block block, String name) {
+        Expr expr = looped.get(block);
+        if (name.equals("value") || isLoopOf(expr, name)) {
+            return LoopMatch.YES;
+        }
+        if (name.equals("index")) {
+            // Only loops with indices have a loop-index; values from a function are indexed 1, 2, 3...
+            return block.indicesSlot() >= 0 || expr instanceof Expr.FunctionCall ? LoopMatch.YES : LoopMatch.NO;
+        }
+        co.xenastudios.neoskript.frontend.registry.TypeRef type = library.registry().resolveType(name);
+        String valueType = expr == null ? null : expr.type();
+        if (type == null || valueType == null || valueType.equals(SyntaxRegistry.OBJECT)) {
+            // A type this doesn't know, or values whose type may only be known as Skript sets the loop up.
+            return LoopMatch.MAYBE;
+        }
+        if (library.registry().isSubtype(valueType, type.type().id())) {
+            return LoopMatch.YES;
+        }
+        return library.registry().isAssignable(valueType, type.type().id()) ? LoopMatch.MAYBE : LoopMatch.NO;
+    }
+
+    /** Skript's {@code isLoopOf}: whether {@code expr} says a loop over it is a {@code loop-<name>}. */
+    private boolean isLoopOf(Expr expr, String name) {
+        return switch (expr) {
+            case Expr.Variable variable -> name.equals("var") || name.equals("variable");
+            case Expr.ListOf list -> list.items().stream().anyMatch(item -> isLoopOf(item, name));
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ARGUMENT)
+                    || isCore(syntax.syntax(), CoreSyntax.TYPED_ARGUMENT) -> name.equals("argument");
+            case null, default -> false;
+        };
+    }
+
     private void loopIteration(String number) throws CompileException {
         int loopNumber = number == null ? -1 : Integer.parseInt(number);
         Block loop = null;
@@ -4393,6 +4576,8 @@ final class TriggerCompiler {
         switch (expr) {
             case Expr.Syntax syntax when syntax.syntax().syntax().id().equals(KEYED) ->
                 keyed((Expr) syntax.syntax().match().values().getFirst(), true);
+            case Expr.Syntax syntax when recursiveIndices(syntax.syntax()) != null ->
+                    keyed(recursiveIndices(syntax.syntax()), implicit);
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RECURSIVE) -> {
                 // Every value under the list, each with its path: {_x::a::b} is at 'a::b'.
                 Expr.Variable list = listVariable(syntax.syntax(), "Only list variables can be recursive");

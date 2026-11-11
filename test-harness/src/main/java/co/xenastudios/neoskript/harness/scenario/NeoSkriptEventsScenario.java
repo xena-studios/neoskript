@@ -47,7 +47,7 @@ public final class NeoSkriptEventsScenario implements Scenario {
 
             int mark = server.mark();
             server.command("nsk-greet");
-            server.await(Pattern.compile("\\[harness] events greeted by .*console$"), mark, WAIT);
+            server.await(Pattern.compile("\\[harness] events greeted by .*CONSOLE$"), mark, WAIT);
             server.await(line("[harness] events any command"), mark, WAIT);
 
             // An uncancelled command the server doesn't know: the server says so, as a control.
@@ -55,7 +55,7 @@ public final class NeoSkriptEventsScenario implements Scenario {
             server.await(Pattern.compile("nsk-plain<--\\[HERE]"), mark, WAIT);
 
             server.command("nsk-wait");
-            server.await(Pattern.compile("\\[harness] events after wait: .*console$"), mark, WAIT);
+            server.await(Pattern.compile("\\[harness] events after wait: .*CONSOLE$"), mark, WAIT);
             // Entity events. On Folia a console command runs on the global thread, which can't spawn entities.
             boolean folia = context.environment().platform() == Environment.Platform.FOLIA;
             if (!folia) {

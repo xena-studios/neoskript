@@ -25,24 +25,30 @@ final class MathFunctions {
         registrar.function("sqrt", n, "number", false, args -> Math.sqrt(number(args[0])));
         registrar.function("round", List.of(Parameter.of("n", "number"), new Parameter("d", "number", false, true)),
                 "number", false, args -> {
-                    double value = number(args[0]);
-                    double placesValue = args[1] == null ? 0 : number(args[1]);
-                    if (!Double.isFinite(placesValue) || Math.abs(placesValue) > Integer.MAX_VALUE) {
-                        // No such place to round to, as in Skript.
-                        return Double.NaN;
+                    // Skript's round(): whole numbers as they are, halves up (round(-2.5) is -2), and Skript's
+                    // epsilon for rounding errors.
+                    if (args[0] instanceof Long whole) {
+                        return whole;
                     }
-                    int places = args[1] == null ? 0 : (int) number(args[1]);
-                    if (Double.isNaN(value) || Double.isInfinite(value)) {
+                    double value = number(args[0]);
+                    if (!Double.isFinite(value)) {
                         return value;
                     }
-                    // Halves round away from zero, as in Skript: round(-11.535, 2) is -11.54.
-                    java.math.BigDecimal rounded = java.math.BigDecimal.valueOf(value);
-                    if (places < 0) {
-                        // To a whole number first, then to tens or hundreds, as Skript does: 1044.5 to 1045 to 1050.
-                        rounded = rounded.setScale(0, java.math.RoundingMode.HALF_UP);
+                    double placesValue = args[1] == null ? 0 : number(args[1]);
+                    if (!Double.isFinite(placesValue) || placesValue >= Integer.MAX_VALUE || placesValue <= Integer.MIN_VALUE) {
+                        return Double.NaN;
                     }
-                    rounded = rounded.setScale(places, java.math.RoundingMode.HALF_UP);
-                    return places <= 0 ? (Object) rounded.longValue() : (Object) rounded.doubleValue();
+                    int places = (int) placesValue;
+                    if (places == 0) {
+                        return Math.round(value + Logic.EPSILON);
+                    }
+                    if (places > 0) {
+                        return new java.math.BigDecimal(Double.toString(value))
+                                .setScale(places, java.math.RoundingMode.HALF_UP)
+                                .doubleValue();
+                    }
+                    long rounded = Math.round(value + Logic.EPSILON);
+                    return (int) Math.round(rounded * Math.pow(10.0, places) + Logic.EPSILON) / Math.pow(10.0, places);
                 });
         registrar.function("mod", List.of(Parameter.of("d", "number"), Parameter.of("m", "number")), "number", false,
                 args -> {

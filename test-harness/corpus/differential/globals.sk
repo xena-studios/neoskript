@@ -1,0 +1,26 @@
+# Probe: global variables, which are saved, so variables.csv is compared too.
+
+function probe_globals():
+	delete {diffprobe::*}
+	set {diffprobe::number} to 5
+	set {diffprobe::decimal} to 2.5
+	set {diffprobe::text} to "hello"
+	set {diffprobe::bool} to true
+	set {diffprobe::list::*} to 1, 2 and 3
+	set {diffprobe::span} to 5 minutes
+	set {diffprobe::item} to 3 diamonds
+	set {diffprobe::location} to location(1.5, 64, -2, world "world")
+	set {diffprobe::vector} to vector(1, 2, 3)
+	set {diffprobe::type} to zombie
+	set {diffprobe::color} to red
+	set {diffprobe::date} to date(2024, 1, 1)
+	add 1 to {diffprobe::number}
+	add "x" to {diffprobe::list::*}
+	show("number", {diffprobe::number})
+	show("list", {diffprobe::list::*})
+	show("size", size of {diffprobe::*})
+	show("indices", indices of {diffprobe::*})
+	set {diffprobe::%{diffprobe::text}%} to "dynamic"
+	show("dynamic", {diffprobe::hello})
+	set {diffprobe::upper::A} to 1
+	show("case", {diffprobe::upper::a})

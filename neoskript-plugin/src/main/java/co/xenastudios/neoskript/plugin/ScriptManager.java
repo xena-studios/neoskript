@@ -23,6 +23,7 @@ import co.xenastudios.neoskript.runtime.SimpleTriggerContext;
 import co.xenastudios.neoskript.runtime.scheduler.Scheduler;
 import co.xenastudios.neoskript.runtime.variables.VariableStore;
 import java.io.IOException;
+import org.bukkit.Bukkit;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -142,7 +143,7 @@ final class ScriptManager {
 
     /** Loads every script when the server starts. */
     synchronized void loadAll() throws IOException {
-        Outcome outcome = load(null, logger::error);
+        Outcome outcome = load(null, problem -> {}, false, ScriptManager::toConsole);
         int triggers = loaded.values().stream().mapToInt(List::size).sum();
         logger.info("Loaded {} {} with {} {} in {} ms{}", outcome.scripts(), outcome.scripts() == 1 ? "script" : "scripts",
                 triggers, triggers == 1 ? "trigger" : "triggers", outcome.millis(),
@@ -578,7 +579,7 @@ final class ScriptManager {
     /** Loads (or reloads) one script, running its load events straight away. */
     private void reloadNow(String name) {
         try {
-            load(name::equals, logger::error, true);
+            load(name::equals, problem -> {}, true, ScriptManager::toConsole);
         } catch (IOException e) {
             logger.error("Couldn't load {}", name, e);
         }
@@ -656,6 +657,11 @@ final class ScriptManager {
         } catch (ScriptRuntimeException e) {
             logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
         }
+    }
+
+    /** Sends a problem to the console as Skript's log does: through the console, with its colors. */
+    private static void toConsole(Diagnostic problem, SourceFile file) {
+        AutoReload.send(List.of(Bukkit.getConsoleSender()), SkriptCommandMessages.PREFIX + AutoReload.describe(problem, file));
     }
 
     /** A problem as Skript reports it: the line and file, the message, then the line itself. */

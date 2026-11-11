@@ -146,6 +146,14 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
                     command.cooldownBypass());
             lastUses.put(player.getUniqueId(), now);
             cooling = true;
+            UUID id = player.getUniqueId();
+            event.afterWait(cancel -> {
+                if (cancel) {
+                    lastUses.remove(id);
+                } else {
+                    lastUses.put(id, now);
+                }
+            });
         }
         try {
             route.trigger().execute(new SimpleTriggerContext(event, sender instanceof Player ? sender : null));

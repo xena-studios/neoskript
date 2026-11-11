@@ -28,23 +28,23 @@ final class EntityEventSyntax {
 
     static void register(Registrar registrar) {
         registrar.expression("ExprTamer", "player", info -> {
-            restrict(info, "the tamer", "the tame event", EntityTameEvent.class);
+            restrict(info, "the tamer", EntityTameEvent.class);
             return (context, args) -> context.event() instanceof EntityTameEvent event
                     && event.getOwner() instanceof Player player ? player : null;
         }, "[the] tamer");
         registrar.expression("ExprProjectileForce", "number", info -> {
-            restrict(info, "the projectile force", "the entity shoot bow event", EntityShootBowEvent.class);
+            restrict(info, "the projectile force", EntityShootBowEvent.class);
             return (context, args) -> context.event() instanceof EntityShootBowEvent event ? (Object) (double) event.getForce()
                     : null;
         }, "[the] projectile force");
         registrar.expression("ExprPathfindingLocation", "location", info -> {
-            restrict(info, "the pathfinding target location", "the pathfind event",
+            restrict(info, "the pathfinding target location",
                     com.destroystokyo.paper.event.entity.EntityPathfindEvent.class);
             return (context, args) -> context.event() instanceof com.destroystokyo.paper.event.entity.EntityPathfindEvent event
                     ? event.getLoc() : null;
         }, "[the] path[ ]finding target location");
         registrar.expression("ExprPathfindingTarget", "entity", info -> {
-            restrict(info, "the pathfinding target", "the pathfind event",
+            restrict(info, "the pathfinding target",
                     com.destroystokyo.paper.event.entity.EntityPathfindEvent.class);
             return (context, args) -> context.event() instanceof com.destroystokyo.paper.event.entity.EntityPathfindEvent event
                     ? event.getTargetEntity() : null;
@@ -55,22 +55,15 @@ final class EntityEventSyntax {
 
     /**
      * Fails parsing outside the events of {@code eventClasses}, as Skript does for syntax that only works in
-     * some events: {@code 'the tamer' can only be used in the tame event}.
+     * some events: {@code 'the tamer' can only be used in the on tame event}.
      */
-    private static void restrict(ElementInfo info, String written, String events, Class<?>... eventClasses) {
-        for (Class<?> eventClass : info.eventClasses()) {
-            for (Class<?> wanted : eventClasses) {
-                if (wanted.isAssignableFrom(eventClass)) {
-                    return;
-                }
-            }
-        }
-        throw new SyntaxError("'" + written + "' can only be used in " + events);
+    private static void restrict(ElementInfo info, String written, Class<?>... eventClasses) {
+        EventExpressions.restrict(info, written, eventClasses);
     }
 
     private static void registerLeashes(Registrar registrar) {
         registrar.condition("CondLeashWillDrop", info -> {
-            restrict(info, "the leash will drop", "the leash / unleash event", EntityUnleashEvent.class);
+            restrict(info, "the leash will drop", EntityUnleashEvent.class);
             boolean negated = info.hasTag("not");
             return new SettableCondition() {
                 @Override
@@ -87,7 +80,7 @@ final class EntityEventSyntax {
             };
         }, "[the] (lead|leash) [item] (will|not:(won't|will not)) (drop|be dropped)");
         registrar.effect("EffDropLeash", info -> {
-            restrict(info, "allow the leash to drop", "the leash / unleash event", EntityUnleashEvent.class);
+            restrict(info, "allow the leash to drop", EntityUnleashEvent.class);
             boolean drop = info.pattern() == 0;
             return (context, args) -> {
                 if (context.event() instanceof EntityUnleashEvent event) {
@@ -99,7 +92,7 @@ final class EntityEventSyntax {
 
     private static void registerEggs(Registrar registrar) {
         registrar.condition("CondWillHatch", info -> {
-            restrict(info, "the egg will hatch", "the egg throw event", PlayerEggThrowEvent.class);
+            restrict(info, "the egg will hatch", PlayerEggThrowEvent.class);
             boolean negated = !info.hasTag("will");
             return new SettableCondition() {
                 @Override
@@ -116,7 +109,7 @@ final class EntityEventSyntax {
             };
         }, "[the] egg (:will|will not|won't) hatch");
         registrar.effect("EffMakeEggHatch", info -> {
-            restrict(info, "make the egg hatch", "the egg throw event", PlayerEggThrowEvent.class);
+            restrict(info, "make the egg hatch", PlayerEggThrowEvent.class);
             boolean not = info.hasTag("not");
             return (context, args) -> {
                 if (context.event() instanceof PlayerEggThrowEvent event) {
@@ -129,7 +122,7 @@ final class EntityEventSyntax {
             };
         }, "make [the] egg [:not] hatch");
         registrar.expression("ExprHatchingNumber", "integer", info -> {
-            restrict(info, "the hatching number", "the egg throw event", PlayerEggThrowEvent.class);
+            restrict(info, "the hatching number", PlayerEggThrowEvent.class);
             return new EggValue(event -> (long) event.getNumHatches(), Number.class, (event, delta, mode) -> {
                 int value = ((Number) delta[0]).intValue();
                 if (mode != Changeable.Mode.SET) {
@@ -139,7 +132,7 @@ final class EntityEventSyntax {
             }, Changeable.Mode.SET, Changeable.Mode.ADD, Changeable.Mode.REMOVE);
         }, "[the] hatching number");
         registrar.expression("ExprHatchingType", "entitytype", info -> {
-            restrict(info, "the hatching entity type", "the egg throw event", PlayerEggThrowEvent.class);
+            restrict(info, "the hatching entity type", PlayerEggThrowEvent.class);
             return new EggValue(event -> EntityKind.of(event.getHatchingType()), EntityKind.class, (event, delta, mode) -> {
                 // Resetting hatches chickens again; only types that can be spawned hatch.
                 org.bukkit.entity.EntityType type = delta == null ? org.bukkit.entity.EntityType.CHICKEN

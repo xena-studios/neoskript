@@ -92,7 +92,7 @@ public final class ScriptFeatures {
     }
 
     /** The experiment {@code name} is written for, by its code name, or the name itself if it isn't one. */
-    private static String codeName(String name) {
+    public static String codeName(String name) {
         String normal = name.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
         if (EXPERIMENTS.containsKey(normal)) {
             return normal;

@@ -87,8 +87,23 @@ public class CommandEvent {
         return cooldownCancelled;
     }
 
+    /**
+     * Cancels the cooldown, or starts it again. After the trigger has waited, the command is over, so it changes
+     * the sender's last use straight away (through {@link #afterWait}), as Skript's {@code ScriptCommandEvent}.
+     */
     public void cancelCooldown(boolean cancel) {
-        cooldownCancelled = cancel;
+        if (afterWait != null && co.xenastudios.neoskript.runtime.Waits.delayed(this)) {
+            afterWait.accept(cancel);
+        } else {
+            cooldownCancelled = cancel;
+        }
+    }
+
+    private java.util.function.Consumer<Boolean> afterWait;
+
+    /** What cancelling the cooldown ({@code true}) or starting it again does once the trigger has waited. */
+    public void afterWait(java.util.function.Consumer<Boolean> change) {
+        afterWait = change;
     }
 
     /** Why the trigger failed the command, as {@code fail the command execution with ...}, or {@code null}. */

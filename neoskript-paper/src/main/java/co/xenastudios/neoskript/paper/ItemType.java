@@ -486,7 +486,10 @@ public final class ItemType {
         return name + "s";
     }
 
-    /** As Skript writes items: {@code 32 cooked beef}, {@code diamond sword of sharpness 2 named "Blade"}. */
+    /**
+     * As Skript writes items: {@code 32 cooked beef}, or {@code diamond sword named Blade}. Like Skript's
+     * ItemData, enchantments aren't written.
+     */
     static String text(ItemStack stack, boolean withAmount) {
         StringBuilder text = new StringBuilder();
         String name = name(stack.getType());
@@ -496,17 +499,8 @@ public final class ItemType {
             text.append(name);
         }
         ItemMeta meta = stack.getItemMeta();
-        if (meta != null) {
-            List<String> enchantments = new ArrayList<>();
-            meta.getEnchants().forEach((enchantment, level) ->
-                    enchantments.add(enchantment.getKey().getKey().replace('_', ' ') + " " + level));
-            if (!enchantments.isEmpty()) {
-                text.append(" of ").append(String.join(", ", enchantments));
-            }
-            Component display = meta.displayName();
-            if (display != null) {
-                text.append(" named \"").append(Messages.LEGACY_SECTION.serialize(display)).append('"');
-            }
+        if (meta != null && meta.hasDisplayName()) {
+            text.append(" named ").append(TextComponentParser.instance().toString(meta.displayName()));
         }
         return text.toString();
     }

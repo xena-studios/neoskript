@@ -50,6 +50,32 @@ class LanguageTest {
     }
 
     @Test
+    void valuesReadAsInSkript() {
+        assertEquals(List.of("-2", "1", "2", "5", "7", "abc", "-0", "1.01",
+                "1 day and 1 hour and 33 minutes and 31.15 seconds", "1 year and 1 month and 1 week", "1.5 seconds",
+                "6:00", "18:30", "5 and 7"), run("""
+                on load:
+                \tsay round(-2.5)
+                \tsay 1.5 rounded down
+                \tsay 1.5 rounded up
+                \tset {_t} to "Hello World"
+                \tsay index of "o" in {_t}
+                \tsay last index of "o" in {_t}
+                \tset {_x} to "abc"
+                \tadd 1 to {_x}
+                \tsay {_x}
+                \tsay -0.004
+                \tsay 1.005
+                \tsay 1 second + 2 minutes + 1.5 hours + 1 day + 3 ticks + 90 seconds
+                \tsay 1 week + 1 month + 1 year
+                \tsay 30 ticks
+                \tsay 6:00
+                \tsay 6:30 pm
+                \tsay (index of "o" in {_t}, last index of "o" in {_t})
+                """));
+    }
+
+    @Test
     void arithmeticFollowsPrecedence() {
         assertEquals(List.of("7", "5", "9", "512", "2.5", "ab", "-3", "4.5"), run("""
                 on load:

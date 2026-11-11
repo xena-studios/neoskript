@@ -1,0 +1,185 @@
+# Skript 2.17.0's events on Paper 26.3, in the order Skript.getEvents() gave them in one run: name, event
+# classes, patterns, tab-separated. Skript orders its events by complexity, then by hash codes, which differ
+# from run to run, so the order within the same complexity is Skript's for that run only.
+On Fishing	org.bukkit.event.player.PlayerFishEvent	[fishing] (line|rod) cast	fish (caught|catch)	entity (hook[ed]|caught|catch)	(bobber|hook) (in|hit) ground	fish (escape|get away)	[fishing] (rod|line) reel in	fish bit(e|ing)	(fish approach[ing]|(bobber|hook) lure[d])	fishing state change[d]
+On World Border Bounds Change	io.papermc.paper.event.world.border.WorldBorderBoundsChangeEvent	world[ ]border [bounds] chang(e|ing)
+On Unknown Command Execution	org.bukkit.event.command.UnknownCommandEvent	(unknown|non-existent) command [execution]
+On Chat	io.papermc.paper.event.player.AsyncChatEvent	chat
+On Loot Generate	org.bukkit.event.world.LootGenerateEvent	loot generat(e|ing)
+On Pathfind	com.destroystokyo.paper.event.entity.EntityPathfindEvent	[entity] [start[s]] pathfind[ing]
+On World Border Center Change	io.papermc.paper.event.world.border.WorldBorderCenterChangeEvent	world[ ]border center chang(e|ing)
+On World Border Bounds Finish Change	io.papermc.paper.event.world.border.WorldBorderBoundsChangeFinishEvent	world[ ]border [bounds] finish chang(e|ing)
+On Brewing Start	org.bukkit.event.block.BrewingStartEvent	brew[ing] start[ed|ing]
+On Sign Change	org.bukkit.event.block.SignChangeEvent	sign (chang[e]|edit)[ing]	[player] (chang[e]|edit)[ing] [a] sign
+On Love Mode Enter	org.bukkit.event.entity.EntityEnterLoveModeEvent	[entity] enter[s] love mode	[entity] love mode [enter]
+On Vehicle Enter	org.bukkit.event.vehicle.VehicleEnterEvent	vehicle enter	enter[ing] [a] vehicle
+On Horse Jump	org.bukkit.event.entity.HorseJumpEvent	horse jump
+On Villager Career Change	org.bukkit.event.entity.VillagerCareerChangeEvent	villager career chang(e[d]|ing)
+On Flight Toggle	org.bukkit.event.player.PlayerToggleFlightEvent	[player] flight toggl(e|ing)	[player] toggl(e|ing) flight
+On Item Break	org.bukkit.event.player.PlayerItemBreakEvent	[player] tool break[ing]	[player] break[ing] (a|the|) tool
+On Beacon Change Effect	io.papermc.paper.event.player.PlayerChangeBeaconEffectEvent	beacon change effect	beacon effect change	player chang(e[s]|ing) [of] beacon effect
+On Beacon Toggle	io.papermc.paper.event.block.BeaconActivatedEvent,io.papermc.paper.event.block.BeaconDeactivatedEvent	beacon toggle	beacon activat(e|ion)	beacon deactivat(e|ion)
+On Egg Throw	org.bukkit.event.player.PlayerEggThrowEvent	throw[ing] [of] [an] egg	[player] egg throw
+On Chunk Load	org.bukkit.event.world.ChunkLoadEvent	chunk load[ing]
+On Bell Ring	org.bukkit.event.block.BellRingEvent	bell ring[ing]
+On Combust	org.bukkit.event.entity.EntityCombustEvent	combust[ing]
+On Physics	org.bukkit.event.block.BlockPhysicsEvent	[block] physics
+On Slime Split	org.bukkit.event.entity.SlimeSplitEvent	slime split[ting]
+On Enderman Enrage	com.destroystokyo.paper.event.entity.EndermanAttackPlayerEvent	enderman (enrage|anger)
+On Bucket fill	org.bukkit.event.player.PlayerBucketFillEvent	bucket fill[ing]	[player] fill[ing] [a] bucket
+On Item Mend	org.bukkit.event.player.PlayerItemMendEvent	item mend[ing]
+On Gliding State Change	org.bukkit.event.entity.EntityToggleGlideEvent	(gliding state change|toggl(e|ing) gliding)
+On Inventory Item Move	org.bukkit.event.inventory.InventoryMoveItemEvent	inventory item (move|transport)	inventory (mov(e|ing)|transport[ing]) [an] item
+On Player Deep Sleep	io.papermc.paper.event.player.PlayerDeepSleepEvent	[player] deep sleep[ing]
+On Lightning Strike	org.bukkit.event.weather.LightningStrikeEvent	lightning [strike]
+On Script Load/Unload	ch.njol.skript.events.bukkit.ScriptEvent	[:async] [script] (load|init|enable)	[:async] [script] (unload|stop|disable)
+On Enchant	org.bukkit.event.enchantment.EnchantItemEvent	[item] enchant
+On Explode	org.bukkit.event.entity.EntityExplodeEvent	explo(d(e|ing)|sion)
+On Item Damage	org.bukkit.event.player.PlayerItemDamageEvent	item damag(e|ing)
+On Bed Leave	org.bukkit.event.player.PlayerBedLeaveEvent	bed leav(e|ing)	[player] leav(e|ing) [a] bed
+On Vehicle Destroy	org.bukkit.event.vehicle.VehicleDestroyEvent	vehicle destroy	destr(oy[ing]|uction of) [a] vehicle
+On Zombie Break Door	org.bukkit.event.entity.EntityBreakDoorEvent	zombie break[ing] [a] [wood[en]] door
+On Shoot	org.bukkit.event.entity.ProjectileLaunchEvent	[projectile] (shoot|launch)
+On Sponge Absorb	org.bukkit.event.block.SpongeAbsorbEvent	sponge absorb
+On Experience Cooldown Change	org.bukkit.event.player.PlayerExpCooldownChangeEvent	player (experience|[e]xp) cooldown change
+On Entity Dismount	org.bukkit.event.entity.EntityDismountEvent	dismount[ing]
+On Block Fertilize	org.bukkit.event.block.BlockFertilizeEvent	[block] fertilize
+On Experience Spawn	ch.njol.skript.events.bukkit.ExperienceSpawnEvent	[e]xp[erience] [orb] spawn	spawn of [a[n]] [e]xp[erience] [orb]
+On Respawn	org.bukkit.event.player.PlayerRespawnEvent	[player] respawn[ing]
+On Portal	org.bukkit.event.player.PlayerPortalEvent,org.bukkit.event.entity.EntityPortalEvent	[player] portal	entity portal
+On Broadcast	org.bukkit.event.server.BroadcastMessageEvent	broadcast
+On Vehicle Exit	org.bukkit.event.vehicle.VehicleExitEvent	vehicle exit	exit[ing] [a] vehicle
+On First Join	org.bukkit.event.player.PlayerJoinEvent	first (join|login)
+On Level Change	org.bukkit.event.player.PlayerLevelChangeEvent	[player] level (change|1¦up|-1¦down)
+On Portal Create	org.bukkit.event.world.PortalCreateEvent	portal creat(e|ion)
+On Sheep Regrow Wool	org.bukkit.event.entity.SheepRegrowWoolEvent	sheep [re]grow[ing] wool
+On Connect	org.bukkit.event.player.PlayerLoginEvent	[player] connect[ing]
+On Explosion Prime	org.bukkit.event.entity.ExplosionPrimeEvent	explosion prime
+On Send Command List	org.bukkit.event.player.PlayerCommandSendEvent	send[ing] [of [the]] [server] command[s] list	[server] command list send
+On Experience Change	org.bukkit.event.player.PlayerExpChangeEvent	[player] (level progress|[e]xp|experience) (change|update|:increase|:decrease)
+On Entity Mount	org.bukkit.event.entity.EntityMountEvent	mount[ing]
+On Server List Ping	com.destroystokyo.paper.event.server.PaperServerListPingEvent	server [list] ping
+On Projectile Hit	org.bukkit.event.entity.ProjectileHitEvent	projectile hit
+On Pig Zap	org.bukkit.event.entity.PigZapEvent	pig[ ]zap
+On Piglin Barter	org.bukkit.event.entity.PiglinBarterEvent	piglin (barter[ing]|trad(e|ing))
+On Block Damage	org.bukkit.event.block.BlockDamageEvent	block damag(ing|e)
+On Player Pickup Arrow	org.bukkit.event.player.PlayerPickupArrowEvent	[player] (pick[ing| ]up [an] arrow|arrow pick[ing| ]up)
+On Inventory Open	org.bukkit.event.inventory.InventoryOpenEvent	inventory open[ed]
+On Tame	org.bukkit.event.entity.EntityTameEvent	[entity] tam(e|ing)
+On Vehicle Create	org.bukkit.event.vehicle.VehicleCreateEvent	vehicle create	creat(e|ing|ion of) [a] vehicle
+On Bed Enter	org.bukkit.event.player.PlayerBedEnterEvent	bed enter[ing]	[player] enter[ing] [a] bed
+On Bucket Empty	org.bukkit.event.player.PlayerBucketEmptyEvent	bucket empty[ing]	[player] empty[ing] [a] bucket
+On Quit	org.bukkit.event.player.PlayerQuitEvent	(quit[ting]|disconnect[ing]|log[ ]out|logging out|leav(e|ing))
+On Vehicle Damage	org.bukkit.event.vehicle.VehicleDamageEvent	vehicle damage	damag(e|ing) [a] vehicle
+On Language Change	org.bukkit.event.player.PlayerLocaleChangeEvent	[player] (language|locale) chang(e|ing)	[player] chang(e|ing) (language|locale)
+On Target	org.bukkit.event.entity.EntityTargetEvent	[entity] target	[entity] un[-]target
+On Flow	org.bukkit.event.block.BlockFromToEvent	[block] flow[ing]	block mov(e|ing)
+On Ready Arrow	com.destroystokyo.paper.event.player.PlayerReadyArrowEvent	[player] ((ready|choose|draw|load) arrow|arrow (choose|draw|load))
+On Swim Toggle	org.bukkit.event.entity.EntityToggleSwimEvent	[entity] toggl(e|ing) swim	[entity] swim toggl(e|ing)
+On Leaves Decay	org.bukkit.event.block.LeavesDecayEvent	leaves decay[ing]
+On Anvil Damage	com.destroystokyo.paper.event.block.AnvilDamagedEvent	anvil damag(e|ing)
+On Server Start/Stop	ch.njol.skript.events.bukkit.SkriptStartEvent,ch.njol.skript.events.bukkit.SkriptStopEvent	(:server|skript) (start|load|enable)	(:server|skript) (stop|unload|disable)
+On Kick	org.bukkit.event.player.PlayerKickEvent	[player] (kick|being kicked)
+On Bell Resonate	org.bukkit.event.block.BellResonateEvent	bell resonat(e|ing)
+On Creeper Power	org.bukkit.event.entity.CreeperPowerEvent	creeper power
+On Hunger Meter Change	org.bukkit.event.entity.FoodLevelChangeEvent	(food|hunger) (level|met(er|re)|bar) chang(e|ing)
+On Can Build Check	org.bukkit.event.block.BlockCanBuildEvent	[block] can build check
+On Chunk Generate	org.bukkit.event.world.ChunkPopulateEvent	chunk (generat|populat)(e|ing)
+On Hand Item Swap	org.bukkit.event.player.PlayerSwapHandItemsEvent	swap[ping of] [(hand|held)] item[s]
+On Join	org.bukkit.event.player.PlayerJoinEvent	[player] (login|logging in|join[ing])
+On Player Trade	io.papermc.paper.event.player.PlayerTradeEvent	player trad(e|ing)
+On Resurrect Attempt	org.bukkit.event.entity.EntityResurrectEvent	[entity] resurrect[ion] [attempt]
+On Spawn Change	org.bukkit.event.world.SpawnChangeEvent	[world] spawn change
+On Tool Change	org.bukkit.event.player.PlayerItemHeldEvent	[player['s]] (tool|item held|held item) chang(e|ing)
+On Vault Display Item	org.bukkit.event.block.VaultDisplayItemEvent	vault display[ing] item
+On Portal Enter	org.bukkit.event.entity.EntityPortalEnterEvent	portal enter[ing]	entering [a] portal
+On Jump	com.destroystokyo.paper.event.player.PlayerJumpEvent	[player] jump[ing]
+On Bat Toggle Sleep	org.bukkit.event.entity.BatToggleSleepEvent	bat toggle sleep
+On Sprint Toggle	org.bukkit.event.player.PlayerToggleSprintEvent	[player] toggl(e|ing) sprint	[player] sprint toggl(e|ing)
+On Inventory Drag	org.bukkit.event.inventory.InventoryDragEvent	inventory drag[ging]
+On Book Edit	org.bukkit.event.player.PlayerEditBookEvent	book (edit|change|write)
+On Spread	org.bukkit.event.block.BlockSpreadEvent	spread[ing]
+On Redstone	org.bukkit.event.block.BlockRedstoneEvent	redstone [current] [chang(e|ing)]
+On Projectile Collide	com.destroystokyo.paper.event.entity.ProjectileCollideEvent	projectile collide
+On Inventory Pickup	org.bukkit.event.inventory.InventoryPickupItemEvent	inventory pick[ ]up
+On Enchant Prepare	org.bukkit.event.enchantment.PrepareItemEnchantEvent	[item] enchant prepare
+On Anvil Prepare	org.bukkit.event.inventory.PrepareAnvilEvent	anvil prepar(e|ing)
+On Vehicle Move	org.bukkit.event.vehicle.VehicleMoveEvent	vehicle move
+On Arm Swing	org.bukkit.event.player.PlayerAnimationEvent	[player] arm swing
+On Ignition	org.bukkit.event.block.BlockIgniteEvent	[block] ignit(e|ion)
+On Sneak Toggle	org.bukkit.event.player.PlayerToggleSneakEvent	[player] toggl(e|ing) sneak	[player] sneak toggl(e|ing)
+On Pressure Plate / Trip	org.bukkit.event.player.PlayerInteractEvent	[step[ping] on] [a] [pressure] plate	(trip|[step[ping] on] [a] tripwire)
+On Entity Jump	com.destroystokyo.paper.event.entity.EntityJumpEvent	entity jump[ing]
+On Inventory Slot Change	io.papermc.paper.event.player.PlayerInventorySlotChangeEvent	[player] inventory slot chang(e|ing)
+On Player World Change	org.bukkit.event.player.PlayerChangedWorldEvent	[player] world chang(ing|e[d])
+On Stop Using Item	io.papermc.paper.event.player.PlayerStopUsingItemEvent	[player] (stop|end) (using item|item use)
+On AoE Cloud Effect	org.bukkit.event.entity.AreaEffectCloudApplyEvent	(area|AoE) [cloud] effect
+On Piston Extend	org.bukkit.event.block.BlockPistonExtendEvent	piston extend[ing]
+On Elytra Boost	com.destroystokyo.paper.event.player.PlayerElytraBoostEvent	elytra boost
+On Chunk Unload	org.bukkit.event.world.ChunkUnloadEvent	chunk unload[ing]
+On Player Chunk Enter	org.bukkit.event.player.PlayerMoveEvent	[player] (enter[s] [a] chunk|chunk enter[ing])
+On Inventory Close	org.bukkit.event.inventory.InventoryCloseEvent	inventory clos(ing|e[d])
+On Riptide	org.bukkit.event.player.PlayerRiptideEvent	[use of] riptide [enchant[ment]]
+On Book Sign	org.bukkit.event.player.PlayerEditBookEvent	book sign[ing]
+On Piston Retract	org.bukkit.event.block.BlockPistonRetractEvent	piston retract[ing]
+On Command	org.bukkit.event.player.PlayerCommandPreprocessEvent,org.bukkit.event.server.ServerCommandEvent	command [%-strings%]
+On Player GameMode Change	org.bukkit.event.player.PlayerGameModeChangeEvent	[player] game[ ]mode change [to %-gamemodes%]
+On Smelt	org.bukkit.event.inventory.FurnaceSmeltEvent	[furnace] [ore] smelt[ed|ing] [of %-itemtypes%]	[furnace] smelt[ed|ing] of ore
+On Brewing Fuel	org.bukkit.event.inventory.BrewingStandFuelEvent	brew[ing [stand]] consum(e|ing) fuel [of %-itemtypes%]	brew[ing [stand]] fuel consumption [of %-itemtypes%]
+On Brewing Complete	org.bukkit.event.inventory.BrewEvent	brew[ing] [complet(e[d]|ion)|finish[ed]] [(of|for) %-itemtypes/potioneffecttypes%]
+On Drop	org.bukkit.event.player.PlayerDropItemEvent,org.bukkit.event.entity.EntityDropItemEvent	[player|1:entity] drop[ping] [[of] %-itemtypes%]
+On Prepare Craft	org.bukkit.event.inventory.PrepareItemCraftEvent	[player] (preparing|beginning) craft[ing] [[of] %-itemtypes%]
+On Stonecutter Recipe Select	io.papermc.paper.event.player.PlayerStonecutterRecipeSelectEvent	stonecutting [[of] %-itemtypes%]
+On Craft	org.bukkit.event.inventory.CraftItemEvent	[player] craft[ing] [[of] %-itemtypes%]
+On Move On	org.bukkit.event.player.PlayerMoveEvent	(step|walk)[ing] (on|over) %-*itemtypes%
+On Player Input	org.bukkit.event.player.PlayerInputEvent	[player] (toggle|toggling|1:press[ing]|2:release|2:releasing) of (%-inputkeys%|(an|any) input key)	([player] %-inputkeys%|[an|player] input key) (toggle|toggling|1:press[ing]|2:release|2:releasing)
+On Start Smelt	org.bukkit.event.inventory.FurnaceStartSmeltEvent	[furnace] start [of] smelt[ing] [[of] %-itemtypes%]	[furnace] smelt[ing] start [of %-itemtypes%]
+On Spawn	org.bukkit.event.entity.EntitySpawnEvent	spawn[ing] [of %-entitydatas%]
+On Inventory Click	org.bukkit.event.inventory.InventoryClickEvent	[player] inventory(-| )click[ing] [[at] %-itemtypes%]
+On Burn	org.bukkit.event.block.BlockBurnEvent	[block] burn[ing] [[of] %-itemtypes/blockdatas%]
+On Leash / Unleash	org.bukkit.event.entity.PlayerLeashEntityEvent,org.bukkit.event.entity.EntityUnleashEvent	[:player] [:un]leash[ing] [of %-entitydatas%]
+On Beacon Effect	com.destroystokyo.paper.event.block.BeaconEffectEvent	[:primary|:secondary] beacon effect [of %-potioneffecttypes%]	application of [:primary|:secondary] beacon effect [of %-potioneffecttypes%]	[:primary|:secondary] beacon effect apply [of %-potioneffecttypes%]
+On Vehicle Collision	org.bukkit.event.vehicle.VehicleBlockCollisionEvent,org.bukkit.event.vehicle.VehicleEntityCollisionEvent	vehicle collision [(with|of) [a[n]] %-itemtypes/blockdatas/entitydatas%]	vehicle block collision [(with|of) [a[n]] %-itemtypes/blockdatas%]	vehicle entity collision [(with|of) [a[n]] %-entitydatas%]
+On Fade	org.bukkit.event.block.BlockFadeEvent	[block] fad(e|ing) [[of] %-itemtypes/blockdatas%]
+On Form	org.bukkit.event.block.BlockFormEvent	[block] form[ing] [[of] %-itemtypes/blockdatas%]
+On Item Merge	org.bukkit.event.entity.ItemMergeEvent	(item[ ][stack]|[item] %-itemtypes%) merg(e|ing)	item[ ][stack] merg(e|ing) [[of] %-itemtypes%]
+On Item Despawn	org.bukkit.event.entity.ItemDespawnEvent	(item[ ][stack]|[item] %-itemtypes%) despawn[ing]	[item[ ][stack]] despawn[ing] [[of] %-itemtypes%]
+On Enderman/Sheep/Silverfish/Falling Block	org.bukkit.event.entity.EntityChangeBlockEvent	enderman place	enderman pickup	sheep eat	silverfish enter	silverfish exit	falling block fall[ing]	falling block land[ing]	(entity|%*-entitydatas%) chang(e|ing) block[s]
+On Consume	org.bukkit.event.player.PlayerItemConsumeEvent	[player] ((eat|drink)[ing]|consum(e|ing)) [[of] %-itemtypes%]
+On Move / Rotate	org.bukkit.event.player.PlayerMoveEvent,io.papermc.paper.event.entity.EntityMoveEvent	%-entitydata% (move|walk|step|rotate:(turn[ing] around|rotate))	%-entitydata% (move|walk|step) or (turn[ing] around|rotate)	%-entitydata% (turn[ing] around|rotate) or (move|walk|step)
+On Player Pick Item	io.papermc.paper.event.player.PlayerPickBlockEvent,io.papermc.paper.event.player.PlayerPickEntityEvent	[player] pick[ing] [of] [an|any] item	[player] pick[ing] [of] [a|any] block	[player] pick[ing] [of] [an|any] entity	[player] pick[ing] [of] %entitydata/itemtype/blockdata%
+On Bucket Catch Entity	org.bukkit.event.player.PlayerBucketEntityEvent	bucket (catch[ing]|captur(e|ing)) [[of] %-entitydatas%]
+On World Unload	org.bukkit.event.world.WorldUnloadEvent	world unload[ing] [of %-worlds%]
+On Block Growth	org.bukkit.event.block.BlockGrowEvent	(plant|crop|block) grow[(th|ing)] [[of] %-itemtypes%]
+On Pick Up	org.bukkit.event.player.PlayerPickupItemEvent,org.bukkit.event.entity.EntityPickupItemEvent	[(player|1¦entity)] (pick[ ]up|picking up) [[of] %-itemtypes%]
+Periodical	ch.njol.skript.events.bukkit.ScheduledNoWorldEvent	every %-timespan%
+On Weather Change	org.bukkit.event.weather.WeatherChangeEvent,org.bukkit.event.weather.ThunderChangeEvent	weather change [to %-weathertypes%]
+On Fuel Burn	org.bukkit.event.inventory.FurnaceBurnEvent	[furnace] fuel burn[ing] [of %-itemtypes%]
+On System Time	ch.njol.skript.events.EvtRealTime$RealTimeEvent	at %-times% [in] real time
+On Entity Breed	org.bukkit.event.entity.EntityBreedEvent	[entity] breed[ing] [of %-entitytypes%]
+On Furnace Item Extract	org.bukkit.event.inventory.FurnaceExtractEvent	furnace [item] extract[ion] [of %-itemtypes%]
+On Break / Mine	org.bukkit.event.block.BlockBreakEvent,org.bukkit.event.player.PlayerBucketFillEvent,org.bukkit.event.hanging.HangingBreakEvent	[block] (break[ing]|1¦min(e|ing)) [[of] %-itemtypes/blockdatas%]
+On Firework Explode	org.bukkit.event.entity.FireworkExplodeEvent	[a] firework explo(d(e|ing)|sion) [colo[u]red %-colors%]
+On World Init	org.bukkit.event.world.WorldInitEvent	world init[ialization] [of %-worlds%]
+On Harvest Block	org.bukkit.event.player.PlayerHarvestBlockEvent	[player] [block|crop] harvest[ing] [of %-itemtypes/blockdatas%]
+On Spectate	com.destroystokyo.paper.event.player.PlayerStartSpectatingEntityEvent,com.destroystokyo.paper.event.player.PlayerStopSpectatingEntityEvent	[player] stop spectating [(of|from) %-*entitydatas%]	[player] (swap|switch) spectating [(of|from) %-*entitydatas%]	[player] start spectating [of %-*entitydatas%]
+On Attempt Attack	io.papermc.paper.event.player.PrePlayerAttackEntityEvent	attack attempt	attempt[ing] to attack %-entitydatas%
+On Dispense	org.bukkit.event.block.BlockDispenseEvent	dispens(e|ing) [[of] %-itemtypes%]
+On Block Drop	org.bukkit.event.block.BlockDropItemEvent	block drop[ping] [[of] %-itemtypes/blockdatas%]
+On Resource Pack Request Response	org.bukkit.event.player.PlayerResourcePackStatusEvent	resource pack [request] response	resource pack [request] %-resourcepackstates%
+On Death	org.bukkit.event.entity.EntityDeathEvent	death [of %-entitydatas%]
+On World Save	org.bukkit.event.world.WorldSaveEvent	world sav(e|ing) [of %-worlds%]
+On Item Spawn	org.bukkit.event.entity.ItemSpawnEvent	item spawn[ing] [[of] %-itemtypes%]
+On Place	org.bukkit.event.block.BlockPlaceEvent,org.bukkit.event.player.PlayerBucketEmptyEvent,org.bukkit.event.hanging.HangingPlaceEvent	[block] (plac(e|ing)|build[ing]) [[of] %-itemtypes/blockdatas%]
+On Entity Shoot Bow	org.bukkit.event.entity.EntityShootBowEvent	%-entitydatas% shoot[ing] (bow|projectile)
+On Armor Change	com.destroystokyo.paper.event.player.PlayerArmorChangeEvent	[player] armo[u]r change[d]	[player] %-equipmentslot% change[d]
+On Teleport	org.bukkit.event.entity.EntityTeleportEvent,org.bukkit.event.player.PlayerTeleportEvent	[%-entitytypes%] teleport[ing]
+On World Load	org.bukkit.event.world.WorldLoadEvent	world load[ing] [of %-worlds%]
+On Heal	org.bukkit.event.entity.EntityRegainHealthEvent	heal[ing] [of %-entitydatas%] [(from|due to|by) %-healreasons%]	%-entitydatas% heal[ing] [(from|due to|by) %-healreasons%]
+On Damage	org.bukkit.event.entity.EntityDamageEvent	damag(e|ing) [of %-entitydata%] [by %-entitydata%]
+On Entity Transform	org.bukkit.event.entity.EntityTransformEvent	(entit(y|ies)|%*-entitydatas%) transform[ing] [due to %-transformreasons%]
+On Click	org.bukkit.event.player.PlayerInteractEvent,org.bukkit.event.player.PlayerInteractEntityEvent,org.bukkit.event.player.PlayerInteractAtEntityEvent	[(1:right|2:left)(| |-)][mouse(| |-)]click[ing] [on %-entitydata/itemtype/blockdata%] [(with|using|holding) %-itemtype%]	[(1:right|2:left)(| |-)][mouse(| |-)]click[ing] (with|using|holding) %-itemtype% on %-entitydata/itemtype/blockdata%
+At Time	ch.njol.skript.events.bukkit.ScheduledEvent	at %-time% [in %-worlds%]
+Periodical	ch.njol.skript.events.bukkit.ScheduledEvent	every %-timespan% in [world[s]] %-worlds%
+On Entity Potion Effect	org.bukkit.event.entity.EntityPotionEffectEvent	entity potion effect [modif[y|ication]] [[of] %-potioneffecttypes%] [%-potionactions%] [due to %-potioncauses%]
+On Grow	org.bukkit.event.world.StructureGrowEvent,org.bukkit.event.block.BlockGrowEvent	grow[th] [of (1:%-treetypes%|2:%-itemtypes/blockdatas%)]	grow[th] from %-itemtypes/blockdatas%	grow[th] [in]to (1:%-treetypes%|2:%-itemtypes/blockdatas%)	grow[th] from %-itemtypes/blockdatas% [in]to (1:%-treetypes%|2:%-itemtypes/blockdatas%)

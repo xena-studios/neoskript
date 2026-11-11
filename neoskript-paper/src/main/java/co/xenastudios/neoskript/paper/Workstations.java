@@ -61,8 +61,7 @@ final class Workstations {
     private static void registerBrewing(Registrar registrar) {
         registrar.condition("CondBrewingConsume", info -> {
             boolean negated = info.pattern() == 1;
-            restrict(info, "the brewing stand will" + (negated ? " not" : "") + " consume the fuel",
-                    "the brewing fuel event", BrewingStandFuelEvent.class);
+            restrict(info, "the brewing stand will" + (negated ? " not" : "") + " consume the fuel", BrewingStandFuelEvent.class);
             return new SettableCondition() {
                 @Override
                 public boolean check(TriggerContext context, Object[] arguments) {
@@ -81,7 +80,7 @@ final class Workstations {
         registrar.effect("EffBrewingConsume", info -> {
             boolean consume = info.pattern() == 0;
             restrict(info, consume ? "make the brewing stand consume the fuel"
-                    : "prevent the brewing stand from consuming the fuel", "the brewing fuel event", BrewingStandFuelEvent.class);
+                    : "prevent the brewing stand from consuming the fuel", BrewingStandFuelEvent.class);
             return (context, args) -> {
                 if (context.event() instanceof BrewingStandFuelEvent event) {
                     event.setConsuming(consume);
@@ -89,7 +88,7 @@ final class Workstations {
             };
         }, "make [the] brewing stand consume [its|the] fuel", "prevent [the] brewing stand from consuming [its|the] fuel");
         registrar.expression("ExprBrewingResults", "itemstack", info -> {
-            restrict(info, "the brewing results", "the brewing complete event", BrewEvent.class);
+            restrict(info, "the brewing results", BrewEvent.class);
             return new EventChangeable<>(BrewEvent.class, event -> event.getResults().toArray(),
                     ItemType[].class, Property.modes(Mode.SET, Mode.DELETE, Mode.ADD, Mode.REMOVE), (event, delta, mode) -> {
                 List<ItemStack> results = event.getResults();
@@ -134,7 +133,10 @@ final class Workstations {
             List<Object> times = new ArrayList<>();
             List<Object> blocks = owners(context, arguments);
             if (inEvent && context.event() instanceof BrewingStartEvent event && blocks.remove(event.getBlock())) {
-                times.add(Property.ticks(event.getBrewingTime()));
+                // After a wait, the stand's own, as in Skript.
+                times.add(Property.ticks(co.xenastudios.neoskript.runtime.Waits.delayed(event)
+                        && event.getBlock().getState() instanceof BrewingStand stand ? stand.getBrewingTime()
+                        : event.getBrewingTime()));
             }
             for (Object block : blocks) {
                 if (block instanceof Block b && b.getState() instanceof BrewingStand stand) {
@@ -257,7 +259,7 @@ final class Workstations {
         registrar.comparison(EnchantmentOffer.class, Experience.class, (offer, xp) -> offer.getCost() == xp.xp());
 
         registrar.expression("ExprEnchantingExpCost", "integer", info -> {
-            restrict(info, "the displayed enchanting cost", "the enchant event", EnchantItemEvent.class);
+            restrict(info, "the displayed enchanting cost", EnchantItemEvent.class);
             return new EventChangeable<>(EnchantItemEvent.class, event -> (long) event.getExpLevelCost(), Number.class,
                     Property.modes(Mode.SET, Mode.ADD, Mode.REMOVE), (event, delta, mode) -> {
                 if (delta == null) {
@@ -273,16 +275,16 @@ final class Workstations {
             });
         }, "[the] [displayed] ([e]xp[erience]|enchanting) cost");
         registrar.expression("ExprEnchantmentBonus", "integer", info -> {
-            restrict(info, "the enchantment bonus", "the enchant prepare event", PrepareItemEnchantEvent.class);
+            restrict(info, "the enchantment bonus", PrepareItemEnchantEvent.class);
             return new EventChangeable<>(PrepareItemEnchantEvent.class, event -> (long) event.getEnchantmentBonus());
         }, "[the] enchant[ment] bonus");
         registrar.expression("ExprEnchantmentHint", "enchantment", info -> {
-            restrict(info, "the enchantment hint", "the enchant event", EnchantItemEvent.class);
+            restrict(info, "the enchantment hint", EnchantItemEvent.class);
             return new EventChangeable<>(EnchantItemEvent.class, EnchantItemEvent::getEnchantmentHint);
         }, "[the] enchant[ment] hint");
         registrar.expression("ExprEnchantmentOffer", "enchantmentoffer", info -> {
             boolean all = info.pattern() == 0;
-            restrict(info, all ? "the enchantment offers" : "enchantment offer", "the enchant prepare event",
+            restrict(info, all ? "the enchantment offers" : "enchantment offer",
                     PrepareItemEnchantEvent.class);
             return new EnchantmentOffers(all);
         }, "[all [[of] the]|the] enchant[ment] offers", "enchant[ment] offer[s] %integers%",
@@ -303,7 +305,7 @@ final class Workstations {
                     }
                 }), co.xenastudios.neoskript.api.registration.Patterns.property("[enchant[ment]] cost", "enchantmentoffers"));
         registrar.expression("ExprAppliedEnchantments", "enchantmenttype", info -> {
-            restrict(info, "the applied enchantments", "the enchant event", EnchantItemEvent.class);
+            restrict(info, "the applied enchantments", EnchantItemEvent.class);
             return new EventChangeable<>(EnchantItemEvent.class, event -> event.getEnchantsToAdd().entrySet().stream()
                     .map(entry -> new Enchantments.Levelled(entry.getKey(), entry.getValue())).toArray(),
                     Enchantments.Levelled[].class, Property.modes(Mode.ADD, Mode.SET, Mode.DELETE, Mode.REMOVE),

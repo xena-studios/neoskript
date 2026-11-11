@@ -1,0 +1,15 @@
+name: NeoSkriptHarnessBot
+version: '1'
+main: co.xenastudios.neoskript.harness.bot.HarnessBotPlugin
+api-version: '1.21.4'
+folia-supported: true
+description: Test harness only. Console commands that make players join, chat and run commands on a headless server.
+commands:
+  bot:
+    description: Drives the harness's bot players.
+    usage: /bot <join|quit|chat|command|op|deop|teleport|damage|respawn|swap|drop|use|punch|slot|list> ...
+    permission: neoskript.harness.bot
+permissions:
+  # Ops and the console, as bots with op could otherwise drive other bots.
+  neoskript.harness.bot:
+    default: op

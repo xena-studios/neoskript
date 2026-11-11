@@ -1,0 +1,37 @@
+# Probe: functions, returns, locals and defaults.
+
+function probe_fn_add(a: number, b: number = 10) :: number:
+	return {_a} + {_b}
+
+function probe_fn_list(xs: numbers) :: numbers:
+	loop {_xs::*}:
+		add loop-value * 2 to {_out::*}
+	return {_out::*}
+
+function probe_fn_none():
+	set {_x} to 1
+
+function probe_fn_text(t: text) :: text:
+	if {_t} is "a":
+		return "was a"
+	return "other: %{_t}%"
+
+function probe_fn_early(n: number) :: text:
+	loop {_n} times:
+		if loop-number is 2:
+			return "stopped at 2"
+	return "ran through"
+
+function probe_functions():
+	show("defaults", (probe_fn_add(1, 2), probe_fn_add(5)))
+	show("list", probe_fn_list(1, 2 and 3))
+	set {_a} to "a"
+	set {_b} to "b"
+	show("text", (probe_fn_text({_a}), probe_fn_text({_b})))
+	probe_fn_none()
+	show("local stays", {_x})
+	set {_l::*} to probe_fn_list(4 and 5)
+	show("list result", (size of {_l::*}, {_l::*}))
+	show("nested", probe_fn_add(probe_fn_add(1, 1), 1))
+	show("early", (probe_fn_early(5), probe_fn_early(1)))
+	show("int to number", probe_fn_add(1.5, 2))

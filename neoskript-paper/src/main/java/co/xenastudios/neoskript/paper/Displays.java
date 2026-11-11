@@ -60,16 +60,23 @@ final class Displays {
                 .resettingTo((java.util.function.Consumer<Object>) display -> ((Display) display).setGlowColorOverride(null)),
                 "[the] glow[ing] colo[u]r[s] override[s]" + of, "%entities%'[s] glow[ing] colo[u]r[s] override[s]");
 
+        // Skript's names, from its language file; each one's first is the one it's shown by.
         Map<String, ItemDisplay.ItemDisplayTransform> transforms = new LinkedHashMap<>();
-        transforms.put("no transform", ItemDisplay.ItemDisplayTransform.NONE);
-        transforms.put("third person left hand", ItemDisplay.ItemDisplayTransform.THIRDPERSON_LEFTHAND);
-        transforms.put("third person right hand", ItemDisplay.ItemDisplayTransform.THIRDPERSON_RIGHTHAND);
-        transforms.put("first person left hand", ItemDisplay.ItemDisplayTransform.FIRSTPERSON_LEFTHAND);
-        transforms.put("first person right hand", ItemDisplay.ItemDisplayTransform.FIRSTPERSON_RIGHTHAND);
-        transforms.put("head", ItemDisplay.ItemDisplayTransform.HEAD);
-        transforms.put("gui", ItemDisplay.ItemDisplayTransform.GUI);
-        transforms.put("ground", ItemDisplay.ItemDisplayTransform.GROUND);
-        transforms.put("fixed", ItemDisplay.ItemDisplayTransform.FIXED);
+        String[][] transformNames = {
+                {"FIRSTPERSON_LEFTHAND", "first person left handed", "first person left hand", "left handed in first person"},
+                {"FIRSTPERSON_RIGHTHAND", "first person right handed", "first person right hand", "right handed in first person"},
+                {"FIXED", "fixed", "fixed position"},
+                {"GROUND", "ground", "the ground"},
+                {"GUI", "gui", "menu"},
+                {"HEAD", "head"},
+                {"NONE", "no transform"},
+                {"THIRDPERSON_LEFTHAND", "third person left handed", "third person left hand", "left handed in third person"},
+                {"THIRDPERSON_RIGHTHAND", "third person right handed", "third person right hand", "right handed in third person"}};
+        for (String[] names : transformNames) {
+            for (int i = 1; i < names.length; i++) {
+                transforms.put(names[i], ItemDisplay.ItemDisplayTransform.valueOf(names[0]));
+            }
+        }
         registrar.namedType("itemdisplaytransform", "item display transform", ItemDisplay.ItemDisplayTransform.class, transforms);
         registrar.expression("ExprItemDisplayTransform", "itemdisplaytransform", info -> new SettableProperty<>(ItemDisplay.class,
                 ItemDisplay.ItemDisplayTransform.class, ItemDisplay::getItemDisplayTransform, ItemDisplay::setItemDisplayTransform)

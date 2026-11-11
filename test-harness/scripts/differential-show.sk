@@ -1,0 +1,5 @@
+# For the differential scenario's probes: prints a label and values, so the values don't have to be
+# written inside a text's %...%.
+
+function show(label: text, values: objects):
+	send "%{_label}%: %{_values::*}%" to console

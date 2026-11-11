@@ -87,7 +87,7 @@ public final class NeoSkriptHooksScenario implements Scenario {
             server.await(Pattern.compile("\\[harness] hooks groups done$"), mark, WAIT);
             server.stop();
             List<String> problems = server.linesMatching(Pattern.compile(
-                    "\\[harness] hooks FAIL|\\[NeoSkript] Line \\d+|Could not hook into"));
+                    "\\[harness] hooks FAIL|\\[Skript] Line \\d+|Could not hook into"));
             if (!problems.isEmpty()) {
                 throw new HarnessFailure("Hooks didn't work: " + problems + ". See " + server.logFile());
             }

@@ -45,7 +45,7 @@ public final class NeoSkriptItemsScenario implements Scenario {
                 .start()) {
             server.await(Pattern.compile("\\[harness] items done$"), WAIT);
             server.stop();
-            List<String> problems = server.linesMatching(Pattern.compile("\\[harness] items FAIL|\\[NeoSkript] Line \\d+"));
+            List<String> problems = server.linesMatching(Pattern.compile("\\[harness] items FAIL|\\[Skript] Line \\d+"));
             if (!problems.isEmpty()) {
                 throw new HarnessFailure("Items didn't work: " + problems + ". See " + server.logFile());
             }

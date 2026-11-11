@@ -141,17 +141,33 @@ final class Players {
             };
         }, Patterns.hasProperty("[the] permission[s] %texts%", "commandsenders"));
 
-        registrar.effect("EffKick", info -> (context, args) -> {
-            Component reason = args[1] == null ? null : Messages.component(args[1]);
-            for (Object player : (Object[]) args[0]) {
-                if (player instanceof Player online) {
-                    if (reason == null) {
-                        online.kick();
-                    } else {
-                        online.kick(reason);
-                    }
+        // As Skript's EffKick: no reason is an empty one, and a reason that's nothing kicks no one. Until the
+        // trigger waits, kicking the player of a login event refuses them, and of a kick event, changes its message.
+        registrar.effect("EffKick", info -> {
+            boolean reasonGiven = !info.isDefault(1);
+            return (context, args) -> {
+                if (reasonGiven && args[1] == null) {
+                    return;
                 }
-            }
+                Component reason = reasonGiven ? Messages.component(args[1]) : Component.empty();
+                Object event = context.event();
+                boolean delayed = co.xenastudios.neoskript.runtime.Waits.delayed(event);
+                for (Object player : (Object[]) args[0]) {
+                    if (!(player instanceof Player online)) {
+                        continue;
+                    }
+                    if (!delayed) {
+                        if (event instanceof org.bukkit.event.player.PlayerLoginEvent login && online.equals(login.getPlayer())) {
+                            login.disallow(org.bukkit.event.player.PlayerLoginEvent.Result.KICK_OTHER, reason);
+                            return;
+                        } else if (event instanceof org.bukkit.event.player.PlayerKickEvent kick && online.equals(kick.getPlayer())) {
+                            kick.leaveMessage(reason);
+                            return;
+                        }
+                    }
+                    online.kick(reason);
+                }
+            };
         }, "kick %players% [(by reason of|because [of]|on account of|due to) %text%]");
 
         registerMore(registrar);
@@ -257,12 +273,29 @@ final class Players {
                 "[the] last damage [taken] (of|by) %livingentities%", "%livingentities%'[s] last damage [taken]");
         registrar.effect("EffIgnite", info -> {
             boolean extinguish = info.pattern() == 2;
+            boolean timeGiven = !extinguish && !info.isDefault(1);
             return (context, args) -> {
-                int ticks = extinguish ? 0 : args[1] instanceof Timespan time ? (int) time.ticks() : 160;
+                // A time that's nothing does nothing, as in Skript.
+                if (timeGiven && !(args[1] instanceof Timespan)) {
+                    return;
+                }
+                int ticks = extinguish ? 0 : timeGiven ? (int) ((Timespan) args[1]).ticks() : 160;
+                Object event = context.event();
+                boolean delayed = co.xenastudios.neoskript.runtime.Waits.delayed(event);
                 for (Object entity : (Object[]) args[0]) {
-                    if (entity instanceof Entity e) {
-                        e.setFireTicks(ticks);
+                    if (!(entity instanceof Entity e)) {
+                        continue;
                     }
+                    // As Skript: the entity of a damage event is set on fire once the event is over, as the
+                    // damage would put it out; the entity of a combust event isn't set on fire by the event.
+                    if (!delayed && event instanceof org.bukkit.event.entity.EntityDamageEvent damage && damage.getEntity() == e) {
+                        e.getScheduler().run(PlayerSyntax.plugin(), task -> e.setFireTicks(ticks), null);
+                        continue;
+                    }
+                    if (!delayed && event instanceof org.bukkit.event.entity.EntityCombustEvent combust && combust.getEntity() == e) {
+                        combust.setCancelled(true);
+                    }
+                    e.setFireTicks(ticks);
                 }
             };
         }, "(ignite|set fire to) %entities% [for %timespan%]", "(set|light) %entities% on fire [for %timespan%]",

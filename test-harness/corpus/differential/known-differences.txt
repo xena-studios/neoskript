@@ -1,0 +1,4 @@
+# Units of the differential scenario that are known to behave differently on NeoSkript, with why.
+# 'folia: <unit>' only differs on Folia, where Skript doesn't run and NeoSkript is compared with Skript on Paper.
+
+folia: probes/world # The console runs on Folia's global thread, which can't read the world's regions.

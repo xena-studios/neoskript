@@ -4,11 +4,13 @@
  */
 package co.xenastudios.neoskript.harness;
 
+import co.xenastudios.neoskript.harness.scenario.DifferentialScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptBootScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptEventsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptLanguageScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptMigrationScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptParseScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptPlayerEventsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptCommandsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptCorpusScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptHooksScenario;
@@ -48,6 +50,7 @@ public final class HarnessMain {
             new NeoSkriptRuntimeErrorsScenario(),
             new NeoSkriptEventsScenario(),
             new NeoSkriptCommandsScenario(),
+            new NeoSkriptPlayerEventsScenario(),
             new NeoSkriptCorpusScenario(),
             new NeoSkriptItemsScenario(),
             new NeoSkriptHooksScenario(),
@@ -59,7 +62,8 @@ public final class HarnessMain {
             new SkriptCorpusScenario(),
             new NeoSkriptParseScenario(),
             new SkriptTestSuiteScenario(),
-            new SkriptLoadBenchmark());
+            new SkriptLoadBenchmark(),
+            new DifferentialScenario());
 
     record Result(String environment, String scenario, boolean passed, Duration duration, String message,
             Map<String, Object> summary) {}

@@ -67,6 +67,10 @@ final class Scripts {
                 args[0] instanceof co.xenastudios.neoskript.runtime.FunctionRef function
                         ? function.call(args[1] == null ? new Object[0] : (Object[]) args[1]) : null,
                 "[the] result[s] of [running|executing] %function% [with arg[ument]s %objects%]");
+        // Functions as values are part of Skript's reflection experiment.
+        for (String id : List.of("ExprFunction", "ExprAllFunctions", "EffRun", "ExprResult")) {
+            registrar.experimental(id, "reflection");
+        }
         registrar.expression("ExprScriptNamed", "script", info -> {
             boolean folder = info.pattern() == 1;
             return (context, args) -> {

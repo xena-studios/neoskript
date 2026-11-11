@@ -96,7 +96,7 @@ final class Tags {
                 "%itemtypes/blocks/blockdatas/entities/entitytypes% (isn't|is not|aren't|are not) tagged (as|with) %minecrafttags%");
         registrar.expression("ExprTagContents", "object", info -> (context, args) -> {
             List<Object> contents = new ArrayList<>();
-            for (Object value : (Object[]) args[0]) {
+            for (Object value : co.xenastudios.neoskript.runtime.Values.array(args[0])) {
                 if (value instanceof Tag tag) {
                     for (Keyed keyed : tag.values()) {
                         contents.add(keyed instanceof Material material ? new ItemType(new org.bukkit.inventory.ItemStack(
@@ -105,7 +105,7 @@ final class Tags {
                 }
             }
             return contents.toArray();
-        }, "[the] tag (contents|values) of %minecrafttags%", "%minecrafttags%'[s] tag (contents|values)");
+        }, "[the] tag (contents|values) of %minecrafttag%", "%minecrafttag%'[s] tag (contents|values)");
         // 'the key of {_tag}': its namespaced key, "minecraft:dirt".
         registrar.property("ExprTagKey", "string", "[namespace[d]] key[s]", "minecrafttags", Tag.class,
                 tag -> tag.key().toString());

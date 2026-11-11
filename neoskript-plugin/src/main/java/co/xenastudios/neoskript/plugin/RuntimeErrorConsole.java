@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.plugin;
 
+import co.xenastudios.neoskript.paper.TextComponentParser;
 import co.xenastudios.neoskript.runtime.RuntimeErrors;
 import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.errors.ErrorFrame;
@@ -62,6 +63,13 @@ final class RuntimeErrorConsole implements RuntimeErrors.Consumer {
     @Override
     public void printError(RuntimeError error) {
         AutoReload.send(List.of(Bukkit.getConsoleSender()), RuntimeErrorMessages.error(error));
+    }
+
+    @Override
+    public void logError(String message) {
+        // Skript's log entry without a line: its prefix, then the message in its error color.
+        AutoReload.send(List.of(Bukkit.getConsoleSender()), SkriptCommandMessages.PREFIX + "<light red>"
+                + TextComponentParser.instance().escape(message) + "<reset>");
     }
 
     @Override

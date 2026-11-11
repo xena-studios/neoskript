@@ -17,7 +17,9 @@ import java.util.function.Predicate;
  * steps and preferences: a value of exactly the class for the closest event class; else one of a subclass, or
  * of the event's subclasses (checked when it runs); else, with conversion allowed, one of a superclass cast down
  * when it runs, and last any value a converter turns into one. Past and future values fall back to the value
- * now. What's found for each event class, class and time is kept, so each is looked into once.
+ * now. What's found for each event class, class and time is kept, so each is looked into once. As in Skript,
+ * an excluded value's error comes only the first time: what's kept after that is that it stopped, with no error,
+ * so later scripts asking get the usual "There's no player in an on damage event."
  */
 final class EventValueResolver {
 
@@ -39,17 +41,22 @@ final class EventValueResolver {
     /** A value found: its class and how to get it from an event. */
     record Candidate(Class<?> valueClass, String type, Function<Object, Object> getter) {}
 
-    /** What resolving found: its candidates, or that an excluded value stopped it, with the error. */
-    record Resolution(List<Candidate> all, String error) {
+    /**
+     * What resolving found: its candidates, or that an excluded value stopped it ({@code aborted}), with the
+     * error the first time.
+     */
+    record Resolution(List<Candidate> all, String error, boolean aborted) {
 
-        static final Resolution EMPTY = new Resolution(List.of(), null);
+        static final Resolution EMPTY = new Resolution(List.of(), null, false);
+        /** An excluded value stopped it before, and Skript gave the error then. */
+        static final Resolution ABORTED = new Resolution(List.of(), null, true);
 
         boolean successful() {
             return !all.isEmpty();
         }
 
         boolean errored() {
-            return error != null;
+            return aborted;
         }
 
         boolean multiple() {
@@ -85,7 +92,7 @@ final class EventValueResolver {
             return cached;
         }
         Resolution resolution = resolveNew(eventClass, valueClass, type, time, flags);
-        cache.put(key, resolution);
+        cache.put(key, resolution.errored() ? Resolution.ABORTED : resolution);
         return resolution;
     }
 
@@ -140,7 +147,7 @@ final class EventValueResolver {
             if (value.excluded() != null) {
                 // An excluded value stops the search where the event is one it's excluded from.
                 if (value.eventClass().isAssignableFrom(event)) {
-                    return new Resolution(List.of(), value.excluded());
+                    return new Resolution(List.of(), value.excluded(), true);
                 }
                 continue;
             }
@@ -159,7 +166,7 @@ final class EventValueResolver {
             }
             best.add(candidate);
         }
-        return new Resolution(filterMatches ? matching(valueClass, type, best) : List.copyOf(best), null);
+        return new Resolution(filterMatches ? matching(valueClass, type, best) : List.copyOf(best), null, false);
     }
 
     /**

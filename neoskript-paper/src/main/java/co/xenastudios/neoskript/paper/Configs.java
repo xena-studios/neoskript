@@ -94,6 +94,11 @@ final class Configs {
                 return node == null ? null : valueAs(node, type);
             };
         }, "[the] <.+> value [at] %string% (from|in) %node/script%");
+        // Reading configs is part of Skript's reflection experiment. Without it, the value of a node is no error
+        // of its own: Skript's ExprSubnodeValue just doesn't match.
+        registrar.experimental("ExprConfig", "reflection");
+        registrar.experimental("ExprNode", "reflection");
+        registrar.experimental("ExprSubnodeValue", "reflection", true);
         registrar.typedExpression("PropExprValueOf", "object", info -> {
             co.xenastudios.neoskript.api.element.ElementInfo.TypeArgument type = info.types().isEmpty() ? null
                     : info.types().getFirst();

@@ -56,6 +56,10 @@ final class LineParser {
     private int unresolvedCode;
     private String functionProblem;
     private String problem;
+    /** The first error for experimental syntax the script can't use, which Skript reports above others. */
+    private String experimentProblem;
+    /** Spans that matched experimental syntax the script can't use: as in Skript, they aren't words to resolve. */
+    private final java.util.Set<Long> experimentalSpans = new java.util.HashSet<>();
     /** Per kind, the unindexed patterns whose required literals all occur somewhere in the line. */
     private final Map<SyntaxKind, List<PatternIndex.Entry<SyntaxRegistry.Candidate>>> viableUnindexed =
             new EnumMap<>(SyntaxKind.class);
@@ -168,6 +172,9 @@ final class LineParser {
         PatternIndex<SyntaxRegistry.Candidate> index = registry.index(kind);
         Object fallback = null;
         int fallbackUnresolved = Integer.MAX_VALUE;
+        // A type property turned down for its values' type, written in full: then a reading leaning on unresolved
+        // words isn't taken instead, as Skript's error for the property is the line's.
+        boolean propertyRefused = false;
         List<PatternIndex.Entry<SyntaxRegistry.Candidate>> indexed = new ArrayList<>();
         for (PatternIndex.Entry<SyntaxRegistry.Candidate> entry : index.indexed(text)) {
             if (isViable(kind, entry)) {
@@ -209,7 +216,29 @@ final class LineParser {
                 refusedEventValues = true;
                 continue;
             }
+            // A type property of values whose type can't have it isn't one, with Skript's error for it.
+            String unpropertied = propertyProblem(parsed);
+            if (unpropertied != null) {
+                problem(unpropertied);
+                if (!hasUnresolved(parsed)) {
+                    propertyRefused = true;
+                    // Of those, Skript's error is for the one taking the most: 'name of 5 + 1' is of '5 + 1'.
+                    if (propertyProblem == null || start < propertySpan[0] || start == propertySpan[0] && end > propertySpan[1]) {
+                        propertyProblem = unpropertied;
+                        propertySpan[0] = start;
+                        propertySpan[1] = end;
+                    }
+                    propertyRefusals.add(start);
+                }
+                continue;
+            }
             if (syntax.id().equals("ExprArithmetic") && !arithmeticOperands(parsed)) {
+                continue;
+            }
+            // A for loop's key and value go into variables, as Skript's refuses anything else: 'loop all players
+            // in world "world"' is a loop over those players.
+            if (syntax.id().equals("SecFor") && !parsed.match().values().subList(0, parsed.match().values().size() - 1)
+                    .stream().allMatch(Expr.Variable.class::isInstance)) {
                 continue;
             }
             // 'all colours' only for types whose values can be listed; 'all players' is something else's.
@@ -217,17 +246,50 @@ final class LineParser {
                     && !(parsed.match().regexValues().getFirst() instanceof TypeRef ref && registry.isEnumerable(ref.type().id()))) {
                 continue;
             }
+            // Positions or indices in a list need a list, and indices one with indices, as Skript's init refuses:
+            // '(index of "o" in {_t}, last index of "o" in {_t})' is two positions in a text.
+            if (syntax.id().equals("ExprIndicesOfValue") && candidate.pattern() > 0
+                    && parsed.match().values().get(1) instanceof Expr haystack) {
+                String words = input.substring(haystack.start(), haystack.end()).strip();
+                if (Plurality.single(haystack, registry)) {
+                    if (problem == null) {
+                        problem = "'" + words + "' can only ever have one value at most, thus the 'indices of x in"
+                                + " list' expression has no effect.";
+                    }
+                    continue;
+                }
+                if (candidate.pattern() == 2 && !(haystack instanceof Expr.Variable || haystack instanceof Expr.Syntax
+                        || haystack instanceof Expr.FunctionCall)) {
+                    if (problem == null) {
+                        problem = "'" + words + "' is not a keyed expression. You can only get the indices of a keyed"
+                                + " expression.";
+                    }
+                    continue;
+                }
+            }
             // Filtering one value isn't filtering, as Skript's filter refuses: '"1" parsed as "%integer%" where [...]'.
             if (syntax.id().equals("ExprFilter") && parsed.match().values().getFirst() instanceof Expr filtered
                     && Plurality.single(filtered, registry)) {
                 continue;
             }
             Object result = parsed;
-            if (expected != null) {
-                String type = returnType(parsed);
-                if (!expected.accepts(type, registry)) {
-                    continue;
+            String type = expected == null ? null : returnType(parsed);
+            if (expected != null && !expected.accepts(type, registry)) {
+                continue;
+            }
+            // Experimental syntax only exists for scripts using its experiment, as in Skript.
+            SyntaxRegistry.Experimental experimental = registry.experimental(syntax);
+            if (experimental != null && !context.using(experimental.experiment())) {
+                if (!experimental.silent()) {
+                    problem(experimental.error());
+                    if (experimentProblem == null) {
+                        experimentProblem = experimental.error();
+                    }
+                    experimentalSpans.add(span(start, end));
                 }
+                continue;
+            }
+            if (expected != null) {
                 result = new Expr.Syntax(start, end, parsed, type);
                 // Several values can't go where one does: 'test location' isn't the entities called 'test'.
                 if (expected.onlyOne() && Plurality.plural((Expr) result, registry)) {
@@ -249,7 +311,7 @@ final class LineParser {
                 fallbackUnresolved = unresolved;
             }
         }
-        return fallback;
+        return propertyRefused && fallbackUnresolved > 0 ? null : fallback;
     }
 
     /**
@@ -260,6 +322,92 @@ final class LineParser {
         // ...or of a hyphenated word, as the 'value' of 'loop-value': only if nothing else parses is it split there.
         return position >= 2 && position < input.length() && Character.isLetterOrDigit(input.charAt(position))
                 && input.charAt(position - 1) == '-' && Character.isLetter(input.charAt(position - 2));
+    }
+
+    /**
+     * Skript's error for a type property ({@code name of 5}) whose values can't have it, as its
+     * {@code PropertyBaseSyntax.getBadTypesErrorMessage}, or {@code null} if they can (or might). Of several, all
+     * must be able to; the error names the types that don't have it themselves.
+     */
+    private String propertyProblem(ParsedSyntax parsed) {
+        SyntaxRegistry.PropertySyntax property = registry.propertySyntax(parsed.syntax());
+        if (property == null || property.argument() >= parsed.match().values().size()
+                || !(parsed.match().values().get(property.argument()) instanceof Expr owners)) {
+            return null;
+        }
+        String name = property.property().apply(parsed.match().tags());
+        // 'amount of X and Y' counts them.
+        if (name == null || property.counts() && !parsed.match().hasTag("s") && !Plurality.single(owners, registry)) {
+            return null;
+        }
+        List<Expr> parts = owners instanceof Expr.ListOf list ? list.items() : List.of(owners);
+        boolean convertible = true;
+        boolean axes = name.length() == 1;
+        java.util.Set<String> lacking = new java.util.LinkedHashSet<>();
+        for (Expr part : parts) {
+            String type = propertyOwnerType(part);
+            if (type == null || part instanceof Expr.Unresolved || part instanceof Expr.ListOf) {
+                return null;
+            }
+            // A text written out is converted while loading, as Skript's literals are, which gives nothing here.
+            boolean itself = part instanceof Expr.Text text && text.embedded().isEmpty();
+            convertible &= itself ? registry.hasPropertyItself(type, name) : registry.hasProperty(type, name);
+            if (!registry.hasPropertyItself(type, name)) {
+                lacking.add(type);
+            }
+            axes &= itself ? registry.hasPropertyItself(type, AXES) : registry.hasProperty(type, AXES);
+        }
+        if (convertible) {
+            return null;
+        }
+        // Things with components, but none on this axis: 'w of vector(1, 2, 3)'.
+        if (axes) {
+            return "None of the types returned by " + expressionText(owners) + " have an "
+                    + name.toLowerCase(java.util.Locale.ROOT) + " axis component.";
+        }
+        List<String> names = new ArrayList<>();
+        for (String type : lacking) {
+            TypeInfo info = registry.type(type);
+            names.add(info == null ? type : info.name().toLowerCase(java.util.Locale.ROOT));
+        }
+        String joined = names.size() <= 1 ? String.join("", names)
+                : String.join(", ", names.subList(0, names.size() - 1)) + " and " + names.getLast();
+        return "The expression '" + expressionText(owners) + "' returns the following types that do not have the "
+                + name + " property: " + joined;
+    }
+
+    /**
+     * The type of a type property's values: arithmetic on whole numbers is a whole number, and on numbers a
+     * number, as Skript's arithmetic returns; anything else its own type.
+     */
+    private static String propertyOwnerType(Expr expr) {
+        if (!(expr instanceof Expr.Syntax syntax) || !syntax.syntax().syntax().id().equals("ExprArithmetic")) {
+            return expr.type();
+        }
+        boolean whole = true;
+        for (Object operand : syntax.syntax().match().values()) {
+            String type = operand instanceof Expr inner ? propertyOwnerType(inner) : null;
+            if (!"integer".equals(type) && !"number".equals(type)) {
+                return expr.type();
+            }
+            whole &= type.equals("integer");
+        }
+        return whole ? "integer" : "number";
+    }
+
+    /**
+     * Skript's WXYZ property, whose syntax ({@code x of %objects%}) is each axis's property by its letter: what has
+     * it but not the axis gets Skript's error for that.
+     */
+    private static final String AXES = "wxyz component";
+
+    /** An expression as Skript's errors write it: without brackets around it, and a list in brackets. */
+    private String expressionText(Expr expr) {
+        String text = input.substring(expr.start(), expr.end()).strip();
+        while (text.length() > 1 && text.charAt(0) == '(' && Scanner.parenEnd(text, 0, text.length()) == text.length()) {
+            text = text.substring(1, text.length() - 1).strip();
+        }
+        return expr instanceof Expr.ListOf ? "(" + text + ")" : text;
     }
 
     /** Types arithmetic works on; an operand of another known type rules arithmetic out, as in Skript. */
@@ -832,6 +980,53 @@ final class LineParser {
     /** Why a variable didn't fit, by its type hints, for the line's error; or {@code null}. */
     private String hintProblem;
 
+    /** Skript's error for the type property turned down for its values' type; or {@code null}. */
+    private String propertyProblem;
+
+    /** Where the type property {@link #propertyProblem} is for starts and ends. */
+    private final int[] propertySpan = new int[2];
+
+    /** Where each type property turned down for its values' type starts. */
+    private final List<Integer> propertyRefusals = new ArrayList<>();
+
+    /**
+     * Skript's error for the type property turned down for its values' type, written in full ({@code name
+     * of 5}), if it's the line's error: nothing else parses ({@code parsed} is {@code null}), or only by reading the
+     * property's words as words nothing understands. Else {@code null}.
+     */
+    String propertyProblem(Object parsed) {
+        if (propertyProblem == null || parsed == null) {
+            return propertyProblem;
+        }
+        List<Expr.Unresolved> unknown = new ArrayList<>();
+        unknownWords(parsed, unknown);
+        for (Expr.Unresolved words : unknown) {
+            for (int start : propertyRefusals) {
+                if (words.start() <= start && start < words.end()) {
+                    return propertyProblem;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** The words nothing understands in {@code value}, those no type's parser has taken. */
+    private static void unknownWords(Object value, List<Expr.Unresolved> found) {
+        switch (value) {
+            case Expr.Unresolved unresolved when !unresolved.verified() -> found.add(unresolved);
+            case Expr.Syntax syntax -> unknownWords(syntax.syntax(), found);
+            case ParsedSyntax syntax -> {
+                syntax.match().values().forEach(inner -> unknownWords(inner, found));
+                syntax.match().regexValues().forEach(inner -> unknownWords(inner, found));
+            }
+            case Expr.ListOf list -> list.items().forEach(item -> unknownWords(item, found));
+            case Expr.FunctionCall call -> call.arguments().forEach(argument -> unknownWords(argument, found));
+            case Expr.Text text -> text.embedded().forEach(inner -> unknownWords(inner, found));
+            case Expr.Variable variable -> variable.embedded().forEach(inner -> unknownWords(inner, found));
+            case null, default -> { }
+        }
+    }
+
     String hintProblem() {
         return hintProblem;
     }
@@ -972,6 +1167,44 @@ final class LineParser {
                     + " Having a single ':' does nothing!");
         }
         return true;
+    }
+
+    /** Skript's error for a variable's name with a {@code %} that starts no expression. */
+    static final String ODD_PERCENTS = "The percent sign is used for expressions (e.g. %player%). To insert a '%' type it"
+            + " twice: %%.";
+
+    /**
+     * Skript's error for a line with a variable whose name has a {@code %} that starts no expression, as
+     * {@code {x::%%y%}}, or {@code null}. Skript finds where a variable ends by its braces alone, so it gets
+     * as far as the variable's name. (A text like that is already the line's error, as its closing quote is
+     * taken to be in an expression.)
+     */
+    static String oddPercents(String line) {
+        boolean inText = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"') {
+                inText = !inText;
+            } else if (c == '{' && !inText) {
+                int depth = 0;
+                int end = i;
+                for (; end < line.length(); end++) {
+                    if (line.charAt(end) == '{') {
+                        depth++;
+                    } else if (line.charAt(end) == '}' && --depth == 0) {
+                        break;
+                    }
+                }
+                if (end == line.length()) {
+                    return null;
+                }
+                if (line.substring(i, end).chars().filter(ch -> ch == '%').count() % 2 != 0) {
+                    return ODD_PERCENTS;
+                }
+                i = end;
+            }
+        }
+        return null;
     }
 
     /**
@@ -1269,9 +1502,19 @@ final class LineParser {
         return String.join(", ", types);
     }
 
+    private long span(int start, int end) {
+        int[] span = trim(start, end);
+        return ((long) span[0] << 32) | span[1];
+    }
+
+    /** The error for experimental syntax the script can't use that the line has, or {@code null}. */
+    String experimentProblem() {
+        return experimentProblem;
+    }
+
     /** The first problem found with a function call in this line, in Skript's wording, or {@code null}. */
     String functionProblem() {
-        return functionProblem != null ? functionProblem : problem;
+        return functionProblem != null ? functionProblem : experimentProblem != null ? experimentProblem : problem;
     }
 
     /** Whether {@code [start, end)} of the line is an expression of any type. */
@@ -1397,7 +1640,7 @@ final class LineParser {
 
     private Expr unresolved(int start, int end, Expected expected) {
         String text = input.substring(start, end);
-        if (!Literals.isWords(text)) {
+        if (!Literals.isWords(text) || experimentalSpans.contains(span(start, end))) {
             return null;
         }
         if (context.isItemAlias(text) && (expected.anything() || expected.types().stream().anyMatch(type ->

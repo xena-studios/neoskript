@@ -106,7 +106,9 @@ final class ServerEvents {
             throw new co.xenastudios.neoskript.api.element.SyntaxError("A connect event cannot be cancelled, but the "
                     + "player may be kicked ('kick player by reason of \"...\"')");
         }
-        throw new co.xenastudios.neoskript.api.element.SyntaxError("An on " + info.eventName() + " event cannot be cancelled");
+        String event = SkriptEventNames.a(info.eventName());
+        throw new co.xenastudios.neoskript.api.element.SyntaxError(Character.toUpperCase(event.charAt(0))
+                + event.substring(1) + " event cannot be cancelled");
     }
 
     /** The messages events show, which triggers can change: chat, join and quit messages, the MOTD. */

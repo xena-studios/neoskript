@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.paper;
 
+import co.xenastudios.neoskript.api.element.Changeable;
 import co.xenastudios.neoskript.api.element.Warnings;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Values;
@@ -337,8 +338,12 @@ final class EntitySyntax {
                     }
                     switch (pattern) {
                         case 0 -> {
+                            // 'make the player ride a saddled pig': a type spawns one at each rider, as in Skript.
+                            Entity vehicle = args[1] instanceof EntityKind kind ? kind.spawn(entity.getLocation())
+                                    : args[1] instanceof Entity existing ? existing : null;
                             // Nothing can ride itself.
-                            if (args[1] instanceof Entity vehicle && vehicle != entity) {
+                            if (vehicle != null && vehicle != entity) {
+                                entity.leaveVehicle();
                                 vehicle.addPassenger(entity);
                             }
                         }
@@ -347,7 +352,7 @@ final class EntitySyntax {
                     }
                 }
             };
-        }, "(make|let|force) %entities% [to] (ride|mount) [(in|on)] %entity%",
+        }, "(make|let|force) %entities% [to] (ride|mount) [(in|on)] %entity/entitytype%",
                 "(make|let|force) %entities% [to] (dismount|(dismount|leave) [(from|of)] [(any|the[ir]|his|her)] vehicle[s])",
                 "(eject|dismount) [(any|the)] passenger[s] (of|from) %entities%");
         // The player who tamed an animal; set to another, or cleared to make it wild.
@@ -402,11 +407,23 @@ final class EntitySyntax {
         }, "[the] (main|hidden:hidden) gene[s] of %livingentities%", "%livingentities%'[s] (main|hidden:hidden) gene[s]");
 
         // Allays: how long until they can duplicate again, whether they can, and making them.
-        registrar.expression("ExprDuplicateCooldown", "timespan", info -> new SettableProperty<>(org.bukkit.entity.Allay.class,
-                co.xenastudios.neoskript.runtime.Timespan.class,
-                allay -> new co.xenastudios.neoskript.runtime.Timespan(allay.getDuplicationCooldown() * 50),
-                (allay, time) -> allay.setDuplicationCooldown(Math.max(0, time.ticks()))),
-                "[the] duplicat(e|ion) cooldown [time] of %livingentities%", "%livingentities%'[s] duplicat(e|ion) cooldown [time]");
+        // Set, added to, taken from, deleted (no cooldown) or reset, as Skript's.
+        registrar.expression("ExprDuplicateCooldown", "timespan", info -> new Property<>(LivingEntity.class,
+                living -> living instanceof org.bukkit.entity.Allay allay ? Property.ticks(allay.getDuplicationCooldown()) : null,
+                co.xenastudios.neoskript.runtime.Timespan.class, Property.modes(Changeable.Mode.SET, Changeable.Mode.ADD,
+                        Changeable.Mode.REMOVE, Changeable.Mode.DELETE, Changeable.Mode.RESET),
+                (living, delta, mode) -> {
+                    if (!(living instanceof org.bukkit.entity.Allay allay)) {
+                        return;
+                    }
+                    long ticks = delta == null ? 0 : Math.max(0, ((co.xenastudios.neoskript.runtime.Timespan) delta[0]).ticks());
+                    switch (mode) {
+                        case ADD -> allay.setDuplicationCooldown(Math.max(0, allay.getDuplicationCooldown() + ticks));
+                        case REMOVE -> allay.setDuplicationCooldown(Math.max(0, allay.getDuplicationCooldown() - ticks));
+                        case RESET -> allay.resetDuplicationCooldown();
+                        default -> allay.setDuplicationCooldown(ticks);
+                    }
+                }).defaulting(), Property.defaultPatterns("(duplicat(e|ing|ion)|clon(e|ing)) cool[ ]down [time]", "livingentities"));
         registrar.effect("EffAllayDuplicate", info -> (context, args) -> {
             for (Object value : (Object[]) args[0]) {
                 if (value instanceof org.bukkit.entity.Allay allay) {
@@ -416,7 +433,7 @@ final class EntitySyntax {
         }, "make %livingentities% (duplicate|clone)");
 
         registrar.effect("EffPersistent", info -> {
-            boolean persist = info.pattern() == 0;
+            boolean persist = info.pattern() < 2 && !info.hasTag("not");
             return (context, args) -> {
                 for (Object value : (Object[]) args[0]) {
                     if (value instanceof Entity entity) {
@@ -428,7 +445,8 @@ final class EntitySyntax {
                     }
                 }
             };
-        }, "(make|force) %entities/blocks% [to] persist[ent]", "prevent %entities/blocks% from persisting");
+        }, "make %entities/blocks% [:not] persist[ent]", "force %entities/blocks% to [:not] persist",
+                "prevent %entities/blocks% from persisting");
         registrar.effect("EffCommandBlockConditional", info -> {
             boolean conditional = !info.hasTag("un");
             return (context, args) -> {
@@ -910,6 +928,16 @@ final class EntitySyntax {
                 org.bukkit.entity.Explosive::isIncendiary, org.bukkit.entity.Explosive::setIsIncendiary,
                 "%entities% ((is|are) incendiary|cause[s] a[n] (incendiary|fiery) explosion)",
                 "%entities% ((is not|are not|isn't|aren't) incendiary|(does not|do not|doesn't|don't) cause[s] a[n] (incendiary|fiery) explosion)");
+        // 'the explosion is fiery': in an explosion prime event, whether the explosion about to happen is.
+        registrar.condition("CondIncendiary-event", info -> {
+            if (!EventExpressions.isIn(info, org.bukkit.event.entity.ExplosionPrimeEvent.class)) {
+                throw new co.xenastudios.neoskript.api.element.SyntaxError(
+                        "Checking if 'the explosion' is fiery is only possible in an explosion prime event");
+            }
+            boolean negated = info.mark() == 1;
+            return (context, args) -> context.event() instanceof org.bukkit.event.entity.ExplosionPrimeEvent event
+                    && event.getFire() != negated;
+        }, "the [event(-| )]explosion (is|1¦(is not|isn't)) (incendiary|fiery)");
         conditionPatterns(registrar, "CondTextDisplayHasDropShadow", org.bukkit.entity.TextDisplay.class,
                 org.bukkit.entity.TextDisplay::isShadowed, org.bukkit.entity.TextDisplay::setShadowed,
                 "[[the] text of] %entities% (has|have) [a] (drop|text) shadow", "%entities%'[s] text (has|have) [a] (drop|text) shadow",
@@ -1698,12 +1726,14 @@ final class EntitySyntax {
         @Override
         public Object get(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments) {
             List<Object> passengers = new ArrayList<>();
+            // After a wait, the vehicle's own, as in Skript.
+            boolean delayed = co.xenastudios.neoskript.runtime.Waits.delayed(context.event());
             for (Object vehicle : owners(arguments[0])) {
                 if (time >= 0 && context.event() instanceof org.bukkit.event.vehicle.VehicleEnterEvent enter
-                        && vehicle.equals(enter.getVehicle())) {
+                        && vehicle.equals(enter.getVehicle()) && !delayed) {
                     passengers.add(enter.getEntered());
                 } else if (time >= 0 && context.event() instanceof org.bukkit.event.vehicle.VehicleExitEvent exit
-                        && vehicle.equals(exit.getVehicle())) {
+                        && vehicle.equals(exit.getVehicle()) && !delayed) {
                     passengers.add(exit.getExited());
                 } else if (vehicle instanceof Entity entity) {
                     passengers.addAll(entity.getPassengers());

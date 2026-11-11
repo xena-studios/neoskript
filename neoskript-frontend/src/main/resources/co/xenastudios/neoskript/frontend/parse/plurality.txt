@@ -198,6 +198,7 @@ ExprHumidity=A
 ExprIndices=P
 ExprInput=S
 ExprInteractionDimensions=A
+ExprInventory=A
 ExprInventoryAction=S
 ExprInventoryCloseReason=S
 ExprInventoryInfo=A

@@ -10,6 +10,7 @@ import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayDeque;
+import java.util.List;
 import org.bukkit.inventory.Inventory;
 
 /** Skript's queues, and whether things are empty. */
@@ -47,6 +48,10 @@ final class Collections {
         }, "(de|un)queued %queue%", "unrolled %queue%");
         registrar.expression("ExprQueueStartEnd", "object", info -> new StartEnd(info.hasTag("end")),
                 "[the] (start|end:end) of %queue%", "%queue%'[s] (start|end:end)");
+        // Queues are experimental in Skript: scripts need 'using queues'.
+        for (String id : List.of("ExprQueue", "ExprDequeuedQueue", "ExprQueueStartEnd")) {
+            registrar.experimental(id, "queues");
+        }
         registrar.changer(ScriptQueue.class, Changeable.Mode.ADD, (queue, values) -> {
             for (Object value : values) {
                 queue.addLast(value);

@@ -41,6 +41,15 @@ public final class VariableCodecs {
         resolved.clear();
     }
 
+    /**
+     * Values of {@code type} can't be saved, even where they're also of a type that can be, as Skript's type for
+     * them has no serializer: money, which is a number.
+     */
+    public void unsavable(Class<?> type) {
+        byClass.put(type, new Registration(null, type, null));
+        resolved.clear();
+    }
+
     /** Encodes a value, or returns {@code null} if its type can't be saved. */
     @SuppressWarnings("unchecked")
     public Encoded encode(Object value) {
@@ -48,6 +57,9 @@ public final class VariableCodecs {
             return new Encoded(raw.type(), raw.bytes());
         }
         Registration registration = registration(value.getClass());
+        if (registration != null && registration.codec() == null) {
+            return null;
+        }
         if (registration == null) {
             // A value without a codec is saved as what it converts to, if that has one: a slot as its item.
             for (Registration candidate : byName.values()) {

@@ -1,0 +1,55 @@
+# Probe: conditions and control flow.
+
+function probe_conditions():
+	set {_a} to 5
+	if {_a} > 3:
+		show("if", "gt")
+	else if {_a} > 1:
+		show("if", "mid")
+	else:
+		show("if", "low")
+	if {_a} is 1 or 5:
+		show("or list", "yes")
+	if {_a} is not 1, 2 or 3:
+		show("not list", "yes")
+	if {_a} is between 4 and 6:
+		show("between", "yes")
+	if any:
+		{_a} = 1
+		{_a} = 5
+	then:
+		show("any", "yes")
+	if all:
+		{_a} > 1
+		{_a} < 10
+	then:
+		show("all", "yes")
+	if {_b} is not set:
+		show("unset", "yes")
+	set {_x} to "abc"
+	if {_x} is "ABC":
+		show("case-insensitive", "yes")
+	{_a} is 5
+	show("inline", "passed")
+	set {_l::*} to 1, 2 and 3
+	if {_l::*} contains 2:
+		show("contains", "yes")
+	if {_l::*} is 1:
+		show("list is 1", "yes")
+	else:
+		show("list is 1", "no")
+	if {_l::*} are greater than 0:
+		show("all greater", "yes")
+	if {_a} is set:
+		if {_a} is 5:
+			show("nested", "yes")
+	show("whether", whether {_a} is 5)
+	set {_y} to 2
+	if {_y} is 1:
+		show("chain", 1)
+	else if {_y} is 2:
+		show("chain", 2)
+	else if {_y} is 2:
+		show("chain", "again")
+	{_a} is 4
+	show("not reached", "!")

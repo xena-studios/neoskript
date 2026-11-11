@@ -40,20 +40,19 @@ final class EventSyntax {
 
     static void register(Registrar registrar) {
         registrar.expression("ExprEgg", "entity", info -> {
-            if (!isIn(info, PlayerEggThrowEvent.class)) {
-                String event = info.eventName();
-                throw new SyntaxError("There's no entity in " + (event == null ? "this event"
-                        : ("aeiou".indexOf(Character.toLowerCase(event.charAt(0))) >= 0 ? "an " : "a ") + event + " event"));
+            if (!SkriptEventNames.related(info, PlayerEggThrowEvent.class)) {
+                // Skript's event value of eggs, which its errors call projectiles.
+                throw SkriptEventNames.noValue(info, "projectile");
             }
             return new EventChangeable<>(PlayerEggThrowEvent.class, PlayerEggThrowEvent::getEgg);
         }, "[the] [thrown] egg");
         registrar.expression("ExprPortal", "block", info -> {
-            restrict(info, "the portal blocks", "the portal create event", PortalCreateEvent.class);
+            restrict(info, "the portal blocks", PortalCreateEvent.class);
             return new EventChangeable<>(PortalCreateEvent.class, event -> event.getBlocks().stream()
                     .map(org.bukkit.block.BlockState::getBlock).toArray());
         }, "[the] portal['s] blocks", "[the] blocks of [the] portal");
         registrar.expression("ExprHoverList", "string", info -> {
-            restrict(info, "the hover list", "the server list ping event", PaperServerListPingEvent.class);
+            restrict(info, "the hover list", PaperServerListPingEvent.class);
             return new EventChangeable<>(PaperServerListPingEvent.class, event -> event.getListedPlayers().stream()
                     .map(PaperServerListPingEvent.ListedPlayerInfo::name).toArray(), Object[].class,
                     Property.modes(Mode.SET, Mode.ADD, Mode.REMOVE, Mode.DELETE, Mode.RESET), (event, delta, mode) -> {
@@ -88,13 +87,13 @@ final class EventSyntax {
             Side expected = info.hasTag("back") ? Side.BACK : Side.FRONT;
             boolean negated = info.pattern() % 2 == 1;
             restrict(info, "the " + (expected == Side.FRONT ? "front" : "back") + " side was " + (negated ? "not " : "")
-                    + "changed", "the sign change event", SignChangeEvent.class);
+                    + "changed", SignChangeEvent.class);
             return (context, args) -> context.event() instanceof SignChangeEvent event
                     && (event.getSide() == expected) != negated;
         }, "[the] (front|:back) [side] (is|was) changed", "[the] (front|:back) [side] (is not|isn't|was not|wasn't) changed",
                 "[the] changed side (is|was) [the] (front|:back)", "[the] changed side (is not|isn't|was not|wasn't) [the] (front|:back)");
         registrar.expression("ExprCommandExecutor", "entity", info -> {
-            restrict(info, "the command executor", "the unknown command execution event", CommandEvent.class,
+            restrict(info, "the command executor", CommandEvent.class,
                     UnknownCommandEvent.class);
             return (context, args) -> switch (context.event()) {
                 case CommandEvent command -> executor(command.sender());

@@ -11,9 +11,9 @@ on load:
 	expect("plural", 4 golden apples, "4 golden apples")
 	expect("article", a diamond, "diamond")
 	expect("singular of a plural name", stone brick, "stone bricks")
-	expect("enchanted", diamond sword of sharpness 2, "diamond sword of sharpness 2")
-	expect("roman level", iron pickaxe of efficiency iii, "iron pickaxe of efficiency 3")
-	expect("named", stone named "Rock", "stone named ""Rock""")
+	expect("enchanted", diamond sword of sharpness 2, "diamond sword")
+	expect("roman level", iron pickaxe of efficiency iii, "iron pickaxe")
+	expect("named", stone named "Rock", "stone named Rock")
 	expect("amount of", item amount of 16 bread, 16)
 	expect("parsed", "3 oak planks" parsed as item type, "3 oak planks")
 	expect("not an item", "zzz" parsed as item type, "<none>")
@@ -22,7 +22,7 @@ on load:
 
 	set {_menu} to chest inventory with 2 rows named "Menu"
 	set slot 3 of {_menu} to ender pearl named "Go" with lore "Click"
-	expect("slot", slot 3 of {_menu}, "ender pearl named ""Go""")
+	expect("slot", slot 3 of {_menu}, "ender pearl named Go")
 	expect("slot index", index of slot 3 of {_menu}, 3)
 	expect("empty slot", slot 4 of {_menu}, "<none>")
 	delete slot 3 of {_menu}

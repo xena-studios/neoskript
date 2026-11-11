@@ -159,12 +159,13 @@ final class CoreTypes {
             }
         });
 
-        // How they read in text: players and worlds by name (a player the server has no name for, by UUID), the
-        // console as Skript writes it.
+        // How they read in text: players, worlds and other senders by name (a player the server has no name for,
+        // by UUID), so the console is CONSOLE, as in Skript.
         registrar.text(OfflinePlayer.class, player -> player.getName() == null ? player.getUniqueId().toString()
                 : player.getName());
         registrar.text(World.class, World::getName);
-        registrar.text(CommandSender.class, sender -> sender instanceof org.bukkit.command.ConsoleCommandSender
-                ? "the console" : sender.getName());
+        registrar.text(CommandSender.class, CommandSender::getName);
+        // Players are entities too, but read as their names, as in Skript.
+        registrar.text(org.bukkit.entity.Player.class, org.bukkit.entity.Player::getName);
     }
 }

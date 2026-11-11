@@ -13,6 +13,7 @@ import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.api.registration.Patterns;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.RuntimeErrors;
+import co.xenastudios.neoskript.runtime.Waits;
 import co.xenastudios.neoskript.runtime.Timespan;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -490,12 +491,17 @@ final class BlockProperties {
                 return new Object[0];
             }
             Object blockArg = block(args);
+            Side side = this.side;
             if (written && context.event() instanceof org.bukkit.event.block.SignChangeEvent event
                     && (side == null || side == event.getSide())) {
-                if (line == ALL) {
+                // After a wait, the sign's own text on the event's side, as in Skript.
+                if (Waits.delayed(event)) {
+                    side = event.getSide();
+                } else if (line == ALL) {
                     return event.lines().stream().map(SignText::text).toArray();
+                } else {
+                    return text(event.line(line));
                 }
-                return text(event.line(line));
             }
             Object value = blockGiven ? blockArg : Property.eventValue(context);
             if (!(value instanceof Block block) || !(block.getState() instanceof Sign sign)) {
@@ -533,10 +539,14 @@ final class BlockProperties {
             net.kyori.adventure.text.Component text = delta == null || delta.length == 0 ? null
                     : Messages.component(delta[0]);
             Object blockArg = block(args);
+            Side side = this.side;
             if (written && context.event() instanceof org.bukkit.event.block.SignChangeEvent event
                     && (side == null || side == event.getSide())) {
-                event.line(line, text);
-                return;
+                if (!Waits.delayed(event)) {
+                    event.line(line, text);
+                    return;
+                }
+                side = event.getSide();
             }
             Object value = blockGiven ? blockArg : Property.eventValue(context);
             if (!(value instanceof Block block) || !(block.getState() instanceof Sign sign)) {

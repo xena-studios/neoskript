@@ -20,12 +20,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import net.kyori.adventure.text.Component;
 import org.bukkit.block.Block;
 import org.bukkit.block.sign.Side;
 import org.bukkit.entity.FishHook;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.player.PlayerFishEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.junit.jupiter.api.Test;
 
 /** Syntax of events, checked where it can be without a server: what it reads and changes, and where it's refused. */
@@ -145,31 +147,31 @@ class EventSyntaxTest {
                     .append(line).append('\n');
         }
         assertEquals(List.of(
-                "'the brewing stand will consume the fuel' can only be used in the brewing fuel event",
-                "'make the brewing stand consume the fuel' can only be used in the brewing fuel event",
-                "'the brewing results' can only be used in the brewing complete event",
-                "'the displayed enchanting cost' can only be used in the enchant event",
-                "'the enchantment bonus' can only be used in the enchant prepare event",
-                "'the enchantment hint' can only be used in the enchant event",
-                "'the enchantment offers' can only be used in the enchant prepare event",
-                "'enchantment offer' can only be used in the enchant prepare event",
-                "'the applied enchantments' can only be used in the enchant event",
+                "'the brewing stand will consume the fuel' can only be used in the on brewing fuel event",
+                "'make the brewing stand consume its fuel' can only be used in the on brewing fuel event",
+                "'the brewing results' can only be used in the on brewing complete event",
+                "'the displayed enchanting cost' can only be used in the on enchant event",
+                "'the enchantment bonus' can only be used in the on enchant prepare event",
+                "'the enchantment hint' can only be used in the on enchant event",
+                "'the enchantment offers' can only be used in the on enchant prepare event",
+                "'enchant offer 1' can only be used in the on enchant prepare event",
+                "'the applied enchantments' can only be used in the on enchant event",
                 "The 'lure enchantment' condition can only be used in a fishing event.",
                 "The 'fishing hook lure' effect can only be used in a fishing event.",
                 "The 'fishing approach angle' expression can only be used in a fishing event.",
                 "The 'fishing bite time' expression can only be used in a fishing event.",
-                "There's no entity in a join event",
+                "There's no entity in an on join event.",
                 "The 'hooked entity' expression can only be used in the fishing event.",
                 "The 'fishing wait time' expression can only be used in a fishing event.",
                 "'smelted item' can only be used in a smelting event.",
                 "'extracted item' can only be used in a furnace extract event.",
                 "'smelting item' can only be used in a start smelting event",
                 "'burned fuel' can only be used in a fuel burning event.",
-                "There's no entity in a join event",
-                "'the portal blocks' can only be used in the portal create event",
-                "'the hover list' can only be used in the server list ping event",
-                "'the back side was changed' can only be used in the sign change event",
-                "'the command executor' can only be used in the unknown command execution event"), errors(script.toString()));
+                "There's no projectile in an on join event.",
+                "'portal blocks' can only be used in the on portal create event",
+                "'the hover list' can only be used in the on server list ping event",
+                "'the back side was changed' can only be used in the on sign change event",
+                "'the executor' can only be used in the on unknown command execution event"), errors(script.toString()));
     }
 
     @Test
@@ -269,5 +271,12 @@ class EventSyntaxTest {
         // As in Skript, a player is a block as an inventory holder (if it were a block state), but a world isn't.
         assertEquals(List.of(), errors("on join:\n\tset {_x} to result slot\n"));
         assertEquals(1, errors("on weather change:\n\tset {_x} to result slot\n").size());
+    }
+
+    @Test
+    void playersReadAsTheirNames() {
+        // A player is an entity too, but reads as its name, not as its entity type.
+        Player alice = fake(Player.class, Map.of("Name", "Alice"));
+        assertEquals(List.of("Alice"), run("on join:\n\tsay \"%player%\"\n", new PlayerJoinEvent(alice, (Component) null)));
     }
 }

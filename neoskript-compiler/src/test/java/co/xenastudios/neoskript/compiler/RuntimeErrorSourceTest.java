@@ -55,6 +55,9 @@ class RuntimeErrorSourceTest {
 
             @Override
             public void printFrameOutput(ErrorFrame.Output output, RuntimeError.Level level) {}
+
+            @Override
+            public void logError(String message) {}
         }, ErrorFrame.Limits.DEFAULT, ErrorFrame.Limits.DEFAULT);
     }
 
@@ -102,7 +105,8 @@ class RuntimeErrorSourceTest {
 
     @Test
     void caughtErrorsArentPrinted() {
-        run("on load:\n\tcatch runtime errors:\n\t\tsay broken line\n\t\twarn me\n\tsay last caught runtime errors\n");
+        run("using error catching\n"
+                + "on load:\n\tcatch runtime errors:\n\t\tsay broken line\n\t\twarn me\n\tsay last caught runtime errors\n");
         assertEquals(List.of(), printed);
         assertEquals(List.of("[Signs only have lines from 1 to 4, but tried to obtain line 5, careful]"),
                 said.subList(said.size() - 1, said.size()));

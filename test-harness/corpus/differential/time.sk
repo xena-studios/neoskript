@@ -1,0 +1,20 @@
+# Probe: timespans and fixed dates.
+
+function probe_time():
+	show("spans", (1 second, 2 minutes, 1.5 hours, 1 day, 3 ticks, 90 seconds))
+	show("compound", (1 hour and 30 minutes, 2 days and 1 hour, 0 seconds))
+	show("math", (1 minute + 30 seconds, 10 minutes - 1 minute))
+	show("long", (1 week, 1 month, 1 year))
+	show("compare", whether 1 minute > 30 seconds)
+	show("compare equal", whether 60 seconds = 1 minute)
+	set {_t} to 75 seconds
+	show("parsed", "5 minutes" parsed as timespan)
+	show("times", (12:00, 6:30 pm, 0:00))
+	show("date", date(2024, 1, 15, 10, 30))
+	show("unix", unix timestamp of date(2020, 1, 1))
+	set {_d} to date(2024, 3, 10)
+	show("date math", ({_d} + 1 day, {_d} - 1 week))
+	show("difference", difference between date(2024, 1, 1) and date(2024, 1, 2))
+	show("formatted", {_d} formatted as "yyyy-MM-dd")
+	show("timespan of ticks", 30 ticks)
+	show("fractional", 1.25 minutes)

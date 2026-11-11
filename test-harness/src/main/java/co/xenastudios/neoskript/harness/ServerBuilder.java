@@ -75,6 +75,8 @@ public final class ServerBuilder {
         command.add("-Ddisable.watchdog=true");
         command.add("-Duser.language=en");
         command.add("-Duser.country=US");
+        // One time zone everywhere, so dates read the same on every machine, as they do in CI.
+        command.add("-Duser.timezone=UTC");
         // Paperclip unpacks the vanilla server and libraries here, so it only happens once per environment.
         command.add("-DbundlerRepoDir=" + config.cacheDir().resolve("bundler").resolve(environment.name()));
         command.addAll(jvmArgs);
@@ -87,6 +89,7 @@ public final class ServerBuilder {
     private static String serverProperties() {
         return """
                 online-mode=false
+                white-list=false
                 server-port=%d
                 motd=NeoSkript test harness
                 level-type=minecraft\\:flat

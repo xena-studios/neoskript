@@ -142,6 +142,7 @@ class MiscElementsTest {
     @Test
     void amounts() {
         assertEquals(List.of("3", "2", "4"), run("""
+                using queues
                 on load:
                 \tsay size of (1, 2 and 3)
                 \tset {_q} to a queue of "a" and "b"

@@ -830,7 +830,9 @@ final class EntityProperties {
                     continue;
                 }
                 Entity target;
-                if (context.event() instanceof org.bukkit.event.entity.EntityTargetEvent event && entity.equals(event.getEntity())) {
+                // The event's target until the trigger waits, as in Skript (which changes the event's even then).
+                if (context.event() instanceof org.bukkit.event.entity.EntityTargetEvent event && entity.equals(event.getEntity())
+                        && !co.xenastudios.neoskript.runtime.Waits.delayed(event)) {
                     target = event.getTarget();
                     if (target != null && type != null && !type.matches(target)) {
                         target = null;

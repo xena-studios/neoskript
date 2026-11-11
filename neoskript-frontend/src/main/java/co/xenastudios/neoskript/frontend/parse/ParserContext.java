@@ -145,6 +145,18 @@ final class ParserContext {
         itemAliases = java.util.Set.copyOf(names);
     }
 
+    /** The experiments the script being parsed is using, by code name. */
+    private java.util.Set<String> experiments = java.util.Set.of();
+
+    void experiments(java.util.Set<String> codeNames) {
+        experiments = java.util.Set.copyOf(codeNames);
+    }
+
+    /** Whether the script being parsed is using the experiment with this code name. */
+    boolean using(String experiment) {
+        return experiments.contains(experiment);
+    }
+
     /** The name of the script being parsed ({@code folder/script.sk}), for warnings that suggest it. */
     private String scriptName = "";
 

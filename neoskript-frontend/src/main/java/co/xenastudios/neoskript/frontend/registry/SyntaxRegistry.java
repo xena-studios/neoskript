@@ -53,6 +53,16 @@ public final class SyntaxRegistry {
     private final Set<String> suppressing;
     private final Set<String> sectionOnly;
     private final Map<String, ParseCheck> checks;
+    /** The experiments syntax elements need, by element id. */
+    private final Map<String, Experimental> experimental;
+    /** The experiment a script's {@code using X} turns on, by its code name. */
+    private final java.util.function.UnaryOperator<String> experimentNames;
+    /** Skript's type properties ({@code name}, {@code amount}...): the types that have each. */
+    private final Map<String, Set<String>> propertyTypes;
+    /** The syntax that's a type property's, by id. */
+    private final Map<String, PropertySyntax> propertySyntaxes;
+    /** Conversions only placeholders make, as {@code from>to}. */
+    private final Set<String> placeholderConversions;
     /** Which event values code can use, or {@code null} if the registry can't tell. */
     private final EventValues eventValues;
 
@@ -97,6 +107,13 @@ public final class SyntaxRegistry {
         this.suppressing = Set.copyOf(builder.suppressing);
         this.sectionOnly = Set.copyOf(builder.sectionOnly);
         this.checks = Map.copyOf(builder.checks);
+        this.experimental = Map.copyOf(builder.experimental);
+        this.experimentNames = builder.experimentNames;
+        Map<String, Set<String>> propertyTypes = new HashMap<>();
+        builder.propertyTypes.forEach((property, types) -> propertyTypes.put(property, Set.copyOf(types)));
+        this.propertyTypes = Map.copyOf(propertyTypes);
+        this.propertySyntaxes = Map.copyOf(builder.propertySyntaxes);
+        this.placeholderConversions = Set.copyOf(builder.placeholderConversions);
         this.eventValues = builder.eventValues;
     }
 
@@ -143,6 +160,80 @@ public final class SyntaxRegistry {
      */
     public ParseCheck sectionCheck(SyntaxInfo syntax) {
         return checks.get("section:" + syntax.kind() + ":" + syntax.id());
+    }
+
+    /**
+     * An experiment a syntax element needs, as Skript's experimental syntax: a script that isn't {@code using} it
+     * can't use the element. Unless {@code silent}, the line's error then says to enable it.
+     */
+    public record Experimental(String experiment, boolean silent) {
+
+        /** Skript's error for using the element without its experiment. */
+        public String error() {
+            return "This element is experimental. To use this, enable '" + experiment + "'.";
+        }
+    }
+
+    /** The experiment the syntax element needs, or {@code null} if it needs none. */
+    public Experimental experimental(SyntaxInfo syntax) {
+        return experimental.isEmpty() ? null : experimental.get(syntax.id());
+    }
+
+    /** The code name of the experiment {@code using <name>} turns on, or the name itself if it names none. */
+    public String experimentName(String name) {
+        return experimentNames.apply(name);
+    }
+
+    /**
+     * A syntax element that's one of Skript 2.17's type properties, as its {@code PropertyBaseExpression} and
+     * {@code PropertyBaseCondition}: argument {@code argument} holds the values whose property it is.
+     *
+     * @param property the property, by the tags the element was written with ({@code size}): what Skript's
+     *     errors call it, and the types that have it are registered under
+     * @param counts whether, given several values and not written in the plural ({@code amount of X, Y}), it
+     *     counts them instead, as Skript's amount, size and number do
+     */
+    public record PropertySyntax(int argument, java.util.function.Function<Set<String>, String> property, boolean counts) {}
+
+    /** The type property syntax {@code syntax} is, or {@code null} if it isn't one. */
+    public PropertySyntax propertySyntax(SyntaxInfo syntax) {
+        return propertySyntaxes.get(syntax.id());
+    }
+
+    /**
+     * Whether values of type {@code type} have {@code property}, as Skript converts an expression's values to the
+     * types that have it: the type is one of them or under one, or it (or a type it's under) converts to one, or
+     * to a type under one. A type something with it might be ({@code object}, {@code entity}) has it too.
+     */
+    public boolean hasProperty(String type, String property) {
+        Set<String> owners = propertyTypes.getOrDefault(property, Set.of());
+        List<String> types = new ArrayList<>(List.of(type));
+        types.addAll(supertypes.getOrDefault(type, Set.of()));
+        for (String each : List.copyOf(types)) {
+            for (String target : conversions.getOrDefault(each, Set.of())) {
+                if (!placeholderConversions.contains(each + ">" + target)) {
+                    types.add(target);
+                }
+            }
+        }
+        for (String each : types) {
+            for (String owner : owners) {
+                if (each.equals(OBJECT) || isSubtype(each, owner) || isSubtype(owner, each)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether type {@code type} itself has {@code property}: it's one of the types with it, or under one. */
+    public boolean hasPropertyItself(String type, String property) {
+        for (String owner : propertyTypes.getOrDefault(property, Set.of())) {
+            if (isSubtype(type, owner)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static Builder builder() {
@@ -369,7 +460,40 @@ public final class SyntaxRegistry {
         private final Set<String> suppressing = new HashSet<>();
         private final Set<String> sectionOnly = new HashSet<>();
         private final Map<String, ParseCheck> checks = new HashMap<>();
+        private final Map<String, Experimental> experimental = new HashMap<>();
+        private java.util.function.UnaryOperator<String> experimentNames =
+                name -> name.strip().toLowerCase(Locale.ROOT);
         private EventValues eventValues;
+
+        /** Makes the syntax elements with this id need an experiment. */
+        public Builder experimental(String id, String experiment, boolean silent) {
+            experimental.put(id, new Experimental(experiment, silent));
+            return this;
+        }
+
+        /** How the names scripts write after {@code using} map to experiments' code names. */
+        public Builder experimentNames(java.util.function.UnaryOperator<String> names) {
+            this.experimentNames = names;
+            return this;
+        }
+
+        private final Map<String, Set<String>> propertyTypes = new HashMap<>();
+        private final Map<String, PropertySyntax> propertySyntaxes = new HashMap<>();
+        private final Set<String> placeholderConversions = new HashSet<>();
+        /** Types that have Skript's type property {@code property}, as its classes declare. */
+        public Builder typeProperty(String property, String... types) {
+            Set<String> owners = propertyTypes.computeIfAbsent(property, p -> new HashSet<>());
+            for (String type : types) {
+                owners.add(type.toLowerCase(Locale.ROOT));
+            }
+            return this;
+        }
+
+        /** Marks syntax as a type property's: see {@link PropertySyntax}. */
+        public Builder propertySyntax(String id, PropertySyntax syntax) {
+            propertySyntaxes.put(id, syntax);
+            return this;
+        }
 
         /** Tells the parser which event values code can use, so it can try other readings where there's none. */
         public Builder eventValues(EventValues eventValues) {
@@ -510,6 +634,15 @@ public final class SyntaxRegistry {
          */
         public Builder convertible(String from, String to) {
             conversions.computeIfAbsent(from, k -> new HashSet<>()).add(to);
+            return this;
+        }
+
+        /**
+         * Marks the conversion from {@code from} to {@code to} as one only placeholders make (an event's location as
+         * its block), not Skript's, so a type property doesn't take it.
+         */
+        public Builder placeholderConversion(String from, String to) {
+            placeholderConversions.add(from + ">" + to);
             return this;
         }
 

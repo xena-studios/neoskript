@@ -1,0 +1,24 @@
+# Probe: what happens at runtime when values are missing or wrong.
+
+function probe_errors():
+	show("unset plus", {_none} + 1)
+	show("plus unset", 1 + {_none})
+	show("length of unset", length of {_none})
+	set {_x} to {_none}
+	show("set to unset", {_x})
+	add 1 to {_counter}
+	show("add to unset", {_counter})
+	set {_t} to "abc"
+	add 1 to {_t}
+	show("add to text", {_t})
+	set {_p} to "abc" parsed as number
+	show("bad parse", {_p})
+	set {_l::*} to 1 and 2
+	show("missing index", {_l::3})
+	set {_s} to "abc"
+	show("too many characters", first 10 characters of {_s})
+	show("character past end", character at 10 of {_s})
+	show("subtext past end", subtext of {_s} from characters 2 to 10)
+	show("divide unset", 5 / {_none})
+	remove 3 from {_neg}
+	show("remove from unset", {_neg})

@@ -1,0 +1,31 @@
+# Probe: text handling.
+
+function probe_text():
+	set {_t} to "Hello World"
+	show("length", length of {_t})
+	show("case", ({_t} in upper case, {_t} in lower case, {_t} in proper case))
+	show("parts", (first 3 characters of {_t}, last 2 characters of {_t}, character at 1 of {_t}))
+	show("subtext", subtext of {_t} from characters 2 to 4)
+	show("index", (index of "o" in {_t}, last index of "o" in {_t}))
+	show("split", {_t} split at " ")
+	show("split empty", "a,b,,c" split at ",")
+	show("contains", (whether {_t} contains "world", whether {_t} starts with "hell", whether {_t} ends with "LD"))
+	show("repeated", "ab" repeated 3 times)
+	show("replaced", {_t} where "o" is replaced with "0")
+	replace all "l" in {_t} with "L"
+	show("replace all", {_t})
+	set {_u} to "abc"
+	replace first "b" in {_u} with "X"
+	show("replace first", {_u})
+	show("equal", (whether "abc" = "ABC"))
+	show("percent", "%%")
+	show("colors", ("<red>red", "&ared", uncolored "&aGreen &lBold", colored "&aGreen"))
+	set {_list::*} to "x", "y" and "z"
+	show("list", {_list::*})
+	show("matches", (whether "hello" matches "h.*o", whether "hello" matches "h"))
+	show("concat", "test" + "ing")
+	show("none in text", "%{_none}%")
+	show("unicode", "é ✓ 日本")
+	show("padded", "a" and "b")
+	show("char codes", character from codepoint 65)
+	show("codepoint", codepoint of "A")

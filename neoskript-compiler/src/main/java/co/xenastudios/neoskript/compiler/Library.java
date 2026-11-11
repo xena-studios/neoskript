@@ -51,6 +51,9 @@ public final class Library implements Registrar {
     /** The binding of a server event. */
     public record ServerEvent(List<Class<?>> classes, ElementFactory<Condition> filter) {}
 
+    /** One of Skript's events, as it names them in errors: {@code On Break / Mine}, its classes and patterns. */
+    private record EventName(String name, List<Class<?>> classes, List<String> patterns) {}
+
     /**
      * A value of {@code type} events of {@code eventClass} have, at {@code time} (-1 past, 0 now, 1 future). If
      * {@code excluded} isn't {@code null}, the events don't have it, and that's the error for asking. A
@@ -60,7 +63,8 @@ public final class Library implements Registrar {
     private record EventValue(Class<?> eventClass, String type, int time, Class<?> valueClass,
             java.util.function.Function<Object, ?> getter, String excluded) {}
 
-    private final SyntaxRegistry.Builder builder = SyntaxRegistry.builder();
+    private final SyntaxRegistry.Builder builder = SyntaxRegistry.builder()
+            .experimentNames(co.xenastudios.neoskript.runtime.ScriptFeatures::codeName);
     private final Map<Key, Object> bindings = new HashMap<>();
     private final Map<String, Class<?>> javaClasses = new HashMap<>();
     /** Every type, in the order registered. */
@@ -77,6 +81,10 @@ public final class Library implements Registrar {
     private final Map<FunctionInfo, List<java.util.function.Supplier<?>>> functionDefaults = new HashMap<>();
     private final VariableCodecs codecs = new VariableCodecs();
     private final List<EventValue> eventValues = new ArrayList<>();
+    /** Skript's events, in its order ({@link #eventName(String, List, String...)}). */
+    private final List<EventName> eventNames = new ArrayList<>();
+    /** The patterns of each server event, by its id. */
+    private final Map<String, List<String>> eventPatterns = new HashMap<>();
     private final Map<String, java.util.function.Function<Object, Class<?>>> kindClasses = new HashMap<>();
     private final Set<String> eventDefaults = new HashSet<>();
     private final Map<String, String> sectionTypes = new HashMap<>();
@@ -192,6 +200,12 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public void experimental(String id, String experiment, boolean silent) {
+        checkOpen();
+        builder.experimental(id, experiment, silent);
+    }
+
+    @Override
     public void deferredSectionExpression(String expressionId) {
         checkOpen();
         sectionExpressions.put(expressionId, SyntaxRegistry.OBJECT);
@@ -284,6 +298,97 @@ public final class Library implements Registrar {
             throw new IllegalArgumentException("Event " + id + " has no event classes");
         }
         add(SyntaxKind.EVENT, id, null, new ServerEvent(List.copyOf(eventClasses), filter), patterns);
+        eventPatterns.put(id, List.of(patterns));
+    }
+
+    @Override
+    public void eventName(String name, List<Class<?>> eventClasses, String... patterns) {
+        checkOpen();
+        eventNames.add(new EventName(name, List.copyOf(eventClasses), List.of(patterns)));
+    }
+
+    /**
+     * What Skript calls the event of a trigger of the server event {@code id} in errors, its name in lower case
+     * ({@code on break / mine}): that of Skript's event with the same patterns, or {@code null} if none has them.
+     */
+    public String eventName(String id) {
+        List<String> patterns = eventPatterns.get(id);
+        if (patterns == null) {
+            return null;
+        }
+        patterns = patterns.stream().map(Library::bare).toList();
+        for (EventName event : eventNames) {
+            if (event.patterns().stream().map(Library::bare).toList().equals(patterns)) {
+                return event.name().toLowerCase(java.util.Locale.ENGLISH);
+            }
+        }
+        // Where NeoSkript splits or joins Skript's patterns, any shared pattern says which it is.
+        for (EventName event : eventNames) {
+            for (String pattern : patterns) {
+                if (event.patterns().stream().map(Library::bare).anyMatch(pattern::equals)) {
+                    return event.name().toLowerCase(java.util.Locale.ENGLISH);
+                }
+            }
+        }
+        // Else, where its patterns are written otherwise, the only event of Skript's with the same classes.
+        if (bindings.get(new Key(SyntaxKind.EVENT, id)) instanceof ServerEvent server) {
+            Set<Class<?>> classes = Set.copyOf(server.classes());
+            EventName found = null;
+            for (EventName event : eventNames) {
+                if (Set.copyOf(event.classes()).equals(classes)) {
+                    if (found != null) {
+                        return null;
+                    }
+                    found = event;
+                }
+            }
+            return found == null ? null : found.name().toLowerCase(java.util.Locale.ENGLISH);
+        }
+        return null;
+    }
+
+    /** A pattern without the flags of its placeholders ({@code %-*itemtypes%}), which NeoSkript's can leave out. */
+    private static String bare(String pattern) {
+        return pattern.replaceAll("%[-*~]+", "%");
+    }
+
+    /**
+     * Skript's {@code supportedEventsNames} for syntax that only works in events of the classes named
+     * {@code supported}: each of Skript's events with a class one of them is, or is a subclass of, as
+     * {@code the on command event}, once for each such pair, joined with commas and a last {@code or}. Classes
+     * no event of Skript's has are named none.
+     */
+    String eventNames(String... supported) {
+        List<String> names = new ArrayList<>();
+        for (EventName event : eventNames) {
+            for (String wanted : supported) {
+                Class<?> wantedClass = eventClass(wanted);
+                if (wantedClass == null) {
+                    continue;
+                }
+                for (Class<?> eventClass : event.classes()) {
+                    if (eventClass.isAssignableFrom(wantedClass)) {
+                        names.add("the " + event.name().toLowerCase(java.util.Locale.ENGLISH) + " event");
+                    }
+                }
+            }
+        }
+        if (names.size() <= 1) {
+            return String.join("", names);
+        }
+        return String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.getLast();
+    }
+
+    /** The class of one of Skript's events called {@code name}, or {@code null}. */
+    private Class<?> eventClass(String name) {
+        for (EventName event : eventNames) {
+            for (Class<?> eventClass : event.classes()) {
+                if (eventClass.getName().equals(name)) {
+                    return eventClass;
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -725,6 +830,25 @@ public final class Library implements Registrar {
         codecs.register(name, type, codec);
     }
 
+    @Override
+    public void unsavable(Class<?> type) {
+        codecs.unsavable(type);
+    }
+
+    @Override
+    public void typeProperty(String property, String... typeIds) {
+        checkOpen();
+        builder.typeProperty(property, typeIds);
+    }
+
+    @Override
+    public void propertySyntax(String syntaxId, int argument, java.util.function.Function<Set<String>, String> property,
+            boolean counts) {
+        checkOpen();
+        builder.propertySyntax(syntaxId, new co.xenastudios.neoskript.frontend.registry.SyntaxRegistry.PropertySyntax(
+                argument, property, counts));
+    }
+
     /** How variable values are saved, as registered with {@link #storage}. */
     public VariableCodecs codecs() {
         return codecs;
@@ -752,6 +876,9 @@ public final class Library implements Registrar {
             for (Map.Entry<String, Class<?>> target : javaClasses.entrySet()) {
                 if (target.getValue() == to) {
                     builder.convertible(source.getKey(), target.getKey());
+                    if ((flags & PLACEHOLDERS_ONLY) != 0) {
+                        builder.placeholderConversion(source.getKey(), target.getKey());
+                    }
                 }
             }
         }
@@ -762,6 +889,38 @@ public final class Library implements Registrar {
             java.util.function.BiConsumer<? super T, Object[]> change) {
         checkOpen();
         Values.registerChanger(owner, mode, change);
+    }
+
+    /** What values of each class take when changed themselves, by mode: see {@link #changerAccepts}. */
+    private final Map<Class<?>, Map<co.xenastudios.neoskript.api.element.Changeable.Mode, Class<?>[]>> changerAccepts =
+            new java.util.LinkedHashMap<>();
+
+    @Override
+    public void changerAccepts(Class<?> owner, co.xenastudios.neoskript.api.element.Changeable.Mode mode,
+            Class<?>... accepted) {
+        checkOpen();
+        changerAccepts.computeIfAbsent(owner, o -> new java.util.EnumMap<>(
+                co.xenastudios.neoskript.api.element.Changeable.Mode.class)).put(mode, accepted.clone());
+    }
+
+    /**
+     * The class whose declared changer applies to values of {@code type}, as Skript's type's changer does: the
+     * nearest class above it that declares what its values take. {@code null} if none does.
+     */
+    Class<?> changerOwner(Class<?> type) {
+        Class<?> nearest = null;
+        for (Class<?> owner : changerAccepts.keySet()) {
+            if (owner.isAssignableFrom(type) && (nearest == null || nearest.isAssignableFrom(owner))) {
+                nearest = owner;
+            }
+        }
+        return nearest;
+    }
+
+    /** What values of {@code owner} take for {@code mode}, or {@code null} if they can't be changed that way. */
+    Class<?>[] changerAccepts(Class<?> owner, co.xenastudios.neoskript.api.element.Changeable.Mode mode) {
+        Map<co.xenastudios.neoskript.api.element.Changeable.Mode, Class<?>[]> modes = changerAccepts.get(owner);
+        return modes == null ? null : modes.get(mode);
     }
 
     @Override

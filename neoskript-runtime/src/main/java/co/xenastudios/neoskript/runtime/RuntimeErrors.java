@@ -29,6 +29,9 @@ public final class RuntimeErrors {
 
         /** Prints the end of a frame: what was skipped, lines put in timeout, and the notifications. */
         void printFrameOutput(ErrorFrame.Output output, Level level);
+
+        /** Logs an error that isn't a runtime error, as Skript's {@code Skript.error} does outside of parsing. */
+        void logError(String message);
     }
 
     /** As Skript's catcher: at most this many errors are kept, against a runaway loop. */
@@ -60,6 +63,16 @@ public final class RuntimeErrors {
         if (to != null) {
             to.printFrameOutput(errors, Level.ERROR);
             to.printFrameOutput(warnings, Level.WARNING);
+        }
+    }
+
+    /** Logs an error that isn't a runtime error: it goes to the console as it is, with no frame limits. */
+    public static void logError(String message) {
+        Consumer to = consumer;
+        if (to != null) {
+            to.logError(message);
+        } else {
+            System.err.println(message);
         }
     }
 

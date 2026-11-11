@@ -1,0 +1,18 @@
+# Checks: lines Skript reports problems for, loaded to compare the messages.
+
+on join:
+	show("or list", ("a" or "b"))
+	show("hex", "%255%")
+	show("as text", "%10%%2.50%")
+	show("signs", (0 * -1, -(5)))
+	show("number in text", "%1.0% %0.5% %-3%")
+	show("reverse", reversed "Hello")
+	show("joined", {_list::*} joined by ", ")
+	show("trimmed", "  pad  " trimmed)
+	show("join", join "a", "b" and "c" with "-")
+	show("slots", (slot 0 of chest inventory))
+	show("vector math", (vector length of {_v}, normalized {_v}, {_v} ++ vector(1, 1, 1)))
+	show("date parts", (year of {_d}, month of {_d}, day of month of {_d}, day of week of {_d}))
+	show("units", ({_t} in minutes, {_t} in ticks, {_t} in seconds))
+	show("in minutes", {_t} in minutes)
+	show("year", year of {_d})

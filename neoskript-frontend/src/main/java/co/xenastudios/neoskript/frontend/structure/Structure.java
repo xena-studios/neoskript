@@ -46,6 +46,16 @@ public record Structure(Kind kind, Node node) {
         throw new IllegalStateException(kind + " structure on line " + node.line().number() + " has no section");
     }
 
+    /** Skript's {@code using [[the] experiment] <.+>}: what follows it is the experiment's name. */
+    private static final java.util.regex.Pattern USING_PATTERN = java.util.regex.Pattern.compile(
+            "using (?:(?:the )?experiment )?(.+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /** The experiment a {@code using} line names, as written, or {@code null} if it isn't a {@code using} line. */
+    public static String usingName(Line line) {
+        java.util.regex.Matcher matcher = USING_PATTERN.matcher(line.text().strip());
+        return matcher.matches() ? matcher.group(1).strip() : null;
+    }
+
     /** The kind of a single-line structure, or {@code null} if the line isn't one. */
     public static Kind simpleKindOf(Line line) {
         if (isAutoReload(line.text())) {

@@ -1,0 +1,7 @@
+# Probe: reading the world. On Folia, the console can't read regions, so this one only matches on Paper.
+
+function probe_world():
+	show("blocks", (type of block at location(0, -64, 0, world "world")))
+	show("biome", biome at location(0, 0, 0, world "world"))
+	show("difficulty", difficulty of world "world")
+	show("weather", weather in world "world")

@@ -53,6 +53,14 @@ public final class ScenarioContext {
         return config.neoskriptJar();
     }
 
+    /**
+     * The harness bot plugin. Its console commands make players join, chat, run commands and more, so
+     * a headless server fires real player events. See {@code test-harness/README.md} for the commands.
+     */
+    public Path botJar() {
+        return config.botJar();
+    }
+
     public Path skriptJar() throws IOException, InterruptedException {
         return downloads.fetch(
                 referenceSkript.jarUrl(), referenceSkript.jarSha256(), "Skript-" + referenceSkript.version() + ".jar");
@@ -75,6 +83,11 @@ public final class ScenarioContext {
 
     /** A builder for a server in {@code runDir}, which is emptied first. */
     public ServerBuilder server(Path runDir) throws IOException, InterruptedException {
+        return server(environment, runDir);
+    }
+
+    /** A builder for a server of another environment in {@code runDir}, which is emptied first. */
+    public ServerBuilder server(Environment environment, Path runDir) throws IOException, InterruptedException {
         Environment.Download download = environment.download();
         Path serverJar = downloads.fetch(download.url(), download.sha256(), environment.name() + ".jar");
         deleteRecursively(runDir);

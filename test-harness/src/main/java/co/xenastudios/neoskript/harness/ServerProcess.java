@@ -130,6 +130,13 @@ public final class ServerProcess implements AutoCloseable {
         }
     }
 
+    /** The console lines from {@code fromLine} on. */
+    public List<String> lines(int fromLine) {
+        synchronized (lines) {
+            return List.copyOf(lines.subList(fromLine, lines.size()));
+        }
+    }
+
     /** Runs a console command, without the leading slash. */
     public void command(String command) throws IOException {
         console.write(command);
