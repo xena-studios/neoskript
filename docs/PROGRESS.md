@@ -10,7 +10,7 @@ What each milestone in the [plan](PLAN.md#6-roadmap) delivered, in order. Add ea
 | [M1: Frontend](#m1-frontend) | Done 2026-10-22 |
 | [M2: Compiler and runtime core](#m2-compiler-and-runtime-core) | Done 2026-10-22 |
 | [M3: Variables and storage](#m3-variables-and-storage) | Done 2026-10-22 |
-| [M4: Standard library](#m4-standard-library) | In progress: Skript's whole test suite passes (862 of 862); the exit also needs the 95% differential check |
+| [M4: Standard library](#m4-standard-library) | Done 2026-11-11 |
 | [M5: Folia and migration](#m5-folia-and-migration) | In progress: the migration CLI, region ownership and `run on` on Folia |
 
 Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4](#step-6-the-long-tail)):
@@ -43,6 +43,7 @@ Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4]
 | 24 | 2026-10-25 | 862 | Time states and auto reload |
 | 25 | 2026-10-25 | 862 | Skript's /skript command |
 | 26 | 2026-10-25 | 862 | Checked line by line against a real Skript server |
+| 27 | 2026-11-11 | 862 | 98.8% of the differential identical to Skript; M4 done |
 
 ## M0: Foundations
 
@@ -107,7 +108,9 @@ Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4]
 
 ## M4: Standard library
 
-In progress. One PR per step. The order comes from `syntaxUsage` in the `neoskript-parse-corpus` report, which counts how often the corpus uses each Skript element. At the start of M4, the real-world corpus used 152 distinct elements and functions, and NeoSkript had 15 of them. Skript's tests use 785.
+**Done 2026-11-11.** Skript 2.17's whole test suite passes on NeoSkript (862 of 862), and 98.8% of the differential's 1,613 units behave exactly as on a real Skript 2.17.0 server, past the 95% the exit needs. The rest are listed, with why, in `test-harness/corpus/differential/known-differences.txt`.
+
+One PR per step. The order comes from `syntaxUsage` in the `neoskript-parse-corpus` report, which counts how often the corpus uses each Skript element. At the start of M4, the real-world corpus used 152 distinct elements and functions, and NeoSkript had 15 of them. Skript's tests use 785.
 
 ### Step 1: The event foundation
 
@@ -585,6 +588,35 @@ Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the mo
 - **Effect commands:** `!effect` from the console and chat, with Skript's options, permission, messages, `me` and a cancellable `EffectCommandEvent`. Moving over from Skript copies the options.
 - **Hooks** tested against the real WorldGuard, Vault, EssentialsX and LuckPerms (`neoskript-hooks`, baseline). Money with money is money; `add 1 to {_money}` leaves it, as in Skript.
 - Known differences: Skript 2.17's warning frames never reset because of a bug, and NeoSkript resets them as intended. The code under a section whose header fails is still checked, so its errors show too. Event names in errors are as the script writes them.
+
+#### Batch 27 (2026-11-11)
+
+**862 of 862 tests pass; 98.8% of the differential identical (1,594 of 1,613 units). M4 is done.**
+- **Differential runner:** the `differential` scenario compares Skript 2.17.0 and NeoSkript on every documentation example, the checks and probes in `corpus/differential`, and the real-world corpus. It compares each line's messages, the probes' output, and `variables.csv`. It fails below 95%, on any difference not listed in `known-differences.txt`, or if the variables differ.
+- **Errors in Skript's order and words:**
+  - problems are reported in line order;
+  - function argument errors;
+  - a later argument's error wins, as Skript parses later arguments first;
+  - errors through the changed values' types ("an entity can't be set to anything");
+  - unparsed literals are quoted;
+  - expressions are written as Skript's `toString` writes them (`Registrar.describe`).
+- **Warnings:** constant conditions, texts inside `%...%`, loops of one value, and `items in` a list variable, all as Skript gives them.
+- **Event values:**
+  - excluded values, and Skript's errors for them;
+  - code in an expression's section can't use the trigger's event values;
+  - a left-out value gives the error for its first type.
+- **Syntax:**
+  - `wait X:` as a section;
+  - `cooldown storage`;
+  - `arguments` in command events;
+  - setting the vehicle;
+  - `X is neither A nor B`;
+  - past and future worlds in teleport events;
+  - `zombify` and `unzombify ... after`;
+  - stricter weather, enchantment and world types where Skript has them;
+  - `the entity` and `the player` as the event's value.
+- **Variables:** entity types are saved as Skript's entity data, byte for byte. The bytes for each type come from a real Skript server.
+- **Known differences:** 20 units where Skript's parser picks a different reading or error are listed as still to do. A few of them give different messages from one Skript run to the next.
 
 ## M5: Folia and migration
 

@@ -614,18 +614,8 @@ final class EntitySyntax {
                 "%entities% (isn't|is not|aren't|are not) riding [%-entitytypes/entities%]");
         // In a mount or dismount event, the event's entity's vehicle is the one it gets on (now and after the
         // event) or got off (before it and now), as Skript's.
-        registrar.expression("ExprVehicle", "entity", info -> {
-            int time = info.time();
-            return (context, args) -> {
-                List<Object> vehicles = new ArrayList<>();
-                for (Object value : owners(args[0])) {
-                    if (value instanceof Entity entity && vehicle(context.event(), entity, time) instanceof Entity vehicle) {
-                        vehicles.add(vehicle);
-                    }
-                }
-                return vehicles.size() == 1 ? vehicles.getFirst() : vehicles.toArray();
-            };
-        }, "[the] vehicle[s] [of %entities%]", "%entities%'[s] vehicle[s]");
+        registrar.expression("ExprVehicle", "entity", info -> new Vehicle(info.time()),
+                "[the] vehicle[s] [of %entities%]", "%entities%'[s] vehicle[s]");
         registrar.timeStates("ExprVehicle", 0, org.bukkit.event.vehicle.VehicleEnterEvent.class,
                 org.bukkit.event.vehicle.VehicleExitEvent.class, org.bukkit.event.entity.EntityMountEvent.class,
                 org.bukkit.event.entity.EntityDismountEvent.class);
@@ -1144,26 +1134,29 @@ final class EntitySyntax {
                 "[the] villager profession[s] of %livingentities%", "%livingentities%'[s] villager profession[s]");
         registrar.effect("EffZombify", info -> {
             boolean zombify = info.pattern() == 0;
-            return co.xenastudios.neoskript.api.element.Update.of(0, (context, args) -> {
+            // The new zombie takes the villager's place where that can be set; elsewhere it's converted all the same.
+            return co.xenastudios.neoskript.api.element.Update.inPlace(0, (context, args) -> {
                 Object[] entities = owners(args[0]);
+                Object time = zombify ? null : Values.single(args[1]);
+                int ticks = time instanceof co.xenastudios.neoskript.runtime.Timespan span ? (int) span.ticks() : 0;
                 Object[] changed = new Object[entities.length];
                 for (int i = 0; i < entities.length; i++) {
                     Object entity = entities[i];
                     if (zombify && entity instanceof org.bukkit.entity.Villager villager) {
-                        // The villager becomes a new entity, which takes its place in the variable.
                         org.bukkit.entity.ZombieVillager zombie = villager.zombify();
                         changed[i] = zombie == null ? entity : zombie;
                     } else {
                         if (!zombify && entity instanceof org.bukkit.entity.ZombieVillager zombie) {
-                            zombie.setConversionTime(1);
+                            zombie.setConversionTime(ticks);
                         }
                         changed[i] = entity;
                     }
                 }
                 return changed;
             });
-        }, "zombify %~objects%", "unzombify %~objects%");
+        }, "zombify %livingentities%", "unzombify %livingentities% [(in|after) %-timespan%]");
         registrar.expression("ExprWhitelist", "offlineplayer", info -> new WhitelistedPlayers(), "[the] white[ ]list[ed players]");
+        registrar.describe("ExprWhitelist", (info, args) -> "whitelist");
         registrar.expression("ExprRemainingAir", "timespan", info -> new SettableProperty<>(LivingEntity.class,
                 co.xenastudios.neoskript.runtime.Timespan.class,
                 living -> new co.xenastudios.neoskript.runtime.Timespan(living.getRemainingAir() * 50L),
@@ -1309,10 +1302,10 @@ final class EntitySyntax {
                 "%livingentities% (can't|cannot|can not) despawn (on chunk unload|when far away)");
         conditionPatterns(registrar, "CondItemDespawn", org.bukkit.entity.Item.class, item -> !item.isUnlimitedLifetime(),
                 (item, despawns) -> item.setUnlimitedLifetime(!despawns),
-                "%entities% will (despawn naturally|naturally despawn)",
-                "%entities% can (despawn naturally|naturally despawn)",
-                "%entities% (will not|won't) (despawn naturally|naturally despawn)",
-                "%entities% (can't|cannot|can not) (despawn naturally|naturally despawn)");
+                "%itementities% will (despawn naturally|naturally despawn)",
+                "%itementities% can (despawn naturally|naturally despawn)",
+                "%itementities% (will not|won't) (despawn naturally|naturally despawn)",
+                "%itementities% (can't|cannot|can not) (despawn naturally|naturally despawn)");
         conditionPatterns(registrar, "CondPvP", org.bukkit.World.class, org.bukkit.World::getPVP, org.bukkit.World::setPVP,
                 "(is PvP|PvP is) enabled [in %worlds%]", "(is PvP|PvP is) disabled [in %worlds%]");
         registrar.condition("CondGoatHasHorns", info -> new GoatHorns(info.pattern() == 1,
@@ -1612,8 +1605,16 @@ final class EntitySyntax {
             return switch (mode) {
                 case ADD, REMOVE -> new Class<?>[] {org.bukkit.OfflinePlayer.class};
                 case RESET, DELETE -> new Class<?>[0];
+                // 'set the whitelist to false' turns it off.
+                case SET -> new Class<?>[] {Boolean.class};
                 default -> null;
             };
+        }
+
+        /** One player at a time, as Skript's: 'add all players to whitelist' is an error. */
+        @Override
+        public boolean takesOne(Mode mode) {
+            return true;
         }
 
         @Override
@@ -1622,6 +1623,12 @@ final class EntitySyntax {
             if (mode == Mode.RESET || mode == Mode.DELETE) {
                 for (org.bukkit.OfflinePlayer player : org.bukkit.Bukkit.getWhitelistedPlayers()) {
                     player.setWhitelisted(false);
+                }
+                return;
+            }
+            if (mode == Mode.SET) {
+                if (delta != null && delta.length > 0 && delta[0] instanceof Boolean on) {
+                    org.bukkit.Bukkit.setWhitelist(on);
                 }
                 return;
             }
@@ -1701,7 +1708,78 @@ final class EntitySyntax {
         };
     }
 
-    /** The entities riding others; set, added to, removed from or cleared. */
+    /**
+     * The vehicles of entities. Set to an entity, the entities get on it; to a kind of entity, one is spawned
+     * for each to ride, as in Skript. Other changes are the vehicles' own, as an entity's.
+     */
+    private record Vehicle(int time) implements co.xenastudios.neoskript.api.element.Expression,
+            co.xenastudios.neoskript.api.element.Changeable {
+        @Override
+        public Object get(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments) {
+            List<Object> vehicles = new ArrayList<>();
+            for (Object value : owners(arguments[0])) {
+                if (value instanceof Entity entity && vehicle(context.event(), entity, time) instanceof Entity vehicle) {
+                    vehicles.add(vehicle);
+                }
+            }
+            return vehicles.size() == 1 ? vehicles.getFirst() : vehicles.toArray();
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return mode == Mode.SET ? new Class<?>[] {Entity.class, EntityKind.class} : null;
+        }
+
+        @Override
+        public boolean typeChanges(Mode mode) {
+            return mode != Mode.SET;
+        }
+
+        /** One vehicle, as Skript's takes only one. */
+        @Override
+        public boolean takesOne(Mode mode) {
+            return true;
+        }
+
+        @Override
+        public void change(co.xenastudios.neoskript.api.element.TriggerContext context, Object[] arguments, Object[] delta,
+                Mode mode) {
+            Object event = context.event();
+            // A player getting on something can desync if it's set then, so it isn't, as in Skript.
+            if (event instanceof org.bukkit.event.entity.EntityMountEvent mount && mount.getEntity() instanceof org.bukkit.entity.Player
+                    || event instanceof org.bukkit.event.vehicle.VehicleEnterEvent enter && enter.getEntered() instanceof org.bukkit.entity.Player) {
+                return;
+            }
+            List<Entity> passengers = new ArrayList<>();
+            for (Object value : owners(arguments[0])) {
+                if (value instanceof Entity entity) {
+                    passengers.add(entity);
+                }
+            }
+            if (passengers.isEmpty() || delta == null || delta.length == 0) {
+                return;
+            }
+            if (delta[0] instanceof Entity vehicle) {
+                vehicle.eject();
+            }
+            for (Entity passenger : passengers) {
+                // The player getting off isn't put back on, which would loop.
+                if (passenger instanceof org.bukkit.entity.Player && (event instanceof org.bukkit.event.vehicle.VehicleExitEvent exit
+                        && passenger.equals(exit.getExited()) || event instanceof org.bukkit.event.entity.EntityDismountEvent
+                        dismount && passenger.equals(dismount.getEntity()))) {
+                    continue;
+                }
+                if (delta[0] instanceof Entity vehicle) {
+                    passenger.leaveVehicle();
+                    vehicle.addPassenger(passenger);
+                } else if (delta[0] instanceof EntityKind kind && kind.spawnable()
+                        && kind.spawn(passenger.getLocation()) instanceof Entity vehicle) {
+                    vehicle.addPassenger(passenger);
+                }
+            }
+        }
+    }
+
     /** {@code entity}'s vehicle, as Skript's: in a mount or dismount event, the one the event is about. */
     private static Entity vehicle(Object event, Entity entity, int time) {
         return switch (event) {
@@ -1744,10 +1822,10 @@ final class EntitySyntax {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            // Entities, or kinds of entity, which are spawned to ride it or taken off it, as in Skript.
             return switch (mode) {
-                case SET, ADD, REMOVE -> new Class<?>[] {Entity.class};
-                case DELETE -> new Class<?>[0];
-                default -> null;
+                case SET, ADD, REMOVE, REMOVE_ALL -> new Class<?>[] {Entity.class, EntityKind.class};
+                case DELETE, RESET -> new Class<?>[0];
             };
         }
 
@@ -1762,9 +1840,20 @@ final class EntitySyntax {
                     vehicle.eject();
                 }
                 for (Object passenger : delta == null ? new Object[0] : delta) {
+                    if (passenger instanceof EntityKind kind) {
+                        if (mode == Mode.REMOVE || mode == Mode.REMOVE_ALL) {
+                            for (Entity riding : vehicle.getPassengers()) {
+                                if (kind.matches(riding)) {
+                                    vehicle.removePassenger(riding);
+                                }
+                            }
+                            continue;
+                        }
+                        passenger = kind.spawnable() ? kind.spawn(vehicle.getLocation()) : null;
+                    }
                     // Nothing can ride itself.
                     if (passenger instanceof Entity entity && entity != vehicle) {
-                        if (mode == Mode.REMOVE) {
+                        if (mode == Mode.REMOVE || mode == Mode.REMOVE_ALL) {
                             vehicle.removePassenger(entity);
                         } else {
                             vehicle.addPassenger(entity);

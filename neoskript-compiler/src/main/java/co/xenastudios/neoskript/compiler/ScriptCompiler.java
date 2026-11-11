@@ -379,8 +379,12 @@ public final class ScriptCompiler {
         ParsedStructure.CommandNode root = command.root();
         Map<String, String> entries = root.entries();
         int line = command.structure().node().line().number();
-        if (entries.containsKey("cooldown storage")) {
-            throw new CompileException(line, "NeoSkript can't store cooldowns in variables yet ('cooldown storage')");
+        CompiledCommand.CooldownStorage storage = null;
+        Expr storageName = root.messages().get("cooldown storage");
+        if (storageName != null) {
+            String value = entries.get("cooldown storage");
+            storage = new CompiledCommand.CooldownStorage(compiler(functions, script).compileCooldownStorage(name,
+                    line, '"' + value.replace("\"", "\"\"") + '"', storageName), globals);
         }
         Timespan cooldown = null;
         if (entries.containsKey("cooldown")) {
@@ -405,7 +409,7 @@ public final class ScriptCompiler {
                 command.structure().node().line().key(), routes, suggesters);
         return new CompiledCommand(name, line, command.name(), aliases, entries.get("description"), entries.get("usage"),
                 entries.get("permission"), message(name, script, functions, root, "permission message"), cooldown,
-                entries.get("cooldown bypass"), message(name, script, functions, root, "cooldown message"),
+                entries.get("cooldown bypass"), message(name, script, functions, root, "cooldown message"), storage,
                 entries.get("prefix"), routes, suggesters);
     }
 

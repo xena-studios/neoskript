@@ -384,6 +384,20 @@ public final class Values {
     }
 
     /**
+     * Sets each of {@code targets} that an update changed to what it became, with its type's changer, as
+     * Skript's changes in place: {@code enchant the player's tool} sets the slot to the enchanted item.
+     */
+    public static void setEach(Object targets, Object results) {
+        Object[] before = array(targets);
+        Object[] after = array(results);
+        for (int i = 0; i < before.length && i < after.length; i++) {
+            if (after[i] != before[i] && after[i] != null) {
+                changeValue(before[i], new Object[] {after[i]}, co.xenastudios.neoskript.api.element.Changeable.Mode.SET);
+            }
+        }
+    }
+
+    /**
      * Changes {@code target} in place with the first changer registered for its class and {@code mode}, as
      * {@code add "x" to {queue}} changes the queue in the variable. Whether there was one.
      */

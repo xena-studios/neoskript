@@ -131,6 +131,19 @@ final class Items {
      * The hand slot of {@code entity}, as Skript's tool: in an item held change event, the player's new slot
      * (the one left, before the event); in a bucket event, the hand the bucket is in.
      */
+    /** Where the brace opening {@code text} closes, or -1. */
+    private static int closingBrace(String text) {
+        int depth = 0;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '{') {
+                depth++;
+            } else if (text.charAt(i) == '}' && --depth == 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private static Slot tool(Object event, LivingEntity entity, boolean off, int time) {
         // Once the trigger has waited, the event is over: the hand's item, as in Skript.
         if (co.xenastudios.neoskript.runtime.Waits.delayed(event)) {
@@ -238,7 +251,8 @@ final class Items {
         registrar.type("itemtype", "item type", ItemType.class);
         // As Skript's item type is also called: 'command /setblock <material>'.
         registrar.alias("itemtype", "material", "materials");
-        registrar.type("itemstack", "item", ItemStack.class);
+        // Named as Skript's messages name it: 'Can't compare an item stack with ...'.
+        registrar.type("itemstack", "item stack", ItemStack.class);
         registrar.alias("itemstack", "item", "items");
         registrar.alias("itemstack", "item stack", "item stacks");
         registrar.type("inventory", "inventory", Inventory.class);
@@ -356,6 +370,65 @@ final class Items {
         // 'remove all diamonds from X': every stack that is one of the items, named or not.
         registrar.changer(InventoryHolder.class, Changeable.Mode.REMOVE_ALL, (holder, items) -> removeAll(holder.getInventory(), items));
         registrar.changer(Inventory.class, Changeable.Mode.REMOVE_ALL, Items::removeAll);
+        // A block with an inventory, like a chest, has items added to and taken from it, as in Skript.
+        registrar.changer(org.bukkit.block.Block.class, Changeable.Mode.ADD, (block, items) -> {
+            if (block.getState() instanceof InventoryHolder holder) {
+                holder.getInventory().addItem(stacks(items));
+            }
+        });
+        registrar.changer(org.bukkit.block.Block.class, Changeable.Mode.REMOVE, (block, items) -> {
+            if (block.getState() instanceof InventoryHolder holder) {
+                remove(holder.getInventory(), items);
+            }
+        });
+        registrar.changer(org.bukkit.block.Block.class, Changeable.Mode.REMOVE_ALL, (block, items) -> {
+            if (block.getState() instanceof InventoryHolder holder) {
+                removeAll(holder.getInventory(), items);
+            }
+        });
+        registerChangerTypes(registrar);
+    }
+
+    /**
+     * What values of each type take when they're changed themselves, as Skript's types' changers say, so what's
+     * given is checked when the script loads ({@code 'a plank' can't be added to an inventory because the former
+     * is neither an item type nor an inventory}), and a type that can't be changed that way says so.
+     */
+    private static void registerChangerTypes(Registrar registrar) {
+        Class<?>[] none = new Class<?>[0];
+        // Entities (living ones and vehicles too): items, inventories and experience go in; items and potion
+        // effects come out. Players can't be deleted.
+        for (Class<?> entity : List.of(org.bukkit.entity.Entity.class, org.bukkit.entity.Player.class)) {
+            registrar.changerAccepts(entity, Changeable.Mode.ADD, ItemType.class, Inventory.class, Experience.class);
+            registrar.changerAccepts(entity, Changeable.Mode.REMOVE, org.bukkit.potion.PotionEffectType.class,
+                    ItemType.class, Inventory.class);
+            registrar.changerAccepts(entity, Changeable.Mode.REMOVE_ALL, org.bukkit.potion.PotionEffectType.class,
+                    ItemType.class);
+        }
+        registrar.changerAccepts(org.bukkit.entity.Entity.class, Changeable.Mode.DELETE, none);
+        // Projectiles, displays and dropped items can only be deleted; a dropped item can be set to an item.
+        for (Class<?> entity : List.of(org.bukkit.entity.Projectile.class, org.bukkit.entity.Display.class,
+                org.bukkit.entity.Item.class)) {
+            registrar.changerAccepts(entity, Changeable.Mode.DELETE, none);
+        }
+        registrar.changerAccepts(org.bukkit.entity.Item.class, Changeable.Mode.SET, ItemStack.class);
+        for (Changeable.Mode mode : List.of(Changeable.Mode.ADD, Changeable.Mode.REMOVE, Changeable.Mode.DELETE)) {
+            registrar.changerAccepts(Inventory.class, mode, ItemType.class, Inventory.class);
+            registrar.changerAccepts(org.bukkit.block.Block.class, mode, ItemType.class, Inventory.class);
+            registrar.changerAccepts(Slot.class, mode, ItemType.class, ItemStack.class);
+        }
+        registrar.changerAccepts(Inventory.class, Changeable.Mode.SET, ItemType.class, Inventory.class);
+        registrar.changerAccepts(Inventory.class, Changeable.Mode.REMOVE_ALL, ItemType.class);
+        registrar.changerAccepts(org.bukkit.block.Block.class, Changeable.Mode.SET, ItemType.class,
+                org.bukkit.block.data.BlockData.class);
+        registrar.changerAccepts(org.bukkit.block.Block.class, Changeable.Mode.REMOVE_ALL, ItemType.class, Inventory.class);
+        registrar.changerAccepts(Slot.class, Changeable.Mode.SET, ItemType.class, ItemStack.class);
+        registrar.changerAccepts(Slot.class, Changeable.Mode.REMOVE_ALL, ItemType.class, ItemStack.class);
+        registrar.changerAccepts(org.bukkit.boss.BossBar.class, Changeable.Mode.DELETE, none);
+        for (Changeable.Mode mode : List.of(Changeable.Mode.ADD, Changeable.Mode.REMOVE, Changeable.Mode.DELETE)) {
+            registrar.changerAccepts(Collections.ScriptQueue.class, mode, Object.class);
+        }
+        registrar.changerAccepts(Collections.ScriptQueue.class, Changeable.Mode.RESET, none);
     }
 
     /** Takes every stack that is one of {@code items} out of {@code inventory}, as Skript's 'remove all'. */
@@ -465,7 +538,8 @@ final class Items {
                     int amount = co.xenastudios.neoskript.runtime.Values.toInt(value.doubleValue());
                     damageable.setDamage(Math.max(0, damage ? amount : maxDurability(stack, damageable) - amount));
                 }
-            })));
+                // Reset, as deleted, it's 0, as in Skript.
+            }))).resettingTo(0L);
         }, co.xenastudios.neoskript.api.registration.Patterns.property("(damage:damage[s] [value[s]]|durabilit(y|ies))",
                 "itemtypes/itemstacks/slots"));
         // The player a head belongs to, on a placed head or a head item.
@@ -920,6 +994,7 @@ final class Items {
         registrar.namedType("itemflag", "item flag", org.bukkit.inventory.ItemFlag.class, flags);
         registrar.expression("ExprItemFlags", "itemflag", info -> new Flags(), "[the] item flags of %itemtypes%",
                 "%itemtypes%'[s] item flags");
+        registrar.describe("ExprItemFlags", (info, args) -> "item flags of " + args.get(0));
         registrar.expression("ExprItemWithItemFlags", "itemtype", info -> {
             boolean all = info.pattern() == 2;
             return (context, args) -> mapItems(args[0], item -> item.withMeta(meta -> {
@@ -984,7 +1059,9 @@ final class Items {
             boolean filtered = info.pattern() == 1;
             int inventories = filtered ? 1 : 0;
             String written = co.xenastudios.neoskript.api.element.Warnings.argument(inventories);
-            if (written != null && written.startsWith("{") && written.endsWith("}") && !info.isSingle(inventories)
+            // As Skript: one list variable, not a list of variables ('{_a} and {_b}').
+            if (written != null && written.startsWith("{") && closingBrace(written) == written.length() - 1
+                    && !info.isSingle(inventories)
                     && !info.hasTag("1") && info.mark() != 1) {
                 co.xenastudios.neoskript.api.element.Warnings.warn("'items in {variable::*}' does not actually represent the"
                         + " items stored in the variable. Use either '{variable::*}' (e.g. 'loop {variable::*}') if the"
@@ -1053,6 +1130,8 @@ final class Items {
             };
         }, "[the] (tool|held item|weapon) [of %livingentities%]", "%livingentities%'[s] (tool|held item|weapon)",
                 "[the] off[ ]hand (tool|item) [of %livingentities%]", "%livingentities%'[s] off[ ]hand (tool|item)");
+        registrar.describe("ExprTool", (info, args) -> (info.time() < 0 ? "former " : info.time() > 0 ? "future " : "")
+                + (info.pattern() >= 2 ? "off hand " : "") + "tool of " + (args.get(0) == null ? "event-livingentity" : args.get(0)));
         // 'past tool' in an item held change event is the item in the slot left; in a bucket event, the future
         // tool is the bucket the player gets.
         registrar.timeStates("ExprTool", 0, org.bukkit.event.player.PlayerItemHeldEvent.class,

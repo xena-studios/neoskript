@@ -1,0 +1,18 @@
+# Skript's literals that are syntax elements (its ch.njol.skript.literals), by NeoSkript's ids.
+ExprPi
+LitAt
+LitClassInfo
+LitConsole
+LitDoubleMaxValue
+LitDoubleMinValue
+LitEternity
+LitFloatMaxValue
+LitFloatMinValue
+LitInfinity
+LitIntMaxValue
+LitIntMinValue
+LitLongMaxValue
+LitLongMinValue
+LitNaN
+LitNegativeInfinity
+LitNewLine

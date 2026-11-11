@@ -45,6 +45,7 @@ final class LineParser {
     /** The event values the line can use, or {@code null} for any. Fixed for the line, so the memo holds. */
     private final co.xenastudios.neoskript.frontend.registry.EventValues.Scope eventScope;
     private boolean refusedEventValues;
+    private boolean refusedSkriptValues;
     private final String input;
     private final String lowerInput;
     private final Map<Key, Object> memo = new HashMap<>();
@@ -58,6 +59,8 @@ final class LineParser {
     private int unresolvedCode;
     private String functionProblem;
     private String problem;
+    /** The first problem with code in a text's {@code %...%} while a function's argument is parsed. */
+    private String embeddedProblem;
     /** The first error for experimental syntax the script can't use, which Skript reports above others. */
     private String experimentProblem;
     /** Spans that matched experimental syntax the script can't use: as in Skript, they aren't words to resolve. */
@@ -213,9 +216,14 @@ final class LineParser {
             ParsedSyntax parsed = new ParsedSyntax(syntax, candidate.pattern(), match);
             // An event value the code can't have isn't one, so another reading is tried, as Skript's fails to
             // initialize: 'amount of slots of {_inv}' in 'on load' is the inventory's number of slots.
-            if (eventScope != null && (hasTypeRole(syntax) && !eventValueAllowed(parsed, text)
-                    || !leftOutAllowed(syntax, pattern, match))) {
+            if (eventScope != null && hasTypeRole(syntax) && !eventValueAllowed(parsed, text)) {
                 refusedEventValues = true;
+                refusedSkriptValues |= skriptEventValue(parsed, text);
+                continue;
+            }
+            if (eventScope != null && !leftOutAllowed(syntax, pattern, match)) {
+                refusedEventValues = true;
+                refusedSkriptValues = true;
                 continue;
             }
             // A type property of values whose type can't have it isn't one, with Skript's error for it.
@@ -235,6 +243,7 @@ final class LineParser {
                 continue;
             }
             if (syntax.id().equals("ExprArithmetic") && !arithmeticOperands(parsed)) {
+                arithmeticProblem(parsed);
                 continue;
             }
             // A for loop's key and value go into variables, as Skript's refuses anything else: 'loop all players
@@ -433,6 +442,32 @@ final class LineParser {
         return true;
     }
 
+    /** Skript's names of its operators, by {@code ExprArithmetic}'s pattern. */
+    private static final List<String> OPERATIONS = List.of("addition", "subtraction", "multiplication", "division",
+            "exponentiation");
+
+    /**
+     * Skript's error for arithmetic refused for its operands' types, when both are of a known type: {@code
+     * subtraction can't be performed on an entity and a block}.
+     */
+    private void arithmeticProblem(ParsedSyntax parsed) {
+        List<Object> values = parsed.match().values();
+        if (values.size() != 2 || parsed.pattern() >= OPERATIONS.size()) {
+            return;
+        }
+        String[] names = new String[2];
+        for (int i = 0; i < 2; i++) {
+            TypeInfo type = values.get(i) instanceof Expr expr && !(expr instanceof Expr.Unresolved) && expr.type() != null
+                    && !expr.type().equals(SyntaxRegistry.OBJECT) ? registry.type(expr.type()) : null;
+            if (type == null) {
+                return;
+            }
+            String name = Text.lower(type.name());
+            names[i] = ("aeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name;
+        }
+        problem(OPERATIONS.get(parsed.pattern()) + " can't be performed on " + names[0] + " and " + names[1]);
+    }
+
     private boolean onlyNonArithmetic(String word) {
         boolean named = false;
         for (TypeInfo type : registry.types()) {
@@ -611,6 +646,27 @@ final class LineParser {
         return refusedEventValues;
     }
 
+    /**
+     * Whether one of those was an event value Skript also has an expression for, so its error is Skript's: a
+     * left-out placeholder's, {@code event-<type>}, or a kind of entity ({@code player's tool}), not {@code the
+     * potion effect type category}.
+     */
+    boolean refusedSkriptValues() {
+        return refusedSkriptValues;
+    }
+
+    private boolean skriptEventValue(ParsedSyntax parsed, String text) {
+        if (text.strip().regionMatches(true, 0, "event-", 0, 6)) {
+            return true;
+        }
+        for (Object value : parsed.match().regexValues()) {
+            if (value instanceof TypeRef ref) {
+                return registry.isSubtype(ref.type().id(), "entity");
+            }
+        }
+        return false;
+    }
+
     /** Whether the placeholders {@code match} left out can be, where the event's value may have to stand for them. */
     private boolean leftOutAllowed(SyntaxInfo syntax, CompiledPattern pattern, MatchResult match) {
         List<Object> values = match.values();
@@ -665,6 +721,13 @@ final class LineParser {
             }
         }
         String type = parsed.syntax().returnType();
+        Integer typedBy = ARGUMENT_TYPED.get(parsed.syntax().id());
+        if (typedBy != null && typedBy < parsed.match().values().size()
+                && parsed.match().values().get(typedBy) instanceof Expr argument
+                && !(argument instanceof Expr.Variable) && argument.type() != null) {
+            // '3 of stone': its argument's values, with an amount, as Skript's return type is its argument's.
+            return argument.type();
+        }
         if (CHOOSING.contains(parsed.syntax().id())) {
             // 'X if C otherwise Y', 'X otherwise Y': one of its values, so their type when they share one.
             String shared = null;
@@ -682,6 +745,9 @@ final class LineParser {
 
     /** Expressions that give one of their arguments' values. */
     private static final java.util.Set<String> CHOOSING = java.util.Set.of("ExprTernary", "ExprDefaultValue");
+
+    /** Expressions whose values are of the type of one of their arguments, by its index. */
+    private static final Map<String, Integer> ARGUMENT_TYPED = Map.of("ExprXOf", 1);
 
     /**
      * Resolves a pattern's placeholders and regexes. With {@code leaned} given, placeholders whose expression leans
@@ -709,7 +775,14 @@ final class LineParser {
             public Object resolveRegex(String text, int start, int end, int index, java.util.regex.MatchResult match) {
                 return switch (syntax.regexRole(index)) {
                     case ANY -> match;
-                    case CONDITION -> strict(condition(start, end), strictCode);
+                    case CONDITION -> {
+                        ParsedSyntax condition = condition(start, end);
+                        // Skript's 'do if' sets up its effect, then its condition, failing with its own error.
+                        if (condition == null && syntax.id().equals("EffDoIf")) {
+                            problem("Can't understand this condition: " + input.substring(start, end).strip());
+                        }
+                        yield strict(condition, strictCode);
+                    }
                     case EFFECT -> {
                         ParsedSyntax effect = effect(start, end);
                         yield effect != null ? strict(effect, strictCode) : call(start, end);
@@ -821,6 +894,20 @@ final class LineParser {
         return expr;
     }
 
+    /** Skript's {@code notOfType}: {@code not a loot table}, {@code neither a text nor a number}. */
+    private static String notOfType(Expected expected) {
+        List<TypeInfo> types = expected.types();
+        StringBuilder not = new StringBuilder(types.size() == 1 ? "not " : "neither ");
+        for (int i = 0; i < types.size(); i++) {
+            if (i > 0) {
+                not.append(i == types.size() - 1 ? " nor " : ", ");
+            }
+            String name = Text.lower(types.get(i).name());
+            not.append("aeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ").append(name);
+        }
+        return not.toString();
+    }
+
     /** The types expected, as Skript lists them in errors: {@code number, text or player}. */
     private static String typeNames(Expected expected) {
         List<TypeInfo> types = expected.types();
@@ -879,6 +966,11 @@ final class LineParser {
         }
         // Skript also reads world names from strings: world "world".
         if (!expected.accepts("string", registry) && !expected.hasType("world")) {
+            // Skript parses it as text all the same, then says it's not what's wanted. (Code in it may not
+            // parse, which Skript's text then fails on instead, so only plain text is said to be.)
+            if (!expected.types().isEmpty() && embedded.isEmpty()) {
+                problem(input.substring(start, end) + " is " + notOfType(expected));
+            }
             return null;
         }
         if (expected.literalOnly() && !embedded.isEmpty()) {
@@ -902,12 +994,11 @@ final class LineParser {
     private Expr embedded(int start, int end) {
         Expr expr = expression(start, end, Expected.OBJECTS);
         String code = input.substring(start, end);
-        if (expr == null) {
+        if (expr == null || isLiteral(expr)) {
             problem("Can't understand this expression: " + code);
-            return null;
-        }
-        if (isLiteral(expr)) {
-            problem("Can't understand this expression: " + code);
+            if (embeddedProblem == null) {
+                embeddedProblem = "Can't understand this expression: " + code;
+            }
             return null;
         }
         if (expr instanceof Expr.ListOf list && list.items().stream().anyMatch(LineParser::isLiteral)) {
@@ -968,11 +1059,24 @@ final class LineParser {
             return null;
         }
         TypeRef ref = registry.resolveType(Literals.normalize(matcher.group(2)));
-        if (ref == null || !expected.accepts(ref.type().id(), registry)) {
+        if (ref == null) {
             return null;
         }
-        String value = Literals.normalize(matcher.group(1));
         TypeInfo type = ref.type();
+        if (!expected.accepts(type.id(), registry)) {
+            // A narrower kind of the type named, where that's wanted: 'all chickens (entity type)' are plural ones.
+            TypeInfo narrower = null;
+            for (TypeInfo wanted : expected.types()) {
+                if (narrower == null && !wanted.id().equals(type.id()) && registry.isSubtype(wanted.id(), type.id())) {
+                    narrower = wanted;
+                }
+            }
+            if (narrower == null) {
+                return null;
+            }
+            type = narrower;
+        }
+        String value = Literals.normalize(matcher.group(1));
         // Open types check the words with the type's own parser: 'size of all chickens (entity type)' isn't one.
         boolean valid = type.literals().contains(value) || ((type.openLiterals() || type.literals().isEmpty())
                 && Literals.isWords(value) && registry.mightBeLiteral(type, value)) || registry.parses(type, value);
@@ -1249,6 +1353,9 @@ final class LineParser {
             Object result = arguments(function, pieces, inner, false);
             if (result instanceof List<?> arguments) {
                 matches.add(call(start, end, function, arguments));
+            } else if (result instanceof String error && error.equals(OR_IN_ARGUMENTS)) {
+                functionProblem(error);
+                return null;
             } else if (result instanceof String error && (problem == null
                     || function.parameters().size() == pieces.size())) {
                 problem = error;
@@ -1340,7 +1447,8 @@ final class LineParser {
         boolean anyNamed = pieces.stream().anyMatch(piece -> argumentName(piece) != null);
         if (absorb) {
             // Only plain values are absorbed into a list parameter, never named arguments.
-            if (anyNamed || parameters.isEmpty() || !parameters.getLast().plural() || pieces.size() <= parameters.size()) {
+            // As Skript, only a function whose one parameter is a list takes any number of values.
+            if (anyNamed || parameters.size() != 1 || !parameters.getLast().plural() || pieces.size() <= parameters.size()) {
                 return null;
             }
             int[] last = {pieces.get(parameters.size() - 1)[0], inner[1]};
@@ -1388,16 +1496,41 @@ final class LineParser {
             TypeRef ref = registry.resolveType(parameter.type());
             // Skript only checks the number of values when the function runs, so lists are accepted here.
             Expected expected = ref == null ? Expected.OBJECTS : context.expected(new TypeRef(ref.type(), true));
-            Expr argument = expression(valueStart, piece[1], expected);
+            String outerEmbedded = embeddedProblem;
+            embeddedProblem = null;
+            Expr argument;
+            String embeddedError;
+            try {
+                argument = expression(valueStart, piece[1], expected);
+            } finally {
+                embeddedError = embeddedProblem;
+                embeddedProblem = outerEmbedded;
+            }
             if (argument == null) {
-                String written = input.substring(valueStart, piece[1]).strip();
-                if (written.startsWith("(") && written.indexOf('(', 1) > 0) {
+                int[] value = trim(valueStart, piece[1]);
+                String written = input.substring(value[0], value[1]);
+                if (nestedList(value[0], value[1])) {
                     // A list with a list in it: no function takes that, so there's no such function.
                     return null;
                 }
+                if (embeddedError != null && written.startsWith("\"")) {
+                    // Skript's error for the text's code is the one it gives, as the best error found.
+                    return embeddedError;
+                }
+                if (ref == null || ref.type().id().equals(SyntaxRegistry.OBJECT)) {
+                    // Words Skript keeps as an unparsed literal, which no type then reads, unless they're a list.
+                    int[] words = written.startsWith("(") && Scanner.parenEnd(input, value[0], value[1]) == value[1]
+                            ? trim(value[0] + 1, value[1] - 1) : value;
+                    if (Scanner.listSeparators(input, words[0], words[1], new boolean[1]).isEmpty()) {
+                        return "Can't understand this expression: '" + input.substring(words[0], words[1]) + "'";
+                    }
+                }
                 String typeName = ref == null ? parameter.type() : Text.lower(ref.type().name());
                 return "Can't understand the argument for the parameter '" + parameter.name() + "' with type '"
-                        + typeName + "': " + input.substring(valueStart, piece[1]).strip() + ".";
+                        + typeName + "': " + written + ".";
+            }
+            if (argument instanceof Expr.ListOf list && !list.and()) {
+                return OR_IN_ARGUMENTS;
             }
             if (argument instanceof Expr.ListOf list && list.items().stream().anyMatch(Expr.ListOf.class::isInstance)) {
                 // A list of lists isn't an argument: 'f(ns: (1, (2, 3)))'.
@@ -1427,6 +1560,35 @@ final class LineParser {
             }
         }
         return java.util.Arrays.asList(byParameter);
+    }
+
+    /** Skript's error for an argument that's an 'or' list, after which it tries no other function. */
+    static final String OR_IN_ARGUMENTS = "Function arguments cannot be seperated by an 'or'. Put the 'or' into a second"
+            + " set of parentheses if you want to make it a single parameter, e.g. 'give(player, (sword or axe))'";
+
+    /** Whether {@code [start, end)} is a list in brackets with a list in brackets in it: {@code (1, (2, 3))}. */
+    private boolean nestedList(int start, int end) {
+        if (start >= end || input.charAt(start) != '(') {
+            return false;
+        }
+        for (int i = start + 1; i < end; i++) {
+            char c = input.charAt(i);
+            if (c == '"') {
+                i = Scanner.stringEnd(input, i, end, null) - 1;
+            } else if (c == '{') {
+                i = Scanner.braceEnd(input, i, end, null) - 1;
+            } else if (c == '(' && !Character.isLetterOrDigit(input.charAt(i - 1)) && input.charAt(i - 1) != '_') {
+                // Brackets, not a function's: 'vector(1, 2, 3)' is one value.
+                int close = Scanner.parenEnd(input, i, end);
+                if (close > 0 && !Scanner.listSeparators(input, i + 1, close - 1, new boolean[1]).isEmpty()) {
+                    return true;
+                }
+            }
+            if (i < 0) {
+                return false;
+            }
+        }
+        return false;
     }
 
     /**

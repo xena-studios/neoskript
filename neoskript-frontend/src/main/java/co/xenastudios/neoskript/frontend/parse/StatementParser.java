@@ -291,6 +291,9 @@ final class StatementParser {
         if (problem == null) {
             problem = changerProblem(line.text());
         }
+        if (problem == null) {
+            problem = compareProblem(line.text());
+        }
         error(line, problem != null ? problem : "Can't understand this condition/effect: " + line.text());
         return new Statement.Invalid(line);
     }
@@ -339,6 +342,55 @@ final class StatementParser {
             }
         }
         return null;
+    }
+
+    /** Skript's comparison's operators, in the order its patterns try them. */
+    private static final Pattern[] COMPARISONS = {
+        Pattern.compile("(?i)(?<a>.+?)\\s*(?:>=|<=|!=|>|<|=)\\s*(?<b>.+)"),
+        Pattern.compile("(?i)(?<a>.+?) (?:is|are|isn't|aren't)(?: not)? (?<b>.+)"),
+        Pattern.compile("(?i)(?<a>.+?) (?:was|were|wasn't|weren't)(?: not)? (?<b>.+)"),
+        Pattern.compile("(?i)(?<a>.+?) (?:will be|won't be|will not be) (?<b>.+)"),
+    };
+
+    /**
+     * For a comparison with a side that's a value of a type and one Skript takes as an unparsed literal that
+     * isn't plain words (those the compiler checks), Skript's comparison's error: {@code Can't compare a player
+     * with 'in the region {regions::3}'}.
+     */
+    private String compareProblem(String text) {
+        String condition = text.strip();
+        for (Pattern comparison : COMPARISONS) {
+            Matcher matcher = comparison.matcher(condition);
+            if (!matcher.matches()) {
+                continue;
+            }
+            LineParser parser = new LineParser(context, condition);
+            String a = compared(parser, condition, matcher.start("a"), matcher.end("a"));
+            String b = compared(parser, condition, matcher.start("b"), matcher.end("b"));
+            if (a == null || b == null || a.startsWith("'") == b.startsWith("'")) {
+                return null;
+            }
+            return "Can't compare " + a + " with " + b;
+        }
+        return null;
+    }
+
+    /**
+     * A side of a comparison as Skript's error writes it: a value of a type as that type, text that's no
+     * expression and not plain words as itself, quoted; {@code null} if it's neither.
+     */
+    private String compared(LineParser parser, String text, int start, int end) {
+        String side = text.substring(start, end).strip();
+        Expr expr = parser.expression(start, end, Expected.OBJECTS);
+        if (expr == null || expr instanceof Expr.Unresolved) {
+            return Literals.isWords(side) || invalidLine(side) != null ? null : "'" + side + "'";
+        }
+        TypeRef ref = expr.type() == null || expr instanceof Expr.Variable ? null : context.registry().resolveType(expr.type());
+        if (ref == null || ref.type().id().equals(SyntaxRegistry.OBJECT)) {
+            return null;
+        }
+        String name = Text.lower(ref.type().name());
+        return ("aeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name;
     }
 
     /**
@@ -449,8 +501,25 @@ final class StatementParser {
             List<Diagnostic> captured = diagnostics.takeSince(mark);
             return new Statement.Parse(line, body, captured);
         }
-        LineParser parser = new LineParser(context, key);
-        ParsedSyntax header = parser.section(0, key.length());
+        LineParser strict = new LineParser(context, key);
+        ParsedSyntax parsed = strict.section(0, key.length());
+        EventValues.Scope scope = context.eventScope();
+        if (scope != null && strict.refusedSkriptValues() && (parsed == null || unresolved(parsed) > 0)) {
+            // As for other lines: with the event values the code can't have, for the compiler to say which.
+            context.eventScope(null);
+            try {
+                LineParser loose = new LineParser(context, key);
+                ParsedSyntax other = loose.section(0, key.length());
+                if (other != null && (parsed == null || unresolved(other) < unresolved(parsed))) {
+                    strict = loose;
+                    parsed = other;
+                }
+            } finally {
+                context.eventScope(scope);
+            }
+        }
+        LineParser parser = strict;
+        ParsedSyntax header = parsed;
         if (header == null) {
             // An effect whose expression takes a section: 'set {_bar} to a new boss bar:'.
             ParsedSyntax effect = parser.effect(0, key.length());
@@ -458,6 +527,12 @@ final class StatementParser {
             if (claimants.size() > 1) {
                 error(line, claimError(key, claimants.get(1), "'" + text(key, claimants.getFirst()) + "'"));
                 return new Statement.Invalid(line);
+            }
+            if (effect != null && effect.syntax().id().equals("Delay") && claimants.isEmpty()) {
+                // Skript's delayed section: its code runs after the delay, the code after it straight away.
+                parser.listWarnings(effect);
+                warn(line, parser);
+                return new Statement.Section(line, effect, delayedBody(section.children()));
             }
             if (effect != null && hasSectionExpression(effect)) {
                 parser.listWarnings(effect);
@@ -482,7 +557,8 @@ final class StatementParser {
             if (parser.experimentProblem() != null) {
                 error(line, parser.experimentProblem());
             } else if (conditional.matches()) {
-                error(line, "Can't understand this condition: '" + conditional.group(1) + "'");
+                String problem = compareProblem(conditional.group(1));
+                error(line, problem != null ? problem : "Can't understand this condition: '" + conditional.group(1) + "'");
             } else if (key.regionMatches(true, 0, "loop ", 0, 5)) {
                 error(line, "Can't understand this loop: '" + key.substring(5) + "'");
             } else {
@@ -596,6 +672,19 @@ final class StatementParser {
             delay = before;
         }
         return body;
+    }
+
+    /** A delayed section's code, which has waited; the code after the section hasn't, as in Skript's Delay. */
+    private List<Statement> delayedBody(List<Node> nodes) {
+        DelayState before = delay;
+        delay = DelayState.DELAYED;
+        context.hints().enter();
+        try {
+            return statements(nodes);
+        } finally {
+            context.hints().exit();
+            delay = before;
+        }
     }
 
     /**

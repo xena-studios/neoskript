@@ -92,11 +92,12 @@ class LanguageTest {
 
     @Test
     void loopValuesDontSwallowWhatFollows() {
-        assertEquals(List.of("world", "****", "ab"), run("""
+        // Lists, as Skript can't loop one value.
+        assertEquals(List.of("world", "hi", "****", "**", "ab"), run("""
                 on load:
-                \tloop "WORLD":
+                \tloop "WORLD" and "Hi":
                 \t\tsay loop-value in lower case
-                \tloop "abcd":
+                \tloop "abcd" and "ab":
                 \t\tset {_stars} to ""
                 \t\tloop length of loop-value-1 times:
                 \t\t\tset {_stars} to "%{_stars}%*"
@@ -316,6 +317,46 @@ class LanguageTest {
         }
         assertEquals(List.of("before", "after kept", "1=a", "2=b", "3=c", "done"), said);
         assertEquals(List.of(20L, 2L, 2L, 2L), delays);
+    }
+
+    @Test
+    void delayedSectionsRunLaterWithACopyOfTheLocals() {
+        java.util.ArrayDeque<Runnable> later = new java.util.ArrayDeque<>();
+        List<Long> delays = new ArrayList<>();
+        co.xenastudios.neoskript.runtime.Waits.install(new co.xenastudios.neoskript.runtime.scheduler.Scheduler() {
+            @Override
+            public void runGlobal(Runnable task) {
+                later.add(task);
+            }
+
+            @Override
+            public void runGlobalLater(long ticks, Runnable task) {
+                delays.add(ticks);
+                later.add(task);
+            }
+
+            @Override
+            public Runnable runGlobalRepeating(long ticks, Runnable task) {
+                throw new UnsupportedOperationException();
+            }
+        }, e -> {
+            throw e;
+        });
+        run("""
+                on load:
+                \tset {_x} to "then"
+                \tsay "first"
+                \twait 1 second:
+                \t\tsay "third %{_x}%"
+                \tset {_x} to "now"
+                \tsay "second %{_x}%"
+                """);
+        assertEquals(List.of("first", "second now"), said);
+        while (!later.isEmpty()) {
+            later.poll().run();
+        }
+        assertEquals(List.of("first", "second now", "third then"), said);
+        assertEquals(List.of(20L), delays);
     }
 
     @Test

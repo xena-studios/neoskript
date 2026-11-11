@@ -43,9 +43,9 @@ final class CommandParser {
 
     /** Entries that are plain text. */
     private static final Set<String> ENTRIES = Set.of("usage", "description", "aliases", "permission",
-            "executable by", "cooldown", "cooldown bypass", "cooldown storage", "prefix");
+            "executable by", "cooldown", "cooldown bypass", "prefix");
     /** Entries that are text with expressions in them. */
-    private static final Set<String> MESSAGES = Set.of("permission message", "cooldown message");
+    private static final Set<String> MESSAGES = Set.of("permission message", "cooldown message", "cooldown storage");
 
     /** Who can run a command, from its {@code executable by} entry. */
     enum Executor {

@@ -847,8 +847,14 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
         known.putIfAbsent(plural, kind);
         if (!plural.equals(alias)) {
             PLURALS.add(plural);
+        } else {
+            // 'all sheep': Skript can't tell, and takes it as plural where it can be.
+            SAME_PLURALS.add(plural);
         }
     }
+
+    /** The names whose plural is the same: {@code sheep}, {@code cod}. */
+    private static final java.util.Set<String> SAME_PLURALS = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     /** The names that are plural: {@code zombies}, {@code block displays}. */
     private static final java.util.Set<String> PLURALS = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -860,6 +866,10 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
     static boolean isPlural(String text) {
         bases();
         String written = text.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        if (written.startsWith("a ") || written.startsWith("an ")) {
+            // 'a sheep' is one.
+            return false;
+        }
         // 'block displays of a spruce log': the name is before what it's of.
         int of = written.indexOf(" of ");
         if (of > 0 && isPlural(written.substring(0, of))) {
@@ -868,7 +878,7 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
         String[] words = written.split(" ");
         for (int start = 0; start < words.length; start++) {
             String name = String.join(" ", java.util.Arrays.copyOfRange(words, start, words.length));
-            if (PLURALS.contains(name)) {
+            if (PLURALS.contains(name) || SAME_PLURALS.contains(name)) {
                 return true;
             }
             if (bases().containsKey(name)) {

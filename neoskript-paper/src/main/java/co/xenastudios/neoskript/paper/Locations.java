@@ -82,9 +82,7 @@ final class Locations {
         // A location is a block when the block's location is it, as Skript compares them through that converter.
         registrar.comparison(Location.class, Block.class, (location, block) -> location.getWorld() == block.getWorld()
                 && location.toVector().equals(block.getLocation().add(0.5, 0.5, 0.5).toVector()));
-        // Not Skript's: only for placeholders, so 'event-world' isn't the world of an event's location.
-        registrar.converter(Location.class, World.class, Location::getWorld, Registrar.PLACEHOLDERS_ONLY);
-        registrar.converter(Entity.class, World.class, Entity::getWorld, Registrar.PLACEHOLDERS_ONLY);
+        // Nothing else is a world where one is wanted, as in Skript: 'broadcast "hi" to player' isn't understood.
         // 'spawn of "world"': a world by its name.
         registrar.converter(String.class, World.class, Bukkit::getWorld);
 
@@ -148,6 +146,7 @@ final class Locations {
         registrar.effect("EffTeleport", info -> {
             boolean directed = info.pattern() == 1;
             boolean force = info.hasTag("force");
+            deprecatedFlags(co.xenastudios.neoskript.api.element.Warnings.argument(directed ? 3 : 2), flags);
             return (context, args) -> {
                 if (!(Values.single(args[directed ? 2 : 1]) instanceof Location given)) {
                     return;
@@ -308,6 +307,40 @@ final class Locations {
         @Override
         public String toString() {
             return name;
+        }
+    }
+
+    /**
+     * Skript's warnings for teleport flags that do nothing, as its teleport flag type gives them when one is
+     * parsed: keeping the pitch or yaw velocity alone, and on Minecraft 1.21.10 and newer passengers, the vehicle
+     * or the open inventory.
+     */
+    private static void deprecatedFlags(String written, java.util.Map<String, TeleportFlags> flags) {
+        if (written == null) {
+            return;
+        }
+        boolean modern = Logic.compareVersions(Bukkit.getMinecraftVersion(), "1.21.10") >= 0;
+        for (String name : written.strip().split("\\s*,\\s*(?:(?:and|or|n?or)\\s+)?|\\s+(?:and|n?or)\\s+")) {
+            TeleportFlags flag = flags.get(name.strip().toLowerCase(java.util.Locale.ENGLISH));
+            if (flag == null) {
+                continue;
+            }
+            if (flag.name().equals("pitch velocity") || flag.name().equals("yaw velocity")) {
+                co.xenastudios.neoskript.api.element.Warnings.deprecated("It is no longer possible to individually retain"
+                        + " yaw or pitch velocities. Use 'yaw and pitch velocity' to retain both instead.");
+            }
+            if (!modern) {
+                continue;
+            }
+            switch (flag.name()) {
+                case "opened inventory" -> co.xenastudios.neoskript.api.element.Warnings.deprecated(
+                        "Inventories are no longer closed on teleportation, meaning this flag is no longer necessary.");
+                case "passengers" -> co.xenastudios.neoskript.api.element.Warnings.deprecated(
+                        "Passengers are no longer removed on teleportation, meaning this flag is no longer necessary.");
+                case "vehicle" -> co.xenastudios.neoskript.api.element.Warnings.deprecated("The 'retain vehicle' flag has no"
+                        + " functionality on modern versions due to technical limitations with the client.");
+                default -> { }
+            }
         }
     }
 }

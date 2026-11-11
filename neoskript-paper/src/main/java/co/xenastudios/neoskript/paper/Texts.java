@@ -49,6 +49,7 @@ final class Texts {
             }
             return lengths.length == 1 ? lengths[0] : lengths;
         }, "[the] length of %texts%", "%texts%'[s] length");
+        registrar.describe("ExprLength", (info, args) -> "length of " + args.get(0));
 
         registrar.expression("ExprJoinSplit", "string", info -> {
             int pattern = info.pattern();
@@ -123,6 +124,12 @@ final class Texts {
                 "[the] (first|last:last) [%-number%] character[s] of %texts%",
                 "[the] %number% (first|last:last) characters of %texts%",
                 "[the] character[s] at [(index|position|indexes|indices|positions)] %numbers% (in|of) %texts%");
+        registrar.describe("ExprSubstring", (info, args) -> switch (info.pattern()) {
+            case 0 -> "the substring of " + args.get(0) + " from index " + args.get(1) + " to " + args.get(2);
+            case 1, 2 -> "the " + (info.hasTag("last") ? "last " : "first ") + (args.get(0) == null ? "1" : args.get(0))
+                    + " characters of " + args.get(1);
+            default -> "the character at " + (info.isSingle(0) ? "index " : "indexes ") + args.get(0) + " in " + args.get(1);
+        });
 
         registrar.expression("ExprNumberOfCharacters", "integer", info -> {
             int pattern = info.pattern();
@@ -154,6 +161,8 @@ final class Texts {
                     }));
         }, "%texts% (match[es]|not:do[es](n't| not) match) %texts%",
                 "%texts% (partially match[es]|not:do[es](n't| not) partially match) %texts%");
+        registrar.describe("CondMatches", (info, args) -> args.get(0) + " " + (info.hasTag("not") ? "doesn't match" : "matches")
+                + " " + args.get(1));
 
         registrar.effect("EffReplace", info -> {
             int pattern = info.pattern();
@@ -162,7 +171,10 @@ final class Texts {
             boolean caseSensitive = info.hasTag("case");
             // 'replace X in T with R' or 'replace X with R in T'.
             boolean targetLast = pattern % 2 == 1;
-            return Update.of(targetLast ? 2 : 1, (context, args) -> {
+            // Items are replaced in their inventories, which needn't be settable; text has to be, as in Skript.
+            boolean inventories = pattern < 2 && "inventory".equals(info.argumentType(targetLast ? 2 : 1));
+            java.util.function.BiFunction<co.xenastudios.neoskript.api.element.TriggerContext, Object[], Object> replace =
+                    (context, args) -> {
                 Object[] needles = (Object[]) args[0];
                 Object[] targets = (Object[]) args[targetLast ? 2 : 1];
                 Object by = args[targetLast ? 1 : 2];
@@ -204,7 +216,8 @@ final class Texts {
                     result[i] = text;
                 }
                 return result;
-            });
+            };
+            return inventories ? Update.inPlace(targetLast ? 2 : 1, replace) : Update.of(targetLast ? 2 : 1, replace);
         }, "replace [(all|every)|first:[the] first] %texts/itemtypes% in %texts/inventories% with %text/itemtype% [case:with case sensitivity]",
                 "replace [(all|every)|first:[the] first] %texts/itemtypes% with %text/itemtype% in %texts/inventories% [case:with case sensitivity]",
                 "(replace [with|using] regex|regex replace) %texts% in %texts% with %text%",
@@ -257,6 +270,7 @@ final class Texts {
             int count = (int) Math.min(times.longValue(), Integer.MAX_VALUE);
             return map((Object[]) args[0], text -> text.repeat(count));
         }, "%texts% repeated %integer% time[s]");
+        registrar.describe("ExprRepeat", (info, args) -> args.get(0) + " repeated " + args.get(1) + " times");
         registrar.expression("ExprCodepoint", "integer", info -> (context, args) -> {
             List<Object> codes = new java.util.ArrayList<>();
             for (Object value : (Object[]) args[0]) {
@@ -295,6 +309,8 @@ final class Texts {
                 return characters.toArray();
             };
         }, "[(all [[of] the]|the)] [alphanumeric:alphanumeric] characters (between|from) %text% (and|to) %text%");
+        registrar.describe("ExprCharacters", (info, args) -> "all the " + (info.hasTag("alphanumeric") ? "alphanumeric " : "")
+                + "characters between " + args.get(0) + " and " + args.get(1));
         registrar.expression("ExprRandomCharacter", "string", info -> {
             boolean alphanumeric = info.hasTag("alphanumeric");
             boolean counted = info.hasTag("count");

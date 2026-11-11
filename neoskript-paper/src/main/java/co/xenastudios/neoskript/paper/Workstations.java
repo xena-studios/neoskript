@@ -120,6 +120,8 @@ final class Workstations {
         }, "[the] brewing results");
         registrar.expression("ExprBrewingTime", "timespan", info -> new BrewingTime(isIn(info, BrewingStartEvent.class)),
                 Property.defaultPatterns("[current|remaining] brewing time", "blocks"));
+        registrar.describe("ExprBrewingTime", (info, args) -> "the current brewing time of "
+                + (args.get(0) == null ? "event-block" : args.get(0)));
     }
 
     /**

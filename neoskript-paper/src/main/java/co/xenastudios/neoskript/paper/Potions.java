@@ -254,16 +254,18 @@ final class Potions {
                 "[an] (infinite|permanent) [ambient:ambient] %potioneffecttype% [[of tier] %-number%] [potion [effect]]",
                 "[a] potion effect [of %-potioneffecttype%] (from|using|based on) %skriptpotioneffect%");
         registrar.sectionExpression("ExprSecPotionEffect", "skriptpotioneffect");
+        registrar.sectionEvent("ExprSecPotionEffect", "create potion effect");
         // 'the created effect' in a potion effect's section: the effect being made, as Skript's
-        // ExprSkriptPotionEffect. 'potion effect' alone is the section's value already, as an event value.
+        // ExprSkriptPotionEffect, which 'the potion effect' is too, and can't be anywhere else.
         registrar.expression("ExprSkriptPotionEffect", "skriptpotioneffect", info -> {
             if (!"skriptpotioneffect".equals(info.sectionType())) {
-                throw new co.xenastudios.neoskript.api.element.SyntaxError("'" + (info.pattern() == 0
-                        ? "created " + (info.hasTag("potion") ? "potion " : "") + "effect" : "effect")
-                        + "' can only be used in ");
+                throw new co.xenastudios.neoskript.api.element.SyntaxError("'" + info.textOr((info.hasTag("the")
+                        ? "the " : "") + (info.hasTag("created") ? "created " : "") + (info.hasTag("potion")
+                        ? "potion " : "") + "effect") + "' can only be used in ");
             }
             return (context, args) -> CREATED.get();
-        }, "created [potion:potion] effect", "effect");
+        }, "[the:the] [created:created] [potion:potion] effect");
+        registrar.eventValueExpression("ExprSkriptPotionEffect");
         // 'speed 5': an effect of that tier, for the default time.
         registrar.expression("ExprSecPotionEffect-2", "skriptpotioneffect", info -> (context, args) -> {
             if (!(args[0] instanceof PotionEffectType type) || !(args[1] instanceof Number tier)) {

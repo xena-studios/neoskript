@@ -63,6 +63,8 @@ final class Collections {
             }
         });
         registrar.changer(ScriptQueue.class, Changeable.Mode.DELETE, (queue, values) -> queue.clear());
+        registrar.changer(ScriptQueue.class, Changeable.Mode.RESET, (queue, values) -> queue.clear());
+        registrar.changer(ScriptQueue.class, Changeable.Mode.RESET, (queue, values) -> queue.clear());
 
         registrar.condition("CondIsEmpty", info -> {
             boolean negated = info.pattern() == 1;

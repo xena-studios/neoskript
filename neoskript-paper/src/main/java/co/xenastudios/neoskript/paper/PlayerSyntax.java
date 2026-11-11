@@ -766,6 +766,8 @@ final class PlayerSyntax {
                 return address == null ? "unknown" : address.getHostAddress();
             });
         }, "IP[s][( |-)address[es]] of %players%", "%players%'[s] IP[s][( |-)address[es]]", "IP[( |-)address]");
+        // Skript writes it without its players, as it does when there's no event to show them for.
+        registrar.describe("ExprIP", (info, args) -> "the IP address");
         property(registrar, "ExprLanguage", "string",
                 Patterns.property("[([currently] selected|current)] [game] (language|locale) [setting]", "players"), Player.class,
                 Player::getLocale, null, null);
@@ -880,7 +882,7 @@ final class PlayerSyntax {
     }
 
     private static void registerMoreExpressions(Registrar registrar) {
-        registrar.expression("ExprSpectatorTarget", "entity", info -> new SpectatorTarget(info.time()), "spectator target [of %-players%]", "%players%'[s] spectator target");
+        registrar.expression("ExprSpectatorTarget", "entity", info -> new SpectatorTarget(info.time(), info.isDefault(0) && info.argumentType(0) == null), "spectator target [of %-players%]", "%players%'[s] spectator target");
         // 'past spectator target' when a player starts spectating something is what they spectated before.
         registrar.timeStates("ExprSpectatorTarget", 0, com.destroystokyo.paper.event.player.PlayerStartSpectatingEntityEvent.class,
                 com.destroystokyo.paper.event.player.PlayerStopSpectatingEntityEvent.class);
@@ -1002,7 +1004,8 @@ final class PlayerSyntax {
     }
 
     /** The entities players are spectating; in a spectating event without players, the event's target. */
-    private record SpectatorTarget(int time) implements Expression, Changeable {
+    /** With {@code event} (no players given), the event's target, which is changed as an entity is, as in Skript. */
+    private record SpectatorTarget(int time, boolean event) implements Expression, Changeable {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
             if (arguments[0] == null) {
@@ -1024,6 +1027,9 @@ final class PlayerSyntax {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            if (event) {
+                return null;
+            }
             return mode == Mode.SET || mode == Mode.RESET || mode == Mode.DELETE ? new Class<?>[] {Entity.class} : null;
         }
 

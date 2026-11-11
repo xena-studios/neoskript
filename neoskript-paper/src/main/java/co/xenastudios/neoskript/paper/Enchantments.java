@@ -75,7 +75,10 @@ final class Enchantments {
                 }
                 Object[] changed = new Object[items.length];
                 for (int i = 0; i < items.length; i++) {
-                    changed[i] = !(items[i] instanceof ItemType item) ? items[i] : switch (pattern) {
+                    // A slot's item is enchanted, and the slot set to it: 'enchant the player's tool'.
+                    Object value = items[i] instanceof ItemType ? items[i]
+                            : co.xenastudios.neoskript.runtime.Values.convert(items[i], ItemType.class);
+                    changed[i] = !(value instanceof ItemType item) ? items[i] : switch (pattern) {
                         case 0 -> enchanted(item, (Object[]) args[1]);
                         case 1 -> atLevel(item, level, treasure);
                         default -> item.withMeta(meta -> meta.removeEnchantments());

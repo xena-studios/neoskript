@@ -60,24 +60,34 @@ final class Logic {
         registrar.condition("CondCompare", info -> {
             Relation relation = relation(info.tags());
             boolean negated = info.hasTag("not");
-            constantComparison(info, relation, negated);
             boolean leftAnd = info.and(0);
             return (context, args) -> negated != holds((Object[]) args[0], leftAnd, (Object[]) args[1], relation);
-        }, "%objects% (is|are)[(not:n't|not: not)] (ge:(greater|more|higher|bigger|larger) than or (equal to|the same as)"
+        }, "%objects% (is|are)[(not:n't|not: not|not: neither)] (ge:(greater|more|higher|bigger|larger) than or (equal to|the same as)"
                 + "|gt:(greater|more|higher|bigger|larger) than|gt:above"
                 + "|le:(less|smaller|lower) than or (equal to|the same as)|lt:(less|smaller|lower) than|lt:below"
                 + "|eq:[equal to|the same as]) %objects%",
                 "%objects% (ge:\\>=|gt:\\>|le:\\<=|ne:\\<\\>|lt:\\<|eq:=|ne:!=) %objects%",
                 // Before and after the event, as Skript's: 'player's tool was a diamond sword'.
-                "%objects@-1% (was|were)[(not:n't|not: not)] (ge:(greater|more|higher|bigger|larger|above) [than] or (equal to|the same as)"
+                "%objects@-1% (was|were)[(not:n't|not: not|not: neither)] (ge:(greater|more|higher|bigger|larger|above) [than] or (equal to|the same as)"
                 + "|gt:(greater|more|higher|bigger|larger) than|gt:above"
                 + "|le:(less|smaller|lower|below) [than] or (equal to|the same as)|lt:(less|smaller|lower) than|lt:below"
                 + "|eq:[equal to|the same as]) %objects%",
-                "%objects@1% (will be|not:will not be|not:won't be) (ge:(greater|more|higher|bigger|larger|above) [than] or (equal to|the same as)"
+                "%objects@1% (will be|not:will (not|neither) be|not:won't be) (ge:(greater|more|higher|bigger|larger|above) [than] or (equal to|the same as)"
                 + "|gt:(greater|more|higher|bigger|larger) than|gt:above"
                 + "|le:(less|smaller|lower|below) [than] or (equal to|the same as)|lt:(less|smaller|lower) than|lt:below"
                 + "|eq:[equal to|the same as]) %objects%",
                 "%objects@1% ((is|are)|not:(isn't|aren't|is not|are not)) (turning|changing) [in]to %objects%");
+
+        // As Skript writes a comparison, which its warning for one that's always true or false quotes.
+        registrar.describe("CondCompare", (info, args) -> args.get(0) + " is " + (info.hasTag("not") ? "not " : "")
+                + switch (relation(info.tags())) {
+                    case EQUAL -> "equal to";
+                    case NOT_EQUAL -> "not equal to";
+                    case GREATER -> "greater than";
+                    case GREATER_OR_EQUAL -> "greater than or equal to";
+                    case LESS -> "smaller than";
+                    case LESS_OR_EQUAL -> "smaller than or equal to";
+                } + " " + args.get(1));
 
         registrar.condition("CondIsSet", info -> {
             boolean negated = info.hasTag("not");
@@ -93,6 +103,8 @@ final class Logic {
 
         // As Skript 2.17's PropCondContains: what's in each container (an inventory, a text...), falling back to
         // whether the values are among them; 'contains' after several only the latter, 'contents of' only the former.
+        registrar.describe("CondContains", (info, args) -> args.get(0) + (info.hasTag("not") ? " doesn't contain " : " contains ")
+                + args.get(1));
         registrar.condition("CondContains", info -> {
             boolean negated = info.hasTag("not");
             boolean containersAnd = info.and(0);
@@ -189,6 +201,7 @@ final class Logic {
                 return below ? order < 0 : order >= 0;
             };
         }, "running [below:below] minecraft %text%");
+        registrar.describe("CondMinecraftVersion", (info, args) -> "is running minecraft " + args.get(0));
         registrar.condition("CondStartsEndsWith", info -> {
             boolean negated = info.pattern() == 1;
             boolean ends = info.hasTag("end");
@@ -199,6 +212,9 @@ final class Logic {
                             ? Values.text(text).endsWith(Values.text(affix))
                             : Values.text(text).startsWith(Values.text(affix))));
         }, "%texts% (start|end:end)[s] with %texts%", "%texts% (doesn't|does not|do not|don't) (start|end:end) with %texts%");
+        registrar.describe("CondStartsEndsWith", (info, args) -> args.get(0) + (info.pattern() == 1
+                ? " doesn't " + (info.hasTag("end") ? "end" : "start") : info.hasTag("end") ? " ends" : " starts")
+                + " with " + args.get(1));
         registrar.condition("CondIsDivisibleBy", info -> {
             boolean negated = info.pattern() % 2 == 1;
             boolean and = info.and(0);
@@ -245,6 +261,8 @@ final class Logic {
             };
         }, "%number% [in] deg[ree][s]", "%number% [in] (rad:rad[ian][s])", "%numbers% in deg[ree][s]",
                 "%numbers% in (rad:rad[ian][s])");
+        // As Skript writes it, which names the other unit: '180 degrees' is "180 in radians".
+        registrar.describe("ExprAngle", (info, args) -> args.get(0) + " in " + (info.hasTag("rad") ? "degrees" : "radians"));
         registrar.expression("ExprSortedList", "object", info -> new SortedList(), "sorted %objects%");
         registrar.expression("ExprAlphabetList", "string", info -> new SortedList(true), "alphabetically sorted %strings%");
         registrar.expression("ExprReversedList", "object", info -> {
@@ -268,9 +286,11 @@ final class Logic {
             };
         }, "%number% time[s]", "(once:once|twice:twice|thrice:thrice)");
         registrar.expression("ExprPi", "number", info -> (context, args) -> Math.PI, "(pi|\u03c0)");
+        registrar.describe("ExprPi", (info, args) -> "pi");
         // Why the last 'X parsed as Y' failed, as Skript's ExprParseError.
         registrar.expression("ExprParseError", "string", info -> (context, args) -> Values.lastParseError(),
                 "[the] [last] [parse] error");
+        registrar.describe("ExprParseError", (info, args) -> "the last parse error");
         // 'debug info of 1, "a"': each value as text with its type, "1 (integer)" and ""a" (text)".
         registrar.property("ExprDebugInfo", "string", "debug info[rmation]", "objects", Object.class, value ->
                 (value instanceof String ? "\"" + value + "\"" : Values.text(value)) + " ("
@@ -317,7 +337,9 @@ final class Logic {
         // 'toggle {_flag}': booleans flip, and blocks that open (doors, trapdoors...) open or close; others stay.
         registrar.effect("EffToggle", info -> {
             int mode = info.hasTag("open") ? 1 : info.hasTag("close") ? 2 : 0;
-            return co.xenastudios.neoskript.api.element.Update.of(0, (context, args) -> {
+            // Blocks open and close themselves, so they needn't be settable; booleans have to be, as in Skript.
+            java.util.function.BiFunction<co.xenastudios.neoskript.api.element.TriggerContext, Object[], Object> toggle =
+                    (context, args) -> {
                 Object[] values = Values.array(args[0]);
                 Object[] toggled = new Object[values.length];
                 for (int i = 0; i < values.length; i++) {
@@ -334,7 +356,10 @@ final class Logic {
                     toggled[i] = value;
                 }
                 return toggled;
-            });
+            };
+            return "block".equals(info.argumentType(0))
+                    ? co.xenastudios.neoskript.api.element.Update.inPlace(0, toggle)
+                    : co.xenastudios.neoskript.api.element.Update.of(0, toggle);
         }, "(open:open|close:close|toggle) %~objects%");
         registrar.expression("ExprInverse", "boolean", info -> (context, args) -> {
             Object[] values = Values.array(args[0]);
@@ -563,54 +588,6 @@ final class Logic {
         return Relation.EQUAL;
     }
 
-    /**
-     * Skript's warning for a comparison of two literals, which it simplifies to its result
-     * ({@code SimplifiedCondition}): "The condition '1 is equal to 1' will always be true."
-     */
-    private static void constantComparison(co.xenastudios.neoskript.api.element.ElementInfo info, Relation relation,
-            boolean negated) {
-        Object left = literalValue(info, 0);
-        Object right = literalValue(info, 1);
-        if (left == null || right == null) {
-            return;
-        }
-        boolean result = negated != holds(new Object[] {left}, true, new Object[] {right}, relation);
-        String relationName = switch (relation) {
-            case EQUAL -> "equal to";
-            case NOT_EQUAL -> "not equal to";
-            case GREATER -> "greater than";
-            case GREATER_OR_EQUAL -> "greater than or equal to";
-            case LESS -> "smaller than";
-            case LESS_OR_EQUAL -> "smaller than or equal to";
-        };
-        // As Skript writes the literals: booleans as their value, the rest as written.
-        String first = left instanceof Boolean ? left.toString() : co.xenastudios.neoskript.api.element.Warnings.argument(0);
-        String second = right instanceof Boolean ? right.toString() : co.xenastudios.neoskript.api.element.Warnings.argument(1);
-        co.xenastudios.neoskript.api.element.Warnings.warn("constant", "The condition '" + first + " is "
-                + (negated ? "not " : "") + relationName + " " + second + "' will always be "
-                + result + ".");
-    }
-
-    /** Argument {@code index}'s value, if it's a number, boolean or text written out, else {@code null}. */
-    private static Object literalValue(co.xenastudios.neoskript.api.element.ElementInfo info, int index) {
-        String literal = info.argumentLiteral(index);
-        String type = info.argumentType(index);
-        if (literal == null || type == null) {
-            return null;
-        }
-        try {
-            return switch (type) {
-                case "string" -> literal;
-                case "boolean" -> literal.equalsIgnoreCase("true") || literal.equalsIgnoreCase("yes")
-                        || literal.equalsIgnoreCase("on");
-                case "integer" -> Long.parseLong(literal.replace("_", ""));
-                case "number" -> Double.parseDouble(literal.replace("_", ""));
-                default -> null;
-            };
-        } catch (NumberFormatException notPlain) {
-            return null;
-        }
-    }
 
     /** Every value on the left relates to at least one on the right. Nothing on either side is false. */
     private static boolean holds(Object[] left, boolean leftAnd, Object[] right, Relation relation) {

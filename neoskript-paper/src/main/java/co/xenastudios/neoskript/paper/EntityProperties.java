@@ -283,8 +283,8 @@ final class EntityProperties {
                     }
                 }
             };
-        }, "(prevent|disallow) %entities% from (naturally despawning|despawning naturally)",
-                "allow natural despawning of %entities%", "allow %entities% to (naturally despawn|despawn naturally)");
+        }, "(prevent|disallow) %itementities% from (naturally despawning|despawning naturally)",
+                "allow natural despawning of %itementities%", "allow %itementities% to (naturally despawn|despawn naturally)");
         registrar.effect("EffMakeResponsive", info -> {
             boolean responsive = info.pattern() == 0;
             return (context, args) -> {
@@ -538,22 +538,8 @@ final class EntityProperties {
         registrar.expression("ExprAllayJukebox", "location", info -> new Property<>(LivingEntity.class,
                 living -> living instanceof org.bukkit.entity.Allay allay ? allay.getJukebox() : null).defaulting(),
                 Property.defaultPatterns("target jukebox", "livingentities"));
-        // Non-creepers' fuses are 0 ticks long; resetting makes a creeper's 30 again.
-        registrar.expression("ExprCreeperMaxFuseTicks", "integer", info -> new Property<>(LivingEntity.class,
-                living -> living instanceof org.bukkit.entity.Creeper creeper ? (long) creeper.getMaxFuseTicks() : 0L,
-                Number.class, Property.modes(Mode.SET, Mode.ADD, Mode.REMOVE, Mode.DELETE, Mode.RESET), (living, delta, mode) -> {
-                    if (!(living instanceof org.bukkit.entity.Creeper creeper)) {
-                        return;
-                    }
-                    int by = delta == null ? 0 : Property.intOf(delta[0]);
-                    creeper.setMaxFuseTicks(Math.max(0, switch (mode) {
-                        case ADD -> creeper.getMaxFuseTicks() + by;
-                        case REMOVE -> creeper.getMaxFuseTicks() - by;
-                        case DELETE -> 0;
-                        case RESET -> 30;
-                        default -> by;
-                    }));
-                }), Patterns.property("[creeper] max[imum] fuse tick[s]", "livingentities"));
+        // No ExprCreeperMaxFuseTicks: Skript 2.17 registers it only if LivingEntity has getMaxFuseTicks, which only
+        // Creeper does, so it never exists.
         registrar.expression("ExprMaxMinecartSpeed", "number", info -> new Property<>(Entity.class,
                 entity -> entity instanceof Minecart minecart ? minecart.getMaxSpeed() : null, Number.class,
                 Property.modes(Mode.ADD, Mode.REMOVE, Mode.RESET, Mode.SET), (entity, delta, mode) -> {
@@ -723,6 +709,10 @@ final class EntityProperties {
 
     /** Dropped items: who threw them and who may pick them up, by UUID. */
     private static void registerItemEntities(Registrar registrar) {
+        // Skript's 'itementity', which only what's known to be a dropped item is: 'all dropped items' and
+        // 'last dropped item' are entities, so they can't go where one is wanted.
+        registrar.type("itementity", "dropped item", Item.class);
+        registrar.subtype("itementity", "entity");
         for (boolean thrower : new boolean[] {false, true}) {
             String who = thrower ? "thrower" : "owner";
             registrar.expression(thrower ? "ExprItemThrower" : "ExprItemOwner", "uuid", info -> new Property<>(Item.class,
@@ -735,8 +725,8 @@ final class EntityProperties {
                             item.setOwner(uuid);
                         }
                     }).defaulting(),
-                    "[the] uuid of [the] [dropped] item " + who + " [of %entities%]",
-                    "[the] [dropped] item " + who + "'s uuid [of %entities%]");
+                    "[the] uuid of [the] [dropped] item " + who + " [of %itementities%]",
+                    "[the] [dropped] item " + who + "'s uuid [of %itementities%]");
         }
     }
 

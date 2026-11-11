@@ -89,6 +89,20 @@ public interface Registrar {
     void sectionExpression(String expressionId, String valueType);
 
     /**
+     * The code in expression {@code expressionId}'s section is in an event of its own, called {@code eventName}
+     * in errors, as Skript's section expressions load it: the trigger's event values can't be used there
+     * ({@code There's no player in a create bossbar event.}), only the value being made.
+     */
+    default void sectionEvent(String expressionId, String eventName) {}
+
+    /**
+     * Marks expression {@code expressionId} as an event value, as Skript's {@code EventValueExpression}s are
+     * ({@code the created damage source}): as an argument, it counts as a default one
+     * ({@link co.xenastudios.neoskript.api.element.ElementInfo#isDefault(int)}).
+     */
+    default void eventValueExpression(String expressionId) {}
+
+    /**
      * Lets expression {@code expressionId} take a section that runs later, as Skript's test runnables do:
      * {@code set {_r} to a new runnable:}. The expression's value is the section itself, a {@link Runnable}
      * that runs the code under it with the local variables of the trigger it was made in.
@@ -115,6 +129,12 @@ public interface Registrar {
     default void lateSyntax() {}
 
     /**
+     * Has effect {@code effectId} tried before effect {@code otherId}, as Skript tries its effects in its own order:
+     * {@code clear drops} is its cancel drops effect, which comes before its change effect.
+     */
+    default void effectBefore(String effectId, String otherId) {}
+
+    /**
      * Lets expression {@code expressionId} be written with a time state, as Skript's {@code setTime}:
      * {@code past tool}, {@code the future gamemode of player}, {@code X was Y}. {@code accepts} gets the
      * element as matched with the time state wanted ({@link co.xenastudios.neoskript.api.element.ElementInfo#time()},
@@ -124,6 +144,7 @@ public interface Registrar {
      */
     void timeStates(String expressionId,
             java.util.function.Predicate<co.xenastudios.neoskript.api.element.ElementInfo> accepts);
+
 
     /**
      * {@link #timeStates(String, java.util.function.Predicate)} in events of {@code eventClasses} only, and
@@ -184,6 +205,13 @@ public interface Registrar {
      * does: asking for it is an error with {@code message}, as Skript's {@code event-entity} in a damage event.
      */
     void eventValueExcluded(Class<?> eventClass, String typeId, String message);
+
+    /**
+     * The time states of events of {@code eventClass}'s values of {@code typeId} are only for the type's bare name
+     * ({@code former world}), not {@code event-<type>}, as in Skript, where the bare name is an expression with
+     * time states of its own ({@code ExprWorld}), and the event value has none.
+     */
+    default void bareTimeStates(Class<?> eventClass, String typeId) {}
 
     /**
      * An event value of {@code typeId} that's only for a narrower kind, whose values are {@code valueClass}:
@@ -280,6 +308,24 @@ public interface Registrar {
      * returns the error, or {@code null} if it has nothing to say about the words.
      */
     void literalError(java.util.function.Function<String, String> problem);
+
+    /**
+     * How Skript writes syntax {@code id} in its messages, its {@code toString}, where that isn't the syntax as
+     * written: {@code the IP address} for {@code IP-address}, as its warnings quote it ("the IP address is
+     * already a text"). Without one, messages quote the syntax as written.
+     */
+    default void describe(String id, Describer describer) {}
+
+    /** Writes an element as Skript's {@code toString} does. */
+    @FunctionalInterface
+    interface Describer {
+
+        /**
+         * @param info how the element was matched
+         * @param arguments each argument written as Skript writes it, or {@code null} where it was left out
+         */
+        String describe(co.xenastudios.neoskript.api.element.ElementInfo info, List<String> arguments);
+    }
 
     /**
      * How text people type, such as a command's arguments, becomes a value of {@code typeId}. The parser

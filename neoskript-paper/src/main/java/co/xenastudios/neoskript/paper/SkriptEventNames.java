@@ -164,7 +164,7 @@ final class SkriptEventNames {
      */
     static void restrict(ElementInfo info, String written, Class<?>... supported) {
         if (!info.isEvent(supported)) {
-            throw new SyntaxError("'" + written + "' can only be used in " + names(supported));
+            throw new SyntaxError("'" + info.textOr(written) + "' can only be used in " + names(supported));
         }
     }
 }

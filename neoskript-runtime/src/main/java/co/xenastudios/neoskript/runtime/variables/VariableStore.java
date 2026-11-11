@@ -512,6 +512,19 @@ public final class VariableStore {
         copy(source, create(to));
     }
 
+    /**
+     * A copy of every variable, as Skript's {@code copyLocalVariables}: what a delayed section runs with, so
+     * changes after it's scheduled don't reach it.
+     */
+    public VariableStore copy() {
+        VariableStore copy = new VariableStore();
+        copy.root.value.set(Values.copy(root.value.get()));
+        if (root.children != null) {
+            copy(root, copy.root);
+        }
+        return copy;
+    }
+
     private static void copy(Node from, Node to) {
         for (Map.Entry<String, Node> entry : from.children.entrySet()) {
             Node target = to.children().computeIfAbsent(entry.getKey(), k -> new Node());

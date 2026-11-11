@@ -118,6 +118,7 @@ final class BossBars {
         }, "[a] [new] [%-color%] boss[ ]bar [(with title|titled) %-text%]",
                 "[a] [new] keyed [%-color%] boss[ ]bar with (id|key) %string% [(with title|titled) %-text%]");
         registrar.sectionExpression("ExprSecCreateBossBar", "bossbar");
+        registrar.sectionEvent("ExprSecCreateBossBar", "create bossbar");
 
         registrar.expression("ExprBossBarFromKey", "keyedbossbar", info -> (context, args) -> {
             List<Object> bars = new ArrayList<>();

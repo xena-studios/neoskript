@@ -240,6 +240,14 @@ final class ScriptManager {
         List<Diagnostic> diagnostics = new ArrayList<>();
         parsed.forEach(script -> diagnostics.addAll(script.diagnostics()));
         diagnostics.addAll(compiled.diagnostics());
+        // Each script's problems in the order of their lines, as Skript gives them while it goes through the
+        // script, though NeoSkript finds some while parsing and others while compiling. Problems with the file's
+        // layout come first, in the order Skript finds them reading the file.
+        Map<String, Integer> fileOrder = new HashMap<>();
+        diagnostics.forEach(d -> fileOrder.putIfAbsent(d.file(), fileOrder.size()));
+        diagnostics.sort(java.util.Comparator.comparingInt((Diagnostic d) -> fileOrder.get(d.file()))
+                .thenComparing(d -> !layoutProblem(d.message()))
+                .thenComparingInt(d -> layoutProblem(d.message()) ? 0 : d.line()));
         Set<String> failed = new HashSet<>();
         int errors = 0;
         for (Diagnostic diagnostic : diagnostics) {
@@ -662,6 +670,11 @@ final class ScriptManager {
     /** Sends a problem to the console as Skript's log does: through the console, with its colors. */
     private static void toConsole(Diagnostic problem, SourceFile file) {
         AutoReload.send(List.of(Bukkit.getConsoleSender()), SkriptCommandMessages.PREFIX + AutoReload.describe(problem, file));
+    }
+
+    /** Whether a problem is with the file's layout, which Skript reports as it reads the file, before the code. */
+    private static boolean layoutProblem(String message) {
+        return message.startsWith("indentation error") || message.startsWith("Empty configuration section!");
     }
 
     /** A problem as Skript reports it: the line and file, the message, then the line itself. */

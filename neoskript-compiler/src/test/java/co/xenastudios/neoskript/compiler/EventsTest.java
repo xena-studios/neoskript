@@ -172,7 +172,9 @@ class EventsTest {
     @Test
     void anEventWithoutTheValueIsAnError() {
         assertEquals("There's no number in an on greet event.", error("on greet:\n\tsay event-number\n"));
-        assertTrue(error("on load:\n\tsay person\n").startsWith("There's no person in"));
+        assertTrue(error("on load:\n\tsay event-person\n").startsWith("There's no person in"));
+        // Where any object is wanted, a type's name alone is the type, as Skript reads words no expression takes.
+        assertEquals(List.of(), compile("on load:\n\tsay person\n").diagnostics());
     }
 
     @Test

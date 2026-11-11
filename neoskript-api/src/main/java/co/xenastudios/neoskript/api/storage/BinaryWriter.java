@@ -22,6 +22,9 @@ public interface BinaryWriter {
     /** A short name, such as an enum constant's. */
     void rawName(String value);
 
+    /** Bytes written as they are: a whole value, already in Skript's format, as Skript saves it. */
+    void rawBytes(byte[] bytes);
+
     void beginObject(int fields);
 
     void byteField(String name, byte value);

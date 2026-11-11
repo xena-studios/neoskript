@@ -77,6 +77,8 @@ final class ServerEvents {
             return new MaxPlayers(info.hasTag("real") || !info.hasTag("fake") && !ping);
         }, "[the] [real:(real|default)|fake:(fake|shown|displayed)] max[imum] player[s] [count|amount|number|size]",
                 "[the] [real:(real|default)|fake:(fake|shown|displayed)] max[imum] (count|amount|number|size) of players");
+        registrar.describe("ExprMaxPlayers", (info, args) -> "the count of " + (info.hasTag("real")
+                || !info.hasTag("fake") && !info.isEvent(ServerListPingEvent.class) ? "real max players" : "max players"));
         registrar.expression("ExprCommandSender", "commandsender", info -> (context, args) -> sender(context.event()),
                 "[the] [command['s]] sender");
         registrar.effect("EffCancelEvent", info -> {

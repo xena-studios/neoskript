@@ -24,6 +24,13 @@ public final class SkriptBinaryReader implements BinaryReader {
         remember(type);
     }
 
+    @Override
+    public byte[] remainingBytes() {
+        byte[] rest = new byte[in.remaining()];
+        in.get(rest);
+        return rest;
+    }
+
     /** Whether every byte was read: a codec that reads less didn't understand the value. */
     public boolean atEnd() {
         return !in.hasRemaining();

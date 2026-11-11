@@ -100,6 +100,8 @@ final class WorldSyntax {
         // Never with an amount: '32 ender pearls' are items.
         registrar.literalParser("pluralentitytype", text -> !EntityKind.counted(text) && EntityKind.isPlural(text)
                 ? EntityKind.parse(text) : null);
+        // 'all chickens (entity type)': entity types too.
+        registrar.subtype("pluralentitytype", "entitytype");
     }
 
     /** Entity types with an amount, tried after items: '5 villagers', '2 zombie'. */
@@ -125,6 +127,9 @@ final class WorldSyntax {
         registrar.cloner(Vector.class, Vector::clone);
         registrar.cloner(Location.class, Location::clone);
         registrar.subtype("livingentity", "entity");
+        // Skript's projectile type, so a left-out one is the event's: "There's no projectile in an on join event."
+        registrar.type("projectile", "projectile", org.bukkit.entity.Projectile.class);
+        registrar.subtype("projectile", "entity");
         registrar.type("vehicle", "vehicle", org.bukkit.entity.Vehicle.class);
         registrar.subtype("vehicle", "entity");
         // A script command's block, where a command block ran it.
@@ -370,7 +375,7 @@ final class WorldSyntax {
                     if (entity instanceof org.bukkit.entity.Projectile projectile) {
                         projectile.setShooter(shooter);
                     }
-                }), "[the] shooter [of %entities%]");
+                }), "[the] shooter [of %projectile%]");
         registrar.expression("ExprLastSpawnedEntity", "entity", info -> {
             if (info.pattern() == 1) {
                 return (context, args) -> Fireworks.LAST_LAUNCHED.get();
@@ -428,12 +433,13 @@ final class WorldSyntax {
                     return found.toArray();
                 }
                 if (args[2] != null) {
-                    for (Object chunk : (Object[]) args[2]) {
-                        if (chunk instanceof org.bukkit.Chunk c) {
-                            for (Entity entity : c.getEntities()) {
-                                if (wanted.test(entity)) {
-                                    found.add(entity);
-                                }
+                    // 'in the player's world' or 'in chunk at player': worlds or chunks.
+                    for (Object place : (Object[]) args[2]) {
+                        Entity[] entities = place instanceof org.bukkit.Chunk c ? c.getEntities()
+                                : place instanceof org.bukkit.World w ? w.getEntities().toArray(Entity[]::new) : new Entity[0];
+                        for (Entity entity : entities) {
+                            if (wanted.test(entity)) {
+                                found.add(entity);
                             }
                         }
                     }
@@ -460,13 +466,20 @@ final class WorldSyntax {
                 }
                 return found.toArray();
             };
-        // 'all' or 'the' is needed: 'baby chicken' alone is the entity type.
-        }, "(all [[of] the]|the) %*entitytypes% [(in|of) (world[s] %-worlds%|%-chunks%)]",
-                "(all [[of] the]|the) entities of type[s] %entitytypes% [(in|of) (world[s] %-worlds%|%-chunks%)]",
-                "(all [[of] the]|the) %*entitytypes% (within|[with]in radius) %number% [(block[s]|met(er|re)[s])] (of|around) %location%",
+        // 'all' or 'the' is needed: 'baby chicken' alone is the entity type. Written out, the types are plural, as
+        // Skript's init wants: 'the entity' is the event's.
+        }, "(all [[of] the]|the) %*pluralentitytypes% [(in|of) (world[s] %-worlds%|%-worlds/chunks%)]",
+                "(all [[of] the]|the) entities of type[s] %entitytypes% [(in|of) (world[s] %-worlds%|%-worlds/chunks%)]",
+                "(all [[of] the]|the) %*pluralentitytypes% (within|[with]in radius) %number% [(block[s]|met(er|re)[s])] (of|around) %location%",
                 "(all [[of] the]|the) entities of type[s] %entitytypes% in radius %number% (of|around) %location%",
-                "(all [[of] the]|the) %*entitytypes% within %location% and %location%",
+                "(all [[of] the]|the) %*pluralentitytypes% within %location% and %location%",
                 "%*pluralentitytypes%");
+        registrar.describe("ExprEntities", (info, args) -> "all entities of type " + args.get(0) + switch (info.pattern()) {
+            case 0, 1 -> args.get(1) != null ? " in " + args.get(1) : args.get(2) != null ? " in " + args.get(2) : "";
+            case 2, 3 -> " in radius " + args.get(1) + " around " + args.get(2);
+            case 4 -> " within " + args.get(1) + " and " + args.get(2);
+            default -> "";
+        });
 
         registrar.expression("ExprHealth", "number", info -> new Health(), "[the] health of %livingentities%",
                 "%livingentities%'[s] health");
@@ -667,6 +680,9 @@ final class WorldSyntax {
                 return moved.isEmpty() || moved.getFirst().getWorld() == null ? null : moved.getFirst().getBlock();
             };
         }, "[the] block[s] (at|of) %locations%", "[the] block %direction% [%location%]");
+        // As Skript's ExprBlock: 'the block at the location'.
+        registrar.describe("ExprBlock-2", (info, args) -> info.pattern() == 0 ? "the block at " + args.get(0)
+                : "the block " + args.get(0) + " " + (args.get(1) == null ? "event-location" : args.get(1)));
         // 'the location 2 meters above {_loc}'; without a location, the event's.
         registrar.expression("ExprLocation", "location", info -> (context, args) -> {
             Object location = args[1] == null ? WorldProperties.eventLocation(context.event()) : args[1];

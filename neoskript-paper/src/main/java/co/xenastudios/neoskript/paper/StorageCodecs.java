@@ -131,6 +131,8 @@ final class StorageCodecs {
             }
         });
 
+        registrar.storage("entitydata", EntityKind.class, ENTITY_DATA);
+
         registrar.storage("offlineplayer", OfflinePlayer.class, new VariableCodec<>() {
             @Override
             public void encode(OfflinePlayer player, BinaryWriter out) {
@@ -154,6 +156,67 @@ final class StorageCodecs {
                 return Bukkit.getOfflinePlayer(new UUID(most, least));
             }
         });
+    }
+
+    /**
+     * An entity type, as Skript's entity data. Its bytes depend on Skript's own entity data classes and the order
+     * it registers them in, so they're taken from a real Skript server: each type a script can name on its own
+     * ({@code zombie}, {@code area effect cloud}) is saved as Skript saves it. Types with more to them ({@code baby
+     * zombie}, {@code red sheep}) can't be saved yet.
+     */
+    static final VariableCodec<EntityKind> ENTITY_DATA = new VariableCodec<>() {
+        @Override
+        public void encode(EntityKind kind, BinaryWriter out) {
+            byte[] bytes = kind.variants().isEmpty() && kind.amount() == 1 ? entityData().get(kind.name()) : null;
+            if (bytes == null) {
+                throw new UnsupportedOperationException("Can't save " + kind + " as Skript would");
+            }
+            out.rawBytes(bytes);
+        }
+
+        @Override
+        public EntityKind decode(BinaryReader in) {
+            String name = entityDataNames().get(java.util.HexFormat.of().formatHex(in.remainingBytes()));
+            // Only a value that saves back to the same bytes is read, so 'xp orb' stays as Skript saved it.
+            return name == null ? null : EntityKind.parse(name);
+        }
+    };
+
+    private static volatile java.util.Map<String, byte[]> entityData;
+    private static volatile java.util.Map<String, String> entityDataNames;
+
+    /** Each entity type's name, and how Skript saves it. */
+    private static java.util.Map<String, byte[]> entityData() {
+        java.util.Map<String, byte[]> data = entityData;
+        if (data == null) {
+            data = new java.util.HashMap<>();
+            java.util.Map<String, String> names = new java.util.HashMap<>();
+            try (java.io.InputStream in = StorageCodecs.class.getResourceAsStream("/skript-entity-data.tsv")) {
+                if (in == null) {
+                    throw new IllegalStateException("skript-entity-data.tsv is missing");
+                }
+                for (String line : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).split("\n")) {
+                    if (line.isBlank() || line.startsWith("#")) {
+                        continue;
+                    }
+                    String[] parts = line.split("\t");
+                    byte[] bytes = java.util.HexFormat.of().parseHex(parts[1].strip());
+                    data.put(parts[0], bytes);
+                    names.put(java.util.HexFormat.of().formatHex(bytes), parts[0]);
+                }
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+            entityDataNames = names;
+            entityData = data;
+        }
+        return data;
+    }
+
+    /** The name of the entity type Skript saves as these bytes (in lower-case hex). */
+    private static java.util.Map<String, String> entityDataNames() {
+        entityData();
+        return entityDataNames;
     }
 
     /** Saves values of an enum by their constant's name. */

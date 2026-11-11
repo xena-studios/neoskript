@@ -74,6 +74,7 @@ final class ServerSyntax {
                 "[(all [[of] the]|the)] offline[ ]players");
         registrar.expression("ExprOps", "offlineplayer", info -> new Operators(info.hasTag("non")),
                 "[all [[of] the]|the] [server] [:non(-| )]op[erator]s");
+        registrar.describe("ExprOps", (info, args) -> info.hasTag("non") ? "all non-operators" : "all operators");
         registrar.expression("ExprOnlinePlayersCount", "integer", info -> {
             boolean ping = inEvent(info, PaperServerListPingEvent.class);
             if (info.mark() == 2 && !ping) {
@@ -204,6 +205,11 @@ final class ServerSyntax {
             return new ServerIcon(defaultIcon);
         }, "[the] [(1¦(default)|2¦(shown|sent))] [server] icon");
         registrar.effect("EffPlayerInfoVisibility", info -> {
+            SkriptEventNames.restrict(info, "hide player info", PaperServerListPingEvent.class);
+            if (co.xenastudios.neoskript.api.element.Warnings.surelyDelayed()) {
+                throw new SyntaxError("Can't change the player info visibility anymore after the server list ping event"
+                        + " has already passed");
+            }
             boolean hide = info.pattern() == 0;
             return (context, args) -> {
                 if (context.event() instanceof PaperServerListPingEvent ping) {
@@ -280,6 +286,8 @@ final class ServerSyntax {
             boolean and = info.and(0);
             return (context, args) -> negated != Condition.check(owners(args[0]), and, text -> alphanumeric(Values.text(text)));
         }, "%strings% (is|are) alphanumeric", "%strings% (isn't|is not|aren't|are not) alphanumeric");
+        registrar.describe("CondAlphanumeric", (info, args) -> args.get(0) + " is" + (info.pattern() == 1 ? "n't" : "")
+                + " alphanumeric");
     }
 
     /** Whether text is only letters and digits, as Skript's {@code StringUtils.isAlphanumeric}; empty text is. */

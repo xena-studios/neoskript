@@ -43,7 +43,7 @@ public final class Library implements Registrar {
     private static final Set<String> STRICT_TYPES =
             Set.of("number", "integer", "long", "string", "boolean", "timespan", "date", "time", "entitytype", "itemtype",
                     "skriptpotioneffect", "hiddenpotioneffect", "damagecause", "direction", "particle", "gameeffect",
-                    "entityeffect");
+                    "entityeffect", "itementity", "world", "weathertype", "enchantment");
 
     private record Key(SyntaxKind kind, String id) {}
 
@@ -91,6 +91,10 @@ public final class Library implements Registrar {
     private final Set<String> eventDefaults = new HashSet<>();
     private final Map<String, String> sectionTypes = new HashMap<>();
     private final Map<String, String> sectionExpressions = new HashMap<>();
+    private final Set<String> eventValueExpressions = new HashSet<>();
+    private final Map<String, String> sectionEvents = new HashMap<>();
+    /** Event classes and types whose values' time states are only for the type's bare name, as {@code "class type"}. */
+    private final Set<String> bareTimeStates = new HashSet<>();
     /** What says where an expression has time states, by its id. */
     private final Map<String, java.util.function.Predicate<co.xenastudios.neoskript.api.element.ElementInfo>> timeStates = new HashMap<>();
     private final java.util.Set<String> deferredSections = new java.util.HashSet<>();
@@ -202,9 +206,37 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public void sectionEvent(String expressionId, String eventName) {
+        checkOpen();
+        sectionEvents.put(expressionId, eventName);
+    }
+
+    /** What the event of expression {@code id}'s section is called, or {@code null} if it has none of its own. */
+    String sectionEvent(String id) {
+        return sectionEvents.get(id);
+    }
+
+    @Override
+    public void eventValueExpression(String expressionId) {
+        checkOpen();
+        eventValueExpressions.add(expressionId);
+    }
+
+    /** Whether expression {@code id} is an event value ({@link #eventValueExpression(String)}). */
+    boolean isEventValueExpression(String id) {
+        return eventValueExpressions.contains(id);
+    }
+
+    @Override
     public void experimental(String id, String experiment, boolean silent) {
         checkOpen();
         builder.experimental(id, experiment, silent);
+    }
+
+    @Override
+    public void effectBefore(String effectId, String otherId) {
+        checkOpen();
+        builder.before(SyntaxKind.EFFECT, effectId, otherId);
     }
 
     @Override
@@ -476,6 +508,19 @@ public final class Library implements Registrar {
         builder.parses(typeId, words -> parser.apply(words) != null);
     }
 
+    private final Map<String, Describer> describers = new HashMap<>();
+
+    @Override
+    public void describe(String id, Describer describer) {
+        checkOpen();
+        describers.put(id, describer);
+    }
+
+    /** How Skript writes syntax {@code id} in messages, or {@code null} for as written: see {@link #describe}. */
+    Describer describer(String id) {
+        return describers.get(id);
+    }
+
     private final List<java.util.function.Function<String, String>> literalErrors = new ArrayList<>();
 
     @Override
@@ -706,11 +751,13 @@ public final class Library implements Registrar {
     EventValueLookup eventValue(List<Class<?>> eventClasses, Class<?> valueClass, String type, int time,
             String eventDescription) {
         EventValueResolver resolver = resolver();
+        // Without a description, it's the parser checking: an excluded value's error is left for the code asking.
+        boolean consume = eventDescription != null;
         String error = null;
         boolean hasValue = false;
         List<Map.Entry<Class<?>, java.util.function.Function<Object, Object>>> getters = new ArrayList<>();
         for (Class<?> eventClass : eventClasses) {
-            EventValueResolver.Resolution exact = resolver.resolve(eventClass, valueClass, type, time,
+            EventValueResolver.Resolution exact = resolver.lookUp(consume, eventClass, valueClass, type, time,
                     EventValueResolver.DEFAULT & ~EventValueResolver.CONVERSION);
             error = error != null ? error : exact.error();
             if (exact.multiple()) {
@@ -718,7 +765,7 @@ public final class Library implements Registrar {
                         : "There are multiple " + input(valueClass, type, true) + " in " + eventDescription
                                 + ". You must define which " + input(valueClass, type, false) + " to use.");
             }
-            EventValueResolver.Resolution resolution = resolver.resolve(eventClass, valueClass, type, time,
+            EventValueResolver.Resolution resolution = resolver.lookUp(consume, eventClass, valueClass, type, time,
                     EventValueResolver.DEFAULT);
             error = error != null ? error : resolution.error();
             hasValue |= resolution.successful();
@@ -735,13 +782,13 @@ public final class Library implements Registrar {
                     : null;
             boolean suggestedExists = false;
             for (Class<?> eventClass : eventClasses) {
-                EventValueResolver.Resolution exact = resolver.resolve(eventClass, suggested, suggestedType, 0,
+                EventValueResolver.Resolution exact = resolver.lookUp(consume, eventClass, suggested, suggestedType, 0,
                         EventValueResolver.DEFAULT & ~EventValueResolver.CONVERSION);
                 error = error != null ? error : exact.error();
                 if (exact.multiple()) {
                     continue;
                 }
-                EventValueResolver.Resolution resolution = resolver.resolve(eventClass, suggested, suggestedType, 0,
+                EventValueResolver.Resolution resolution = resolver.lookUp(consume, eventClass, suggested, suggestedType, 0,
                         EventValueResolver.DEFAULT);
                 error = error != null ? error : resolution.error();
                 if (resolution.successful()) {
@@ -796,6 +843,22 @@ public final class Library implements Registrar {
      * Whether any of {@code eventClasses} has a past or future value of {@code valueClass}, as Skript's event value
      * expressions need to take a time state.
      */
+    @Override
+    public void bareTimeStates(Class<?> eventClass, String typeId) {
+        checkOpen();
+        bareTimeStates.add(eventClass.getName() + " " + typeId);
+    }
+
+    /** Whether the time states of values of {@code typeId} in events of {@code eventClasses} are only for its bare name. */
+    boolean bareTimeStatesOnly(List<Class<?>> eventClasses, String typeId) {
+        for (Class<?> eventClass : eventClasses) {
+            if (bareTimeStates.contains(eventClass.getName() + " " + typeId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     boolean hasTimeStates(List<Class<?>> eventClasses, Class<?> valueClass, String type) {
         EventValueResolver resolver = resolver();
         for (Class<?> eventClass : eventClasses) {

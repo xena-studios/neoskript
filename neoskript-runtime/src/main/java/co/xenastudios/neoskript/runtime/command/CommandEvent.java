@@ -142,6 +142,37 @@ public class CommandEvent {
         return event == null || index >= event.arguments.length ? null : event.arguments[index];
     }
 
+    /** Which of a command event's arguments {@link #eventArgument} gives, as Skript's ExprArgument's types. */
+    public static final int LAST = 0;
+    public static final int ORDINAL = 1;
+    public static final int SINGLE = 2;
+    public static final int ALL = 3;
+
+    /**
+     * An argument of a command event (a player's or the console's command, or an unknown one): the words typed
+     * after the command, split at each space, as Skript's ExprArgument. {@code the argument} is the only one, if
+     * there's just one; {@code the arguments} all of them.
+     */
+    public static Object eventArgument(TriggerContext context, int type, int ordinal) {
+        String full = switch (context.event()) {
+            case org.bukkit.event.player.PlayerCommandPreprocessEvent event -> event.getMessage().substring(1).trim();
+            case org.bukkit.event.server.ServerCommandEvent event -> event.getCommand().trim();
+            case org.bukkit.event.command.UnknownCommandEvent event -> event.getCommandLine().trim();
+            case null, default -> null;
+        };
+        int space = full == null ? -1 : full.indexOf(' ');
+        if (space == -1) {
+            return type == ALL ? new String[0] : null;
+        }
+        String[] arguments = full.substring(space + 1).split(" ");
+        return switch (type) {
+            case LAST -> arguments.length > 0 ? arguments[arguments.length - 1] : null;
+            case ORDINAL -> arguments.length >= ordinal ? arguments[ordinal - 1] : null;
+            case SINGLE -> arguments.length == 1 ? arguments[0] : null;
+            default -> arguments;
+        };
+    }
+
     /** Every argument's values, in order: {@code the arguments}. */
     public static Object[] arguments(TriggerContext context) {
         CommandEvent event = of(context);

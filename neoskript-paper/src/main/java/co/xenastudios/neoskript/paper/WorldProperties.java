@@ -154,18 +154,17 @@ final class WorldProperties {
         registrar.subtype("world", "metadataholder");
     }
 
-    /** The game rule named {@code text}, ignoring case. */
+    /**
+     * The game rule named {@code text}, as Skript's parser: {@code GameRule.getByName}, so only the server's own
+     * names ({@code keep_inventory} on newer servers, {@code keepInventory} on older ones).
+     */
     private static GameRule<?> gameRule(String text) {
         String name = text.strip();
         try {
-            GameRule<?> exact = GameRule.getByName(name);
-            if (exact != null) {
-                return exact;
-            }
+            return GameRule.getByName(name);
         } catch (Throwable e) {
-            // Not a name this server knows, or no server to look it up on.
+            // No server to look it up on: either way of writing one will do.
         }
-        // Newer servers name them in snake case ('keep_inventory'): either way of writing one will do.
         String loose = loose(name);
         for (GameRule<?> rule : gameRules()) {
             if (loose(rule.getName()).equals(loose) || (Object) rule instanceof org.bukkit.Keyed keyed && loose(keyed.getKey().getKey()).equals(loose)) {

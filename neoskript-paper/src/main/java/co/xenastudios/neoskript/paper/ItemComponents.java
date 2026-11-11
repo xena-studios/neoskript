@@ -239,6 +239,7 @@ final class ItemComponents {
         registrar.expression("ExprSecBlankEquipComp", "equippablecomponent", info -> (context, args) ->
                 new EquippableComponent(Equippable.equippable(EquipmentSlot.HEAD).build()), "a (blank|empty) equippable component");
         registrar.sectionExpression("ExprSecBlankEquipComp", "equippablecomponent");
+        registrar.sectionEvent("ExprSecBlankEquipComp", "blank equippable component");
 
         registrar.experimental("ExprEquippableComponent", EXPERIMENT);
         // Item stacks too: an item stack in a variable is its own, not a copy made an item type, as in Skript.

@@ -81,6 +81,7 @@ final class DamageSources {
             return source;
         }, "[a] custom damage source [(with|using) [the|a] [damage type [of]] %damagetype%]");
         registrar.sectionExpression("ExprSecDamageSource", "damagesource");
+        registrar.sectionEvent("ExprSecDamageSource", "custom damage source");
         registerFinisher(registrar);
         registrar.expression("ExprCreatedDamageSource", "damagesource", info -> {
             if (!"damagesource".equals(info.sectionType())) {
@@ -88,6 +89,8 @@ final class DamageSources {
             }
             return (context, args) -> CREATED.get();
         }, "[the:the] created damage source");
+        // Skript's is an event value expression, so the section's damage source can be changed through it.
+        registrar.eventValueExpression("ExprCreatedDamageSource");
 
         attribute(registrar, "ExprDamageType", "damagetype", "damage type", DamageType.class, false,
                 DamageSource::getDamageType, (source, value) -> source.damageType = (DamageType) value);

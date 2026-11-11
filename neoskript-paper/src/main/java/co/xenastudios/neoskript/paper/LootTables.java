@@ -184,6 +184,7 @@ final class LootTables {
 
         registrar.expression("ExprLootTable", "loottable", info -> new LootableProperty<>(LootTable.class,
                 Lootable::getLootTable, Lootable::setLootTable, true), Patterns.property("loot[ ]table[s]", "entities/blocks"));
+        registrar.describe("ExprLootTable", (info, args) -> "loot table of " + args.get(0));
         registrar.expression("ExprLootTableFromString", "loottable", info -> (context, args) -> {
             List<Object> tables = new ArrayList<>();
             for (Object key : (Object[]) args[0]) {
@@ -207,6 +208,7 @@ final class LootTables {
             return new Context(direction.getRelative(location), null, null, 0, true);
         }, "[a] loot context %direction% %location%");
         registrar.sectionExpression("ExprSecCreateLootContext", "lootcontext");
+        registrar.sectionEvent("ExprSecCreateLootContext", "create loot context");
 
         contextProperty(registrar, "ExprLootContextEntity", "entity", "looted entity", Entity.class,
                 context -> context.entity, (context, entity) -> context.entity = entity, true, false,

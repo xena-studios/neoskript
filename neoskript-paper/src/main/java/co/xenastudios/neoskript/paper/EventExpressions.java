@@ -293,8 +293,8 @@ final class EventExpressions {
             return new Drops(isIn(info, EntityDeathEvent.class));
         }, "[the:the] drops");
         registrar.effect("EffCancelDrops", info -> {
-            restrict(info, "cancel the drops", EntityDeathEvent.class, BlockBreakEvent.class, BlockDropItemEvent.class,
-                    PlayerHarvestBlockEvent.class);
+            restrict(info, info.textOr("cancel the drops"), EntityDeathEvent.class, BlockBreakEvent.class,
+                    BlockDropItemEvent.class, PlayerHarvestBlockEvent.class);
             boolean items = !info.hasTag("xp");
             boolean experience = !info.hasTag("items");
             return (context, args) -> {
@@ -322,6 +322,8 @@ final class EventExpressions {
             };
         }, "(cancel|clear|delete) [the] drops [of (items:items|xp:[e]xp[erience][s])]",
                 "(cancel|clear|delete) [the] (items:item|xp:[e]xp[erience]) drops");
+        // Skript tries it before its change effect: 'clear drops' is this.
+        registrar.effectBefore("EffCancelDrops", "EffChange");
 
         registrar.expression("ExprExperience", "experience", info -> {
             restrict(info, "the experience", EventBridges.ExperienceSpawnEvent.class, BlockBreakEvent.class,

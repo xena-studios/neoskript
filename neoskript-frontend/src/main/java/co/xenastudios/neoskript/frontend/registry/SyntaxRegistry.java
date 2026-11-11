@@ -78,7 +78,7 @@ public final class SyntaxRegistry {
         Map<SyntaxKind, List<SyntaxInfo>> syntaxes = new EnumMap<>(SyntaxKind.class);
         Map<SyntaxKind, PatternIndex<Candidate>> indexes = new EnumMap<>(SyntaxKind.class);
         for (SyntaxKind kind : SyntaxKind.values()) {
-            List<SyntaxInfo> list = List.copyOf(builder.syntaxes.getOrDefault(kind, List.of()));
+            List<SyntaxInfo> list = List.copyOf(builder.ordered(kind));
             syntaxes.put(kind, list);
             PatternIndex<Candidate> index = new PatternIndex<>();
             for (SyntaxInfo syntax : list) {
@@ -470,6 +470,39 @@ public final class SyntaxRegistry {
         public Builder experimental(String id, String experiment, boolean silent) {
             experimental.put(id, new Experimental(experiment, silent));
             return this;
+        }
+
+        /** Has syntax {@code id} of {@code kind} tried before {@code otherId}, wherever each was added. */
+        public Builder before(SyntaxKind kind, String id, String otherId) {
+            befores.add(new Before(kind, id, otherId));
+            return this;
+        }
+
+        private record Before(SyntaxKind kind, String id, String otherId) {}
+
+        private final List<Before> befores = new ArrayList<>();
+
+        /** The syntax of {@code kind} in the order it's tried. */
+        private List<SyntaxInfo> ordered(SyntaxKind kind) {
+            List<SyntaxInfo> list = new ArrayList<>(syntaxes.getOrDefault(kind, List.of()));
+            for (Before before : befores) {
+                if (before.kind() != kind) {
+                    continue;
+                }
+                int other = -1;
+                for (int i = 0; i < list.size() && other < 0; i++) {
+                    if (list.get(i).id().equals(before.otherId())) {
+                        other = i;
+                    }
+                }
+                for (int i = other + 1; other >= 0 && i < list.size(); i++) {
+                    if (list.get(i).id().equals(before.id())) {
+                        list.add(other, list.remove(i));
+                        other++;
+                    }
+                }
+            }
+            return list;
         }
 
         /** How the names scripts write after {@code using} map to experiments' code names. */

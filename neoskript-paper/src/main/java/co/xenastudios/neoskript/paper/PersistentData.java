@@ -84,6 +84,7 @@ final class PersistentData {
             }
             return keys.toArray();
         }, "[all [[of] the]] [persistent] data [tag] keys of %objects%", "[all of] %objects%'[s] [persistent] data [tag] keys");
+        registrar.describe("ExprAllPersistentDataKeys", (info, args) -> "persistent data keys of " + args.get(0));
     }
 
     private static final NamespacedKey TYPE = new NamespacedKey("neoskript", "type");

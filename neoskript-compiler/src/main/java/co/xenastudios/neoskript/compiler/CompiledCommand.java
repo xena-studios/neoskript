@@ -23,19 +23,31 @@ import java.util.function.Function;
  *     {@link co.xenastudios.neoskript.runtime.command.CommandEvent#result()} is the message, or {@code null}
  * @param cooldown how long a player has to wait between uses, or {@code null}
  * @param cooldownMessage what a player who has to wait is told, like {@code permissionMessage}, or {@code null}
+ * @param cooldownStorage the variable each player's last use is kept in, or {@code null} to keep them in memory
  * @param routes what can be typed after the name, most specific first: each subcommand, then the command
  * @param suggesters the {@code suggestions:} entries, by each argument (by identity) whose suggestions they work
  *     out: an argument of the entry's own command or subcommand whose suggestions its code changes, as in Skript
  */
 public record CompiledCommand(String script, int line, String name, List<String> aliases, String description,
         String usage, String permission, Trigger permissionMessage, Timespan cooldown, String cooldownBypass,
-        Trigger cooldownMessage, String prefix, List<Route> routes, Map<CommandPattern.Argument, Suggester> suggesters) {
+        Trigger cooldownMessage, CooldownStorage cooldownStorage, String prefix, List<Route> routes,
+        Map<CommandPattern.Argument, Suggester> suggesters) {
 
     public CompiledCommand {
         aliases = List.copyOf(aliases);
         routes = List.copyOf(routes);
         suggesters = java.util.Collections.unmodifiableMap(new IdentityHashMap<>(suggesters));
     }
+
+    /**
+     * A {@code cooldown storage:} entry: the variable a player's last use of the command is kept in, as a date,
+     * as in Skript.
+     *
+     * @param name a trigger whose {@link co.xenastudios.neoskript.runtime.command.CommandEvent#result()} is the
+     *     variable's name, written as a variable ({@code {cooldown::%player%}}) or not
+     * @param globals the global variables it's one of
+     */
+    public record CooldownStorage(Trigger name, co.xenastudios.neoskript.runtime.variables.VariableStore globals) {}
 
     /**
      * A {@code suggestions:} entry.

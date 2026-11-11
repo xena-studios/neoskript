@@ -96,6 +96,31 @@ final class EventValueResolver {
         return resolution;
     }
 
+    /** {@link #resolve}, or with {@code consume} false, {@link #peek}. */
+    Resolution lookUp(boolean consume, Class<?> eventClass, Class<?> valueClass, String type, int time, int flags) {
+        return consume ? resolve(eventClass, valueClass, type, time, flags)
+                : peek(eventClass, valueClass, type, time, flags);
+    }
+
+    /**
+     * {@link #resolve} without using up an excluded value's error, for the parser checking what code can have
+     * before the script is set up: the error still comes the first time the code asks for it.
+     */
+    Resolution peek(Class<?> eventClass, Class<?> valueClass, String type, int time, int flags) {
+        if (time == 0) {
+            flags &= ~FALLBACK;
+        }
+        Resolution cached = cache.get(new Key(eventClass, valueClass, type, time, flags));
+        if (cached != null) {
+            return cached;
+        }
+        Resolution resolution = resolveNew(eventClass, valueClass, type, time, flags);
+        if (!resolution.errored()) {
+            cache.put(new Key(eventClass, valueClass, type, time, flags), resolution);
+        }
+        return resolution.errored() ? Resolution.ABORTED : resolution;
+    }
+
     private Resolution resolveNew(Class<?> event, Class<?> valueClass, String type, int time, int flags) {
         List<Value> atTime = values.stream().filter(value -> value.time() == time).toList();
         // Exactly the class, for the closest superclass of the event.

@@ -17,6 +17,9 @@ public interface BinaryReader {
 
     String rawName();
 
+    /** The rest of the value's bytes, as they are: for a value matched whole against how Skript saves it. */
+    byte[] remainingBytes();
+
     /** Starts an object; returns its field count. */
     int beginObject();
 

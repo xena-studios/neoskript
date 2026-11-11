@@ -19,6 +19,11 @@ final class BlockStates {
 
     private BlockStates() {}
 
+    /** A block argument as Skript writes it, the event's where it's left out. */
+    static String eventBlock(String written) {
+        return written == null ? "event-block" : written;
+    }
+
     static void register(Registrar registrar) {
         // Skript's patterns, two for each time: cook time, total cook time and fuel burn time. Its possessive
         // patterns have no space after the 's, so they're kept that way.
@@ -38,6 +43,8 @@ final class BlockStates {
             }
             return new FurnaceTime(info.pattern() / 2, explicit);
         }, furnacePatterns);
+        registrar.describe("ExprFurnaceTime", (info, args) -> new String[] {"cook time", "total cook time",
+            "fuel burn time"}[info.pattern() / 2] + " of " + eventBlock(args.get(0)));
         registrar.expression("ExprFurnaceSlot", "itemtype", info -> {
             int slot = info.hasTag("fuel") ? 1 : info.hasTag("result") ? 2 : 0;
             return slotOf(org.bukkit.block.Furnace.class, furnace -> furnace.getInventory(), slot);

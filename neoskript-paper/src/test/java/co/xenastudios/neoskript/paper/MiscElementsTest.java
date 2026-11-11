@@ -36,8 +36,12 @@ class MiscElementsTest {
             return errors;
         }
         CompiledScripts compiled = new ScriptCompiler(library, new VariableStore()).compile(parsed);
-        if (!compiled.diagnostics().isEmpty()) {
-            return compiled.diagnostics().stream().map(Diagnostic::message).toList();
+        // Warnings, as Skript gives for conditions on literals that are always true, don't stop it running.
+        List<String> compileErrors = compiled.diagnostics().stream()
+                .filter(d -> d.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR)
+                .map(Diagnostic::message).toList();
+        if (!compileErrors.isEmpty()) {
+            return compileErrors;
         }
         compiled.linkFunctions();
         compiled.triggers().forEach(t -> t.trigger().execute(new SimpleTriggerContext(null)));

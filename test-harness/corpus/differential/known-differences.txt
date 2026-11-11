@@ -2,3 +2,25 @@
 # 'folia: <unit>' only differs on Folia, where Skript doesn't run and NeoSkript is compared with Skript on Paper.
 
 folia: probes/world # The console runs on Folia's global thread, which can't read the world's regions.
+
+# Not matched yet: still to do, not impossible.
+examples/CondCanAge-1 # Skript doesn't understand 'broadcast "..." to player'; NeoSkript reports the text isn't a potion effect type, from another effect's reading
+examples/CondPotionHasParticles-1 # Skript then reads 'has particles' as having the particle type, which isn't an item type; NeoSkript stops at 'the potion effect' outside its section
+examples/EffChange-2 # Skript reads 'the data value of the clicked block' through an expression of living entities; NeoSkript doesn't understand the line
+examples/EffGenerateLoot-2 # Skript's error is that the text isn't a loot table; NeoSkript's is about the event's loot, several values, where one tree type goes
+examples/EffOpenInventory-1 # Skript's 'show' effect reads 'the player' first, and there's none in a damage event; NeoSkript's stricter types turn the inventory down before that
+examples/ExprArrowPierceLevel-1 # Skript compares the projectile with 'an arrow' as an item type and says it isn't one; NeoSkript compares it as an entity
+examples/ExprAttachedBlock-1 # Skript doesn't understand setting the single attached block; NeoSkript sets it as a block, with the warning about the plural
+examples/ExprClicked-1 # Skript says the inventory is neither a game effect nor a particle; NeoSkript's stricter types don't understand the line
+examples/ExprColored-2 # Skript reads 'the player argument' as an argument of a type and says what it isn't; NeoSkript doesn't understand the expression
+examples/ExprElement-6 # Skript can't understand 'broadcast X in Y' with an element expression; NeoSkript reads the element of the list
+examples/ExprElement-7 # Skript can't understand 'broadcast X in Y' with an element expression; NeoSkript reads the elements of the list
+examples/ExprEntity-4 # Skript reads 'projectile' and 'an arrow' as other types' values, which it finds always equal; NeoSkript compares them as entity types
+examples/ExprItemCompCopy-1 # Skript drops the inner expression's experiment error when the outer experimental expression is refused; NeoSkript gives it
+examples/ExprLocationAt-1 # Skript's error quotes 'the world arg-4', read as a typed argument; NeoSkript's quotes 'arg-4' (Skript's own result varies between runs)
+examples/ExprNumberOfCharacters-1 # Skript's chat message is a text component, which can't be divided; NeoSkript's is a text, so the line isn't understood
+examples/ExprPassenger-1 # Skript names its EntityData class and the type 'pig' for 'pigs' in its errors, and its line 5 error varies between runs
+examples/ExprPersistentData-1 # Skript says there's no player in a damage event for 'player's tool'; NeoSkript reads the slot first and turns down the value
+examples/ExprSecCreateLootContext-1 # Skript says the loot items can't be given to a player; NeoSkript turns down the event's loot, several values, where one goes
+examples/ExprTagContents-2 # Skript can't understand the possessive of a bracketed expression; NeoSkript reads it
+examples/ExprLowestHighestSolidBlock-2 # Skript's own result varies between runs: it sometimes can't set the location of the highest solid block

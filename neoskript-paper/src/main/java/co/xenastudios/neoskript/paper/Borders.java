@@ -30,6 +30,7 @@ final class Borders {
         registrar.expression("ExprSecCreateWorldBorder", "worldborder", info -> (context, args) -> Bukkit.createWorldBorder(),
                 "(a|[a] virtual) world[ ]border");
         registrar.sectionExpression("ExprSecCreateWorldBorder", "worldborder");
+        registrar.sectionEvent("ExprSecCreateWorldBorder", "create worldborder");
         registrar.expression("ExprWorldBorder", "worldborder", info -> (context, args) -> {
             List<Object> borders = new ArrayList<>();
             Object[] owners = args[0] == null ? new Object[] {Bukkit.getWorlds().getFirst()} : (Object[]) args[0];

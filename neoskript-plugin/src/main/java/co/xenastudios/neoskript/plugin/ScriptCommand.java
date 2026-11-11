@@ -132,10 +132,14 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
     private void run(CommandSender sender, CompiledCommand.Route route, CommandEvent event) {
         Long previous = null;
         boolean cooling = false;
-        if (command.cooldown() != null && sender instanceof Player player
-                && (command.cooldownBypass() == null || !player.hasPermission(command.cooldownBypass()))) {
+        if (command.cooldown() != null && sender instanceof Player player && command.cooldownBypass() != null
+                && player.hasPermission(command.cooldownBypass())) {
+            // As Skript's, a cooldown that's bypassed is cleared, in case one was set.
+            setLastUse(event, player.getUniqueId(), null);
+        } else if (command.cooldown() != null && sender instanceof Player player) {
             long now = System.currentTimeMillis();
-            previous = lastUses.get(player.getUniqueId());
+            UUID id = player.getUniqueId();
+            previous = lastUse(event, id);
             if (previous != null && now - previous < command.cooldown().millis()) {
                 event.cooldown(command.cooldown(), new Timespan(now - previous), command.cooldownBypass());
                 String message = message(command.cooldownMessage(), event);
@@ -144,16 +148,9 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
             }
             event.cooldown(command.cooldown(), previous == null ? null : new Timespan(now - previous),
                     command.cooldownBypass());
-            lastUses.put(player.getUniqueId(), now);
+            setLastUse(event, id, now);
             cooling = true;
-            UUID id = player.getUniqueId();
-            event.afterWait(cancel -> {
-                if (cancel) {
-                    lastUses.remove(id);
-                } else {
-                    lastUses.put(id, now);
-                }
-            });
+            event.afterWait(cancel -> setLastUse(event, id, cancel ? null : now));
         }
         try {
             route.trigger().execute(new SimpleTriggerContext(event, sender instanceof Player ? sender : null));
@@ -167,13 +164,54 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
             sender.sendMessage(failure.colorIfAbsent(net.kyori.adventure.text.format.NamedTextColor.RED));
         }
         if (cooling && event.cooldownCancelled()) {
-            UUID id = ((Player) sender).getUniqueId();
-            if (previous == null) {
+            setLastUse(event, ((Player) sender).getUniqueId(), previous);
+        }
+    }
+
+    /** When a player last used the command, in milliseconds, from its cooldown storage if it has one. */
+    private Long lastUse(CommandEvent event, UUID id) {
+        CompiledCommand.CooldownStorage storage = command.cooldownStorage();
+        if (storage == null) {
+            return lastUses.get(id);
+        }
+        String name = storageName(storage, event);
+        if (name == null) {
+            return null;
+        }
+        Object value = storage.globals().get(name);
+        if (value != null && !(value instanceof co.xenastudios.neoskript.runtime.Date)) {
+            logger.warn("Variable {{}} was not a date! You may be using this variable elsewhere. This warning is"
+                    + " letting you know that this variable is now overridden for the command storage.", name);
+            return null;
+        }
+        return value == null ? null : ((co.xenastudios.neoskript.runtime.Date) value).millis();
+    }
+
+    /** Sets when a player last used the command, or with {@code null}, that they haven't. */
+    private void setLastUse(CommandEvent event, UUID id, Long millis) {
+        CompiledCommand.CooldownStorage storage = command.cooldownStorage();
+        if (storage == null) {
+            if (millis == null) {
                 lastUses.remove(id);
             } else {
-                lastUses.put(id, previous);
+                lastUses.put(id, millis);
             }
+            return;
         }
+        String name = storageName(storage, event);
+        if (name != null) {
+            storage.globals().set(name, millis == null ? null : new co.xenastudios.neoskript.runtime.Date(millis));
+        }
+    }
+
+    /** The name of the cooldown storage variable, as Skript takes it: without the brackets it's written in. */
+    private String storageName(CompiledCommand.CooldownStorage storage, CommandEvent event) {
+        String name = message(storage.name(), event);
+        if (name == null) {
+            logger.error("The cooldown storage variable defined is invalid! Cooldowns for this command will not work.");
+            return null;
+        }
+        return name.startsWith("{") && name.length() >= 2 ? name.substring(1, name.length() - 1) : name;
     }
 
     private void denyPermission(CommandSender sender, String label, String fullCommand) {

@@ -34,6 +34,23 @@ public interface Changeable {
     Class<?>[] acceptChange(Mode mode);
 
     /**
+     * Whether {@code mode} takes only one value, as Skript's expressions that accept a class rather than an
+     * array of it: {@code add all players to whitelist} is then an error. Most take several.
+     */
+    default boolean takesOne(Mode mode) {
+        return false;
+    }
+
+    /**
+     * Whether, in {@code mode}, which this doesn't take itself, its values are changed through their type
+     * instead, as Skript's expressions that leave other modes to {@code super.acceptChange}: {@code delete the
+     * vehicle of player} kills it, though only setting the vehicle is the expression's own.
+     */
+    default boolean typeChanges(Mode mode) {
+        return false;
+    }
+
+    /**
      * Changes the expression.
      *
      * @param arguments the expression's own arguments, as for {@link Expression#get}

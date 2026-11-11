@@ -61,6 +61,24 @@ class WarningsTest {
     }
 
     @Test
+    void alreadyText() {
+        assertEquals(List.of(
+                "W3: loop-value is already a text, so you should not put it in one (e.g. loop-value instead of"
+                        + " \"%loop-value%\")",
+                "W4: the last parse error is already a text, so you should not put it in one (e.g. the last parse error"
+                        + " instead of \"%the last parse error%\")",
+                "W5: the first 2 characters of {_s} is already a text, so you should not put it in one (e.g. the first 2"
+                        + " characters of {_s} instead of \"%the first 2 characters of {_s}%\")"), problems("""
+                on load:
+                \tloop characters from "a" to "c":
+                \t\tset {_x} to "%loop-value%"
+                \tset {_y} to "%parse error%"
+                \tset {_z} to "%first 2 characters of {_s}%"
+                \tset {_w} to "%{_s}%"
+                """));
+    }
+
+    @Test
     void elements() {
         assertEquals(List.of(
                 "W3: the 1st argument is already a text, so you should not put it in one (e.g. the 1st argument instead"

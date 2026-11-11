@@ -323,6 +323,11 @@ final class PlayerEvents {
         registrar.eventValue(EntityTeleportEvent.class, "location", -1, EntityTeleportEvent::getFrom);
         registrar.eventValue(EntityTeleportEvent.class, "location", EntityTeleportEvent::getTo);
         registrar.eventValue(PlayerTeleportEvent.class, "teleportcause", PlayerTeleportEvent::getCause);
+        // 'former world' and 'world will be': the worlds teleported from and to, as Skript's ExprWorld, which a
+        // bare 'world' is there, has them.
+        registrar.eventValue(PlayerTeleportEvent.class, "world", -1, event -> event.getFrom().getWorld());
+        registrar.eventValue(PlayerTeleportEvent.class, "world", 1, event -> event.getTo().getWorld());
+        registrar.bareTimeStates(PlayerTeleportEvent.class, "world");
 
         registrar.event("EvtPortal", List.of(PlayerPortalEvent.class, EntityPortalEvent.class), info ->
                 Events.narrowed(List.of(info.pattern() == 0 ? PlayerPortalEvent.class : EntityPortalEvent.class),

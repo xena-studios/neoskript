@@ -87,6 +87,11 @@ public final class SkriptBinaryWriter implements BinaryWriter {
     }
 
     @Override
+    public void rawBytes(byte[] value) {
+        io(() -> out.write(value));
+    }
+
+    @Override
     public void beginObject(int fields) {
         if (fields >= 0x80) {
             throw new IllegalArgumentException("Too many fields: " + fields);

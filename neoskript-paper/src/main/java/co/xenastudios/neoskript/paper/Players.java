@@ -218,11 +218,9 @@ final class Players {
         }, "%offlineplayers% [(has|have|did)] [already] play[ed] [on (this|the) server] (before|already)",
                 "%offlineplayers% (has not|hasn't|have not|haven't|did not|didn't) [(already|yet)] play[ed] "
                         + "[on (this|the) server] (before|already|yet)");
-        registrar.condition("CondCanFly", info -> {
-            boolean negated = info.pattern() == 1;
-            return (context, args) -> all((Object[]) args[0], Player.class,
-                    player -> player.getAllowFlight() != negated);
-        }, "%players% can fly", "%players% (can't|cannot|can not) fly");
+        // Settable, as Skript's: 'set whether the player can fly to true'.
+        EntitySyntax.conditionPatterns(registrar, "CondCanFly", Player.class, Player::getAllowFlight, Player::setAllowFlight,
+                "%players% can fly", "%players% (can't|cannot|can not) fly");
 
         SettableProperty.register(registrar, "ExprFlightMode", "boolean", "fl(y[ing]|ight) (mode|state)", "players",
                 Player.class, Boolean.class, Player::getAllowFlight, Player::setAllowFlight);

@@ -25,6 +25,34 @@ public interface Update extends Effect {
         update(context, arguments);
     }
 
+    /**
+     * Whether the target has to be one that can be set. If not, the effect does its work on the values
+     * themselves where it can't be ({@code zombify last spawned villager}), as Skript's do.
+     */
+    default boolean setRequired() {
+        return true;
+    }
+
+    /** An update whose target needn't be settable: see {@link #setRequired}. */
+    static Update inPlace(int target, BiFunction<TriggerContext, Object[], Object> update) {
+        return new Update() {
+            @Override
+            public int target() {
+                return target;
+            }
+
+            @Override
+            public Object update(TriggerContext context, Object[] arguments) {
+                return update.apply(context, arguments);
+            }
+
+            @Override
+            public boolean setRequired() {
+                return false;
+            }
+        };
+    }
+
     static Update of(int target, BiFunction<TriggerContext, Object[], Object> update) {
         return new Update() {
             @Override
