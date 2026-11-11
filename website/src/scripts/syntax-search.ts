@@ -1,20 +1,22 @@
 // Searches all of /syntax from its index page, over src/pages/syntax/search.json: names first, then ids and
-// patterns. Every word typed has to start a word of the entry's. Results are links; arrow keys move between them
+// patterns. Every word typed has to start a word of the entry's. The category and "Added in" filters narrow it,
+// and with only filters set it lists everything they match. Results are links; arrow keys move between them
 // and the field.
 import { focusOnSlash, split } from "./search-helpers";
+import { filterBar } from "./syntax-searchbar";
 
-type Row = { n: string; c: string; s: string; p: string[]; i: string };
+type Row = { n: string; c: string; s: string; p: string[]; i: string; v: string };
 type Indexed = Row & { name: string; nameWords: string[]; words: string[] };
 const LIMIT = 40;
 // Words that patterns have and names don't: "location of" should find Location first.
 const SMALL = new Set(["a", "an", "the", "of", "to", "in", "on", "at", "is", "are", "and", "or"]);
 
-const input = document.querySelector<HTMLInputElement>("#search");
 const list = document.querySelector<HTMLOListElement>("#results");
-const status = document.querySelector<HTMLElement>("#search-status");
-const labels: Record<string, string> = JSON.parse(input?.dataset.labels ?? "{}");
+const bar = filterBar();
 
-if (input && list && status) {
+if (list && bar) {
+  const { input, count: status } = bar;
+  const labels: Record<string, string> = JSON.parse(list.dataset.labels ?? "{}");
   let rows: Indexed[] | null = null;
   let loading: Promise<void> | null = null;
   const load = () =>
@@ -34,6 +36,7 @@ if (input && list && status) {
 
   const score = (row: Indexed, q: string, query: string[]) => {
     if (!query.every((w) => row.words.some((x) => x.startsWith(w)))) return -1;
+    if (!q) return 0;
     const content = query.filter((w) => !SMALL.has(w));
     if (row.name === q || (content.length > 0 && row.name === content.join(" "))) return 0;
     if (row.name.startsWith(q)) return 1;
@@ -43,10 +46,19 @@ if (input && list && status) {
     return 4;
   };
 
+  const span = (className: string, text: string) => {
+    const node = document.createElement("span");
+    node.className = className;
+    node.textContent = text;
+    return node;
+  };
+
   const render = () => {
-    const q = input.value.trim().toLowerCase();
+    const f = bar.read();
+    bar.write(f);
+    const q = f.q.toLowerCase();
     list.replaceChildren();
-    if (!q) {
+    if (!bar.active(f)) {
       status.textContent = "";
       list.hidden = true;
       return;
@@ -58,6 +70,7 @@ if (input && list && status) {
     }
     const query = split(q);
     const found = rows
+      .filter((row) => (!f.category || row.c === f.category) && (!f.since || row.v === f.since))
       .map((row) => ({ row, score: score(row, q, query) }))
       .filter((r) => r.score >= 0)
       .sort((a, b) => a.score - b.score || a.row.n.length - b.row.n.length || a.row.n.localeCompare(b.row.n));
@@ -65,16 +78,13 @@ if (input && list && status) {
       const li = document.createElement("li");
       const a = document.createElement("a");
       a.href = `/syntax/${row.c}/#${row.s}`;
-      const name = document.createElement("span");
-      name.className = "r-name";
-      name.textContent = row.n;
-      const kind = document.createElement("span");
-      kind.className = "r-kind label";
-      kind.textContent = labels[row.c] ?? row.c;
+      const badges = span("r-badges", "");
+      badges.append(span("", labels[row.c] ?? row.c));
+      if (row.v !== "unknown") badges.append(span("", `Skript ${row.v}`));
       const pattern = document.createElement("code");
       pattern.className = "r-pattern";
       pattern.textContent = row.p[0] ?? "";
-      a.append(name, kind, pattern);
+      a.append(span("r-name", row.n), badges, pattern);
       li.append(a);
       list.append(li);
     }
@@ -84,12 +94,9 @@ if (input && list && status) {
   };
 
   input.addEventListener("focus", () => void load(), { once: true });
-  input.addEventListener("input", render);
+  bar.onChange(render);
   input.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      input.value = "";
-      render();
-    } else if (event.key === "ArrowDown") {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
       list.querySelector<HTMLAnchorElement>("a")?.focus();
     } else if (event.key === "Enter") {
@@ -109,10 +116,6 @@ if (input && list && status) {
       input.focus();
     }
   });
-  const initial = new URL(location.href).searchParams.get("q");
-  if (initial) {
-    input.value = initial;
-    render();
-  }
+  if (bar.active(bar.read())) render();
   focusOnSlash(input);
 }

@@ -73,3 +73,23 @@ export const signature = (f: Fn) =>
 
 export const total = Object.values(syntax.coverage).reduce((n, c) => n + c.elements, 0);
 export const documented = Object.values(syntax.coverage).reduce((n, c) => n + c.documented, 0);
+
+/** The Skript version an entry came in, as its first "since" says without the note: "2.10", "1.0 pre-5". */
+export function since(item: { since: string[] }): string | null {
+  const first = item.since[0]?.replace(/\s*\(.*$/, "").trim();
+  return first && /^\d/.test(first) ? first : null;
+}
+
+/** The same to the minor version, for /syntax's "Added in" filter: "2.10", or "1.x" for Skript 1. */
+export function sinceKey(item: { since: string[] }): string {
+  const match = since(item)?.match(/^(\d+)\.(\d+)/);
+  if (!match) return "unknown";
+  return match[1] === "1" ? "1.x" : `${match[1]}.${match[2]}`;
+}
+
+/** The "Added in" filter's options for these entries, oldest first. */
+export function sinceOptions(items: { since: string[] }[]): string[] {
+  const keys = new Set(items.map(sinceKey));
+  const order = (v: string) => (v === "unknown" ? Infinity : v === "1.x" ? 1 : Number(v.split(".")[0]) * 1000 + Number(v.split(".")[1]));
+  return [...keys].sort((a, b) => order(a) - order(b));
+}

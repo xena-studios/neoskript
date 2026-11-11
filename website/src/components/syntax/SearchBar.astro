@@ -1,0 +1,249 @@
+---
+// The syntax reference's search box, across the top of the main column, with its filters: category, the Skript
+// version entries came in, and (on a category page) only entries with examples, no deprecated ones and, for
+// events, only cancellable ones. "Clear filters" shows once anything is set. The filters live in the URL
+// (?q=, ?category=, ?since=, ?examples, ?current, ?cancellable) so a filtered page can be shared.
+// src/scripts/syntax-filter.ts (a category page) and syntax-search.ts (/syntax/) make it work.
+import Icon from "../Icon.astro";
+import { categories } from "../../lib/syntax";
+interface Props {
+  /** The category page it's on; on /syntax/ it searches everything. */
+  current?: string;
+  versions: string[];
+  count: string;
+  placeholder: string;
+}
+const { current, versions, count, placeholder } = Astro.props;
+const events = current === "events";
+---
+<div class="search" role="search">
+  <label class="sr-only" for="q">{placeholder}</label>
+  <div class="bar">
+    <Icon name="search" class="lens" />
+    <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder={placeholder} aria-describedby="q-count" />
+    <kbd aria-hidden="true">/</kbd>
+    <button type="button" class="filters-btn" id="filters-btn" aria-expanded="false" aria-controls="filters"><Icon name="filter" /><span>Filters</span></button>
+  </div>
+  <div class="filters" id="filters" hidden>
+    <label>
+      <span class="label">Category</span>
+      <select id="f-category" data-current={current ?? ""}>
+        <option value="">{current ? "This category" : "All categories"}</option>
+        {categories.filter((c) => c.path !== current).map((c) => <option value={c.path}>{c.label}</option>)}
+      </select>
+    </label>
+    <label>
+      <span class="label">Added in</span>
+      <select id="f-since">
+        <option value="">Any Skript version</option>
+        {versions.map((v) => <option value={v}>{v === "unknown" ? "Unknown" : `Skript ${v}`}</option>)}
+      </select>
+    </label>
+    {current && (
+      <>
+        <label class="check"><input type="checkbox" id="f-examples" /> With examples</label>
+        <label class="check"><input type="checkbox" id="f-current" /> Hide deprecated</label>
+        {events && <label class="check"><input type="checkbox" id="f-cancellable" /> Cancellable only</label>}
+      </>
+    )}
+  </div>
+  <div class="under">
+    <p id="q-count" class="count" aria-live="polite">{count}</p>
+    <button type="button" class="clear" id="clear" hidden><Icon name="close" />Clear filters</button>
+  </div>
+</div>
+<style>
+  .search {
+    display: grid;
+    gap: 0.6rem;
+  }
+  .bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .lens {
+    position: absolute;
+    left: 1.1rem;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  input {
+    flex: 1;
+    min-width: 0;
+    min-height: 52px;
+    padding: 0 8.5rem 0 2.9rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--raised);
+    color: var(--text);
+    font: inherit;
+    font-size: 1.0625rem;
+    transition: border-color 180ms var(--ease);
+  }
+  input::placeholder {
+    color: var(--muted);
+    opacity: 1;
+  }
+  input:hover {
+    border-color: color-mix(in srgb, var(--magenta) 60%, var(--rule));
+  }
+  input:focus-visible {
+    outline: 2px solid var(--magenta);
+    outline-offset: 2px;
+    border-radius: 999px;
+  }
+  input::-webkit-search-cancel-button {
+    display: none;
+  }
+  kbd {
+    position: absolute;
+    right: 7.6rem;
+    min-width: 1.5rem;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    color: var(--muted);
+    font-size: 0.8125rem;
+    text-align: center;
+    pointer-events: none;
+  }
+  input:focus ~ kbd,
+  input:not(:placeholder-shown) ~ kbd {
+    display: none;
+  }
+  .filters-btn {
+    position: absolute;
+    right: 0.4rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 40px;
+    padding: 0 1rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--night);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: border-color 180ms var(--ease);
+  }
+  .filters-btn:hover,
+  .filters-btn[aria-expanded="true"] {
+    border-color: var(--magenta);
+  }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.75rem 1.5rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--raised);
+  }
+  .filters[hidden] {
+    display: none;
+  }
+  .filters > label:not(.check) {
+    display: grid;
+    gap: 0.35rem;
+  }
+  .filters .label {
+    font-size: 0.6875rem;
+  }
+  select {
+    min-height: 40px;
+    min-width: 12rem;
+    padding: 0 0.6rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--night);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.9375rem;
+  }
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 40px;
+    font-size: 0.9375rem;
+    cursor: pointer;
+  }
+  .check input {
+    width: 1.1rem;
+    min-height: 0;
+    height: 1.1rem;
+    padding: 0;
+    flex: none;
+    accent-color: var(--magenta);
+  }
+  .under {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    min-height: 2rem;
+  }
+  .count {
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+  .count:empty {
+    display: none;
+  }
+  .clear {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 2rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.8125rem;
+    cursor: pointer;
+  }
+  .clear:hover {
+    border-color: var(--magenta);
+  }
+  .clear[hidden] {
+    display: none;
+  }
+  .clear :global(.icon) {
+    width: 0.8rem;
+    height: 0.8rem;
+  }
+  @media (max-width: 36rem) {
+    input {
+      padding-right: 3.5rem;
+      font-size: 1rem;
+    }
+    .filters-btn {
+      width: 40px;
+      padding: 0;
+      justify-content: center;
+    }
+    .filters-btn span {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+    kbd {
+      display: none;
+    }
+    select {
+      min-width: 0;
+      width: 100%;
+    }
+    .filters > label:not(.check) {
+      flex: 1 1 100%;
+    }
+  }
+</style>

@@ -1,5 +1,7 @@
 // What the in-browser parser reports (neoskript-web's WebParser), the messages
-// between the page and its worker, and the share-link encoding.
+// between the page and its worker, the share-link encoding, and the counts the
+// parser's status bar shows that the parser doesn't report.
+import { commentStart } from "./skript";
 
 export type Diagnostic = {
   severity: "error" | "warning";
@@ -49,4 +51,45 @@ export async function decodeShare(hash: string): Promise<string | null | Error> 
   } catch (e) {
     return e instanceof Error ? e : new Error(String(e));
   }
+}
+
+/**
+ * The script's variables, for the parser's status bar: each distinct {name} outside comments, with the line
+ * it's first used on and how often. A rough count, as the status bar says: {_local} and {list::*} count,
+ * {@option} references don't, and %expressions% inside a name stay as written.
+ */
+export function variables(source: string): { name: string; line: number; uses: number }[] {
+  const found = new Map<string, { name: string; line: number; uses: number }>();
+  let inBlockComment = false;
+  source.split("\n").forEach((text, i) => {
+    if (text.trim() === "###") {
+      inBlockComment = !inBlockComment;
+      return;
+    }
+    if (inBlockComment) return;
+    const end = commentStart(text);
+    for (const name of braces(end < 0 ? text : text.slice(0, end))) {
+      if (name.startsWith("@")) continue;
+      const key = name.toLowerCase();
+      const seen = found.get(key);
+      if (seen) seen.uses++;
+      else found.set(key, { name, line: i + 1, uses: 1 });
+    }
+  });
+  return [...found.values()];
+}
+
+/** The outermost {...} of a line of code, with any nested ones left inside. */
+function braces(code: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < code.length; i++) {
+    if (code[i] === "{") {
+      if (depth++ === 0) start = i;
+    } else if (code[i] === "}" && depth > 0 && --depth === 0) {
+      out.push(code.slice(start + 1, i));
+    }
+  }
+  return out;
 }

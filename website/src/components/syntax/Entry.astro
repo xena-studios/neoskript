@@ -1,17 +1,21 @@
 ---
-// One element, type or function on a /syntax page: its patterns, Skript's description and examples where they
-// matched, and what the registry says (return type, event values). Each has an anchor to link to.
+// One element, type or function on a /syntax page, as a card: a magenta header with its link, name and badges
+// (category, the Skript version it came in), its patterns on a darker band, Skript's description where it
+// matched, what the registry says (return type, parameters and so on), then rows that open to show the
+// examples and, for events, the event values. Each has an anchor to link to.
 import Pattern from "./Pattern.astro";
 import Example from "./Example.astro";
+import Icon from "../Icon.astro";
 import type { Element, Fn, Type } from "../../lib/syntax";
-import { signature } from "../../lib/syntax";
+import { signature, since, sinceKey } from "../../lib/syntax";
 // Plain, unscoped styles: scoping would add a class to each of the thousands of elements on a page.
 import "../../styles/syntax.css";
 
-type Props =
+type Props = { category: string } & (
   | { kind: "element"; item: Element }
   | { kind: "type"; item: Type }
-  | { kind: "function"; item: Fn };
+  | { kind: "function"; item: Fn }
+);
 const props = Astro.props;
 const item = props.item;
 
@@ -28,87 +32,102 @@ if (props.kind === "element") {
 }
 const typeHref = (slug: string | null) => (slug ? `/syntax/types/#${slug}` : null);
 const sinceText = item.since.join(", ");
+const added = since(item);
+const deprecated = props.kind === "element" && props.item.deprecated;
+const eventValues = props.kind === "element" && props.item.kind === "event" ? props.item.eventValues : [];
+const cancellable = props.kind === "element" && props.item.kind === "event" ? props.item.cancellable : null;
 ---
-<article class="entry" id={item.slug} data-search={search.join("\n").toLowerCase()}>
-  <h2><a href={`#${item.slug}`}>{item.name}</a></h2>
-  {props.kind === "element" && props.item.deprecated && <p class="label flag">Deprecated in Skript</p>}
+<article
+  class="entry"
+  id={item.slug}
+  data-search={search.join("\n").toLowerCase()}
+  data-since={sinceKey(item)}
+  data-examples={item.examples.length > 0 ? "" : undefined}
+  data-deprecated={deprecated ? "" : undefined}
+  data-cancellable={cancellable ? "" : undefined}
+>
+  <header class="entry-head">
+    <a class="anchor" href={`#${item.slug}`} aria-label={`Link to ${item.name}`} title="Copy a link to this"><Icon name="link" /></a>
+    <h2>{item.name}</h2>
+    <ul class="badges" aria-label="About">
+      <li>{props.category}</li>
+      {added && <li>Skript {added}</li>}
+      {deprecated && <li class="flag">Deprecated</li>}
+    </ul>
+  </header>
 
   {patterns.length > 0 && (
     <div class="patterns">{patterns.map((p) => <Pattern pattern={p} />)}</div>
   )}
 
-  {item.description.length > 0 ? (
-    <div class="description">{item.description.map((p) => (p.startsWith("<ul>") ? <Fragment set:html={p} /> : <p set:html={p} />))}</div>
-  ) : (
-    <p class="undocumented">No matching entry in Skript's documentation.</p>
-  )}
+  <div class="entry-body">
+    {item.description.length > 0 ? (
+      <div class="description">{item.description.map((p) => (p.startsWith("<ul>") ? <Fragment set:html={p} /> : <p set:html={p} />))}</div>
+    ) : (
+      <p class="undocumented">No matching entry in Skript's documentation.</p>
+    )}
 
-  <dl class="meta">
-    {props.kind === "element" && props.item.returns && (
-      <div><dt class="label">Returns</dt><dd>{typeHref(props.item.returns.slug) ? <a href={typeHref(props.item.returns.slug)}>{props.item.returns.name}</a> : props.item.returns.name}</dd></div>
-    )}
-    {props.kind === "function" && (
-      <div><dt class="label">Returns</dt><dd>{props.item.returns ? (typeHref(props.item.returns.slug) ? <a href={typeHref(props.item.returns.slug)}>{props.item.returns.name}{props.item.returns.plural ? " (several)" : ""}</a> : props.item.returns.name) : "Nothing"}</dd></div>
-    )}
-    {props.kind === "function" && props.item.parameters.length > 0 && (
-      <div>
-        <dt class="label">Parameters</dt>
-        <dd>
-          <ul class="params">
-            {props.item.parameters.map((p) => (
-              <li><code>{p.name}</code> {typeHref(p.typeSlug) ? <a href={typeHref(p.typeSlug)}>{p.type}</a> : p.type}{p.optional && <span class="muted">, optional</span>}</li>
-            ))}
-          </ul>
-        </dd>
-      </div>
-    )}
-    {props.kind === "element" && props.item.eventValues.length > 0 && (
-      <div>
-        <dt class="label">Event values</dt>
-        <dd><ul class="values">{props.item.eventValues.map((v) => <li><code>{v.text}</code></li>)}</ul></dd>
-      </div>
-    )}
-    {props.kind === "element" && props.item.cancellable !== null && props.item.kind === "event" && (
-      <div><dt class="label">Cancellable</dt><dd>{props.item.cancellable ? "Yes" : "No"}</dd></div>
-    )}
-    {props.kind === "type" && (
-      <div><dt class="label">In patterns</dt><dd><code>{props.item.codeName}</code>, <code>{props.item.plural}</code></dd></div>
-    )}
-    {props.kind === "type" && props.item.literals.length === 0 && props.item.usage.length > 0 && (
-      <div>
-        <dt class="label">Written as</dt>
-        <dd>
-          {props.item.usage.join(" ").length <= 240 ? props.item.usage.join(" ") : (
-            <details><summary>Show all</summary>{props.item.usage.join(" ")}</details>
-          )}
-        </dd>
-      </div>
-    )}
-    {props.kind === "type" && props.item.literals.length > 0 && (
-      <div>
-        <dt class="label">Values</dt>
-        <dd>
-          {props.item.literals.length <= 12 ? (
-            <ul class="values">{props.item.literals.map((v) => <li><code>{v}</code></li>)}</ul>
-          ) : (
-            <details>
-              <summary>{props.item.literals.length} values</summary>
-              <ul class="values">{props.item.literals.map((v) => <li><code>{v}</code></li>)}</ul>
-            </details>
-          )}
-        </dd>
-      </div>
-    )}
-    {props.kind === "element" && props.item.requirements.length > 0 && (
-      <div><dt class="label">Requires</dt><dd>{props.item.requirements.join(", ")}</dd></div>
-    )}
-    {sinceText && <div><dt class="label">In Skript since</dt><dd>{sinceText}</dd></div>}
-    {props.kind !== "function" && <div><dt class="label">ID</dt><dd><code class="id">{props.item.id}</code></dd></div>}
-  </dl>
+    <dl class="meta">
+      {props.kind === "element" && props.item.returns && (
+        <div><dt class="label">Returns</dt><dd>{typeHref(props.item.returns.slug) ? <a href={typeHref(props.item.returns.slug)}>{props.item.returns.name}</a> : props.item.returns.name}</dd></div>
+      )}
+      {props.kind === "function" && (
+        <div><dt class="label">Returns</dt><dd>{props.item.returns ? (typeHref(props.item.returns.slug) ? <a href={typeHref(props.item.returns.slug)}>{props.item.returns.name}{props.item.returns.plural ? " (several)" : ""}</a> : props.item.returns.name) : "Nothing"}</dd></div>
+      )}
+      {props.kind === "function" && props.item.parameters.length > 0 && (
+        <div>
+          <dt class="label">Parameters</dt>
+          <dd>
+            <ul class="params">
+              {props.item.parameters.map((p) => (
+                <li><code>{p.name}</code> {typeHref(p.typeSlug) ? <a href={typeHref(p.typeSlug)}>{p.type}</a> : p.type}{p.optional && <span class="muted">, optional</span>}</li>
+              ))}
+            </ul>
+          </dd>
+        </div>
+      )}
+      {cancellable !== null && (
+        <div><dt class="label">Cancellable</dt><dd>{cancellable ? "Yes" : "No"}</dd></div>
+      )}
+      {props.kind === "type" && (
+        <div><dt class="label">In patterns</dt><dd><code>{props.item.codeName}</code>, <code>{props.item.plural}</code></dd></div>
+      )}
+      {props.kind === "type" && props.item.literals.length === 0 && props.item.usage.length > 0 && props.item.usage.join(" ").length <= 240 && (
+        <div><dt class="label">Written as</dt><dd>{props.item.usage.join(" ")}</dd></div>
+      )}
+      {props.kind === "type" && props.item.literals.length > 0 && props.item.literals.length <= 12 && (
+        <div><dt class="label">Values</dt><dd><ul class="values">{props.item.literals.map((v) => <li><code>{v}</code></li>)}</ul></dd></div>
+      )}
+      {props.kind === "element" && props.item.requirements.length > 0 && (
+        <div><dt class="label">Requires</dt><dd>{props.item.requirements.join(", ")}</dd></div>
+      )}
+      {sinceText && <div><dt class="label">In Skript since</dt><dd>{sinceText}</dd></div>}
+      {props.kind !== "function" && <div><dt class="label">ID</dt><dd><code class="id">{props.item.id}</code></dd></div>}
+    </dl>
+  </div>
 
   {item.examples.length > 0 && (
-    <div class="examples">
-      {item.examples.map((e) => <Example code={e} />)}
-    </div>
+    <details class="more">
+      <summary>View {item.examples.length === 1 ? "example" : `${item.examples.length} examples`}<Icon name="chevron" /></summary>
+      <div class="more-body examples">{item.examples.map((e) => <Example code={e} />)}</div>
+    </details>
+  )}
+  {eventValues.length > 0 && (
+    <details class="more">
+      <summary>View event values<Icon name="chevron" /></summary>
+      <div class="more-body"><ul class="values">{eventValues.map((v) => <li><code>{v.text}</code></li>)}</ul></div>
+    </details>
+  )}
+  {props.kind === "type" && props.item.literals.length > 12 && (
+    <details class="more">
+      <summary>View all {props.item.literals.length} values<Icon name="chevron" /></summary>
+      <div class="more-body"><ul class="values">{props.item.literals.map((v) => <li><code>{v}</code></li>)}</ul></div>
+    </details>
+  )}
+  {props.kind === "type" && props.item.literals.length === 0 && props.item.usage.join(" ").length > 240 && (
+    <details class="more">
+      <summary>View how it's written<Icon name="chevron" /></summary>
+      <div class="more-body"><p class="usage">{props.item.usage.join(" ")}</p></div>
+    </details>
   )}
 </article>

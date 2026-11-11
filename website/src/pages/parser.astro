@@ -1,8 +1,13 @@
 ---
 // The in-browser parser: NeoSkript's frontend, compiled to JavaScript by TeaVM
-// (neoskript-web/), runs in a Web Worker and checks the script as you type.
-// The page's behaviour is in src/scripts/parser-page.ts.
+// (neoskript-web/), runs in a Web Worker and checks the script in a Monaco
+// editor. A full-window tool under the site header: a menu bar, the editor with
+// the results beside it, and a status bar. The behaviour is in
+// src/scripts/parser-page.ts; Monaco loads from src/scripts/parser-editor.ts.
 import Base from "../layouts/Base.astro";
+import Icon from "../components/Icon.astro";
+import External from "../components/External.astro";
+import { repo } from "../lib/nav";
 // What the parser checks against, as the worker says once it's loaded: the committed syntax export's header.
 import { neoskript, server } from "../data/syntax.json";
 
@@ -11,74 +16,163 @@ const examples = [
   { id: "warps", label: "Warps" },
   { id: "tpa", label: "Teleport requests" },
 ];
+const snippets = [
+  { id: "event", label: "Event" },
+  { id: "command", label: "Command" },
+  { id: "function", label: "Function" },
+  { id: "every", label: "Periodic event" },
+  { id: "options", label: "Options" },
+];
+const counts = [
+  { id: "errors", label: "Errors" },
+  { id: "warnings", label: "Warnings" },
+  { id: "functions", label: "Functions" },
+  { id: "variables", label: "Variables" },
+  { id: "commands", label: "Commands" },
+];
 ---
 <Base
   title="Parser · NeoSkript"
   description="Paste a Skript script and see its errors and warnings, from NeoSkript's own parser running in your browser. Nothing is uploaded."
   path="/parser/"
+  app
 >
-  <section class="page" aria-labelledby="parser-title">
-    <div class="wrap">
-      <h1 id="parser-title">Parser</h1>
-      <p class="lead">
-        Paste a script to find its errors and warnings. This is NeoSkript's own parser, running in your browser: the
-        script stays on your device.
-      </p>
-      <p class="source">
-        It checks against the syntax NeoSkript registers, exported from a real server
-        (<span id="about">NeoSkript {neoskript} on {server}</span>), the same list as the
-        <a href="/syntax/">syntax reference</a>. <a href="/docs/parser-checks/">What it checks and what it can't</a>
-      </p>
+  <h1 class="sr-only">Parser</h1>
+  <div class="tool">
+    <div class="menubar">
+      <div class="menus">
+        <button type="button" class="icon-btn" id="save" aria-label="Save in this browser" title="Save in this browser (Ctrl+S)"><Icon name="save" /></button>
+        <button type="button" class="icon-btn" id="open-settings" aria-label="Settings" title="Settings" aria-haspopup="dialog"><Icon name="gear" /></button>
 
-      <div class="toolbar">
-        <div class="examples" role="group" aria-labelledby="examples-label">
-          <span class="label" id="examples-label">Examples</span>
-          {examples.map((e) => <button type="button" class="chip" data-example={e.id}>{e.label}</button>)}
+        <div class="menu">
+          <button type="button" class="menu-btn" id="file-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="file-menu">File</button>
+          <ul class="menu-list" id="file-menu" role="menu" aria-labelledby="file-btn" hidden>
+            <li role="none"><button type="button" role="menuitem" data-action="new">New file</button></li>
+            <li role="none"><button type="button" role="menuitem" data-action="open">Open from your device…</button></li>
+            <li role="none"><button type="button" role="menuitem" data-action="download">Download .sk</button></li>
+            <li role="separator"></li>
+            <li role="none"><button type="button" role="menuitem" data-action="rename">Rename…</button></li>
+            <li role="none"><button type="button" role="menuitem" data-action="close">Close file</button></li>
+          </ul>
         </div>
-        <div class="share">
-          <span class="share-status" id="share-status" role="status"></span>
-          <button type="button" class="btn btn-secondary" id="share">Copy link</button>
+        <div class="menu">
+          <button type="button" class="menu-btn" id="insert-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="insert-menu">Insert</button>
+          <ul class="menu-list" id="insert-menu" role="menu" aria-labelledby="insert-btn" hidden>
+            <li role="presentation" class="menu-head label" id="examples-head">Examples</li>
+            {examples.map((e) => <li role="none"><button type="button" role="menuitem" data-example={e.id}>{e.label}</button></li>)}
+            <li role="separator"></li>
+            <li role="presentation" class="menu-head label">Snippets</li>
+            {snippets.map((s) => <li role="none"><button type="button" role="menuitem" data-snippet={s.id}>{s.label}</button></li>)}
+          </ul>
+        </div>
+        <div class="menu">
+          <button type="button" class="menu-btn" id="share-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="share-menu">Sharing</button>
+          <ul class="menu-list" id="share-menu" role="menu" aria-labelledby="share-btn" hidden>
+            <li role="none"><button type="button" role="menuitem" data-action="share">Copy share link</button></li>
+            <li role="none"><button type="button" role="menuitem" data-action="copy">Copy the script</button></li>
+          </ul>
+        </div>
+        <div class="menu">
+          <button type="button" class="menu-btn" id="help-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="help-menu">Help</button>
+          <ul class="menu-list" id="help-menu" role="menu" aria-labelledby="help-btn" hidden>
+            <li role="none"><a role="menuitem" href="/docs/parser/">Using the parser</a></li>
+            <li role="none"><a role="menuitem" href="/docs/parser-checks/">What it checks</a></li>
+            <li role="none"><a role="menuitem" href="/syntax/">Syntax reference</a></li>
+            <li role="none"><button type="button" role="menuitem" data-action="keys">Keyboard shortcuts</button></li>
+            <li role="separator"></li>
+            <li role="none"><a role="menuitem" href={`${repo}/issues/new/choose`}>Report a bug<External /></a></li>
+          </ul>
         </div>
       </div>
 
-      <div class="workspace">
-        <div class="editor-column">
-          <div class="editor" id="editor">
-            <div class="gutter" id="gutter" aria-hidden="true"></div>
-            <div class="stack">
-              <pre class="highlight" id="highlight" aria-hidden="true"></pre>
-              <textarea
-                id="source"
-                aria-label="Script"
-                aria-describedby="editor-help"
-                spellcheck="false"
-                autocapitalize="off"
-                autocomplete="off"
-                wrap="off"
-              ></textarea>
-            </div>
-          </div>
-          <p class="help" id="editor-help">
-            <kbd>Tab</kbd> indents and <kbd>Shift</kbd>+<kbd>Tab</kbd> outdents. To leave the editor from the keyboard,
-            press <kbd>Esc</kbd>, then <kbd>Tab</kbd>.
-          </p>
+      <div class="files">
+        <div class="tab">
+          <button type="button" class="tab-name" id="tab-name" title="Rename">Untitled.sk</button>
+          <input class="tab-input" id="tab-input" type="text" aria-label="File name" spellcheck="false" autocomplete="off" hidden />
+          <button type="button" class="icon-btn small" id="tab-close" aria-label="Close file" title="Close file"><Icon name="close" /></button>
         </div>
-
-        <div class="results">
-          <div class="results-head">
-            <h2 id="problems-title">Problems</h2>
-            <span class="timing" id="timing"></span>
-          </div>
-          <p class="status" id="status" role="status">Loading the parser…</p>
-          <ol class="list" id="problems" aria-labelledby="problems-title"></ol>
-
-          <h2 id="outline-title">Outline</h2>
-          <ol class="list" id="outline" aria-labelledby="outline-title"></ol>
-          <p class="empty" id="no-outline" hidden>No structures yet: events, commands, functions and options show here.</p>
+        <button type="button" class="icon-btn" id="new-file" aria-label="New file" title="New file"><Icon name="plus" /></button>
+        <div class="menu end">
+          <button type="button" class="icon-btn" id="files-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="files-menu" aria-label="Open files" title="Open files"><Icon name="files" /><Icon name="chevron" class="chevron" /></button>
+          <ul class="menu-list" id="files-menu" role="menu" aria-labelledby="files-btn" hidden></ul>
         </div>
+        <button type="button" class="parse-btn" id="parse" title="Parse (Ctrl+Enter)"><Icon name="parse" /><span>Parse</span></button>
       </div>
     </div>
-  </section>
+
+    <div class="split">
+      <div class="editor-pane">
+        <div class="editor" id="editor"><p class="editor-note" id="editor-note">Loading the editor…</p></div>
+      </div>
+
+      <section class="results" aria-labelledby="results-title">
+        <div class="results-head">
+          <h2 id="results-title">Problems</h2>
+          <button type="button" class="text-btn" id="show-problems" hidden>Show problems</button>
+        </div>
+        <div class="waiting" id="waiting">
+          <p class="waiting-title">Waiting on you</p>
+          <button type="button" class="btn btn-primary" id="waiting-parse">Click to parse</button>
+          <p class="about">
+            NeoSkript's own parser, running in your browser: the script stays on your device. It checks against
+            <span id="about">NeoSkript {neoskript} on {server}</span>, the same syntax as the
+            <a href="/syntax/">reference</a>. <a href="/docs/parser-checks/">What it checks</a>
+          </p>
+        </div>
+        <ol class="cards" id="cards" aria-labelledby="results-title" hidden></ol>
+      </section>
+    </div>
+
+    <footer class="statusbar" aria-label="Parse status">
+      <p class="stat"><span class="stat-key">Status:</span> <span class="stat-word" id="status-word">Loading</span></p>
+      <ul class="counts">
+        {counts.map((c) => (
+          <li><button type="button" class="count" data-view={c.id} aria-pressed="false"><span class="n" id={`count-${c.id}`}>0</span> {c.label}</button></li>
+        ))}
+      </ul>
+      <span class="timing" id="timing"></span>
+      <button type="button" class="click-parse" id="status-parse">Click to parse</button>
+    </footer>
+  </div>
+
+  <p class="sr-only" id="live" role="status"></p>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <input type="file" id="file-input" accept=".sk,.txt,text/plain" hidden />
+
+  <dialog class="dialog" id="settings" aria-labelledby="settings-title">
+    <form method="dialog">
+      <h2 id="settings-title">Settings</h2>
+      <label class="check"><input type="checkbox" id="set-live" /> Parse as you type</label>
+      <label class="check"><input type="checkbox" id="set-minimap" /> Show the minimap</label>
+      <label class="check"><input type="checkbox" id="set-wrap" /> Wrap long lines</label>
+      <label class="check"><input type="checkbox" id="set-tab" /> <span>Tab moves focus instead of indenting <span class="hint">(also Ctrl+M)</span></span></label>
+      <label class="field-row">Editor font size
+        <select id="set-font">
+          {[12, 13, 14, 15, 16, 18, 20].map((n) => <option value={n}>{n}px</option>)}
+        </select>
+      </label>
+      <div class="dialog-actions"><button class="btn btn-primary" value="close">Done</button></div>
+    </form>
+  </dialog>
+
+  <dialog class="dialog" id="keys" aria-labelledby="keys-title">
+    <form method="dialog">
+      <h2 id="keys-title">Keyboard shortcuts</h2>
+      <dl class="keys">
+        <div><dt><kbd>Ctrl</kbd>+<kbd>Enter</kbd></dt><dd>Parse the script</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>S</kbd></dt><dd>Save in this browser</dd></div>
+        <div><dt><kbd>F8</kbd></dt><dd>Next problem in the editor (<kbd>Shift</kbd>+<kbd>F8</kbd>, previous)</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>G</kbd></dt><dd>Go to a line</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>F</kbd></dt><dd>Find, and <kbd>Ctrl</kbd>+<kbd>H</kbd> to replace</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>/</kbd></dt><dd>Comment or uncomment the lines</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>M</kbd></dt><dd>Make <kbd>Tab</kbd> move focus out of the editor, or indent again</dd></div>
+        <div><dt><kbd>Alt</kbd>+<kbd>F1</kbd></dt><dd>The editor's accessibility help</dd></div>
+        <div><dt><kbd>F1</kbd></dt><dd>Every editor command</dd></div>
+      </dl>
+      <p class="hint">On a Mac, <kbd>Cmd</kbd> for <kbd>Ctrl</kbd>.</p>
+      <div class="dialog-actions"><button class="btn btn-primary" value="close">Done</button></div>
+    </form>
+  </dialog>
 </Base>
 
 <script>
@@ -86,217 +180,242 @@ const examples = [
 </script>
 
 <style>
-  .page {
-    padding-block: clamp(3rem, 2rem + 4vw, 5rem) clamp(4rem, 2.5rem + 5vw, 7rem);
-  }
-  h1 {
-    font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
-    letter-spacing: -0.035em;
-  }
-  .lead {
-    margin-top: 1.25rem;
-  }
-  .source {
-    margin-top: 0.75rem;
-    max-width: 62ch;
-    color: var(--muted);
-    font-size: 0.9375rem;
-  }
-  .source a {
-    color: var(--text);
+  .tool {
+    --bar: var(--night);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: calc(100dvh - 4.5rem - 1px);
+    min-height: 28rem;
   }
 
-  .toolbar {
-    margin-top: clamp(2rem, 1.5rem + 2vw, 3rem);
-    padding-block: 0.75rem;
-    border-top: 1px solid var(--rule);
+  /* ---- Menu bar. */
+  .menubar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem 1.5rem;
+    gap: 0.25rem 1rem;
+    padding: 0.25rem 0.75rem;
+    border-bottom: 1px solid var(--rule);
+    background: var(--bar);
   }
-  .examples {
+  .menus,
+  .files {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0 1.25rem;
+    gap: 0.125rem;
+    min-width: 0;
   }
-  /* Quiet text buttons, 44px tall for touch. No side padding, so a wrapped
-     row lines up with the label. */
-  .chip {
-    min-height: 44px;
-    padding: 0;
+  .icon-btn,
+  .menu-btn,
+  .tab-name,
+  .parse-btn,
+  .text-btn,
+  .count,
+  .click-parse {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     border: 0;
-    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    cursor: pointer;
+    transition: color 180ms var(--ease), background-color 180ms var(--ease);
+  }
+  .icon-btn {
+    justify-content: center;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    padding: 0 0.5rem;
+    border-radius: 4px;
+  }
+  .icon-btn.small {
+    min-width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+  }
+  .icon-btn .chevron {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+  .menu-btn {
+    height: 2.5rem;
+    padding: 0 0.7rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+  }
+  .icon-btn:hover,
+  .menu-btn:hover,
+  .menu-btn[aria-expanded="true"],
+  .icon-btn[aria-expanded="true"] {
+    color: var(--text);
+    background: color-mix(in srgb, var(--magenta) 10%, transparent);
+  }
+
+  .menu {
+    position: relative;
+  }
+  .menu-list {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    min-width: 14rem;
+    max-width: min(22rem, calc(100vw - 1.5rem));
+    max-height: 70dvh;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0.35rem;
+    list-style: none;
+    background: var(--night);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+  .menu.end .menu-list {
+    left: auto;
+    right: 0;
+  }
+  .menu-list[hidden] {
+    display: none;
+  }
+  .menu-list :global([role="menuitem"]),
+  .menu-list :global([role="menuitemradio"]) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 2.25rem;
+    padding: 0.3rem 0.75rem;
+    border: 0;
+    border-radius: 4px;
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: 0.9375rem;
-    text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--text) 35%, transparent);
-    text-underline-offset: 0.25em;
-    cursor: pointer;
-    transition: text-decoration-color 180ms var(--ease);
-  }
-  .chip:hover {
-    text-decoration-color: var(--magenta);
-  }
-  .share {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-left: auto;
-  }
-  .share-status:empty {
-    display: none;
-  }
-  .share-status {
-    color: var(--muted);
     font-size: 0.875rem;
-  }
-  .share .btn {
-    background: transparent;
-    font-family: inherit;
+    text-align: left;
+    text-decoration: none;
     cursor: pointer;
   }
-
-  .workspace {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(17rem, 26rem);
-    gap: 2rem 2.5rem;
-    align-items: start;
+  .menu-list :global([role="menuitem"]:hover),
+  .menu-list :global([role="menuitem"]:focus-visible),
+  .menu-list :global([role="menuitemradio"]:hover),
+  .menu-list :global([role="menuitemradio"]:focus-visible) {
+    background: color-mix(in srgb, var(--magenta) 14%, transparent);
+    outline-offset: -2px;
+  }
+  .menu-list :global([aria-checked="true"]) {
+    color: var(--magenta);
+    font-weight: 600;
+  }
+  .menu-list :global([aria-checked="true"])::before {
+    content: "";
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 999px;
+    background: currentColor;
+  }
+  .menu-list [role="separator"] {
+    margin: 0.35rem 0.25rem;
+    border-top: 1px solid var(--rule);
+  }
+  .menu-head {
+    padding: 0.4rem 0.75rem 0.2rem;
+    font-size: 0.6875rem;
   }
 
-  /* The editor: script on raised night, as the landing's staff centre. */
-  .editor {
-    --lh: 1.5rem;
-    --pad: 0.75rem;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    min-height: 22rem;
-    max-height: min(72vh, 52rem);
-    overflow: auto;
+  /* The current file, as a tab. */
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    min-width: 0;
+    height: 2.25rem;
+    margin-right: 0.25rem;
+    padding: 0 0.25rem 0 0.75rem;
     background: var(--raised);
     border: 1px solid var(--rule);
+    border-bottom-color: var(--magenta);
+    border-radius: 4px 4px 0 0;
+  }
+  .tab-name {
+    min-width: 0;
+    max-width: 16rem;
+    height: 100%;
+    padding: 0;
+    color: var(--text);
     font-family: var(--mono);
+    font-size: 0.8125rem;
+  }
+  .tab-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    line-height: 2.25rem;
+  }
+  .tab-input {
+    width: 12rem;
+    height: 1.75rem;
+    padding: 0 0.4rem;
+    border: 1px solid var(--magenta);
+    border-radius: 4px;
+    background: var(--night);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+  }
+  .parse-btn {
+    height: 2.25rem;
+    margin-left: 0.5rem;
+    padding: 0 0.9rem;
+    border-radius: 999px;
+    background: var(--magenta);
+    color: var(--night);
     font-size: 0.875rem;
-    line-height: var(--lh);
-    font-variant-ligatures: none;
-    font-feature-settings: "liga" 0, "calt" 0;
-    tab-size: 4;
-    overscroll-behavior: contain;
+    font-weight: 600;
+  }
+  .parse-btn:hover {
+    background: color-mix(in srgb, var(--magenta) 85%, white);
+  }
+  .parse-btn .icon {
+    fill: currentColor;
+  }
+
+  /* ---- Editor and results, two thirds and one third. */
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+    min-height: 0;
+  }
+  .editor-pane {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    background: var(--raised);
+  }
+  .editor {
+    position: absolute;
+    inset: 0;
   }
   .editor:focus-within {
     outline: 2px solid var(--magenta);
-    outline-offset: 3px;
+    outline-offset: -2px;
   }
-  .gutter {
-    position: sticky;
-    left: 0;
-    z-index: 1;
-    padding: var(--pad) 0.625rem var(--pad) 0.75rem;
-    background: var(--raised);
-    border-right: 1px solid var(--rule);
+  .editor-note {
+    padding: 1rem 1.25rem;
     color: var(--muted);
-    text-align: right;
-    user-select: none;
-    font-variant-numeric: tabular-nums;
-  }
-  .gutter :global(.n) {
-    display: block;
-    min-width: 3ch;
-    padding-right: 0.375rem;
-    border-right: 2px solid transparent;
-  }
-  /* Error and warning lines differ by more than colour: a solid or dashed rail. */
-  .gutter :global(.n.error) {
-    color: var(--magenta);
-    font-weight: 600;
-    border-right: 2px solid var(--magenta);
-  }
-  .gutter :global(.n.warning) {
-    color: var(--string);
-    border-right: 2px dashed var(--string);
-  }
-  .stack {
-    display: grid;
-    min-width: max-content;
-  }
-  .highlight,
-  textarea {
-    grid-area: 1 / 1;
-    margin: 0;
-    padding: var(--pad) 1rem;
-    border: 0;
-    font: inherit;
-    line-height: inherit;
-    letter-spacing: 0;
-    tab-size: inherit;
-    white-space: pre;
-    overflow-wrap: normal;
-  }
-  .highlight {
-    color: var(--text);
-    pointer-events: none;
-  }
-  .highlight :global(.line) {
-    display: block;
-    min-height: var(--lh);
-    margin-inline: -1rem;
-    padding-inline: 1rem;
-  }
-  .highlight :global(.line.has-error) {
-    background: color-mix(in srgb, var(--magenta) 9%, transparent);
-  }
-  .highlight :global(.line.has-warning) {
-    background: color-mix(in srgb, var(--string) 6%, transparent);
-  }
-  .highlight :global(.line.current) {
-    background: color-mix(in srgb, var(--magenta) 18%, transparent);
-  }
-  .highlight :global(.comment) {
-    color: var(--muted);
-  }
-  .highlight :global(.mark-error) {
-    text-decoration: underline wavy var(--magenta);
-    text-decoration-skip-ink: none;
-    text-underline-offset: 0.3em;
-  }
-  .highlight :global(.mark-warning) {
-    text-decoration: underline dotted var(--string);
-    text-decoration-thickness: 2px;
-    text-decoration-skip-ink: none;
-    text-underline-offset: 0.3em;
-  }
-  textarea {
-    width: 100%;
-    min-height: 100%;
-    resize: none;
-    overflow: hidden;
-    background: transparent;
-    color: transparent;
-    caret-color: var(--text);
-    outline: none;
-  }
-  textarea::selection {
-    color: transparent;
-    background: color-mix(in srgb, var(--magenta) 35%, transparent);
-  }
-  .help {
-    margin-top: 0.75rem;
-    color: var(--muted);
-    font-size: 0.875rem;
-  }
-  kbd {
-    font-size: 0.8125rem;
-    color: var(--text);
+    font-size: 0.9375rem;
   }
 
-  /* Results: hairline-ruled rows, no cards. */
-  .results h2 {
-    font-size: 1.5rem;
-    letter-spacing: -0.02em;
+  .results {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem;
+    border-left: 1px solid var(--rule);
+    background: var(--night);
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
   .results-head {
     display: flex;
@@ -304,37 +423,93 @@ const examples = [
     justify-content: space-between;
     gap: 1rem;
   }
-  .timing {
+  .results h2 {
+    font-size: 1.125rem;
+    letter-spacing: -0.01em;
+  }
+  .text-btn {
+    min-height: 2rem;
+    padding: 0;
+    color: var(--text);
+    font-size: 0.875rem;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--text) 35%, transparent);
+    text-underline-offset: 0.25em;
+  }
+  .text-btn:hover {
+    text-decoration-color: var(--magenta);
+  }
+  .waiting {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: clamp(2rem, 1rem + 4vh, 4rem) 1rem;
+    text-align: center;
+    border: 1px dashed var(--rule);
+    border-radius: 4px;
+  }
+  .waiting[hidden] {
+    display: none;
+  }
+  .waiting-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .waiting .btn {
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .about {
+    max-width: 34ch;
     color: var(--muted);
     font-size: 0.8125rem;
-    font-variant-numeric: tabular-nums;
   }
-  .status {
-    margin-top: 0.5rem;
-    font-size: 0.9375rem;
+  .about a {
+    color: var(--text);
   }
-  #outline-title {
-    margin-top: 2.5rem;
-  }
-  .list {
-    margin: 0.75rem 0 0;
+
+  .cards {
+    display: grid;
+    gap: 0.75rem;
+    margin: 1rem 0 0;
     padding: 0;
     list-style: none;
-    border-top: 1px solid var(--rule);
   }
-  .list:empty {
-    border-top: 0;
+  .cards[hidden] {
+    display: none;
   }
-  .list :global(li) {
-    border-bottom: 1px solid var(--rule);
+  .cards :global(.card) {
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--muted);
+    border-radius: 4px;
+    background: var(--raised);
   }
-  .list :global(.jump) {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.125rem 0.75rem;
-    width: 100%;
-    min-height: 44px;
-    padding: 0.625rem 0.5rem;
+  .cards :global(.card.error) {
+    border-left-color: var(--magenta);
+  }
+  .cards :global(.card.warning) {
+    border-left: 3px dashed var(--string);
+  }
+  .cards :global(.card.ok) {
+    border-left-color: var(--text);
+  }
+  .cards :global(.card-head) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem 0.25rem 0;
+  }
+  .cards :global(.toggle) {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    min-height: 2.5rem;
+    padding: 0 0.75rem;
     border: 0;
     background: transparent;
     color: var(--text);
@@ -342,54 +517,303 @@ const examples = [
     font-size: 0.9375rem;
     text-align: left;
     cursor: pointer;
-    transition: background-color 180ms var(--ease);
   }
-  .list :global(.jump:hover) {
-    background: color-mix(in srgb, var(--magenta) 7%, transparent);
+  .cards :global(.toggle .icon) {
+    margin-left: auto;
+    color: var(--muted);
+    transition: transform 180ms var(--ease);
   }
-  .list :global(.label) {
-    align-self: center;
+  .cards :global(.toggle[aria-expanded="false"] .icon) {
+    transform: rotate(-90deg);
   }
-  .list :global(.error .sev) {
+  .cards :global(.sev) {
+    font-weight: 700;
+  }
+  .cards :global(.error .sev) {
     color: var(--magenta);
   }
-  .list :global(.warning .sev) {
+  .cards :global(.warning .sev) {
     color: var(--string);
   }
-  .list :global(.where) {
-    color: var(--muted);
-    font-size: 0.875rem;
-    font-variant-numeric: tabular-nums;
-    justify-self: end;
+  .cards :global(.goto) {
+    flex: none;
+    min-height: 2rem;
+    padding: 0 0.7rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: border-color 180ms var(--ease);
   }
-  .list :global(.message) {
-    grid-column: 1 / -1;
+  .cards :global(.goto:hover) {
+    border-color: color-mix(in srgb, var(--magenta) 60%, var(--rule));
+  }
+  .cards :global(.card-body) {
+    display: grid;
+    gap: 0.6rem;
+    padding: 0 0.75rem 0.75rem;
+  }
+  .cards :global(.card-body[hidden]) {
+    display: none;
+  }
+  .cards :global(.message) {
+    font-size: 0.9375rem;
     overflow-wrap: anywhere;
   }
-  .list :global(code.message) {
+  .cards :global(.code) {
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    background: var(--night);
+    border-radius: 4px;
     font-size: 0.8125rem;
     white-space: pre;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-x: auto;
+    tab-size: 4;
   }
-  .empty {
-    margin-top: 0.75rem;
+  .cards :global(.muted) {
     color: var(--muted);
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
   }
 
+  /* ---- Status bar. */
+  .statusbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 1.25rem;
+    min-height: 2.25rem;
+    padding: 0 0.75rem;
+    border-top: 1px solid var(--rule);
+    background: var(--bar);
+    font-family: var(--label);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .stat-key {
+    color: var(--muted);
+  }
+  .stat-word {
+    color: var(--text);
+  }
+  .stat-word.parsed {
+    color: var(--magenta);
+  }
+  .counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .count,
+  .click-parse {
+    min-height: 2.25rem;
+    padding: 0 0.5rem;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: var(--magenta);
+    border-radius: 4px;
+    border-bottom: 2px solid transparent;
+  }
+  .count .n {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .count:hover,
+  .click-parse:hover {
+    background: color-mix(in srgb, var(--magenta) 10%, transparent);
+  }
+  .count[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--magenta) 18%, transparent);
+    border-bottom-color: var(--magenta);
+  }
+  .timing {
+    color: var(--muted);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .timing:empty {
+    display: none;
+  }
+  .click-parse {
+    margin-left: auto;
+    color: var(--text);
+  }
+
+  /* ---- Toast, dialogs. */
+  .toast {
+    position: fixed;
+    right: 1rem;
+    bottom: 3rem;
+    z-index: 30;
+    max-width: min(24rem, calc(100vw - 2rem));
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--magenta);
+    border-radius: 4px;
+    background: var(--night);
+    font-size: 0.875rem;
+    opacity: 0;
+    translate: 0 0.5rem;
+    pointer-events: none;
+    transition: opacity 180ms var(--ease), translate 180ms var(--ease);
+  }
+  .toast.shown {
+    opacity: 1;
+    translate: 0 0;
+  }
+  .dialog {
+    width: min(28rem, calc(100vw - 2rem));
+    padding: 1.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--night);
+    color: var(--text);
+  }
+  .dialog::backdrop {
+    background: color-mix(in srgb, var(--night) 70%, transparent);
+  }
+  .dialog form {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .dialog h2 {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+  }
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 2.25rem;
+    font-size: 0.9375rem;
+    cursor: pointer;
+  }
+  .check input {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: var(--magenta);
+  }
+  .hint {
+    color: var(--muted);
+    font-size: 0.8125rem;
+  }
+  .field-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.9375rem;
+  }
+  select {
+    min-height: 2.25rem;
+    padding: 0 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--raised);
+    color: var(--text);
+    font: inherit;
+  }
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+  }
+  .dialog-actions .btn {
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .keys {
+    display: grid;
+    gap: 0.4rem;
+  }
+  .keys div {
+    display: grid;
+    grid-template-columns: 9rem minmax(0, 1fr);
+    gap: 1rem;
+    font-size: 0.875rem;
+  }
+  .keys dd {
+    color: var(--muted);
+  }
+  kbd {
+    font-size: 0.8125rem;
+    color: var(--text);
+  }
+
+  /* ---- Phones and narrow windows: the page scrolls, the panels stack. */
   @media (max-width: 60rem) {
-    .workspace {
+    .tool {
+      height: auto;
+      min-height: 0;
+    }
+    .split {
       grid-template-columns: minmax(0, 1fr);
     }
-    .editor {
-      min-height: 16rem;
-      max-height: 60vh;
+    .editor-pane {
+      height: 60dvh;
+      min-height: 18rem;
+    }
+    .results {
+      overflow: visible;
+      border-left: 0;
+      border-top: 1px solid var(--rule);
+    }
+    .statusbar {
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+      padding-block: 0.25rem;
     }
   }
-  @media (max-width: 30rem) {
-    .share {
-      margin-left: 0;
+  @media (max-width: 36rem) {
+    .menubar {
+      padding-inline: 0.25rem;
+    }
+    /* The file controls take their own row under the menus. */
+    .files {
+      flex: 1 1 100%;
+      padding-bottom: 0.25rem;
+    }
+    .tab {
+      flex: 1;
+    }
+    .tab-name {
+      max-width: none;
+      flex: 1;
+      text-align: left;
+    }
+    .statusbar {
+      gap: 0 0.5rem;
+      padding-inline: 0.25rem;
+    }
+    .count {
+      padding: 0 0.3rem;
+    }
+    .timing {
+      display: none;
+    }
+    .parse-btn span {
+      display: none;
+    }
+    .parse-btn {
+      width: 2.5rem;
+      justify-content: center;
+      padding: 0;
+    }
+    .click-parse {
+      display: none;
+    }
+    .toast {
+      bottom: 5rem;
     }
   }
 </style>

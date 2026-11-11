@@ -143,7 +143,8 @@ Two surfaces share one palette. The custom pages (landing, download, the syntax 
 - Neo Magenta on near-black, aubergine-tinted night; magenta marks meaning, never decoration.
 - Geist Bold headlines at tight negative tracking; Geist Mono for script and output; JetBrains Mono uppercase labels for metadata.
 - Hairline rules instead of cards; flat, no shadows anywhere.
-- 44px pills for actions; one authored SVG arrow is the only icon.
+- 44px pills for actions; one authored SVG arrow is the only icon on the content pages. The two tools (the parser and the syntax reference) add a small authored icon set.
+- The tools are laid out as tools, like the community tools people already use: a parser in a full-window app, a reference with a sidebar and one flat card per entry. Cards are theirs alone.
 - One authored motion moment (bars draw out, rows settle once); reduced motion shows everything at once.
 
 ## Colors
@@ -243,7 +244,10 @@ Pills, quiet and certain.
 Inherit their colour, underlined at 0.25em offset in a 35% text mix; the underline turns magenta on hover. Every link to another site carries the External arrow.
 
 ### External arrow
-The site's only icon (`src/components/External.astro`): an authored 10x10 SVG up-right arrow, 1.4 stroke with round caps, in `currentColor`, sized 0.62em. It nudges 1px up-right on hover and focus. No Unicode arrows, no icon fonts.
+The content pages' only icon (`src/components/External.astro`): an authored 10x10 SVG up-right arrow, 1.4 stroke with round caps, in `currentColor`, sized 0.62em. It nudges 1px up-right on hover and focus. No Unicode arrows, no icon fonts.
+
+### Tool icons
+The parser and the syntax reference have a small authored set in the arrow's style (`src/lib/icons.ts`, `components/Icon.astro`): 16x16 strokes, 1.5 wide, round caps, `currentColor`, no fills except the Parse button's. Save, settings, new, close, chevron, parse, link, search, filter, files, one per syntax category, guides and parser. They're decorative: every icon-only control has an `aria-label`. Monaco's own codicons stay inside the editor.
 
 ### The staff (signature)
 - **Centre column:** raised night between 1px magenta inline rails, Geist Mono 0.875rem, 0.7rem by 1.25rem cells, every cell ruled underneath. In the performance staff the centre holds the measure name in Geist and what was measured in muted mono.
@@ -256,8 +260,16 @@ The site's only icon (`src/components/External.astro`): an authored 10x10 SVG up
 ### Facts row and steps
 Hairline-topped rows of three, not cards. Facts lead with a large tabular figure in text, a muted sentence, and a source link. Steps number themselves with a magenta JetBrains Mono counter above a bold first sentence.
 
+### The parser (`/parser`)
+A full-window tool under the site header (Base's `app` prop: no footer, and the body doesn't scroll above 60rem). A night menu bar: save and settings icons, then the File, Insert, Sharing and Help menus (WAI-ARIA menu buttons: arrows move, Left and Right switch menus, Esc closes); on the right the open file as a raised tab with a magenta underline, new file, the open-files list and the magenta Parse pill. Below it, Monaco (bundled from npm, loaded lazily, `src/scripts/parser-editor.ts`) on raised night takes two thirds and the results panel on night one third. A status bar across the foot in uppercase JetBrains Mono: STATUS and its word (magenta once parsed), then counts with the number in text and the word in magenta, each a toggle that lists its items, and CLICK TO PARSE at the end. Under 60rem the editor, results and status bar stack and the page scrolls, with the status bar sticky at the foot.
+
+The editor's theme is built from the brand tokens at runtime (no typed hex): keywords magenta, structure keywords bold magenta, strings and numbers String Pink, variables and event values a 45% magenta / text mix, comments and punctuation muted.
+
 ### Parser diagnostics
-The one place magenta means "error": an error's label, its line's rail and its wavy underline are magenta, a warning's are String Pink. That keeps to magenta's rule (it marks where to act), and colour is never alone: every problem has an ERROR or WARNING label, a line number, and its message.
+The one place magenta means "error": an error's label, its card's left rail, its squiggle and its overview-ruler mark are magenta, a warning's are String Pink with a dashed rail. That keeps to magenta's rule (it marks where to act), and colour is never alone: every problem card says Error or Warning on Line N, then the message and the line's code, and has a Go to line button.
+
+### Syntax reference cards
+`/syntax/<category>/` has a 15rem sticky sidebar (categories with icons and counts, Guides and Parser, then every entry's name; the current category and the entry in view get a 3px magenta bar) and a main column: a 52px search pill with a Filters toggle (category, Added in, and per page with examples, hide deprecated, cancellable only), a Clear filters pill, then one flat card per entry: a magenta header with night text (6.3:1) holding the link icon, the name and night badges (category, Skript version), the patterns on a night band, the description and the registry's facts on raised night, and full-width 44px rows that open (View examples, View event values) with a chevron. 4px corners, hairline borders, no shadows. Under 60rem the sidebar becomes a scrolling row of categories and the names list goes.
 
 ### Definition rows (download)
 A `<dl>` of hairline-separated rows: bold term in a 14rem column, muted definition in the rest. The build block above them is a hairline-bounded band with its own small term/definition grid, not a card.
@@ -277,9 +289,9 @@ A `<dl>` of hairline-separated rows: bold term in a 14rem column, muted definiti
 - **Do** emit styles as files: authored code has no `<style>` inlined into the page and no `style` attributes (`inlineStylesheets: "never"`, no inlined assets), and scripts run only from files or hashed inline blocks, per the CSP in `public/_headers`. Its `style-src` allows `'unsafe-inline'` only for the `style` attributes Starlight writes.
 
 ### Don't:
-- **Don't** use cards or card grids; facts, steps and rows are hairline rows.
+- **Don't** use cards or card grids on the content pages; facts, steps and rows are hairline rows. The tools' result and entry cards are the exception.
 - **Don't** put an uppercase label above a heading as an eyebrow.
-- **Don't** use Unicode or emoji arrows or icons; the SVG arrow is the only icon.
+- **Don't** use Unicode or emoji arrows or icons; the SVG arrow, and in the tools their authored icon set, are the only icons.
 - **Don't** add shadows, glows or gradient text, or any atmosphere beyond the Xena horizon.
 - **Don't** use magenta decoratively, or Xena's Ion Blue anywhere.
 - **Don't** recolour the NeoSkript logo.

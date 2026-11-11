@@ -1,40 +1,96 @@
-/* The syntax reference's entries (src/components/syntax): hairline-ruled rows, patterns and examples on raised
-   night. Unscoped, under .entry, so the pages' thousands of elements carry no scoping classes. */
+/* The syntax reference's entries (src/components/syntax): one card each, a magenta header, patterns on a darker
+   band, then the description and rows that open. Flat: tone and hairlines, no shadows. Unscoped, under .entry,
+   so the pages' thousands of elements carry no scoping classes. */
 
 .entry {
-  padding-block: clamp(1.75rem, 1.25rem + 1.5vw, 2.5rem);
-  border-top: 1px solid var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--raised);
+  overflow: hidden;
   scroll-margin-top: 1rem;
+}
+.entry + .entry {
+  margin-top: 1rem;
 }
 .entry[hidden] {
   display: none;
 }
+
+/* The header: night on magenta, 6.3:1. */
+.entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.6rem 1rem 0.6rem 0.5rem;
+  background: var(--magenta);
+  color: var(--night);
+}
 .entry h2 {
-  font-size: 1.5rem;
+  flex: 1 1 14rem;
+  min-width: 0;
+  font-size: 1.375rem;
   letter-spacing: -0.02em;
+  overflow-wrap: break-word;
 }
-.entry h2 a {
-  text-decoration: none;
+.entry .anchor {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 4px;
+  color: var(--night);
+  transition: background-color 180ms var(--ease);
 }
-.entry h2 a:hover {
-  text-decoration: underline;
-  text-decoration-color: var(--magenta);
+.entry .anchor:hover {
+  background: color-mix(in srgb, var(--night) 15%, transparent);
 }
-.entry:target h2 a {
+.entry .anchor:focus-visible {
+  outline-color: var(--night);
+  outline-offset: 0;
+}
+.entry .anchor.copied {
+  background: var(--night);
   color: var(--magenta);
 }
-.entry .flag {
-  margin-top: 0.5rem;
+.entry .badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.entry .badges li {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--night);
+  color: var(--text);
+  font-family: var(--label);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.entry .badges .flag {
+  background: transparent;
+  color: var(--night);
+  border: 1px solid var(--night);
+}
+.entry:target {
+  border-color: var(--magenta);
 }
 
 /* Patterns: words as typed, marks muted, %type% slots magenta, <regex> pale. */
 .entry .patterns {
-  margin-top: 1rem;
   display: grid;
   gap: 0.45rem;
   padding: 0.85rem 1.1rem;
-  background: var(--raised);
-  border-left: 1px solid var(--magenta);
+  background: var(--night);
+  border-bottom: 1px solid var(--rule);
 }
 .pattern {
   display: block;
@@ -53,11 +109,14 @@
   color: var(--string);
 }
 
+.entry-body {
+  padding: 1rem 1.1rem 1.1rem;
+}
 .entry .description {
-  margin-top: 1rem;
   display: grid;
   gap: 0.6rem;
-  max-width: 68ch;
+  max-width: 72ch;
+  color: var(--text);
 }
 .entry .description code,
 .entry .meta code {
@@ -70,19 +129,15 @@
   margin: 0;
   padding-left: 1.25rem;
 }
-.entry .description,
 .entry .undocumented {
   color: var(--muted);
-}
-.entry .undocumented {
-  margin-top: 1rem;
   font-size: 0.9375rem;
 }
 
 .entry .meta {
-  margin-top: 1.25rem;
+  margin-top: 1rem;
   display: grid;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 .entry .meta > div {
   display: grid;
@@ -95,6 +150,7 @@
 }
 .entry .meta dd {
   font-size: 0.9375rem;
+  overflow-wrap: break-word;
 }
 .entry .meta a {
   color: var(--text);
@@ -111,27 +167,54 @@
 .entry .params {
   flex-direction: column;
 }
-.entry details {
-  font-size: 0.9375rem;
-}
-.entry summary {
-  cursor: pointer;
-  color: var(--muted);
-  width: fit-content;
-}
-.entry summary:hover {
-  color: var(--text);
-}
-.entry details[open] summary {
-  margin-bottom: 0.5rem;
-}
 .entry .muted,
 .entry .id {
   color: var(--muted);
 }
 
+/* Rows that open: View examples, View event values. Full width, a chevron at the end. */
+.entry .more {
+  border-top: 1px solid var(--rule);
+}
+.entry .more summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 44px;
+  padding: 0 1.1rem;
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+  transition: background-color 180ms var(--ease);
+}
+.entry .more summary::-webkit-details-marker {
+  display: none;
+}
+.entry .more summary:hover {
+  background: color-mix(in srgb, var(--magenta) 8%, transparent);
+}
+.entry .more summary:focus-visible {
+  outline-offset: -2px;
+}
+.entry .more summary .icon {
+  color: var(--muted);
+  transition: transform 180ms var(--ease);
+}
+.entry .more[open] summary .icon {
+  transform: rotate(180deg);
+  color: var(--magenta);
+}
+.entry .more-body {
+  padding: 0 1.1rem 1.1rem;
+}
+.entry .usage {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
 .entry .examples {
-  margin-top: 1.25rem;
   display: grid;
   /* minmax(0, 1fr), not auto: a long line scrolls inside its example
      instead of widening the page. */
@@ -141,8 +224,8 @@
 .example {
   margin: 0;
   padding: 0.85rem 1.1rem;
-  background: var(--raised);
-  border-left: 1px solid var(--rule);
+  background: var(--night);
+  border-left: 2px solid var(--magenta);
   font-size: 0.8125rem;
   line-height: 1.65;
   tab-size: 4;
@@ -154,12 +237,7 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 0.1rem;
   }
-}
-
-/* Some names and formats are slash-joined lists ("Enderman/Sheep/Silverfish/
-   Falling Block", "ticks/seconds/minutes/...") with nowhere to wrap at phone
-   width. */
-.entry h2,
-.entry .meta dd {
-  overflow-wrap: break-word;
+  .entry-head {
+    padding-right: 0.75rem;
+  }
 }

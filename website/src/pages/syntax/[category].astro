@@ -1,11 +1,13 @@
 ---
-// One page per kind of syntax, as Skript's docs have: every element of the kind with its patterns, a filter,
-// and a list of names to jump to. Anchors are the element's slug, so links can point at one element.
+// One page per kind of syntax, as Skript's docs have: a sidebar with the categories and every entry's name, a
+// search with filters across the top, and every element of the kind as a card. Anchors are the element's slug,
+// so links can point at one element.
 import Base from "../../layouts/Base.astro";
 import SyntaxNav from "../../components/syntax/SyntaxNav.astro";
+import SearchBar from "../../components/syntax/SearchBar.astro";
 import Entry from "../../components/syntax/Entry.astro";
 import Attribution from "../../components/syntax/Attribution.astro";
-import { categories, syntax, type Category } from "../../lib/syntax";
+import { categories, sinceOptions, syntax, type Category } from "../../lib/syntax";
 
 export function getStaticPaths() {
   return categories.map((category) => ({ params: { category: category.path }, props: { category } }));
@@ -27,36 +29,27 @@ const counted = (n: number) => `${n} ${n === 1 ? one : noun}`;
   description={`Every one of NeoSkript's ${category.count} ${noun}, with patterns, descriptions and examples. ${category.blurb}`}
   path={`/syntax/${category.path}/`}
 >
-  <div class="wrap ref">
-    <header class="head">
-      <h1>{category.label}</h1>
-      <p class="lead">{category.blurb}</p>
-      {category.kind === "structure" && (
-        <p class="note">
-          Event triggers, commands, functions, options, variables and aliases are read by NeoSkript's script parser
-          itself rather than registered as syntax, so they aren't in the registry this page is made from.
-        </p>
-      )}
-    </header>
+  <div class="ref">
+    <SyntaxNav current={category.path} names={items.map(({ item }) => ({ slug: item.slug, name: item.name }))} />
 
-    <aside class="rail" aria-label="Syntax reference">
-      <SyntaxNav current={category.path} />
-      <div class="filter" role="search">
-        <label class="label" for="filter">Filter {noun}</label>
-        <div class="field">
-          <input id="filter" type="search" autocomplete="off" spellcheck="false" placeholder="Name or pattern" aria-describedby="filter-count" data-noun={noun} data-one={one} />
-          <kbd aria-hidden="true">/</kbd>
-        </div>
-        <p id="filter-count" class="count" aria-live="polite">{counted(items.length)}</p>
+    <div class="main" data-noun={noun} data-one={one} data-category={category.path}>
+      <SearchBar current={category.path} versions={sinceOptions(items.map(({ item }) => item))} count={counted(items.length)} placeholder={`Search ${noun}: name, id or pattern`} />
+
+      <header class="head">
+        <h1>{category.label}</h1>
+        <p class="lead">{category.blurb}</p>
+        {category.kind === "structure" && (
+          <p class="note">
+            Event triggers, commands, functions, options, variables and aliases are read by NeoSkript's script parser
+            itself rather than registered as syntax, so they aren't in the registry this page is made from.
+          </p>
+        )}
+      </header>
+
+      <div class="entries">
+        {items.map((props) => <Entry {...props} category={noun} />)}
+        <p class="empty" hidden>No {noun} match. <a href="/syntax/" id="search-all">Search all syntax</a></p>
       </div>
-      <ol class="names" aria-label={`All ${noun}`}>
-        {items.map(({ item }) => <li data-slug={item.slug}><a href={`#${item.slug}`}>{item.name}</a></li>)}
-      </ol>
-    </aside>
-
-    <div class="entries">
-      {items.map((props) => <Entry {...props} />)}
-      <p class="empty" hidden>No {noun} match.</p>
       <Attribution />
     </div>
   </div>
@@ -69,21 +62,22 @@ const counted = (n: number) => `${n} ${n === 1 ? one : noun}`;
 <style>
   .ref {
     display: grid;
-    grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr);
-    grid-template-areas: "rail head" "rail entries";
-    column-gap: clamp(2rem, 1rem + 3vw, 5rem);
-    padding-bottom: clamp(4rem, 2.5rem + 5vw, 7rem);
+    grid-template-columns: 15rem minmax(0, 1fr);
+  }
+  .main {
+    min-width: 0;
+    max-width: 64rem;
+    padding: 1.5rem clamp(1rem, 0.4rem + 3vw, 3rem) clamp(4rem, 2.5rem + 5vw, 7rem);
   }
   .head {
-    grid-area: head;
-    padding-block: clamp(2.5rem, 1.5rem + 3vw, 4rem) clamp(1.75rem, 1.25rem + 1.5vw, 2.5rem);
+    padding-block: 1.5rem 1.5rem;
   }
   h1 {
     font-size: clamp(2.25rem, 1.6rem + 2.6vw, 3.5rem);
     letter-spacing: -0.035em;
   }
   .lead {
-    margin-top: 0.9rem;
+    margin-top: 0.75rem;
   }
   .note {
     margin-top: 1rem;
@@ -91,126 +85,24 @@ const counted = (n: number) => `${n} ${n === 1 ? one : noun}`;
     color: var(--muted);
     font-size: 0.9375rem;
   }
-  .rail {
-    grid-area: rail;
-    position: sticky;
-    top: 0;
-    align-self: start;
-    max-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    padding-block: clamp(2.5rem, 1.5rem + 3vw, 4rem) 1.5rem;
-  }
-  .filter {
-    display: grid;
-    gap: 0.5rem;
-  }
-  .filter .label {
-    font-size: 0.6875rem;
-  }
-  .field {
-    position: relative;
-  }
-  input {
-    width: 100%;
-    min-height: 44px;
-    padding: 0 2.5rem 0 0.9rem;
-    border: 1px solid var(--rule);
-    border-radius: 999px;
-    background: var(--night);
-    color: var(--text);
-    font: inherit;
-    font-size: 0.9375rem;
-    transition: border-color 180ms var(--ease);
-  }
-  input::placeholder {
-    color: var(--muted);
-    opacity: 1;
-  }
-  input:hover {
-    border-color: color-mix(in srgb, var(--magenta) 60%, var(--rule));
-  }
-  input:focus-visible {
-    outline: 2px solid var(--magenta);
-    outline-offset: 2px;
-    border-radius: 999px;
-  }
-  input::-webkit-search-cancel-button {
-    display: none;
-  }
-  kbd {
-    position: absolute;
-    right: 0.75rem;
-    top: 50%;
-    translate: 0 -50%;
-    min-width: 1.4rem;
-    padding: 0.05rem 0.35rem;
-    border: 1px solid var(--rule);
-    border-radius: 4px;
-    color: var(--muted);
-    font-size: 0.75rem;
-    text-align: center;
-    pointer-events: none;
-  }
-  input:focus + kbd,
-  input:not(:placeholder-shown) + kbd {
-    display: none;
-  }
-  .count {
-    color: var(--muted);
-    font-size: 0.8125rem;
-  }
-  .names {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    margin: 0;
-    padding: 0.5rem 0.25rem 0 0;
-    list-style: none;
-    border-top: 1px solid var(--rule);
-    scrollbar-width: thin;
-  }
-  .names li[hidden] {
-    display: none;
-  }
-  .names a {
-    display: block;
-    padding: 0.3rem 0;
-    color: var(--muted);
-    font-size: 0.875rem;
-    line-height: 1.35;
-    text-decoration: none;
-  }
-  .names a:hover {
-    color: var(--text);
-  }
   .entries {
-    grid-area: entries;
-    min-width: 0;
-    max-width: 60rem;
+    margin-bottom: 2.5rem;
   }
   .empty {
-    padding-block: 2rem;
-    border-top: 1px solid var(--rule);
+    padding: 2rem 1.25rem;
+    border: 1px dashed var(--rule);
+    border-radius: 4px;
     color: var(--muted);
+  }
+  .empty a {
+    color: var(--text);
   }
   @media (max-width: 60rem) {
     .ref {
       grid-template-columns: minmax(0, 1fr);
-      grid-template-areas: "head" "rail" "entries";
     }
-    .head {
-      padding-bottom: 1.25rem;
-    }
-    .rail {
-      position: static;
-      max-height: none;
-      padding-block: 0 1.5rem;
-      gap: 1.25rem;
-    }
-    .names {
-      display: none;
+    .main {
+      padding-top: 1rem;
     }
   }
 </style>

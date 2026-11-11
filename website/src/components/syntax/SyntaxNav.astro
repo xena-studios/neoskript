@@ -1,61 +1,184 @@
 ---
-// The syntax reference's categories, with how many of each there are.
+// The syntax reference's sidebar: the categories with their icons and counts, links to the guides and the
+// parser, then (on a category page) every entry of the category by name, each jumping to its card. The entry
+// in view gets the magenta bar (src/scripts/syntax-filter.ts). Under 60rem the categories become a row and the
+// names list goes: the filter does its job there.
+import Icon from "../Icon.astro";
 import { categories } from "../../lib/syntax";
-interface Props { current?: string }
-const { current } = Astro.props;
+import type { IconName } from "../../lib/icons";
+interface Props { current?: string; names?: { slug: string; name: string }[] }
+const { current, names } = Astro.props;
+const label = categories.find((c) => c.path === current)?.label;
 ---
-<nav class="cats" aria-label="Syntax categories">
-  <ul>
-    {categories.map((c) => (
-      <li>
-        <a href={`/syntax/${c.path}/`} aria-current={c.path === current ? "page" : undefined}>
-          <span>{c.label}</span><span class="n">{c.count}</span>
-        </a>
-      </li>
-    ))}
-  </ul>
-</nav>
+<aside class="side" aria-label="Syntax reference">
+  <nav class="cats" aria-label="Syntax categories">
+    <ul>
+      <li><a href="/syntax/" aria-current={current === undefined ? "page" : undefined}><Icon name="search" /><span>All syntax</span></a></li>
+      {categories.map((c) => (
+        <li>
+          <a href={`/syntax/${c.path}/`} aria-current={c.path === current ? "page" : undefined}>
+            <Icon name={c.kind as IconName} /><span>{c.label}</span><span class="n">{c.count}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+    <ul class="more">
+      <li><a href="/docs/"><Icon name="guide" /><span>Guides</span></a></li>
+      <li><a href="/parser/"><Icon name="parser" /><span>Parser</span></a></li>
+    </ul>
+  </nav>
+  {names && (
+    <>
+      <p class="names-head label" id="names-head">{label}</p>
+      <ol class="names" aria-labelledby="names-head">
+        {names.map((n) => <li data-slug={n.slug}><a href={`#${n.slug}`}>{n.name}</a></li>)}
+      </ol>
+    </>
+  )}
+</aside>
 <style>
-  ul {
+  .side {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    padding: 1.25rem 0 0;
+    border-right: 1px solid var(--rule);
+    background: var(--night);
+  }
+  ul,
+  ol {
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  a {
+  .cats a {
+    position: relative;
     display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.3rem 0;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 2.25rem;
+    padding: 0 1rem 0 1.25rem;
     color: var(--muted);
     font-size: 0.9375rem;
     text-decoration: none;
+    transition: color 180ms var(--ease), background-color 180ms var(--ease);
   }
-  a:hover,
-  a[aria-current="page"] {
+  .cats a:hover {
     color: var(--text);
+    background: color-mix(in srgb, var(--magenta) 7%, transparent);
   }
-  a[aria-current="page"] span:first-child {
-    text-decoration: underline;
-    text-decoration-color: var(--magenta);
-    text-decoration-thickness: 2px;
-    text-underline-offset: 0.35em;
+  .cats a[aria-current="page"] {
+    color: var(--text);
+    font-weight: 600;
+    background: color-mix(in srgb, var(--magenta) 10%, transparent);
+  }
+  /* The accent bar. */
+  .cats a[aria-current="page"]::before,
+  .names :global(li.active) a::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    width: 3px;
+    background: var(--magenta);
+  }
+  .cats a[aria-current="page"] :global(.icon) {
+    color: var(--magenta);
+  }
+  .cats a:focus-visible,
+  .names a:focus-visible {
+    outline-offset: -2px;
   }
   .n {
-    font-variant-numeric: tabular-nums;
+    margin-left: auto;
     font-size: 0.8125rem;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
     color: var(--muted);
   }
+  .more {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--rule);
+  }
+  .names-head {
+    margin-top: 1rem;
+    padding: 0.75rem 1.25rem 0.5rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.6875rem;
+  }
+  .names {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 1.5rem;
+    scrollbar-width: thin;
+    overscroll-behavior: contain;
+  }
+  .names li[hidden] {
+    display: none;
+  }
+  .names a {
+    position: relative;
+    display: block;
+    padding: 0.3rem 1rem 0.3rem 1.25rem;
+    color: var(--muted);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    text-decoration: none;
+  }
+  .names a:hover {
+    color: var(--text);
+  }
+  .names :global(li.active) a {
+    color: var(--text);
+    background: color-mix(in srgb, var(--magenta) 8%, transparent);
+  }
   @media (max-width: 60rem) {
-    ul {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.25rem 1.25rem;
-    }
-    a {
-      gap: 0.4rem;
+    .side {
+      position: static;
+      height: auto;
       padding: 0.5rem 0;
+      border-right: 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .cats {
+      display: flex;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+    .cats ul {
+      display: flex;
+    }
+    .more {
+      margin: 0;
+      padding: 0;
+      border-top: 0;
+      border-left: 1px solid var(--rule);
+    }
+    .cats a {
       min-height: 44px;
-      align-items: center;
+      padding: 0 0.85rem;
+      white-space: nowrap;
+    }
+    .cats a[aria-current="page"]::before {
+      top: auto;
+      left: 0.5rem;
+      right: 0.5rem;
+      bottom: 0;
+      width: auto;
+      height: 3px;
+    }
+    .n {
+      margin-left: 0.15rem;
+    }
+    .names-head,
+    .names {
+      display: none;
     }
   }
 </style>

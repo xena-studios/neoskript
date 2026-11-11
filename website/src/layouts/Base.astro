@@ -1,13 +1,14 @@
 ---
 // The custom pages' shell: head, header, footer. The guides are Starlight's.
+// An app page (the parser) fills the window under the header and has no footer.
 import "../styles/site.css";
 import Logo from "../components/Logo.astro";
 import External from "../components/External.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import { current, nav, repo } from "../lib/nav";
 
-interface Props { title: string; description: string; path: string }
-const { title, description, path } = Astro.props;
+interface Props { title: string; description: string; path: string; app?: boolean }
+const { title, description, path, app = false } = Astro.props;
 const url = new URL(path, Astro.site).href;
 const og = new URL("/og.png", Astro.site).href;
 ---
@@ -31,7 +32,7 @@ const og = new URL("/og.png", Astro.site).href;
     <meta property="og:image:alt" content="NeoSkript: Keep your scripts. Lose the lag." />
     <meta name="twitter:card" content="summary_large_image" />
   </head>
-  <body>
+  <body class:list={{ app }}>
     <a class="skip" href="#main">Skip to content</a>
     <header class="site-header">
       <div class="wrap bar">
@@ -49,7 +50,7 @@ const og = new URL("/og.png", Astro.site).href;
     <main id="main">
       <slot />
     </main>
-    <SiteFooter />
+    {!app && <SiteFooter />}
   </body>
 </html>
 <style>
