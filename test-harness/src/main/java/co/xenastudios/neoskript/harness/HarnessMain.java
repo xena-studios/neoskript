@@ -29,6 +29,7 @@ import co.xenastudios.neoskript.harness.scenario.SkriptCorpusScenario;
 import co.xenastudios.neoskript.harness.scenario.SkriptLoadBenchmark;
 import co.xenastudios.neoskript.harness.scenario.SkriptSmokeScenario;
 import co.xenastudios.neoskript.harness.scenario.SkriptTestSuiteScenario;
+import co.xenastudios.neoskript.harness.scenario.SyntaxExportScenario;
 import com.google.gson.GsonBuilder;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,7 +68,8 @@ public final class HarnessMain {
             new SkriptLoadBenchmark(),
             new NeoSkriptLoadBenchmark(),
             new DifferentialScenario(),
-            new NeoSkriptCliScenario());
+            new NeoSkriptCliScenario(),
+            new SyntaxExportScenario());
 
     record Result(String environment, String scenario, boolean passed, Duration duration, String message,
             Map<String, Object> summary) {}
@@ -86,7 +88,9 @@ public final class HarnessMain {
             throw new IllegalArgumentException("No environment named '" + env + "' in " + config.environmentsDir());
         }
         List<Scenario> scenarios = SCENARIOS.stream()
-                .filter(s -> only.isEmpty() ? group.equals("ALL") || s.group().name().equals(group) : s.name().equals(only))
+                .filter(s -> only.isEmpty()
+                        ? s.group() != Scenario.Group.MANUAL && (group.equals("ALL") || s.group().name().equals(group))
+                        : s.name().equals(only))
                 .toList();
         if (scenarios.isEmpty()) {
             throw new IllegalArgumentException("No scenarios match group '" + group + "' / scenario '" + only + "'");

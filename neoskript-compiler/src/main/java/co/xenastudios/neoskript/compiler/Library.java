@@ -12,9 +12,11 @@ import co.xenastudios.neoskript.api.element.Function;
 import co.xenastudios.neoskript.api.registration.Parameter;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.api.registration.ScriptEvent;
+import co.xenastudios.neoskript.frontend.pattern.CompiledPattern;
 import co.xenastudios.neoskript.frontend.pattern.PatternCompiler;
 import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
 import co.xenastudios.neoskript.frontend.registry.RegexRole;
+import co.xenastudios.neoskript.frontend.registry.SyntaxExport;
 import co.xenastudios.neoskript.frontend.registry.SyntaxInfo;
 import co.xenastudios.neoskript.frontend.registry.SyntaxKind;
 import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
@@ -312,6 +314,12 @@ public final class Library implements Registrar {
      * ({@code on break / mine}): that of Skript's event with the same patterns, or {@code null} if none has them.
      */
     public String eventName(String id) {
+        EventName event = skriptEvent(id);
+        return event == null ? null : event.name().toLowerCase(java.util.Locale.ENGLISH);
+    }
+
+    /** Skript's event that the server event {@code id} is, as {@link #eventName(String)} finds it, or {@code null}. */
+    private EventName skriptEvent(String id) {
         List<String> patterns = eventPatterns.get(id);
         if (patterns == null) {
             return null;
@@ -319,14 +327,14 @@ public final class Library implements Registrar {
         patterns = patterns.stream().map(Library::bare).toList();
         for (EventName event : eventNames) {
             if (event.patterns().stream().map(Library::bare).toList().equals(patterns)) {
-                return event.name().toLowerCase(java.util.Locale.ENGLISH);
+                return event;
             }
         }
         // Where NeoSkript splits or joins Skript's patterns, any shared pattern says which it is.
         for (EventName event : eventNames) {
             for (String pattern : patterns) {
                 if (event.patterns().stream().map(Library::bare).anyMatch(pattern::equals)) {
-                    return event.name().toLowerCase(java.util.Locale.ENGLISH);
+                    return event;
                 }
             }
         }
@@ -342,7 +350,7 @@ public final class Library implements Registrar {
                     found = event;
                 }
             }
-            return found == null ? null : found.name().toLowerCase(java.util.Locale.ENGLISH);
+            return found;
         }
         return null;
     }
@@ -1076,6 +1084,81 @@ public final class Library implements Registrar {
     /** Every built-in function, as registered. */
     public Map<FunctionInfo, Function> builtIns() {
         return java.util.Collections.unmodifiableMap(functions);
+    }
+
+    /**
+     * What's registered, for the syntax reference: every element with its patterns as written, Skript's names for
+     * the events and their values, the types and the built-in functions. Freezes the library, as
+     * {@link #registry()} does.
+     */
+    public SyntaxExport export(String neoskriptVersion, String server) {
+        SyntaxRegistry registry = registry();
+        List<SyntaxExport.Element> elements = new ArrayList<>();
+        for (SyntaxKind kind : SyntaxKind.values()) {
+            for (SyntaxInfo syntax : registry.syntaxes(kind)) {
+                List<SyntaxExport.EventValue> values = List.of();
+                String name = null;
+                if (kind == SyntaxKind.EVENT) {
+                    EventName event = skriptEvent(syntax.id());
+                    name = event == null ? null : event.name();
+                    if (bindings.get(new Key(kind, syntax.id())) instanceof ServerEvent serverEvent) {
+                        values = eventValuesOf(serverEvent.classes());
+                    }
+                }
+                elements.add(new SyntaxExport.Element(
+                        SyntaxExport.kindName(kind), syntax.id(),
+                        syntax.patterns().stream().map(CompiledPattern::source)
+                                .toList(),
+                        kind == SyntaxKind.EXPRESSION ? syntax.returnType() : null, name, values));
+            }
+        }
+        List<TypeInfo> types = new ArrayList<>();
+        registry.types().forEach(types::add);
+        types.sort(java.util.Comparator.comparingInt((TypeInfo t) ->
+                registry.typeOrder(t.id())).thenComparing(TypeInfo::id));
+        List<SyntaxExport.Type> typeList = types.stream()
+                .map(t -> new SyntaxExport.Type(t.id(), t.name(),
+                        SyntaxRegistry.plural(t.name()), t.literals().stream().sorted().toList()))
+                .toList();
+        List<SyntaxExport.Function> functionList = functions.keySet().stream()
+                .sorted(java.util.Comparator.comparing(FunctionInfo::name)
+                        .thenComparingInt(f -> f.parameters().size()))
+                .map(f -> new SyntaxExport.Function(f.name(), f.parameters(),
+                        f.returnType(), f.returnsPlural()))
+                .toList();
+        return new SyntaxExport(
+                SyntaxExport.FORMAT, neoskriptVersion, server, elements,
+                typeList, functionList);
+    }
+
+    /**
+     * The event values registered for events of any of {@code eventClasses} or their superclasses, in the order
+     * registered, each type and time once, without those the events are registered not to have.
+     */
+    private List<SyntaxExport.EventValue> eventValuesOf(
+            List<Class<?>> eventClasses) {
+        Set<String> excluded = new HashSet<>();
+        for (EventValue value : eventValues) {
+            if (value.excluded() != null && eventClasses.stream().allMatch(value.eventClass()::isAssignableFrom)) {
+                excluded.add(value.type());
+            }
+        }
+        java.util.LinkedHashSet<SyntaxExport.EventValue> values =
+                new java.util.LinkedHashSet<>();
+        for (EventValue value : eventValues) {
+            if (value.excluded() != null || eventClasses.stream().noneMatch(value.eventClass()::isAssignableFrom)) {
+                continue;
+            }
+            String type = value.type();
+            if (value.valueClass() != null) {
+                String exact = exactType(value.valueClass());
+                type = exact != null ? exact : type;
+            }
+            if (!excluded.contains(type)) {
+                values.add(new SyntaxExport.EventValue(type, value.time()));
+            }
+        }
+        return List.copyOf(values);
     }
 
     /** The syntax registry for the frontend. Nothing can be registered after this is called. */
