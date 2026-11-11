@@ -237,6 +237,38 @@ public final class SyntaxRegistry {
         return false;
     }
 
+    // ---------------------------------------------------------------- what the syntax export reads
+
+    /** Every name a type is known by in patterns and scripts, singular and plural: what {@link #resolveType} takes. */
+    public Map<String, TypeRef> typeNames() {
+        return typeNames;
+    }
+
+    /** The types {@code id} can be used as, its supertypes and theirs. */
+    public Set<String> supertypes(String id) {
+        return supertypes.getOrDefault(id, Set.of());
+    }
+
+    /** Whether type {@code id} only takes itself, its subtypes and conversions: see {@link Builder#strict}. */
+    public boolean isStrict(String id) {
+        return strictTypes.contains(id);
+    }
+
+    /** Every direct conversion, as {@code from -> {to...}}: see {@link Builder#convertible}. */
+    public Map<String, Set<String>> conversions() {
+        return conversions;
+    }
+
+    /** Whether the conversion from {@code from} to {@code to} is only placeholders': see {@link Builder#placeholderConversion}. */
+    public boolean isPlaceholderConversion(String from, String to) {
+        return placeholderConversions.contains(from + ">" + to);
+    }
+
+    /** Skript's type properties, each with the types that have it: see {@link Builder#typeProperty}. */
+    public Map<String, Set<String>> typeProperties() {
+        return propertyTypes;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -590,6 +622,16 @@ public final class SyntaxRegistry {
             }
             typeNames.put(normalize(alias), new TypeRef(type, false));
             typeNames.put(normalize(plural), new TypeRef(type, true));
+            return this;
+        }
+
+        /** Makes {@code name} (in its plural if {@code plural}) mean type {@code typeId}, replacing what it meant. */
+        public Builder typeName(String typeId, String name, boolean plural) {
+            TypeInfo type = typesById.get(Text.lower(typeId));
+            if (type == null) {
+                throw new IllegalArgumentException("Unknown type: " + typeId);
+            }
+            typeNames.put(normalize(name), new TypeRef(type, plural));
             return this;
         }
 

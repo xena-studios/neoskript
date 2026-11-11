@@ -10,6 +10,7 @@
     "preview": "astro preview",
     "brand:sync": "node scripts/sync-brand.mjs",
     "syntax:sync": "node scripts/syntax.mjs",
+    "syntax:export": "cd .. && ./gradlew :test-harness:harness -Pharness.env=paper-26.3 -Pharness.scenario=syntax-export && cd website && node scripts/syntax.mjs",
     "deploy": "pnpm build && wrangler deploy",
     "parser": "cd .. && ./gradlew :neoskript-web:website"
   },

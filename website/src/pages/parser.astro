@@ -3,6 +3,8 @@
 // (neoskript-web/), runs in a Web Worker and checks the script as you type.
 // The page's behaviour is in src/scripts/parser-page.ts.
 import Base from "../layouts/Base.astro";
+// What the parser checks against, as the worker says once it's loaded: the committed syntax export's header.
+import { neoskript, server } from "../data/syntax.json";
 
 const examples = [
   { id: "mistakes", label: "A few mistakes" },
@@ -23,8 +25,9 @@ const examples = [
         script stays on your device.
       </p>
       <p class="source">
-        For now it checks against <span id="about">Skript 2.17.0 syntax</span>, the syntax in Skript's documentation,
-        not yet NeoSkript's own list. <a href="/docs/parser-checks/">What it checks and what it can't</a>
+        It checks against the syntax NeoSkript registers, exported from a real server
+        (<span id="about">NeoSkript {neoskript} on {server}</span>), the same list as the
+        <a href="/syntax/">syntax reference</a>. <a href="/docs/parser-checks/">What it checks and what it can't</a>
       </p>
 
       <div class="toolbar">

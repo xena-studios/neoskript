@@ -1150,38 +1150,74 @@ public final class Library implements Registrar {
     }
 
     /**
-     * What's registered, for the syntax reference: every element with its patterns as written, Skript's names for
-     * the events and their values, the types and the built-in functions. Freezes the library, as
+     * What's registered, for the syntax reference and the in-browser parser: every element with its patterns as
+     * written, Skript's names for the events and their values, the types and the built-in functions, and what the
+     * parser needs besides to check scripts as {@link #registry()} does. Freezes the library, as
      * {@link #registry()} does.
      */
     public SyntaxExport export(String neoskriptVersion, String server) {
         SyntaxRegistry registry = registry();
+        LibraryEventValues events = (LibraryEventValues) registry.eventValues();
+        List<SyntaxExport.Scope> scopes = new ArrayList<>();
+        Map<List<Class<?>>, Integer> scopeIndexes = new HashMap<>();
+        java.util.function.Function<List<Class<?>>, Integer> scope = classes -> {
+            Integer index = scopeIndexes.get(classes);
+            if (index == null) {
+                index = scopes.size();
+                scopes.add(events.export(classes));
+                scopeIndexes.put(List.copyOf(classes), index);
+            }
+            return index;
+        };
         List<SyntaxExport.Element> elements = new ArrayList<>();
         for (SyntaxKind kind : SyntaxKind.values()) {
             for (SyntaxInfo syntax : registry.syntaxes(kind)) {
                 List<SyntaxExport.EventValue> values = List.of();
                 String name = null;
+                int scopeIndex = -1;
                 if (kind == SyntaxKind.EVENT) {
                     EventName event = skriptEvent(syntax.id());
                     name = event == null ? null : event.name();
                     if (bindings.get(new Key(kind, syntax.id())) instanceof ServerEvent serverEvent) {
                         values = eventValuesOf(serverEvent.classes());
                     }
+                    List<Class<?>> classes = events.eventClasses(syntax);
+                    scopeIndex = classes == null ? -1 : scope.apply(classes);
                 }
                 elements.add(new SyntaxExport.Element(
                         SyntaxExport.kindName(kind), syntax.id(),
                         syntax.patterns().stream().map(CompiledPattern::source)
                                 .toList(),
-                        kind == SyntaxKind.EXPRESSION ? syntax.returnType() : null, name, values));
+                        kind == SyntaxKind.EXPRESSION ? syntax.returnType() : null, name, values,
+                        elementParser(registry, events, syntax, scopeIndex)));
             }
         }
         List<TypeInfo> types = new ArrayList<>();
         registry.types().forEach(types::add);
         types.sort(java.util.Comparator.comparingInt((TypeInfo t) ->
                 registry.typeOrder(t.id())).thenComparing(TypeInfo::id));
+        Map<String, java.util.TreeSet<String>> names = new HashMap<>();
+        Map<String, java.util.TreeSet<String>> pluralNames = new HashMap<>();
+        registry.typeNames().forEach((typeName, ref) -> (ref.plural() ? pluralNames : names)
+                .computeIfAbsent(ref.type().id(), id -> new java.util.TreeSet<>()).add(typeName));
+        // The words tried on each type's parsers: every type's literals, and for an enum, its constants' names.
+        java.util.Set<String> literalWords = new java.util.TreeSet<>();
+        types.forEach(t -> literalWords.addAll(t.literals()));
         List<SyntaxExport.Type> typeList = types.stream()
                 .map(t -> new SyntaxExport.Type(t.id(), t.name(),
-                        SyntaxRegistry.plural(t.name()), t.literals().stream().sorted().toList()))
+                        SyntaxRegistry.plural(t.name()), t.literals().stream().sorted().toList(),
+                        new SyntaxExport.TypeParser(
+                                List.copyOf(names.getOrDefault(t.id(), new java.util.TreeSet<>())),
+                                List.copyOf(pluralNames.getOrDefault(t.id(), new java.util.TreeSet<>())),
+                                registry.supertypes(t.id()).stream().sorted().toList(),
+                                registry.isStrict(t.id()), registry.isEnumerable(t.id()), t.openLiterals(),
+                                hasEventDefault(t.id()), defaultValue(t.id()) != null,
+                                takesAnyWords(word -> registry.parses(t, word)) ? List.of()
+                                        : acceptedWords(literalWords, t, word -> !t.literals().contains(word)
+                                                && registry.parses(t, word)),
+                                takesAnyWords(word -> registry.parses(t, word)),
+                                !t.openLiterals() || takesAnyWords(word -> registry.isLiteral(t, word)) ? List.of()
+                                        : acceptedWords(literalWords, t, word -> registry.isLiteral(t, word)))))
                 .toList();
         List<SyntaxExport.Function> functionList = functions.keySet().stream()
                 .sorted(java.util.Comparator.comparing(FunctionInfo::name)
@@ -1189,9 +1225,107 @@ public final class Library implements Registrar {
                 .map(f -> new SyntaxExport.Function(f.name(), f.parameters(),
                         f.returnType(), f.returnsPlural()))
                 .toList();
+        List<SyntaxExport.Conversion> conversions = new ArrayList<>();
+        new java.util.TreeMap<>(registry.conversions()).forEach((from, targets) -> targets.stream().sorted()
+                .forEach(to -> conversions.add(new SyntaxExport.Conversion(from, to,
+                        registry.isPlaceholderConversion(from, to)))));
+        Map<String, List<String>> properties = new java.util.TreeMap<>();
+        registry.typeProperties().forEach((property, owners) -> properties.put(property,
+                owners.stream().sorted().toList()));
+        int commandScope = scope.apply(events.commandClasses());
+        int functionScope = scope.apply(List.of());
         return new SyntaxExport(
                 SyntaxExport.FORMAT, neoskriptVersion, server, elements,
-                typeList, functionList);
+                typeList, functionList, new SyntaxExport.Parser(conversions, properties,
+                        new java.util.TreeMap<>(co.xenastudios.neoskript.runtime.ScriptFeatures.experiments()),
+                        scopes, commandScope, functionScope));
+    }
+
+    /** Whether {@code accepts} takes a made-up word, as the parsers of text and player names do. */
+    private static boolean takesAnyWords(java.util.function.Predicate<String> accepts) {
+        try {
+            return accepts.test("zqxvjk");
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        }
+    }
+
+    /**
+     * The words of {@code tried}, and the names of {@code type}'s constants if its values are an enum's, that
+     * {@code accepts} takes, for {@link #export}.
+     */
+    private List<String> acceptedWords(Set<String> tried, TypeInfo type, java.util.function.Predicate<String> accepts) {
+        java.util.Set<String> words = new java.util.TreeSet<>(tried);
+        Object[] constants = javaClass(type.id()).getEnumConstants();
+        if (constants != null) {
+            for (Object constant : constants) {
+                words.add(((Enum<?>) constant).name().toLowerCase(java.util.Locale.ROOT).replace('_', ' '));
+            }
+        }
+        java.util.Set<String> accepted = new java.util.TreeSet<>();
+        for (String word : words) {
+            try {
+                if (accepts.test(word)) {
+                    // As the browser's registry looks words up.
+                    accepted.add(word.strip().toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+", " "));
+                }
+            } catch (RuntimeException | LinkageError e) {
+                // A parser that can't run here doesn't take it.
+            }
+        }
+        return List.copyOf(accepted);
+    }
+
+    /** What the parser knows about {@code syntax} besides its patterns, for {@link #export}. */
+    private SyntaxExport.ElementParser elementParser(SyntaxRegistry registry, LibraryEventValues events,
+            SyntaxInfo syntax, int scope) {
+        List<Integer> stops = new ArrayList<>();
+        for (int i = 0; i < syntax.patterns().size(); i++) {
+            if (registry.stops(syntax, i)) {
+                stops.add(i);
+            }
+        }
+        SyntaxRegistry.Experimental experimental = registry.experimental(syntax);
+        SyntaxRegistry.PropertySyntax property = registry.propertySyntax(syntax);
+        SyntaxExport.Property exported = null;
+        if (property != null) {
+            // The property is a function of the tags matched: write down what each tag the patterns have gives.
+            String otherwise = property.property().apply(Set.of());
+            Map<String, String> byTag = new java.util.LinkedHashMap<>();
+            for (CompiledPattern pattern : syntax.patterns()) {
+                for (String tag : tags(pattern.root(), new java.util.LinkedHashSet<>())) {
+                    String named = property.property().apply(Set.of(tag));
+                    if (!java.util.Objects.equals(named, otherwise)) {
+                        byTag.putIfAbsent(tag, named);
+                    }
+                }
+            }
+            exported = new SyntaxExport.Property(property.argument(), property.counts(), byTag, otherwise);
+        }
+        return new SyntaxExport.ElementParser(syntax.regexRoles().stream().map(RegexRole::name).toList(),
+                registry.delays(syntax), stops, registry.ends(syntax), registry.suppressesWarnings(syntax),
+                registry.sectionOnly(syntax), experimental == null ? null : experimental.experiment(),
+                experimental != null && experimental.silent(), exported,
+                binding(syntax) instanceof Core, events.isEventValue(syntax), events.keepsEventValues(syntax), scope);
+    }
+
+    /** The tags a pattern's alternatives are written with, in order. */
+    private static Set<String> tags(co.xenastudios.neoskript.frontend.pattern.PatternElement element, Set<String> tags) {
+        switch (element) {
+            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Sequence sequence ->
+                    sequence.elements().forEach(e -> tags(e, tags));
+            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Choice choice -> {
+                for (var alternative : choice.alternatives()) {
+                    if (alternative.tag() != null) {
+                        tags.add(alternative.tag());
+                    }
+                    tags(alternative.body(), tags);
+                }
+            }
+            case co.xenastudios.neoskript.frontend.pattern.PatternElement.Optional optional -> tags(optional.choice(), tags);
+            default -> { }
+        }
+        return tags;
     }
 
     /**
