@@ -33,7 +33,7 @@ const size = build ? `${(build.jar.size / 1024 / 1024).toFixed(1)} MB` : "";
               {build.sha256 && <div><dt>SHA-256</dt><dd><code class="hash">{build.sha256}</code></dd></div>}
             </dl>
             <div class="actions">
-              <a class="btn btn-primary" href={build.jar.url}>Download {build.jar.name}</a>
+              <a class="btn btn-primary" href={build.jar.url}>Download the dev build</a>
               <a class="btn btn-secondary" href={`${repo}/releases/tag/dev`}>On GitHub<External /></a>
             </div>
           </>
@@ -55,8 +55,20 @@ const size = build ? `${(build.jar.size / 1024 / 1024).toFixed(1)} MB` : "";
           <dd>Put the jar in <code>plugins/</code> and start the server. <a href="/docs/install/">Install</a> and <a href="/docs/moving-from-skript/">moving from Skript</a> have the details.</dd>
         </div>
         <div>
+          <dt>Check your scripts</dt>
+          <dd>
+            Before you switch, the script checker loads your scripts on a throwaway server and lists every line NeoSkript
+            won't load: <code>java -jar neoskript-cli-0.1.0.jar check plugins/Skript/scripts</code>. It needs Java 21.
+            Get <a href={`${repo}/releases/tag/cli-v0.1.0`}>neoskript-cli 0.1.0<External /></a>;{" "}
+            <a href="/docs/moving-from-skript/#check-your-scripts-first">moving from Skript</a> has its options.
+          </dd>
+        </div>
+        <div>
           <dt>Releases</dt>
-          <dd>None yet. The public beta will be on Modrinth and GitHub Releases.</dd>
+          <dd>
+            The script checker's first release, <a href={`${repo}/releases/tag/cli-v0.1.0`}>neoskript-cli 0.1.0<External /></a>,
+            is out. NeoSkript itself has none yet: its public beta will be on Modrinth and GitHub Releases.
+          </dd>
         </div>
         <div>
           <dt>From source</dt>

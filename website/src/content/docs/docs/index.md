@@ -6,7 +6,7 @@ description: A fast, modern drop-in replacement for Skript. Your .sk scripts run
 NeoSkript runs [Skript](https://github.com/SkriptLang/Skript) scripts. It isn't a fork: it's a clean-room rewrite that treats Skript's behaviour as the spec, so the `.sk` files you have today load and behave the same way. What changes is underneath. Each trigger is compiled to JVM bytecode, so the JIT can optimise across a whole script instead of stepping through syntax one element at a time, and the threading model is built for Folia from the start.
 
 :::caution[In development]
-Nothing is released yet. [Development builds](/download/) are for testing on a server you can afford to break. Where each milestone stands is in [the progress log](https://github.com/xena-studios/neoskript/blob/main/docs/PROGRESS.md).
+NeoSkript itself isn't released yet. [Development builds](/download/) are for testing on a server you can afford to break. Its script checker is: [check your scripts](/docs/moving-from-skript/#check-your-scripts-first) before you switch. Where each milestone stands is in [the progress log](https://github.com/xena-studios/neoskript/blob/main/docs/PROGRESS.md).
 :::
 
 ## How we check it's a drop-in
@@ -16,7 +16,7 @@ Nothing is released yet. [Development builds](/download/) are for testing on a s
 
 ## What it runs on
 
-| | |
+| Platform | Supported |
 |---|---|
 | Server | Paper or Folia |
 | Minecraft | 1.21.4 or newer |

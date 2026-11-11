@@ -31,11 +31,12 @@ The editor is [Monaco](https://microsoft.github.io/monaco-editor/), the editor i
 | <kbd>Tab</kbd>, <kbd>Shift</kbd>+<kbd>Tab</kbd> | Indents or outdents the line, or every selected line. |
 | <kbd>Enter</kbd> | Starts a new line at the same indentation, one level deeper after a line ending in `:`. |
 | <kbd>F8</kbd>, <kbd>Shift</kbd>+<kbd>F8</kbd> | Goes to the next or previous problem. |
-| <kbd>Ctrl</kbd>+<kbd>F</kbd>, <kbd>Ctrl</kbd>+<kbd>H</kbd> | Finds, and replaces. |
-| <kbd>Ctrl</kbd>+<kbd>M</kbd> | Makes <kbd>Tab</kbd> move focus out of the editor instead of indenting, and back. The settings can make that the default. |
-| <kbd>Alt</kbd>+<kbd>F1</kbd> | Opens the editor's accessibility help. |
+| <kbd>Ctrl</kbd>+<kbd>F</kbd>, <kbd>Ctrl</kbd>+<kbd>H</kbd> | Finds, and replaces (<kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>F</kbd> on a Mac). |
+| <kbd>Ctrl</kbd>+<kbd>G</kbd> | Goes to a line (<kbd>Ctrl</kbd>, not <kbd>Cmd</kbd>, on a Mac too). |
+| <kbd>Ctrl</kbd>+<kbd>M</kbd> | Makes <kbd>Tab</kbd> move focus out of the editor instead of indenting, and back (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> on a Mac). The settings can make that the default. |
+| <kbd>F1</kbd> | Lists every editor command, with its keys. |
 
-On a Mac, use <kbd>Cmd</kbd> for <kbd>Ctrl</kbd>. The menus open with <kbd>Enter</kbd> or the down arrow; the arrow keys move through them and between them, and <kbd>Esc</kbd> closes them. **Help**, then **Keyboard shortcuts**, lists these on the page.
+On a Mac, use <kbd>Cmd</kbd> for <kbd>Ctrl</kbd> unless the table says otherwise. The menus open with <kbd>Enter</kbd> or the down arrow; the arrow keys move through them and between them, and <kbd>Esc</kbd> closes them. **Help**, then **Keyboard shortcuts**, lists these on the page.
 
 ## Sharing a link
 

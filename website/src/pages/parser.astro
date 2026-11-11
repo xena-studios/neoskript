@@ -145,7 +145,7 @@ const counts = [
       <label class="check"><input type="checkbox" id="set-live" /> Parse as you type</label>
       <label class="check"><input type="checkbox" id="set-minimap" /> Show the minimap</label>
       <label class="check"><input type="checkbox" id="set-wrap" /> Wrap long lines</label>
-      <label class="check"><input type="checkbox" id="set-tab" /> <span>Tab moves focus instead of indenting <span class="hint">(also Ctrl+M)</span></span></label>
+      <label class="check"><input type="checkbox" id="set-tab" /> <span>Tab moves focus instead of indenting <span class="hint">(also Ctrl+M, or Ctrl+Shift+M on a Mac)</span></span></label>
       <label class="field-row">Editor font size
         <select id="set-font">
           {[12, 13, 14, 15, 16, 18, 20].map((n) => <option value={n}>{n}px</option>)}
@@ -162,14 +162,13 @@ const counts = [
         <div><dt><kbd>Ctrl</kbd>+<kbd>Enter</kbd></dt><dd>Parse the script</dd></div>
         <div><dt><kbd>Ctrl</kbd>+<kbd>S</kbd></dt><dd>Save in this browser</dd></div>
         <div><dt><kbd>F8</kbd></dt><dd>Next problem in the editor (<kbd>Shift</kbd>+<kbd>F8</kbd>, previous)</dd></div>
-        <div><dt><kbd>Ctrl</kbd>+<kbd>G</kbd></dt><dd>Go to a line</dd></div>
-        <div><dt><kbd>Ctrl</kbd>+<kbd>F</kbd></dt><dd>Find, and <kbd>Ctrl</kbd>+<kbd>H</kbd> to replace</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>G</kbd></dt><dd>Go to a line (<kbd>Ctrl</kbd>+<kbd>G</kbd> on a Mac too)</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>F</kbd></dt><dd>Find, and <kbd>Ctrl</kbd>+<kbd>H</kbd> to replace (<kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>F</kbd> on a Mac)</dd></div>
         <div><dt><kbd>Ctrl</kbd>+<kbd>/</kbd></dt><dd>Comment or uncomment the lines</dd></div>
-        <div><dt><kbd>Ctrl</kbd>+<kbd>M</kbd></dt><dd>Make <kbd>Tab</kbd> move focus out of the editor, or indent again</dd></div>
-        <div><dt><kbd>Alt</kbd>+<kbd>F1</kbd></dt><dd>The editor's accessibility help</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>M</kbd></dt><dd>Make <kbd>Tab</kbd> move focus out of the editor, or indent again (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> on a Mac)</dd></div>
         <div><dt><kbd>F1</kbd></dt><dd>Every editor command</dd></div>
       </dl>
-      <p class="hint">On a Mac, <kbd>Cmd</kbd> for <kbd>Ctrl</kbd>.</p>
+      <p class="hint">On a Mac, <kbd>Cmd</kbd> for <kbd>Ctrl</kbd> unless it says otherwise.</p>
       <div class="dialog-actions"><button class="btn btn-primary" value="close">Done</button></div>
     </form>
   </dialog>
@@ -397,6 +396,36 @@ const counts = [
   .editor {
     position: absolute;
     inset: 0;
+    /* Monaco's widget CSS (menus, find, hover, the command palette) sizes itself with VS Code's design tokens,
+       which the standalone editor never defines: without them borders and paddings drop out. Ours: hairlines,
+       the tools' 4px corners, VS Code's spacing steps, and no shadows (Monaco's defaults draw them). */
+    --vscode-strokeThickness: 1px;
+    --vscode-cornerRadius-small: 4px;
+    --vscode-cornerRadius-medium: 4px;
+    --vscode-cornerRadius-large: 4px;
+    --vscode-cornerRadius-xLarge: 4px;
+    --vscode-cornerRadius-circle: 999px;
+    --vscode-spacing-sizeNone: 0;
+    --vscode-spacing-size20: 2px;
+    --vscode-spacing-size40: 4px;
+    --vscode-spacing-size60: 6px;
+    --vscode-spacing-size80: 8px;
+    --vscode-spacing-size100: 10px;
+    --vscode-spacing-size120: 12px;
+    --vscode-spacing-size160: 16px;
+    --vscode-spacing-size200: 20px;
+    --vscode-spacing-size240: 24px;
+    --vscode-spacing-size280: 28px;
+    --vscode-spacing-size320: 32px;
+    --vscode-spacing-size400: 40px;
+    --vscode-fontSize-body1: 13px;
+    --vscode-fontSize-body2: 12px;
+    --vscode-fontSize-label2: 11px;
+    --vscode-fontWeight-regular: 400;
+    --vscode-fontWeight-semiBold: 600;
+    --vscode-shadow-md: none;
+    --vscode-shadow-lg: none;
+    --vscode-shadow-xl: none;
   }
   .editor:focus-within {
     outline: 2px solid var(--magenta);
@@ -814,6 +843,12 @@ const counts = [
     }
     .toast {
       bottom: 5rem;
+    }
+  }
+  /* The smallest phones (320px): the menus close up so the menu bar fits without scrolling sideways. */
+  @media (max-width: 22rem) {
+    .menu-btn {
+      padding: 0 0.45rem;
     }
   }
 </style>

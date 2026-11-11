@@ -8,7 +8,10 @@ import SiteFooter from "../SiteFooter.astro";
 <div class="site-footer-wrap"><SiteFooter /></div>
 
 <style>
+  /* In a guide the footer sits in the content column, which has its own padding: no gutter of its own (the
+     guides define --gutter for their header). */
   .site-footer-wrap {
+    --gutter: 0;
     margin-top: 3rem;
   }
 </style>

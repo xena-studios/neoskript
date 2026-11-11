@@ -24,7 +24,26 @@ export default defineConfig({
       customCss: ["./src/styles/theme.css"],
       expressiveCode: {
         themes: ["github-dark-default", "github-light-default"],
-        styleOverrides: { borderRadius: "12px" },
+        // GitHub's token colours, on the site's own surfaces: raised night (or the light theme's tint) under a
+        // hairline, the frame's bar in the page colour, and flat, as everything else (DESIGN.md).
+        styleOverrides: {
+          borderRadius: "12px",
+          borderColor: "var(--sl-color-hairline)",
+          codeBackground: "var(--sl-color-gray-6)",
+          frames: {
+            frameBoxShadowCssValue: "none",
+            shadowColor: "transparent",
+            editorBackground: "var(--sl-color-gray-6)",
+            editorTabBarBackground: "var(--sl-color-black)",
+            editorTabBarBorderBottomColor: "var(--sl-color-hairline)",
+            editorActiveTabBackground: "var(--sl-color-gray-6)",
+            editorActiveTabIndicatorTopColor: "var(--sl-color-accent)",
+            terminalBackground: "var(--sl-color-gray-6)",
+            terminalTitlebarBackground: "var(--sl-color-black)",
+            terminalTitlebarBorderBottomColor: "var(--sl-color-hairline)",
+            terminalTitlebarDotsForeground: "var(--sl-color-gray-4)",
+          },
+        },
       },
       // The site's nav in the header and mobile menu, and the site footer under each guide.
       components: {

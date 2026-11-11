@@ -8,22 +8,37 @@ import { current, nav, repo } from "../../lib/nav";
 const path = Astro.url.pathname;
 ---
 <ul class="site-nav">
-  {nav.map((item) => <li><a href={item.href} aria-current={current(path, item.href) ? "page" : undefined}>{item.label}</a></li>)}
-  <li><a href={repo}>GitHub<External /></a></li>
+  {nav.map((item) => <li class={item.href === "/docs/" ? "docs" : undefined}><a href={item.href} aria-current={current(path, item.href) ? "page" : undefined}>{item.label}</a></li>)}
+  <li class="gh"><a href={repo}>GitHub<External /></a></li>
 </ul>
 
 <style>
   .site-nav {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 1.5rem;
+    gap: 1.75rem;
     margin: 0;
     padding: 0;
     list-style: none;
   }
   li {
     margin: 0;
+  }
+  /* Beside Starlight's search and theme select the row is tighter than the custom pages' header, so it closes
+     up rather than wrapping onto a second line. */
+  @media (max-width: 72rem) {
+    .site-nav {
+      gap: 1rem;
+    }
+  }
+  /* Where the header is narrowest beside the search (the mobile menu takes over under 50rem), Docs and GitHub
+     leave it, as they leave the custom pages' header on a phone: a guide is already in the docs, and GitHub is
+     in the footer. */
+  @media (min-width: 50rem) and (max-width: 60rem) {
+    .docs,
+    .gh {
+      display: none;
+    }
   }
   a {
     color: var(--sl-color-gray-3);

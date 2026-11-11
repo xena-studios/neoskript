@@ -37,7 +37,9 @@
   --sl-color-bg-nav: var(--night);
   --sl-color-hairline: var(--rule);
   --sl-color-hairline-light: var(--rule);
-  --sl-color-hairline-shade: var(--night);
+  /* Starlight draws the header's, the sidebar's and the mobile contents' rules in this shade: a hairline,
+     as every rule on the site, not night on night. */
+  --sl-color-hairline-shade: var(--rule);
 
   --sl-color-accent-low: color-mix(in srgb, var(--magenta) 18%, var(--night));
   --sl-color-accent: var(--magenta);
@@ -61,12 +63,15 @@
   --sl-color-bg-nav: color-mix(in srgb, var(--neoskript-ink) 3%, white);
   --sl-color-hairline: var(--sl-color-gray-5);
   --sl-color-hairline-light: var(--sl-color-gray-5);
-  --sl-color-hairline-shade: var(--sl-color-gray-6);
+  --sl-color-hairline-shade: var(--sl-color-gray-5);
 
   --sl-color-accent-low: color-mix(in srgb, var(--neoskript-magenta-daylight) 12%, white);
   --sl-color-accent: var(--neoskript-magenta-daylight);
   --sl-color-accent-high: color-mix(in srgb, var(--neoskript-magenta-daylight) 80%, var(--neoskript-ink));
   --on-accent: white;
+  /* Links and the current contents entry in the deeper accent, as the dark theme uses its accent-high: plain
+     magenta-daylight is 4.85:1 on white but 4.4:1 on inline code's tint. */
+  --sl-color-text-accent: var(--sl-color-accent-high);
 }
 
 /* Flat: depth from tone and hairlines, no shadows. */
@@ -130,7 +135,22 @@ h1#_top {
   box-shadow: none;
 }
 
-/* The header as tall as the custom pages'. */
+/* The header as the custom pages' (Base.astro): a 4.5rem bar over a hairline, the site's gutter, and the
+   wordmark at the same 1.75rem, its exported clear space (50 of 250 units on every side) cropped by a
+   negative margin as Logo.astro crops it with the viewBox. */
 :root {
-  --sl-nav-height: 4.5rem;
+  --gutter: clamp(1rem, 0.4rem + 3vw, 4rem);
+  --sl-nav-height: calc(4.5rem + 1px);
+  --sl-nav-pad-x: var(--gutter);
+}
+.site-title img {
+  height: calc(1.75rem * 250 / 150);
+  max-width: none;
+  margin-inline: calc(-1.75rem * 50 / 150);
+}
+@media (max-width: 30rem) {
+  .site-title img {
+    height: calc(1.375rem * 250 / 150);
+    margin-inline: calc(-1.375rem * 50 / 150);
+  }
 }
