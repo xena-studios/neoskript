@@ -179,7 +179,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     /**
      * With {@code -Dneoskript.syntaxExport=<file>}, writes every registered syntax element, type and function to
-     * that file as JSON, for neoskript.dev's syntax reference. The harness's {@code syntax-export} scenario sets it.
+     * that file as JSON, for neoskript.dev's syntax reference and in-browser parser. The harness's {@code syntax-export}
+     * scenario sets it.
      */
     private void exportSyntax(Library library) {
         String file = System.getProperty("neoskript.syntaxExport");

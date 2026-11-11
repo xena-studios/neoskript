@@ -45,11 +45,17 @@ final class LibraryEventValues implements EventValues {
 
     @Override
     public Scope event(SyntaxInfo event) {
+        List<Class<?>> classes = eventClasses(event);
+        return classes == null ? null : scope(classes);
+    }
+
+    /** The classes of the events code under {@code event} runs for, or {@code null} if unknown. */
+    List<Class<?>> eventClasses(SyntaxInfo event) {
         return switch (library.binding(event)) {
-            case Library.ServerEvent server -> scope(server.classes());
-            case ScriptEvent script -> scope(List.of(co.xenastudios.neoskript.runtime.ScriptLoadEvent.class));
+            case Library.ServerEvent server -> server.classes();
+            case ScriptEvent script -> List.of(co.xenastudios.neoskript.runtime.ScriptLoadEvent.class);
             case Library.Core core when core.id().equals(CoreSyntax.PERIODICAL)
-                    -> scope(List.of(co.xenastudios.neoskript.runtime.PeriodicalEvent.class));
+                    -> List.of(co.xenastudios.neoskript.runtime.PeriodicalEvent.class);
             case null, default -> null;
         };
     }
@@ -61,7 +67,49 @@ final class LibraryEventValues implements EventValues {
 
     @Override
     public Scope command() {
-        return scope(List.of(CommandEvent.class));
+        return scope(commandClasses());
+    }
+
+    /** The classes of the events a command's code runs for. */
+    List<Class<?>> commandClasses() {
+        return List.of(CommandEvent.class);
+    }
+
+    /** Whether {@code syntax} is the event's value of a type, which {@link Scope#allows} checks. */
+    boolean isEventValue(SyntaxInfo syntax) {
+        return EVENT_VALUES.contains(syntax.id()) && library.binding(syntax) instanceof Library.Core;
+    }
+
+    /**
+     * What code in events of {@code classes} can use, written down for the syntax export: for each type, whether
+     * {@link Scope#allows} takes its value, single and plural (for a kind of entity it can't be written down), and
+     * whether {@link Scope#allowsLeftOut} finds the event's value of it.
+     */
+    co.xenastudios.neoskript.frontend.registry.SyntaxExport.Scope export(List<Class<?>> classes) {
+        List<String> values = new java.util.ArrayList<>();
+        List<String> plurals = new java.util.ArrayList<>();
+        List<String> defaults = new java.util.ArrayList<>();
+        for (co.xenastudios.neoskript.frontend.registry.TypeInfo type : library.registry().types()) {
+            if (has(classes, new TypeRef(type, false))) {
+                values.add(type.id());
+            }
+            if (has(classes, new TypeRef(type, true))) {
+                plurals.add(type.id());
+            }
+            if (library.hasEventDefault(type.id()) && library.eventValue(classes, type.id()) != null) {
+                defaults.add(type.id());
+            }
+        }
+        return new co.xenastudios.neoskript.frontend.registry.SyntaxExport.Scope(values, plurals, defaults);
+    }
+
+    /** Whether events of {@code classes} have the value {@code type} asks for, as {@link EventScope#allows}. */
+    private boolean has(List<Class<?>> classes, TypeRef type) {
+        if (classes.isEmpty()) {
+            return false;
+        }
+        Library.EventValueRequest request = library.request(type, null);
+        return library.eventValue(classes, request.valueClass(), request.type(), 0, null).getter() != null;
     }
 
     @Override
@@ -93,7 +141,7 @@ final class LibraryEventValues implements EventValues {
 
         @Override
         public boolean allows(SyntaxInfo syntax, TypeRef type, String words) {
-            if (!EVENT_VALUES.contains(syntax.id()) || !(library.binding(syntax) instanceof Library.Core)) {
+            if (!isEventValue(syntax)) {
                 return true;
             }
             if (classes.isEmpty()) {

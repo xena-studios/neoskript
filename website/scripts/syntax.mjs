@@ -1,21 +1,32 @@
-// Makes src/data/syntax.json, the data /syntax is built from, out of two files the harness writes:
+// Makes the syntax data neoskript.dev is built from, out of two files the harness writes:
 //
-//   ./gradlew :test-harness:harness -Pharness.env=paper-26.3 -Pharness.scenario=syntax-export
-//   pnpm syntax:sync [reports dir, default ../test-harness/build/harness/reports/paper-26.3]
+//   pnpm syntax:export
+//
+// runs the harness's syntax-export scenario on Paper 26.3, then this script (`pnpm syntax:sync [reports dir]`,
+// default ../test-harness/build/harness/reports/paper-26.3, does just this part).
 //
 // syntax-export.json is NeoSkript's own registry (every element, type and function it registers, patterns
-// as written). skript-docs.json is the reference Skript's `sk gen-docs` output, which has the names,
-// descriptions, examples and "since" for Skript's elements. Each NeoSkript element is joined to Skript's by
-// id, then by Skript's event name, then by a pattern both have; one with no match keeps its patterns and gets
-// no description. Nothing is written by hand. Skript's docs are GPL-3.0-or-later, used here under v3.
+// as written, and what its parser needs besides). It's copied to src/data/syntax-export.json, which is committed:
+// the in-browser parser at /parser checks scripts against it (neoskript-web's `website` task reads it), and
+// src/data/syntax.json for /syntax is made from it here, so the two pages can't disagree. syntax.json records the
+// export's hash, and scripts/parser.mjs refuses to build when they don't match.
+//
+// skript-docs.json is the reference Skript's `sk gen-docs` output, which has the names, descriptions, examples
+// and "since" for Skript's elements. Each NeoSkript element is joined to Skript's by id, then by Skript's event
+// name, then by a pattern both have; one with no match keeps its patterns and gets no description. Nothing is
+// written by hand. Skript's docs are GPL-3.0-or-later, used here under v3.
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const reports = process.argv[2] ?? fileURLToPath(new URL("../../test-harness/build/harness/reports/paper-26.3", import.meta.url));
 const out = fileURLToPath(new URL("../src/data/syntax.json", import.meta.url));
-const neo = JSON.parse(await readFile(`${reports}/syntax-export.json`, "utf8"));
+const exportFile = fileURLToPath(new URL("../src/data/syntax-export.json", import.meta.url));
+const exportText = await readFile(`${reports}/syntax-export.json`, "utf8");
+await writeFile(exportFile, exportText);
+const neo = JSON.parse(exportText);
 const skript = JSON.parse(await readFile(`${reports}/skript-docs.json`, "utf8"));
-if (neo.format !== 1) throw new Error(`Unknown syntax export format ${neo.format}`);
+if (neo.format !== 2) throw new Error(`Unknown syntax export format ${neo.format}`);
 
 const KINDS = ["event", "condition", "effect", "expression", "section", "structure"];
 const PLURAL = { event: "events", condition: "conditions", effect: "effects", expression: "expressions", section: "sections", structure: "structures" };
@@ -297,6 +308,8 @@ const functionList = neo.functions.map((f) => {
 coverage.type = typeCoverage;
 coverage.function = fnCoverage;
 const data = {
+  // The hash of src/data/syntax-export.json, which scripts/parser.mjs checks.
+  exportSha256: createHash("sha256").update(exportText).digest("hex"),
   neoskript: neo.neoskript,
   server: neo.server,
   skript: `${skript.source.name} ${skript.source.version}`,

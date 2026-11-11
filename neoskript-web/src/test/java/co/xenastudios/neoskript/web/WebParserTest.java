@@ -7,32 +7,43 @@ package co.xenastudios.neoskript.web;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import co.xenastudios.neoskript.frontend.stub.SkriptSyntax;
+import co.xenastudios.neoskript.frontend.parse.ParsedScript;
+import co.xenastudios.neoskript.frontend.parse.ScriptLoader;
+import co.xenastudios.neoskript.frontend.registry.SyntaxRegistry;
+import co.xenastudios.neoskript.frontend.source.Diagnostic;
+import co.xenastudios.neoskript.frontend.source.Severity;
+import co.xenastudios.neoskript.frontend.source.SourceFile;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+/** The browser parser, with the committed syntax export (website/src/data/syntax-export.json). */
 class WebParserTest {
 
-    private static String syntaxData() throws IOException {
-        try (InputStream in = WebParserTest.class.getResourceAsStream("/skript-syntax/" + SkriptSyntax.VERSION + ".json")) {
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        }
+    private static String data;
+    private static SyntaxRegistry registry;
+
+    @BeforeAll
+    static void load() throws IOException {
+        data = Files.readString(Path.of(System.getProperty("neoskript.syntaxExport")));
+        registry = RegistrySource.CURRENT.load(data);
     }
 
     @Test
-    void readsTheDocsExportAsGsonDoes() throws IOException {
-        // The browser build can't use Gson, so its reader has to give the corpus tests' syntax exactly.
-        assertEquals(SkriptSyntax.load(), SkriptDocsRegistry.read(syntaxData()));
-        assertEquals("Skript 2.17.0 syntax", RegistrySource.CURRENT.describe(syntaxData()));
+    void saysWhatItParsesAgainst() {
+        assertTrue(RegistrySource.CURRENT.describe(data).matches("NeoSkript \\S+ on Paper \\S+"),
+                RegistrySource.CURRENT.describe(data));
     }
 
     @Test
-    void reportsProblemsAndAnOutline() throws IOException {
-        WebParser parser = new WebParser(RegistrySource.CURRENT.load(syntaxData()));
+    void reportsProblemsAndAnOutline() {
+        WebParser parser = new WebParser(registry);
         String result = parser.parse("""
                 on join:
                 \tsend "hi" to player
@@ -55,8 +66,39 @@ class WebParserTest {
     }
 
     @Test
+    void acceptsScriptsNeoSkriptLoads() throws IOException {
+        // The real-world corpus loads without errors on a NeoSkript server (the harness's
+        // neoskript-real-world-corpus scenario), and so do the page's examples but the one with mistakes.
+        List<SourceFile> corpus = new ArrayList<>(read(Path.of("../test-harness/corpus/real-world")));
+        corpus.add(new SourceFile("corpus-assert.sk", Files.readString(Path.of("../test-harness/scripts/corpus-assert.sk"))));
+        // Each example is pasted alone; some define the same functions as the corpus.
+        List<List<SourceFile>> loads = new ArrayList<>(List.of(corpus));
+        read(Path.of("../website/src/parser/examples")).stream()
+                .filter(f -> !f.name().equals("mistakes.sk"))
+                .forEach(f -> loads.add(List.of(f)));
+        List<String> errors = new ArrayList<>();
+        for (List<SourceFile> files : loads) {
+            for (ParsedScript script : new ScriptLoader(registry).load(files)) {
+                script.diagnostics().stream().filter(d -> d.severity() == Severity.ERROR).map(Diagnostic::toString)
+                        .forEach(errors::add);
+            }
+        }
+        assertEquals(List.of(), errors);
+    }
+
+    @Test
     void quotesStrings() {
         assertEquals("\"a\\\"b\\\\c\\nd\\u0001\"", Json.quote("a\"b\\c\nd\u0001"));
         assertEquals("a\"b\\c\nd\u0001", Json.parse(Json.quote("a\"b\\c\nd\u0001")));
+    }
+
+    private static List<SourceFile> read(Path dir) throws IOException {
+        try (Stream<Path> paths = Files.walk(dir)) {
+            List<SourceFile> files = new ArrayList<>();
+            for (Path path : paths.filter(p -> p.toString().endsWith(".sk")).sorted().toList()) {
+                files.add(new SourceFile(path.getFileName().toString(), Files.readString(path)));
+            }
+            return files;
+        }
     }
 }

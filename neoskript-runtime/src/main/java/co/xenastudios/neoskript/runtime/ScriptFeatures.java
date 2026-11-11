@@ -91,6 +91,13 @@ public final class ScriptFeatures {
         return EXPERIMENTS.containsKey(code) ? null : "The experimental feature '" + name + "' was not found.";
     }
 
+    /** Each experiment's code name, with the regex for what a script may write for it, for the syntax export. */
+    public static Map<String, String> experiments() {
+        Map<String, String> experiments = new java.util.HashMap<>();
+        EXPERIMENTS.forEach((name, pattern) -> experiments.put(name, pattern.pattern()));
+        return experiments;
+    }
+
     /** The experiment {@code name} is written for, by its code name, or the name itself if it isn't one. */
     public static String codeName(String name) {
         String normal = name.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
