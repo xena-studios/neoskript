@@ -35,7 +35,7 @@ spotless {
             """
             /*
              * Copyright (c) ${'$'}YEAR Xena Studios
-             * SPDX-License-Identifier: GPL-3.0-or-later
+             * SPDX-License-Identifier: GPL-3.0-only
              */
             """.trimIndent() + "\n"
         )

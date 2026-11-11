@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026 Xena Studios
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 /**
  * The runtime: values, variables and their storage, the Paper/Folia scheduler abstraction, and

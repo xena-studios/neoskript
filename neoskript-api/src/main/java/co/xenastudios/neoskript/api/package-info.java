@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026 Xena Studios
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 /**
  * The public addon API: syntax registration, types, converters, events, and codegen hooks.

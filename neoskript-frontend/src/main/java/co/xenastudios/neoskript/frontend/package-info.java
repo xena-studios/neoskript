@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026 Xena Studios
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: GPL-3.0-only
  */
 /**
  * The frontend: lexer, structure parser, pattern compiler and matcher, type checker, AST, and

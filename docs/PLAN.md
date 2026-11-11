@@ -17,7 +17,7 @@ A fast, modern, **clean-room** replacement for Skript. Existing `.sk` scripts ru
 |---|----------|--------|-----|
 | D1 | Compatibility scope | Core Skript syntax at 1.0. Skript-addon shim (`ch.njol.skript.*`) in 1.x. Modern NeoSkript addon API from day one. | Ships sooner. The modern API gets proven because our own stdlib is built on it. |
 | D2 | Codebase | Clean-room rewrite. Skript's *behaviour* is the spec. | Skript's architecture (regex-style pattern trials, `Object[]` everywhere, single-thread assumptions) is the thing we're replacing. |
-| D3 | Licence | **GPL-3.0-or-later** | Matches the ecosystem. It also lets us legally reuse Skript's GPL data (aliases, lang files, test scripts) with attribution. The code stays ours. |
+| D3 | Licence | **GPL-3.0-only** | Matches the ecosystem. It also lets us legally reuse Skript's GPL data (aliases, lang files, test scripts) with attribution. The code stays ours. |
 | D4 | Execution | Compile each trigger to **JVM bytecode** (ASM), loaded as hidden classes | The JIT can inline across syntax elements. Hidden classes unload cleanly on reload. |
 | D5 | Platforms | Paper **and** Folia at 1.0 | Folia is the differentiator, so the threading model is designed for it from the start. |
 | D6 | Versions | MC **1.21.4+**, **Java 21**, ASM. Move to the JDK ClassFile API when the floor is Java 25. | Modern Paper APIs (Brigadier lifecycle commands, data components, registries) and a large audience. |
@@ -30,7 +30,7 @@ A fast, modern, **clean-room** replacement for Skript. Existing `.sk` scripts ru
 | D13 | Team / timeline | Solo, no fixed dates | Milestones are ordered by dependency, not dated. |
 | D14 | Distribution | Modrinth + GitHub Releases. Docs are a separate Starlight site, outside this plan. | |
 | D15 | Telemetry & updates | bStats, with `metrics: false` in config to turn it off. A Modrinth update checker, with `update-checker: false` to turn it off. | Usage data and update notices, both opt-out. |
-| D16 | Licence header | `GPL-3.0-or-later` (SPDX header on every source file, checked by Spotless) | Same terms as Skript. |
+| D16 | Licence header | `GPL-3.0-only` (SPDX header on every source file, checked by Spotless) | Version 3 of the GPL only. Skript is GPL-3.0-or-later, so its data we reuse (D3) can be used under version 3. |
 | D17 | Test servers | Pinned to exact Paper/Folia builds and SHA-256 hashes, bumped on purpose | Paper ships daily, and build 211 of 26.3 broke Skript 2.17.0 the day it came out. |
 | D18 | Where the Skript baseline runs | Paper 26.x only. Skript doesn't support Folia, and Skript 2.17.0 needs 1.21.5 or newer. NeoSkript-only checks run on all four servers. | |
 | D19 | Moving over from Skript | NeoSkript uses `plugins/NeoSkript`. On its first start it copies `scripts/` and `variables.csv` from `plugins/Skript`, then leaves a marker so it never copies again. It copies rather than moves, so Skript's folder stays as it was. Skript's `config.sk` isn't copied. | Swapping the jar just works, and switching back is safe. |

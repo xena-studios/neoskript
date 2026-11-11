@@ -43,4 +43,4 @@ Bugs and ideas go in [issues](https://github.com/xena-studios/neoskript/issues/n
 
 ## Licence
 
-[GPL-3.0-or-later](LICENSE).
+[GPL-3.0-only](LICENSE).
