@@ -8,7 +8,7 @@ import starlightLinksValidator from "starlight-links-validator";
 
 export default defineConfig({
   site: "https://neoskript.dev",
-  trailingSlash: "ignore",
+  trailingSlash: "always",
   // Hashed build files go in /assets, not Astro's default /_astro. Stylesheets
   // stay files, never inline <style>. The CSP (public/_headers) still allows
   // 'unsafe-inline' styles only because Starlight writes style attributes.
@@ -30,7 +30,7 @@ export default defineConfig({
       editLink: { baseUrl: "https://github.com/xena-studios/neoskript/edit/main/website/" },
       lastUpdated: true,
       // Custom pages (src/pages) can't be validated; the rest of the site is.
-      plugins: [starlightLinksValidator({ exclude: ["/", "/download", "/syntax", "/syntax/**", "/parser"] })],
+      plugins: [starlightLinksValidator({ exclude: ["/", "/download/", "/syntax/", "/syntax/**", "/parser/"] })],
       sidebar: [
         { label: "Start here", items: ["docs", "docs/install", "docs/moving-from-skript"] },
       ],

@@ -2,9 +2,10 @@
 # the build output). The build fills in the inline-script placeholder below
 # with the hashes of Starlight's few inline scripts (scripts/headers.mjs), so
 # nothing else inline can run. Search (Pagefind) runs as WebAssembly, hence
-# 'wasm-unsafe-eval'; so will the parser. Nothing loads from another origin.
+# 'wasm-unsafe-eval'; so will the parser. The one other origin is Cloudflare
+# Web Analytics, which Cloudflare injects into pages (cookieless).
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self' 'wasm-unsafe-eval' __INLINE_SCRIPTS__; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com __INLINE_SCRIPTS__; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   Strict-Transport-Security: max-age=15552000; includeSubDomains
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin

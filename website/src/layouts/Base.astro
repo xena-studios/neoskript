@@ -9,8 +9,8 @@ const { title, description, path } = Astro.props;
 const url = new URL(path, Astro.site).href;
 const og = new URL("/og.png", Astro.site).href;
 const nav = [
-  { href: "/docs", label: "Docs" },
-  { href: "/download", label: "Download" },
+  { href: "/docs/", label: "Docs" },
+  { href: "/download/", label: "Download" },
 ];
 ---
 <!doctype html>
@@ -55,8 +55,8 @@ const nav = [
       <div class="wrap foot">
         <a class="xena" href="https://xenastudios.co" aria-label="Xena Studios"><Logo name="xena" label="Xena" /></a>
         <ul>
-          <li><a href="/docs">Docs</a></li>
-          <li><a href="/download">Download</a></li>
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/download/">Download</a></li>
           <li><a href="https://github.com/xena-studios/neoskript">Source<External /></a></li>
           <li><a href="https://github.com/xena-studios/neoskript/issues/new/choose">Report a bug<External /></a></li>
         </ul>
