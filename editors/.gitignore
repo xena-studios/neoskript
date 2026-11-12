@@ -1,0 +1,12 @@
+node_modules/
+dist/
+# Built by Gradle (./gradlew :neoskript-web:languageServer) and by scripts/docs.mjs; never committed.
+language-server/vendor/
+language-server/generated/
+vscode/server/
+*.vsix
+# Zed builds these.
+zed/target/
+zed/extension.wasm
+zed/grammars/
+tree-sitter-skript/node_modules/

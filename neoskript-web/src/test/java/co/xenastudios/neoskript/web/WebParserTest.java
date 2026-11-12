@@ -62,7 +62,7 @@ class WebParserTest {
         assertEquals(3.0, diagnostics.getFirst().get("line"));
         assertTrue(diagnostics.getFirst().get("message").toString().contains("frobnicate"), result);
         assertEquals(List.of(Map.of("kind", "event", "line", 1.0, "text", "on join:"),
-                Map.of("kind", "command", "line", 5.0, "text", "command /hello:")), json.get("outline"));
+                Map.of("kind", "command", "line", 5.0, "text", "command /hello:", "name", "hello")), json.get("outline"));
     }
 
     @Test
@@ -100,5 +100,49 @@ class WebParserTest {
             }
             return files;
         }
+    }
+
+    @Test
+    void saysWhereEachElementIs() {
+        String source = """
+                on join:
+                \tsend "hi %player%" to player
+                \tgreet(player)
+
+                function greet(p: player) :: boolean:
+                \treturn true
+                """;
+        @SuppressWarnings("unchecked")
+        Map<String, Object> json = (Map<String, Object>) Json.parse(new WebParser(registry).parse(source));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> elements = (List<Map<String, Object>>) json.get("elements");
+        String[] lines = source.split("\n");
+        List<String> seen = new ArrayList<>();
+        for (Map<String, Object> element : elements) {
+            int line = ((Number) element.get("line")).intValue();
+            String text = lines[line - 1].substring(((Number) element.get("start")).intValue(),
+                    ((Number) element.get("end")).intValue());
+            seen.add(element.get("kind") + ":" + (element.containsKey("id") ? element.get("id") : element.get("name"))
+                    + "=" + text);
+        }
+        assertTrue(seen.contains("event:EvtJoin=on join"), seen.toString());
+        assertTrue(seen.contains("effect:EffMessage=send \"hi %player%\" to player"), seen.toString());
+        assertTrue(seen.stream().anyMatch(s -> s.endsWith("=player") && s.startsWith("expression:")), seen.toString());
+        assertTrue(seen.contains("function:greet=greet(player)"), seen.toString());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> outline = (List<Map<String, Object>>) json.get("outline");
+        assertTrue(outline.stream().anyMatch(o -> "greet(p: player) :: boolean".equals(o.get("signature"))),
+                outline.toString());
+    }
+
+    @Test
+    void knowsTheOtherScriptsFunctions() {
+        WebParser parser = new WebParser(registry);
+        String source = "on join:\n\twelcome(player)\n";
+        assertTrue(parser.parse(source).contains("\"severity\":\"error\""), "unknown without the context");
+        String context = "function welcome(p: player):\n\tstop\n";
+        String result = parser.parse(source, context);
+        assertTrue(!result.contains("\"severity\":\"error\""), result);
+        assertTrue(result.contains("\"name\":\"welcome\""), result);
     }
 }

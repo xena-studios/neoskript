@@ -1,0 +1,17 @@
+name = "Skript"
+grammar = "skript"
+path_suffixes = ["sk"]
+line_comments = ["# "]
+tab_size = 4
+hard_tabs = true
+autoclose_before = ";:.,=}])>\" \n\t"
+brackets = [
+    { start = "(", end = ")", close = true, newline = false },
+    { start = "[", end = "]", close = true, newline = false },
+    { start = "{", end = "}", close = true, newline = false },
+    { start = "\"", end = "\"", close = true, newline = false, not_in = ["string", "comment"] },
+    { start = "%", end = "%", close = false, newline = false },
+]
+increase_indent_pattern = ":\\s*(#.*)?$"
+decrease_indent_pattern = "^\\s*else\\b"
+word_characters = ["-", "'"]

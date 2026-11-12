@@ -66,3 +66,12 @@ tasks.register<Copy>("website") {
     from(parserData)
     into(rootProject.layout.projectDirectory.dir("website/src/parser"))
 }
+
+tasks.register<Copy>("languageServer") {
+    group = "build"
+    description = "Builds the parser and copies it into editors/language-server/vendor/, for the editor extensions."
+    dependsOn("generateJavaScript")
+    from(layout.buildDirectory.dir("generated/teavm/js")) { include("neoskript-parser.js") }
+    from(parserData)
+    into(rootProject.layout.projectDirectory.dir("editors/language-server/vendor"))
+}

@@ -1,0 +1,9 @@
+packages:
+  - language-server
+  - vscode
+  - tree-sitter-skript
+allowBuilds:
+  esbuild: true
+  tree-sitter-cli: true
+  # Only for signing marketplace uploads, which vsce does on its own.
+  "@vscode/vsce-sign": false

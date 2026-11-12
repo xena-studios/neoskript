@@ -56,7 +56,7 @@ export default defineConfig({
       plugins: [starlightLinksValidator({ exclude: ["/", "/download/", "/syntax/", "/syntax/**", "/parser/", "/llms.txt"] })],
       sidebar: [
         { label: "Start here", items: ["docs", "docs/install", "docs/moving-from-skript", "docs/ai"] },
-        { label: "Parser", items: ["docs/parser", "docs/parser-checks"] },
+        { label: "Tools", items: ["docs/editors", "docs/parser", "docs/parser-checks"] },
       ],
     }),
   ],

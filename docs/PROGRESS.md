@@ -744,3 +744,13 @@ What D15 asks for, done. When the server starts and once a day after, NeoSkript 
 - on [Modrinth](https://modrinth.com/plugin/neoskript) as a beta, for Paper and Folia, Minecraft 1.21.4 to 26.3. The project page now has the beta's install steps, compatibility and benchmarks, and it was sent for Modrinth's review on 2026-11-12.
 
 The jar was booted on all four harness servers before it was published. The update checker looks for it on Modrinth, so betas hear of newer betas and releases. neoskript.dev's download page offers the latest release first, read from GitHub Releases when the site builds, then the development build. The home page, the docs and the README say it's a public beta.
+
+### Step 7: Code editors
+
+Planned for 1.x, done early: NeoSkript's parser in editors (`editors/`).
+- **The language server** (`editors/language-server`) is NeoSkript's frontend compiled to JavaScript, the same as neoskript.dev/parser, bundled with the syntax data into one Node file (`dist/server.cjs`, 1.9 MB). It gives problems as you type, with Skript's messages. Each script is parsed with the function declarations of the other `.sk` files in the workspace, so calls to them aren't unknown. It also gives hover docs for each line's element, its expressions and function calls, from the syntax reference with a link to its entry. Completion covers events after `on`, effects, conditions and sections (snippets from their patterns), functions, `{@options}` and variables. There's an outline, and go to definition for functions (across the workspace) and options. The parser now also reports where each element is on its line (`elements`), function signatures, and command names. A script of about 1,150 lines parses in about 260 ms on Node.
+- **VS Code** (`editors/vscode`): a TextMate grammar (from the site's Monaco tokenizer), Skript's editing rules (`#` comments, `:` indents, folding by indentation) and the server. Packaged as `neoskript-0.1.0.vsix`, about 600 KB.
+- **Zed** (`editors/zed`): a tree-sitter grammar (`editors/tree-sitter-skript`) with highlight, bracket and outline queries, and a Rust extension that runs the server with Zed's Node.js. It uses `neoskript-language-server` from the PATH, else it downloads it from the `language-server-v<version>` release.
+- **Tested** by `pnpm test` in `editors/language-server`, which starts the built server over stdio in a workspace of two scripts and checks problems, hover, completion, the outline and both kinds of definition. The grammars are checked by tokenizing and parsing a sample, and the Zed extension builds for `wasm32-wasip2`.
+- **neoskript.dev** has a [Code editors](https://neoskript.dev/docs/editors/) guide.
+

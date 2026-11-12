@@ -56,6 +56,7 @@ neoskript-cli        checks a scripts folder before you switch
 test-harness         real Paper and Folia servers, run against Skript
 website              neoskript.dev
 plugins/skript       the AI skill for writing Skript (Claude Code, Codex)
+editors              the language server, and the VS Code and Zed extensions
 ```
 
 | Doc | What's in it |
@@ -63,6 +64,10 @@ plugins/skript       the AI skill for writing Skript (Claude Code, Codex)
 | [Plan](docs/PLAN.md) | Goals, locked decisions, architecture, roadmap |
 | [Progress](docs/PROGRESS.md) | What each milestone and batch delivered |
 | [Test harness](test-harness/README.md) | Running the real-server tests, scenarios, pins |
+
+## Code editors
+
+NeoSkript's parser in VS Code and Zed: problems as you type, hover docs, completion, an outline and go to definition. See [Code editors](https://neoskript.dev/docs/editors/), and [`editors/`](editors/README.md) for building them.
 
 ## Writing scripts with AI
 

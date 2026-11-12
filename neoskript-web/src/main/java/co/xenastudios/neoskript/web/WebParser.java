@@ -37,7 +37,15 @@ public final class WebParser {
     }
 
     public String parse(String source) {
-        ParsedScript script = loader.load(List.of(new SourceFile(FILE_NAME, source))).getFirst();
+        return parse(source, null);
+    }
+
+    /** {@link #parse(String)}, with the other scripts' function declarations as {@code context}, if any. */
+    public String parse(String source, String context) {
+        List<SourceFile> files = context == null || context.isBlank()
+                ? List.of(new SourceFile(FILE_NAME, source))
+                : List.of(new SourceFile(FILE_NAME, source), new SourceFile("context.sk", context));
+        ParsedScript script = loader.load(files).getFirst();
         StringBuilder out = new StringBuilder("{\"diagnostics\":[");
         boolean first = true;
         for (Diagnostic diagnostic : script.diagnostics()) {
@@ -62,10 +70,17 @@ public final class WebParser {
             Line line = structure.structure().node().line();
             out.append("{\"kind\":").append(Json.quote(kind(structure)))
                     .append(",\"line\":").append(line.number())
-                    .append(",\"text\":").append(Json.quote(line.text()))
-                    .append('}');
+                    .append(",\"text\":").append(Json.quote(line.text()));
+            if (structure instanceof ParsedStructure.Function function) {
+                out.append(",\"name\":").append(Json.quote(function.signature().name()))
+                        .append(",\"signature\":").append(Json.quote(Elements.signature(function.signature())));
+            } else if (structure instanceof ParsedStructure.Command command) {
+                out.append(",\"name\":").append(Json.quote(command.name()));
+            }
+            out.append('}');
         }
-        return out.append("]}").toString();
+        out.append("],\"elements\":").append(Elements.of(script));
+        return out.append("}").toString();
     }
 
     private static String kind(ParsedStructure structure) {

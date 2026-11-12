@@ -1,0 +1,17 @@
+{
+  "name": "tree-sitter-skript",
+  "version": "0.1.0",
+  "description": "Skript (.sk) for tree-sitter, for highlighting in Zed and other tree-sitter editors.",
+  "license": "GPL-3.0-only",
+  "author": "Xena Studios",
+  "repository": { "type": "git", "url": "https://github.com/xena-studios/neoskript", "directory": "editors/tree-sitter-skript" },
+  "main": "grammar.js",
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter generate && tree-sitter test"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "0.27.2"
+  },
+  "tree-sitter": [{ "scope": "source.skript", "file-types": ["sk"], "highlights": "queries/highlights.scm" }]
+}

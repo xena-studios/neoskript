@@ -1,0 +1,130 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Skript",
+  "scopeName": "source.skript",
+  "comment": "Skript (.sk), as neoskript.dev's parser highlights it: structures and control words, strings with %expressions% and colour tags, {variables}, numbers, event values and comments. Every rule ends with its line, so an unclosed string doesn't colour the lines after it.",
+  "patterns": [
+    { "include": "#block-comment" },
+    { "include": "#comment" },
+    { "include": "#entry" },
+    { "include": "#structure" },
+    { "include": "#content" }
+  ],
+  "repository": {
+    "block-comment": {
+      "begin": "^\\s*###\\s*$",
+      "end": "^\\s*###\\s*$",
+      "name": "comment.block.skript"
+    },
+    "comment": {
+      "match": "(?<!#)#(?!#).*$",
+      "name": "comment.line.number-sign.skript"
+    },
+    "entry": {
+      "match": "^(\\s+)(description|usage|permission message|permission|aliases|executable by|cooldown message|cooldown bypass|cooldown storage|cooldown|prefix|return type|trigger)(:)",
+      "captures": {
+        "2": { "name": "support.type.property-name.skript" },
+        "3": { "name": "punctuation.separator.key-value.skript" }
+      }
+    },
+    "structure": {
+      "patterns": [
+        {
+          "match": "^(?i)(on|every|at)\\b",
+          "name": "keyword.declaration.event.skript"
+        },
+        {
+          "match": "^(?i)(command)\\s+(/?[^\\s:]+)",
+          "captures": {
+            "1": { "name": "keyword.declaration.command.skript" },
+            "2": { "name": "entity.name.function.command.skript" }
+          }
+        },
+        {
+          "match": "^(?i)(local\\s+)?(function)\\s+([\\p{L}\\p{N}_]+)",
+          "captures": {
+            "1": { "name": "storage.modifier.skript" },
+            "2": { "name": "keyword.declaration.function.skript" },
+            "3": { "name": "entity.name.function.skript" }
+          }
+        },
+        {
+          "match": "^(?i)(options|variables|aliases|import|using)\\b",
+          "name": "keyword.declaration.skript"
+        }
+      ]
+    },
+    "content": {
+      "patterns": [
+        { "include": "#string" },
+        { "include": "#variable" },
+        { "include": "#option" },
+        { "include": "#expression" },
+        { "include": "#number" },
+        { "include": "#event-value" },
+        { "include": "#function-call" },
+        { "include": "#control" },
+        { "include": "#keyword" }
+      ]
+    },
+    "string": {
+      "begin": "\"",
+      "end": "\"(?!\")|$",
+      "name": "string.quoted.double.skript",
+      "patterns": [
+        { "match": "\"\"|%%", "name": "constant.character.escape.skript" },
+        { "include": "#expression" },
+        { "match": "<[^<>\"]*>", "name": "constant.other.color.skript" },
+        { "match": "[&§][0-9a-fk-orA-FK-OR]", "name": "constant.other.color.skript" }
+      ]
+    },
+    "variable": {
+      "begin": "\\{(?!@)",
+      "end": "\\}|$",
+      "name": "variable.other.skript",
+      "patterns": [
+        { "include": "#variable" },
+        { "include": "#expression" }
+      ]
+    },
+    "option": {
+      "match": "\\{@[^}]*\\}",
+      "name": "variable.other.constant.option.skript"
+    },
+    "expression": {
+      "begin": "%",
+      "end": "%|$",
+      "beginCaptures": { "0": { "name": "punctuation.section.embedded.skript" } },
+      "endCaptures": { "0": { "name": "punctuation.section.embedded.skript" } },
+      "name": "meta.embedded.expression.skript",
+      "patterns": [
+        { "include": "#string" },
+        { "include": "#variable" },
+        { "include": "#option" },
+        { "include": "#number" },
+        { "include": "#event-value" },
+        { "include": "#function-call" }
+      ]
+    },
+    "number": {
+      "match": "(?<![\\w.])-?\\d+(\\.\\d+)?\\b",
+      "name": "constant.numeric.skript"
+    },
+    "event-value": {
+      "match": "(?i)\\b(event|loop|arg|argument)-[\\w-]+",
+      "name": "variable.language.skript"
+    },
+    "function-call": {
+      "match": "([\\p{L}\\p{N}_]+)(?=\\()",
+      "name": "entity.name.function.call.skript"
+    },
+    "control": {
+      "match": "(?i)\\b(if|else if|else|loop|while|do|return|stop|exit|continue|wait|trigger|parse|any|all)\\b",
+      "name": "keyword.control.skript"
+    },
+    "keyword": {
+      "match": "(?i)\\b(set|add|remove|delete|clear|reset|send|broadcast|give|teleport|cancel|make|execute|kill|to|from|of|is|are|not|isn't|aren't|has|have|and|or|with|in|where|by|times|true|false|yes|no|event)\\b",
+      "name": "keyword.other.skript"
+    }
+  }
+}

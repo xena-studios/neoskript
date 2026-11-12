@@ -33,4 +33,16 @@ public final class Main {
         }
         return parser.parse(source);
     }
+
+    /**
+     * Parses one script of several, for an editor: {@code context} is the declarations of the functions the other
+     * scripts define (a script of their headers), so calls to them aren't unknown. Only {@code source} is reported.
+     */
+    @JSExport
+    public static String parseWith(String source, String context) {
+        if (parser == null) {
+            throw new IllegalStateException("init first");
+        }
+        return parser.parse(source, context);
+    }
 }

@@ -1,0 +1,19 @@
+{
+  "grammars": [
+    {
+      "name": "skript",
+      "camelcase": "Skript",
+      "scope": "source.skript",
+      "path": ".",
+      "file-types": ["sk"],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "GPL-3.0-only",
+    "description": "Skript (.sk) for tree-sitter",
+    "authors": [{ "name": "Xena Studios" }],
+    "links": { "repository": "https://github.com/xena-studios/neoskript" }
+  }
+}

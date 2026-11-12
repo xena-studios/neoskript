@@ -124,7 +124,7 @@ Rules on Folia:
 ## 5. Tooling
 
 - **Migration CLI (`neoskript-cli`):** runs against a `scripts/` folder offline. It reports what's supported, what's unsupported (with line numbers), likely Folia hazards (cross-entity access, reliance on atomicity), and performance smells.
-- **LSP:** diagnostics, completion from the syntax registry, hover docs, go-to-definition for functions and options. It reuses the frontend, with a VS Code extension first.
+- **LSP:** diagnostics, completion from the syntax registry, hover docs, go-to-definition for functions and options. It reuses the frontend, compiled to JavaScript (`neoskript-web`), so it runs on Node with no Java, in a VS Code extension and a Zed extension (`editors/`).
 
 ## 6. Roadmap
 
