@@ -1,0 +1,27 @@
+# The event benchmark's triggers. The harness bot fires each toggle event thousands of times in a row on the
+# player's thread, and times them: each is a common kind of script work.
+on load:
+	send "[harness] event benchmark loaded" to console
+
+# Global variables and text: a per-player counter, and a message built from it.
+on sneak toggle:
+	add 1 to {bench::sneaks::%player's uuid%}
+	set {_message} to "%player% has sneaked %{bench::sneaks::%player's uuid%}% times"
+	if length of {_message} > 1000:
+		send {_message} to player
+
+# Logic: a loop with arithmetic, a local list and a check.
+on sprint toggle:
+	set {_total} to 0
+	loop 10 times:
+		add loop-number * 2 to {_total}
+		add "item %loop-number%" to {_list::*}
+	if {_total} is not 110:
+		broadcast "wrong total"
+	if size of {_list::*} is not 10:
+		broadcast "wrong size"
+
+# Close to nothing: a condition on the player, so what's measured is mostly running a trigger at all.
+on flight toggle:
+	if player is op:
+		stop

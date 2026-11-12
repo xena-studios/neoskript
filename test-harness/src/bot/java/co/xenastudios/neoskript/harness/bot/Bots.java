@@ -51,6 +51,9 @@ import org.bukkit.plugin.Plugin;
  *       the held item or stack, and select a hotbar slot, also as a client does.
  *   <li>{@code bot op|deop <name>}, {@code bot teleport <name> <x> <y> <z>}, {@code bot damage <name>
  *       <amount>}: server-side changes, through the API on the player's thread.
+ *   <li>{@code bot bench <name> <sneak|sprint|flight> <count>}: fires that toggle event for the player
+ *       {@code count} times in a row on its thread, as a benchmark of the triggers listening to it, and logs
+ *       {@code [bot] bench <event> <count> <nanoseconds>ns}.
  *   <li>{@code bot list}.
  * </ul>
  *
@@ -161,6 +164,27 @@ final class Bots implements Listener {
                     }
                     onPlayer(sender, name, player -> player.teleportAsync(
                             new Location(player.getWorld(), xyz[0], xyz[1], xyz[2])));
+                }
+                case "bench" -> {
+                    String[] parts = rest.split(" ");
+                    if (parts.length != 2) {
+                        return false;
+                    }
+                    String event = parts[0].toLowerCase(Locale.ROOT);
+                    int count = Integer.parseInt(parts[1]);
+                    onPlayer(sender, name, player -> {
+                        org.bukkit.plugin.PluginManager events = Bukkit.getPluginManager();
+                        long start = System.nanoTime();
+                        for (int i = 0; i < count; i++) {
+                            boolean on = (i & 1) == 0;
+                            events.callEvent(switch (event) {
+                                case "sneak" -> new org.bukkit.event.player.PlayerToggleSneakEvent(player, on);
+                                case "sprint" -> new org.bukkit.event.player.PlayerToggleSprintEvent(player, on);
+                                default -> new org.bukkit.event.player.PlayerToggleFlightEvent(player, on);
+                            });
+                        }
+                        LOG.info("[bot] bench " + event + " " + count + " " + (System.nanoTime() - start) + "ns");
+                    });
                 }
                 case "damage" -> {
                     double amount = Double.parseDouble(rest);

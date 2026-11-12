@@ -425,10 +425,16 @@ public final class VariableStore {
                 if (value == null) {
                     continue;
                 }
-                while (children.containsKey(Integer.toString(index)) && children.get(Integer.toString(index)).value.get() != null) {
-                    index++;
+                String key = Integer.toString(index);
+                Node slot = children.get(key);
+                while (slot != null && slot.value.get() != null) {
+                    key = Integer.toString(++index);
+                    slot = children.get(key);
                 }
-                children.computeIfAbsent(Integer.toString(index), k -> new Node()).value.set(Values.copy(value));
+                if (slot == null) {
+                    slot = children.computeIfAbsent(key, k -> new Node());
+                }
+                slot.value.set(Values.copy(value));
             }
         }
     }
@@ -551,22 +557,33 @@ public final class VariableStore {
 
     private Node find(String name) {
         Node node = root;
-        for (String part : name.split(SEPARATOR, -1)) {
+        // Split on '::' by hand: String.split compiles a regex for a separator longer than a character, which
+        // was half of what a trigger using list variables cost.
+        int start = 0;
+        while (true) {
+            int end = name.indexOf(SEPARATOR, start);
+            String part = end < 0 ? name.substring(start) : name.substring(start, end);
             ConcurrentSkipListMap<String, Node> children = node.children;
             node = children == null ? null : children.get(part);
-            if (node == null) {
-                return null;
+            if (node == null || end < 0) {
+                return node;
             }
+            start = end + SEPARATOR.length();
         }
-        return node;
     }
 
     private Node create(String name) {
         Node node = root;
-        for (String part : name.split(SEPARATOR, -1)) {
+        int start = 0;
+        while (true) {
+            int end = name.indexOf(SEPARATOR, start);
+            String part = end < 0 ? name.substring(start) : name.substring(start, end);
             // Names are kept in lower case, as Skript keeps them: {_list::Hello} is at index "hello".
             node = node.children().computeIfAbsent(part.toLowerCase(java.util.Locale.ROOT), k -> new Node());
+            if (end < 0) {
+                return node;
+            }
+            start = end + SEPARATOR.length();
         }
-        return node;
     }
 }

@@ -1,7 +1,8 @@
 ---
 // neoskript.dev. The first screen is a real benchmark (src/data/benchmark.json):
 // the same generated scripts loaded and reloaded by Skript and by NeoSkript
-// on the same server, each bar as long as the time it took. Below it, a real
+// on the same server, then what one trigger costs per event, each bar as long
+// as the time it took (loading and triggers each on their own scale). Below it, a real
 // run of the differential harness (src/data/differential.json): one probe,
 // what Skript printed and what NeoSkript printed, row for row.
 import Base from "../layouts/Base.astro";
@@ -38,9 +39,25 @@ const measures = [
     show: (ms: number) => `${fmt(ms)} ms`,
   },
 ];
-// Every bar on one scale, so lengths compare across rows too.
-const longest = Math.max(...measures.map((m) => m.skript));
-const width = (ms: number) => Math.max(1.5, (ms / longest) * 100);
+// What a trigger costs each time its event fires, from the event benchmark.
+const triggerNames: Record<string, string> = {
+  flight: "A trigger with one condition",
+  sneak: "A trigger with global variables",
+  sprint: "A trigger with a loop",
+};
+const triggers = bench.events.rows.map((row) => ({
+  name: triggerNames[row.event] ?? row.workload,
+  what: `per event: ${row.workload}`,
+  skript: row.skriptMicros,
+  neo: row.neoskriptMicros,
+  show: (us: number) => `${us.toFixed(2)} µs`,
+}));
+// Bars in a group share a scale, so lengths compare across its rows too.
+const scaled = (group: typeof measures) => {
+  const longest = Math.max(...group.map((m) => m.skript));
+  return group.map((m) => ({ ...m, width: (v: number) => Math.max(1.5, (v / longest) * 100) }));
+};
+const rows = [...scaled(measures), ...scaled(triggers)];
 ---
 <Base
   title="NeoSkript: Keep your scripts. Lose the lag."
@@ -60,23 +77,23 @@ const width = (ms: number) => Math.max(1.5, (ms / longest) * 100);
     </div>
 
     <figure class="staff-figure wrap">
-      <div class="staff perf" role="table" aria-label="Load and reload times, Skript and NeoSkript">
+      <div class="staff perf" role="table" aria-label="Load and reload times, and what triggers cost, Skript and NeoSkript">
         <div class="row head" role="row">
           <span class="label skript" role="columnheader">{bench.skript} · {serverName}</span>
           <span class="label script" role="columnheader">The same scripts</span>
           <span class="label neo" role="columnheader">NeoSkript · {serverName}</span>
         </div>
-        {measures.map((m) => (
+        {rows.map((m) => (
           <div class="row line" role="row">
             <span class="skript out" role="cell">
               <span class="who" aria-hidden="true">Skript</span>
               <span class="time">{m.show(m.skript)}</span>
-              <svg class="bar" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect class="track" width="100" height="10" /><rect class="fill" width={width(m.skript)} height="10" /></svg>
+              <svg class="bar" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect class="track" width="100" height="10" /><rect class="fill" width={m.width(m.skript)} height="10" /></svg>
             </span>
             <span class="script" role="cell"><strong>{m.name}</strong><span class="what">{m.what}</span></span>
             <span class="neo out" role="cell">
               <span class="who" aria-hidden="true">NeoSkript</span>
-              <svg class="bar" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect class="track" width="100" height="10" /><rect class="fill" width={width(m.neo)} height="10" /></svg>
+              <svg class="bar" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect class="track" width="100" height="10" /><rect class="fill" width={m.width(m.neo)} height="10" /></svg>
               <span class="reading">
                 <span class="time">{m.show(m.neo)}</span>
                 <span class="same label">{times(m.skript, m.neo)}</span>
@@ -86,7 +103,8 @@ const width = (ms: number) => Math.max(1.5, (ms / longest) * 100);
         ))}
       </div>
       <figcaption>
-        {bench.scripts} generated scripts on {serverName}, {bench.machine.replace(/^an? /, "")}, {day(bench.date)}.
+        {bench.scripts} generated scripts on {serverName}, then each trigger run {fmt(bench.events.count)} times in a row,
+        {bench.events.rounds} rounds; {bench.machine.replace(/^an? /, "")}, {day(bench.date)}.
         Measured by the <a href={`${repo}/tree/main/test-harness`}>test harness<External /></a>.
       </figcaption>
     </figure>

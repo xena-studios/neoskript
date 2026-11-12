@@ -706,3 +706,16 @@ What D15 asks for, done. When the server starts and once a day after, NeoSkript 
 - **Skript's tests on Folia** now run on the thread of the region that owns `test-location`, where they act on blocks and entities, instead of the global thread. Skript's suite on Folia 26.3 went from 755 to 847 of 862. Of the other 15, 10 check straight after a console command, a time or a PvP change, which on Folia land a tick later, by the rule above. The rest (growing trees, `all entities`, `items in` a chest at a world's spawn, and the nearest creeper) are still to look at. On Paper it stays 862 of 862.
 - **`neoskript-skript-tests` has no pending tests left:** the 8 waiting on M4 pass on every server and now must, including `literal type parsing`, which failed on Folia when its spawn section ran on the global thread.
 - **Tested** by the `neoskript-regions` scenario: from the global thread, a spawn section at the far pig's region names its cow there, reads the far pig without an error, and goes back to the global thread after it. `exit loop` in one leaves the loop.
+
+### Step 3: What a trigger costs per event
+
+**`event-benchmark`** (BASELINE, paper-26.3) runs `event-benchmark.sk` on Skript and on NeoSkript. A harness bot joins, and `bot bench` fires a toggle event 20,000 times in a row on the player's thread and times it. There are 12 rounds of each event; the first 4 warm up and the result is the median of the other 8.
+
+| Trigger | Skript | NeoSkript |
+|---|---|---|
+| One condition (`on flight toggle`) | 0.93 µs | 0.04 µs |
+| Global variables and text (`on sneak toggle`) | 7.01 µs | 1.48 µs |
+| A loop with arithmetic and a local list (`on sprint toggle`) | 8.73 µs | 3.97 µs |
+
+- **The first run found a slow path:** the loop was slower on NeoSkript than on Skript (12.5 µs against 10.5). Profiling showed half of it was the variable store splitting names on `::` with `String.split`, which compiles a regex for every name. It now walks the name with `indexOf`, and adding to a list looks each index up once.
+- **On neoskript.dev:** the home page's benchmark shows the three triggers next to load and reload, from a fresh run of all three benchmarks on 2026-11-12 (startup 1.57 s against 0.77 s, reload 1,127 ms against 214 ms).

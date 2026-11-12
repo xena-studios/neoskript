@@ -1,19 +1,44 @@
 {
-  "source": "test-harness: skript-load-benchmark and neoskript-load-benchmark, paper-26.3",
-  "date": "2026-11-10",
+  "source": "test-harness: skript-load-benchmark, neoskript-load-benchmark and event-benchmark, paper-26.3",
+  "date": "2026-11-12",
   "machine": "an Apple M1 Pro laptop",
   "skript": "Skript 2.17.0",
   "scripts": 40,
   "lines": 5960,
   "reloads": 5,
   "startup": {
-    "skriptMs": 1780,
-    "neoskriptMs": 713,
+    "skriptMs": 1570,
+    "neoskriptMs": 770,
     "note": "as each plugin logs its own startup load"
   },
   "reload": {
-    "skriptMs": 1311,
-    "neoskriptMs": 237,
+    "skriptMs": 1127,
+    "neoskriptMs": 214,
     "note": "median wall time of /sk reload scripts, measured by the harness"
+  },
+  "events": {
+    "count": 20000,
+    "rounds": 8,
+    "note": "microseconds per event, the median of 8 rounds of 20,000 after 4 to warm up",
+    "rows": [
+      {
+        "event": "flight",
+        "workload": "a condition only",
+        "skriptMicros": 0.93,
+        "neoskriptMicros": 0.04
+      },
+      {
+        "event": "sneak",
+        "workload": "global variables and text",
+        "skriptMicros": 7.01,
+        "neoskriptMicros": 1.48
+      },
+      {
+        "event": "sprint",
+        "workload": "a loop with arithmetic and a local list",
+        "skriptMicros": 8.73,
+        "neoskriptMicros": 3.97
+      }
+    ]
   }
 }
