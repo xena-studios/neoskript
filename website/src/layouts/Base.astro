@@ -40,7 +40,7 @@ const og = new URL("/og.png", Astro.site).href;
         <nav aria-label="Main">
           <ul>
             {nav.map((item) => (
-              <li class={item.href === "/docs/" ? "docs" : undefined}><a href={item.href} aria-current={current(path, item.href) ? "page" : undefined}>{item.label}</a></li>
+              <li class={item.wide ? "wide" : undefined}><a href={item.href} aria-current={current(path, item.href) ? "page" : undefined}>{item.label}</a></li>
             ))}
             <li class="gh"><a href={repo}>GitHub<External /></a></li>
           </ul>
@@ -120,10 +120,10 @@ const og = new URL("/og.png", Astro.site).href;
     nav a {
       font-size: 0.875rem;
     }
-    /* The wordmark and three links fit on a phone. Docs and GitHub are in the
-       footer, and the landing links the guides too. */
+    /* The wordmark and three links fit on a phone. Docs, Addons and GitHub are
+       in the footer, and the landing links the guides too. */
     nav .gh,
-    nav .docs {
+    nav .wide {
       display: none;
     }
   }

@@ -8,7 +8,7 @@ import { current, nav, repo } from "../../lib/nav";
 const path = Astro.url.pathname;
 ---
 <ul class="site-nav">
-  {nav.map((item) => <li class={item.href === "/docs/" ? "docs" : undefined}><a href={item.href} aria-current={current(path, item.href) ? "page" : undefined}>{item.label}</a></li>)}
+  {nav.map((item) => <li class={item.wide ? "wide" : undefined}><a href={item.href} aria-current={current(path, item.href) ? "page" : undefined}>{item.label}</a></li>)}
   <li class="gh"><a href={repo}>GitHub<External /></a></li>
 </ul>
 
@@ -31,11 +31,11 @@ const path = Astro.url.pathname;
       gap: 1rem;
     }
   }
-  /* Where the header is narrowest beside the search (the mobile menu takes over under 50rem), Docs and GitHub
+  /* Where the header is narrowest beside the search (the mobile menu takes over under 50rem), Docs, Addons and GitHub
      leave it, as they leave the custom pages' header on a phone: a guide is already in the docs, and GitHub is
      in the footer. */
   @media (min-width: 50rem) and (max-width: 60rem) {
-    .docs,
+    .wide,
     .gh {
       display: none;
     }

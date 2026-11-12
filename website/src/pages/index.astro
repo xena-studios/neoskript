@@ -434,7 +434,8 @@ const faq = [
   }
 
   /* Skript and NeoSkript side by side: one hairline row per point, Skript's
-     answer muted, NeoSkript's in text beside a magenta rail. */
+     answer muted, NeoSkript's in text on a raised column (as the staffs'
+     centre), every cell padded alike. */
   .compare {
     width: 100%;
     margin-top: clamp(2rem, 1.5rem + 2vw, 3rem);
@@ -443,13 +444,17 @@ const faq = [
   }
   .compare th,
   .compare td {
-    padding: 1rem 1.25rem 1rem 0;
+    padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--rule);
     text-align: left;
     vertical-align: top;
   }
+  .compare th:first-child {
+    padding-left: 0;
+  }
   .compare thead th {
-    padding-block: 0 0.9rem;
+    padding-block: 0.9rem;
+    border-top: 1px solid var(--rule);
   }
   .compare thead th:first-child {
     width: 26%;
@@ -464,14 +469,12 @@ const faq = [
   .c-skript {
     color: var(--muted);
   }
+  .c-neo,
+  .compare .neo-head {
+    background: var(--raised);
+  }
   .c-neo {
     color: var(--text);
-    padding-left: 1.25rem;
-    border-left: 1px solid var(--magenta);
-  }
-  .compare thead th:last-child {
-    padding-left: 1.25rem;
-    border-left: 1px solid var(--magenta);
   }
   .compare .who {
     display: none;
@@ -479,8 +482,11 @@ const faq = [
   .compare tbody tr {
     transition: background-color 180ms var(--ease);
   }
-  .compare tbody tr:hover {
+  .compare tbody tr:hover > * {
     background-color: color-mix(in srgb, var(--magenta) 5%, transparent);
+  }
+  .compare tbody tr:hover > .c-neo {
+    background-color: color-mix(in srgb, var(--magenta) 8%, var(--raised));
   }
   @media (max-width: 44rem) {
     .compare,
@@ -512,9 +518,9 @@ const faq = [
       gap: 0.75rem;
       padding-block: 0.2rem;
     }
-    .c-neo {
-      padding-left: 0;
-      border-left: 0;
+    .c-neo,
+    .compare tbody tr:hover > .c-neo {
+      background: none;
     }
     .compare .who {
       display: block;

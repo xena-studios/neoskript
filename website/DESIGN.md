@@ -209,7 +209,7 @@ Breakpoints, as built:
 - **Under 60rem** the staff becomes one column: the script line first, then each server's output under it, each cell a small grid of server name, value and mark. The magenta rails move to the staff's outer edges and the column heads hide.
 - **Under 52rem** the facts row, the three steps and the footer collapse to one column.
 - **Under 44rem** download rows and build facts stack their term over their definition.
-- **Under 30rem** the header tightens: wordmark 1.375rem, nav at 0.875rem with no wrap, and Docs and GitHub leave the header (both are in the footer, and the landing links the guides).
+- **Under 30rem** the header tightens: wordmark 1.375rem, nav at 0.875rem with no wrap, and Docs, Addons and GitHub leave the header (all are in the footer, and the landing links the guides).
 - **Under 22rem** the `.sk` tile stands in for the wordmark.
 
 Actions sit in a wrapping row with a 0.75rem gap. The header is 4.5rem tall.
@@ -235,7 +235,7 @@ Pills, quiet and certain.
 - **Secondary:** transparent with a `night-rule` hairline and text colour ("See how it compares", "Read the docs", "On Modrinth").
 
 ### Navigation
-- **Header:** the NeoSkript logo (1.75rem tall) left; Docs, Syntax, Parser, Download and GitHub right in muted 0.9375rem, turning text on hover and when `aria-current="page"`. A hairline under the bar. The links come from `src/lib/nav.ts`; the guides show the same links in Starlight's header and mobile menu (`components/starlight/SocialIcons.astro`), with search and the theme select beside them. The guides' header is set to match (`theme.css`): the same 4.5rem bar over a `night-rule` hairline, the site's gutter, the wordmark at the same 1.75rem (1.375rem under 30rem) with its clear space cropped, and the links at 1.75rem gaps, closing to 1rem beside the search under 72rem; between 50rem and 60rem Docs and GitHub leave it, as on a phone. Every structural rule in the guides (header, sidebar, mobile contents) is a hairline: `--sl-color-hairline-shade` is `night-rule`, never night.
+- **Header:** the NeoSkript logo (1.75rem tall) left; Docs, Syntax, Parser, Addons, Download and GitHub right in muted 0.9375rem, turning text on hover and when `aria-current="page"`. A hairline under the bar. The links come from `src/lib/nav.ts`; the guides show the same links in Starlight's header and mobile menu (`components/starlight/SocialIcons.astro`), with search and the theme select beside them. The guides' header is set to match (`theme.css`): the same 4.5rem bar over a `night-rule` hairline, the site's gutter, the wordmark at the same 1.75rem (1.375rem under 30rem) with its clear space cropped, and the links at 1.75rem gaps, closing to 1rem beside the search under 72rem; between 50rem and 60rem Docs, Addons and GitHub leave it, as on a phone. Every structural rule in the guides (header, sidebar, mobile contents) is a hairline: `--sl-color-hairline-shade` is `night-rule`, never night.
 - **Footer:** `SiteFooter.astro`, on every page, the guides included (after Starlight's edit link and previous/next), laid out as on Xena's other sites (raptorpanel.net, xenastudios.co): the XENA mark in text colour beside a label-styled "© <year> Xena Studios", a muted line on the licence and affiliation, then the site's links plus Modrinth, Source and "Report a bug", stacked and left-aligned. A hairline above.
 - **Guides:** the current guide in the sidebar is text colour with a 1px magenta rail, not a filled pill; asides are hairline-ruled notes with no coloured stripe or fill; previous/next is a hairline row, not boxes.
 - **Skip link:** a magenta pill that drops in at the top-left gutter on focus.
@@ -261,7 +261,7 @@ The parser and the syntax reference have a small authored set in the arrow's sty
 The hero's row of three, under a hairline: each a large magenta figure ("2.3×", tabular, 700) over its claim in text and one muted sentence with both servers' times. A muted note under the row names the reference and links to the numbers. Not cards.
 
 ### Comparison table
-A real `<table>`, hairline rows: the point in bold text, Skript's answer in muted, NeoSkript's in text beside a 1px magenta rail (the column head is a magenta label). It includes where NeoSkript is behind (Skript addons), stated plainly. Under 44rem each row stacks: the point, then a Skript line and a NeoSkript line, each led by its label-small server name.
+A real `<table>`, hairline rows: the point in bold text, Skript's answer in muted, NeoSkript's in text on a raised night column, as the staffs' centre (its head is a magenta label); every cell has the same 1.25rem inline padding. It includes where NeoSkript is behind (Skript addons), stated plainly. Under 44rem each row stacks: the point, then a Skript line and a NeoSkript line, each led by its label-small server name.
 
 ### Questions
 `<details>` rows between hairlines: the question in bold text (at least 44px tall) with the authored chevron, which turns on open; the answer in muted, capped at 66ch. A two-column section above 52rem: the heading left, the rows right.
@@ -282,8 +282,11 @@ The one place magenta means "error": an error's label, its card's left rail, its
 ### Syntax reference cards
 `/syntax/<category>/` has a 15rem sticky sidebar (categories with icons and counts, Guides and Parser, then every entry's name; the current category and the entry in view get a 3px magenta bar) and a main column: a 52px search pill with a Filters toggle (category, Added in, and per page with examples, hide deprecated, cancellable only), a Clear filters pill, then one flat card per entry: a magenta header with night text (6.3:1) holding the link icon, the name and night badges (category, Skript version), the patterns on a night band, the description and the registry's facts on raised night, and full-width 44px rows that open (View examples, View event values) with a chevron. 4px corners, hairline borders, no shadows. Under 60rem the sidebar becomes a scrolling row of categories and the names list goes.
 
-### Definition rows (download)
-A `<dl>` of hairline-separated rows: bold term in a 14rem column, muted definition in the rest. The build block above them is a hairline-bounded band with its own small term/definition grid, not a card.
+### The download page
+Kept simple: the page title and one line on the release, then a hairline band with the big pills (52px: "Download NeoSkript <version>", and "Get it on Modrinth") over what you need, as label-and-value pairs (jar and size, server, Java, price). Then the install in three numbered steps (as the landing's), the script checker with its command on a raised block with a magenta left rail, and the rest (checking the jar's SHA-256, the development build, building from source, updates, reporting a difference) as hairline `<details>` rows with the chevron, as the landing's questions.
+
+### The addons page
+`/addons/`: official addons (`src/data/addons.json`, made and maintained by Xena Studios) as hairline rows with name, version label, summary, an example on a raised block and pill links; with none yet, one ruled line says so plainly. Then what's built in (Vault, WorldGuard, GriefPrevention) as definition rows (bold plugin in a 14rem column, muted description and a highlighted example line), where Skript addons stand, and the addon API.
 
 ### Logo and Horizon
 `Logo.astro` inlines the brand SVGs and crops their 50-unit clear space; the XENA mark takes `currentColor`, NeoSkript's own colours are never changed. `Horizon.astro` inlines the brand's recoloured horizon (night sky, magenta limb), absolutely positioned at the bottom of an `isolation: isolate` section, `clamp(14rem, 30vw, 26rem)` tall, masked from 55% to transparent.

@@ -1,23 +1,31 @@
 ---
-// Downloads: the latest release (a public beta, until 1.0) on GitHub Releases
-// and Modrinth, and the development build CI publishes from main
-// (src/lib/release.ts). The page says plainly what each is.
+// Downloads, kept simple: one button for the latest release (a public beta,
+// until 1.0) with what you need to know beside it, the install in three
+// steps, then the rest (checking the jar, the development build, building from
+// source) in rows that open. The release and the development build are read
+// from GitHub Releases when the site builds (src/lib/release.ts). Before the
+// first release, the development build is the download.
 import Base from "../layouts/Base.astro";
 import External from "../components/External.astro";
 import { devBuild, latestRelease } from "../lib/release";
 
 const repo = "https://github.com/xena-studios/neoskript";
 const modrinth = "https://modrinth.com/plugin/neoskript";
+const cli = `${repo}/releases/tag/cli-v0.1.0`;
 const release = await latestRelease();
 const build = await devBuild();
 const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-const date = build ? day(build.published) : "";
 const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-const size = build ? mb(build.jar.size) : "";
+// What the big button downloads: the release, or before there is one, the development build.
+const main = release
+  ? { name: `NeoSkript ${release.version}`, jar: release.jar, sha256: release.sha256, date: release.published }
+  : build
+    ? { name: "the development build", jar: build.jar, sha256: build.sha256, date: build.published }
+    : null;
 ---
 <Base
   title="Download NeoSkript"
-  description="Download NeoSkript: the public beta on Modrinth and GitHub, and the development build. For Paper and Folia, Minecraft 1.21.4+, Java 21."
+  description="Download NeoSkript, the drop-in replacement for Skript: the public beta for Paper and Folia, Minecraft 1.21.4 to 26.3, Java 21."
   path="/download/"
 >
   <section class="page">
@@ -25,92 +33,106 @@ const size = build ? mb(build.jar.size) : "";
       <h1>Download</h1>
       <p class="lead">
         {release?.beta
-          ? "NeoSkript is in public beta. Try it on a test server before your live one, and tell us about anything that behaves differently than on Skript."
+          ? `NeoSkript ${release.version} is the public beta, released ${day(release.published)}. Try it on a test server before your live one.`
           : release
-            ? "The latest release of NeoSkript."
+            ? `NeoSkript ${release.version}, released ${day(release.published)}.`
             : "NeoSkript isn't released yet. The development build is the latest commit on main that passed CI on real Paper and Folia servers. Use it on a test server, not your live one."}
       </p>
 
-      {release && (
-        <div class="build" aria-labelledby="release-title">
-          <h2 id="release-title">NeoSkript {release.version}{release.beta ? " (beta)" : ""}</h2>
-          <dl class="facts">
-            <div><dt>File</dt><dd><code>{release.jar.name}</code> · {mb(release.jar.size)}</dd></div>
-            <div><dt>Released</dt><dd>{day(release.published)}</dd></div>
-            {release.sha256 && <div><dt>SHA-256</dt><dd><code class="hash">{release.sha256}</code></dd></div>}
-          </dl>
+      {main ? (
+        <div class="get">
           <div class="actions">
-            <a class="btn btn-primary" href={release.jar.url}>Download {release.beta ? "the beta" : "NeoSkript"}</a>
-            <a class="btn btn-secondary" href={modrinth}>On Modrinth<External /></a>
-            <a class="btn btn-secondary" href={release.page}>Release notes<External /></a>
+            <a class="btn btn-primary big" href={main.jar.url}>Download {main.name}</a>
+            {release && <a class="btn btn-secondary big" href={modrinth}>Get it on Modrinth<External /></a>}
           </div>
+          <ul class="needs" aria-label="What you need">
+            <li><span class="label">Jar</span>{main.jar.name} · {mb(main.jar.size)}</li>
+            <li><span class="label">Server</span>Paper or Folia, Minecraft 1.21.4 to 26.3</li>
+            <li><span class="label">Java</span>21 or newer</li>
+            <li><span class="label">Price</span>Free and open source, GPL-3.0</li>
+          </ul>
         </div>
+      ) : (
+        <p class="none">
+          There's nothing to download yet: CI publishes a development build from the next commit on main that passes.
+          Until then, build it from source below.
+        </p>
       )}
 
-      <div class="build" aria-labelledby="dev-title">
-        <h2 id="dev-title">Development build</h2>
-        {release && <p class="note">The latest commit on main that passed CI, ahead of the release. For testing what's next.</p>}
-        {build ? (
-          <>
-            <dl class="facts">
-              <div><dt>File</dt><dd><code>{build.jar.name}</code> · {size}</dd></div>
-              <div><dt>Built from</dt><dd><a href={`${repo}/commit/${build.commit}`}><code>{build.commit.slice(0, 7)}</code><External /></a> on {date}</dd></div>
-              {build.sha256 && <div><dt>SHA-256</dt><dd><code class="hash">{build.sha256}</code></dd></div>}
-            </dl>
-            <div class="actions">
-              <a class="btn btn-primary" href={build.jar.url}>Download the dev build</a>
-              <a class="btn btn-secondary" href={`${repo}/releases/tag/dev`}>On GitHub<External /></a>
-            </div>
-          </>
-        ) : (
-          <p class="none">
-            There's no development build yet: CI publishes one from the next commit on main that passes. Until then,
-            build it from source below.
-          </p>
-        )}
-      </div>
+      <h2>Install</h2>
+      <ol class="steps">
+        <li><strong>Take out Skript.jar.</strong> Leave the <code>plugins/Skript</code> folder where it is. NeoSkript won't start next to Skript.</li>
+        <li><strong>Put the NeoSkript jar in <code>plugins/</code>.</strong></li>
+        <li><strong>Start the server.</strong> Your scripts and variables are copied over from Skript's folder, which is never changed.</li>
+      </ol>
+      <p class="more">
+        <a href="/docs/install/">The install guide</a>
+        <a href="/docs/moving-from-skript/">Moving from Skript</a>
+      </p>
 
-      <dl class="rows">
-        <div>
-          <dt>Requirements</dt>
-          <dd>Paper or Folia, Minecraft 1.21.4 or newer, Java 21 or newer. Take Skript out first: NeoSkript won't start next to it.</dd>
-        </div>
-        <div>
-          <dt>Installing</dt>
-          <dd>Put the jar in <code>plugins/</code> and start the server. <a href="/docs/install/">Install</a> and <a href="/docs/moving-from-skript/">moving from Skript</a> have the details.</dd>
-        </div>
-        <div>
-          <dt>Check your scripts</dt>
-          <dd>
-            Before you switch, the script checker loads your scripts on a throwaway server and lists every line NeoSkript
-            won't load: <code>java -jar neoskript-cli-0.1.0.jar check plugins/Skript/scripts</code>. It needs Java 21.
-            Get <a href={`${repo}/releases/tag/cli-v0.1.0`}>neoskript-cli 0.1.0<External /></a>;{" "}
-            <a href="/docs/moving-from-skript/#check-your-scripts-first">moving from Skript</a> has its options.
-          </dd>
-        </div>
-        <div>
-          <dt>Releases</dt>
-          <dd>
-            {release
-              ? <>NeoSkript is on <a href={modrinth}>Modrinth<External /></a> and <a href={`${repo}/releases`}>GitHub Releases<External /></a>. It tells you about newer versions itself (<code>update-checker: false</code> turns that off). The script checker is <a href={`${repo}/releases/tag/cli-v0.1.0`}>neoskript-cli 0.1.0<External /></a>.</>
-              : <>The script checker's first release, <a href={`${repo}/releases/tag/cli-v0.1.0`}>neoskript-cli 0.1.0<External /></a>, is out. NeoSkript itself has none yet: its public beta will be on Modrinth and GitHub Releases.</>}
-          </dd>
-        </div>
-        <div>
-          <dt>From source</dt>
-          <dd>
-            With JDK 21: <code>./gradlew build</code> in <a href={repo}>the repository<External /></a>. The jar is in{" "}
-            <code>neoskript-plugin/build/libs/</code>.
-          </dd>
-        </div>
-        <div>
-          <dt>Found a difference?</dt>
-          <dd>
-            If a script behaves differently than on Skript, <a href={`${repo}/issues/new/choose`}>open an issue<External /></a>{" "}
-            with the script and what each one did.
-          </dd>
-        </div>
-      </dl>
+      <h2>Not sure your scripts will work?</h2>
+      <p class="check">
+        The script checker loads your scripts on a throwaway server, without running them, and lists every line
+        NeoSkript won't load. Get <a href={cli}>neoskript-cli 0.1.0<External /></a> and run it on your scripts folder:
+      </p>
+      <pre class="cmd"><code>java -jar neoskript-cli-0.1.0.jar check plugins/Skript/scripts</code></pre>
+      <p class="check">Or paste a script into <a href="/parser/">the parser</a>, right here in your browser.</p>
+
+      <h2>More</h2>
+      <div class="more-rows">
+        {main?.sha256 && (
+          <details>
+            <summary>Check the download<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg></summary>
+            <div class="body">
+              <p>The jar's SHA-256. Compare it with <code>shasum -a 256 {main.jar.name}</code>:</p>
+              <p><code class="hash">{main.sha256}</code></p>
+              {release && <p><a href={release.page}>Release notes<External /></a></p>}
+            </div>
+          </details>
+        )}
+        {release && build && (
+          <details>
+            <summary>The development build<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg></summary>
+            <div class="body">
+              <p>
+                The latest commit on main that passed CI, ahead of the release: for trying what's next, not for a live
+                server. Built from <a href={`${repo}/commit/${build.commit}`}><code>{build.commit.slice(0, 7)}</code><External /></a>{" "}
+                on {day(build.published)}.
+              </p>
+              <p><a href={build.jar.url}>Download {build.jar.name}</a> · {mb(build.jar.size)}</p>
+              {build.sha256 && <p><code class="hash">{build.sha256}</code></p>}
+            </div>
+          </details>
+        )}
+        <details>
+          <summary>Build it from source<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg></summary>
+          <div class="body">
+            <p>
+              With JDK 21, run <code>./gradlew build</code> in <a href={repo}>the repository<External /></a>. The jar is
+              in <code>neoskript-plugin/build/libs/</code>.
+            </p>
+          </div>
+        </details>
+        <details>
+          <summary>Updates<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg></summary>
+          <div class="body">
+            <p>
+              NeoSkript tells you when a newer version is on Modrinth: in the console, and to players with
+              <code>skript.admin</code> when they join. <code>update-checker: false</code> in its config turns that off.
+              Every version is on <a href={`${repo}/releases`}>GitHub Releases<External /></a> too.
+            </p>
+          </div>
+        </details>
+        <details>
+          <summary>Found a difference from Skript?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg></summary>
+          <div class="body">
+            <p>
+              If a script behaves differently than on Skript, <a href={`${repo}/issues/new/choose`}>open an issue<External /></a>{" "}
+              with the script and what each one did. Matching Skript is the point, so it's a bug we fix.
+            </p>
+          </div>
+        </details>
+      </div>
     </div>
   </section>
 </Base>
@@ -126,73 +148,152 @@ const size = build ? mb(build.jar.size) : "";
   .lead {
     margin-top: 1.25rem;
   }
-  /* A hairline-ruled block, as the landing's rows: no card. */
-  .build {
-    margin-top: clamp(2.5rem, 2rem + 2vw, 3.5rem);
-    padding-block: clamp(1.5rem, 1rem + 2vw, 2.25rem);
-    border-block: 1px solid var(--rule);
-  }
-  .build + .build {
-    margin-top: 0;
-    border-top: 0;
-  }
-  .note {
-    margin-top: 0.5rem;
-    color: var(--muted);
-  }
   h2 {
-    font-size: 1.5rem;
+    margin-top: clamp(3rem, 2rem + 3vw, 4.5rem);
+    font-size: clamp(1.375rem, 1.1rem + 1vw, 1.75rem);
     letter-spacing: -0.02em;
   }
-  .facts {
-    margin-block: 1.25rem 1.75rem;
-    display: grid;
-    gap: 0.6rem;
+
+  /* The download: the button, then what you need, on one hairline band. */
+  .get {
+    margin-top: clamp(2rem, 1.5rem + 2vw, 3rem);
+    padding-block: clamp(1.75rem, 1.25rem + 2vw, 2.5rem);
+    border-block: 1px solid var(--rule);
   }
-  .facts div {
-    display: grid;
-    grid-template-columns: 7rem minmax(0, 1fr);
-    gap: 1rem;
+  .big {
+    height: 52px;
+    padding-inline: 1.75rem;
+    font-size: 1rem;
   }
-  .facts dt {
+  .needs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 2.5rem;
+    margin: 1.75rem 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--text);
+  }
+  .needs li {
+    display: grid;
+    gap: 0.2rem;
+  }
+  .none {
+    margin-top: 2rem;
     color: var(--muted);
+    max-width: 62ch;
+  }
+
+  /* The install, in the order you do it. */
+  .steps {
+    margin: 1.25rem 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-top: 1px solid var(--rule);
+  }
+  .steps li {
+    counter-increment: step;
+    padding: 1.25rem clamp(1rem, 0.5rem + 2vw, 2.5rem) 0 0;
+    color: var(--muted);
+    max-width: 34ch;
+  }
+  .steps li::before {
+    content: counter(step);
+    display: block;
+    margin-bottom: 0.75rem;
+    font-family: var(--label);
+    font-size: 0.75rem;
+    color: var(--magenta);
+  }
+  .steps strong {
+    display: block;
+    color: var(--text);
+    margin-bottom: 0.25rem;
+  }
+  .more {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.75rem;
+    margin-top: 1.75rem;
+  }
+
+  .check {
+    margin-top: 1rem;
+    color: var(--muted);
+    max-width: 66ch;
+  }
+  .check a {
+    color: var(--text);
+  }
+  .cmd {
+    margin-top: 1rem;
+    padding: 0.9rem 1.25rem;
+    background: var(--raised);
+    border-left: 1px solid var(--magenta);
+    overflow-x: auto;
+    font-size: 0.875rem;
+  }
+
+  /* The rest, as hairline rows that open. */
+  .more-rows {
+    margin-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+  }
+  .more-rows details {
+    border-bottom: 1px solid var(--rule);
+  }
+  .more-rows summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    min-height: 44px;
+    padding-block: 1rem;
+    cursor: pointer;
+    list-style: none;
+    font-weight: 600;
+  }
+  .more-rows summary::-webkit-details-marker {
+    display: none;
+  }
+  .more-rows summary:hover .chev {
+    stroke: var(--magenta);
+  }
+  .chev {
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 180ms var(--ease), stroke 180ms var(--ease);
+  }
+  .more-rows details[open] .chev {
+    transform: rotate(180deg);
+  }
+  .body {
+    display: grid;
+    gap: 0.75rem;
+    padding-bottom: 1.25rem;
+    color: var(--muted);
+    max-width: 66ch;
+  }
+  .body a {
+    color: var(--text);
   }
   .hash {
     overflow-wrap: anywhere;
     font-size: 0.8125rem;
-    color: var(--muted);
   }
-  .none {
-    margin-top: 0.75rem;
-    color: var(--muted);
-    max-width: 62ch;
-  }
-  /* The build block's bottom rule is this list's top rule. */
-  .rows {
-    margin-top: 0;
-  }
-  .rows > div {
-    display: grid;
-    grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
-    gap: 0.5rem 3rem;
-    padding-block: 1.25rem;
-    border-bottom: 1px solid var(--rule);
-  }
-  .rows dt {
-    font-weight: 700;
-  }
-  .rows dd {
-    color: var(--muted);
-    max-width: 66ch;
-  }
-  .rows a {
-    color: var(--text);
-  }
-  @media (max-width: 44rem) {
-    .rows > div,
-    .facts div {
+
+  @media (max-width: 52rem) {
+    .steps {
       grid-template-columns: minmax(0, 1fr);
-      gap: 0.25rem;
     }
   }
 </style>

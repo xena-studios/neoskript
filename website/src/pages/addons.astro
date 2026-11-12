@@ -1,0 +1,222 @@
+---
+// Addons: NeoSkript's official addons (src/data/addons.json), made and
+// maintained by Xena Studios; what NeoSkript already does with other plugins,
+// with no addon; where Skript's own addons stand; and where to start one.
+import Base from "../layouts/Base.astro";
+import Code from "../components/Code.astro";
+import External from "../components/External.astro";
+import addons from "../data/addons.json";
+
+type Addon = {
+  name: string;
+  summary: string;
+  adds?: string;
+  example?: string;
+  version?: string;
+  status?: "beta" | "stable";
+  links?: { modrinth?: string; source?: string; docs?: string };
+};
+const official = addons.official as Addon[];
+const repo = "https://github.com/xena-studios/neoskript";
+
+const builtIn = [
+  {
+    plugin: "Vault",
+    gives: "Players' money (balance, and adding or taking it), permission groups, and chat prefixes and suffixes, through whichever economy, permissions and chat plugins Vault finds.",
+    example: "add 100 to player's balance",
+  },
+  {
+    plugin: "WorldGuard",
+    gives: "Regions: which regions a place is in, their members and owners, whether a player can build somewhere, and an event for entering and leaving a region.",
+    example: "on region enter:",
+  },
+  {
+    plugin: "GriefPrevention",
+    gives: "Claims, as regions, with the same syntax as WorldGuard's: members, owners, can build, and entering and leaving.",
+    example: "if player can build at event-block:",
+  },
+];
+---
+<Base
+  title="Addons: NeoSkript"
+  description="NeoSkript's official addons, made and maintained by Xena Studios, what NeoSkript does with Vault, WorldGuard and GriefPrevention built in, and where Skript addons stand."
+  path="/addons/"
+>
+  <section class="page">
+    <div class="wrap">
+      <h1>Addons</h1>
+      <p class="lead">
+        Official addons are made and maintained by Xena Studios, next to NeoSkript itself: each is released and tested
+        with every NeoSkript version, so updating one never breaks the other.
+      </p>
+
+      <h2 id="official">Official addons</h2>
+      {official.length > 0 ? (
+        <ul class="addons">
+          {official.map((a) => (
+            <li>
+              <div class="addon-head">
+                <h3>{a.name}</h3>
+                {a.version && <span class="label">{a.version}{a.status === "beta" ? " · beta" : ""}</span>}
+              </div>
+              <p class="summary">{a.summary}</p>
+              {a.adds && <p class="adds">{a.adds}</p>}
+              {a.example && <pre class="example">{a.example.split("\n").map((line) => <><Code line={line} />{"\n"}</>)}</pre>}
+              <p class="links">
+                {a.links?.modrinth && <a class="btn btn-primary" href={a.links.modrinth}>Get it on Modrinth<External /></a>}
+                {a.links?.docs && <a class="btn btn-secondary" href={a.links.docs}>Docs</a>}
+                {a.links?.source && <a class="btn btn-secondary" href={a.links.source}>Source<External /></a>}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p class="empty">
+          None yet. The first official addons come with NeoSkript's addon API, after the beta. They'll be listed here,
+          and on <a href="https://modrinth.com/organization/xena-studios">Modrinth<External /></a>.
+        </p>
+      )}
+
+      <h2 id="built-in">Built in, no addon needed</h2>
+      <p class="section-lead">
+        Like Skript, NeoSkript has the syntax for these plugins itself. It's there when the plugin is installed, and
+        nothing changes when it isn't.
+      </p>
+      <dl class="rows">
+        {builtIn.map((b) => (
+          <div>
+            <dt>{b.plugin}</dt>
+            <dd>
+              <p>{b.gives}</p>
+              <p><Code line={b.example} /></p>
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      <h2 id="skript-addons">Skript addons</h2>
+      <p class="section-lead">
+        Skript addons like SkBee, skript-yaml, SkQuery and skript-reflect don't load on NeoSkript yet: they're built
+        against Skript's own code, which NeoSkript doesn't have. A compatibility layer for them is planned after 1.0, in
+        that order, SkBee first. skript-reflect reaches deepest into Skript and may never work fully.
+      </p>
+      <p class="section-lead">
+        Until then, <a href="/docs/moving-from-skript/#check-your-scripts-first">the script checker</a> lists every line
+        of your scripts that uses an addon's syntax, so you know what a switch would leave out.
+      </p>
+
+      <h2 id="make-one">Making an addon</h2>
+      <p class="section-lead">
+        NeoSkript's own standard library is built on its addon API, <code>neoskript-api</code>: syntax is registered
+        with builders, typed, and says which thread it's safe on, for Folia. The API is open in the{" "}
+        <a href={`${repo}/tree/main/neoskript-api`}>repository<External /></a>, and marked experimental until it's
+        declared stable after 1.0.
+      </p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .page {
+    padding-block: clamp(3.5rem, 2rem + 5vw, 6rem) clamp(4rem, 2.5rem + 5vw, 7rem);
+  }
+  h1 {
+    font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+    letter-spacing: -0.035em;
+  }
+  .lead {
+    margin-top: 1.25rem;
+  }
+  h2 {
+    margin-top: clamp(3rem, 2rem + 3vw, 4.5rem);
+    font-size: clamp(1.375rem, 1.1rem + 1vw, 1.75rem);
+    letter-spacing: -0.02em;
+  }
+  .section-lead,
+  .empty {
+    margin-top: 1rem;
+    color: var(--muted);
+    max-width: 66ch;
+  }
+  .section-lead a,
+  .empty a {
+    color: var(--text);
+  }
+  .empty {
+    padding-block: 1.25rem;
+    border-block: 1px solid var(--rule);
+  }
+
+  /* Official addons, one hairline row each. */
+  .addons {
+    margin: 1.25rem 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+  }
+  .addons li {
+    display: grid;
+    gap: 0.75rem;
+    padding-block: 1.75rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .addon-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 1rem;
+  }
+  h3 {
+    font-size: 1.25rem;
+    letter-spacing: -0.015em;
+  }
+  .summary {
+    color: var(--text);
+    max-width: 66ch;
+  }
+  .adds {
+    color: var(--muted);
+    max-width: 66ch;
+  }
+  .example {
+    padding: 0.9rem 1.25rem;
+    background: var(--raised);
+    border-left: 1px solid var(--magenta);
+    overflow-x: auto;
+    font-size: 0.875rem;
+  }
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+  }
+
+  /* Built-in hooks, as the download page's rows. */
+  .rows {
+    margin-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+  }
+  .rows > div {
+    display: grid;
+    grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+    gap: 0.5rem 3rem;
+    padding-block: 1.25rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .rows dt {
+    font-weight: 700;
+  }
+  .rows dd {
+    display: grid;
+    gap: 0.5rem;
+    color: var(--muted);
+    max-width: 66ch;
+  }
+  @media (max-width: 44rem) {
+    .rows > div {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.25rem;
+    }
+  }
+</style>
