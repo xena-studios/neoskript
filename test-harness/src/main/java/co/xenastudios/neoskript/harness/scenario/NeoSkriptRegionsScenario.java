@@ -97,8 +97,24 @@ public final class NeoSkriptRegionsScenario implements Scenario {
                 server.await(expected, at, WAIT);
                 at = lineOf(server, expected, at) + 1;
             }
-            if (folia && server.linesMatching(IN_ANOTHER_REGION).size() != 2) {
-                throw new HarnessFailure("Reading a pig from another region's thread should have been 2 runtime errors,"
+
+            mark = server.mark();
+            server.command("regiontest section");
+            order = List.of(
+                    Pattern.compile("\\[regiontest] section Daisy 3(\\.0)?$"),
+                    Pattern.compile(folia ? "\\[regiontest] after section <none>$" : "\\[regiontest] after section 3(\\.0)?$"),
+                    line("[regiontest] loop section 1"),
+                    line("[regiontest] after exit loop"));
+            at = mark;
+            for (Pattern expected : order) {
+                server.await(expected, at, WAIT);
+                at = lineOf(server, expected, at) + 1;
+            }
+            if (!server.linesMatching(line("[regiontest] loop section 2")).isEmpty()) {
+                throw new HarnessFailure("'exit loop' in a section didn't leave the loop. See " + server.logFile());
+            }
+            if (folia && server.linesMatching(IN_ANOTHER_REGION).size() != 3) {
+                throw new HarnessFailure("Reading a pig from another region's thread should have been 3 runtime errors,"
                         + " was " + server.linesMatching(IN_ANOTHER_REGION).size() + ". See " + server.logFile());
             }
             server.stop();

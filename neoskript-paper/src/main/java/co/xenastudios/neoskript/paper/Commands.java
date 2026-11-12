@@ -69,13 +69,22 @@ final class Commands {
                     }
                     for (Object command : commands) {
                         String line = Values.text(command);
-                        ScriptCommandInfo.FAILED.remove();
-                        dispatch(s, line.startsWith("/") ? line.substring(1) : line);
-                        String failed = ScriptCommandInfo.FAILED.get();
-                        if (failed != null) {
+                        Runnable execute = () -> {
                             ScriptCommandInfo.FAILED.remove();
-                            co.xenastudios.neoskript.runtime.RuntimeErrors.report("Failed to execute command: " + line
-                                    + " (" + failed + ")");
+                            dispatch(s, line.startsWith("/") ? line.substring(1) : line);
+                            String failed = ScriptCommandInfo.FAILED.get();
+                            if (failed != null) {
+                                ScriptCommandInfo.FAILED.remove();
+                                co.xenastudios.neoskript.runtime.RuntimeErrors.report("Failed to execute command: "
+                                        + line + " (" + failed + ")");
+                            }
+                        };
+                        if (s instanceof org.bukkit.entity.Entity || s instanceof org.bukkit.command.BlockCommandSender) {
+                            // A player's command runs on the player's thread, which runs this trigger.
+                            execute.run();
+                        } else {
+                            // On Folia, the console's commands run on the global thread.
+                            co.xenastudios.neoskript.runtime.region.Regions.onGlobal(execute);
                         }
                     }
                 }

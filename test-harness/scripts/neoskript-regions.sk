@@ -33,3 +33,16 @@ command /regiontest <text>:
 			run on {regiontest::near}:
 				send "[regiontest] near health %health of {regiontest::near}%" to console
 			send "[regiontest] after run on" to console
+		else if arg-1 is "section":
+			# A section given a location runs where it is, like 'run on', and the trigger goes on after it.
+			spawn a cow at location(4100, 80, 4100, world "world"):
+				set name of entity to "Daisy"
+				send "[regiontest] section %name of entity% %health of {regiontest::far}%" to console
+			# Back on the trigger's own thread: the far pig is another region's again, an error on Folia.
+			set {_far} to health of {regiontest::far}
+			send "[regiontest] after section %{_far}%" to console
+			loop 3 times:
+				spawn a chicken at location(4100, 80, 4100, world "world"):
+					send "[regiontest] loop section %loop-value%" to console
+					exit loop
+			send "[regiontest] after exit loop" to console

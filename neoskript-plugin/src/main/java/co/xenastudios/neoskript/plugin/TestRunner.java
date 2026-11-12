@@ -33,7 +33,7 @@ final class TestRunner {
         return Boolean.getBoolean(ENABLED);
     }
 
-    /** Runs the tests and writes the results. Call on the global thread. */
+    /** Runs the tests and writes the results. Call on the thread that owns test-location. */
     static void run(CompiledScripts compiled, Logger logger) throws IOException {
         List<String> passed = new ArrayList<>();
         List<String> skipped = new ArrayList<>();

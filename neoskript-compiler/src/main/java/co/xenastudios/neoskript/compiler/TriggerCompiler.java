@@ -189,9 +189,16 @@ final class TriggerCompiler {
 
     /**
      * A {@code run on X:} being compiled for Folia: the slot X is kept in, and the sections around it, which its
-     * code can't jump to as the rest of the trigger runs on another thread.
+     * code can't jump to as the rest of the trigger runs on another thread. With {@code implicit}, it's a library
+     * section that runs where its entity or location is ({@link #librarySection}), whose code can jump out: it goes
+     * back to the right thread first. {@code carried} are more slots it keeps across going there, of arrays.
      */
-    private record RunOn(int slot, java.util.Set<Block> outside) {}
+    private record RunOn(int slot, java.util.Set<Block> outside, boolean implicit, int[] carried) {
+
+        RunOn(int slot, java.util.Set<Block> outside) {
+            this(slot, outside, false, new int[0]);
+        }
+    }
 
     /** The {@code run on} sections around the code being compiled for Folia, innermost first. */
     private final Deque<RunOn> runOns = new ArrayDeque<>();
@@ -753,24 +760,46 @@ final class TriggerCompiler {
         }
         PlaceholderSpec[] specs = placeholderSpecs(syntax.syntax().patterns().get(syntax.pattern()));
         long reads = 0;
-        int entity = -1;
-        int place = -1;
-        for (int i = 0; i < specs.length; i++) {
+        for (int i = 0; i < specs.length && i < 64; i++) {
             for (String typeName : specs[i].types()) {
-                TypeRef ref = registry.resolveType(typeName);
-                RegionAccess.Kind kind = ref == null ? RegionAccess.Kind.NONE
-                        : access.kindOf(library.javaClass(ref.type().id()));
-                if (kind == RegionAccess.Kind.ENTITY && entity < 0) {
-                    entity = i;
-                } else if (kind != RegionAccess.Kind.NONE && kind != RegionAccess.Kind.ENTITY && place < 0) {
-                    place = i;
-                }
-                if ((kind == RegionAccess.Kind.ENTITY || kind == RegionAccess.Kind.BLOCK) && i < 64) {
+                RegionAccess.Kind kind = regionKind(access, typeName);
+                if (kind == RegionAccess.Kind.ENTITY || kind == RegionAccess.Kind.BLOCK) {
                     reads |= 1L << i;
                 }
             }
         }
-        return RegionalElements.wrap(element, type, site, reads, entity >= 0 ? entity : place);
+        int subject = Regions.global(syntax.syntax().id()) ? Regions.GLOBAL_SUBJECT : subject(syntax);
+        return RegionalElements.wrap(element, type, site, reads, subject);
+    }
+
+    /**
+     * The argument an element acts on, for region ownership: the first that takes entities, else blocks or
+     * locations, or -1.
+     */
+    private int subject(ParsedSyntax syntax) {
+        RegionAccess access = Regions.access();
+        if (access == null) {
+            return -1;
+        }
+        PlaceholderSpec[] specs = placeholderSpecs(syntax.syntax().patterns().get(syntax.pattern()));
+        int place = -1;
+        for (int i = 0; i < specs.length; i++) {
+            for (String typeName : specs[i].types()) {
+                RegionAccess.Kind kind = regionKind(access, typeName);
+                if (kind == RegionAccess.Kind.ENTITY) {
+                    return i;
+                }
+                if (kind != RegionAccess.Kind.NONE && place < 0) {
+                    place = i;
+                }
+            }
+        }
+        return place;
+    }
+
+    private RegionAccess.Kind regionKind(RegionAccess access, String typeName) {
+        TypeRef ref = registry.resolveType(typeName);
+        return ref == null ? RegionAccess.Kind.NONE : access.kindOf(library.javaClass(ref.type().id()));
     }
 
     /** Skript's {@code getSyntaxTypeName}: events are structures. */
@@ -874,6 +903,9 @@ final class TriggerCompiler {
         }
         for (RunOn runOn : runOns) {
             saved.add(new int[] {runOn.slot(), SAVED_OBJECT});
+            for (int carried : runOn.carried()) {
+                saved.add(new int[] {carried, SAVED_VALUES});
+            }
         }
         WaitPoint wait = new WaitPoint(new Label(), line, saved);
         int state = waits.size();
@@ -1660,7 +1692,38 @@ final class TriggerCompiler {
         ParsedSyntax header = section.header();
         int valuesSlot = nextSlot++;
         int indexSlot = nextSlot++;
-        callThrough(header, co.xenastudios.neoskript.api.element.Section.class);
+        // On Folia, a section given an entity or location runs on the thread that owns it, as in 'run on', since
+        // its code goes on with what it made there ('spawn a pig at X:' from an 'every' trigger, on the global
+        // thread). Getting there and back are like waits, and only happen when this thread doesn't own it.
+        int place = Regions.enabled() && !Regions.exempt(header.syntax().id()) ? subject(header) : -1;
+        RunOn outer = runOns.peek();
+        if (place >= 0) {
+            int argumentsSlot = nextSlot++;
+            int ownerSlot = nextSlot++;
+            if (!(library.binding(header.syntax()) instanceof ElementFactory<?> factory)) {
+                throw unsupported(header.syntax().id());
+            }
+            Object element = factory.create(info(header));
+            co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site = site(header, element.getClass());
+            arguments(header);
+            method.visitVarInsn(ASTORE, argumentsSlot);
+            method.visitVarInsn(ALOAD, argumentsSlot);
+            pushInt(place);
+            method.visitInsn(AALOAD);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "single", "(" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+            method.visitVarInsn(ASTORE, ownerSlot);
+            RunOn there = new RunOn(ownerSlot, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()),
+                    true, new int[] {argumentsSlot});
+            there.outside().addAll(blocks);
+            runOns.push(there);
+            hop(ownerSlot);
+            constant(regional(element, co.xenastudios.neoskript.api.element.Section.class, header, site),
+                    co.xenastudios.neoskript.api.element.Section.class);
+            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+            method.visitVarInsn(ALOAD, argumentsSlot);
+        } else {
+            callThrough(header, co.xenastudios.neoskript.api.element.Section.class);
+        }
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(co.xenastudios.neoskript.api.element.Section.class),
                 "run", "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
         convert(true);
@@ -1678,12 +1741,22 @@ final class TriggerCompiler {
         method.visitJumpInsn(IF_ICMPGE, end);
         blocks.push(new Block(BlockKind.SECTION, end, next, valuesSlot, -1, indexSlot,
                 library.sectionType(header.syntax().id())));
-        statements(section.body());
-        blocks.pop();
+        try {
+            statements(section.body());
+        } finally {
+            blocks.pop();
+            if (place >= 0) {
+                runOns.pop();
+            }
+        }
         method.visitLabel(next);
         method.visitIincInsn(indexSlot, 1);
         method.visitJumpInsn(GOTO, top);
         method.visitLabel(end);
+        if (place >= 0) {
+            // Back to the thread of the 'run on' around this one, or the trigger's own.
+            hop(outer == null ? -1 : outer.slot());
+        }
     }
 
     /** The expression in an effect's header that takes the section under it ({@code set X to a worldborder:}). */
@@ -2211,13 +2284,27 @@ final class TriggerCompiler {
         method.visitJumpInsn(GOTO, matching.get(count - 1).end());
     }
 
-    /** Fails if jumping to {@code target} would leave a {@code run on} section, whose end must run. */
+    /**
+     * Fails if jumping to {@code target} would leave a {@code run on} section, whose end must run. Leaving only
+     * library sections that run where their entity or location is goes back to the thread {@code target} runs on
+     * first.
+     */
     private void leaving(Block target) throws CompileException {
+        boolean left = false;
+        int thread = -1;
         for (RunOn runOn : runOns) {
-            if (runOn.outside().contains(target)) {
+            if (!runOn.outside().contains(target)) {
+                thread = runOn.slot();
+                break;
+            }
+            if (!runOn.implicit()) {
                 throw new CompileException(line, "Can't leave a 'run on' section this way, as the rest of the trigger"
                         + " runs on another thread. Use 'exit section' to leave it.");
             }
+            left = true;
+        }
+        if (left) {
+            hop(thread);
         }
     }
 

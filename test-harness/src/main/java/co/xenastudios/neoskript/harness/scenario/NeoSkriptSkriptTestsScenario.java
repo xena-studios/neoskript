@@ -71,18 +71,21 @@ public final class NeoSkriptSkriptTestsScenario implements Scenario {
             "functions",
             "function list argument with a single default value",
             "function argument with a default value",
-            "function default arguments");
+            "function default arguments",
+            "loop peeking",
+            "function structure arguments",
+            "named function arguments",
+            "named function arguments with single list params",
+            "previous and next loop value",
+            "literal type parsing",
+            "duplicate keys in function arguments",
+            "clone objects at function boundary");
 
-    /** Tests in these files that need later milestones, and why. They're reported but don't fail the check. */
-    static final Map<String, String> PENDING = Map.of(
-            "loop peeking", "Skript's test-only loop peeking expression and its restrictions (M4)",
-            "function structure arguments", "the location() function and Skript's 'Did you mean' suggestion (M4)",
-            "named function arguments", "the location() function (M4)",
-            "named function arguments with single list params", "the type Skript reports for nested lists (M4)",
-            "previous and next loop value", "item literals (M4)",
-            "literal type parsing", "spawning entities (M4)",
-            "duplicate keys in function arguments", "keyed list arguments (M4)",
-            "clone objects at function boundary", "vectors (M4)");
+    /**
+     * Tests in these files that need later work, and why. They're reported but don't fail the check. None since
+     * M4: on Folia too, a section like 'spawn a pig at X:' runs where X is.
+     */
+    static final Map<String, String> PENDING = Map.of();
 
     @Override
     public String name() {

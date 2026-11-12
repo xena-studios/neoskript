@@ -42,6 +42,17 @@ public final class Regions {
     public static final Set<String> SENDING = Set.of("EffMessage", "EffBroadcast", "EffActionBar", "EffSendTitle",
             "EffLog", "EffPlaySound", "EffSendResourcePack", "EffKick");
 
+    /**
+     * What Folia lets only its global thread change: world time, weather, gamerules, difficulty and PvP. Changed
+     * from a region's thread, they run on the global thread, soon, while the trigger carries on without waiting, as
+     * changes to another region's entities do.
+     */
+    public static final Set<String> GLOBAL_CHANGES = Set.of("ExprTime", "ExprWeather", "ExprGameRule",
+            "ExprDifficulty", "EffPvP", "CondPvP");
+
+    /** The subject of an element that acts on what only the global thread may change ({@link #GLOBAL_CHANGES}). */
+    public static final int GLOBAL_SUBJECT = -2;
+
     private static volatile RegionAccess access;
     private static volatile Consumer<ScriptRuntimeException> errors = e -> RuntimeErrors.logError(e.getMessage());
 
@@ -69,6 +80,25 @@ public final class Regions {
     }
 
     /** Whether the element {@code id} needs no checks: it only reads what's safe anywhere, or only sends. */
+    /** Whether the element {@code id} changes what only Folia's global thread may ({@link #GLOBAL_CHANGES}). */
+    public static boolean global(String id) {
+        int dash = id.indexOf('-');
+        return GLOBAL_CHANGES.contains(dash < 0 ? id : id.substring(0, dash));
+    }
+
+    /**
+     * Runs {@code task} on Folia's global thread: here if this is it (or ownership is off, on Paper), else soon,
+     * without waiting for it. For what only the global thread may do, like dispatching a console command.
+     */
+    public static void onGlobal(Runnable task) {
+        RegionAccess current = access;
+        if (current == null || current.owns(null)) {
+            task.run();
+        } else {
+            dispatch(current, ErrorSites.current(), null, task);
+        }
+    }
+
     public static boolean exempt(String id) {
         int dash = id.indexOf('-');
         String base = dash < 0 ? id : id.substring(0, dash);
@@ -170,6 +200,14 @@ public final class Regions {
      */
     static void run(RegionAccess access, ErrorSites.Site site, Object[] arguments, int subject,
             Consumer<Object[]> effect) {
+        if (subject == GLOBAL_SUBJECT) {
+            if (access.owns(null)) {
+                guarded(site, () -> effect.accept(arguments));
+            } else {
+                dispatch(access, site, null, () -> effect.accept(arguments));
+            }
+            return;
+        }
         Object argument = subject < 0 || subject >= arguments.length ? null : arguments[subject];
         if (argument instanceof Object[] values) {
             List<Object> here = new ArrayList<>(values.length);

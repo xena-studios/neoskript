@@ -362,8 +362,11 @@ final class ScriptManager {
         if (afterTests != null) {
             Runnable done = afterTests;
             afterTests = null;
-            // As in Skript's test mode, tests start once the world has had time to load and tick its chunks.
-            scheduler.runGlobalLater(100, () -> {
+            // As in Skript's test mode, tests start once the world has had time to load and tick its chunks. They
+            // run where test-location is, at the first world's spawn: on Folia, on the thread of the region that
+            // owns it, as Skript's tests act on blocks and entities there (on Paper, the main thread).
+            org.bukkit.Location testLocation = org.bukkit.Bukkit.getWorlds().getFirst().getSpawnLocation();
+            scheduler.runLater(testLocation, 100, () -> {
                 try {
                     TestRunner.run(compiled, logger);
                 } catch (IOException e) {
