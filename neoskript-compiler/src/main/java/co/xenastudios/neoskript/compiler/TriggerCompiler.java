@@ -525,8 +525,11 @@ final class TriggerCompiler {
         }));
     }
 
-    /** A Skript test ({@code test "name" [when <condition>]:}): skipped if its condition is false. */
-    Trigger compileTest(String scriptName, ParsedStructure.Custom test) throws CompileException {
+    /**
+     * A Skript test ({@code test "name" [when <condition>]:}): skipped if its condition is false. With {@code body}
+     * false, only its condition, which the loader runs first ({@link ScriptCompiler}).
+     */
+    Trigger compileTest(String scriptName, ParsedStructure.Custom test, boolean body) throws CompileException {
         eventClasses = List.of(co.xenastudios.neoskript.runtime.testing.TestEvent.class);
         eventLabel = "on test case";
         headerLine = test.structure().node().line();
@@ -541,7 +544,9 @@ final class TriggerCompiler {
                 method.visitInsn(RETURN);
                 method.visitLabel(run);
             }
-            statements(test.body());
+            if (body) {
+                statements(test.body());
+            }
         });
         return (Trigger) define(bytes);
     }
@@ -1079,11 +1084,17 @@ final class TriggerCompiler {
      */
     private void statements(List<Statement> statements) throws CompileException {
         depth++;
+        if (depth == 1) {
+            onGlobal = false;
+        }
         try {
             for (int i = 0; i < statements.size(); i++) {
                 Statement statement = statements.get(i);
                 int open = blocks.size();
                 try {
+                    if (onGlobal && !globalSafe(statement)) {
+                        leaveGlobal();
+                    }
                     if (startsConditional(statement)) {
                         i = conditional(statements, i) - 1;
                     } else {
@@ -1118,6 +1129,8 @@ final class TriggerCompiler {
                     failed(null, open);
                 }
             }
+            // Code after the block runs on the trigger's thread, whichever way it gets there.
+            leaveGlobal();
         } finally {
             depth--;
         }
@@ -2057,6 +2070,134 @@ final class TriggerCompiler {
     // ---------------------------------------------------------------- effects
 
     private void effect(ParsedSyntax effect) throws CompileException {
+        if (Regions.enabled() && globalOnly(effect)) {
+            // On Folia, a line only the global thread may run goes there first (when nothing is lost by it), so what
+            // it changes is there for the next line, as on Paper. The trigger stays there while the lines after it
+            // touch nothing in a region ({@link #globalSafe}), then goes back to its own thread: each move is a
+            // tick, in which the world's time would move on.
+            if (!onGlobal) {
+                hop(-1, "hopGlobal");
+                onGlobal = true;
+            }
+            effectHere(effect);
+            return;
+        }
+        effectHere(effect);
+    }
+
+    /**
+     * Whether the code being compiled may be on Folia's global thread, after a line only it may run: then a line
+     * that touches what's in a region goes back to the trigger's thread first. Only within one block of code;
+     * code that may still be there goes back at the block's end.
+     */
+    private boolean onGlobal;
+
+    /** Goes back from the global thread to the trigger's own (or its 'run on' section's), if it may be there. */
+    private void leaveGlobal() {
+        if (onGlobal) {
+            onGlobal = false;
+            hop(runOns.isEmpty() ? -1 : runOns.peek().slot());
+        }
+    }
+
+    /**
+     * Whether {@code statement} can run on Folia's global thread as well as on the trigger's: an effect that's
+     * only on what's global, or whose elements take nothing in a region (no entities, blocks or locations).
+     */
+    private boolean globalSafe(Statement statement) {
+        if (!(statement instanceof Statement.Effect line)) {
+            return false;
+        }
+        ParsedSyntax effect = line.effect();
+        if (globalOnly(effect)) {
+            return true;
+        }
+        if (library.binding(effect.syntax()) instanceof Library.Core core
+                && !core.id().equals(CoreSyntax.CHANGE) && !core.id().equals(CoreSyntax.ASSERT)) {
+            // Waits, exits and the like.
+            return false;
+        }
+        return regionFree(effect);
+    }
+
+    /** Whether {@code syntax} and what's in it take nothing that's in a region. */
+    private boolean regionFree(ParsedSyntax syntax) {
+        RegionAccess access = Regions.access();
+        if (access == null) {
+            return true;
+        }
+        for (PlaceholderSpec spec : placeholderSpecs(syntax.syntax().patterns().get(syntax.pattern()))) {
+            for (String type : spec.types()) {
+                if (regionKind(access, type) != RegionAccess.Kind.NONE) {
+                    return false;
+                }
+            }
+        }
+        for (Object value : syntax.match().values()) {
+            if (value != null && !regionFree(value)) {
+                return false;
+            }
+        }
+        for (Object value : syntax.match().regexValues()) {
+            if (value instanceof ParsedSyntax inner && !regionFree(inner)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean regionFree(Object value) {
+        return switch (value) {
+            case Expr.Literal literal -> true;
+            case Expr.Variable variable -> variable.embedded().stream().allMatch(this::regionFree);
+            case Expr.Text text -> text.embedded().stream().allMatch(this::regionFree);
+            case Expr.ListOf list -> list.items().stream().allMatch(this::regionFree);
+            case Expr.Syntax syntax -> regionFree(syntax.syntax());
+            case ParsedSyntax syntax -> regionFree(syntax);
+            default -> false;
+        };
+    }
+
+    /**
+     * Whether {@code effect} does what only Folia's global thread may: a console command, or a change to what
+     * {@link Regions#GLOBAL_CHANGES} has (world time, weather, gamerules, difficulty, PvP).
+     */
+    private boolean globalOnly(ParsedSyntax effect) {
+        String id = effect.syntax().id();
+        if (Regions.global(id)) {
+            return true;
+        }
+        List<Object> values = effect.match().values();
+        if (id.equals("EffCommand")) {
+            // Without 'by', or by the console; a player's commands run on the player's own thread.
+            Object senders = values.get(effect.pattern() == 0 ? 1 : 0);
+            return senders == null || (senders instanceof Expr.Syntax syntax
+                    && syntax.syntax().syntax().id().equals("LitConsole"));
+        }
+        if (library.binding(effect.syntax()) instanceof Library.Core core && core.id().equals(CoreSyntax.CHANGE)) {
+            int target = CoreSyntax.ChangeMode.values()[effect.pattern()].target;
+            return target < values.size() && changesGlobal(values.get(target));
+        }
+        return false;
+    }
+
+    /** Whether the changed {@code value} is, or is a list of, what only Folia's global thread may change. */
+    private boolean changesGlobal(Object value) {
+        if (value instanceof Expr.Syntax syntax && isCore(syntax.syntax(), CoreSyntax.WHETHER)) {
+            // 'set whether pvp is enabled in X to false' changes the condition.
+            return syntax.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition
+                    && Regions.global(condition.syntax().id());
+        }
+        if (value instanceof Expr.Syntax syntax) {
+            return Regions.global(syntax.syntax().syntax().id());
+        }
+        if (value instanceof Expr.ListOf list) {
+            return list.items().stream().anyMatch(this::changesGlobal);
+        }
+        return false;
+    }
+
+    private void effectHere(ParsedSyntax effect) throws CompileException {
         if (library.binding(effect.syntax()) instanceof ElementFactory<?> factory
                 && factory.create(info(effect))
                         instanceof Update update) {
@@ -2347,6 +2488,11 @@ final class TriggerCompiler {
 
     /** Carries on on the thread that owns what's in {@code slot} (or with -1, the trigger's own): a wait, on Folia. */
     private void hop(int slot) {
+        hop(slot, "hop");
+    }
+
+    /** {@link #hop(int)}, through {@code Waits.<how>}, which decides whether to go. */
+    private void hop(int slot, String how) {
         method.visitVarInsn(ALOAD, 0);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         WaitPoint wait = saveFrame();
@@ -2355,7 +2501,7 @@ final class TriggerCompiler {
         } else {
             method.visitVarInsn(ALOAD, slot);
         }
-        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "hop",
+        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), how,
                 "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + OBJECT_DESC + ")Z", false);
         // Not scheduled: this thread owns it already, so the trigger carries straight on.
         method.visitJumpInsn(IFEQ, wait.resume());

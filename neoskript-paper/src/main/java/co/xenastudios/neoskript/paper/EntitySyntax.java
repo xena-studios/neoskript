@@ -1090,7 +1090,7 @@ final class EntitySyntax {
         }, "%itemtypes% with[:out] [enchant[ment]] glint");
         registrar.expression("ExprItemWithFireResistance", "itemtype", info -> {
             boolean with = !info.hasTag("out");
-            return (context, args) -> mapItems(args[0], item -> item.withMeta(meta -> meta.setFireResistant(with)));
+            return (context, args) -> mapItems(args[0], item -> item.withMeta(meta -> fireResistant(meta, with)));
         }, "%itemtypes% with[:out] fire[ ]resistance", "fire resistant %itemtypes%");
         registrar.expression("ExprItemWithTooltip", "itemtype", info -> {
             boolean hide = info.pattern() == 1;
@@ -1265,7 +1265,7 @@ final class EntitySyntax {
             return (context, args) -> {
                 for (Object item : owners(args[0])) {
                     if (item instanceof ItemType type) {
-                        type.editMeta(meta -> meta.setFireResistant(resistant));
+                        type.editMeta(meta -> fireResistant(meta, resistant));
                     }
                 }
             };
@@ -1323,7 +1323,7 @@ final class EntitySyntax {
                 (item, value) -> item.editMeta(meta -> meta.setUnbreakable(value)));
         condition(registrar, "CondIsFireResistant", "itemtypes", "(fire resistant|resistant to fire)", ItemType.class,
                 item -> item.stack().getItemMeta() != null && item.stack().getItemMeta().isFireResistant(),
-                (item, value) -> item.editMeta(meta -> meta.setFireResistant(value)));
+                (item, value) -> item.editMeta(meta -> fireResistant(meta, value)));
         // Having the override at all, or being forced to glint (or, with 'not', not to).
         registrar.condition("CondItemEnchantmentGlint", info -> {
             boolean override = info.pattern() <= 1;
@@ -2052,6 +2052,18 @@ final class EntitySyntax {
                     horse.setDomestication(Math.max(1, Math.min(level, horse.getMaxDomestication())));
                 }
             }
+        }
+    }
+
+    /**
+     * Makes an item fire resistant or not. Paper 1.21.4's {@code setFireResistant} makes it resistant whatever it's
+     * given, so not being resistant clears the item's damage resistance, as later versions do.
+     */
+    private static void fireResistant(org.bukkit.inventory.meta.ItemMeta meta, boolean resistant) {
+        if (resistant) {
+            meta.setFireResistant(true);
+        } else if (meta.isFireResistant()) {
+            meta.setDamageResistant(null);
         }
     }
 }

@@ -137,7 +137,7 @@ public final class ScriptCompiler {
                                 instanceof Library.Core core && core.id().equals(CoreSyntax.EXAMPLE) -> {}
                         case ParsedStructure.Custom custom when testName != null -> triggers.add(
                                 new CompiledScripts.CompiledTrigger(name, header.number(), null, null, null, testName,
-                                        compiler(functions, script).compileTest(name, custom)));
+                                        test(name, script, functions, custom)));
                         case ParsedStructure.Command command -> {
                             // As in Skript, the first script loaded (they load in order of their names) keeps a name.
                             String defined = commandScripts.get(command.name().toLowerCase(java.util.Locale.ROOT));
@@ -577,6 +577,31 @@ public final class ScriptCompiler {
             }
         }
         return null;
+    }
+
+    /**
+     * A test's trigger. As Skript's test structure does, a {@code when} condition that's false when the script loads
+     * skips the test without its code being loaded: {@code test "x" when running minecraft "1.21.11":} uses what
+     * older versions don't have. The test is then only its condition, which skips it when it runs.
+     */
+    private co.xenastudios.neoskript.runtime.Trigger test(String name, ParsedScript script,
+            Map<FunctionInfo, FunctionHandle> functions, ParsedStructure.Custom test) throws CompileException {
+        if (test.syntax().match().regexValues().getFirst() instanceof co.xenastudios.neoskript.frontend.parse.ParsedSyntax) {
+            co.xenastudios.neoskript.runtime.Trigger condition = compiler(functions, script).compileTest(name, test, false);
+            co.xenastudios.neoskript.runtime.testing.TestRun.begin();
+            try {
+                condition.execute(new co.xenastudios.neoskript.runtime.SimpleTriggerContext(
+                        new co.xenastudios.neoskript.runtime.testing.TestEvent()));
+            } catch (RuntimeException e) {
+                // Not something to decide at load: the test runs, and its condition with it.
+            }
+            boolean skipped = co.xenastudios.neoskript.runtime.testing.TestRun.skipped();
+            co.xenastudios.neoskript.runtime.testing.TestRun.begin();
+            if (skipped) {
+                return condition;
+            }
+        }
+        return compiler(functions, script).compileTest(name, test, true);
     }
 
     /** The name of a {@code test "name":} structure, or {@code null} if it isn't one. */

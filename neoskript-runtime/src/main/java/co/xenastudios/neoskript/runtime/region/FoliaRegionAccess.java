@@ -59,6 +59,11 @@ public final class FoliaRegionAccess implements RegionAccess {
     }
 
     @Override
+    public boolean dispatching(Object event) {
+        return event instanceof org.bukkit.event.Event;
+    }
+
+    @Override
     public void execute(Object value, Runnable task) {
         switch (value) {
             // An entity that's gone (a player who left) has nothing left to change.

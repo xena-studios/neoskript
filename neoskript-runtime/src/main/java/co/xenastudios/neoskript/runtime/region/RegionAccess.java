@@ -27,6 +27,15 @@ public interface RegionAccess {
     /** Runs {@code task} soon on the thread that owns {@code value}'s region, without waiting for it. */
     void execute(Object value, Runnable task);
 
+    /**
+     * Whether {@code event} is one the server is still dispatching to plugins, so a trigger of it that waited would
+     * lose what it could still do to it (cancel it, change its values). Not an event of NeoSkript's own, like a
+     * test, an {@code every} period or a script command.
+     */
+    default boolean dispatching(Object event) {
+        return false;
+    }
+
     /** How a runtime error names {@code value}: {@code the player Notch}, {@code a zombie}. */
     String describe(Object value);
 }

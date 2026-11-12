@@ -25,6 +25,36 @@ public final class Waits {
 
     private Waits() {}
 
+    /** With {@link #track}, how many carry-ons each event's triggers have scheduled and not yet run. */
+    private static final java.util.Map<Object, Integer> PENDING =
+            Collections.synchronizedMap(new java.util.IdentityHashMap<>());
+    private static volatile boolean tracking;
+
+    /**
+     * Starts keeping count of the carry-ons each event's triggers have scheduled, for {@link #pending}. Skript's
+     * test runner does, to finish a test that waits before the next one starts.
+     */
+    public static void track() {
+        tracking = true;
+    }
+
+    /** Whether a trigger of {@code event} is waiting to carry on, with {@link #track} on. */
+    public static boolean pending(Object event) {
+        return PENDING.containsKey(event);
+    }
+
+    private static void scheduled(Object event) {
+        if (tracking && event != null) {
+            PENDING.merge(event, 1, Integer::sum);
+        }
+    }
+
+    private static void ran(Object event) {
+        if (tracking && event != null) {
+            PENDING.computeIfPresent(event, (key, count) -> count == 1 ? null : count - 1);
+        }
+    }
+
     public static void install(Scheduler scheduler, Consumer<ScriptRuntimeException> errors) {
         Waits.scheduler = scheduler;
         Waits.errors = errors;
@@ -35,6 +65,40 @@ public final class Waits {
         return Values.single(timespan) instanceof Timespan t ? Math.max(t.ticks(), 0) : 0;
     }
 
+    /**
+     * Called by code compiled for Folia before a line that only Folia's global thread may run (a console command, a
+     * change of world time or PvP): carries on with {@code frame} on the global thread, so the line's change is
+     * there for the next line, as on Paper. Not when this is the global thread already, nor in a trigger of an event
+     * the server is still dispatching, which would lose what it could still do to the event: there the line sends
+     * its change to the global thread and the trigger carries on
+     * ({@link co.xenastudios.neoskript.runtime.region.Regions#GLOBAL_CHANGES}). Whether it was scheduled.
+     */
+    public static boolean hopGlobal(Resumable trigger, TriggerContext context, Frame frame, Object unused) {
+        co.xenastudios.neoskript.runtime.region.RegionAccess access =
+                co.xenastudios.neoskript.runtime.region.Regions.access();
+        if (access == null || access.owns(null)
+                || (access.dispatching(context.event()) && !delayed(context.event()))) {
+            return false;
+        }
+        Scheduler current = scheduler;
+        if (current == null) {
+            throw new IllegalStateException("Waiting isn't available: no scheduler is installed");
+        }
+        frame.owner = null;
+        scheduled(context.event());
+        current.runLater(null, 0, () -> {
+            delay(context.event());
+            try {
+                trigger.resume(context, frame);
+            } catch (ScriptRuntimeException e) {
+                errors.accept(e);
+            } finally {
+                ran(context.event());
+            }
+        });
+        return true;
+    }
+
     /** Called by the generated code at a {@code wait}: carries on with {@code frame} after {@code ticks}. */
     public static void schedule(Resumable trigger, TriggerContext context, Frame frame, long ticks) {
         Scheduler current = scheduler;
@@ -42,12 +106,15 @@ public final class Waits {
             throw new IllegalStateException("Waiting isn't available: no scheduler is installed");
         }
         Object owner = frame.owner != null ? frame.owner : owner(context);
+        scheduled(context.event());
         current.runLater(owner, ticks, () -> {
             delay(context.event());
             try {
                 trigger.resume(context, frame);
             } catch (ScriptRuntimeException e) {
                 errors.accept(e);
+            } finally {
+                ran(context.event());
             }
         });
     }
@@ -78,12 +145,15 @@ public final class Waits {
         if (current == null) {
             throw new IllegalStateException("Waiting isn't available: no scheduler is installed");
         }
+        scheduled(context.event());
         current.runLater(owner, 0, () -> {
             delay(context.event());
             try {
                 trigger.resume(context, carried);
             } catch (ScriptRuntimeException e) {
                 errors.accept(e);
+            } finally {
+                ran(context.event());
             }
         });
         return true;

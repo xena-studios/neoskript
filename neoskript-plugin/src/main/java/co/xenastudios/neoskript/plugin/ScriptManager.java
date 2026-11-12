@@ -366,14 +366,7 @@ final class ScriptManager {
             // run where test-location is, at the first world's spawn: on Folia, on the thread of the region that
             // owns it, as Skript's tests act on blocks and entities there (on Paper, the main thread).
             org.bukkit.Location testLocation = org.bukkit.Bukkit.getWorlds().getFirst().getSpawnLocation();
-            scheduler.runLater(testLocation, 100, () -> {
-                try {
-                    TestRunner.run(compiled, logger);
-                } catch (IOException e) {
-                    logger.error("Couldn't write the test results", e);
-                }
-                done.run();
-            });
+            scheduler.runLater(testLocation, 100, () -> TestRunner.run(compiled, logger, scheduler, testLocation, done));
         }
         return new Outcome(inScope, errors, millis);
     }
