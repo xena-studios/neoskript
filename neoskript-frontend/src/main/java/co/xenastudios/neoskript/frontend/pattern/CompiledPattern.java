@@ -241,7 +241,20 @@ public final class CompiledPattern {
                             continue;
                         }
                         m.region(pos, to);
-                        if (m.matches()) {
+                        if (m.matches() && resolver.regexAfterRest(regex.index())) {
+                            // Like a placeholder: the rest first, so its errors come before this part's.
+                            java.util.regex.MatchResult matched = m.toMatchResult();
+                            State rest = next.next(to, state);
+                            Object value = rest == null ? null
+                                    : resolver.resolveRegex(input, pos, to, regex.index(), matched);
+                            if (value != null) {
+                                // The rest again with this part captured, as what follows may depend on it.
+                                State result = next.next(to, state.withCapture(true, regex.index(), pos, to, value));
+                                if (result != null) {
+                                    yield result;
+                                }
+                            }
+                        } else if (m.matches()) {
                             Object value = resolver.resolveRegex(input, pos, to, regex.index(), m.toMatchResult());
                             if (value != null) {
                                 State result = next.next(to, state.withCapture(true, regex.index(), pos, to, value));

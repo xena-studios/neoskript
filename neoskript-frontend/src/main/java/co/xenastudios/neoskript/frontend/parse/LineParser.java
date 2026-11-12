@@ -251,6 +251,14 @@ final class LineParser {
             }
             // Words no type reads can't be an operand, as Skript's arithmetic can't convert its unparsed literal to
             // any operation's type and fails to set up.
+            // Nor can a condition's or expression's: Skript's elements can't read text no type takes and fail to set
+            // up, with no error of their own ('clicked block is tagged as "minecraft:all_signs"' is the tag's error;
+            // 'assert X contains Y with "..."' isn't X containing 'Y with "..."'). Effects keep it, for their errors.
+            if (kind != SyntaxKind.EFFECT && kind != SyntaxKind.SECTION && parsed.match().values().stream()
+                    .anyMatch(value -> value instanceof Expr.Unresolved words && !words.verified()
+                            && !Literals.isWords(words.text()))) {
+                continue;
+            }
             if (syntax.id().equals("ExprArithmetic") && parsed.match().values().stream()
                     .anyMatch(value -> value instanceof Expr.Unresolved words && !words.verified() && !anyLiteral(words.text()))) {
                 continue;
@@ -303,7 +311,8 @@ final class LineParser {
             }
             // 'all colours' only for types whose values can be listed; 'all players' is something else's.
             if (syntax.id().equals("ExprSets") && !parsed.match().regexValues().isEmpty()
-                    && !(parsed.match().regexValues().getFirst() instanceof TypeRef ref && registry.isEnumerable(ref.type().id()))) {
+                    && !(parsed.match().regexValues().getFirst() instanceof TypeRef ref && registry.isEnumerable(ref.type().id())
+                            && (candidate.pattern() == 0 || ref.plural()))) {
                 continue;
             }
             // Positions or indices in a list need a list, and indices one with indices, as Skript's init refuses:
@@ -557,6 +566,11 @@ final class LineParser {
     private void arithmeticProblem(ParsedSyntax parsed) {
         List<Object> values = parsed.match().values();
         if (values.size() != 2 || parsed.pattern() >= OPERATIONS.size()) {
+            return;
+        }
+        // A literal operand is Skript's unparsed literal, of any type until converted: its errors with any type
+        // aren't given ('message / 2' says nothing).
+        if (values.stream().anyMatch(Expr.Literal.class::isInstance)) {
             return;
         }
         String[] names = new String[2];
@@ -983,6 +997,12 @@ final class LineParser {
             }
 
             @Override
+            public boolean regexAfterRest(int index) {
+                RegexRole role = syntax.regexRole(index);
+                return role == RegexRole.TYPE || role == RegexRole.TYPE_OR_ENTITY;
+            }
+
+            @Override
             public boolean unparsed(Object value) {
                 return value instanceof Expr.Unresolved words && !words.verified() && !anyLiteral(words.text());
             }
@@ -1087,10 +1107,36 @@ final class LineParser {
         return expr;
     }
 
+    /** The problems found so far, to drop those found after: see {@link #restore}. */
+    private record Problems(String problem, int quality, String experiment, List<String[]> frames) {}
+
+    private Problems problems() {
+        List<String[]> copies = new ArrayList<>();
+        for (String[] frame : frames) {
+            copies.add(frame.clone());
+        }
+        return new Problems(problem, problemQuality, experimentProblem, copies);
+    }
+
+    private void restore(Problems problems) {
+        problem = problems.problem();
+        problemQuality = problems.quality();
+        experimentProblem = problems.experiment();
+        int i = 0;
+        for (String[] frame : frames) {
+            if (i < problems.frames().size()) {
+                frame[0] = problems.frames().get(i)[0];
+                frame[1] = problems.frames().get(i)[1];
+            }
+            i++;
+        }
+    }
+
     /** The errors of the texts being read, innermost first: see {@link #parseExpression}. */
     private final java.util.Deque<String[]> frames = new java.util.ArrayDeque<>();
 
     private Expr parseExpressionLogged(int start, int end, Expected expected) {
+        int leaning = unresolvedCode;
         char first = input.charAt(start);
         char last = input.charAt(end - 1);
         if (first == '\u201C' || first == '\u201D' || last == '\u201C' || last == '\u201D') {
@@ -1127,10 +1173,14 @@ final class LineParser {
         if (expr == null) {
             expr = unresolved(start, end, expected);
         }
-        if (expr == null && expected.anything() && !expected.literalOnly() && BRACKETED_WORDS.matcher(input).region(start, end).matches()
+        // (Not where a reading was only turned down for now for leaning on words: it's read again with them, first.)
+        if (expr == null && expected.anything() && !expected.literalOnly() && listItems == 0 && unresolvedCode == leaning
+                && !experimentalSpans.contains(span(start, end))
+                && !(input.charAt(start) == '(' && Scanner.parenEnd(input, start, end) == end)
                 && Scanner.listSeparators(input, start, end, new boolean[1]).isEmpty()) {
-            // Where only any value goes, Skript makes words it can't read an unparsed literal, brackets and all, for
-            // the syntax to make sense of: '(first element of player's tool's block tags)'s tag contents'.
+            // Where only any value goes, Skript makes anything it can't read that isn't a list, or in brackets (read
+            // again on its own), an unparsed literal for the syntax to make sense of ('(first element of player's
+            // tool's block tags)'s tag contents'), keeping the best error found reading it.
             expr = new Expr.Unresolved(start, end, input.substring(start, end), false);
         }
         if (expr != null && expected.changeable() && !isChangeable(expr)) {
@@ -1195,9 +1245,17 @@ final class LineParser {
         String text = input.substring(start, end);
 
         if (first == '(' && Scanner.parenEnd(input, start, end) == end) {
+            // As Skript's parseExpressionList reads what's in brackets again on its own and returns without printing
+            // its log, the errors of what's in brackets are dropped when it isn't of a type wanted: '(the equippable
+            // component of {_item})' says nothing where an item component goes. Where any value goes, it's an
+            // unparsed literal that keeps them.
+            Problems before = expected.anything() ? null : problems();
             Expr inner = expression(start + 1, end - 1, expected);
             if (inner != null) {
                 return inner;
+            }
+            if (before != null) {
+                restore(before);
             }
         }
         if (first == '"') {
@@ -1426,6 +1484,8 @@ final class LineParser {
         }
         hintProblem = "Expected variable '{" + variable.name() + "}' to be "
                 + typeNames(expected.types().stream().map(TypeInfo::id).toList()) + ", but it is " + typeNames(types);
+        // As Skript logs it while parsing, so an unparsed literal around it keeps it.
+        problem(hintProblem);
         return false;
     }
 
@@ -2049,8 +2109,20 @@ final class LineParser {
         return count;
     }
 
+    /** How deep in reading a list's items the parser is: an item is no unparsed literal of any text, as in Skript. */
+    private int listItems;
+
     /** An item of a list: one value, or, in brackets, a list of its own, as in {@code 1, (2, 3)}. */
     private Expr listItem(int start, int end, Expected item, Expected list) {
+        listItems++;
+        try {
+            return listItemRead(start, end, item, list);
+        } finally {
+            listItems--;
+        }
+    }
+
+    private Expr listItemRead(int start, int end, Expected item, Expected list) {
         int[] span = trim(start, end);
         if (span[0] < span[1] && input.charAt(span[0]) == '(' && Scanner.parenEnd(input, span[0], span[1]) == span[1]) {
             Expr inner = expression(span[0], span[1], list);

@@ -361,7 +361,13 @@ final class CoreSyntax {
         boolean places = library.javaClass("entity") != Object.class && library.javaClass("location") != Object.class;
         library.core(SyntaxKind.SECTION, RUN_ON, null, List.of(), places ? "run on %entity/location%" : "run on %object%");
         // 'all colours': every value of a type that has a fixed set of them.
-        library.core(SyntaxKind.EXPRESSION, SETS, "object", List.of(RegexRole.TYPE), "(all [[of] the]|every) <.+>");
+        // 'particles' alone too, as Skript's '[all [[of] the]|the|every] %*classinfo%' (named in the plural only, so
+        // 'the player' is still the event's).
+        library.core(SyntaxKind.EXPRESSION, SETS, "object", List.of(RegexRole.TYPE), "(all [[of] the]|every) <.+>",
+                "[the] <.+>");
+        // As Skript's ExprSets writes itself in errors: 'all of the particles'.
+        library.describe(SETS, (info, arguments) -> info.types().isEmpty() ? null
+                : "all of the " + co.xenastudios.neoskript.frontend.registry.SyntaxRegistry.plural(info.types().getFirst().name()));
         // 'X is a color': a type as a value, which a value is if it's of that type.
         library.core(SyntaxKind.EXPRESSION, TYPE_VALUE, "object", List.of(RegexRole.TYPE), "(a|an) <.+>");
         // 'number within {_x}': the values of that type. Its type comes from the type name. Late, as in Skript,

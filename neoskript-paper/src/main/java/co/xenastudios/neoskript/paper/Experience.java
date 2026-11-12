@@ -46,7 +46,9 @@ record Experience(int xp) {
     }
 
     static void register(Registrar registrar) {
-        registrar.type("experience", "experience", Experience.class);
+        // Named as Skript names it in errors, and still read as 'experience'.
+        registrar.type("experience", "experience point", Experience.class);
+        registrar.alias("experience", "experience", "experiences");
         registrar.literalParser("experience", Experience::parse);
         registrar.parser("experience", Experience::parse);
         registrar.text(Experience.class, Experience::toString);

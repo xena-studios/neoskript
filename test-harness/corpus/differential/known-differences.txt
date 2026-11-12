@@ -3,9 +3,7 @@
 
 folia: probes/world # The console runs on Folia's global thread, which can't read the world's regions.
 
+# Varies in Skript: the differential counts these as identical, as NeoSkript gives one of Skript's results.
+examples/ExprLocationAt-1 # 'the world arg-4' in 16 of 29 runs of Skript, 'arg-4' in 13; NeoSkript gives 'arg-4'. Which error Skript keeps depends on its order of syntax tied on priority and complexity (by identity hash code: ExprLocation's 'location %directions% [%location%]' before ExprLocationAt gives 'the world arg-4', through 'X of %itemtypes...%' reading 'the world arg-4' first) and on its expression parse cache
+
 # Not matched yet: still to do, not impossible.
-examples/CondPotionHasParticles-1 # Skript's error is that 'particles' (all of the particles) isn't an item type, a lesser error than the one for 'the potion effect' outside its section, which Skript doesn't give here; why it isn't tried, or is dropped, is still to find
-examples/ExprItemCompCopy-1 # both expressions need the experiment; Skript gives no error for the outer one and drops the inner one's, so the value is an unparsed literal it can't understand; NeoSkript gives the inner error
-examples/ExprLocationAt-1 # Skript's result varies between runs, about half each: 'the world arg-4' (a typed argument, the more common in 15 runs) or 'arg-4'; NeoSkript gives 'arg-4', one of Skript's results. Which one depends on Skript's expression parse cache and its order of syntax by hash code
-examples/ExprNumberOfCharacters-1 # the chat message is now a text component, as in Skript; Skript's error comes from reading the colonless 'if' line's words again (CondCompare's reconstruction of its unparsed literal), which tries 'number of uppercase chars in (message / length of message)'; NeoSkript says it can't compare the words
-examples/ExprSecCreateLootContext-1 # Skript makes the value an unparsed literal (quotes, variable and all) and says it can't be given to a player; NeoSkript only makes words and bracketed words unparsed literals, as doing so for any text changes other units' errors

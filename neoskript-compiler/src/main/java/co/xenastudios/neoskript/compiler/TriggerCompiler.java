@@ -1059,16 +1059,23 @@ final class TriggerCompiler {
                     }
                 } catch (co.xenastudios.neoskript.api.element.SyntaxError error) {
                     // An element that matched but can't be used as written.
+                    String message = error.getMessage();
                     if (statement instanceof Statement.Section section && section.body() != null
                             && line == section.line().number()) {
                         unparsed(section.body());
+                        // Skript then reads the line as a statement, whose error it keeps if it has one.
+                        message = script.statementError(section.line()) != null ? script.statementError(section.line()) : message;
                     }
-                    failed(new CompileException(line, error.getMessage()), open);
+                    failed(new CompileException(line, message), open);
                 } catch (CompileException e) {
                     // A section whose header fails isn't one: as in Skript, what's in it isn't read.
                     if (statement instanceof Statement.Section section && section.body() != null
                             && e.line() == section.line().number()) {
                         unparsed(section.body());
+                        if (script.statementError(section.line()) != null && !e.alreadyReported()) {
+                            // Skript then reads the line as a statement, whose error it keeps if it has one.
+                            e = new CompileException(e.line(), script.statementError(section.line()));
+                        }
                     }
                     failed(e, open);
                 } catch (RuntimeException e) {
@@ -3206,8 +3213,9 @@ final class TriggerCompiler {
                 if (!e.unknownWords() || textPart != null) {
                     throw e;
                 }
+                // A literal is Skript's unparsed literal too, of no type yet: 'if X > 0.5' isn't understood.
                 boolean typed = values.stream().anyMatch(v -> v instanceof Expr expr && !(expr instanceof Expr.Unresolved)
-                        && valueType(expr) != null && !valueType(expr).equals(SyntaxRegistry.OBJECT));
+                        && !(expr instanceof Expr.Literal) && valueType(expr) != null && !valueType(expr).equals(SyntaxRegistry.OBJECT));
                 for (Object value : values) {
                     if (value instanceof Expr.Unresolved words && words.problem() != null) {
                         // Skript's comparison first tries to read its unparsed literal, which gives the error it kept.
@@ -3261,6 +3269,10 @@ final class TriggerCompiler {
     private String unknownWords(Expr.Unresolved unresolved) {
         if (textPart != null) {
             return "Can't understand this expression: " + textPart;
+        }
+        if (unresolved.problem() != null && (textPart == null)) {
+            // Skript's unparsed literal gives the error it kept from reading its words when nothing can use them.
+            return unresolved.problem();
         }
         if (unresolved == argumentWords) {
             // A function's argument: Skript's function call can't read its unparsed literal.

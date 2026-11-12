@@ -169,7 +169,8 @@ public final class ScriptLoader {
                 parsed.add(p);
             }
         }
-        return new ParsedScript(result.file(), parsed, diagnostics.all(), statements.delays(), statements.suppressions());
+        return new ParsedScript(result.file(), parsed, diagnostics.all(), statements.delays(), statements.suppressions(),
+                statements.statementErrors());
     }
 
     private ParsedStructure structure(Structure structure, ParserContext context, StatementParser statements,

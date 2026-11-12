@@ -24,9 +24,23 @@ import java.util.Set;
  *     ({@code deprecated}), compared by identity
  */
 public record ParsedScript(SourceFile file, List<ParsedStructure> structures, List<Diagnostic> diagnostics,
-        Map<Line, DelayState> delays, Map<Line, Set<String>> suppressions) {
+        Map<Line, DelayState> delays, Map<Line, Set<String>> suppressions, Map<Line, String> statementErrors) {
+
+    public ParsedScript(SourceFile file, List<ParsedStructure> structures, List<Diagnostic> diagnostics,
+            Map<Line, DelayState> delays, Map<Line, Set<String>> suppressions) {
+        this(file, structures, diagnostics, delays, suppressions, Map.of());
+    }
+
+    /**
+     * The error the section header on {@code line} gives read as a statement, which Skript reports instead when the
+     * header fails, or {@code null}.
+     */
+    public String statementError(Line line) {
+        return line == null ? null : statementErrors.get(line);
+    }
 
     public ParsedScript {
+        statementErrors = Collections.unmodifiableMap(new IdentityHashMap<>(statementErrors));
         structures = List.copyOf(structures);
         diagnostics = List.copyOf(diagnostics);
         delays = Collections.unmodifiableMap(new IdentityHashMap<>(delays));

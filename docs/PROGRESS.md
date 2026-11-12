@@ -46,6 +46,7 @@ Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4]
 | 27 | 2026-11-11 | 862 | 98.8% of the differential identical to Skript; M4 done |
 | 28 | 2026-11-11 | 862 | 99.0% of the differential identical; comparisons and parse errors in Skript's order |
 | 29 | 2026-11-11 | 862 | 99.7% of the differential identical; Skript's syntax order, types and init checks |
+| 30 | 2026-11-11 | 862 | 100% of the differential identical; Skript's unparsed literals and section fallback |
 
 ## M0: Foundations
 
@@ -646,6 +647,17 @@ Done in batches, each a PR: run `neoskript-skript-suite`, rank what stops the mo
 - **Section headers that fail:** as Skript doesn't read the code in them, its problems aren't reported.
 - **Fixed in the differential:** ExprElement-6, ExprElement-7, ExprTagContents-2, ExprAttachedBlock-1, ExprPassenger-1, ExprLowestHighestSolidBlock-2, EffOpenInventory-1, ExprPersistentData-1, ExprClicked-1, EffChange-2, ExprColored-2. Also two of Skript's own tests NeoSkript expected wrongly: Skript reads `1.5 rounded down` as 2 meters below.
 - **Still to do:** CondPotionHasParticles-1, ExprItemCompCopy-1, ExprNumberOfCharacters-1 (the message is a text component now; Skript's error comes from re-reading the line's words), ExprSecCreateLootContext-1, and ExprLocationAt-1's more common result. The committed website syntax export predates these type changes; `pnpm syntax:export` remakes it.
+
+#### Batch 30 (2026-11-11)
+
+**862 of 862 tests pass; 100% of the differential identical (1,613 of 1,613 units, against 3 runs of Skript).** Nothing is left in "Not matched yet"; one unit, ExprLocationAt-1, is listed as varying in Skript, where NeoSkript gives one of Skript's results.
+- **What's in brackets:** Skript's list parser reads text in brackets again on its own and returns without printing its log, so its errors are dropped where it isn't a value wanted (`(the equippable component of {_item})` where an item component goes). Where any value goes, the unparsed literal keeps them.
+- **A failed section header read as a statement:** Skript's script loader reads a section header that fails as a statement too, and keeps that error unless it's that the statement isn't understood (`ScriptLoader.loadItems`). `if the potion effect has particles:` says that all of the particles isn't an item type.
+- **A type named in the plural alone** is all its values, as Skript's `[all [[of] the]|the|every] %*classinfo%`: `particles`, written `all of the particles` in errors. In the singular it stays the event's value.
+- **A type's name in a pattern is a placeholder:** the rest of the pattern is matched before it, as for Skript's `%*classinfo%`, so its errors come first. A colonless `if number of uppercase chars in message / length of message > 0.5` gives the division's error through `X in %~objects%`. A literal is of no type in arithmetic and comparison errors, as Skript's unparsed literal is (`message / 2` says nothing).
+- **Unparsed literals of any text:** where any value goes, text Skript can't read that isn't a list, isn't in brackets and isn't a list's item is an unparsed literal, as Skript's list parser makes it. Conditions and expressions can't use one and fail to set up, saying nothing. A change to a variable fails with the literal's error, or that it can't understand it. Elsewhere the literal gives the best error found reading it. A type hint that isn't met is an error found while reading, and experience is named `experience point`, as in Skript.
+- **ExprLocationAt-1:** of 29 runs of Skript, 16 say `'the world arg-4'` and 13 `'arg-4'`. Comparing Skript's syntax order across 14 runs shows what decides it: `the world arg-4` comes when Skript's `location %directions% [%location%]` (tied with ExprLocationAt on priority and complexity, ordered by hash code) is tried first and reads `the world arg-4` through `X of %itemtypes...%`. NeoSkript gives `'arg-4'`; matching the other result needs command arguments refused while parsing outside commands, which gave another argument's error first.
+- **Fixed in the differential:** ExprItemCompCopy-1, CondPotionHasParticles-1, ExprNumberOfCharacters-1, ExprSecCreateLootContext-1.
 
 ## M5: Folia and migration
 

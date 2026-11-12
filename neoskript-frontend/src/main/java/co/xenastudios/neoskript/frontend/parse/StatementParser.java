@@ -15,6 +15,7 @@ import co.xenastudios.neoskript.frontend.registry.TypeInfo;
 import co.xenastudios.neoskript.frontend.registry.TypeRef;
 import co.xenastudios.neoskript.frontend.source.Diagnostic;
 import co.xenastudios.neoskript.frontend.source.Diagnostics;
+import co.xenastudios.neoskript.frontend.source.Severity;
 import co.xenastudios.neoskript.frontend.structure.Line;
 import co.xenastudios.neoskript.frontend.structure.Node;
 import java.util.ArrayList;
@@ -68,6 +69,41 @@ final class StatementParser {
     StatementParser(ParserContext context, Diagnostics diagnostics) {
         this.context = context;
         this.diagnostics = diagnostics;
+    }
+
+    /**
+     * For section headers, the error reading the whole line as a statement gives, where it's one Skript keeps: see
+     * {@link ParsedScript#statementError}.
+     */
+    private final Map<Line, String> statementErrors = new IdentityHashMap<>();
+
+    Map<Line, String> statementErrors() {
+        return statementErrors;
+    }
+
+    /**
+     * Skript reads a section header that fails as a statement too, and its error is the line's if it has one that
+     * isn't that the statement isn't understood ({@code ScriptLoader.loadItems}): 'if the potion effect has
+     * particles:', read as words compared, says 'particles' isn't an item type. The compiler may yet fail the header.
+     */
+    private void statementError(Line line, String key) {
+        int mark = diagnostics.mark();
+        DelayState before = delay;
+        try {
+            Statement statement = simple(new Line(line.number(), line.indent(), key));
+            List<Diagnostic> found = diagnostics.takeSince(mark);
+            if (statement instanceof Statement.Invalid) {
+                for (Diagnostic diagnostic : found) {
+                    if (diagnostic.severity() == Severity.ERROR
+                            && !diagnostic.message().startsWith("Can't understand this condition/effect:")) {
+                        statementErrors.put(line, diagnostic.message());
+                        return;
+                    }
+                }
+            }
+        } finally {
+            delay = before;
+        }
     }
 
     /** The delay state before each line parsed so far, by line. */
@@ -247,6 +283,12 @@ final class StatementParser {
             error(line, parser.experimentProblem());
             return new Statement.Invalid(line);
         }
+        // A change whose value is text Skript can only read as an unparsed literal fails as its init does, while parsing.
+        String unusable = parsed instanceof ParsedSyntax syntax ? unusableChanger(line.text(), syntax) : null;
+        if (unusable != null) {
+            error(line, unusable);
+            return new Statement.Invalid(line);
+        }
         if (parsed instanceof Expr.FunctionCall call) {
             return new Statement.Call(line, call);
         }
@@ -304,6 +346,25 @@ final class StatementParser {
      */
     private static boolean experimentalOnly(LineParser parser, ParsedSyntax parsed) {
         return parser.experimentProblem() != null && LineParser.countUnresolved(parsed) > 0;
+    }
+
+    /**
+     * For a change effect whose value is text Skript can only read as an unparsed literal (not words), the error its
+     * init gives: the literal's own, or that it can't understand it.
+     */
+    private static String unusableChanger(String key, ParsedSyntax effect) {
+        // Only where any value goes (a variable): else Skript says what the target can't take, which the compiler does.
+        if (!effect.syntax().id().equals("EffChange") || !effect.match().values().stream().allMatch(value -> value == null
+                || value instanceof Expr.Unresolved || value instanceof Expr.Variable)) {
+            return null;
+        }
+        for (Object value : effect.match().values()) {
+            if (value instanceof Expr.Unresolved words && !words.verified() && !Literals.isWords(words.text())) {
+                return words.problem() != null ? words.problem()
+                        : "Can't understand this expression: '" + words.text().strip() + "'";
+            }
+        }
+        return null;
     }
 
     /** A one-line conditional's header, with its condition. */
@@ -382,7 +443,7 @@ final class StatementParser {
     private String compared(LineParser parser, String text, int start, int end) {
         String side = text.substring(start, end).strip();
         Expr expr = parser.expression(start, end, Expected.OBJECTS);
-        if (expr == null || expr instanceof Expr.Unresolved) {
+        if (expr == null || expr instanceof Expr.Unresolved || expr instanceof Expr.Literal) {
             return Literals.isWords(side) || invalidLine(side) != null ? null : "'" + side + "'";
         }
         TypeRef ref = expr.type() == null || expr instanceof Expr.Variable ? null : context.registry().resolveType(expr.type());
@@ -548,6 +609,12 @@ final class StatementParser {
                         + " there is no parameter to manage it.");
                 return new Statement.Invalid(line);
             }
+            String unusable = effect == null ? null : unusableChanger(key, effect);
+            if (unusable != null) {
+                // Skript's change effect fails to set up before anything claims the section, with its error.
+                error(line, unusable);
+                return new Statement.Invalid(line);
+            }
             if (effect != null || call != null || parser.condition(0, key.length()) != null) {
                 error(line, "The line '" + key + "' is a valid statement but cannot function as a section (:) because"
                         + " there is no syntax in the line to manage it.");
@@ -621,6 +688,7 @@ final class StatementParser {
             return new Statement.Section(line, header, body);
         }
         if (isConditional(lower)) {
+            statementError(line, key);
             return new Statement.Section(line, header, sectionBody(section.children()));
         }
         if (header.syntax().id().equals(SUPPRESS_HINTS)) {

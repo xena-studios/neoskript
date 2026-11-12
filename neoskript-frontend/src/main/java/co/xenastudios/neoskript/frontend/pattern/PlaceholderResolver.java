@@ -30,6 +30,14 @@ public interface PlaceholderResolver {
         return false;
     }
 
+    /**
+     * Whether the {@code <regex>} at {@code index} stands for one of Skript's placeholders (a type's name, Skript's
+     * {@code %*classinfo%}), so the rest of the pattern is matched before it, as for a placeholder.
+     */
+    default boolean regexAfterRest(int index) {
+        return false;
+    }
+
     default Object resolveRegex(String input, int start, int end, int index, java.util.regex.MatchResult match) {
         return match;
     }
