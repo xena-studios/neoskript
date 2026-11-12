@@ -736,3 +736,11 @@ What D15 asks for, done. When the server starts and once a day after, NeoSkript 
 - **`variable-benchmark`**: Skript makes 140,000 variables of the kinds servers keep and saves them. Then Skript and NeoSkript each load that `variables.csv` 3 times when the server starts: **500 ms on Skript, 438 on NeoSkript** (median; Skript logs tenths of a second). Most of NeoSkript's time is putting each index in Skript's order.
 - **The bot plugin:** a bot's channel can be active before it's attached, which made one bot in 16 fail to join. The bot now takes its channel when it's active.
 - **neoskript.dev** shows both, from a fresh run of every benchmark on 2026-11-12: startup 1.97 s against 0.87, reload 1,412 ms against 228.
+
+### Step 6: The public beta
+
+**NeoSkript 0.1.0-beta.1** is out:
+- on [GitHub Releases](https://github.com/xena-studios/neoskript/releases/tag/v0.1.0-beta.1) (a prerelease, with its SHA-256), from `2c626d6`;
+- on [Modrinth](https://modrinth.com/plugin/neoskript) as a beta, for Paper and Folia, Minecraft 1.21.4 to 26.3. The project page now has the beta's install steps, compatibility and benchmarks, and it was sent for Modrinth's review on 2026-11-12.
+
+The jar was booted on all four harness servers before it was published. The update checker looks for it on Modrinth, so betas hear of newer betas and releases. neoskript.dev's download page offers the latest release first, read from GitHub Releases when the site builds, then the development build. The home page, the docs and the README say it's a public beta.

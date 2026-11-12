@@ -4,7 +4,7 @@
 
 NeoSkript is a fast, modern drop-in replacement for [Skript](https://github.com/SkriptLang/Skript). Your `.sk` scripts run unchanged, only faster, on Paper and Folia.
 
-**Status:** in development, nothing released yet. Skript's whole test suite passes on NeoSkript. See [progress](docs/PROGRESS.md).
+**Status:** public beta, [0.1.0-beta.1](https://github.com/xena-studios/neoskript/releases/tag/v0.1.0-beta.1), on [Modrinth](https://modrinth.com/plugin/neoskript) and [GitHub Releases](https://github.com/xena-studios/neoskript/releases). Skript's whole test suite passes on NeoSkript. See [progress](docs/PROGRESS.md).
 
 ## Building
 

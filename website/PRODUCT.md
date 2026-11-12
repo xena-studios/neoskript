@@ -34,7 +34,7 @@ NeoSkript is a clean-room, drop-in replacement for Skript: existing `.sk` script
 
 ## Capabilities and Constraints
 
-- **Status: in development; the plugin isn't released.** The site must say so plainly. Before 1.0, `/download` offers development builds from CI, clearly labelled as such, with the status; Modrinth and GitHub Releases come with the public beta (M6). The one release so far is the script checker, neoskript-cli 0.1.0 (GitHub Releases, tag `cli-v0.1.0`): `/download` and the guides (Moving from Skript) point to it, and nothing on the site says the checker isn't out.
+- **Status: public beta.** NeoSkript 0.1.0-beta.1 is on Modrinth and GitHub Releases (tag `v0.1.0-beta.1`). The site says it's a beta plainly: try it on a test server first. `/download` offers the latest release first (read from GitHub Releases at build time), then the development build from CI, labelled as ahead of the release. The script checker is neoskript-cli 0.1.0 (tag `cli-v0.1.0`); `/download` and the guides (Moving from Skript) point to it.
 - **Scope of syntax: NeoSkript's core library only for now.** Addon syntax (skUnity-style) comes later; the structure should leave room for it.
 - Syntax descriptions and examples may reuse Skript's documentation with attribution: Skript is GPL-3.0-or-later and NeoSkript is GPL-3.0-only, so it's used under version 3.
 - Requirements to state: Paper or Folia, Minecraft 1.21.4+, Java 21. NeoSkript refuses to load alongside Skript, and on first start copies `scripts/` and `variables.csv` from `plugins/Skript` (copy, not move).

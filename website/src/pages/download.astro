@@ -1,30 +1,55 @@
 ---
-// Downloads. Until the public beta, that's the development build CI publishes
-// from main (src/lib/release.ts); the page says plainly what it is.
+// Downloads: the latest release (a public beta, until 1.0) on GitHub Releases
+// and Modrinth, and the development build CI publishes from main
+// (src/lib/release.ts). The page says plainly what each is.
 import Base from "../layouts/Base.astro";
 import External from "../components/External.astro";
-import { devBuild } from "../lib/release";
+import { devBuild, latestRelease } from "../lib/release";
 
 const repo = "https://github.com/xena-studios/neoskript";
+const modrinth = "https://modrinth.com/plugin/neoskript";
+const release = await latestRelease();
 const build = await devBuild();
-const date = build?.published.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-const size = build ? `${(build.jar.size / 1024 / 1024).toFixed(1)} MB` : "";
+const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+const date = build ? day(build.published) : "";
+const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+const size = build ? mb(build.jar.size) : "";
 ---
 <Base
   title="Download NeoSkript"
-  description="The NeoSkript development build: the latest commit on main that passed CI. For Paper and Folia, Minecraft 1.21.4+, Java 21."
+  description="Download NeoSkript: the public beta on Modrinth and GitHub, and the development build. For Paper and Folia, Minecraft 1.21.4+, Java 21."
   path="/download/"
 >
   <section class="page">
     <div class="wrap">
       <h1>Download</h1>
       <p class="lead">
-        NeoSkript isn't released yet. The development build is the latest commit on main that passed CI on real Paper
-        and Folia servers. Use it on a test server, not your live one.
+        {release?.beta
+          ? "NeoSkript is in public beta. Try it on a test server before your live one, and tell us about anything that behaves differently than on Skript."
+          : release
+            ? "The latest release of NeoSkript."
+            : "NeoSkript isn't released yet. The development build is the latest commit on main that passed CI on real Paper and Folia servers. Use it on a test server, not your live one."}
       </p>
+
+      {release && (
+        <div class="build" aria-labelledby="release-title">
+          <h2 id="release-title">NeoSkript {release.version}{release.beta ? " (beta)" : ""}</h2>
+          <dl class="facts">
+            <div><dt>File</dt><dd><code>{release.jar.name}</code> · {mb(release.jar.size)}</dd></div>
+            <div><dt>Released</dt><dd>{day(release.published)}</dd></div>
+            {release.sha256 && <div><dt>SHA-256</dt><dd><code class="hash">{release.sha256}</code></dd></div>}
+          </dl>
+          <div class="actions">
+            <a class="btn btn-primary" href={release.jar.url}>Download {release.beta ? "the beta" : "NeoSkript"}</a>
+            <a class="btn btn-secondary" href={modrinth}>On Modrinth<External /></a>
+            <a class="btn btn-secondary" href={release.page}>Release notes<External /></a>
+          </div>
+        </div>
+      )}
 
       <div class="build" aria-labelledby="dev-title">
         <h2 id="dev-title">Development build</h2>
+        {release && <p class="note">The latest commit on main that passed CI, ahead of the release. For testing what's next.</p>}
         {build ? (
           <>
             <dl class="facts">
@@ -66,8 +91,9 @@ const size = build ? `${(build.jar.size / 1024 / 1024).toFixed(1)} MB` : "";
         <div>
           <dt>Releases</dt>
           <dd>
-            The script checker's first release, <a href={`${repo}/releases/tag/cli-v0.1.0`}>neoskript-cli 0.1.0<External /></a>,
-            is out. NeoSkript itself has none yet: its public beta will be on Modrinth and GitHub Releases.
+            {release
+              ? <>NeoSkript is on <a href={modrinth}>Modrinth<External /></a> and <a href={`${repo}/releases`}>GitHub Releases<External /></a>. It tells you about newer versions itself (<code>update-checker: false</code> turns that off). The script checker is <a href={`${repo}/releases/tag/cli-v0.1.0`}>neoskript-cli 0.1.0<External /></a>.</>
+              : <>The script checker's first release, <a href={`${repo}/releases/tag/cli-v0.1.0`}>neoskript-cli 0.1.0<External /></a>, is out. NeoSkript itself has none yet: its public beta will be on Modrinth and GitHub Releases.</>}
           </dd>
         </div>
         <div>
@@ -105,6 +131,14 @@ const size = build ? `${(build.jar.size / 1024 / 1024).toFixed(1)} MB` : "";
     margin-top: clamp(2.5rem, 2rem + 2vw, 3.5rem);
     padding-block: clamp(1.5rem, 1rem + 2vw, 2.25rem);
     border-block: 1px solid var(--rule);
+  }
+  .build + .build {
+    margin-top: 0;
+    border-top: 0;
+  }
+  .note {
+    margin-top: 0.5rem;
+    color: var(--muted);
   }
   h2 {
     font-size: 1.5rem;
