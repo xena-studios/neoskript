@@ -8,7 +8,7 @@ authors = ["Xena Studios"]
 
 [grammars.skript]
 repository = "https://github.com/xena-studios/neoskript"
-rev = "GRAMMAR_REV"
+rev = "5043913cbc61d9738d02e84c4cfc9730432e2f18"
 path = "editors/tree-sitter-skript"
 
 [language_servers.neoskript]
