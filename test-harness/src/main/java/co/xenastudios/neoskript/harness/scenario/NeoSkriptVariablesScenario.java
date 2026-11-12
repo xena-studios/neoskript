@@ -27,6 +27,8 @@ import java.util.regex.Pattern;
  *       be identical to Skript's file.
  *   <li>NeoSkript saves its own variables; Skript has to read them, and its rewrite has to be identical to
  *       NeoSkript's file.
+ *   <li>Skript's file with its last line cut short, as a crash under Skript can leave it: NeoSkript backs it up,
+ *       skips that line, loads the rest, and never writes over it with less.
  * </ol>
  */
 public final class NeoSkriptVariablesScenario implements Scenario {
@@ -124,6 +126,51 @@ public final class NeoSkriptVariablesScenario implements Scenario {
             Files.write(runs.resolve("skript-rewrite-variables.csv"), skriptRewrite);
             throw new HarnessFailure("Skript's rewrite of NeoSkript's variables differs. Compare "
                     + runs.resolve("neoskript-own-variables.csv") + " and " + runs.resolve("skript-rewrite-variables.csv"));
+        }
+
+        // 5. A file with its last line cut short.
+        damagedFile(context, runs, skriptFile);
+    }
+
+    /**
+     * Skript's file with a line cut short at the end, as Skript leaves it when the server crashes while it appends
+     * a change. Before, the bad hex escaped NeoSkript's load and the shutdown save wrote an empty file over it.
+     */
+    private static void damagedFile(ScenarioContext context, Path runs, byte[] skriptFile) throws Exception {
+        String original = new String(skriptFile, StandardCharsets.UTF_8);
+        String damaged = original.stripTrailing() + "\nharness::cut, string, 80037\n";
+        ServerBuilder neoskript = context.server(runs.resolve("5-neoskript-damaged"))
+                .plugin(context.neoskriptJar())
+                .file("plugins/Skript/variables.csv", damaged)
+                .file("plugins/Skript/scripts/read.sk", context.script("variables-neoskript-read.sk"));
+        List<String> read = stopAfter(neoskript, Pattern.compile("\\[harness] read loc: .*"));
+        String values = read.stream().filter(line -> line.contains("[harness] read: ")).findFirst().orElse("");
+        if (!values.endsWith("hello | héllo ✓ 日本 | say \"hi\" | 42 | 2.5 | true | 5 minutes | a, b and ten"
+                + " | diamond sword named x")) {
+            throw new HarnessFailure("NeoSkript didn't load the readable variables of a damaged file: '" + values + "'");
+        }
+        if (read.stream().noneMatch(line -> line.contains("1 variable could not be loaded!"))
+                || read.stream().noneMatch(line -> line.contains("Affected variables: harness::cut"))) {
+            throw new HarnessFailure("NeoSkript didn't report the line it skipped. See " + neoskript.runDir());
+        }
+        Path dir = neoskript.runDir().resolve("plugins/NeoSkript");
+        List<Path> backups;
+        try (var files = Files.list(dir.resolve("backups"))) {
+            backups = files.toList();
+        }
+        if (backups.isEmpty()) {
+            throw new HarnessFailure("NeoSkript didn't back up the damaged variables.csv");
+        }
+        for (Path backup : backups) {
+            if (!Files.readString(backup, StandardCharsets.UTF_8).equals(damaged)) {
+                throw new HarnessFailure("The backup " + backup + " isn't the file as it was");
+            }
+        }
+        // Either nothing changed and the file is as it was, or it was saved without the line cut short.
+        String after = Files.readString(dir.resolve("variables.csv"), StandardCharsets.UTF_8);
+        if (!after.equals(damaged) && !after.equals(original)) {
+            throw new HarnessFailure("NeoSkript wrote over the damaged variables.csv with less. See "
+                    + dir.resolve("variables.csv"));
         }
     }
 

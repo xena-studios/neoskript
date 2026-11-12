@@ -38,27 +38,59 @@ public final class VariableFile {
 
     private VariableFile() {}
 
+    /** A line that couldn't be read and was skipped, with its number, its text and why. */
+    public record Problem(int line, String text, String name, String message) {}
+
+    /** What a file holds: the variables it could read, and the lines it skipped. */
+    public record Contents(Map<String, Entry> entries, List<Problem> problems) {}
+
+    /** The variables in the file. Lines that can't be read are skipped; {@link #load} says which. */
     public static Map<String, Entry> read(Path file) throws IOException {
+        return load(file).entries();
+    }
+
+    /**
+     * Reads the file as Skript does: a line that can't be read is skipped and the rest are kept. A skipped line
+     * changes nothing, so an earlier line for the same variable still counts.
+     */
+    public static Contents load(Path file) throws IOException {
         Map<String, Entry> entries = new LinkedHashMap<>();
+        List<Problem> problems = new ArrayList<>();
+        // Bytes that aren't UTF-8 (a line cut off mid-character) become U+FFFD instead of failing the read,
+        // as with Skript's reader.
+        String text = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+        HexFormat hex = HexFormat.of();
         int number = 0;
-        for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+        for (String line : (Iterable<String>) text.lines()::iterator) {
             number++;
             if (line.isBlank() || line.startsWith("#")) {
                 continue;
             }
             List<String> fields = split(line);
+            String name = fields.getFirst();
+            String shown = name.isEmpty() ? "<unknown>" : name;
             if (fields.size() != 3) {
-                throw new IOException(file + ", line " + number + ": expected 'name, type, value'");
+                // Skript's message.
+                problems.add(new Problem(number, line, shown,
+                        "invalid amount of commas in line " + number + " ('" + line + "')"));
+                continue;
             }
-            String name = fields.get(0);
             if (fields.get(1).isEmpty()) {
                 entries.remove(name);
-            } else {
-                entries.remove(name);
-                entries.put(name, new Entry(name, fields.get(1), HexFormat.of().parseHex(fields.get(2))));
+                continue;
             }
+            byte[] bytes;
+            try {
+                bytes = hex.parseHex(fields.get(2));
+            } catch (IllegalArgumentException e) {
+                problems.add(new Problem(number, line, shown,
+                        "invalid value in line " + number + " ('" + line + "'): " + e.getMessage()));
+                continue;
+            }
+            entries.remove(name);
+            entries.put(name, new Entry(name, fields.get(1), bytes));
         }
-        return entries;
+        return new Contents(entries, problems);
     }
 
     /** Writes the entries, in the order given, to a temporary file that then replaces {@code file}. */

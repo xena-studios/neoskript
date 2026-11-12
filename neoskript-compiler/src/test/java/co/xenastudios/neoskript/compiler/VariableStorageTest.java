@@ -76,21 +76,25 @@ class VariableStorageTest {
         VariableStorage storage = new VariableStorage(store, new Library().codecs(), original);
         storage.load();
         Path copy = dir.resolve("copy.csv");
-        new VariableStorage(store, new Library().codecs(), copy).save();
+        VariableStorage copyStorage = new VariableStorage(store, new Library().codecs(), copy);
+        copyStorage.load();
+        copyStorage.save();
         assertEquals(Files.readString(original), Files.readString(copy));
     }
 
     @Test
     void savesInSkriptsOrderWithoutMemoryVariables() throws Exception {
         VariableStore store = new VariableStore();
+        Path file = dir.resolve("out.csv");
+        VariableStorage storage = new VariableStorage(store, new Library().codecs(), file);
+        storage.load();
+        assertFalse(storage.changed());
         store.set("o::10", "ten");
         store.set("o::B", "upper b");
         store.set("o::2", "two");
         store.set("o::a", "lower a");
         store.set("-memory", 1L);
         store.set("-memory::list", 1L);
-        Path file = dir.resolve("out.csv");
-        VariableStorage storage = new VariableStorage(store, new Library().codecs(), file);
         assertTrue(storage.changed());
         storage.save();
         assertFalse(storage.changed());

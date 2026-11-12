@@ -754,3 +754,11 @@ Planned for 1.x, done early: NeoSkript's parser in editors (`editors/`).
 - **Tested** by `pnpm test` in `editors/language-server`, which starts the built server over stdio in a workspace of two scripts and checks problems, hover, completion, the outline and both kinds of definition. The grammars are checked by tokenizing and parsing a sample, and the Zed extension builds for `wasm32-wasip2`.
 - **neoskript.dev** has a [Code editors](https://neoskript.dev/docs/editors/) guide.
 
+### Step 8: Damaged variable files
+
+A fix for 0.1.0-beta.1, which could wipe `variables.csv`. Skript appends changes to the file, so a crash under Skript can cut its last line short. A value of odd length made the load throw an exception the plugin didn't catch, Paper disabled NeoSkript, and its shutdown save wrote an empty store over the file. A unit test on the old code showed the empty file.
+- **Nothing saves until the variables load:** `VariableStorage` refuses to save, at the interval or at shutdown, until a load has succeeded. A file that can't be read at all is left alone, and the console says so.
+- **Bad lines are skipped, as in Skript:** a line with the wrong number of fields (Skript's `invalid amount of commas in line N`) or a value that isn't hex is skipped, and the rest load. An earlier line for the same variable still counts. The console lists them with Skript's summary (`1 variable could not be loaded!`, `Affected variables: ...`) and how many lines were skipped. A line cut inside a UTF-8 character no longer fails the read.
+- **Backups:** when lines are skipped, the file is first copied to `backups/variables_<time>.csv`, named as Skript names its backups. The first start after migrating from Skript backs up the copied `variables.csv` the same way before it's loaded, as the plan's risks section promised.
+- **Interrupted saves:** temporary files a save left beside `variables.csv` are removed at startup. If `variables.csv` is missing they're kept.
+- **Tested** by `VariableStorageLoadTest` (a cut last line, odd-length and non-hex values, a wrong field count, a file that can't be read, leftover temporary files), `SkriptMigrationTest`, and a fifth step of `neoskript-variables` that starts a real server on Skript's file with its last line cut short.

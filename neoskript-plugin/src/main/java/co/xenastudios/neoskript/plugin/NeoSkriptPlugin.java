@@ -66,6 +66,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                         String.join(" and ", migration.copied()), migration.scriptCount(),
                         migration.scriptCount() == 1 ? "script" : "scripts");
             }
+            if (migration.variablesBackup() != null) {
+                getSLF4JLogger().info("Backed up Skript's variables as {} before loading them",
+                        getDataPath().toAbsolutePath().relativize(migration.variablesBackup().toAbsolutePath()));
+            }
             // The variables copied are keyed as Skript's config said, so keep reading them that way.
             if (migration.playerUuids() != null
                     && migration.playerUuids() != getConfig().getBoolean("variables.player-uuids-in-names", true)) {
@@ -234,11 +238,32 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         try {
             long start = System.nanoTime();
             VariableStorage.Result loaded = storage.load();
+            if (loaded.leftovers() > 0) {
+                getSLF4JLogger().info("Removed {} temporary {} left by a save that was interrupted", loaded.leftovers(),
+                        loaded.leftovers() == 1 ? "file" : "files");
+            }
+            if (!loaded.skipped().isEmpty()) {
+                // As Skript reports them.
+                for (var problem : loaded.skipped()) {
+                    getSLF4JLogger().error(problem.message());
+                }
+                int count = loaded.skipped().size();
+                getSLF4JLogger().error("{} variable{} could not be loaded!", count, count == 1 ? "" : "s");
+                getSLF4JLogger().error("Affected variables: {}", loaded.skipped().stream()
+                        .map(co.xenastudios.neoskript.runtime.variables.storage.VariableFile.Problem::name)
+                        .collect(java.util.stream.Collectors.joining(", ")));
+                getSLF4JLogger().info("Created a backup of {} as {}", storage.file().getFileName(),
+                        getDataPath().toAbsolutePath().relativize(loaded.backup().toAbsolutePath()));
+                getSLF4JLogger().warn("Skipped {} {} of {} that couldn't be read; the other variables loaded. "
+                        + "The next save leaves those lines out, and the backup keeps them.", count,
+                        count == 1 ? "line" : "lines", storage.file().getFileName());
+            }
             getSLF4JLogger().info("Loaded {} {} in {} ms{}", loaded.variables(), loaded.variables() == 1 ? "variable" : "variables",
                     (System.nanoTime() - start) / 1_000_000,
                     loaded.raw() == 0 ? "" : " (" + loaded.raw() + " kept as saved until NeoSkript supports their types)");
-        } catch (IOException e) {
-            // Don't run with an empty set of variables that would then overwrite the file.
+        } catch (IOException | RuntimeException e) {
+            // Don't run with an empty set of variables that would then overwrite the file. The storage never saves
+            // until it has loaded, so nothing writes over the file, not even when the server stops.
             getSLF4JLogger().error("Couldn't load variables from {}. Variables won't be saved until it's fixed.",
                     storage.file(), e);
             storage = null;
@@ -252,7 +277,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     private void saveVariables(boolean always) {
         VariableStorage current = storage;
-        if (current == null || (!always && !current.changed())) {
+        if (current == null || !current.loaded() || (!always && !current.changed())) {
             return;
         }
         try {
@@ -260,7 +285,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             if (saved.unsaved() > 0) {
                 getSLF4JLogger().warn("{} variables have values that can't be saved yet, so they weren't", saved.unsaved());
             }
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             getSLF4JLogger().error("Couldn't save variables to {}", current.file(), e);
         }
     }
