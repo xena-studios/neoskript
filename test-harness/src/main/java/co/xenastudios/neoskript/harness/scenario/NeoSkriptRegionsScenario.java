@@ -16,10 +16,12 @@ import java.util.regex.Pattern;
 
 /**
  * Region ownership (plan 3.3), with two pigs 4096 blocks apart, each in its own region on Folia, and console
- * commands, which run on Folia's global region thread. On Folia, reading a pig from another region's thread
- * is a runtime error naming the line (not Folia's stack trace) and reads nothing; changing one is sent to its
- * thread; and {@code run on} runs code on its thread, in order with the rest of the trigger. On Paper, where one
- * thread owns everything, the same script reads, changes and runs everything as it is, with no errors.
+ * commands, which run on Folia's global region thread. On Folia, a script command's line that reads a pig in
+ * another region goes to that region's thread to read it, as does an {@code every} trigger's line that reads a
+ * chest at another world's spawn. In a Bukkit event still being dispatched, the read is a runtime error naming
+ * the line (not Folia's stack trace) and reads nothing. Changing a pig is sent to its thread, and {@code run on}
+ * runs code on its thread, in order with the rest of the trigger. On Paper, where one thread owns everything, the
+ * same script reads, changes and runs everything as it is, with no errors.
  */
 public final class NeoSkriptRegionsScenario implements Scenario {
 
@@ -69,14 +71,30 @@ public final class NeoSkriptRegionsScenario implements Scenario {
 
             mark = server.mark();
             server.command("regiontest read");
+            server.await(Pattern.compile("\\[regiontest] read 5(\\.0)?$"), mark, WAIT);
+
+            mark = server.mark();
+            server.command("regionevent");
             if (folia) {
                 server.await(ERROR, mark, WAIT);
                 server.await(IN_ANOTHER_REGION, mark, WAIT);
-                server.await(Pattern.compile(Pattern.quote("    Line 19: set {_health} to health of {regiontest::near}")
+                server.await(Pattern.compile(Pattern.quote("    Line 9: set {_health} to health of {regiontest::near}")
                         + "$"), mark, WAIT);
-                server.await(line("[regiontest] read <none>"), mark, WAIT);
+                server.await(line("[regiontest] event read <none>"), mark, WAIT);
             } else {
-                server.await(Pattern.compile("\\[regiontest] read 5(\\.0)?$"), mark, WAIT);
+                server.await(Pattern.compile("\\[regiontest] event read 5(\\.0)?$"), mark, WAIT);
+            }
+
+            mark = server.mark();
+            server.command("regiontest worlds");
+            List<Pattern> worlds = List.of(
+                    line("[regiontest] every world_nether chest, dirt and stone"),
+                    line("[regiontest] every world_the_end chest, dirt and stone"),
+                    line("[regiontest] every done"));
+            int from = mark;
+            for (Pattern expected : worlds) {
+                server.await(expected, from, WAIT);
+                from = lineOf(server, expected, from) + 1;
             }
 
             mark = server.mark();
@@ -88,7 +106,7 @@ public final class NeoSkriptRegionsScenario implements Scenario {
             server.command("regiontest check");
             List<Pattern> order = new ArrayList<>(List.of(
                     Pattern.compile("\\[regiontest] far health 3(\\.0)?$"),
-                    Pattern.compile(folia ? "\\[regiontest] cross <none>$" : "\\[regiontest] cross 4(\\.0)?$"),
+                    Pattern.compile("\\[regiontest] cross 4(\\.0)?$"),
                     Pattern.compile("\\[regiontest] far after wait 3(\\.0)?$"),
                     Pattern.compile("\\[regiontest] near health 4(\\.0)?$"),
                     line("[regiontest] after run on")));
@@ -102,7 +120,7 @@ public final class NeoSkriptRegionsScenario implements Scenario {
             server.command("regiontest section");
             order = List.of(
                     Pattern.compile("\\[regiontest] section Daisy 3(\\.0)?$"),
-                    Pattern.compile(folia ? "\\[regiontest] after section <none>$" : "\\[regiontest] after section 3(\\.0)?$"),
+                    Pattern.compile("\\[regiontest] after section 3(\\.0)?$"),
                     line("[regiontest] loop section 1"),
                     line("[regiontest] after exit loop"));
             at = mark;
@@ -113,8 +131,8 @@ public final class NeoSkriptRegionsScenario implements Scenario {
             if (!server.linesMatching(line("[regiontest] loop section 2")).isEmpty()) {
                 throw new HarnessFailure("'exit loop' in a section didn't leave the loop. See " + server.logFile());
             }
-            if (folia && server.linesMatching(IN_ANOTHER_REGION).size() != 3) {
-                throw new HarnessFailure("Reading a pig from another region's thread should have been 3 runtime errors,"
+            if (folia && server.linesMatching(IN_ANOTHER_REGION).size() != 1) {
+                throw new HarnessFailure("Reading a pig from another region's thread should have been 1 runtime error,"
                         + " was " + server.linesMatching(IN_ANOTHER_REGION).size() + ". See " + server.logFile());
             }
             server.stop();

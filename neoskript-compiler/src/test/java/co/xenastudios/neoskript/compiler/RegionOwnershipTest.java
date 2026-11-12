@@ -52,6 +52,8 @@ class RegionOwnershipTest {
     private final Deque<Object[]> elsewhere = new ArrayDeque<>();
     /** The region whose thread is running now. */
     private String running = "here";
+    /** Whether the pretend server is still dispatching the triggers' event, as with a Bukkit event. */
+    private boolean dispatching = true;
     private Library library;
 
     private final RegionAccess access = new RegionAccess() {
@@ -78,6 +80,11 @@ class RegionOwnershipTest {
         @Override
         public void execute(Object value, Runnable task) {
             elsewhere.add(new Object[] {value, task});
+        }
+
+        @Override
+        public boolean dispatching(Object event) {
+            return dispatching;
         }
 
         @Override
@@ -129,6 +136,8 @@ class RegionOwnershipTest {
         library.expression("FarPlace", "location", info -> (context, args) -> new Place("there"), "the far place");
         library.expression("NameOf", "string", info -> (context, args) -> ((Thing) args[0]).name() + "!",
                 "name of %entity%");
+        library.condition("IsNamed", info -> (context, args) -> ((Thing) args[0]).name().equals(args[1]),
+                "%entity% is named %string%");
         library.expression("Refused", "string", info -> (context, args) -> {
             IllegalStateException refused = new IllegalStateException("Accessing entity state off owning region's thread");
             refused.setStackTrace(new StackTraceElement[] {
@@ -202,6 +211,54 @@ class RegionOwnershipTest {
         assertEquals(3, error.source().lineNumber());
         assertEquals("test.sk", error.source().script());
         assertTrue(error.error().startsWith("The thing far is in another region"), error.error());
+    }
+
+    @Test
+    void whereNothingIsLostAReadOfAnotherRegionGoesThereAndRunsTheLineAgain() {
+        // As in a test, an 'every' period or a script command: the event isn't being dispatched.
+        dispatching = false;
+        folia();
+        run("on load:\n\tsay \"before\"\n\tsay \"%name of the far thing%\"\n\tsay \"there\"\n"
+                + "\tpoke the near thing\n");
+        assertEquals(List.of("before"), said);
+        runElsewhere();
+        // The line after it touches nothing in a region and stays there; the poke goes home as effects do.
+        assertEquals(List.of("before", "far!", "there", "poked near on here"), said);
+        assertEquals(List.of(), errors);
+    }
+
+    @Test
+    void aReadThereSeesWhatTheTriggerChangedThereBefore() {
+        dispatching = false;
+        folia();
+        run("on load:\n\tpoke the far thing\n\tsay \"%name of the far thing%\"\n");
+        runElsewhere();
+        assertEquals(List.of("poked far on there", "far!"), said);
+        assertEquals(List.of(), errors);
+    }
+
+    @Test
+    void anIfThatReadsAnotherRegionGoesThereThenItsElseGoesBack() {
+        dispatching = false;
+        folia();
+        run("on load:\n\tif the far thing is named \"nope\":\n\t\tsay \"named nope\"\n\telse:\n"
+                + "\t\tsay \"%name of the near thing%\"\n\tsay \"after\"\n");
+        runElsewhere();
+        assertEquals(List.of("near!", "after"), said);
+        assertEquals(List.of(), errors);
+    }
+
+    @Test
+    void aLineThatReadsTwoRegionsIsStillAnError() {
+        dispatching = false;
+        folia();
+        run("on load:\n\tsay \"%name of the far thing% %name of the near thing%\"\n");
+        runElsewhere();
+        // It went to the far thing's thread once; there, the near thing is in another region.
+        assertEquals(List.of("far! <none>"), said);
+        assertEquals(1, errors.size());
+        assertTrue(errors.getFirst().error().startsWith("The thing near is in another region"),
+                errors.getFirst().error());
     }
 
     @Test

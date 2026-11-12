@@ -43,6 +43,7 @@ import static org.objectweb.asm.Opcodes.ISTORE;
 import static org.objectweb.asm.Opcodes.LADD;
 import static org.objectweb.asm.Opcodes.LCONST_1;
 import static org.objectweb.asm.Opcodes.NEW;
+import static org.objectweb.asm.Opcodes.NOP;
 import static org.objectweb.asm.Opcodes.POP;
 import static org.objectweb.asm.Opcodes.PUTFIELD;
 import static org.objectweb.asm.Opcodes.RETURN;
@@ -644,7 +645,12 @@ final class TriggerCompiler {
         Label end = new Label();
         Label handler = new Label();
         Label dispatch = new Label();
-        method.visitTryCatchBlock(start, end, handler, "java/lang/Throwable");
+        // On Folia, armed lines ({@link #armed}) catch their own exceptions first: their handlers are visited
+        // while the body is, and this one after it.
+        boolean handlerLast = Regions.enabled();
+        if (!handlerLast) {
+            method.visitTryCatchBlock(start, end, handler, "java/lang/Throwable");
+        }
         pushInt(0);
         method.visitVarInsn(ISTORE, LINE_SLOT);
         if (trigger) {
@@ -708,6 +714,9 @@ final class TriggerCompiler {
         }
         exitTrigger();
         method.visitLabel(end);
+        if (handlerLast) {
+            method.visitTryCatchBlock(start, end, handler, "java/lang/Throwable");
+        }
         // catch (Throwable t) { throw t instanceof ScriptRuntimeException ? t : new ScriptRuntimeException(...); }
         // Errors from a function called here already say where they happened, so they pass through as is.
         method.visitLabel(handler);
@@ -890,6 +899,11 @@ final class TriggerCompiler {
      * and returns the point it carries on from, whose label the caller places.
      */
     private WaitPoint saveFrame() {
+        return saveFrame(new Label());
+    }
+
+    /** {@link #saveFrame()}, carrying on from {@code resume}, which the caller places. */
+    private WaitPoint saveFrame(Label resume) {
         String frame = Type.getInternalName(Frame.class);
         List<int[]> saved = new ArrayList<>();
         for (Block block : loops()) {
@@ -912,7 +926,7 @@ final class TriggerCompiler {
                 saved.add(new int[] {carried, SAVED_VALUES});
             }
         }
-        WaitPoint wait = new WaitPoint(new Label(), line, saved);
+        WaitPoint wait = new WaitPoint(resume, line, saved);
         int state = waits.size();
         waits.add(wait);
 
@@ -1086,6 +1100,7 @@ final class TriggerCompiler {
         depth++;
         if (depth == 1) {
             onGlobal = false;
+            away = false;
         }
         try {
             for (int i = 0; i < statements.size(); i++) {
@@ -1095,10 +1110,16 @@ final class TriggerCompiler {
                     if (onGlobal && !globalSafe(statement)) {
                         leaveGlobal();
                     }
+                    if (away && !globalSafe(statement) && !armable(statement)) {
+                        leaveAway();
+                    }
                     if (startsConditional(statement)) {
                         i = conditional(statements, i) - 1;
                     } else {
                         statement(statement);
+                        if (armable(statement)) {
+                            away = true;
+                        }
                     }
                 } catch (co.xenastudios.neoskript.api.element.SyntaxError error) {
                     // An element that matched but can't be used as written.
@@ -1131,6 +1152,9 @@ final class TriggerCompiler {
             }
             // Code after the block runs on the trigger's thread, whichever way it gets there.
             leaveGlobal();
+            if (depth > 1) {
+                leaveAway();
+            }
         } finally {
             depth--;
         }
@@ -1355,9 +1379,14 @@ final class TriggerCompiler {
     private void statement(Statement statement) throws CompileException {
         lineOf(statement, statement instanceof Statement.Section s ? s.line().key() : statement.line().text());
         switch (statement) {
+            case Statement.Effect effect when armable(statement) -> armed(() -> effect(effect.effect()));
             case Statement.Effect effect -> effect(effect.effect());
             case Statement.Condition condition -> {
-                condition(condition.condition());
+                if (armable(statement)) {
+                    armed(() -> condition(condition.condition()));
+                } else {
+                    condition(condition.condition());
+                }
                 Label pass = new Label();
                 method.visitJumpInsn(IFNE, pass);
                 exitTrigger();
@@ -1485,6 +1514,7 @@ final class TriggerCompiler {
     private int conditional(List<Statement> statements, int i) throws CompileException {
         Label chainEnd = new Label();
         boolean first = true;
+        boolean armedAny = false;
         while (i < statements.size()) {
             Statement statement = statements.get(i);
             String key = statement.line().key().strip().toLowerCase(Locale.ROOT);
@@ -1492,6 +1522,14 @@ final class TriggerCompiler {
                 break;
             }
             first = false;
+            // After an 'if' whose condition may have gone to another region, an 'else' that can't goes back first.
+            ParsedSyntax header = statement instanceof Statement.Section section && section.header() != null
+                    && section.header().match().regexValues().size() == 1
+                    && section.header().match().regexValues().getFirst() instanceof ParsedSyntax condition
+                    ? condition : null;
+            if (away && (header == null || !armableCondition(header))) {
+                leaveAway();
+            }
             Label next = new Label();
             if (statement instanceof Statement.Conditions conditions) {
                 lineOf(statement, statement.line().key());
@@ -1538,9 +1576,17 @@ final class TriggerCompiler {
                 if (!(section.header().match().regexValues().getFirst() instanceof ParsedSyntax condition)) {
                     throw unsupported("'" + section.line().key() + "'");
                 }
-                condition(condition);
+                if (armableCondition(condition)) {
+                    armed(() -> condition(condition));
+                    armedAny = true;
+                    away = true;
+                } else {
+                    condition(condition);
+                }
                 method.visitJumpInsn(IFEQ, next);
+                boolean afterHeader = away;
                 block(BlockKind.CONDITIONAL, chainEnd, section.body());
+                away = afterHeader;
             } else {
                 break;
             }
@@ -1549,6 +1595,8 @@ final class TriggerCompiler {
             i++;
         }
         method.visitLabel(chainEnd);
+        // Where a condition went to another region and was false, the trigger may still be there.
+        away = armedAny;
         return i;
     }
 
@@ -2078,11 +2126,146 @@ final class TriggerCompiler {
             if (!onGlobal) {
                 hop(-1, "hopGlobal");
                 onGlobal = true;
+                // From there, the trigger goes back to its own thread.
+                away = false;
             }
             effectHere(effect);
             return;
         }
         effectHere(effect);
+    }
+
+    /**
+     * Whether the code being compiled may be on another region's thread, after a line that read something there
+     * ({@link #armed}). It stays there while the lines after it can go there too, or touch nothing in a region,
+     * then goes back to the trigger's own thread, as after a line only the global thread may run.
+     */
+    private boolean away;
+
+    /** Goes back from another region's thread to the trigger's own (or its 'run on' section's), if it may be there. */
+    private void leaveAway() {
+        if (away) {
+            away = false;
+            hop(runOns.isEmpty() ? -1 : runOns.peek().slot(), "hopBack");
+        }
+    }
+
+    /**
+     * Whether {@code statement} is a line that, on Folia, goes to another region's thread to read what's there
+     * ({@link #armed}): an effect, change, assert or condition on its own line that reads what's in a region, in a
+     * trigger. Not in a function, whose caller can't wait for it, nor a line that calls a function, whose effects
+     * would happen twice.
+     */
+    private boolean armable(Statement statement) {
+        return switch (statement) {
+            case Statement.Effect line -> {
+                ParsedSyntax effect = line.effect();
+                if (!Regions.enabled() || function != null || globalOnly(effect)) {
+                    yield false;
+                }
+                if (library.binding(effect.syntax()) instanceof Library.Core core
+                        && !core.id().equals(CoreSyntax.CHANGE) && !core.id().equals(CoreSyntax.ASSERT)) {
+                    // Waits, exits and the like.
+                    yield false;
+                }
+                yield !regionFree(effect) && !callsFunction(effect);
+            }
+            case Statement.Condition line -> armableCondition(line.condition());
+            default -> false;
+        };
+    }
+
+    /** {@link #armable} for a condition: an {@code if}'s, or one on its own line. */
+    private boolean armableCondition(ParsedSyntax condition) {
+        return Regions.enabled() && function == null && !regionFree(condition) && !callsFunction(condition);
+    }
+
+    /** Whether {@code syntax}, or what's in it, calls a function. */
+    private boolean callsFunction(ParsedSyntax syntax) {
+        for (Object value : syntax.match().values()) {
+            if (value != null && callsFunction(value)) {
+                return true;
+            }
+        }
+        for (Object value : syntax.match().regexValues()) {
+            if (value instanceof ParsedSyntax inner && callsFunction(inner)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean callsFunction(Object value) {
+        return switch (value) {
+            case Expr.FunctionCall call -> true;
+            case Expr.Variable variable -> variable.embedded().stream().anyMatch(this::callsFunction);
+            case Expr.Text text -> text.embedded().stream().anyMatch(this::callsFunction);
+            case Expr.ListOf list -> list.items().stream().anyMatch(this::callsFunction);
+            case Expr.Syntax syntax -> callsFunction(syntax.syntax());
+            case ParsedSyntax syntax -> callsFunction(syntax);
+            default -> false;
+        };
+    }
+
+    /**
+     * Compiles a line that may read what's in another region on Folia, from {@code code}, which leaves what it
+     * leaves on the stack. Where the trigger loses nothing by waiting ({@link Regions#hoppable}), such a read
+     * throws {@link Regions.Hop}: the trigger then carries on on the thread that owns what it read, like a wait,
+     * and runs the line again from its start there. It isn't armed then, so a read of a third region in it is the
+     * usual error, and the line can't go back and forth. Elsewhere, the read is the usual error.
+     */
+    private void armed(Body code) throws CompileException {
+        String regions = Type.getInternalName(Regions.class);
+        String hop = Type.getInternalName(Regions.Hop.class);
+        int previous = nextSlot++;
+        Label retry = new Label();
+        Label body = new Label();
+        Label end = new Label();
+        Label hopped = new Label();
+        Label failed = new Label();
+        Label after = new Label();
+        method.visitTryCatchBlock(body, end, hopped, hop);
+        method.visitTryCatchBlock(body, end, failed, null);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        method.visitMethodInsn(INVOKESTATIC, regions, "arm", "(" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+        method.visitVarInsn(ASTORE, previous);
+        method.visitJumpInsn(GOTO, body);
+        // Run again on the other thread, unarmed.
+        method.visitLabel(retry);
+        method.visitInsn(ACONST_NULL);
+        method.visitMethodInsn(INVOKESTATIC, regions, "arm", "(" + OBJECT_DESC + ")" + OBJECT_DESC, false);
+        method.visitVarInsn(ASTORE, previous);
+        method.visitLabel(body);
+        // A line may compile to nothing ('assert ... to fail' is checked as it loads); a try range can't be empty.
+        method.visitInsn(NOP);
+        code.emit();
+        method.visitLabel(end);
+        method.visitVarInsn(ALOAD, previous);
+        method.visitMethodInsn(INVOKESTATIC, regions, "disarm", "(" + OBJECT_DESC + ")V", false);
+        method.visitJumpInsn(GOTO, after);
+
+        method.visitLabel(hopped);
+        method.visitVarInsn(ASTORE, EXCEPTION_SLOT);
+        method.visitVarInsn(ALOAD, previous);
+        method.visitMethodInsn(INVOKESTATIC, regions, "disarm", "(" + OBJECT_DESC + ")V", false);
+        method.visitVarInsn(ALOAD, 0);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        saveFrame(retry);
+        method.visitVarInsn(ALOAD, EXCEPTION_SLOT);
+        method.visitTypeInsn(CHECKCAST, hop);
+        method.visitMethodInsn(INVOKEVIRTUAL, hop, "target", "()" + OBJECT_DESC, false);
+        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "hopRegion",
+                "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + OBJECT_DESC + ")V", false);
+        exitTrigger();
+
+        // Anything else goes on as it would, unarmed.
+        method.visitLabel(failed);
+        method.visitVarInsn(ASTORE, EXCEPTION_SLOT);
+        method.visitVarInsn(ALOAD, previous);
+        method.visitMethodInsn(INVOKESTATIC, regions, "disarm", "(" + OBJECT_DESC + ")V", false);
+        method.visitVarInsn(ALOAD, EXCEPTION_SLOT);
+        method.visitInsn(ATHROW);
+        method.visitLabel(after);
     }
 
     /**

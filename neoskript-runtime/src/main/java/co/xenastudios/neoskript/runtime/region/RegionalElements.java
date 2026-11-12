@@ -56,14 +56,21 @@ public final class RegionalElements {
         return element;
     }
 
-    /** Checks the entities and blocks an element reads; whether it may go on. */
-    private static boolean readable(RegionAccess access, ErrorSites.Site site, Object[] arguments, long reads) {
+    /**
+     * Checks the entities and blocks an element reads; whether it may go on. One in another region is an error,
+     * unless the line may go there and run again ({@link Regions#hoppable}).
+     */
+    private static boolean readable(RegionAccess access, ErrorSites.Site site, TriggerContext context,
+            Object[] arguments, long reads) {
         if (reads == 0) {
             return true;
         }
         Object foreign = Regions.foreign(access, arguments, reads);
         if (foreign == null) {
             return true;
+        }
+        if (Regions.hoppable(access, context)) {
+            throw new Regions.Hop(foreign);
         }
         Regions.readError(access, site, foreign);
         return false;
@@ -74,7 +81,7 @@ public final class RegionalElements {
 
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
-            if (!readable(access, site, arguments, reads)) {
+            if (!readable(access, site, context, arguments, reads)) {
                 return null;
             }
             try {
@@ -100,7 +107,7 @@ public final class RegionalElements {
 
     private static boolean check(Condition element, RegionAccess access, ErrorSites.Site site, long reads,
             TriggerContext context, Object[] arguments) {
-        if (!readable(access, site, arguments, reads)) {
+        if (!readable(access, site, context, arguments, reads)) {
             return false;
         }
         try {
@@ -134,7 +141,7 @@ public final class RegionalElements {
         @Override
         public Object run(TriggerContext context, Object[] arguments) {
             // Its code runs right after it, so it can't run elsewhere: it's read like an expression.
-            if (!readable(access, site, arguments, reads)) {
+            if (!readable(access, site, context, arguments, reads)) {
                 return null;
             }
             try {

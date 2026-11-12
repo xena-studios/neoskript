@@ -99,6 +99,46 @@ public final class Waits {
         return true;
     }
 
+    /**
+     * Called by code compiled for Folia when a line read {@code target} in another region, in a trigger that loses
+     * nothing by waiting ({@link co.xenastudios.neoskript.runtime.region.Regions#hoppable}): carries on with
+     * {@code frame}, which runs the line again from its start, on the thread that owns {@code target}. It goes
+     * there as the region's other tasks do, so what this trigger changed there before is done first.
+     */
+    public static void hopRegion(Resumable trigger, TriggerContext context, Frame frame, Object target) {
+        co.xenastudios.neoskript.runtime.region.RegionAccess access =
+                co.xenastudios.neoskript.runtime.region.Regions.access();
+        if (access == null) {
+            throw new IllegalStateException("Region ownership isn't on");
+        }
+        scheduled(context.event());
+        access.resume(target, () -> {
+            delay(context.event());
+            try {
+                trigger.resume(context, frame);
+            } catch (ScriptRuntimeException e) {
+                errors.accept(e);
+            } finally {
+                ran(context.event());
+            }
+        });
+    }
+
+    /**
+     * Called by code compiled for Folia after lines that may have gone to another region's thread
+     * ({@link #hopRegion}), before code that may not run there: carries on with {@code frame} on the thread that
+     * owns {@code to} (or with {@code null}, the trigger's own), as {@link #hop}. Not in a trigger of an event the
+     * server is still dispatching, which never went. Whether it was scheduled.
+     */
+    public static boolean hopBack(Resumable trigger, TriggerContext context, Frame frame, Object to) {
+        co.xenastudios.neoskript.runtime.region.RegionAccess access =
+                co.xenastudios.neoskript.runtime.region.Regions.access();
+        if (access == null || (access.dispatching(context.event()) && !delayed(context.event()))) {
+            return false;
+        }
+        return hop(trigger, context, frame, to);
+    }
+
     /** Called by the generated code at a {@code wait}: carries on with {@code frame} after {@code ticks}. */
     public static void schedule(Resumable trigger, TriggerContext context, Frame frame, long ticks) {
         Scheduler current = scheduler;

@@ -75,6 +75,19 @@ public final class FoliaRegionAccess implements RegionAccess {
     }
 
     @Override
+    public void resume(Object value, Runnable task) {
+        if (value instanceof Entity entity) {
+            // The entity's scheduler, as execute uses; if the entity is gone, the trigger carries on globally.
+            Runnable global = () -> server.getGlobalRegionScheduler().execute(plugin, task);
+            if (entity.getScheduler().run(plugin, scheduled -> task.run(), global) == null) {
+                global.run();
+            }
+        } else {
+            execute(value, task);
+        }
+    }
+
+    @Override
     public String describe(Object value) {
         return switch (value) {
             case Player player -> "the player " + player.getName();

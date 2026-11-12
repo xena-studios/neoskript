@@ -3,6 +3,27 @@
 on load:
 	send "[regiontest] loaded" to console
 
+# A Bukkit event still being dispatched: reading another region is a runtime error on Folia, and nothing read, as
+# going there would end the event first.
+on command "regionevent":
+	set {_health} to health of {regiontest::near}
+	send "[regiontest] event read %{_health}%" to console
+	cancel event
+
+# From the global thread, a chest at the spawn of other worlds, as Skript's own 'items in' tests do: on Folia each
+# line that reads it goes to its region's thread.
+every second:
+	{regiontest::worlds} is set
+	delete {regiontest::worlds}
+	loop "world_nether" and "world_the_end":
+		set {_world} to world loop-value
+		set block at spawn of {_world} to chest
+		set {_inv} to inventory of (block at spawn of {_world})
+		set slot 1 of {_inv} to dirt
+		set slot 2 of {_inv} to stone
+		send "[regiontest] every %loop-value% %type of block at spawn of {_world}%, %all items in inventory {_inv}%" to console
+	send "[regiontest] every done" to console
+
 command /regiontest <text>:
 	trigger:
 		if arg-1 is "spawn":
@@ -15,7 +36,8 @@ command /regiontest <text>:
 			if {regiontest::far} is set:
 				send "[regiontest] spawned" to console
 		else if arg-1 is "read":
-			# Another region's thread owns the pig: a runtime error on Folia, and nothing read.
+			# Another region's thread owns the pig: on Folia the line goes there to read it, as a script command
+			# loses nothing by waiting.
 			set {_health} to health of {regiontest::near}
 			send "[regiontest] read %{_health}%" to console
 		else if arg-1 is "change":
@@ -33,12 +55,14 @@ command /regiontest <text>:
 			run on {regiontest::near}:
 				send "[regiontest] near health %health of {regiontest::near}%" to console
 			send "[regiontest] after run on" to console
+		else if arg-1 is "worlds":
+			set {regiontest::worlds} to true
 		else if arg-1 is "section":
 			# A section given a location runs where it is, like 'run on', and the trigger goes on after it.
 			spawn a cow at location(4100, 80, 4100, world "world"):
 				set name of entity to "Daisy"
 				send "[regiontest] section %name of entity% %health of {regiontest::far}%" to console
-			# Back on the trigger's own thread: the far pig is another region's again, an error on Folia.
+			# Back on the trigger's own thread: the far pig is another region's again, which the line goes to.
 			set {_far} to health of {regiontest::far}
 			send "[regiontest] after section %{_far}%" to console
 			loop 3 times:

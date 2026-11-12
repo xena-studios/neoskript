@@ -177,8 +177,9 @@ public final class ScriptCheck {
                         && !SENDING.contains(syntax.syntax().id()) && hasArgument(syntax, ENTITY_TYPES);
                 if (!changes && readsRegions(syntax)) {
                     findings.add(new Finding(Kind.FOLIA, statement.line().number(), "Reads a player's, an entity's or"
-                            + " a block's state in a trigger that runs on Folia's global region, where it can't be"
-                            + " read. 'run on' runs code on its thread."));
+                            + " a block's state in a trigger that runs on Folia's global region. The line goes to"
+                            + " its region's thread to read it, a tick later. 'run on' runs several lines there at"
+                            + " once."));
                 } else if (changes) {
                     findings.add(new Finding(Kind.FOLIA, statement.line().number(), "Changes players or entities from"
                             + " Folia's global region. NeoSkript sends the change to their region, so it happens a"

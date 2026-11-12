@@ -5,10 +5,12 @@
 package co.xenastudios.neoskript.runtime.region;
 
 import co.xenastudios.neoskript.api.element.Changeable;
+import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.runtime.KeyedValues;
 import co.xenastudios.neoskript.runtime.RuntimeErrors;
 import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
 import co.xenastudios.neoskript.runtime.Values;
+import co.xenastudios.neoskript.runtime.Waits;
 import co.xenastudios.neoskript.runtime.errors.ErrorSites;
 import co.xenastudios.neoskript.runtime.errors.ErrorSource;
 import java.lang.reflect.Array;
@@ -136,6 +138,60 @@ public final class Regions {
         }
         RegionAccess.Kind kind = access.kind(value);
         return (kind == RegionAccess.Kind.ENTITY || kind == RegionAccess.Kind.BLOCK) && !access.owns(value);
+    }
+
+    // ------------------------------------------------------------------------------------------- hopping
+
+    /** The trigger context whose line is running armed ({@link #arm}) on this thread, or {@code null}. */
+    private static final ThreadLocal<Object> ARMED = new ThreadLocal<>();
+
+    /**
+     * Called by code compiled for Folia before a line that may read what's in a region: with the trigger's context,
+     * a read of another region in the line may go there ({@link Hop}); with {@code null}, it may not, as when the
+     * line runs again after going there. Returns what was armed before, for {@link #disarm}.
+     */
+    public static Object arm(Object context) {
+        Object previous = ARMED.get();
+        ARMED.set(context);
+        return previous;
+    }
+
+    /** Called by code compiled for Folia after the line {@link #arm} armed, with what it returned. */
+    public static void disarm(Object previous) {
+        if (previous == null) {
+            ARMED.remove();
+        } else {
+            ARMED.set(previous);
+        }
+    }
+
+    /**
+     * Whether a read of {@code value}, in another region, may go there instead of failing: in a line armed for
+     * {@code context}, of a trigger that loses nothing by waiting (an event of NeoSkript's own, like a test, an
+     * {@code every} period or a script command, or one that has waited already).
+     */
+    static boolean hoppable(RegionAccess access, TriggerContext context) {
+        return context != null && ARMED.get() == context
+                && (!access.dispatching(context.event()) || Waits.delayed(context.event()));
+    }
+
+    /**
+     * Thrown by a read of another region in an armed line ({@link #arm}). The line catches it, carries on on the
+     * thread that owns {@link #target} ({@link Waits#hopRegion}) and runs again from its start there.
+     */
+    public static final class Hop extends RuntimeException {
+
+        private final transient Object target;
+
+        Hop(Object target) {
+            super(null, null, false, false);
+            this.target = target;
+        }
+
+        /** What the line reads, whose thread it runs again on. */
+        public Object target() {
+            return target;
+        }
     }
 
     /** Reports that {@code value}, which another thread owns, can't be read here. */
