@@ -13,8 +13,10 @@
 //
 // skript-docs.json is the reference Skript's `sk gen-docs` output, which has the names, descriptions, examples
 // and "since" for Skript's elements. Each NeoSkript element is joined to Skript's by id, then by Skript's event
-// name, then by a pattern both have; one with no match keeps its patterns and gets no description. Nothing is
-// written by hand. Skript's docs are GPL-3.0-or-later, used here under v3.
+// name, then by a pattern both have. What Skript's docs don't cover under the same id is in syntax-extra.json:
+// elements and types joined to the Skript entry they're part of there, and docs written here for what Skript
+// registers but never documents, and for NeoSkript's own syntax. Skript's docs are GPL-3.0-or-later, used here
+// under v3.
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -27,6 +29,9 @@ await writeFile(exportFile, exportText);
 const neo = JSON.parse(exportText);
 const skript = JSON.parse(await readFile(`${reports}/skript-docs.json`, "utf8"));
 if (neo.format !== 2) throw new Error(`Unknown syntax export format ${neo.format}`);
+const extra = JSON.parse(await readFile(fileURLToPath(new URL("./syntax-extra.json", import.meta.url)), "utf8"));
+// Docs written here look like Skript's entries.
+const written = (id, w) => (w ? { id, name: w.name, description: w.description, examples: w.examples, since: w.since ?? [] } : null);
 
 const KINDS = ["event", "condition", "effect", "expression", "section", "structure"];
 const PLURAL = { event: "events", condition: "conditions", effect: "effects", expression: "expressions", section: "sections", structure: "structures" };
@@ -57,6 +62,9 @@ function match(el) {
   const own = (d) => d && (d.kind === el.kind || el.kind === "section" || d.kind === "section");
   let d = docsById.get(el.id);
   if (own(d)) return [d, "id"];
+  const alias = extra.aliases.elements[el.id];
+  if (alias && docsById.get(alias)) return [docsById.get(alias), "alias"];
+  if (extra.written.elements[el.id]) return [written(el.id, extra.written.elements[el.id]), "written"];
   if (el.id.includes("-")) {
     d = docsById.get(el.id.split("-")[0]);
     if (own(d)) return [d, "id"];
@@ -261,12 +269,13 @@ const typeCoverage = { elements: neo.types.length, documented: 0 };
 const typeList = neo.types
   .filter((t) => t.id !== "object" || docsTypes.has("object"))
   .map((t) => {
-    const d = docsTypes.get(t.id);
+    const d = docsTypes.get(t.id) ?? docsTypes.get(extra.aliases.types[t.id]) ?? written(t.id, extra.written.types[t.id]);
     if (d) typeCoverage.documented++;
     return {
       id: t.id,
       slug: typeSlug(t.id),
-      name: d?.name ?? t.name.replace(/^./, (c) => c.toUpperCase()),
+      // A type documented as part of another keeps its own name.
+      name: (d && !extra.aliases.types[t.id] ? d.name : null) ?? t.name.replace(/^./, (c) => c.toUpperCase()),
       documented: Boolean(d),
       codeName: t.name,
       plural: t.plural,
@@ -284,7 +293,7 @@ for (const f of skript.functions) if (!docsFunctions.has(f.name)) docsFunctions.
 const fnCoverage = { elements: neo.functions.length, documented: 0 };
 const fnSlugs = new Set();
 const functionList = neo.functions.map((f) => {
-  const d = docsFunctions.get(f.name);
+  const d = docsFunctions.get(f.name) ?? written(f.name, extra.written.functions[f.name]);
   if (d) fnCoverage.documented++;
   let slug = slugify(f.name);
   while (fnSlugs.has(slug)) slug += "-2";

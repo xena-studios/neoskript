@@ -6,8 +6,9 @@ import { syntax, total, documented } from "../../lib/syntax";
 <p class="source">
   Generated from NeoSkript {syntax.neoskript}'s registry on {syntax.server}. Descriptions and examples from{" "}
   <a href="https://docs.skriptlang.org">Skript's documentation<External /></a> ({syntax.skript}), GPL-3.0.{" "}
-  {documented} of {total} entries matched one of its entries by id, event name or pattern; the rest show only
-  their patterns.
+  {documented === total
+    ? "For syntax Skript has but doesn't document, and NeoSkript's own, they're written here."
+    : `${documented} of ${total} entries have descriptions; the rest show only their patterns.`}
 </p>
 <style>
   .source {

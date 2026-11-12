@@ -1,0 +1,222 @@
+{
+  "_": "Docs for what Skript's own docs (sk gen-docs) don't cover under the same id. 'aliases' joins a NeoSkript element or type to the Skript docs entry it's part of there; 'written' are docs written here, for elements Skript registers but never documents, and for NeoSkript's own. Read by scripts/syntax.mjs.",
+  "aliases": {
+    "elements": {
+      "ExprAmount": "PropExprAmount",
+      "CondIsBetween": "CondCompare",
+      "ExprDisplayRotation": "ExprDisplayTransformationRotation",
+      "ExprInventoryHolder": "ExprInventoryInfo",
+      "ExprInventoryOfType": "ExprNamed",
+      "ExprTypedArgument": "ExprArgument",
+      "ExprItemUnbreakable": "ExprUnbreakable",
+      "ExprLastDroppedItem": "ExprLastSpawnedEntity"
+    },
+    "types": {
+      "skriptpotioneffect": "potioneffect",
+      "countedentitytype": "entitytype",
+      "pluralentitytype": "entitytype"
+    }
+  },
+  "written": {
+    "elements": {
+      "SecRunOn": {
+        "name": "Run On",
+        "description": [
+          "NeoSkript only. Runs its code on the thread that owns an entity or location. On Folia, each region of the world has its own thread, and only that thread may read the entities and blocks in it, so code that reads something in another region goes in <code>run on</code>.",
+          "Getting there and back work like a <code>wait</code>: the trigger carries on on the other thread, at once if this thread already owns it, else on the next tick, then goes back to its own thread after the section. On Paper, where one thread owns everything, the code just runs."
+        ],
+        "examples": [
+          "every 5 seconds:\n\tloop all players:\n\t\trun on loop-player:\n\t\t\tif health of loop-player < 5:\n\t\t\t\tsend \"You're low on health\" to loop-player"
+        ],
+        "since": [
+          "NeoSkript 0.1"
+        ]
+      },
+      "StructExample": {
+        "name": "Example",
+        "description": [
+          "Code that's parsed but never run, as Skript's documentation examples are: it shows how syntax is written, and a script with it still loads. It's experimental, so a script needs <code>using examples</code> first."
+        ],
+        "examples": [
+          "using examples\n\nexample:\n\tsend \"Hello\" to player"
+        ]
+      },
+      "CondHasSaddle": {
+        "name": "Has Saddle",
+        "description": [
+          "Checks whether an animal that can be ridden, like a horse, pig or strider, has a saddle on."
+        ],
+        "examples": [
+          "if event-entity has a saddle:\n\tsend \"It's ready to ride\" to player"
+        ]
+      },
+      "EffVectorRotateAroundAnother": {
+        "name": "Vectors - Rotate Around Vector",
+        "description": [
+          "Rotates vectors around another vector by a number of degrees."
+        ],
+        "examples": [
+          "rotate {_vector} around vector(0, 1, 0) by 90 degrees"
+        ]
+      },
+      "ExprVectorRotateAroundAnother": {
+        "name": "Vectors - Rotated Around Vector",
+        "description": [
+          "Vectors rotated around another vector by a number of degrees, leaving the vectors themselves as they were."
+        ],
+        "examples": [
+          "set {_rotated} to {_vector} rotated around vector(0, 1, 0) by 45 degrees"
+        ]
+      },
+      "ExprAllFunctions": {
+        "name": "Functions of a Script",
+        "description": [
+          "The functions a script defines, as function references that can be run. It's experimental, so a script needs <code>using reflection</code> first."
+        ],
+        "examples": [
+          "using reflection\n\non load:\n\tloop all functions in script \"utilities.sk\":\n\t\tbroadcast \"%loop-value%\""
+        ]
+      },
+      "ExprItemWithItemModel": {
+        "name": "Item With Item Model",
+        "description": [
+          "A copy of items with another item model, which changes how they look to players who have that model in a resource pack."
+        ],
+        "examples": [
+          "give player a stick with item model \"mypack:wand\""
+        ]
+      },
+      "LitAt": {
+        "name": "At",
+        "description": [
+          "The word <code>at</code> as a direction of no distance, so <code>at %location%</code> is the location itself, as in <code>spawn a pig at player</code>."
+        ],
+        "examples": [
+          "spawn a zombie at {_location}"
+        ]
+      },
+      "LitClassInfo": {
+        "name": "Type",
+        "description": [
+          "A type written as a value: <code>a player</code>, <code>an item type</code>. Used where syntax takes a type, as in <code>%object% is a %type%</code> checks and function references."
+        ],
+        "examples": [
+          "if {_value} is a player:\n\tsend \"It's a player\""
+        ]
+      },
+      "ExprCast": {
+        "name": "Values of a Type",
+        "description": [
+          "Only the values of a type out of others: <code>players in {_list::*}</code> is the players in the list, and <code>value within X</code> treats X as an object."
+        ],
+        "examples": [
+          "set {_players::*} to players in {_entities::*}"
+        ]
+      },
+      "ExprEventEntity": {
+        "name": "Event Value",
+        "description": [
+          "A value the event has, named by its type: <code>the player</code>, <code>event-block</code>, <code>the attacker</code>. What each event has is listed under it on the events page."
+        ],
+        "examples": [
+          "on break:\n\tsend \"You broke %event-block%\" to the player"
+        ]
+      },
+      "ExprEventEntityBare": {
+        "name": "Event Value (bare)",
+        "description": [
+          "An event value written as just its type, as in <code>send \"Hi\" to player</code> in a join event."
+        ],
+        "examples": [
+          "on join:\n\tsend \"Welcome, %player%\" to player"
+        ]
+      }
+    },
+    "types": {
+      "integer": {
+        "name": "Integer",
+        "description": [
+          "A whole number, like <code>5</code> or <code>-12</code>. Where syntax asks for an integer, a number with a fraction is rounded down."
+        ],
+        "examples": [
+          "set {_count} to 10"
+        ]
+      },
+      "inventoryholder": {
+        "name": "Inventory Holder",
+        "description": [
+          "What has an inventory: a player or other entity, or a block like a chest, furnace or hopper."
+        ],
+        "examples": [
+          "set {_holder} to holder of event-inventory"
+        ]
+      },
+      "itementity": {
+        "name": "Dropped Item",
+        "description": [
+          "An item lying on the ground, as an entity: what <code>drop</code> makes and players pick up."
+        ],
+        "examples": [
+          "on spawn of dropped item:\n\tbroadcast \"Something dropped\""
+        ]
+      },
+      "hiddenpotioneffect": {
+        "name": "Hidden Potion Effect",
+        "description": [
+          "A potion effect waiting under another of the same type, which takes over when the stronger one runs out."
+        ],
+        "examples": [
+          "loop hidden potion effects of player:\n\tbroadcast \"%loop-value%\""
+        ]
+      },
+      "keyedbossbar": {
+        "name": "Keyed Boss Bar",
+        "description": [
+          "A boss bar with a namespaced key, which the server keeps (as <code>/bossbar</code> does) and can be found again by its key."
+        ],
+        "examples": [
+          "set {_bar} to boss bar with id \"myplugin:event\""
+        ]
+      },
+      "fireworktype": {
+        "name": "Firework Type",
+        "description": [
+          "The shape a firework explodes in: ball, large ball, star, burst or creeper face."
+        ],
+        "examples": [
+          "launch ball large firework colored red at player"
+        ]
+      },
+      "cattype": {
+        "name": "Cat Type",
+        "description": [
+          "A cat's coat: tabby, black, red, siamese, british shorthair, calico, persian, ragdoll, white, jellie or all black. It's written in front of <code>cat</code>, to spawn or check for that kind of cat."
+        ],
+        "examples": [
+          "spawn a calico cat at player",
+          "if victim is a black cat:\n\tcancel event"
+        ]
+      },
+      "wolfvariant": {
+        "name": "Wolf Variant",
+        "description": [
+          "A wolf's coat, by the biome it comes from: pale, woods, ashen, black, chestnut, rusty, spotted, striped or snowy. It's written in front of <code>wolf</code>, to spawn or check for that kind of wolf."
+        ],
+        "examples": [
+          "spawn a snowy wolf at player",
+          "if victim is a snowy wolf:\n\tcancel event"
+        ]
+      }
+    },
+    "functions": {
+      "case_equals": {
+        "description": [
+          "Whether all the texts are the same, upper and lower case included. Skript's <code>is</code> compares texts ignoring case; this doesn't."
+        ],
+        "examples": [
+          "case_equals(\"Hi\", \"hi\") # false\ncase_equals(\"Hi\", \"Hi\") # true"
+        ]
+      }
+    }
+  }
+}
