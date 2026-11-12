@@ -9,6 +9,9 @@ dependencies {
     implementation(project(":neoskript-paper"))
     implementation(libs.bstats.bukkit)
     compileOnly(libs.paper.api)
+    // Paper ships Gson; the update checker reads Modrinth's answers with it.
+    compileOnly(libs.gson)
+    testImplementation(libs.gson)
 }
 
 tasks.processResources {

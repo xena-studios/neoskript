@@ -173,6 +173,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         } else {
             start.run();
         }
+        // D15: tell admins about newer versions on Modrinth, opt-out with `update-checker: false`.
+        if (!TestRunner.enabled() && getConfig().getBoolean("update-checker", true)) {
+            UpdateNotices.start(this, getSLF4JLogger());
+        }
         // D10: NeoSkript takes over /skript and /sk, with /neoskript as an alias.
         getCommand("skript").setExecutor(new SkriptCommand(this, scripts, this::reloadSettings));
     }
@@ -202,7 +206,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     /**
      * {@code /skript reload config}: reads config.yml again and applies what can change while the server
-     * runs. The other settings (metrics, event priority, cancelled events and where variables are saved)
+     * runs. The other settings (metrics, the update checker, event priority, cancelled events and where variables are saved)
      * take effect when the server restarts.
      */
     private void reloadSettings() {

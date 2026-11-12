@@ -12,6 +12,7 @@ What each milestone in the [plan](PLAN.md#6-roadmap) delivered, in order. Add ea
 | [M3: Variables and storage](#m3-variables-and-storage) | Done 2026-10-22 |
 | [M4: Standard library](#m4-standard-library) | Done 2026-11-11 |
 | [M5: Folia and migration](#m5-folia-and-migration) | Done 2026-11-11 |
+| [M6: Beta to 1.0](#m6-beta-to-10) | In progress |
 
 Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4](#step-6-the-long-tail)):
 
@@ -687,3 +688,13 @@ What [plan 3.3](PLAN.md#33-runtime--threading-paper--folia) says Folia does, don
 
 **`neoskript-cli` 0.1.0** is on the [releases](https://github.com/xena-studios/neoskript/releases) as a jar with its SHA-256. `neoskript-cli --version` prints the version, from the jar's manifest. With this, M5's exit is met: the corpus runs on Folia without thread violations (`neoskript-real-world-corpus` fails on any), and the CLI is released.
 
+## M6: Beta to 1.0
+
+### Step 1: The update checker
+
+What D15 asks for, done. When the server starts and once a day after, NeoSkript asks Modrinth for its versions (project `neoskript`, Paper and Folia loaders).
+- **Who hears of it:** the console gets one line per new version, and players with `skript.admin` get a clickable line when they join, as Skript's permission describes.
+- **Which versions count:** a release only hears of newer releases. A beta also hears of newer betas. Alphas never count. Development builds (SNAPSHOT versions) don't check at all; they update from the dev build.
+- **Turning it off:** `update-checker: false` in config.yml. Test servers never check.
+- **When Modrinth can't be reached:** a debug line, nothing more. Until the project is on Modrinth its answer is a 404, which means nothing newer.
+- **Tested** by `UpdateCheckerTest`: semantic-version order, the channels, and skipping alphas and snapshots.

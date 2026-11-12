@@ -4,6 +4,10 @@
 # You can also turn bStats off for every plugin in plugins/bStats/config.yml.
 metrics: true
 
+# Check Modrinth for newer NeoSkript versions when the server starts and once a day. A newer version is
+# logged to the console and shown to players with skript.admin when they join. Development builds never check.
+update-checker: true
+
 variables:
   # Where global variables are saved, in Skript's variables.csv format (Skript can read it too).
   # Relative to plugins/NeoSkript. Variables whose names start with - aren't saved.
