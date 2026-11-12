@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.plugin;
 
+import co.xenastudios.neoskript.runtime.variables.storage.VariableStorage;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -33,12 +34,14 @@ final class SkriptMigration {
     /**
      * What was copied, relative to the folders, for the log (empty if nothing was), Skript's
      * {@code use player UUIDs in variable names} from its config.sk, or {@code null} if it doesn't say, and its
-     * other settings NeoSkript has, by their path in NeoSkript's config.yml ({@link #SETTINGS}).
+     * other settings NeoSkript has, by their path in NeoSkript's config.yml ({@link #SETTINGS}), and the backup of
+     * the variables copied, made before NeoSkript first loads them (or {@code null}).
      */
-    record Result(List<String> copied, int scriptCount, Boolean playerUuids, Map<String, Object> settings) {
+    record Result(List<String> copied, int scriptCount, Boolean playerUuids, Map<String, Object> settings,
+            Path variablesBackup) {
 
         Result(List<String> copied, int scriptCount, Boolean playerUuids) {
-            this(copied, scriptCount, playerUuids, Map.of());
+            this(copied, scriptCount, playerUuids, Map.of(), null);
         }
     }
 
@@ -67,10 +70,13 @@ final class SkriptMigration {
             copy(source, neoskriptDir.resolve(name), scripts);
             copied.add(name);
         }
+        // Before NeoSkript first loads or saves them, the variables Skript saved are backed up as they were.
+        Path variables = neoskriptDir.resolve("variables.csv");
+        Path backup = copied.contains("variables.csv") ? VariableStorage.backup(variables) : null;
         Files.writeString(neoskriptDir.resolve(MARKER),
                 "Copied " + copied + " from " + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n");
         return new Result(copied, scripts[0], playerUuids(skriptDir.resolve("config.sk")),
-                settings(skriptDir.resolve("config.sk")));
+                settings(skriptDir.resolve("config.sk")), backup);
     }
 
     /**

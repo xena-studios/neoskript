@@ -40,6 +40,10 @@ class SkriptMigrationTest {
         assertEquals("on load:\n\tbroadcast \"a\"\n", Files.readString(neoskript.resolve("scripts/a.sk")));
         assertTrue(Files.exists(neoskript.resolve("scripts/sub/-disabled.sk")));
         assertTrue(Files.exists(neoskript.resolve("variables.csv")));
+        assertEquals(neoskript.resolve("backups"), result.variablesBackup().getParent(),
+                "the variables are backed up before they're first loaded");
+        assertTrue(result.variablesBackup().getFileName().toString().matches("variables_[0-9_-]+\\.csv"));
+        assertEquals("# variables\n", Files.readString(result.variablesBackup()));
         assertFalse(Files.exists(neoskript.resolve("config.sk")), "Skript's config isn't NeoSkript's");
         assertTrue(Files.exists(skript.resolve("scripts/a.sk")), "Skript's files stay where they were");
 
