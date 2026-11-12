@@ -135,7 +135,7 @@ components:
 
 neoskript.dev is NeoSkript's own brand on night, laid out with xenastudios.co's grammar: hairlines, pills, one column of ideas, no cards. Every colour, logo and scene comes from [xena-studios/brand](https://github.com/xena-studios/brand) (`tokens/neoskript.*`, synced into `src/brand/` by `pnpm brand:sync`); the site composes them with exact type, hairline rules and space. Xena frames the product with the planet horizon and the XENA endorsement in the footer, and nothing else.
 
-The signature is the staff: the same script (or the same measured job) runs down a raised centre column between two magenta rails, with Skript's result mirrored on its left and NeoSkript's on its right, one grid row per line so the two sides always line up. The landing page leads with a performance staff whose bars share one scale, so a bar's length is the time it took, then a differential staff that prints what each server output for the same probe. The rest of the site is hairline rows, plain claims and links to source.
+The signature is the staff: the same script (or the same measured job) runs down a raised centre column between two magenta rails, with Skript's result mirrored on its left and NeoSkript's on its right, one grid row per line so the two sides always line up. The landing page leads with the promise and three headline numbers, then Skript and NeoSkript side by side in a comparison table, then the performance staff (bars share a scale per group, so a bar's length is the time it took) and the differential staff that prints what each server output for the same probe, then the switch, questions people ask before switching, and the call to try it. The rest of the site is hairline rows, plain claims and links to source.
 
 Two surfaces share one palette. The custom pages (landing, download, the syntax reference and the parser) are dark only (`color-scheme: dark`) and styled by `src/styles/site.css`, with `src/styles/syntax.css` for the reference. The guides are Starlight, mapped onto the same tokens in `src/styles/theme.css`. They follow the visitor's system theme (Starlight's Auto), with a light theme in ink and magenta-daylight: going from the dark landing to light guides is deliberate, for people who read docs in light mode. Both surfaces share the header links and the footer (`src/lib/nav.ts`, `SiteFooter.astro`), so they read as one site.
 
@@ -143,7 +143,7 @@ Two surfaces share one palette. The custom pages (landing, download, the syntax 
 - Neo Magenta on near-black, aubergine-tinted night; magenta marks meaning, never decoration.
 - Geist Bold headlines at tight negative tracking; Geist Mono for script and output; JetBrains Mono uppercase labels for metadata.
 - Hairline rules instead of cards; flat, no shadows anywhere.
-- 44px pills for actions; one authored SVG arrow is the only icon on the content pages. The two tools (the parser and the syntax reference) add a small authored icon set.
+- 44px pills for actions; one authored SVG arrow is the only icon on the content pages, with the landing questions' chevron in the same style. The two tools (the parser and the syntax reference) add a small authored icon set.
 - The tools are laid out as tools, like the community tools people already use: a parser in a full-window app, a reference with a sidebar and one flat card per entry. Cards are theirs alone.
 - One authored motion moment (bars draw out, rows settle once); reduced motion shows everything at once.
 
@@ -230,13 +230,13 @@ Shapes are straight. Rows, sections and the staff are square-edged and bounded b
 ### Buttons
 Pills, quiet and certain.
 - **Shape:** fully rounded (999px), at least 44px tall, 1.375rem inline padding, 0.9375rem Geist 500, never wrapping.
-- **Primary:** solid Neo Magenta with night text. One per action row ("Download the dev build", the jar download).
+- **Primary:** solid Neo Magenta with night text. One per action row ("Download the beta", the jar download).
 - **Hover / Focus:** primary lightens to an 85% magenta / white mix; secondary's border warms to a 60% magenta mix. 180ms on the shared ease. Focus is the global 2px magenta outline at 3px offset.
-- **Secondary:** transparent with a `night-rule` hairline and text colour ("How we test", "Read the docs", "On GitHub").
+- **Secondary:** transparent with a `night-rule` hairline and text colour ("See how it compares", "Read the docs", "On Modrinth").
 
 ### Navigation
 - **Header:** the NeoSkript logo (1.75rem tall) left; Docs, Syntax, Parser, Download and GitHub right in muted 0.9375rem, turning text on hover and when `aria-current="page"`. A hairline under the bar. The links come from `src/lib/nav.ts`; the guides show the same links in Starlight's header and mobile menu (`components/starlight/SocialIcons.astro`), with search and the theme select beside them. The guides' header is set to match (`theme.css`): the same 4.5rem bar over a `night-rule` hairline, the site's gutter, the wordmark at the same 1.75rem (1.375rem under 30rem) with its clear space cropped, and the links at 1.75rem gaps, closing to 1rem beside the search under 72rem; between 50rem and 60rem Docs and GitHub leave it, as on a phone. Every structural rule in the guides (header, sidebar, mobile contents) is a hairline: `--sl-color-hairline-shade` is `night-rule`, never night.
-- **Footer:** `SiteFooter.astro`, on every page, the guides included (after Starlight's edit link and previous/next): the XENA mark in text colour, the same links plus Source and "Report a bug", and a label-styled licence line ("GPL-3.0-only · Not affiliated with SkriptLang"). A hairline above. It lays out by its own width (a container query), so it stacks inside a guide's column.
+- **Footer:** `SiteFooter.astro`, on every page, the guides included (after Starlight's edit link and previous/next), laid out as on Xena's other sites (raptorpanel.net, xenastudios.co): the XENA mark in text colour beside a label-styled "© <year> Xena Studios", a muted line on the licence and affiliation, then the site's links plus Modrinth, Source and "Report a bug", stacked and left-aligned. A hairline above.
 - **Guides:** the current guide in the sidebar is text colour with a 1px magenta rail, not a filled pill; asides are hairline-ruled notes with no coloured stripe or fill; previous/next is a hairline row, not boxes.
 - **Skip link:** a magenta pill that drops in at the top-left gutter on focus.
 
@@ -244,7 +244,7 @@ Pills, quiet and certain.
 Inherit their colour, underlined at 0.25em offset in a 35% text mix; the underline turns magenta on hover. Every link to another site carries the External arrow.
 
 ### External arrow
-The content pages' only icon (`src/components/External.astro`): an authored 10x10 SVG up-right arrow, 1.4 stroke with round caps, in `currentColor`, sized 0.62em. It nudges 1px up-right on hover and focus. No Unicode arrows, no icon fonts.
+The content pages' only icon besides the landing questions' chevron (`src/components/External.astro`): an authored 10x10 SVG up-right arrow, 1.4 stroke with round caps, in `currentColor`, sized 0.62em. It nudges 1px up-right on hover and focus. No Unicode arrows, no icon fonts.
 
 ### Tool icons
 The parser and the syntax reference have a small authored set in the arrow's style (`src/lib/icons.ts`, `components/Icon.astro`): 16x16 strokes, 1.5 wide, round caps, `currentColor`, no fills except the Parse button's. Save, settings, new, close, chevron, parse, link, search, filter, files, one per syntax category, guides and parser. They're decorative: every icon-only control has an `aria-label`. Monaco's own codicons stay inside the editor.
@@ -256,6 +256,15 @@ The parser and the syntax reference have a small authored set in the arrow's sty
 - **Hover:** pointing at a row tints it across both servers (7% magenta mix; 10% over raised night in the centre).
 - **Motion:** rows settle in once (700ms, 6px rise, staggered 60ms from 120ms); in the performance staff, bars draw out from the staff instead (1100ms scale from zero).
 - **Caption:** centred, muted 0.875rem, at most 72ch, naming the machine, server, date and a source link.
+
+### Headline numbers
+The hero's row of three, under a hairline: each a large magenta figure ("2.3×", tabular, 700) over its claim in text and one muted sentence with both servers' times. A muted note under the row names the reference and links to the numbers. Not cards.
+
+### Comparison table
+A real `<table>`, hairline rows: the point in bold text, Skript's answer in muted, NeoSkript's in text beside a 1px magenta rail (the column head is a magenta label). It includes where NeoSkript is behind (Skript addons), stated plainly. Under 44rem each row stacks: the point, then a Skript line and a NeoSkript line, each led by its label-small server name.
+
+### Questions
+`<details>` rows between hairlines: the question in bold text (at least 44px tall) with the authored chevron, which turns on open; the answer in muted, capped at 66ch. A two-column section above 52rem: the heading left, the rows right.
 
 ### Facts row and steps
 Hairline-topped rows of three, not cards. Facts lead with a large tabular figure in text, a muted sentence, and a source link. Steps number themselves with a magenta JetBrains Mono counter above a bold first sentence.
@@ -293,7 +302,7 @@ A `<dl>` of hairline-separated rows: bold term in a 14rem column, muted definiti
 ### Don't:
 - **Don't** use cards or card grids on the content pages; facts, steps and rows are hairline rows. The tools' result and entry cards are the exception.
 - **Don't** put an uppercase label above a heading as an eyebrow.
-- **Don't** use Unicode or emoji arrows or icons; the SVG arrow, and in the tools their authored icon set, are the only icons.
+- **Don't** use Unicode or emoji arrows or icons; the SVG arrow, the questions' chevron, and in the tools their authored icon set, are the only icons.
 - **Don't** add shadows, glows or gradient text, or any atmosphere beyond the Xena horizon.
 - **Don't** use magenta decoratively, or Xena's Ion Blue anywhere.
 - **Don't** recolour the NeoSkript logo.

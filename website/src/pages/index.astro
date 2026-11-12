@@ -1,10 +1,11 @@
 ---
-// neoskript.dev. The first screen is a real benchmark (src/data/benchmark.json):
-// the same generated scripts loaded and reloaded by Skript and by NeoSkript
-// on the same server, then what one trigger costs per event, each bar as long
-// as the time it took (loading and triggers each on their own scale). Below it, a real
-// run of the differential harness (src/data/differential.json): one probe,
-// what Skript printed and what NeoSkript printed, row for row.
+// neoskript.dev, the landing page. In order: the promise and three headline
+// numbers (src/data/benchmark.json); Skript and NeoSkript side by side, as a
+// table of what changes and what doesn't; every benchmark as a staff whose
+// bars share a scale per group; a real run of the differential harness
+// (src/data/differential.json), what each server printed for one probe, row
+// for row, with the test results; the switch in three steps; questions people
+// ask before switching; and the call to try it.
 import Base from "../layouts/Base.astro";
 import Code from "../components/Code.astro";
 import External from "../components/External.astro";
@@ -12,8 +13,10 @@ import Horizon from "../components/Horizon.astro";
 import bench from "../data/benchmark.json";
 import run from "../data/differential.json";
 import suite from "../data/suite.json";
+import { latestRelease } from "../lib/release";
 
 const repo = "https://github.com/xena-studios/neoskript";
+const release = await latestRelease();
 const day = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 const date = day(run.date);
 const fmt = (n: number) => n.toLocaleString("en-US");
@@ -22,7 +25,41 @@ const serverName = server.replace("paper-", "Paper ");
 const file = run.file.split("/").pop();
 
 const secs = (ms: number) => `${(ms / 1000).toFixed(2)} s`;
-const times = (a: number, b: number) => `${(a / b).toFixed(1)}× faster`;
+const ratio = (a: number, b: number) => (a / b).toFixed(1);
+const times = (a: number, b: number) => `${ratio(a, b)}× faster`;
+
+// The three numbers the hero leads with.
+const headline = [
+  {
+    figure: `${ratio(bench.startup.skriptMs, bench.startup.neoskriptMs)}×`,
+    name: "faster startup",
+    text: `${bench.scripts} scripts load in ${secs(bench.startup.neoskriptMs)}. Skript takes ${secs(bench.startup.skriptMs)}.`,
+  },
+  {
+    figure: `${ratio(bench.reload.skriptMs, bench.reload.neoskriptMs)}×`,
+    name: "faster reloads",
+    text: `/sk reload in ${fmt(bench.reload.neoskriptMs)} ms instead of ${fmt(bench.reload.skriptMs)} ms.`,
+  },
+  {
+    figure: `${ratio(bench.ticks.skriptScriptMs, bench.ticks.neoskriptScriptMs)}×`,
+    name: "less time per tick",
+    text: `With ${bench.ticks.players} players online, scripts take ${bench.ticks.neoskriptScriptMs.toFixed(2)} ms of each tick, not ${bench.ticks.skriptScriptMs.toFixed(2)} ms.`,
+  },
+];
+
+// Skript and NeoSkript, side by side.
+const compare: { what: string; skript: string; neo: string; same?: boolean }[] = [
+  { what: "Your .sk scripts", skript: "Written for Skript", neo: "Run unchanged, line for line", same: true },
+  { what: "Your variables.csv", skript: "Skript's format", neo: "Read and saved byte for byte, so Skript can still read it", same: true },
+  { what: `Skript ${suite.skript}'s own test suite`, skript: `${suite.total} tests`, neo: `${suite.passed} of ${suite.total} pass`, same: true },
+  { what: "How scripts run", skript: "Interpreted: each line steps through its syntax, every time it runs", neo: "Compiled to JVM bytecode when they load, so the JIT optimises whole scripts" },
+  { what: `Loading ${bench.scripts} scripts`, skript: secs(bench.startup.skriptMs), neo: secs(bench.startup.neoskriptMs) },
+  { what: "/sk reload", skript: `${fmt(bench.reload.skriptMs)} ms`, neo: `${fmt(bench.reload.neoskriptMs)} ms` },
+  { what: "Folia", skript: "Doesn't run", neo: "Runs, and keeps each region's rules for you" },
+  { what: "Skript addons", skript: "SkBee, skript-reflect and the rest", neo: "Not yet: planned after 1.0, SkBee first" },
+  { what: "Price and licence", skript: "Free, GPL-3.0", neo: "Free, GPL-3.0", same: true },
+];
+
 const measures = [
   {
     name: "Startup load",
@@ -46,7 +83,7 @@ const measures = [
     show: (ms: number) => `${fmt(Math.round(ms))} ms`,
   },
 ];
-// What the scripts add to each server tick, with players online, from the tick benchmark.
+// What the scripts add to each server tick, with players online.
 const ticks = [
   {
     name: "Every tick",
@@ -56,7 +93,7 @@ const ticks = [
     show: (ms: number) => `${ms.toFixed(2)} ms`,
   },
 ];
-// What a trigger costs each time its event fires, from the event benchmark.
+// What one trigger costs each time its event fires.
 const triggerNames: Record<string, string> = {
   flight: "A trigger with one condition",
   sneak: "A trigger with global variables",
@@ -75,6 +112,33 @@ const scaled = (group: typeof measures) => {
   return group.map((m) => ({ ...m, width: (v: number) => Math.max(1.5, (v / longest) * 100) }));
 };
 const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
+
+const faq = [
+  {
+    q: "Do I have to change my scripts?",
+    a: "No. NeoSkript reads the same .sk files and treats Skript's behaviour as the spec, down to its error messages. If a script does something different, that's a bug: tell us and we fix NeoSkript, not your script.",
+  },
+  {
+    q: "Can I go back to Skript?",
+    a: "Yes. NeoSkript copies your scripts and variables from plugins/Skript the first time and never changes that folder, and it saves variables in Skript's own format. Put Skript.jar back and you're where you started.",
+  },
+  {
+    q: "Does it work with my Skript addons?",
+    a: "Not yet. Addons like SkBee hook into Skript's own code, which NeoSkript doesn't have. A compatibility layer for them is planned after 1.0, SkBee first. The script checker tells you which lines use addon syntax.",
+  },
+  {
+    q: "Which servers does it run on?",
+    a: "Paper and Folia, Minecraft 1.21.4 to 26.3, on Java 21 or newer. Not Spigot or plain Bukkit.",
+  },
+  {
+    q: "How do I know my scripts will work?",
+    a: "Run the script checker on your scripts folder: it loads them on a throwaway server and lists every line NeoSkript won't load. Or paste a script into the parser on this site.",
+  },
+  {
+    q: "Is it really free?",
+    a: "Yes, and open source under the GPL-3.0, like Skript. The code, the tests and the benchmarks are all on GitHub.",
+  },
+];
 ---
 <Base
   title="NeoSkript: Keep your scripts. Lose the lag."
@@ -85,14 +149,70 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
     <div class="wrap hero-copy">
       <h1 id="hero-title">Keep your scripts. <span class="accent">Lose the lag.</span></h1>
       <p class="lead">
-        NeoSkript is a drop-in replacement for Skript. Your <code>.sk</code> scripts run unchanged, on Paper and Folia.
+        NeoSkript is a drop-in replacement for Skript. Swap the jar and your <code>.sk</code> scripts run unchanged,
+        compiled for speed, on Paper and Folia.
       </p>
       <div class="actions">
         <a class="btn btn-primary" href="/download/">Download the beta</a>
-        <a class="btn btn-secondary" href="#same-title">How we test</a>
+        <a class="btn btn-secondary" href="#compare-title">See how it compares</a>
       </div>
+      <p class="meta">
+        {release ? `Public beta ${release.version}` : "Public beta"} · Free and open source · Paper and Folia, 1.21.4 to 26.3
+      </p>
     </div>
 
+    <div class="wrap">
+      <ul class="headline" aria-label="NeoSkript against Skript">
+        {headline.map((h) => (
+          <li>
+            <strong><span class="figure">{h.figure}</span> {h.name}</strong>
+            <span>{h.text}</span>
+          </li>
+        ))}
+      </ul>
+      <p class="headline-note">
+        Against Skript {skriptVersion}, with the same scripts on the same {serverName} server.{" "}
+        <a href="#numbers-title">All the numbers</a>
+      </p>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="compare-title">
+    <div class="wrap">
+      <h2 id="compare-title">Everything your scripts do on Skript, without the lag</h2>
+      <p class="lead section-lead">
+        Same language, same files, same results. What changes is underneath: NeoSkript compiles your scripts instead
+        of interpreting them, and it was built for Folia from the start.
+      </p>
+      <table class="compare">
+        <thead>
+          <tr>
+            <th scope="col"><span class="sr-only">What</span></th>
+            <th scope="col" class="label">Skript {skriptVersion}</th>
+            <th scope="col" class="label neo-head">NeoSkript</th>
+          </tr>
+        </thead>
+        <tbody>
+          {compare.map((c) => (
+            <tr class={c.same ? "is-same" : undefined}>
+              <th scope="row">{c.what}</th>
+              <td class="c-skript"><span class="who" aria-hidden="true">Skript</span>{c.skript}</td>
+              <td class="c-neo"><span class="who" aria-hidden="true">NeoSkript</span>{c.neo}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="numbers-title">
+    <div class="wrap">
+      <h2 id="numbers-title">The numbers</h2>
+      <p class="lead section-lead">
+        The same scripts on the same server, measured by our test harness. Each bar is as long as the time it took, so
+        shorter is better.
+      </p>
+    </div>
     <figure class="staff-figure wrap">
       <div class="staff perf" role="table" aria-label="Load, reload, variable and tick times, and what triggers cost, Skript and NeoSkript">
         <div class="row head" role="row">
@@ -104,25 +224,26 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
           <div class="row line" role="row">
             <span class="skript out" role="cell">
               <span class="who" aria-hidden="true">Skript</span>
-              <span class="time">{m.show(m.skript)}</span>
+              <span class="reading"><span class="time">{m.show(m.skript)}</span></span>
               <svg class="bar" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect class="track" width="100" height="10" /><rect class="fill" width={m.width(m.skript)} height="10" /></svg>
             </span>
             <span class="script" role="cell"><strong>{m.name}</strong><span class="what">{m.what}</span></span>
             <span class="neo out" role="cell">
               <span class="who" aria-hidden="true">NeoSkript</span>
-              <svg class="bar" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect class="track" width="100" height="10" /><rect class="fill" width={m.width(m.neo)} height="10" /></svg>
               <span class="reading">
                 <span class="time">{m.show(m.neo)}</span>
                 <span class="same label">{times(m.skript, m.neo)}</span>
               </span>
+              <svg class="bar" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect class="track" width="100" height="10" /><rect class="fill" width={m.width(m.neo)} height="10" /></svg>
             </span>
           </div>
         ))}
       </div>
       <figcaption>
-        {bench.scripts} generated scripts on {serverName}; a busy server's per-player script with {bench.ticks.players} bots, over the
-        same server with none ({bench.ticks.noScriptsMs.toFixed(1)} ms a tick); each trigger run {fmt(bench.events.count)} times in a
-        row, {bench.events.rounds} rounds. {bench.machine.replace(/^an? /, "").replace(/^./, (c) => c.toUpperCase())}, {day(bench.date)}.
+        {bench.scripts} generated scripts on {serverName}; a busy server's per-player script with {bench.ticks.players} bots online,
+        over the same server with no scripts ({bench.ticks.noScriptsMs.toFixed(1)} ms a tick); each trigger fired
+        {" "}{fmt(bench.events.count)} times in a row, {bench.events.rounds} rounds. Load, ticks and triggers each have their own
+        scale. {bench.machine.replace(/^an? /, "").replace(/^./, (c) => c.toUpperCase())}, {day(bench.date)}.
         Measured by the <a href={`${repo}/tree/main/test-harness`}>test harness<External /></a>.
       </figcaption>
     </figure>
@@ -133,7 +254,7 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
       <h2 id="same-title">Same scripts, same output</h2>
       <p class="lead section-lead">
         Faster only counts if nothing changes. We run the same scripts on real Skript and on NeoSkript, and compare
-        what each one does.
+        what each one prints and saves, line by line.
       </p>
     </div>
     <figure class="staff-figure wrap">
@@ -160,20 +281,17 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
         From <a href={`${repo}/blob/main/${run.file}`}>{file}<External /></a>, run on both servers on {date}.
       </figcaption>
     </figure>
-  </section>
-
-  <section class="section facts-section" aria-label="Test results">
     <div class="wrap facts">
       <p>
         <strong>{suite.passed} of {suite.total}</strong> of Skript {suite.skript}'s own tests pass on NeoSkript.
         <a href={`${repo}/blob/main/docs/PROGRESS.md`}>Progress<External /></a>
       </p>
       <p>
-        <strong>{run.percent}%</strong> of {fmt(run.units)} side-by-side checks match Skript exactly, and counting.
+        <strong>{run.percent}%</strong> of {fmt(run.units)} side-by-side checks print and save exactly what Skript does.
         <a href={`${repo}/blob/main/test-harness/src/main/java/co/xenastudios/neoskript/harness/scenario/DifferentialScenario.java`}>The checks<External /></a>
       </p>
       <p>
-        <strong>Folia</strong> runs NeoSkript too. Skript doesn't.
+        <strong>Folia</strong> runs NeoSkript, with each region's rules kept for you. Skript doesn't run there.
         <a href="/docs/">Requirements</a>
       </p>
     </div>
@@ -185,16 +303,33 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
       <ol class="steps">
         <li><strong>Take out Skript.jar.</strong> Leave its folder where it is.</li>
         <li><strong>Put in NeoSkript.jar.</strong> Paper or Folia, Minecraft 1.21.4+, Java 21.</li>
-        <li><strong>Start the server.</strong> Your scripts and variables are copied over. Skript's folder is never touched.</li>
+        <li><strong>Start the server.</strong> Your scripts and variables are copied over. Skript's folder is never touched, so going back is one swap.</li>
       </ol>
-      <p class="more"><a href="/docs/moving-from-skript/">Moving from Skript, in detail</a></p>
+      <p class="more">
+        <a href="/docs/moving-from-skript/">Moving from Skript, in detail</a>
+        <a href="/docs/moving-from-skript/#check-your-scripts-first">Check your scripts first</a>
+      </p>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="faq-title">
+    <div class="wrap faq-wrap">
+      <h2 id="faq-title">Before you switch</h2>
+      <div class="faq">
+        {faq.map((f) => (
+          <details>
+            <summary>{f.q}<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg></summary>
+            <p>{f.a}</p>
+          </details>
+        ))}
+      </div>
     </div>
   </section>
 
   <section class="close" aria-labelledby="close-title">
     <div class="wrap close-copy">
       <h2 id="close-title">Try it on a test server</h2>
-      <p class="lead">NeoSkript is in public beta. Swap the jar on a test server and see your scripts run.</p>
+      <p class="lead">NeoSkript is in public beta. Swap the jar on a test server and watch your scripts run.</p>
       <div class="actions">
         <a class="btn btn-primary" href="/download/">Download the beta</a>
         <a class="btn btn-secondary" href="/docs/">Read the docs</a>
@@ -234,16 +369,176 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
     justify-content: center;
     margin-top: 0.75rem;
   }
+  .meta {
+    color: var(--muted);
+    font-size: 0.875rem;
+    text-wrap: balance;
+  }
+
+  /* Three headline numbers on one hairline row. */
+  .headline {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.5rem clamp(1.5rem, 1rem + 3vw, 4rem);
+    margin: clamp(3rem, 2rem + 3vw, 4.5rem) 0 0;
+    padding: clamp(1.75rem, 1.25rem + 1.5vw, 2.5rem) 0 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+  }
+  .headline li {
+    display: grid;
+    align-content: start;
+    gap: 0.5rem;
+    color: var(--muted);
+    max-width: 34ch;
+  }
+  .headline strong {
+    color: var(--text);
+    font-size: clamp(1.25rem, 1rem + 0.8vw, 1.625rem);
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  .figure {
+    display: block;
+    color: var(--magenta);
+    font-size: clamp(2.75rem, 2rem + 3vw, 4.25rem);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.25rem;
+  }
+  .headline-note {
+    margin-top: clamp(1.5rem, 1rem + 1vw, 2rem);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+  @media (max-width: 52rem) {
+    .headline {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .section {
+    padding-block: clamp(4rem, 2.5rem + 5vw, 7.5rem);
+    border-top: 1px solid var(--rule);
+  }
+  h2 {
+    font-size: clamp(1.75rem, 1.3rem + 1.9vw, 2.75rem);
+    line-height: 1.1;
+    max-width: 22ch;
+    text-wrap: balance;
+  }
+  .section-lead {
+    margin-top: 1.25rem;
+  }
+
+  /* Skript and NeoSkript side by side: one hairline row per point, Skript's
+     answer muted, NeoSkript's in text beside a magenta rail. */
+  .compare {
+    width: 100%;
+    margin-top: clamp(2rem, 1.5rem + 2vw, 3rem);
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .compare th,
+  .compare td {
+    padding: 1rem 1.25rem 1rem 0;
+    border-bottom: 1px solid var(--rule);
+    text-align: left;
+    vertical-align: top;
+  }
+  .compare thead th {
+    padding-block: 0 0.9rem;
+  }
+  .compare thead th:first-child {
+    width: 26%;
+  }
+  .compare .neo-head {
+    color: var(--magenta);
+  }
+  .compare tbody th {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .c-skript {
+    color: var(--muted);
+  }
+  .c-neo {
+    color: var(--text);
+    padding-left: 1.25rem;
+    border-left: 1px solid var(--magenta);
+  }
+  .compare thead th:last-child {
+    padding-left: 1.25rem;
+    border-left: 1px solid var(--magenta);
+  }
+  .compare .who {
+    display: none;
+  }
+  .compare tbody tr {
+    transition: background-color 180ms var(--ease);
+  }
+  .compare tbody tr:hover {
+    background-color: color-mix(in srgb, var(--magenta) 5%, transparent);
+  }
+  @media (max-width: 44rem) {
+    .compare,
+    .compare tbody,
+    .compare tr,
+    .compare th,
+    .compare td {
+      display: block;
+      width: auto;
+    }
+    .compare thead {
+      display: none;
+    }
+    .compare tr {
+      padding-block: 1rem;
+      border-bottom: 1px solid var(--rule);
+    }
+    .compare th,
+    .compare td {
+      padding: 0;
+      border: 0;
+    }
+    .compare tbody th {
+      margin-bottom: 0.5rem;
+    }
+    .compare td {
+      display: grid;
+      grid-template-columns: 6.5rem minmax(0, 1fr);
+      gap: 0.75rem;
+      padding-block: 0.2rem;
+    }
+    .c-neo {
+      padding-left: 0;
+      border-left: 0;
+    }
+    .compare .who {
+      display: block;
+      padding-top: 0.2rem;
+      font-family: var(--label);
+      font-size: 0.6875rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .c-neo .who {
+      color: var(--magenta);
+    }
+  }
 
   /* The staff: the script down the middle between magenta rails, Skript's
      output mirrored on its left, NeoSkript's on its right, every row one
      grid row so the two outputs always line up with their line. */
   .staff-figure {
-    margin-top: clamp(2.5rem, 1.5rem + 3vw, 4rem);
+    margin-top: clamp(2rem, 1.5rem + 2vw, 3rem);
   }
   .staff {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 36rem) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 32rem) minmax(0, 1fr);
     border-top: 1px solid var(--rule);
     font-family: var(--mono);
     font-size: 0.875rem;
@@ -286,7 +581,7 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
   .who {
     display: none;
   }
-  /* The signature: pointing at a line lights its row across both servers. */
+  /* Pointing at a line lights its row across both servers. */
   .line:hover > * {
     background-color: color-mix(in srgb, var(--magenta) 7%, transparent);
   }
@@ -310,7 +605,9 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
     }
   }
   /* The performance staff: what was measured down the middle, each server's
-     time as a bar growing away from it, Skript's to the left. */
+     time over a bar that grows away from it, Skript's to the left. The bar
+     fills its cell, and both sides' cells are the same width, so lengths
+     compare across the staff as well as down it. */
   .perf .script {
     display: grid;
     gap: 0.15rem;
@@ -327,24 +624,21 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
     font-family: var(--mono);
   }
   .perf .row > * {
-    padding-block: 1.25rem;
+    padding-block: 1.1rem;
   }
   .perf .out {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+    align-content: center;
+    gap: 0.6rem;
   }
-  .perf .skript {
-    justify-content: flex-end;
+  .perf .skript .reading {
+    justify-content: end;
   }
-  .perf .neo {
-    justify-content: flex-start;
-  }
-  /* Both sides share one track width, so a bar's length is comparable
-     across the staff as well as down it. */
   .bar {
-    flex: none;
-    width: clamp(6rem, 1rem + 12vw, 13rem);
+    display: block;
+    width: 100%;
     height: 0.75rem;
   }
   /* Skript's bar grows leftward, away from the staff. */
@@ -367,9 +661,6 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
     transform-origin: left center;
     animation: draw 1100ms var(--ease) both;
   }
-  .perf .line:nth-child(3) .fill {
-    animation-delay: 160ms;
-  }
   .perf .line {
     animation: none;
   }
@@ -378,24 +669,23 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
       transform: scaleX(0);
     }
   }
+  .reading {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+  }
   .time {
-    flex: none;
-    font-size: clamp(1.125rem, 0.9rem + 0.9vw, 1.625rem);
+    font-size: clamp(1.125rem, 0.95rem + 0.6vw, 1.5rem);
     font-weight: 500;
+    font-family: var(--sans);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
     color: var(--text);
+    white-space: nowrap;
   }
   .skript .time {
     color: var(--muted);
-  }
-  .reading {
-    display: grid;
-    gap: 0.1rem;
-    flex: none;
-  }
-  .section-lead {
-    margin-top: 1.25rem;
   }
   figcaption {
     text-wrap: balance;
@@ -410,8 +700,6 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
   /* Under 60rem the staff becomes one column: each line, then what each
      server printed under it. */
   @media (max-width: 60rem) {
-    /* Every output cell is the same grid, so the two servers' values start
-       on one line and wrap at one width. */
     .row .out {
       display: grid;
       grid-template-columns: 6rem minmax(0, 1fr) 3.25rem;
@@ -419,25 +707,17 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
       align-items: baseline;
     }
     .perf .out {
-      grid-template-columns: 6rem 5.75rem minmax(0, 1fr);
+      grid-template-columns: 6rem 6.5rem minmax(0, 1fr);
       align-items: center;
     }
-    .perf .same {
-      white-space: nowrap;
+    .perf .skript .reading {
+      justify-content: start;
     }
     .perf .skript .bar {
       transform: none;
     }
     .perf .bar {
-      width: 100%;
-      max-width: 6.5rem;
-    }
-    .perf .who {
-      order: -2;
-    }
-    .perf .reading,
-    .perf .skript .time {
-      order: -1;
+      max-width: 8rem;
     }
     .perf .time {
       font-size: 1.125rem;
@@ -451,6 +731,9 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
     }
     .row > * {
       border-bottom: 0;
+      padding-block: 0.45rem;
+    }
+    .perf .row > * {
       padding-block: 0.45rem;
     }
     .row .script {
@@ -482,24 +765,14 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
     }
   }
 
-  .section {
-    padding-block: clamp(4rem, 2.5rem + 5vw, 7.5rem);
-    border-top: 1px solid var(--rule);
-  }
-  h2 {
-    font-size: clamp(1.75rem, 1.3rem + 1.9vw, 2.75rem);
-    line-height: 1.1;
-    max-width: 22ch;
-  }
-
-  /* Three facts on one hairline row. */
-  .facts-section {
-    padding-block: clamp(2.5rem, 2rem + 2vw, 3.5rem);
-  }
+  /* Three facts on one hairline row, under the output staff. */
   .facts {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1.5rem clamp(1.5rem, 1rem + 3vw, 4rem);
+    margin-top: clamp(3rem, 2rem + 3vw, 4.5rem);
+    padding-top: clamp(1.75rem, 1.25rem + 1.5vw, 2.5rem);
+    border-top: 1px solid var(--rule);
     color: var(--muted);
   }
   .facts a {
@@ -552,10 +825,70 @@ const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
     margin-bottom: 0.25rem;
   }
   .more {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.75rem;
     margin-top: 2rem;
   }
   @media (max-width: 52rem) {
     .steps {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* Questions, as hairline rows that open. */
+  .faq-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+    gap: 2rem clamp(2rem, 1rem + 4vw, 6rem);
+    align-items: start;
+  }
+  .faq {
+    border-top: 1px solid var(--rule);
+  }
+  .faq details {
+    border-bottom: 1px solid var(--rule);
+  }
+  .faq summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    min-height: 44px;
+    padding-block: 1.1rem;
+    cursor: pointer;
+    list-style: none;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 1.0625rem;
+  }
+  .faq summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq summary:hover .chev {
+    stroke: var(--magenta);
+  }
+  .chev {
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 180ms var(--ease), stroke 180ms var(--ease);
+  }
+  .faq details[open] .chev {
+    transform: rotate(180deg);
+  }
+  .faq details p {
+    padding-bottom: 1.25rem;
+    max-width: 66ch;
+    color: var(--muted);
+  }
+  @media (max-width: 52rem) {
+    .faq-wrap {
       grid-template-columns: minmax(0, 1fr);
     }
   }

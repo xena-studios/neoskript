@@ -1,6 +1,6 @@
 # NeoSkript
 
-> NeoSkript is a drop-in replacement for Skript, the Minecraft server plugin whose scripts (.sk files) read like English. Existing scripts run unchanged on NeoSkript, compiled to JVM bytecode, on Paper and Folia (Minecraft 1.21.4+, Java 21+). It's in development: there's a development build, no release yet; its script checker, neoskript-cli 0.1.0, is released. NeoSkript is GPL-3.0-only, by Xena Studios, and not affiliated with SkriptLang.
+> NeoSkript is a drop-in replacement for Skript, the Minecraft server plugin whose scripts (.sk files) read like English. Existing scripts run unchanged on NeoSkript, compiled to JVM bytecode, on Paper and Folia (Minecraft 1.21.4+, Java 21+). It's in public beta: 0.1.0-beta.1 is on Modrinth (https://modrinth.com/plugin/neoskript) and GitHub Releases, and its script checker, neoskript-cli 0.1.0, is released. NeoSkript is GPL-3.0-only, by Xena Studios, and not affiliated with SkriptLang.
 
 Scripts written for Skript 2.17 with no addons run on both Skript and NeoSkript. When writing Skript, use only syntax listed in the syntax reference; Skript rejects any line that isn't one of its registered patterns.
 
@@ -22,5 +22,5 @@ Scripts written for Skript 2.17 with no addons run on both Skript and NeoSkript.
 
 ## Optional
 
-- [Download](https://neoskript.dev/download/): the development build
+- [Download](https://neoskript.dev/download/): the public beta, and the development build
 - [Source code](https://github.com/xena-studios/neoskript): the repository, issues and progress

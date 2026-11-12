@@ -1,22 +1,33 @@
 ---
-// The site footer: the XENA endorsement, the site's links and the licence
-// line. Used by the custom pages (Base.astro) and, after Starlight's own
+// The site footer, laid out as on Xena's other sites (raptorpanel.net,
+// xenastudios.co): the XENA mark and the copyright, the licence line, then the
+// site's links. Used by the custom pages (Base.astro) and, after Starlight's own
 // footer, by the guides (components/starlight/Footer.astro). Its colours come
 // from the brand tokens both stylesheets load, with the guides' theme colours
 // first where there are any, so it follows the guides' light theme too.
 import Logo from "./Logo.astro";
 import External from "./External.astro";
 import { nav, repo } from "../lib/nav";
+
+const year = new Date().getFullYear();
 ---
 <footer class="site-footer">
   <div class="foot">
-    <a class="xena" href="https://xenastudios.co" aria-label="Xena Studios"><Logo name="xena" label="Xena" /></a>
-    <ul>
-      {nav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
-      <li><a href={repo}>Source<External /></a></li>
-      <li><a href={`${repo}/issues/new/choose`}>Report a bug<External /></a></li>
-    </ul>
-    <p class="licence">GPL-3.0-only · Not affiliated with SkriptLang</p>
+    <p class="studio">
+      <a class="xena" href="https://xenastudios.co" aria-label="Xena Studios"><Logo name="xena" label="Xena" /></a>
+      <span class="label">© {year} Xena Studios</span>
+    </p>
+    <p class="note">
+      NeoSkript is open source under GPL-3.0-only. Skript belongs to SkriptLang; NeoSkript isn't affiliated with it.
+    </p>
+    <nav aria-label="Footer">
+      <ul>
+        {nav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+        <li><a href="https://modrinth.com/plugin/neoskript">Modrinth<External /></a></li>
+        <li><a href={repo}>Source<External /></a></li>
+        <li><a href={`${repo}/issues/new/choose`}>Report a bug<External /></a></li>
+      </ul>
+    </nav>
   </div>
 </footer>
 
@@ -29,24 +40,41 @@ import { nav, repo } from "../lib/nav";
     padding-block: 2.5rem 3rem;
     color: var(--f-muted);
     font-size: 0.9375rem;
-    /* Laid out by its own width: full width on the custom pages, the guide's
-       column in the guides. */
-    container-type: inline-size;
   }
+  /* As on Xena's other sites: the studio, a line on the licence, then the
+     links, stacked. */
   .foot {
     display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 1.5rem 2.5rem;
+    gap: 1rem;
     max-width: var(--max, none);
     margin-inline: auto;
     padding-inline: var(--gutter, 0);
+  }
+  .studio {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.25rem;
+    margin: 0;
+  }
+  .label {
+    font-family: "JetBrains Mono Variable", ui-monospace, monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--f-muted);
+  }
+  .note {
+    margin: 0;
+    max-width: 72ch;
+    font-size: 0.875rem;
   }
   ul {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem 1.75rem;
-    margin: 0;
+    margin: 0.25rem 0 0;
     padding: 0;
     list-style: none;
   }
@@ -67,18 +95,5 @@ import { nav, repo } from "../lib/nav";
   .xena :global(.logo) {
     height: 0.9rem;
     width: auto;
-  }
-  .licence {
-    margin: 0;
-    font-family: "JetBrains Mono Variable", ui-monospace, monospace;
-    font-size: 0.75rem;
-    font-weight: 500;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-  @container (max-width: 52rem) {
-    .foot {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

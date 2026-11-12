@@ -1,10 +1,10 @@
 {
   "source": "test-harness DifferentialScenario, paper-26.3",
   "reference": "Skript 2.17.0 on paper-26.3",
-  "date": "2026-11-10",
+  "date": "2026-11-12",
   "units": 1613,
-  "identical": 1495,
-  "percent": 92.6,
+  "identical": 1613,
+  "percent": 100,
   "probe": "probes/text",
   "file": "test-harness/corpus/differential/text.sk",
   "setup": "set {_t} to \"Hello World\"",
