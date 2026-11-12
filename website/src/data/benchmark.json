@@ -1,5 +1,5 @@
 {
-  "source": "test-harness: skript-load-benchmark, neoskript-load-benchmark and event-benchmark, paper-26.3",
+  "source": "test-harness: skript-load-benchmark, neoskript-load-benchmark, event-benchmark, tick-benchmark and variable-benchmark, paper-26.3",
   "date": "2026-11-12",
   "machine": "an Apple M1 Pro laptop",
   "skript": "Skript 2.17.0",
@@ -7,13 +7,13 @@
   "lines": 5960,
   "reloads": 5,
   "startup": {
-    "skriptMs": 1570,
-    "neoskriptMs": 770,
+    "skriptMs": 1970,
+    "neoskriptMs": 872,
     "note": "as each plugin logs its own startup load"
   },
   "reload": {
-    "skriptMs": 1127,
-    "neoskriptMs": 214,
+    "skriptMs": 1412,
+    "neoskriptMs": 228,
     "note": "median wall time of /sk reload scripts, measured by the harness"
   },
   "events": {
@@ -24,21 +24,36 @@
       {
         "event": "flight",
         "workload": "a condition only",
-        "skriptMicros": 0.93,
+        "skriptMicros": 1.0,
         "neoskriptMicros": 0.04
       },
       {
         "event": "sneak",
         "workload": "global variables and text",
-        "skriptMicros": 7.01,
-        "neoskriptMicros": 1.48
+        "skriptMicros": 7.03,
+        "neoskriptMicros": 0.88
       },
       {
         "event": "sprint",
         "workload": "a loop with arithmetic and a local list",
-        "skriptMicros": 8.73,
-        "neoskriptMicros": 3.97
+        "skriptMicros": 8.98,
+        "neoskriptMicros": 3.55
       }
     ]
+  },
+  "ticks": {
+    "players": 20,
+    "noScriptsMs": 3.541,
+    "skriptMs": 5.897,
+    "neoskriptMs": 4.489,
+    "skriptScriptMs": 2.355,
+    "neoskriptScriptMs": 0.948,
+    "note": "milliseconds per tick with 20 bots online and tick-benchmark.sk running, the median of 8 readings of the server's mean over 100 ticks; the script's part is over the same server with no scripts"
+  },
+  "variables": {
+    "count": 140000,
+    "skriptMs": 500.0,
+    "neoskriptMs": 438.0,
+    "note": "loading the same variables.csv when the server starts, the median of 3; Skript logs tenths of a second"
   }
 }

@@ -38,6 +38,23 @@ const measures = [
     neo: bench.reload.neoskriptMs,
     show: (ms: number) => `${fmt(ms)} ms`,
   },
+  {
+    name: "Loading variables",
+    what: `${fmt(bench.variables.count)} saved variables, when the server starts`,
+    skript: bench.variables.skriptMs,
+    neo: bench.variables.neoskriptMs,
+    show: (ms: number) => `${fmt(Math.round(ms))} ms`,
+  },
+];
+// What the scripts add to each server tick, with players online, from the tick benchmark.
+const ticks = [
+  {
+    name: "Every tick",
+    what: `${bench.ticks.players} players online, the scripts' part of each tick`,
+    skript: bench.ticks.skriptScriptMs,
+    neo: bench.ticks.neoskriptScriptMs,
+    show: (ms: number) => `${ms.toFixed(2)} ms`,
+  },
 ];
 // What a trigger costs each time its event fires, from the event benchmark.
 const triggerNames: Record<string, string> = {
@@ -57,7 +74,7 @@ const scaled = (group: typeof measures) => {
   const longest = Math.max(...group.map((m) => m.skript));
   return group.map((m) => ({ ...m, width: (v: number) => Math.max(1.5, (v / longest) * 100) }));
 };
-const rows = [...scaled(measures), ...scaled(triggers)];
+const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
 ---
 <Base
   title="NeoSkript: Keep your scripts. Lose the lag."
@@ -77,7 +94,7 @@ const rows = [...scaled(measures), ...scaled(triggers)];
     </div>
 
     <figure class="staff-figure wrap">
-      <div class="staff perf" role="table" aria-label="Load and reload times, and what triggers cost, Skript and NeoSkript">
+      <div class="staff perf" role="table" aria-label="Load, reload, variable and tick times, and what triggers cost, Skript and NeoSkript">
         <div class="row head" role="row">
           <span class="label skript" role="columnheader">{bench.skript} · {serverName}</span>
           <span class="label script" role="columnheader">The same scripts</span>
@@ -103,8 +120,9 @@ const rows = [...scaled(measures), ...scaled(triggers)];
         ))}
       </div>
       <figcaption>
-        {bench.scripts} generated scripts on {serverName}, then each trigger run {fmt(bench.events.count)} times in a row,
-        {bench.events.rounds} rounds; {bench.machine.replace(/^an? /, "")}, {day(bench.date)}.
+        {bench.scripts} generated scripts on {serverName}; a busy server's per-player script with {bench.ticks.players} bots, over the
+        same server with none ({bench.ticks.noScriptsMs.toFixed(1)} ms a tick); each trigger run {fmt(bench.events.count)} times in a
+        row, {bench.events.rounds} rounds. {bench.machine.replace(/^an? /, "").replace(/^./, (c) => c.toUpperCase())}, {day(bench.date)}.
         Measured by the <a href={`${repo}/tree/main/test-harness`}>test harness<External /></a>.
       </figcaption>
     </figure>

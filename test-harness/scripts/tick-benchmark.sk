@@ -1,0 +1,40 @@
+# The tick benchmark's script: what a typical server runs every tick and every few ticks for each online player,
+# with 20 harness bots online. The harness reads the server's milliseconds per tick.
+on load:
+	send "[harness] tick benchmark loaded" to console
+
+on join:
+	set {bench::balance::%player's uuid%} to 100
+	set {bench::joins::%player's uuid%} to 0
+
+# A busy server's per-player work, every tick: counters and a scoreboard-like line, 40 times for each player. The
+# counters are {-...} variables, which neither saves: saved ones changed this often fill Skript's save queue.
+every tick:
+	loop all players:
+		set {_uuid} to loop-player's uuid
+		loop 40 times:
+			add 1 to {-bench::ticks::%{_uuid}%}
+			set {_line} to "Balance: %{bench::balance::%{_uuid}%}% | Ticks: %{-bench::ticks::%{_uuid}%}% | %loop-number%"
+			if length of {_line} > 200:
+				send {_line} to console
+
+# Checks on each player, every 5 ticks.
+every 5 ticks:
+	loop all players:
+		if loop-player's health < 20:
+			heal loop-player
+		if {bench::balance::%loop-player's uuid%} < 50:
+			add 10 to {bench::balance::%loop-player's uuid%}
+		set {_level} to level of loop-player
+		if {_level} > 1000:
+			set level of loop-player to 0
+
+# Work over all players at once, every second.
+every second:
+	set {_total} to 0
+	loop all players:
+		add {bench::balance::%loop-player's uuid%} to {_total}
+	set {bench::total} to {_total}
+	set {_names::*} to name of all players
+	if size of {_names::*} > 100:
+		broadcast "too many"

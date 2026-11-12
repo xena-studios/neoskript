@@ -1,0 +1,12 @@
+# Makes the variable benchmark's variables on Skript, which saves them to its variables.csv: 140,000 of the
+# kinds servers keep (numbers, texts, booleans, locations and lists), under a few lists.
+on load:
+	set {_world} to world "world"
+	loop 40000 times:
+		set {bench::balance::%loop-number%} to loop-number * 1.5
+		set {bench::name::%loop-number%} to "player %loop-number%"
+		set {bench::flag::%loop-number%} to true
+	loop 10000 times:
+		set {bench::home::%loop-number%} to location(loop-number, 64, loop-number, {_world})
+		set {bench::kills::%loop-number%} to loop-number
+	send "[harness] variables made" to console

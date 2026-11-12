@@ -114,6 +114,100 @@ public final class VariableStore {
 
     private static final String SEPARATOR = "::";
 
+    /**
+     * A node's children, in Skript's order of indices ({@link #INDEX_ORDER}) for going through them, with a hash
+     * index beside it for finding one: comparing long indices like UUIDs in that order made a lookup most of what a
+     * trigger using variables cost. Two indices are the same in that order when they're the same ignoring case, so
+     * the index is keyed by the lower-case index. Children are only ever added ({@link #computeIfAbsent}) and
+     * cleared ({@link #clear}); both keep the index.
+     */
+    private static final class Children extends ConcurrentSkipListMap<String, Node> {
+
+        private final java.util.concurrent.ConcurrentHashMap<String, Node> byIndex =
+                new java.util.concurrent.ConcurrentHashMap<>();
+
+        Children() {
+            super(INDEX_ORDER);
+        }
+
+        /** The key {@link #byIndex} has for {@code index}: lower case, character by character, as the order compares. */
+        static String fold(String index) {
+            for (int i = 0; i < index.length(); i++) {
+                char c = index.charAt(i);
+                // Most indices are ASCII: only A to Z change there.
+                if (c < 0x80 ? c >= 'A' && c <= 'Z' : Character.toLowerCase(c) != c) {
+                    char[] chars = index.toCharArray();
+                    for (int j = i; j < chars.length; j++) {
+                        chars[j] = Character.toLowerCase(chars[j]);
+                    }
+                    return new String(chars);
+                }
+            }
+            return index;
+        }
+
+        @Override
+        public Node get(Object key) {
+            return key instanceof String index ? byIndex.get(fold(index)) : null;
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+            return get(key) != null;
+        }
+
+        /** In constant time, where the skip list counts its entries. */
+        @Override
+        public int size() {
+            return byIndex.size();
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return byIndex.isEmpty();
+        }
+
+        @Override
+        public Node computeIfAbsent(String key, java.util.function.Function<? super String, ? extends Node> make) {
+            String folded = fold(key);
+            Node found = byIndex.get(folded);
+            if (found != null) {
+                return found;
+            }
+            synchronized (this) {
+                Node node = super.computeIfAbsent(key, make);
+                byIndex.put(folded, node);
+                return node;
+            }
+        }
+
+        @Override
+        public synchronized void clear() {
+            super.clear();
+            byIndex.clear();
+        }
+
+        @Override
+        public Node put(String key, Node value) {
+            throw new UnsupportedOperationException("children are added with computeIfAbsent");
+        }
+
+        @Override
+        public Node remove(Object key) {
+            throw new UnsupportedOperationException("children are only cleared");
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return this == other;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(this);
+        }
+    }
+
     private static final class Node {
         final AtomicReference<Object> value = new AtomicReference<>();
         volatile ConcurrentSkipListMap<String, Node> children;
@@ -124,7 +218,7 @@ public final class VariableStore {
                 synchronized (this) {
                     map = children;
                     if (map == null) {
-                        map = new ConcurrentSkipListMap<>(INDEX_ORDER);
+                        map = new Children();
                         children = map;
                     }
                 }

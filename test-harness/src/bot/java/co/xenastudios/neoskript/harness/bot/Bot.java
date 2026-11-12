@@ -126,6 +126,8 @@ final class Bot extends SimpleChannelInboundHandler<Packet<?>> {
     @Override
     @SuppressWarnings("deprecation") // Paper deprecates building the handshake packet, which only clients do.
     public void channelActive(ChannelHandlerContext ctx) {
+        // The channel can be active before Bots attaches it.
+        channel = ctx.channel();
         send(new ClientIntentionPacket(SharedConstants.getProtocolVersion(), "localhost", port, ClientIntent.LOGIN));
         send(new ServerboundHelloPacket(name, offlineUuid(name)));
     }

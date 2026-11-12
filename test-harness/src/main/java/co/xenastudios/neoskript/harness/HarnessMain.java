@@ -32,6 +32,8 @@ import co.xenastudios.neoskript.harness.scenario.SkriptLoadBenchmark;
 import co.xenastudios.neoskript.harness.scenario.SkriptSmokeScenario;
 import co.xenastudios.neoskript.harness.scenario.SkriptTestSuiteScenario;
 import co.xenastudios.neoskript.harness.scenario.EventBenchmark;
+import co.xenastudios.neoskript.harness.scenario.TickBenchmark;
+import co.xenastudios.neoskript.harness.scenario.VariableBenchmark;
 import co.xenastudios.neoskript.harness.scenario.SyntaxExportScenario;
 import com.google.gson.GsonBuilder;
 import java.nio.file.Files;
@@ -75,6 +77,8 @@ public final class HarnessMain {
             new NeoSkriptCliScenario(),
             new SyntaxExportScenario(),
             new EventBenchmark(),
+            new TickBenchmark(),
+            new VariableBenchmark(),
             new NeoSkriptRegionsScenario());
 
     record Result(String environment, String scenario, boolean passed, Duration duration, String message,

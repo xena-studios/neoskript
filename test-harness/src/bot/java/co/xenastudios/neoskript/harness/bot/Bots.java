@@ -54,6 +54,8 @@ import org.bukkit.plugin.Plugin;
  *   <li>{@code bot bench <name> <sneak|sprint|flight> <count>}: fires that toggle event for the player
  *       {@code count} times in a row on its thread, as a benchmark of the triggers listening to it, and logs
  *       {@code [bot] bench <event> <count> <nanoseconds>ns}.
+ *   <li>{@code bot mspt}: logs {@code [bot] mspt <mean> <p95>}, the server's milliseconds per tick over its
+ *       last 100 ticks, as a benchmark of everything the server runs.
  *   <li>{@code bot list}.
  * </ul>
  *
@@ -123,6 +125,15 @@ final class Bots implements Listener {
     boolean command(CommandSender sender, String[] args) {
         if (args.length == 1 && args[0].equalsIgnoreCase("list")) {
             sender.sendMessage("[bot] Bots: " + String.join(", ", bots.values().stream().map(Bot::name).sorted().toList()));
+            return true;
+        }
+        if (args.length == 1 && args[0].equalsIgnoreCase("mspt")) {
+            long[] ticks = Bukkit.getServer().getTickTimes();
+            long[] sorted = ticks.clone();
+            java.util.Arrays.sort(sorted);
+            double mean = Arrays.stream(ticks).average().orElse(0) / 1_000_000.0;
+            double p95 = sorted.length == 0 ? 0 : sorted[(int) Math.min(sorted.length - 1, sorted.length * 0.95)] / 1_000_000.0;
+            LOG.info(String.format(Locale.ROOT, "[bot] mspt %.3f %.3f", mean, p95));
             return true;
         }
         if (args.length < 2) {
