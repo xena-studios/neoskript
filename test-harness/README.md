@@ -7,7 +7,7 @@ Needs JDK 21 and JDK 25 installed. Gradle finds them automatically.
 ```sh
 ./gradlew :test-harness:harness                                   # smoke scenarios, every environment
 ./gradlew :test-harness:harness -Pharness.env=folia-26.3          # one environment
-./gradlew :test-harness:harness -Pharness.group=baseline          # Skript test suite + load benchmark
+./gradlew :test-harness:harness -Pharness.group=baseline          # Skript's suite, the differential, the benchmarks
 ./gradlew :test-harness:harness -Pharness.scenario=skript-smoke   # one scenario
 ./gradlew :test-harness:harness -Pharness.echo=true               # stream server consoles
 ```
@@ -21,7 +21,7 @@ Reports go to `test-harness/build/harness/reports/`, and each run's server direc
 | `neoskript-boot` | smoke | all | NeoSkript enables and detects the right platform and version |
 | `neoskript-hello` | smoke | all | NeoSkript compiles and runs `scripts/neoskript-hello.sk` |
 | `neoskript-language` | smoke | all | NeoSkript runs `scripts/neoskript-language.sk`: variables, arithmetic, loops, conditionals and functions |
-| `neoskript-skript-tests` | smoke | all | M2's exit check: NeoSkript runs Skript's own control-flow and function tests in test mode. The must-pass tests have to pass; the pending ones need later milestones (listed with reasons in the scenario) |
+| `neoskript-skript-tests` | smoke | all | M2's exit check: NeoSkript runs Skript's own control-flow and function tests in test mode, and all of them must pass |
 | `neoskript-reload` | smoke | all | `/sk reload`: changed scripts switch over, a script with errors keeps its last version (D12), and one script can be reloaded on its own |
 | `neoskript-auto-reload` | smoke | all | A script with `auto reload` reloads itself when its file changes, with Skript's messages. A version with errors keeps the old one running |
 | `neoskript-runtime-errors` | smoke | all | Runtime errors print as Skript prints them, with its per-frame limits and timeouts |
@@ -29,7 +29,6 @@ Reports go to `test-harness/build/harness/reports/`, and each run's server direc
 | `neoskript-commands` | smoke | all | Script commands, run from the console: arguments, aliases, subcommands, choices, default values, named arguments, `executable by`, usage messages, `execute command`, and a reload that changes one command and removes the others |
 | `neoskript-real-world-corpus` | smoke | all | NeoSkript loads the real-world corpus without problems and every script's self-test passes, with no thread violations or cross-region errors in the log (M5's Folia check) |
 | `neoskript-regions` | smoke | all | Region ownership, with two pigs in different regions: on Folia, reading one from another region's thread is a runtime error naming the line, changes reach each pig's own thread, and `run on` runs code on its thread in order with the rest of the trigger. On Paper the same script runs with no errors |
-| `neoskript-real-world-corpus` | smoke | all | NeoSkript loads the real-world corpus without problems and every script's self-test passes |
 | `skill-examples` | smoke | all | Every example script in the AI skill (`plugins/skript`) loads without errors or warnings on NeoSkript, and on the reference Skript in Skript envs |
 | `neoskript-items` | smoke | all | Items and inventories, with the server's registries: item literals with amounts, plurals and enchantments, names and lore, items parsed from text, and chest inventory slots |
 | `neoskript-hooks` | baseline | Paper 26.x | Skript's plugin hooks against the real plugins, pinned by SHA-256: WorldGuard 7.0.20 (with WorldEdit 7.4.6) regions written into its `regions.yml`, Vault 1.7.3 with EssentialsX 2.22.0 money and balances, and LuckPerms 5.5.71 groups. Baseline, as it downloads about 16 MB of plugins |
@@ -43,10 +42,13 @@ Reports go to `test-harness/build/harness/reports/`, and each run's server direc
 | `skript-test-suite` | baseline | Skript envs | Runs Skript's own test suite in Skript's test mode and records the results |
 | `skript-load-benchmark` | baseline | Skript envs | Times Skript loading and reloading 40 generated scripts (600 structures) |
 | `neoskript-player-events` | smoke | 26.3 | Real players from the harness bot (`src/bot`): join, chat, commands and quit run their triggers, messages reach the players, and on Paper the same script behaves the same on the reference Skript |
-| `differential` | baseline | Skript envs, Folia 26.3 | M4's exit check: Skript's documentation examples, the checks and probes in `corpus/differential` and the real-world corpus, on the reference Skript and on NeoSkript. Each script's load messages, the probes' output and the saved variables are compared; at least 95% must match, and any difference `corpus/differential/known-differences.txt` doesn't list fails. Folia is compared with Skript on Paper |
+| `differential` | baseline | Skript envs, Folia 26.3 | M4's exit check: Skript's documentation examples, the checks and probes in `corpus/differential` and the real-world corpus, on the reference Skript and on NeoSkript. Each script's load messages, the probes' output and the saved variables are compared; at least 95% must match (every unit does, since 2026-11-11), and any difference `corpus/differential/known-differences.txt` doesn't list fails. Folia is compared with Skript on Paper |
 | `neoskript-cli` | smoke | Paper 26.3 | `neoskript-cli check` loads the real-world corpus cleanly, and gives the Folia and performance hints for a script with known hazards |
 | `syntax-export` | manual | Skript envs | Not a check: writes the data for neoskript.dev's syntax reference. NeoSkript's registry (`-Dneoskript.syntaxExport`) as `syntax-export.json` and the reference Skript's `sk gen-docs` output as `skript-docs.json`. Run it by name; `pnpm syntax:sync` in `website/` turns them into the site's data |
 | `neoskript-load-benchmark` | baseline | Skript envs | The same measurement on NeoSkript, for the comparison on neoskript.dev |
+| `event-benchmark` | baseline | Skript envs | What a trigger costs per event, on Skript and NeoSkript with `scripts/event-benchmark.sk`: the harness bot fires each toggle event 20,000 times in a row, 12 rounds, and the median of the last 8 is the result |
+| `tick-benchmark` | baseline | Skript envs | Milliseconds per tick with 20 bots online and `scripts/tick-benchmark.sk` running, on Skript, on NeoSkript and with no scripts: the median of 8 readings of the server's mean over 100 ticks |
+| `variable-benchmark` | baseline | Skript envs | Loading 140,000 saved variables when the server starts: Skript saves them with `scripts/variables-benchmark.sk`, then each loads that `variables.csv` 3 times |
 
 ## Pins
 

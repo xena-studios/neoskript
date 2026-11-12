@@ -4,7 +4,17 @@
 
 NeoSkript is a fast, modern drop-in replacement for [Skript](https://github.com/SkriptLang/Skript). Your `.sk` scripts run unchanged, only faster, on Paper and Folia.
 
-**Status:** public beta, [0.1.0-beta.1](https://github.com/xena-studios/neoskript/releases/tag/v0.1.0-beta.1), on [Modrinth](https://modrinth.com/plugin/neoskript) and [GitHub Releases](https://github.com/xena-studios/neoskript/releases). Skript's whole test suite passes on NeoSkript. See [progress](docs/PROGRESS.md).
+**Status:** public beta, [0.1.0-beta.1](https://github.com/xena-studios/neoskript/releases/tag/v0.1.0-beta.1). Skript's whole test suite passes on NeoSkript. See [progress](docs/PROGRESS.md).
+
+**Website:** [neoskript.dev](https://neoskript.dev), with the docs, the syntax reference and an in-browser script checker.
+
+## Installing
+
+1. Download the jar from [Modrinth](https://modrinth.com/plugin/neoskript), [GitHub Releases](https://github.com/xena-studios/neoskript/releases) or [neoskript.dev](https://neoskript.dev/download/).
+2. Take `Skript.jar` out of `plugins/` (NeoSkript won't start next to it) and put NeoSkript's jar in.
+3. Start the server. Your scripts and variables are copied from `plugins/Skript`, which is never changed.
+
+Paper or Folia, Minecraft 1.21.4 to 26.3, Java 21 or newer. It's a beta: try it on a test server first. [Moving from Skript](https://neoskript.dev/docs/moving-from-skript/) has the details.
 
 ## Building
 
@@ -41,7 +51,8 @@ neoskript-compiler   compiles scripts to JVM bytecode
 neoskript-runtime    variables, storage, scheduling, waits
 neoskript-paper      the standard library: Skript's syntax on Paper
 neoskript-plugin     the plugin: /sk, config, reload
-neoskript-cli        checks a scripts folder before you switch (M5)
+neoskript-web        the parser, compiled to JavaScript for neoskript.dev
+neoskript-cli        checks a scripts folder before you switch
 test-harness         real Paper and Folia servers, run against Skript
 website              neoskript.dev
 plugins/skript       the AI skill for writing Skript (Claude Code, Codex)
