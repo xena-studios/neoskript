@@ -7,3 +7,10 @@ allowBuilds:
   tree-sitter-cli: true
   # Only for signing marketplace uploads, which vsce does on its own.
   "@vscode/vsce-sign": false
+
+# Security fixes for transitive dependencies. Drop each once its parent
+# depends on a patched version.
+# minimatch: @vscode/vsce and vscode-languageclient ask for ^10, and only
+# 11.0.1 fixes GHSA-g3hv-75wg-m249.
+overrides:
+  minimatch: 11.0.1

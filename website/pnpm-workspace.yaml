@@ -1,3 +1,11 @@
 allowBuilds:
   esbuild: true
   workerd: true
+
+# Security fixes for transitive dependencies. Drop each once its parent
+# depends on a patched version.
+# dompurify: monaco-editor 0.57.0 pins 3.4.15, before 3.4.17, which fixes
+# GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr, GHSA-c6gr-qvv4-5v3f,
+# GHSA-6688-9rhm-gjv2 and GHSA-p98j-92pf-mc4p.
+overrides:
+  dompurify: 3.4.17
