@@ -59,6 +59,13 @@ public record NeoSkriptConfig(
             "Every option, and how to share variables between servers: https://neoskript.dev/docs/server/variables/"})
         DatabaseSettings databases,
         Syntax syntax,
+        @Comment({
+            "How much NeoSkript logs, as Skript's 'verbosity': low (not even how many scripts and variables loaded),",
+            "normal, high (also each script's structures and each hooked plugin), very high (also each structure as",
+            "it loads, and each event with the triggers it runs and how long they took) or debug (as very high)."})
+        Verbosity verbosity,
+        Warnings warnings,
+        Hooks hooks,
         Events events,
         RuntimeErrors runtimeErrors,
         EffectCommands effectCommands) {
@@ -75,7 +82,10 @@ public record NeoSkriptConfig(
                     co.xenastudios.neoskript.paper.TextComponentParser.DEFAULT_SAFE_TAGS, LinkParsing.DISABLED),
             new Variables(false, Interval.parse("5 minutes"), true, true),
             DatabaseSettings.DEFAULTS,
-            new Syntax(100, NamePattern.DEFAULT),
+            new Syntax(100, NamePattern.DEFAULT, true),
+            Verbosity.NORMAL,
+            new Warnings(true, true, true, true, true, Interval.parse("2 seconds")),
+            new Hooks(true, true, true),
             new Events(Priority.HIGH, false),
             new RuntimeErrors(Interval.parse("1 second"), 8, 2, 4, 10, 8, 2, 4, 10),
             new EffectCommands(false, "!", false, false));
@@ -111,6 +121,7 @@ public record NeoSkriptConfig(
             .codec(DatePattern.class, DatePattern.CODEC)
             .codec(NamePattern.class, NamePattern.CODEC)
             .codec(LinkParsing.class, LinkParsing.CODEC)
+            .codec(Verbosity.class, Verbosity.CODEC)
             .build();
 
     public record Aliases(
@@ -160,7 +171,76 @@ public record NeoSkriptConfig(
             @Comment({
                 "Skript's 'player name regex pattern': the text that can be read as an offline player's name, as a",
                 "Java regular expression. Names that don't match aren't players (UUIDs always are)."})
-            NamePattern playerNamePattern) {}
+            NamePattern playerNamePattern,
+            @Comment({
+                "Skript's 'enable legacy tab completion event compatibility': other plugins can add tab completions to",
+                "script commands (through Bukkit's TabCompleteEvent). Off, a script command's completions are its own."})
+            boolean legacyTabCompletion) {}
+
+    /**
+     * Warnings when scripts load, as Skript's {@code disable ... warnings} options turned round: {@code false} turns
+     * one off for every script. All apply on /sk reload config, to the scripts loaded after it.
+     */
+    public record Warnings(
+            @Comment({
+                "Off is Skript's 'disable variable will not be saved warnings': setting a global variable to a value",
+                "that can't be saved, which is lost when the server stops."})
+            boolean variableNotSaved,
+            @Comment("Off is Skript's 'disable variable missing and/or warnings': a list without 'and' or 'or'.")
+            boolean missingAndOr,
+            @Comment({
+                "Off is Skript's 'disable starting a variable's name with an expression warnings', as in",
+                "{%player%::money}."})
+            boolean variableStartingWithExpression,
+            @Comment("Off is Skript's 'disable single colon in variable name warnings', as in {money:%player%}.")
+            boolean singleColonInVariableName,
+            @Comment("Off is Skript's 'disable unreachable code warnings': code after a stop, return or exit.")
+            boolean unreachableCode,
+            @Comment({
+                "Skript's 'long parse time warning threshold': a line that takes longer than this to parse gets a",
+                "warning. 0 seconds turns it off."})
+            Interval longParseTime) {}
+
+    /**
+     * The plugins NeoSkript hooks into for their syntax, as Skript's {@code disable hooks} turned round: {@code false}
+     * leaves one alone. Applies on restart.
+     */
+    public record Hooks(
+            @Comment("Vault: money, chat prefixes and suffixes, permission groups. Off is Skript's 'disable hooks.vault'.")
+            boolean vault,
+            @Comment("WorldGuard's regions. Off is Skript's 'disable hooks.regions.worldguard'.")
+            boolean worldguard,
+            @Comment("GriefPrevention's claims, as regions. Off is Skript's 'disable hooks.regions.grief prevention'.")
+            boolean griefPrevention) {}
+
+    /** Skript's {@code verbosity}. */
+    public enum Verbosity {
+        LOW, NORMAL, HIGH, VERY_HIGH, DEBUG;
+
+        /** As config.yml writes them, {@code very-high}, also read as Skript writes them, {@code very high}. */
+        static final Codec<Verbosity> CODEC = new Codec<>() {
+            @Override
+            public Verbosity decode(Object raw) {
+                String name = raw.toString().strip().replace(' ', '_').replace('-', '_').toUpperCase(java.util.Locale.ROOT);
+                for (Verbosity verbosity : values()) {
+                    if (verbosity.name().equals(name)) {
+                        return verbosity;
+                    }
+                }
+                throw new IllegalArgumentException("should be low, normal, high, very-high or debug");
+            }
+
+            @Override
+            public Object encode(Verbosity value) {
+                return value.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+            }
+        };
+
+        /** Whether this logs what Skript logs at {@code level}. */
+        boolean logs(Verbosity level) {
+            return compareTo(level) >= 0;
+        }
+    }
 
     public record Variables(
             @Comment({
@@ -482,6 +562,9 @@ public record NeoSkriptConfig(
         }
         if (events.listenToCancelled != before.events.listenToCancelled) {
             changed.add("events.listen-to-cancelled");
+        }
+        if (!hooks.equals(before.hooks)) {
+            changed.add("hooks");
         }
         return changed;
     }
