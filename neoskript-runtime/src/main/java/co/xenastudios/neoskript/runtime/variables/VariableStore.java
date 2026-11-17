@@ -511,6 +511,47 @@ public final class VariableStore {
     }
 
     /**
+     * Told of the changes that only add to something: a number added to or taken from, or a value added to a list at
+     * its next free index. Storage shared between servers needs these to merge two servers' changes to one variable
+     * rather than keep only one of them. Called on the thread that makes the change; each must be quick.
+     */
+    public interface Additions {
+
+        /** {@code add} or {@code remove} is about to change {@code {name}}: {@link #added} follows, always. */
+        void adding(String name);
+
+        /**
+         * The change {@link #adding} announced is done. {@code amount} is what it added to the number in
+         * {@code {name}}, negative for a removal, if it only added plain numbers ({@code Long} or {@code Double}) to a
+         * plain number or to nothing; otherwise {@code null}.
+         */
+        void added(String name, Number amount);
+
+        /**
+         * {@code {name}} is about to be made by adding a value to its list at the list's next free index: told before
+         * the value is there, so whoever sees the value can see this too.
+         */
+        void appending(String name);
+    }
+
+    private final java.util.concurrent.CopyOnWriteArrayList<Additions> additions =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /**
+     * Tells {@code watcher} of every change that only adds ({@link Additions}) from now on.
+     *
+     * @return what stops it
+     */
+    public Runnable watchAdditions(Additions watcher) {
+        additions.add(watcher);
+        return () -> additions.remove(watcher);
+    }
+
+    private static boolean plainNumber(Object value) {
+        return value instanceof Long || value instanceof Double;
+    }
+
+    /**
      * Visits every variable that has a value, depth first in index order: each variable, then the ones
      * under it. That's the order Skript saves them in.
      */
@@ -655,22 +696,47 @@ public final class VariableStore {
             changed();
             return;
         }
-        update(name, old -> {
-            Object result = old;
-            for (Object value : values) {
-                if (Arithmetic.unchangedBy('+', old, value)) {
-                    continue; // 'add 1 to {_money}', as in Skript
-                }
-                if (result == null) {
-                    result = value;
-                    continue;
-                }
-                // As Skript, a value the current one can't be added to is skipped: 'add 1 to {_text}' leaves it.
-                Object sum = Arithmetic.add(result, value);
-                result = sum == null ? result : sum;
+        boolean watched = !additions.isEmpty();
+        Object[] amount = watched ? new Object[1] : null;
+        if (watched) {
+            for (Additions watcher : additions) {
+                watcher.adding(name);
             }
-            return result;
-        });
+        }
+        try {
+            update(name, old -> {
+                Object result = old;
+                // What was added, while it's only plain numbers to a plain number (or to nothing).
+                Object added = watched && (old == null || plainNumber(old)) ? 0L : null;
+                for (Object value : values) {
+                    if (Arithmetic.unchangedBy('+', old, value)) {
+                        continue; // 'add 1 to {_money}', as in Skript
+                    }
+                    if (result == null) {
+                        result = value;
+                        added = added != null && plainNumber(value) ? Arithmetic.add(added, value) : null;
+                        continue;
+                    }
+                    // As Skript, a value the current one can't be added to is skipped: 'add 1 to {_text}' leaves it.
+                    Object sum = Arithmetic.add(result, value);
+                    if (sum != null) {
+                        added = added != null && plainNumber(value) ? Arithmetic.add(added, value) : null;
+                    }
+                    result = sum == null ? result : sum;
+                }
+                if (watched) {
+                    amount[0] = added;
+                }
+                return result;
+            });
+        } finally {
+            if (watched) {
+                Number number = amount[0] instanceof Number n ? n : null;
+                for (Additions watcher : additions) {
+                    watcher.added(name, number);
+                }
+            }
+        }
     }
 
     /** Subtracts {@code values} from the number in {@code {name}}. */
@@ -693,17 +759,40 @@ public final class VariableStore {
             changed();
             return;
         }
-        update(name, old -> {
-            Object result = old == null ? 0L : old;
-            for (Object value : values) {
-                if (Arithmetic.unchangedBy('-', old, value)) {
-                    continue;
-                }
-                Object difference = Arithmetic.subtract(result, value);
-                result = difference == null ? result : difference;
+        boolean watched = !additions.isEmpty();
+        Object[] amount = watched ? new Object[1] : null;
+        if (watched) {
+            for (Additions watcher : additions) {
+                watcher.adding(name);
             }
-            return result;
-        });
+        }
+        try {
+            update(name, old -> {
+                Object result = old == null ? 0L : old;
+                Object taken = watched && (old == null || plainNumber(old)) ? 0L : null;
+                for (Object value : values) {
+                    if (Arithmetic.unchangedBy('-', old, value)) {
+                        continue;
+                    }
+                    Object difference = Arithmetic.subtract(result, value);
+                    if (difference != null) {
+                        taken = taken != null && plainNumber(value) ? Arithmetic.subtract(taken, value) : null;
+                    }
+                    result = difference == null ? result : difference;
+                }
+                if (watched) {
+                    amount[0] = taken;
+                }
+                return result;
+            });
+        } finally {
+            if (watched) {
+                Number number = amount[0] instanceof Number n ? n : null;
+                for (Additions watcher : additions) {
+                    watcher.added(name, number);
+                }
+            }
+        }
     }
 
     /** The values directly under {@code {prefix::*}}, in index order. */
@@ -936,12 +1025,19 @@ public final class VariableStore {
                 if (node.dead()) {
                     continue;
                 }
+                boolean watched = !additions.isEmpty();
                 for (Object value : values) {
                     if (value == null) {
                         continue;
                     }
                     Children children = node.children;
                     int index = children == null ? 1 : children.nextOpen();
+                    if (watched) {
+                        String made = prefix + SEPARATOR + index;
+                        for (Additions watcher : additions) {
+                            watcher.appending(made);
+                        }
+                    }
                     node.lockedChild(Integer.toString(index)).value.set(Values.copy(value));
                 }
                 return;
