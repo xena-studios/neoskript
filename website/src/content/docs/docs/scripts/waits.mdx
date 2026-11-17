@@ -16,14 +16,14 @@ command /countdown:
 		broadcast "<green>Go!"
 ```
 
-Timespans: `1 tick` (a twentieth of a second), `5 seconds`, `2 minutes`, `1 hour`, `1 minute and 30 seconds`, or short forms like `30s` and `2h`.
+Timespans: `1 tick` (a twentieth of a second), `5 seconds`, `2 minutes`, `1 hour`, and `1 minute and 30 seconds`. Short forms like `30s` and `2h` work only in a command argument a player types, not in a script.
 
 ## After a wait
 
 The world moves on while a trigger waits, so check what you rely on.
 
 - **The player may have left.** Check `player is online` before using them.
-- **The event is over.** `cancel event` after a wait does nothing, because the event already happened. Cancel before waiting.
+- **The event is over.** Skript won't load `cancel event`, or changes to event values such as `set damage to`, after a wait: "An event cannot be cancelled after it has already passed". Do them before waiting.
 - **Local variables are kept.** `{_x}` is still there, and so are the loops the wait is inside.
 
 ```skript

@@ -26,11 +26,11 @@ Functions keep working across reloads too: a trigger that calls a function from 
 - `every` timers start again.
 - Global variables aren't touched: they're not part of the script.
 
-A reload of two scripts takes about 2 ms on top of reading and compiling them. The benchmark on the [performance](/docs/server/performance/) page reloads 40 scripts, 5,960 lines, in 228 ms, against 1,412 ms on Skript.
+The benchmark on the [performance](/docs/server/performance/) page reloads 40 scripts, 5,960 lines, in 228 ms, against 1,412 ms on Skript.
 
 ## Who hears about it
 
-The player who reloads gets the result and each error, and so does the console. Players with `skript.reloadnotify` are told who's reloading what, and get the errors too.
+The player who reloads gets the result and each error. Players with `skript.reloadnotify` are told who's reloading what, and get the errors too.
 
 ```text
 [Skript] Reloading shop.sk...

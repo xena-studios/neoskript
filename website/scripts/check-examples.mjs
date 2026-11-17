@@ -23,7 +23,8 @@ const filter = process.argv[2] ?? "";
 function findCli() {
   if (process.env.NEOSKRIPT_CLI) return process.env.NEOSKRIPT_CLI;
   const libs = join(root, "neoskript-cli/build/libs");
-  const jar = readdirSync(libs, { withFileTypes: true }).find((f) => f.name.endsWith(".jar"));
+  // The shadow jar, with its dependencies; `./gradlew build` also leaves a -plain jar without them.
+  const jar = readdirSync(libs, { withFileTypes: true }).find((f) => f.name.endsWith(".jar") && !f.name.endsWith("-plain.jar"));
   if (!jar) throw new Error("No CLI jar: run ./gradlew :neoskript-cli:shadowJar");
   return join(libs, jar.name);
 }

@@ -108,7 +108,7 @@ command /size:
 
 ## Is it set?
 
-`is set` checks that a variable or expression has a value. A variable that was never set is `<none>`, and comparisons with it are false. `X ? Y` gives `Y` when `X` isn't set:
+`is set` checks that a variable or expression has a value. A variable that was never set is `<none>`. Comparing it with `is`, `>` or `<` is false, and with `is not` it's true. `X ? Y` gives `Y` when `X` isn't set:
 
 ```skript
 command /coins:

@@ -47,7 +47,7 @@ A script is a text file of Skript code. This one greets players when they join a
 
 ## Add a variable
 
-Variables keep values. One in curly brackets without `_` at the start is saved, so it's still there after a restart. Change `hello.sk` to count joins:
+Variables keep values. One in curly brackets whose name doesn't start with `_` or `-` is saved, so it's still there after a restart. Change `hello.sk` to count joins:
 
 ```skript title="hello.sk"
 on join:
@@ -64,7 +64,7 @@ command /hello:
 
 ## Fix an error
 
-Change `send` to `sned` on the third line, save, and reload. The script doesn't load that line, and NeoSkript says why:
+Change `send` to `sned` on the third line, save, and reload. The new version doesn't load, and NeoSkript says why:
 
 ```text
 Line 3: (hello.sk)

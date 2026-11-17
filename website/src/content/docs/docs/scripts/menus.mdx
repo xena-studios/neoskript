@@ -18,6 +18,7 @@ command /menu:
 		open {_menu} to player
 
 on inventory click:
+	event-inventory is not player's inventory
 	name of event-inventory is "Server menu"
 	cancel event
 	if index of event-slot is 11:
@@ -45,7 +46,7 @@ on inventory click:
 </Steps>
 
 <Aside type="caution">
-Check which menu was clicked before cancelling, as the first line of the click trigger does, so other inventories keep working. Checking the title works when the title is unique to the menu.
+Check which menu was clicked before cancelling, as the first lines of the click trigger do, so other inventories keep working. `event-inventory is not player's inventory` skips clicks in the player's own inventory below the menu, and checking the title works when the title is unique to the menu.
 </Aside>
 
 ## Filling a menu from a list
@@ -62,6 +63,7 @@ command /warps:
 		open {_menu} to player
 
 on inventory click:
+	event-inventory is not player's inventory
 	name of event-inventory is "Warps"
 	cancel event
 	set {_warp} to uncolored name of event-slot

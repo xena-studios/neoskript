@@ -3,13 +3,11 @@ title: Reading errors
 description: What NeoSkript's error messages mean, where they appear, and how to fix the common ones.
 ---
 
-import { Aside } from "@astrojs/starlight/components";
-
 NeoSkript reads each script when it loads, and reports every line it can't load, with Skript's own wording. A message you search for on a forum still applies.
 
 ## Where errors appear
 
-- **When you reload**, `/sk reload <script>` sends them to you and to the console.
+- **When you reload**, `/sk reload <script>` sends them to you, and to players with `skript.reloadnotify`.
 - **When the server starts**, they go to the console, and the summary line counts them: `Loaded 12 scripts with 48 triggers in 310 ms (2 errors)`.
 - **Before you load**, [the parser](/parser/) and the [editor extensions](/docs/editors/) show them as you type, and [`neoskript-cli`](/docs/cli/) checks a whole folder.
 
@@ -103,7 +101,3 @@ Warnings don't stop a line loading, but point at something that may not do what 
 Some problems only show up when a line runs, such as a value that isn't set or, on Folia, an entity in another region. These are runtime errors, printed to the console as Skript prints them, with the script and line. Players with `skript.see_runtime_errors` (ops, by default) are told in chat that errors happened.
 
 So a broken line in a loop can't flood the console, runtime errors are limited per frame of time, a second by default, as in Skript. The limits are under [`runtime-errors`](/docs/server/configuration/#runtime-errors) in config.yml.
-
-<Aside type="tip">
-`catch runtime errors:` runs its code and keeps the runtime errors from it, which `last caught runtime errors` then gives you, instead of printing them.
-</Aside>

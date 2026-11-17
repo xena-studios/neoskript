@@ -47,7 +47,7 @@ A call with the wrong kind of value doesn't load: `total("x")` gives *Can't unde
 
 ## Returning a value
 
-`:: type` after the parameters says what the function gives back, and `return` gives it. A function with no return type just runs. `return` in it, with no value, stops it.
+`:: type` after the parameters says what the function gives back, and `return` gives it. A function with no return type just runs, and `stop` ends it early.
 
 ```skript
 function isRich(p: offline player) :: boolean:
@@ -90,5 +90,5 @@ command /maths:
 ```
 
 <Aside type="note">
-Functions can `wait`. As in Skript, the trigger that called one doesn't wait with it: it carries on as soon as the function starts waiting, and the rest of the function runs later, on the caller's thread. So a function that waits can't give a value back to its caller.
+Functions can `wait`. As in Skript, the trigger that called one doesn't wait with it: it carries on as soon as the function starts waiting, and the rest of the function runs later, on the caller's thread. So a function that waits can't give a value back to its caller, and Skript refuses a `return` after a wait: "A return statement after a delay is useless…".
 </Aside>
