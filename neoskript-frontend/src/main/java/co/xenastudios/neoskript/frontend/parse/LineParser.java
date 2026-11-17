@@ -75,17 +75,21 @@ final class LineParser {
     /** Per kind, whether each pattern (by index order) could match somewhere in the line; null = unknown. */
     private final Map<SyntaxKind, Boolean[]> viable = new EnumMap<>(SyntaxKind.class);
 
-    /** A memo key. {@code what} is a kind or an interned {@link Expected}, so it's compared by identity. */
-    private record Key(int start, int end, Object what) {
+    /**
+     * A memo key. {@code what} is a kind or an interned {@link Expected}, so it's compared by identity. A parse that
+     * takes syntax for other events too ({@code anyEvent}) is kept apart, so a later parse doesn't reuse its reading.
+     */
+    private record Key(int start, int end, Object what, boolean anyEvent) {
 
         @Override
         public boolean equals(Object other) {
-            return other instanceof Key key && key.start == start && key.end == end && key.what == what;
+            return other instanceof Key key && key.start == start && key.end == end && key.what == what
+                    && key.anyEvent == anyEvent;
         }
 
         @Override
         public int hashCode() {
-            return (start * 31 + end) * 31 + System.identityHashCode(what);
+            return ((start * 31 + end) * 31 + System.identityHashCode(what)) * 2 + (anyEvent ? 1 : 0);
         }
     }
 
@@ -2284,7 +2288,7 @@ final class LineParser {
 
     private Object memoized(int start, int end, Object what, java.util.function.Supplier<Object> compute) {
         Map<Key, Object> memo = strictOuter ? strictMemo : this.memo;
-        Key key = new Key(start, end, what);
+        Key key = new Key(start, end, what, anyEvent);
         Object cached = memo.get(key);
         if (cached != null) {
             return cached == IN_PROGRESS || cached == FAILED ? null : cached;
