@@ -1,0 +1,24 @@
+# Probe: words for values the event hasn't, where any object goes, read as Skript's unparsed literal reads them:
+# the first of its types, in its order, that takes them (issue #84). 'player' is the inventory close reason,
+# 'zombie' the entity type, and 'time' and 'weather' the types they name.
+
+function probe_event_value_words():
+	set {_p} to player
+	send "player: %{_p}%" to console
+	send "player is entity: %whether {_p} is entity%" to console
+	send "player is living entity: %whether {_p} is living entity%" to console
+	send "player is player: %whether {_p} is player%" to console
+	set {_e} to entity
+	send "entity is entity: %whether {_e} is entity%" to console
+	send "entity is living entity: %whether {_e} is living entity%" to console
+	set {_l} to living entity
+	send "living entity is entity: %whether {_l} is entity%" to console
+	set {_z} to zombie
+	send "zombie is entity: %whether {_z} is entity%" to console
+	set {_t} to time
+	send "time: %{_t}%" to console
+	send "time is time: %whether {_t} is time%" to console
+	set {_w} to weather
+	send "weather: %{_w}%" to console
+	send "weather is weather: %whether {_w} is weather%" to console
+	send "end" to console
