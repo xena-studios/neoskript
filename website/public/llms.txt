@@ -27,8 +27,8 @@ Scripts written for Skript 2.17 with no addons run on both Skript and NeoSkript.
 - [Menus](https://neoskript.dev/docs/scripts/menus/): chest menus with Skript's own syntax
 - [Reading errors](https://neoskript.dev/docs/scripts/errors/): what NeoSkript's error messages mean
 - [Writing scripts with AI](https://neoskript.dev/docs/ai/): the skill for Claude Code, Codex and other agents
-- [Configuration](https://neoskript.dev/docs/server/configuration/): every config.yml option
-- [Commands and permissions](https://neoskript.dev/docs/server/commands/): /skript and its subcommands, and Skript's permissions
+- [Configuration](https://neoskript.dev/docs/server/configuration/): every config.yml setting, the theme, and what applies on reload
+- [Commands and permissions](https://neoskript.dev/docs/server/commands/): /skript, /sk, /neoskript and /ns, reload reports, and Skript's permissions
 - [Effect commands](https://neoskript.dev/docs/server/effect-commands/): running one line of Skript from chat or the console
 - [Variables and storage](https://neoskript.dev/docs/server/variables/): variables.csv, saving, backups and player UUIDs
 - [Reloading scripts](https://neoskript.dev/docs/server/reloading/): /sk reload, failed reloads and auto reload

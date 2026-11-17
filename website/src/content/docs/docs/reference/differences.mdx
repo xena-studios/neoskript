@@ -17,7 +17,8 @@ What's on this page is what's left: the deliberate differences, what NeoSkript a
 - **`config.yml`, not `config.sk`,** with the settings NeoSkript has. See [configuration](/docs/server/configuration/).
 - **Folia.** Skript doesn't run on Folia; NeoSkript runs on its region threads. See [Folia](/docs/server/folia/).
 - **`/sk reload aliases`** has nothing to read: item names come from the server's registries.
-- **`/sk update` and `/sk gen-docs`** say NeoSkript can't do them. The [update checker](/docs/server/updates-and-metrics/) tells admins about new versions instead.
+- **`/sk update`** uses NeoSkript's [update checker](/docs/server/updates-and-metrics/), and **`/sk gen-docs`** points to the [syntax reference](/syntax/) instead of writing docs files.
+- **`/sk`'s messages are NeoSkript's own**, in the [theme](/docs/server/configuration/#make-it-look-like-your-server) from `config.yml`, with reload reports per script. Problems at startup and runtime errors keep Skript's look.
 
 ## Skript bugs NeoSkript fixes
 

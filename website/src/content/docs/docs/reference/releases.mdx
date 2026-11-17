@@ -28,6 +28,8 @@ On main, in the [development build](https://github.com/xena-studios/neoskript/re
 
 - **Damaged variable files:** a `variables.csv` whose last line was cut short by a crash could be wiped. Now lines that can't be read are skipped and the file is backed up first, nothing is saved until variables have loaded, and the file copied from Skript is backed up before its first load. See [variables and storage](/docs/server/variables/#backups).
 
+- **The family look for `/sk` and `config.yml`:** `/ns` as another name for `/sk`, clickable help, reload reports per script, a `theme` section and `config-version` in `config.yml`, and more settings applied by `/sk reload config`. A 0.1.0-beta.1 `config.yml` is carried forward, with a backup as `config.yml.bak-v1`. See [commands](/docs/server/commands/) and [configuration](/docs/server/configuration/#updating-neoskript).
+
 ## neoskript-cli 0.1.0
 
 The [script checker](/docs/cli/)'s first release: errors, warnings, and Folia and performance hints for a folder of scripts, on a throwaway server. [Release notes](https://github.com/xena-studios/neoskript/releases/tag/cli-v0.1.0).

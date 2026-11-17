@@ -54,16 +54,18 @@ Nothing is copied if `plugins/NeoSkript/scripts` already exists, for example aft
 
 A few of Skript's `config.sk` settings carry over to NeoSkript's `config.yml` in that first start: whether players are saved by UUID in variable names, and the effect command settings. The rest of `config.sk` isn't copied; NeoSkript's defaults match Skript's.
 
+`/skript` and `/sk` keep Skript's subcommands and arguments, so what you type and any console automation still work. Their messages are NeoSkript's own: see [commands](/docs/server/commands/).
+
 ## What stays the same
 
 - **Your scripts**, unchanged: Skript 2.17's syntax, with Skript's error messages.
 - **`variables.csv`**, in Skript's format, byte for byte. Skript can read the file NeoSkript writes.
-- **`/skript`**, `/sk` and their subcommands, with Skript's messages, and Skript's permissions: `skript.admin`, `skript.effectcommands`, `skript.reloadnotify` and `skript.see_runtime_errors`. See [commands and permissions](/docs/server/commands/).
+- **`/skript`**, `/sk` and their subcommands and arguments, and Skript's permissions: `skript.admin`, `skript.effectcommands`, `skript.reloadnotify` and `skript.see_runtime_errors`. See [commands and permissions](/docs/server/commands/).
 - **Vault, WorldGuard and GriefPrevention** syntax, when those plugins are installed.
 
 ## What's different
 
-NeoSkript aims to behave exactly as Skript does, messages included. A few things are different on purpose: a reload with errors keeps the old script running, and some of Skript's bugs are fixed. The [differences from Skript](/docs/reference/differences/) page lists them, and the [progress log](https://github.com/xena-studios/neoskript/blob/main/docs/PROGRESS.md) has the detail of each batch's known differences.
+NeoSkript aims to behave exactly as Skript does, scripts' messages included. A few things are different on purpose: a reload with errors keeps the old script running, and some of Skript's bugs are fixed. The [differences from Skript](/docs/reference/differences/) page lists them, and the [progress log](https://github.com/xena-studios/neoskript/blob/main/docs/PROGRESS.md) has the detail of each batch's known differences.
 
 <Aside type="caution">
 Skript addons don't load on NeoSkript yet. If your scripts need SkBee, skript-reflect or another addon, the lines that use it won't load. The script checker shows which lines those are.

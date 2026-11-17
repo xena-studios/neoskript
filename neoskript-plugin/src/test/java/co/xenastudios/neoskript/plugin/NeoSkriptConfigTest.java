@@ -533,7 +533,7 @@ class NeoSkriptConfigTest {
 
     @Test
     void theDocsShowTheDefaultConfig() throws IOException {
-        Path page = Path.of("../website/src/content/docs/docs/configuration.md");
+        Path page = Path.of("../website/src/content/docs/docs/server/configuration.mdx");
         String docs = Files.readString(page);
         String config = ConfigLoader.defaultText(NeoSkriptConfig.SPEC);
         assertTrue(docs.contains("```yaml title=\"plugins/NeoSkript/config.yml\"\n" + config + "```"),

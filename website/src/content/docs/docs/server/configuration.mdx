@@ -1,60 +1,74 @@
 ---
 title: Configuration
-description: Every option in NeoSkript's config.yml, its default, and when a change takes effect.
+description: Every setting in NeoSkript's config.yml, its default, when a change applies, and how to make NeoSkript's messages look like your server.
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
-NeoSkript's settings are in `plugins/NeoSkript/config.yml`. It's written on the first start, with a comment on every option. NeoSkript has no `config.sk`: the few Skript settings it has are here, and the rest of Skript's settings either match Skript's defaults or aren't needed.
+NeoSkript's settings are in `plugins/NeoSkript/config.yml`. It's written on the first start, with a comment on every setting. NeoSkript has no `config.sk`: the few Skript settings it has are here, and the rest of Skript's settings either match Skript's defaults or aren't needed.
 
-## When changes apply
+Apply changes with `/sk reload config`. Most settings apply at once; [some wait for a restart](#what-applies-when).
 
-`/sk reload config` reads the file again and applies the [`variables.player-uuids-in-names`](#variables) and [`effect-commands`](#effect-commands) settings straight away. Every other setting takes effect when the server restarts.
+- A setting that isn't valid falls back to its default, and the console says which and why.
+- A file that isn't valid YAML is never overwritten: on a reload the running settings stay, and at startup NeoSkript runs on the defaults until it's fixed.
+- A file NeoSkript can read but not write, such as a read-only mount, is used as it is; the console says what it couldn't add.
 
-## The defaults
+## Make it look like your server
 
-```yaml title="plugins/NeoSkript/config.yml"
-metrics: true
-update-checker: true
+The `theme` section at the top sets the look of NeoSkript's messages: `/sk`, reload reports and update notices. It's the same as in Xena Studios' other plugins: a prefix, the text colour, and three styles the messages use as tags.
 
-variables:
-  file: variables.csv
-  save-interval: 5 minutes
-  player-uuids-in-names: true
-
-events:
-  priority: high
-  listen-to-cancelled: false
-
-runtime-errors:
-  frame-duration: 1 second
-  total-errors-per-frame: 8
-  errors-from-one-line-per-frame: 2
-  error-spam-timeout-limit: 4
-  error-timeout-length: 10
-  total-warnings-per-frame: 8
-  warnings-from-one-line-per-frame: 2
-  warning-spam-timeout-limit: 4
-  warning-timeout-length: 10
-
-effect-commands:
-  enabled: false
-  token: "!"
-  allow-ops: false
-  log: false
+```yaml
+theme:
+  prefix: "<dark_gray>[<#FF4D9D>NeoSkript</#FF4D9D>]</dark_gray> "
+  base: "<gray>"            # text with no tag of its own
+  highlight: "<#FF4D9D>"    # names and numbers
+  success: "<#5EE08A>"      # done
+  error: "<#FF6B6B>"        # something went wrong
 ```
+
+| Setting | Default | What it styles |
+|---|---|---|
+| `theme.prefix` | `<dark_gray>[<#FF4D9D>NeoSkript</#FF4D9D>]</dark_gray> ` | The start of each message. `""` for none. |
+| `theme.base` | `<gray>` | Message text with no tag of its own. |
+| `theme.highlight` | `<#FF4D9D>` | Names and values, such as a script or a number. |
+| `theme.success` | `<#5EE08A>` | Something done, such as a script reloaded. |
+| `theme.error` | `<#FF6B6B>` | Something that went wrong, such as a script's errors. |
+
+Styles are [MiniMessage](https://docs.advntr.dev/minimessage/format) tags, such as `<gray>`, `<#FF4D9D>` or `<gold><bold>`. Quote a colour that starts with `#`. The prefix can be anything, gradients too, or `""` for none. It's the only setting that may be empty; any other left empty falls back to its default.
+
+Script problems at startup and runtime errors keep Skript's look, since tools and guides read them.
+
+## What applies when
+
+`/sk reload config` applies these at once:
+
+- the theme;
+- `update-checker`;
+- `variables.player-uuids-in-names` and `variables.save-interval`;
+- the `runtime-errors` limits;
+- `effect-commands`.
+
+`metrics`, `variables.file` and the `events` settings apply when the server restarts. The reload says so when one of them changed.
+
+## config-version
+
+| Setting | Default | What it does |
+|---|---|---|
+| `config-version` | `2` | Managed by NeoSkript, to carry your settings forward on updates. Don't edit it. |
+
+See [updating NeoSkript](#updating-neoskript).
 
 ## metrics
 
-| Option | Default | What it does |
+| Setting | Default | What it does |
 |---|---|---|
-| `metrics` | `true` | Sends anonymous usage statistics to [bStats](https://bstats.org/plugin/bukkit/NeoSkript/34868). `false` turns it off. |
+| `metrics` | `true` | Sends anonymous usage statistics to [bStats](https://bstats.org/plugin/bukkit/NeoSkript/34868). `false` turns it off. Applies on restart. |
 
 bStats can also be turned off for every plugin at once in `plugins/bStats/config.yml`. See [updates and bStats](/docs/server/updates-and-metrics/).
 
 ## update-checker
 
-| Option | Default | What it does |
+| Setting | Default | What it does |
 |---|---|---|
 | `update-checker` | `true` | Checks Modrinth for newer NeoSkript versions when the server starts and once a day. `false` turns it off. |
 
@@ -62,28 +76,26 @@ See [updates and bStats](/docs/server/updates-and-metrics/) for who hears about 
 
 ## variables
 
-| Option | Default | What it does |
+| Setting | Default | What it does |
 |---|---|---|
-| `variables.file` | `variables.csv` | Where global variables are saved, relative to `plugins/NeoSkript`. The file is in Skript's format. |
-| `variables.save-interval` | `5 minutes` | How often changed variables are saved. They're also saved when the server stops. The shortest interval is 10 seconds. |
+| `variables.file` | `variables.csv` | Where global variables are saved, relative to `plugins/NeoSkript`. The file is in Skript's format. Applies on restart. |
+| `variables.save-interval` | `5 minutes` | How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops. |
 | `variables.player-uuids-in-names` | `true` | Whether a player in a variable's name, as in `{money::%player%}`, is their UUID (`true`) or their name. Skript's `use player UUIDs in variable names`. |
 
 Moving over from Skript copies Skript's `use player UUIDs in variable names` setting into `player-uuids-in-names`, so the variables Skript saved are found. See [variables and storage](/docs/server/variables/).
 
 ## events
 
-| Option | Default | What it does |
+| Setting | Default | What it does |
 |---|---|---|
-| `events.priority` | `high` | The priority scripts listen to events at: `lowest`, `low`, `normal`, `high` or `highest`. As in Skript, `high` lets scripts see what most other plugins did to an event, and still cancel it. |
-| `events.listen-to-cancelled` | `false` | Whether `on <event>` triggers also run for events another plugin cancelled. |
-
-A priority NeoSkript doesn't know is logged as a warning, and `high` is used.
+| `events.priority` | `high` | The priority scripts listen to events at: `lowest`, `low`, `normal`, `high`, `highest` or `monitor`. As in Skript, `high` lets scripts see what most other plugins did to an event, and still cancel it. Applies on restart. |
+| `events.listen-to-cancelled` | `false` | Whether `on <event>` triggers also run for events another plugin cancelled. Applies on restart. |
 
 ## runtime-errors
 
 Errors that happen while a script runs are collected over frames of time. Each frame prints up to a limit, and what wasn't printed is summed up at the end of the frame. These are Skript's `runtime errors` settings from `config.sk`, with the same defaults.
 
-| Option | Default | What it does |
+| Setting | Default | What it does |
 |---|---|---|
 | `frame-duration` | `1 second` | How long each frame is. |
 | `total-errors-per-frame` | `8` | The most errors printed per frame. More are hidden, and counted at the end of the frame. |
@@ -95,19 +107,123 @@ Errors that happen while a script runs are collected over frames of time. Each f
 | `warning-spam-timeout-limit` | `4` | The same as `error-spam-timeout-limit`, for warnings. |
 | `warning-timeout-length` | `10` | The same as `error-timeout-length`, for warnings. |
 
-All the options are under `runtime-errors:`. Players with `skript.see_runtime_errors` are told in chat when errors happen; the details go to the console.
+All of them are under `runtime-errors:`. A negative limit falls back to its default. Players with `skript.see_runtime_errors` are told in chat when errors happen; the details go to the console.
 
 ## effect-commands
 
-| Option | Default | What it does |
+| Setting | Default | What it does |
 |---|---|---|
 | `effect-commands.enabled` | `false` | Whether console commands and chat messages starting with the token run as effects. Skript's `enable effect commands`. |
 | `effect-commands.token` | `"!"` | What an effect command starts with. It can be longer than a character, but shouldn't start with `/`. Skript's `effect command token`. |
 | `effect-commands.allow-ops` | `false` | Whether ops can use effect commands without the `skript.effectcommands` permission. Skript's `allow ops to use effect commands`. |
 | `effect-commands.log` | `false` | Whether players' effect commands are logged, as `<player> issued effect command: <command>`. Skript's `log effect commands`. |
 
-Moving over from Skript copies these four settings from `config.sk`. See [effect commands](/docs/server/effect-commands/).
+These commands can do anything, so give the permission carefully. See [effect commands](/docs/server/effect-commands/).
+
+## Moving from Skript
+
+The first start copies Skript's settings for effect commands and `use player UUIDs in variable names` from `config.sk`. Skript's other `config.sk` settings aren't copied: NeoSkript's behaviour matches Skript's defaults for them. See [moving from Skript](/docs/moving-from-skript/).
+
+## Updating NeoSkript
+
+When a new version adds settings, NeoSkript adds them with their defaults and says so in the console.
+
+When the layout changes, `config-version` goes up:
+
+- The old file is backed up as `config.yml.bak-v<version>`.
+- The new one keeps every value you set, and any keys that aren't NeoSkript's settings.
+- Your comments on NeoSkript's settings are replaced by its own; the backup has them.
+
+Files without `config-version` or a `theme` are version 1, from NeoSkript 0.1.0-beta.1, and are carried forward the same way, backed up as `config.yml.bak-v1`. Every setting keeps its meaning, with two on purpose: `metrics: "false"` in quotes now turns bStats off, and a negative runtime error limit falls back to its default.
+
+A file from a newer NeoSkript is never written.
 
 <Aside type="note">
-Skript's other `config.sk` settings aren't copied. NeoSkript's behaviour matches Skript's defaults for them.
+The update checker and bStats can both be turned off: see [updates and bStats](/docs/server/updates-and-metrics/).
 </Aside>
+
+## The full default config
+
+```yaml title="plugins/NeoSkript/config.yml"
+# NeoSkript's config. Docs: https://neoskript.dev/docs/configuration/
+#
+# Apply changes with /sk reload config. Most settings apply at once; those that say so wait for a
+# restart. A bad value falls back to its default, with a warning in the console.
+
+# Managed by NeoSkript, to carry your settings forward on updates. Don't edit it.
+config-version: 2
+
+# The look of NeoSkript's messages: /sk, reload reports and update notices. They use these as tags, so
+# changing a colour here restyles them all. Write a style as MiniMessage tags: <gray>, <#FF4D9D>, or
+# <gold><bold>. Script problems and runtime errors keep Skript's own look, which tools read.
+theme:
+  # <prefix> starts NeoSkript's messages, such as "<dark_gray>[<#FF4D9D>MyServer</#FF4D9D>]</dark_gray> ",
+  # or blank for none.
+  prefix: "<dark_gray>[<#FF4D9D>NeoSkript</#FF4D9D>]</dark_gray> "
+  # The colour of message text that has no tag of its own.
+  base: "<gray>"
+  # <highlight>: names and values, such as a script or a number.
+  highlight: "<#FF4D9D>"
+  # <success>: something done, such as a script reloaded.
+  success: "<#5EE08A>"
+  # <error>: something that went wrong, such as a script's errors.
+  error: "<#FF6B6B>"
+
+# Send anonymous usage statistics to bStats: https://bstats.org/plugin/bukkit/NeoSkript/34868
+# You can also turn bStats off for every plugin in plugins/bStats/config.yml. Applies on restart.
+metrics: true
+
+# Check Modrinth for newer NeoSkript versions when the server starts and once a day. A newer version is
+# logged to the console and shown to players with skript.admin when they join. Development builds never check.
+update-checker: true
+
+variables:
+  # Where global variables are saved, in Skript's variables.csv format (Skript can read it too).
+  # Relative to plugins/NeoSkript. Variables whose names start with - aren't saved. Applies on restart.
+  file: "variables.csv"
+  # How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops.
+  save-interval: "5 minutes"
+  # Whether players are their UUIDs in variable names ({money::%player%}) or their names, as Skript's
+  # 'use player UUIDs in variable names' (on in Skript's default config). Moving over from Skript copies
+  # its setting, so the variables it saved are found.
+  player-uuids-in-names: true
+
+events:
+  # The priority scripts listen to events at: lowest, low, normal, high, highest or monitor. As in Skript,
+  # the default is high, so scripts see what most other plugins did to an event, and can still cancel it.
+  # Applies on restart.
+  priority: "high"
+  # Whether 'on <event>' triggers also run for events another plugin cancelled. Applies on restart.
+  listen-to-cancelled: false
+
+runtime-errors:
+  # As Skript's 'runtime errors' in config.sk. Frames are the duration over which runtime errors are
+  # collected; at the end of each, what wasn't printed is summed up.
+  frame-duration: "1 second"
+  # The most errors printed per frame; more are hidden, and counted at the end of the frame.
+  total-errors-per-frame: 8
+  # The most errors one line prints per frame, so a line in a loop can't fill the frame.
+  errors-from-one-line-per-frame: 2
+  # A line with this many errors in a frame is put in timeout: its errors are hidden for a while.
+  error-spam-timeout-limit: 4
+  # How many frames a line stays in timeout.
+  error-timeout-length: 10
+  # The same for warnings.
+  total-warnings-per-frame: 8
+  warnings-from-one-line-per-frame: 2
+  warning-spam-timeout-limit: 4
+  warning-timeout-length: 10
+
+effect-commands:
+  # Skript's effect commands, as its 'enable effect commands': console commands and chat messages starting with
+  # the token are effects, run straight away, like '!set time to 6:00'. Players need the permission
+  # skript.effectcommands, which ops don't have unless allow-ops is on, as these commands can do anything.
+  # Moving over from Skript copies its settings for them.
+  enabled: false
+  # Skript's 'effect command token'. It can be longer than a character, but shouldn't start with / (a command).
+  token: "!"
+  # Skript's 'allow ops to use effect commands': ops can use them without the permission.
+  allow-ops: false
+  # Skript's 'log effect commands': players' effect commands are logged as '<player> issued effect command: <command>'.
+  log: false
+```

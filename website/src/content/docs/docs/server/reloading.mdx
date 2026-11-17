@@ -30,14 +30,17 @@ The benchmark on the [performance](/docs/server/performance/) page reloads 40 sc
 
 ## Who hears about it
 
-The player who reloads gets the result and each error. Players with `skript.reloadnotify` are told who's reloading what, and get the errors too.
+The player who reloads gets a report: what was reloaded, how many scripts, how long it took, and each script's problems with their line numbers. Players with `skript.reloadnotify` are told who's reloading what, and get the same report.
 
 ```text
-[Skript] Reloading shop.sk...
-[Skript] Encountered 1 error while reloading shop.sk! (3ms)
+[NeoSkript] Reloading shop.sk...
+ shop.sk - 1 error
+   Line 14: Can't understand this condition/effect: sned "hi" to player
+     sned "hi" to player
+[NeoSkript] Reloaded shop.sk with 1 error in 3 ms. Scripts with errors keep their last version.
 ```
 
-The messages say `[Skript]`, as Skript's do, so tools that read them keep working.
+In chat, hovering over a problem shows the line of code, and clicking copies it. The look comes from the [theme](/docs/server/configuration/#make-it-look-like-your-server) in `config.yml`. See [reload reports](/docs/server/commands/#reload-reports).
 
 ## auto reload
 
@@ -52,4 +55,4 @@ on join:
 	send "Hello!" to player
 ```
 
-The console and the listed recipients hear about each reload. Without `recipients:`, players with the `permission:` hear, `skript.reloadnotify` by default. `auto reload` alone, with no entries, works too.
+The console and the listed recipients get each reload's report. Without `recipients:`, players with the `permission:` hear, `skript.reloadnotify` by default. `auto reload` alone, with no entries, works too.

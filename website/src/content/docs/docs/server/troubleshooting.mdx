@@ -38,6 +38,13 @@ If the new version has errors, the old one keeps running: fix the errors and rel
 - **"... variables could not be loaded!"** means some lines were skipped. The file was backed up to `plugins/NeoSkript/backups/` first. See [variables and storage](/docs/server/variables/#backups).
 - **Memory-only and local variables** (`{-name}`, `{_name}`) are never saved.
 
+## A config.yml change didn't apply
+
+- **It needs a restart:** `metrics`, `variables.file` and the `events` settings apply when the server restarts. `/sk reload config` says so when one of them changed. See [what applies when](/docs/server/configuration/#what-applies-when).
+- **The value isn't valid:** it falls back to its default, and the console says which setting and why.
+- **The file isn't valid YAML:** NeoSkript never overwrites it. A reload keeps the running settings, and at startup the defaults run until it's fixed. The console says what the YAML parser found.
+- **After updating from 0.1.0-beta.1:** your old file was carried forward to the new layout, with every value you set, and backed up as `config.yml.bak-v1`. See [updating NeoSkript](/docs/server/configuration/#updating-neoskript).
+
 ## Something behaves differently than on Skript
 
 NeoSkript aims to behave exactly as Skript 2.17 does. The [differences from Skript](/docs/reference/differences/) page lists the known differences and the deliberate ones. If yours isn't there, [open an issue](https://github.com/xena-studios/neoskript/issues/new/choose) with the script and what each plugin did.

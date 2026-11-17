@@ -36,11 +36,11 @@ The console says it's running, and how many scripts it loaded:
     - scripts/ your .sk files
 </FileTree>
 
-Scripts go in `plugins/NeoSkript/scripts/`, as `.sk` files, like Skript's. `/skript reload <script>` (or `/sk`, or `/neoskript`) reloads them. New to Skript? Start with [your first script](/docs/first-script/).
+Scripts go in `plugins/NeoSkript/scripts/`, as `.sk` files, like Skript's. `/sk reload <script>` reloads one, and `/sk help` lists the rest; `/skript`, `/neoskript` and `/ns` work too. See [commands](/docs/server/commands/). New to Skript? Start with [your first script](/docs/first-script/).
 
 ## Configuration
 
-`plugins/NeoSkript/config.yml` is written on the first start, with a comment on every option. It covers where variables are saved, the event priority scripts listen at, how runtime errors are rate-limited, effect commands, the update checker, which tells you about newer versions on Modrinth (`update-checker: false` turns it off), and bStats, which you can turn off with `metrics: false`. Every option is on the [configuration](/docs/server/configuration/) page.
+`plugins/NeoSkript/config.yml` is written on the first start, with a comment on every setting. It starts with a theme for NeoSkript's messages, then covers where variables are saved, the event priority scripts listen at, how runtime errors are rate-limited, effect commands, the update checker, which tells you about newer versions on Modrinth (`update-checker: false` turns it off), and bStats, which you can turn off with `metrics: false`. Every setting is on the [configuration](/docs/server/configuration/) page.
 
 <Aside type="tip">
 Development builds of every change on main are on the [download page](/download/) and [GitHub](https://github.com/xena-studios/neoskript/releases/tag/dev). Use them on a server you can afford to break.

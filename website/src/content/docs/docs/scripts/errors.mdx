@@ -11,7 +11,17 @@ NeoSkript reads each script when it loads, and reports every line it can't load,
 - **When the server starts**, they go to the console, and the summary line counts them: `Loaded 12 scripts with 48 triggers in 310 ms (2 errors)`.
 - **Before you load**, [the parser](/parser/) and the [editor extensions](/docs/editors/) show them as you type, and [`neoskript-cli`](/docs/cli/) checks a whole folder.
 
-Each error names the script and line, then the problem, then the line itself:
+A reload lists each script's problems with their line numbers, then the line of code. In chat, hover over a problem to see the line, and click it to copy it:
+
+```text
+[NeoSkript] Reloading shop.sk...
+ shop.sk - 1 error
+   Line 2: Can't understand this condition/effect: sned "hi" to player
+     sned "hi" to player
+[NeoSkript] Reloaded shop.sk with 1 error in 3 ms. Scripts with errors keep their last version.
+```
+
+At startup, the console writes them as Skript does, so tools and guides that read Skript's log still work:
 
 ```text
 Line 2: (shop.sk)

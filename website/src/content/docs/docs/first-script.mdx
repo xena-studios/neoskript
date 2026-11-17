@@ -33,7 +33,7 @@ A script is a text file of Skript code. This one greets players when they join a
    /sk reload hello
    ```
 
-   You'll see `Successfully reloaded hello.sk.` and how long it took. Join the server, or run `/hello`, and the script answers.
+   You'll see `Reloaded hello.sk in 3 ms.`, with however long it took. Join the server, or run `/hello`, and the script answers.
 
 </Steps>
 
@@ -67,9 +67,11 @@ command /hello:
 Change `send` to `sned` on the third line, save, and reload. The new version doesn't load, and NeoSkript says why:
 
 ```text
-Line 3: (hello.sk)
-    Can't understand this condition/effect: sned "<gold>Welcome, %player%! That's visit number %{joins::%player's uuid%}%." to player
-    Line: sned "<gold>Welcome, %player%! That's visit number %{joins::%player's uuid%}%." to player
+[NeoSkript] Reloading hello.sk...
+ hello.sk - 1 error
+   Line 3: Can't understand this condition/effect: sned "<gold>Welcome, %player%! That's visit number %{joins::%player's uuid%}%." to player
+     sned "<gold>Welcome, %player%! That's visit number %{joins::%player's uuid%}%." to player
+[NeoSkript] Reloaded hello.sk with 1 error in 3 ms. Scripts with errors keep their last version.
 ```
 
 The version that was running keeps running until the new one loads without errors. Change it back and reload.

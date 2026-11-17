@@ -18,6 +18,12 @@ const skript = {
 export default defineConfig({
   site: "https://neoskript.dev",
   trailingSlash: "always",
+  // The commands and configuration pages moved under /docs/server/. config.yml's header comment links the old
+  // configuration address, so both keep working.
+  redirects: {
+    "/docs/commands/": "/docs/server/commands/",
+    "/docs/configuration/": "/docs/server/configuration/",
+  },
   // Hashed build files go in /assets, not Astro's default /_astro. Stylesheets
   // stay files, never inline <style>. The CSP (public/_headers) still allows
   // 'unsafe-inline' styles only because Starlight writes style attributes.
