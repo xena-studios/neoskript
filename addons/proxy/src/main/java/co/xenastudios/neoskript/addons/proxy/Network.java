@@ -26,6 +26,11 @@ final class Network {
 
     /** The most messages waiting to reach scripts: past this, new ones are dropped. */
     static final int MAX_PENDING = 10_000;
+    /** The most bytes of messages waiting to reach scripts. */
+    static final long MAX_PENDING_BYTES = 16L * 1024 * 1024;
+    /** The most messages for named servers held while this server's name isn't known yet, and for how long. */
+    static final int MAX_HELD = 1_000;
+    static final long HELD_FOR_MILLIS = 60_000;
 
     private final Settings settings;
     private final Logger logger;
@@ -37,6 +42,11 @@ final class Network {
     private volatile RedisLink redis;
     private volatile String serverName;
     private final AtomicInteger pending = new AtomicInteger();
+    private final java.util.concurrent.atomic.AtomicLong pendingBytes = new java.util.concurrent.atomic.AtomicLong();
+    /** Messages for named servers that came before this server knew its name: delivered once it does. */
+    private final java.util.Deque<Held> held = new java.util.ArrayDeque<>();
+
+    private record Held(JsonObject json, String channel, long until) {}
     private volatile long warnedAt;
 
     /**
@@ -66,9 +76,25 @@ final class Network {
 
     /** The proxy said this server's name. */
     void learnName(String name) {
-        if (settings.serverName().isEmpty() && name != null && !name.isBlank()) {
+        if (settings.serverName().isEmpty() && name != null && !name.isBlank() && serverName.isEmpty()) {
             serverName = name;
+            List<Held> due;
+            synchronized (held) {
+                due = new java.util.ArrayList<>(held);
+                held.clear();
+            }
+            long now = System.currentTimeMillis();
+            for (Held message : due) {
+                if (message.until() >= now) {
+                    networkMessage(message.channel(), message.json());
+                }
+            }
         }
+    }
+
+    /** The Redis channel a network channel is published on: with redis.channel-prefix in front. */
+    private String redisChannel(String channel) {
+        return settings.redisChannelPrefix() + channel;
     }
 
     /**
@@ -97,16 +123,22 @@ final class Network {
                 servers.forEach(to::add);
                 json.add("servers", to);
             }
-            return link.publish(channel, json.toString());
+            return link.publish(redisChannel(channel), json.toString());
         }
         PluginMessaging messaging = plugin;
         if (messaging == null) {
             return false;
         }
-        byte[] sealed = envelope.seal(serverName, instance, channel, message);
+        if (!envelope.usable()) {
+            warn("A network message wasn't sent: no secret is set in plugins/NeoSkriptProxy/config.yml, so the other"
+                    + " servers would refuse it. Set the same secret on every server.");
+            return false;
+        }
         boolean sent = true;
         for (String server : servers == null ? List.of("ALL") : servers) {
-            sent &= messaging.send(PluginMessaging.forward(server, sealed));
+            // Sealed for each server, so a message for one can't be passed on to another.
+            sent &= messaging.send(PluginMessaging.forward(server,
+                    envelope.seal(serverName, instance, server, channel, message)));
         }
         return sent;
     }
@@ -121,7 +153,7 @@ final class Network {
         json.addProperty("message", message);
         json.addProperty("action", "skredis-message");
         json.addProperty("date", System.currentTimeMillis());
-        return link.publish(channel, json.toString());
+        return link.publish(redisChannel(channel), json.toString());
     }
 
     /**
@@ -142,14 +174,17 @@ final class Network {
                     + " JSON string.");
         }
         RedisLink link = redis;
-        return link != null && link.publish(channel, parsed.toString());
+        return link != null && link.publish(redisChannel(channel), parsed.toString());
     }
 
     /** A Redis message arrived, on the listener's thread. */
-    void fromRedis(String channel, String text) {
-        if (text.length() > Resp.MAX_BULK) {
+    void fromRedis(String redisChannel, String text) {
+        // A message, with the JSON around it, is held to max-message-bytes plus what SkRedis's format adds.
+        if (text.length() > settings.maxMessageBytes() + 1_024
+                || !redisChannel.startsWith(settings.redisChannelPrefix())) {
             return;
         }
+        String channel = redisChannel.substring(settings.redisChannelPrefix().length());
         JsonObject json;
         try {
             JsonElement parsed = JsonParser.parseString(text);
@@ -174,14 +209,33 @@ final class Network {
                         number(json, "date")));
             }
         } else if (kind.equals("neoskript-message")) {
-            String message = string(json, "message");
-            if (message == null || instance.equals(string(json, "instance")) || !forThisServer(json.get("servers"))) {
+            if (instance.equals(string(json, "instance"))) {
                 return;
             }
-            String origin = string(json, "origin");
-            deliver(new NetworkMessageEvent(NetworkMessageEvent.Kind.NETWORK, channel, message,
-                    origin == null || origin.isEmpty() ? null : origin, number(json, "date")));
+            JsonElement servers = json.get("servers");
+            if (servers != null && servers.isJsonArray() && serverName.isEmpty()) {
+                // For named servers, and this one doesn't know its name yet (it learns it from the proxy once a
+                // player is online, or from server-name): held until it does.
+                synchronized (held) {
+                    if (held.size() >= MAX_HELD) {
+                        held.poll();
+                    }
+                    held.add(new Held(json, channel, System.currentTimeMillis() + HELD_FOR_MILLIS));
+                }
+                return;
+            }
+            networkMessage(channel, json);
         }
+    }
+
+    private void networkMessage(String channel, JsonObject json) {
+        String message = string(json, "message");
+        if (message == null || !forThisServer(json.get("servers"))) {
+            return;
+        }
+        String origin = string(json, "origin");
+        deliver(new NetworkMessageEvent(NetworkMessageEvent.Kind.NETWORK, channel, message,
+                origin == null || origin.isEmpty() ? null : origin, number(json, "date")));
     }
 
     private boolean forThisServer(JsonElement servers) {
@@ -226,6 +280,10 @@ final class Network {
         if (opened.instance().equals(instance)) {
             return; // This server's own, back from the proxy.
         }
+        if (!opened.target().equals("ALL") && !serverName.isEmpty() && !opened.target().equalsIgnoreCase(serverName)) {
+            warn("A network message for " + opened.target() + " came to this server (" + serverName + "): dropped.");
+            return;
+        }
         deliver(new NetworkMessageEvent(NetworkMessageEvent.Kind.NETWORK, opened.channel(), opened.message(),
                 opened.origin().isEmpty() ? null : opened.origin(), opened.sent()));
     }
@@ -241,13 +299,17 @@ final class Network {
         if (!delivering) {
             return;
         }
-        if (pending.incrementAndGet() > MAX_PENDING) {
+        long bytes = 64L + 2L * (event.message().length() + event.channel().length());
+        if (pending.incrementAndGet() > MAX_PENDING || pendingBytes.addAndGet(bytes) > MAX_PENDING_BYTES) {
             pending.decrementAndGet();
-            warn(MAX_PENDING + " network messages are waiting for the server already: new ones are dropped.");
+            pendingBytes.addAndGet(-bytes);
+            warn("Too many network messages are waiting for the server already (" + MAX_PENDING + ", or "
+                    + MAX_PENDING_BYTES / (1024 * 1024) + " MB): new ones are dropped.");
             return;
         }
         global.accept(() -> {
             pending.decrementAndGet();
+            pendingBytes.addAndGet(-bytes);
             fire.accept(event);
         });
     }

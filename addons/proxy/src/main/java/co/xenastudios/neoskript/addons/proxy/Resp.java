@@ -56,6 +56,15 @@ final class Resp implements Closeable {
     static Resp connect(String host, int port, boolean ssl, int connectMillis, int timeoutMillis, String user,
             String password, int database) throws IOException {
         Socket socket = ssl ? SSLSocketFactory.getDefault().createSocket() : new Socket();
+        if (socket instanceof javax.net.ssl.SSLSocket tls) {
+            // The certificate has to be for the host, as a browser checks it, and the host is named (SNI).
+            javax.net.ssl.SSLParameters parameters = tls.getSSLParameters();
+            parameters.setEndpointIdentificationAlgorithm("HTTPS");
+            if (!host.isEmpty() && !Character.isDigit(host.charAt(host.length() - 1)) && !host.contains(":")) {
+                parameters.setServerNames(List.of(new javax.net.ssl.SNIHostName(host)));
+            }
+            tls.setSSLParameters(parameters);
+        }
         try {
             socket.connect(new InetSocketAddress(host, port), connectMillis);
             socket.setSoTimeout(timeoutMillis);

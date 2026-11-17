@@ -21,6 +21,12 @@ command /proxytest:
 		send custom redis message "{""kind"":""custom""}" to channel "net"
 		send "[proxytest] done" to console
 
+# An original's expression is an answer at once, so the event can still be cancelled after it.
+on command "proxyquick":
+	set {_count} to proxy player count
+	cancel event
+	send "[proxytest] quick %{_count}%" to console
+
 command /redissend <text>:
 	trigger:
 		send redis message arg-1 to channel "net"

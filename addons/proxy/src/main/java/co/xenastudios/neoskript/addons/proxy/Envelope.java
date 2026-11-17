@@ -20,17 +20,21 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * A network message as it travels inside BungeeCord's {@code Forward}: the channel, the message, who sent it and
- * when, signed with the network's secret. A forged one (no secret, or another), one replayed, or one older or newer
- * than a minute isn't let through, so a player able to send plugin messages on the BungeeCord channel can't make
- * scripts believe another server said something.
+ * A network message as it travels inside BungeeCord's {@code Forward}: the channel, the message, who sent it, to
+ * which server and when, signed with the network's secret. A forged one (unsigned, or signed with another secret),
+ * one replayed, one sent to another server, or one older or newer than a minute isn't let through, so whoever can
+ * send plugin messages on the BungeeCord channel can't make scripts believe another server said something.
+ *
+ * <p>Without a secret, nothing is let through and nothing is sent, unless the secret is {@value #INSECURE}, which
+ * turns signing off on purpose.
  *
  * <pre>
- * byte    version (1)
+ * byte    version (2)
  * long    sent, milliseconds since 1970
  * long    nonce, random
  * UTF     the sender's server name, or empty
  * UTF     the sender's instance, random each start, so a server ignores its own
+ * UTF     the server it's for, or ALL
  * UTF     channel
  * int     message length, then the message in UTF-8
  * byte    signature length (0 or 32), then HMAC-SHA256 of everything before it
@@ -42,7 +46,9 @@ final class Envelope {
     static final String SUBCHANNEL = "NeoSkriptNetwork";
     /** The most a message may be: BungeeCord's {@code Forward} carries at most 32,767 bytes, with what's around it. */
     static final int MAX_MESSAGE_BYTES = 30_000;
-    private static final byte VERSION = 1;
+    private static final byte VERSION = 2;
+    /** The secret that turns signing off: messages are sent and taken unsigned. */
+    static final String INSECURE = "insecure";
     private static final long WINDOW_MILLIS = 60_000;
     private static final int REMEMBERED = 10_000;
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -56,7 +62,7 @@ final class Envelope {
      * @param channel its channel
      * @param message the message
      */
-    record Opened(long sent, String origin, String instance, String channel, String message) {}
+    record Opened(long sent, String origin, String instance, String target, String channel, String message) {}
 
     /** Why a message wasn't let through. */
     static final class Refused extends Exception {
@@ -66,6 +72,7 @@ final class Envelope {
     }
 
     private final byte[] secret;
+    private final boolean insecure;
     private final int maxMessageBytes;
     /** Nonces seen in the last minute, so a message can't be replayed. */
     private final Map<Long, Long> seen = new LinkedHashMap<>(16, 0.75f, false) {
@@ -76,7 +83,8 @@ final class Envelope {
     };
 
     Envelope(String secret, int maxMessageBytes) {
-        this.secret = secret == null || secret.isEmpty() ? null : secret.getBytes(StandardCharsets.UTF_8);
+        this.insecure = INSECURE.equals(secret);
+        this.secret = secret == null || secret.isEmpty() || insecure ? null : secret.getBytes(StandardCharsets.UTF_8);
         this.maxMessageBytes = maxMessageBytes;
     }
 
@@ -84,12 +92,17 @@ final class Envelope {
         return secret != null;
     }
 
+    /** Whether messages can go at all: with a secret, or with signing turned off on purpose. */
+    boolean usable() {
+        return secret != null || insecure;
+    }
+
     /**
      * Seals a message.
      *
      * @throws IllegalArgumentException if it's longer than {@code max-message-bytes}
      */
-    byte[] seal(String origin, String instance, String channel, String message) {
+    byte[] seal(String origin, String instance, String target, String channel, String message) {
         byte[] text = message.getBytes(StandardCharsets.UTF_8);
         if (text.length > maxMessageBytes) {
             throw new IllegalArgumentException("The message is " + text.length + " bytes, longer than "
@@ -103,6 +116,7 @@ final class Envelope {
             out.writeLong(RANDOM.nextLong());
             out.writeUTF(origin);
             out.writeUTF(instance);
+            out.writeUTF(target);
             out.writeUTF(channel);
             out.writeInt(text.length);
             out.write(text);
@@ -121,6 +135,9 @@ final class Envelope {
      * @throws Refused if it isn't: why
      */
     Opened open(byte[] data) throws Refused {
+        if (!usable()) {
+            throw new Refused("no secret is set in config.yml, so network messages over plugin messaging are refused");
+        }
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(data));
             if (in.readByte() != VERSION) {
@@ -130,6 +147,7 @@ final class Envelope {
             long nonce = in.readLong();
             String origin = in.readUTF();
             String instance = in.readUTF();
+            String target = in.readUTF();
             String channel = in.readUTF();
             int length = in.readInt();
             if (length < 0 || length > maxMessageBytes || length > in.available()) {
@@ -157,7 +175,7 @@ final class Envelope {
                     }
                 }
             }
-            return new Opened(sent, origin, instance, channel, new String(text, StandardCharsets.UTF_8));
+            return new Opened(sent, origin, instance, target, channel, new String(text, StandardCharsets.UTF_8));
         } catch (IOException cutShort) {
             throw new Refused("it's cut short or garbled");
         }

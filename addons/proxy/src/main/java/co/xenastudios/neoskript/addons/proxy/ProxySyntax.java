@@ -134,24 +134,28 @@ final class ProxySyntax {
                     network.learnName(answer instanceof String name ? name : null);
                     return answer;
                 }, "[the] [this] server's network name", "[the] network name of this server");
-        // SkProxy 2.4's and Skelocity 1.1's: they answer from what they heard last (nothing, the first time) and ask
-        // again; these wait for the answer. Where the proxy doesn't know the server, 0, "Offline" and "Unknown", as
-        // they give them.
-        question(registrar, "ExprSkProxyPlayerCount", "integer", args -> args[0] instanceof String server
-                ? PluginMessaging.Question.playerCount(server) : null, messaging, wait,
-                answer -> answer == null ? 0L : answer, "player count of %string%",
-                "[the] [total] player count of [(proxy|velocity)] server %string%");
-        question(registrar, "ExprSkProxyStatus", "string", args -> args[0] instanceof String server
-                ? PluginMessaging.Question.playerCount(server) : null, messaging, wait,
-                answer -> answer == null ? "Offline" : "Online", "status of %string%");
-        question(registrar, "ExprSkProxyTotal", "integer", args -> PluginMessaging.Question.playerCount("ALL"),
-                messaging, wait, answer -> answer == null ? 0L : answer, "[the] [total] [(proxy|velocity)] proxy player count");
-        question(registrar, "ExprSkelocityPlayers", "string", args -> PluginMessaging.Question.playerList(
-                args[0] instanceof String server ? server : "ALL"), messaging, wait, answer -> answer,
+        // SkProxy 2.4's and Skelocity 1.1's: they answer at once, from the last answer the proxy gave, and ask
+        // again in the background, so scripts can use them anywhere an expression goes (a server list ping's motd,
+        // before cancel event). Before the first answer, what they give: 0, "Offline", nothing, "Unknown".
+        cached(registrar, "ExprSkProxyPlayerCount", "integer", args -> args[0] instanceof String server
+                ? PluginMessaging.Question.playerCount(server) : null, messaging, 0L,
+                "player count of %string%", "[the] [total] player count of [(proxy|velocity)] server %string%");
+        registrar.expression(ID + "ExprSkProxyStatus", "string", info -> (context, args) -> {
+            if (!(args[0] instanceof String server)) {
+                return "Offline";
+            }
+            PluginMessaging.Question question = PluginMessaging.Question.playerCount(server);
+            messaging.cached(question);
+            return messaging.answered(question) ? "Online" : "Offline";
+        }, "status of %string%");
+        cached(registrar, "ExprSkProxyTotal", "integer", args -> PluginMessaging.Question.playerCount("ALL"),
+                messaging, 0L, "[the] [total] [(proxy|velocity)] proxy player count");
+        cached(registrar, "ExprSkelocityPlayers", "string", args -> PluginMessaging.Question.playerList(
+                args[0] instanceof String server ? server : "ALL"), messaging, List.of(),
                 "[all] (proxy|velocity) players [on [server] %-string%]");
-        question(registrar, "ExprSkelocityServer", "string", args -> args[0] instanceof OfflinePlayer player
+        cached(registrar, "ExprSkelocityServer", "string", args -> args[0] instanceof OfflinePlayer player
                 && player.getName() != null ? PluginMessaging.Question.playerServer(player.getName()) : null,
-                messaging, wait, answer -> answer == null ? "Unknown" : answer, "[the] [(sk|v)elocity] server of %player%");
+                messaging, "Unknown", "[the] [(sk|v)elocity] server of %player%");
 
         for (String id : List.of("EffSend", "EffSendRedis", "EffSendCustomRedis", "EffBroadcast", "EffKick",
                 "ExprNetworkMessage", "ExprNetworkChannel", "ExprNetworkSender", "ExprRedisMessage", "ExprRedisChannel",
@@ -177,6 +181,18 @@ final class ProxySyntax {
         registrar.pausingExpression(ID + id, type, info -> (PausingExpression) (context, args) ->
                 ask(messaging, question.apply(args)).thenApply(answer), patterns);
         registrar.timeout(ID + id, wait);
+    }
+
+    /** An original's expression: the last answer at once (or what it gives before one), asked again behind. */
+    private static void cached(Registrar registrar, String id, String type,
+            Function<Object[], PluginMessaging.Question> question, PluginMessaging messaging, Object before,
+            String... patterns) {
+        registrar.expression(ID + id, type, info -> (context, args) -> {
+            PluginMessaging.Question asked = question.apply(args);
+            Object answer = asked == null ? null : messaging.cached(asked);
+            Object value = answer != null ? answer : before;
+            return value instanceof List<?> list ? list.toArray() : value;
+        }, patterns);
     }
 
     private static CompletionStage<Object> ask(PluginMessaging messaging, PluginMessaging.Question question) {
