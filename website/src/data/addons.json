@@ -1,4 +1,16 @@
 {
   "_": "Official NeoSkript addons: made and maintained by Xena Studios, released and tested with NeoSkript. Shown on /addons/. Each entry: name, summary (one sentence), adds (what syntax it gives scripts), example (a few lines of script), version, status (beta or stable), and links (modrinth, source, docs; any can be left out).",
-  "official": []
+  "official": [
+    {
+      "name": "NeoSkriptWeb",
+      "summary": "HTTP requests, webhooks and JSON for scripts, without blocking the server. Scripts written for Reqn, or for skJson's requests and JSON, run unchanged.",
+      "adds": "Requests that wait for their answer without blocking the server, JSON from text and the web, and JSON into list variables and back.",
+      "example": "send a \"POST\" request to {webhook} with header \"Content-Type: application/json\" and body {_body}\nset {_json} to json from url \"https://api.example.com/data.json\"\nmap {_json} to {_data::*}",
+      "status": "beta",
+      "links": {
+        "docs": "/docs/addons/web/",
+        "source": "https://github.com/xena-studios/neoskript/tree/main/addons/web"
+      }
+    }
+  ]
 }
