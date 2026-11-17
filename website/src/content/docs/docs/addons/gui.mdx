@@ -1,0 +1,103 @@
+---
+title: NeoSkript GUI
+description: "Inventory menus from scripts, with skript-gui's syntax: GUIs with slots that run code when they're clicked, shapes, global GUIs and pages."
+sidebar:
+  label: GUI
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+NeoSkript GUI (`NeoSkriptGui`) makes inventory menus from scripts: a GUI is an inventory whose slots hold items and code that runs when they're clicked, and players can't take its items unless the script lets them.
+
+It replaces [skript-gui](https://github.com/APickledWalrus/skript-gui) and takes its syntax (1.4.0), so scripts written for it load unchanged. NeoSkript's test harness runs the same scripts on Skript 2.17.0 with skript-gui 1.4.0 and on NeoSkript with this addon, with a real player clicking, and compares what the scripts print, what the player is shown and what every inventory holds afterwards.
+
+## Installing
+
+1. Put `NeoSkriptGui-<version>.jar` in `plugins/`, next to NeoSkript. Use the version that matches NeoSkript's: they're released together.
+2. Remove `skript-gui.jar` if it's there. It needs Skript, so it can't run with NeoSkript, and the console says so.
+3. Restart the server.
+
+`/sk info` lists the addon. It works on Paper and Folia.
+
+## Making a GUI
+
+```skript nocheck
+command /shop:
+	trigger:
+		create a gui with virtual chest inventory with 3 rows named "Shop":
+			make gui slot 11 with diamond named "Buy a diamond":
+				if player's balance >= 100:
+					remove 100 from player's balance
+					give a diamond to player
+			make gui slot 15 with barrier named "Close":
+				close the player's inventory
+			run on gui close:
+				send "Come back soon!" to player
+		open the last gui to player
+```
+
+The code under `make gui slot ...:` runs each time the slot is clicked, with the click as its event: `player` is who clicked, and the GUI values below work. It keeps the local variables as they were when the slot was made: one copy, which every click shares, so what one click sets the next sees.
+
+| Syntax | |
+|---|---|
+| `create [a] [new] gui [[with id[entifier]] %text%] with %inventory% [(and\|with) (removable\|stealable) items] [(and\|with) (layout\|shape) %texts%]` | Makes a GUI. With an id it's a global GUI, kept until it's deleted; without one, it goes once nobody has it open. |
+| `(change\|edit) [gui] %gui%:` | Edits a GUI. |
+| `virtual (chest\|hopper\|dropper\|dispenser\|anvil\|crafting table\|%inventory type%) [with %number% rows] [named %text%]` | A new inventory for a GUI. Rows can also be a size: `with size 27`. |
+| `(make\|format) gui [slot[s]] %numbers/texts% (with\|to) [removable] %item%[:]` | Puts an item in slots, by number or by a character of the shape, with code to run on click. |
+| `(make\|format) [the] next gui [slot] (with\|to) [removable] %item%[:]` | The same, in the first slot not made yet. |
+| `(remove\|unformat) gui [slot[s]] %numbers/texts%`, `remove the (next\|last) gui slot`, `remove all gui slots` | Empties slots. |
+| `run on [gui] (open\|close):`, `run when [the] gui (opens\|closes):` | Code for when a player opens or closes it. |
+| `run when [gui] slot[s] %numbers/texts% change[s]:` | Code for when a player changes what's in a removable slot. |
+| `(cancel\|uncancel) [the] gui closing` | In a close section: the GUI opens again. |
+| `(open\|show\|display) [gui] %gui% (to\|for) %players%` | Opens it. `open the last gui to player` works too. |
+| `(lock\|unlock) %guis%` | Whether players can take items from slots without code. |
+
+### Shapes
+
+A shape names the slots by characters, so one `make gui slot` fills all the slots with that character:
+
+```skript nocheck
+create a gui with virtual chest inventory with 3 rows and shape "xxxxxxxxx", "x-------x" and "xxxxxxxxx":
+	make gui slot "x" with black stained glass pane
+	make next gui with diamond
+```
+
+Without a shape, each slot is its own character (`A`, `B`...), so slot numbers work as they are.
+
+## Values
+
+| Syntax | |
+|---|---|
+| `[the] gui` | The GUI of the section, in GUI code. Can be deleted. |
+| `[the] last [created] gui` | The GUI made or edited last in this trigger. |
+| `[the] gui of %players%`, `%player%'s gui` | The GUI a player has open. |
+| `[the] gui with id %text%`, `[all] global guis` | Global GUIs. |
+| `[the] id of %gui%`, `[the] layout of %gui%`, `name of %gui%` | Its properties. All three can be set; setting the name shows its viewers the new one. |
+| `[the] next gui slot [of %guis%]` | The next slot not made yet, as a character. |
+| `page[s] %numbers% of %objects% with %number% values` | A page of a list: page 2 of 20 values with 10 per page is values 11 to 20. |
+| `%players% (has\|have) a gui [open]`, `%guis% (is\|are) (locked\|unlocked)` | Conditions. |
+
+In a slot's code: `gui slot`, `gui raw slot`, `gui hotbar slot`, `gui inventory`, `gui inventory action`, `gui click type`, `gui cursor item`, `gui clicked item` (which can be set), `gui slot type`, `gui player`, `gui viewers` and `gui slot id`. In open and close code: `gui player`, `gui viewers` and `gui inventory`.
+
+## Taking items
+
+A GUI is locked unless it's made with `removable items`: nothing can be taken from it or put in it. A slot made `removable` can always change; in an unlocked GUI, so can slots without code. Every way of moving items is checked before any code runs: clicks, shift-clicks from either side, number keys, the offhand key, dropping, a creative player's middle click, double-clicks that gather items, and dragging. A script error in a slot's code can't undo that.
+
+## Differences from skript-gui
+
+Scripts written for skript-gui 1.4.0 work the same, with these differences:
+
+- **Double-clicks:** a double-click gathering an item onto the cursor is refused if any locked slot of the GUI holds that item. skript-gui stopped counting once the cursor would be full, but the server gathers in two passes, full stacks last, so with a full stack in a removable slot it took the locked item.
+- **Folia:** each click runs on the clicking player's thread. While a GUI is open for players in more than one region, nothing can be moved in or out of it, removable slots included: the server moves items on each player's own thread, so two regions could otherwise take the same item. Clicks still run their code. Reopening a GUI whose closing was cancelled happens on the player's thread; skript-gui used the global thread, which Folia refuses.
+- **Shift-clicks into a furnace, brewing stand or other GUI with slots of its own:** refused if any of its slots is locked, as the server puts items in particular slots there, not the first empty one.
+- **Reloading:** when a script reloads or unloads, GUIs with code from its old version close, and one made later by the old version (a trigger that waited across the reload) goes when it's opened or clicked. skript-gui left them open, running the old code.
+- **GUIs that went away:** a player who still has a GUI open after it's deleted or replaced (on Folia, until their region closes it) can't take anything from it.
+- **Nothing kept:** a GUI goes once nobody has it open and it has no id, including when its player quits or dies with it open; nothing is kept for players who left. When the addon disables, every GUI closes.
+- **Nested sections:** after `create a gui` or `edit gui` inside another GUI's section, `the gui` stays the inner one. skript-gui switched back to the outer one.
+- **Menu GUIs:** skript-gui's experimental `menu guis` (`%inventory type% menu bound to %player%`, `using menu guis`) aren't supported yet.
+- **`size of gui`** can't be set yet. Its name can.
+- `edit gui` without a `:` isn't an error; it makes it the last GUI.
+
+<Aside type="note">
+The [script checker](/docs/cli/) and [the parser](/parser/) don't know this addon's syntax unless their syntax list includes it, so they may flag these lines. On a server with the addon installed, they load.
+</Aside>

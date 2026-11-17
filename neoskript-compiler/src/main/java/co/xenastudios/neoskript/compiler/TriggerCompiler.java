@@ -319,6 +319,17 @@ final class TriggerCompiler {
     private java.util.function.BiConsumer<Integer, String> warnings = (line, message) -> {};
 
     /** Sends the warnings this compiler finds to {@code sink}. */
+    /**
+     * What this compile of the script is, for the code of sections that run later to know whether it's still the
+     * script's loaded version ({@code SectionCode.loaded}). {@code null} for code that isn't a script's.
+     */
+    private Object scriptVersion;
+
+    TriggerCompiler version(Object version) {
+        this.scriptVersion = version;
+        return this;
+    }
+
     TriggerCompiler warnings(java.util.function.BiConsumer<Integer, String> sink) {
         this.warnings = sink;
         return this;
@@ -2000,6 +2011,8 @@ final class TriggerCompiler {
             }
             case Statement.Section section when section.header() != null
                     && library.isPausingSection(section.header().syntax().id()) -> pausingSection(section);
+            case Statement.Section section when section.header() != null
+                    && library.later(section.header().syntax().id()) != null -> laterSection(section);
             case Statement.Section section when library.sectionType(section.header() == null ? null
                     : section.header().syntax().id()) != null -> librarySection(section);
             case Statement.Section section when sectionExpression(section) != null -> expressionSection(section);
@@ -2588,6 +2601,63 @@ final class TriggerCompiler {
         } finally {
             precomputed.remove(made);
         }
+    }
+
+    /**
+     * An addon's section whose code runs later, for events of its own ({@code make gui slot 0 with dirt:}): the code
+     * is kept, as after a wait, with a copy of the local variables, and the element gets it when its line runs. The
+     * code is checked against its own events, apart from the loops and sections around it, and ends at the section's
+     * end.
+     */
+    private void laterSection(Statement.Section section) throws CompileException {
+        ParsedSyntax header = section.header();
+        Library.Later later = library.later(header.syntax().id());
+        int codeSlot = nextSlot++;
+        Label after = new Label();
+        List<Class<?>> outerClasses = eventClasses;
+        String outerLabel = eventLabel;
+        List<Block> outerBlocks = new ArrayList<>(blocks);
+        List<RunOn> outerRunOns = new ArrayList<>(runOns);
+        // The code is apart from the loops and 'run on' sections around it: its frame doesn't keep their values (the
+        // players a loop went through), for as long as the code is kept.
+        blocks.clear();
+        runOns.clear();
+        try {
+            method.visitVarInsn(ALOAD, 0);
+            WaitPoint start = saveFrame();
+            method.visitLdcInsn(constantsScript == null ? "" : constantsScript);
+            if (scriptVersion == null) {
+                method.visitInsn(ACONST_NULL);
+            } else {
+                constant(scriptVersion, Object.class);
+            }
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "laterSection",
+                    "(" + Type.getDescriptor(Resumable.class) + FRAME_DESC + STRING_DESC + OBJECT_DESC + ")" + OBJECT_DESC,
+                    false);
+            method.visitVarInsn(ASTORE, codeSlot);
+            method.visitJumpInsn(GOTO, after);
+            method.visitLabel(start.resume());
+            eventClasses = later.eventClasses();
+            eventLabel = later.eventName();
+            statements(section.body());
+            // The code's own end: nothing around it was entered, so nothing is left.
+            suspendTrigger();
+        } finally {
+            eventClasses = outerClasses;
+            eventLabel = outerLabel;
+            blocks.clear();
+            runOns.clear();
+            blocks.addAll(outerBlocks);
+            runOns.addAll(outerRunOns);
+        }
+        method.visitLabel(after);
+        lineOf(section, section.line().key());
+        callThrough(header, co.xenastudios.neoskript.api.element.LaterSection.class);
+        method.visitVarInsn(ALOAD, codeSlot);
+        method.visitTypeInsn(CHECKCAST, Type.getInternalName(co.xenastudios.neoskript.api.element.SectionCode.class));
+        method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(co.xenastudios.neoskript.api.element.LaterSection.class),
+                "run", "(" + CONTEXT + OBJECTS + Type.getDescriptor(co.xenastudios.neoskript.api.element.SectionCode.class)
+                        + ")V", true);
     }
 
     /** The type a returnable section returns: {@code string} in {@code returnable string section}. */

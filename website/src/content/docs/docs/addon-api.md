@@ -211,6 +211,20 @@ registrar.eventTriggers("MyAddonEvtQuestion", triggers -> {
 
 Each list replaces the one before: drop the old triggers when it arrives. A trigger whose script has unloaded or reloaded since runs nothing. Each `LoadedTrigger` can `run(event, owner)` right away, from any thread, on that thread: its filter, then its code, until it ends or waits. A runtime error in it is logged as any trigger's, and doesn't reach your code. `owner` is the entity, block or location whose thread it carries on on after a `wait`, or `null` for the global thread. The list is given on the thread that loaded the scripts, the global thread on Folia, with an empty list once none are left, so what you register for them can follow scripts as they reload, with nothing left behind. On Folia, NeoSkript's region rules apply to what the code reads, as for any trigger. A trigger's code may run another (a placeholder asking for one); limit how deep and how much yourself. NeoSkript's own [placeholders addon](/docs/addons/placeholders/) is built this way.
 
+### Sections whose code runs later
+
+Some sections keep their code for later, for an event the addon fires itself, as skript-gui's `make gui slot 0 with dirt:` keeps its code for when the slot is clicked:
+
+```java
+registrar.laterSection("MyAddonSecOnRing", "doorbell ring", List.of(RingEvent.class), info -> (context, args, code) -> {
+    if (code != null) {
+        doorbell((String) args[0]).onRing(code);   // kept for later
+    }
+}, "when doorbell %text% rings");
+```
+
+The code is checked as code in that event, with its event values and syntax, and starts with no delay. The element gets it as a `SectionCode` when its line runs (or `null`, written without `:`), and runs it with `code.run(event, owner)` whenever the event happens, from any thread, on that thread. It keeps the trigger's local variables as they were at the section: one copy, which every run shares, as Skript's own sections that run later do. `code.script()` names its script: `registrar.scriptsUnloaded(names -> ...)` says when scripts reload or unload, after which code from them is the old version. NeoSkript's own [GUI addon](/docs/addons/gui/) closes GUIs with such code.
+
 ### Syntax for some events only
 
 This is experimental: it may change in a minor release.

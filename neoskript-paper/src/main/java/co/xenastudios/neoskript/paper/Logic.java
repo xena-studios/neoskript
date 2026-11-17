@@ -358,7 +358,9 @@ final class Logic {
             return "block".equals(info.argumentType(0))
                     ? co.xenastudios.neoskript.api.element.Update.inPlace(0, toggle)
                     : co.xenastudios.neoskript.api.element.Update.of(0, toggle);
-        }, "(open:open|close:close|toggle) %~objects%");
+        // As Skript's patterns: only blocks open and close, so 'close the player's inventory' is the inventory effect.
+        }, "(open:open|open:turn on|open:activate) %~blocks%", "(close:close|close:turn off|close:de[-]activate) %~blocks%",
+                "(toggle|switch) [[the] state of] %~blocks/booleans%");
         registrar.expression("ExprInverse", "boolean", info -> (context, args) -> {
             Object[] values = Values.array(args[0]);
             Object[] inverse = new Object[values.length];

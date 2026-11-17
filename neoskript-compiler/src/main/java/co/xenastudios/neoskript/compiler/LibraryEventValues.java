@@ -127,6 +127,14 @@ final class LibraryEventValues implements EventValues {
     }
 
     @Override
+    public Scope later(SyntaxInfo header) {
+        Library.Later later = library.later(header.id());
+        return later == null ? null
+                : named.computeIfAbsent(later.eventClasses() + "/" + later.eventName(),
+                        k -> new EventScope(later.eventClasses(), later.eventName()));
+    }
+
+    @Override
     public boolean keepsEventValues(SyntaxInfo header) {
         return library.binding(header) instanceof Library.Core core && KEEPING.contains(core.id());
     }

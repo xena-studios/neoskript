@@ -1,0 +1,19 @@
+# The neoskript-gui scenario: lines skript-gui refuses, with its errors. Each must be an error on both Skript and
+# NeoSkript, with the same message.
+
+on load:
+	make gui slot 0 with dirt
+	set {_s} to the gui slot
+	run on gui close:
+		send "x"
+	cancel the gui closing
+	set {_n} to the next gui slot
+	set {_p::*} to page 1 of 5 with 2 values
+
+on load:
+	create a gui with virtual chest inventory:
+		set {_s} to the gui slot
+		make gui slot 0 with dirt:
+			cancel the gui closing
+		run on gui open:
+			set {_t} to the gui click type

@@ -268,12 +268,13 @@ final class ScriptManager {
         List<SourceFile> files = read();
         List<ParsedScript> parsed;
         CompiledScripts compiled;
+        ScriptCompiler compiler = new ScriptCompiler(library, globals, functions);
         try {
             parsed = new ScriptLoader(library.registry()).load(files);
             // Which item names each script looks up, so /sk reload aliases reloads the scripts a change affects.
             co.xenastudios.neoskript.paper.GlobalAliases.recordUses();
             try {
-                compiled = new ScriptCompiler(library, globals, functions).compile(parsed);
+                compiled = compiler.compile(parsed);
             } finally {
                 Map<String, Set<String>> uses = co.xenastudios.neoskript.paper.GlobalAliases.recordedUses();
                 itemNames.clear();
@@ -349,6 +350,8 @@ final class ScriptManager {
         // Every script switches to its new version, as in Skript: one with errors, without what has them (D12).
         // In the files' order, which Skript loads them in: their load events run in it.
         Set<String> switching = new java.util.LinkedHashSet<>();
+        // Scripts whose code stops: reloaded or gone.
+        Set<String> stopped = new java.util.LinkedHashSet<>();
         int inScope = 0;
         for (SourceFile file : files) {
             String name = file.name();
@@ -364,6 +367,7 @@ final class ScriptManager {
             loaded.forEach((name, old) -> {
                 if (!byName.containsKey(name)) {
                     runUnload(old);
+                    stopped.add(name);
                 }
             });
             loaded.keySet().removeIf(name -> !byName.containsKey(name));
@@ -394,6 +398,20 @@ final class ScriptManager {
             }
         }
         for (String name : switching) {
+            if (loaded.containsKey(name)) {
+                stopped.add(name);
+            }
+        }
+        for (String name : stopped) {
+            if (!switching.contains(name)) {
+                co.xenastudios.neoskript.runtime.ScriptVersions.unloaded(name);
+            }
+        }
+        for (String name : switching) {
+            // This compile is now the script's loaded version: code from the one before knows it isn't.
+            co.xenastudios.neoskript.runtime.ScriptVersions.load(name, compiler.version(name));
+        }
+        for (String name : switching) {
             // The previous version of a script unloads before the new one loads.
             runUnload(loaded.getOrDefault(name, List.of()));
             loaded.put(name, triggers.getOrDefault(name, List.of()));
@@ -404,6 +422,7 @@ final class ScriptManager {
         reorder(loaded, files);
         reorder(loadedCommands, files);
         updateListenersAndCommands();
+        tellUnloaded(stopped);
         long millis = (System.nanoTime() - start) / 1_000_000;
 
         for (String name : switching) {
@@ -706,6 +725,25 @@ final class ScriptManager {
             autoReload.stop();
         }
         updateListenersAndCommands();
+        if (old != null) {
+            co.xenastudios.neoskript.runtime.ScriptVersions.unloaded(name);
+            tellUnloaded(Set.of(name));
+        }
+    }
+
+    /** Tells addons ({@code Registrar.scriptsUnloaded}) which scripts' code stopped: reloaded or gone. */
+    private void tellUnloaded(Set<String> stopped) {
+        if (stopped.isEmpty()) {
+            return;
+        }
+        Set<String> names = java.util.Collections.unmodifiableSet(new java.util.LinkedHashSet<>(stopped));
+        for (var watcher : library.unloadWatchers()) {
+            try {
+                watcher.accept(names);
+            } catch (RuntimeException | LinkageError e) {
+                logger.error("An addon failed when told which scripts' code stopped", e);
+            }
+        }
     }
 
     /**

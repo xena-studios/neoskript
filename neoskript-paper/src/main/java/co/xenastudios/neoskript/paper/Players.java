@@ -84,6 +84,8 @@ final class Players {
                         ((org.bukkit.block.BlockState) nameable).update(true, false);
                     }
                 }
+                // Anything else with a name, an addon's GUI among them.
+                case Nameable nameable -> nameable.customName(component);
                 default -> {}
             }
         };

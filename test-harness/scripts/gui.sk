@@ -1,0 +1,125 @@
+# The neoskript-gui scenario: inventory menus with skript-gui's syntax, clicked by the harness bot's players. It runs
+# on Skript with skript-gui and on NeoSkript with NeoSkriptGui, and what they print as "[harness] gui ..." and what
+# the players are shown must be the same.
+
+on load:
+	send "[harness] gui loaded" to console
+
+function guilog(label: text, value: objects):
+	send "[harness] gui %{_label}%: %{_value::*}%" to console
+
+function shop(p: player):
+	set {_clicks} to 0
+	create a gui with virtual chest inventory with 3 rows named "Shop":
+		# Locked: code runs when it's clicked, and the diamond stays.
+		make gui slot 0 with diamond named "Buy":
+			add 1 to {_clicks}
+			guilog("click", "%gui slot% %gui raw slot% %gui slot id% %gui click type% %gui player% %{_clicks}%")
+			guilog("click item", gui clicked item)
+			guilog("click values", "%gui slot type% %gui inventory action% %gui hotbar slot%")
+		# Removable: it can be taken.
+		make gui slot 1 with removable dirt
+		make next gui with stone
+		make gui slot 4 with gold ingot:
+			guilog("edit", "editing")
+			make gui slot 5 with emerald
+			guilog("next slot", the next gui slot)
+		run when slot 8 changes:
+			guilog("changed", gui slot)
+		run on gui open:
+			guilog("open", gui player)
+		run on gui close:
+			guilog("close", gui player)
+	guilog("made", the last gui)
+	guilog("next", next gui slot of the last gui)
+	open the last gui to {_p}
+
+function sticky(p: player):
+	create a gui with virtual hopper inventory named "Sticky":
+		make gui slot 0 with barrier:
+			guilog("sticky click", gui slot)
+			set {sticky::let} to true
+			guilog("sticky player", player)
+			close the player's inventory
+		run on gui close:
+			guilog("sticky close", {sticky::let})
+			if {sticky::let} is not set:
+				cancel the gui closing
+	open the last gui to {_p}
+
+function layout(p: player):
+	create a gui with id "layout" with virtual chest inventory with 3 rows named "Layout" and shape "xxxxxxxxx", "x-------x" and "xxxxxxxxx":
+		make gui slot "x" with black stained glass pane
+		make gui slot "-" with removable paper
+	guilog("layout", layout of gui with id "layout")
+	guilog("global", global guis)
+	guilog("id", id of gui "layout")
+	guilog("locked", whether gui "layout" is locked)
+	unlock the gui with id "layout"
+	guilog("unlocked", whether gui "layout" is unlocked)
+	lock the gui with id "layout"
+	set name of gui "layout" to "Layout Two"
+	guilog("name", name of gui "layout")
+	open gui "layout" to {_p}
+
+# NeoSkript only: a double-click gathering diamonds onto the cursor, past a full stack of removable ones, mustn't take
+# the locked one (skript-gui's gather took it).
+function gather(p: player):
+	create a gui with virtual chest inventory with 3 rows named "Gather":
+		make gui slot 0 with removable 64 diamonds
+		make gui slot 1 with diamond
+	open the last gui to {_p}
+
+# NeoSkript only: a GUI without an id goes when its player quits or dies with it open.
+function kept(p: player):
+	create a gui with virtual chest inventory with 3 rows named "Kept":
+		make gui slot 0 with diamond
+	set {gui::kept::%{_p}%} to the last gui
+	open the last gui to {_p}
+
+command /nsk-gui-released <text>:
+	trigger:
+		guilog("released %arg-1%", amount of diamond in {gui::kept::%arg-1%})
+		delete {gui::kept::%arg-1%}
+
+command /nsk-gui <player> <text>:
+	trigger:
+		if arg-2 is "shop":
+			shop(arg-1)
+		else if arg-2 is "sticky":
+			delete {sticky::let}
+			sticky(arg-1)
+		else if arg-2 is "layout":
+			layout(arg-1)
+		else if arg-2 is "gather":
+			gather(arg-1)
+		else if arg-2 is "kept":
+			kept(arg-1)
+		else if arg-2 is "pages":
+			set {_items::*} to 1, 2, 3, 4, 5, 6 and 7
+			guilog("page 2", page 2 of {_items::*} with 3 values)
+			guilog("pages 1 and 3", pages 1 and 3 of {_items::*} with 3 values)
+
+command /nsk-gui-state <player>:
+	trigger:
+		guilog("has gui", whether arg-1 has a gui)
+		guilog("player diamonds", amount of diamond in arg-1's inventory)
+		guilog("player stone", amount of stone in arg-1's inventory)
+		guilog("player dirt", amount of dirt in arg-1's inventory)
+		guilog("player cobblestone", amount of cobblestone in arg-1's inventory)
+		guilog("player paper", amount of paper in arg-1's inventory)
+		guilog("player glass", amount of black stained glass pane in arg-1's inventory)
+		guilog("cursor", cursor slot of arg-1)
+		if arg-1 has a gui:
+			guilog("gui diamonds", amount of diamond in arg-1's gui)
+			guilog("gui stone", amount of stone in arg-1's gui)
+			guilog("gui dirt", amount of dirt in arg-1's gui)
+			guilog("gui cobblestone", amount of cobblestone in arg-1's gui)
+			guilog("gui paper", amount of paper in arg-1's gui)
+			guilog("gui glass", amount of black stained glass pane in arg-1's gui)
+		send "[harness] gui state done" to console
+
+# The harness bot runs this after an action: once it's printed, the action before it has been handled.
+command /nsk-gui-sync <text>:
+	trigger:
+		send "[harness] gui sync %arg-1%" to console

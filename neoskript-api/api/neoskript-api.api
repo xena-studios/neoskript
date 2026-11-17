@@ -149,6 +149,9 @@ public interface co.xenastudios.neoskript.api.element.Keyed @Experimental
   public abstract java.lang.String[] keys()
   public abstract java.lang.Object[] values()
 
+public interface co.xenastudios.neoskript.api.element.LaterSection
+  public abstract void run(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[], co.xenastudios.neoskript.api.element.SectionCode)
+
 public interface co.xenastudios.neoskript.api.element.LoopValue
   public abstract java.lang.Object get(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[], java.lang.Object)
 
@@ -169,6 +172,11 @@ public interface co.xenastudios.neoskript.api.element.PausingSection @Experiment
 
 public interface co.xenastudios.neoskript.api.element.Section
   public abstract java.lang.Object run(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[])
+
+public interface co.xenastudios.neoskript.api.element.SectionCode
+  public abstract boolean loaded()
+  public abstract void run(java.lang.Object, java.lang.Object)
+  public abstract java.lang.String script()
 
 public interface co.xenastudios.neoskript.api.element.SettableCondition extends co.xenastudios.neoskript.api.element.Condition
   public abstract void set(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[], boolean)
@@ -282,6 +290,7 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public abstract void expression(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/Expression;>;[Ljava/lang/String;)V
   public abstract void function(java.lang.String, java.util.List, java.lang.String, boolean, co.xenastudios.neoskript.api.element.Function) signature (Ljava/lang/String;Ljava/util/List<Lco/xenastudios/neoskript/api/registration/Parameter;>;Ljava/lang/String;ZLco/xenastudios/neoskript/api/element/Function;)V
   public abstract void kindClass(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/Object;Ljava/lang/Class<*>;>;)V @Experimental
+  public abstract void laterSection(java.lang.String, java.lang.String, java.util.List, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Ljava/util/List<Ljava/lang/Class<*>;>;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/LaterSection;>;[Ljava/lang/String;)V
   public abstract void literalError(java.util.function.Function) signature (Ljava/util/function/Function<Ljava/lang/String;Ljava/lang/String;>;)V @Experimental
   public abstract void literalParser(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/String;*>;)V
   public abstract void loopValue(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/LoopValue;>;)V @Experimental
@@ -298,6 +307,7 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public void propertyCondition(java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Predicate) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/function/Predicate<-TT;>;)V
   public void propertySyntax(java.lang.String, int, java.util.function.Function, boolean) signature (Ljava/lang/String;ILjava/util/function/Function<Ljava/util/Set<Ljava/lang/String;>;Ljava/lang/String;>;Z)V @Experimental
   public void returnType(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Lco/xenastudios/neoskript/api/element/ElementInfo;Ljava/lang/String;>;)V @Experimental
+  public void scriptsUnloaded(java.util.function.Consumer) signature (Ljava/util/function/Consumer<-Ljava/util/Set<Ljava/lang/String;>;>;)V
   public abstract void section(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/Section;>;[Ljava/lang/String;)V
   public void sectionEvent(java.lang.String, java.lang.String) @Experimental
   public abstract void sectionExpression(java.lang.String, java.lang.String)

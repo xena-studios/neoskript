@@ -377,11 +377,23 @@ public final class ScriptCompiler {
     }
 
     /** A compiler for code in {@code script}, whose warnings are reported with the other problems. */
+    /** What each script's compile here is: its version, which becomes the loaded one if it loads. */
+    private final Map<String, Object> versions = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * The version of {@code script} this compiler made, for {@link co.xenastudios.neoskript.runtime.ScriptVersions}
+     * once it loads, or {@code null} if it compiled no code of that script.
+     */
+    public Object version(String script) {
+        return versions.get(script);
+    }
+
     private TriggerCompiler compiler(Map<FunctionInfo, FunctionHandle> functions, ParsedScript script) {
         String name = script.file().name();
+        Object version = versions.computeIfAbsent(name, k -> new Object());
         List<Diagnostic> into = warnings;
         java.util.Set<String> skipped = unparsedLines;
-        return new TriggerCompiler(library, functions, globals, script)
+        return new TriggerCompiler(library, functions, globals, script).version(version)
                 .warnings((at, message) -> into.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message)))
                 .unparsed(line -> skipped.add(name + ":" + line));
     }
