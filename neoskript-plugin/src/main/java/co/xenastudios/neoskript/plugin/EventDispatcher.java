@@ -106,7 +106,11 @@ class EventDispatcher implements Listener {
         logger.info("== {} with priority {}{} ==", event.getClass().getName(), priority,
                 event instanceof org.bukkit.event.Cancellable cancellable && cancellable.isCancelled() ? " (cancelled)" : "");
         SimpleTriggerContext context = new SimpleTriggerContext(event, owner(event));
+        LoadWalk loading = walk;
         for (int i = 0; i < triggers.length; i++) {
+            if (loading != null && loading.pending(triggers[i])) {
+                continue;
+            }
             long started = System.nanoTime();
             logger.info("# {}", names[i]);
             try {
@@ -119,9 +123,21 @@ class EventDispatcher implements Listener {
         logger.info("== took {} milliseconds ==", (System.nanoTime() - start) / 1_000_000.0);
     }
 
+    /** The scripts being loaded whose triggers don't all listen yet, or {@code null}: see {@link LoadWalk}. */
+    private volatile LoadWalk walk;
+
+    void walk(LoadWalk walk) {
+        this.walk = walk;
+    }
+
     void fire(Trigger[] triggers, Event event) {
         SimpleTriggerContext context = new SimpleTriggerContext(event, owner(event));
+        LoadWalk loading = walk;
         for (Trigger trigger : triggers) {
+            if (loading != null && loading.pending(trigger)) {
+                // As in Skript, an 'on load' before it in the load order fired the event: it isn't registered yet.
+                continue;
+            }
             try {
                 trigger.execute(context);
             } catch (Throwable e) {

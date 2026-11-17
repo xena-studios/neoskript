@@ -1,0 +1,12 @@
+# Probe, with load-fire-2 and load-fire-3: an event an 'on load' fires reaches the triggers before it in Skript's
+# load order, and not those after it. Skript registers each event's trigger in turn, script by script and line by
+# line, and runs each 'on load' when it gets to it. The event is a weather change, which on Folia belongs to the
+# global thread 'on load' runs on; only the changes made while {diff::load-fire-on} is set are counted, so the
+# weather the world starts with doesn't matter.
+
+on weather change:
+	{diff::load-fire-on} is set
+	add "1: weather" to {diff::load-fire::*}
+
+function probe_load_fire_1():
+	stop
