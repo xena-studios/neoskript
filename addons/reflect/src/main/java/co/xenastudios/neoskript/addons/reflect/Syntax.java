@@ -47,6 +47,7 @@ final class Syntax {
 
     static void elements(Registrar registrar, Imports imports) {
         CustomSyntax.register(registrar);
+        Proxies.register(registrar, imports);
         registrar.structure("NeoSkriptReflectStructImport", imports, "import");
         // skript-reflect turns Skript's 'disable variable missing and/or warnings' on as it enables, so a server with it
         // gives no "List is missing 'and' or 'or'" warning at all, in any script.

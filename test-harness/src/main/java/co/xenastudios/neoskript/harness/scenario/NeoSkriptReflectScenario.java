@@ -46,7 +46,7 @@ public final class NeoSkriptReflectScenario implements Scenario {
             "error: java.lang.IndexOutOfBoundsException: Index 9 out of bounds for length 2", "system: yes", "loaded",
             "custom shout: hi", "custom big: yes", "custom doubled: 8", "custom pattern 1: a", "custom pattern 2: b",
             "custom twice: 6", "custom twices: 2 and 4", "custom even: yes", "custom not even: yes", "custom java: 1",
-            "custom whisper: psst", "custom done",
+            "custom whisper: psst", "proxy run", "proxy get: given", "proxy apply: 42", "custom done",
             "event: reflect-event", "missing done");
 
     /**

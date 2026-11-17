@@ -225,7 +225,47 @@ final class ScriptHarness {
 
         @Override
         public Scripts scripts() {
-            throw new UnsupportedOperationException();
+            // Only call: by name, through the loaded functions' handles, as the plugin's does.
+            return new Scripts() {
+                @Override
+                public List<String> loaded() {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public boolean isLoaded(String name) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public boolean load(String name) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public boolean reload(String name) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public boolean unload(String name) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public Object call(String name, Object... arguments) {
+                    for (var entry : handles.entrySet()) {
+                        if (entry.getKey().name().equals(name) && entry.getValue().loaded()) {
+                            Object[] values = new Object[entry.getKey().parameters().size()];
+                            for (int i = 0; i < values.length && i < arguments.length; i++) {
+                                values[i] = arguments[i];
+                            }
+                            return entry.getValue().call(null, values);
+                        }
+                    }
+                    throw new IllegalArgumentException("There's no function called " + name);
+                }
+            };
         }
 
         @Override

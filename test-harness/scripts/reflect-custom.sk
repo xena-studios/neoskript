@@ -2,6 +2,9 @@
 # NeoSkript with NeoSkriptReflect. Each line it prints is compared. reflect-check.sk loads first.
 import:
 	java.util.ArrayList
+	java.lang.Runnable
+	java.util.function.Supplier
+	java.util.function.Function
 
 effect shout %string%:
 	trigger:
@@ -40,6 +43,15 @@ local effect whisper %string%:
 	trigger:
 		send "[reflect] custom whisper: %expression-1%" to console
 
+function reflectProxyRun(p: object):
+	send "[reflect] proxy run" to console
+
+function reflectProxyGet(p: object) :: object:
+	return "given"
+
+function reflectProxyApply(times: number, p: object, value: object) :: object:
+	return {_value} * {_times}
+
 on load:
 	shout "hi"
 	if 20 is big:
@@ -59,4 +71,13 @@ on load:
 	{_l}.add("x")
 	send "[reflect] custom java: %size of java list {_l}%" to console
 	whisper "psst"
+	set {_r::run} to function reference "reflectProxyRun"
+	set {_runnable} to new proxy instance of Runnable using {_r::*}
+	{_runnable}.run()
+	set {_g::get} to function "reflectProxyGet"
+	set {_supplier} to new proxy instance of Supplier using {_g::*}
+	send "[reflect] proxy get: %{_supplier}.get()%" to console
+	set {_a::apply} to function reference "reflectProxyApply" called with arguments 2
+	set {_function} to new proxy instance of Function using {_a::*}
+	send "[reflect] proxy apply: %{_function}.apply(21)%" to console
 	send "[reflect] custom done" to console
