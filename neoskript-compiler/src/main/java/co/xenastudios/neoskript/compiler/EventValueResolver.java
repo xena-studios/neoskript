@@ -72,6 +72,17 @@ final class EventValueResolver {
     private final Function<Class<?>, String> exactType;
     private final Map<Key, Resolution> cache = new ConcurrentHashMap<>();
 
+    /** What's been resolved so far, including the excluded values whose error was used up, to {@link #restore}. */
+    Map<Key, Resolution> save() {
+        return Map.copyOf(cache);
+    }
+
+    @SuppressWarnings("unchecked")
+    void restore(Object saved) {
+        cache.clear();
+        cache.putAll((Map<Key, Resolution>) saved);
+    }
+
     EventValueResolver(List<Value> values, Converters converters, Function<Class<?>, String> exactType) {
         this.values = values;
         this.converters = converters;

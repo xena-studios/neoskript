@@ -1,0 +1,52 @@
+{
+  "examples/ExprLocationAt-1": {
+    "script": "31e5f3b6f0fb2510",
+    "answers": [
+      {
+        "messages": [
+          "2 INFO: 'arg-4' can only be used in the on unknown command execution event, the on command event or the on command event"
+        ]
+      },
+      {
+        "messages": [
+          "2 INFO: 'the world arg-4' can only be used in the on unknown command execution event, the on command event or the on command event"
+        ]
+      }
+    ]
+  },
+  "examples/ExprLowestHighestSolidBlock-2": {
+    "script": "5e999729e4a39729",
+    "answers": [
+      {
+        "messages": [
+          "2 INFO: the location of highest solid block of the player can't be set to the location of lowest solid block of the player because the latter is neither an item type nor a block data"
+        ]
+      },
+      {
+        "messages": []
+      }
+    ]
+  },
+  "examples/ExprPassenger-1": {
+    "script": "9b0c8e266335cbcc",
+    "answers": [
+      {
+        "messages": [
+          "2 INFO: There's no vehicle in an on join event.",
+          "3 INFO: There's no vehicle in an on join event.",
+          "6 INFO: all entities of type pig can't be removed from an entity because the former is neither a potion effect type nor an item type",
+          "7 INFO: There's no vehicle in an on join event."
+        ]
+      },
+      {
+        "messages": [
+          "2 INFO: There's no vehicle in an on join event.",
+          "3 INFO: There's no vehicle in an on join event.",
+          "5 INFO: vehicle of the passenger of the player can only be set to one class org.skriptlang.skript.bukkit.entity.EntityData, not more",
+          "6 INFO: all entities of type pig can't be removed from an entity because the former is neither a potion effect type nor an item type",
+          "7 INFO: There's no vehicle in an on join event."
+        ]
+      }
+    ]
+  }
+}

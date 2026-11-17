@@ -758,6 +758,27 @@ public final class Library implements Registrar {
      */
     void parserAsked(List<Class<?>> eventClasses, Class<?> valueClass, String type, String error) {
         parserAsked.put(eventClasses + "/" + valueClass.getName() + "/" + type, error);
+        usedUp.incrementAndGet();
+    }
+
+    /** How many times the parser has used up an excluded value's error: see {@link EventValues#usedUp}. */
+    private final java.util.concurrent.atomic.AtomicLong usedUp = new java.util.concurrent.atomic.AtomicLong();
+
+    long usedUp() {
+        return usedUp.get();
+    }
+
+    /** The excluded values whose errors are used up so far, and those the parser kept for the compiler. */
+    Object saveUsedUp() {
+        return List.of(resolver().save(), Map.copyOf(parserAsked));
+    }
+
+    @SuppressWarnings("unchecked")
+    void restoreUsedUp(Object saved) {
+        List<Object> both = (List<Object>) saved;
+        resolver().restore(both.get(0));
+        parserAsked.clear();
+        parserAsked.putAll((Map<String, String>) both.get(1));
     }
 
     /** The error {@link #parserAsked} kept for this value, now taken, or {@code null}. */

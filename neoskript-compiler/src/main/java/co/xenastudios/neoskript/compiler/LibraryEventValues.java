@@ -137,6 +137,21 @@ final class LibraryEventValues implements EventValues {
     }
 
     /** The event values of events of some classes (none outside events). */
+    @Override
+    public long usedUp() {
+        return library.usedUp();
+    }
+
+    @Override
+    public Object save() {
+        return library.saveUsedUp();
+    }
+
+    @Override
+    public void restore(Object saved) {
+        library.restoreUsedUp(saved);
+    }
+
     private final class EventScope implements Scope {
 
         private final List<Class<?>> classes;

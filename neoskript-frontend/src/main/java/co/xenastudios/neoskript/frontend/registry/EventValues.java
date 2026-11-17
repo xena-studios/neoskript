@@ -31,6 +31,23 @@ public interface EventValues {
      */
     boolean keepsEventValues(SyntaxInfo header);
 
+    /**
+     * How many times the parser has used up an event value's error so far ({@code Use 'attacker' and/or 'victim'...}),
+     * which Skript gives only the first time any script asks: which script that is depends on the order scripts are
+     * read in.
+     */
+    default long usedUp() {
+        return 0;
+    }
+
+    /** What's been used up so far, to {@link #restore} it: see {@link #usedUp}. */
+    default Object save() {
+        return null;
+    }
+
+    /** Puts back what was used up when {@link #save} was called. */
+    default void restore(Object saved) {}
+
     /** The event values some code can use. */
     interface Scope {
 

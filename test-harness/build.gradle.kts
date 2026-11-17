@@ -132,6 +132,9 @@ tasks.register<JavaExec>("harness") {
     val echo = providers.gradleProperty("harness.echo").orElse("false")
     // -Pharness.differential.skriptRuns=N runs the reference Skript N times for the differential (each run cached).
     val skriptRuns = providers.gradleProperty("harness.differential.skriptRuns").orElse("3")
+    // -Pharness.differential.recordVariations=true adds the answers of units that vary in Skript to
+    // corpus/differential/skript-varies.json.
+    val recordVariations = providers.gradleProperty("harness.differential.recordVariations").orElse("false")
     val projectDir = layout.projectDirectory
     val buildDir = layout.buildDirectory
     val cacheDir = layout.settingsDirectory.dir(".harness-cache")
@@ -154,6 +157,7 @@ tasks.register<JavaExec>("harness") {
             "-Dharness.cache=" + cacheDir.asFile.absolutePath,
             "-Dharness.echo=" + echo.get(),
             "-Dharness.differential.skriptRuns=" + skriptRuns.get(),
+            "-Dharness.differential.recordVariations=" + recordVariations.get(),
         )
     })
 

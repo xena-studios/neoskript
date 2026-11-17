@@ -124,10 +124,23 @@ public final class ScriptLoader {
         this.duplicates = duplicates;
         this.registered = registered;
         this.functions = functions;
-        return parallel(results)
+        EventValues values = registry.eventValues();
+        Object saved = values == null ? null : values.save();
+        long usedUp = values == null ? 0 : values.usedUp();
+        List<ParsedScript> parsed = parallel(results)
                 .map(result -> parse(result, new ParserContext(registry, functions,
                         locals.getOrDefault(result.file().name(), Map.of()))))
                 .toList();
+        if (values != null && results.size() > 1 && values.usedUp() != usedUp) {
+            // An event value's error that Skript gives only the first time was used up, by whichever script was
+            // parsed first: parsed again one after another, it's the first script in order that gets it, every time.
+            values.restore(saved);
+            parsed = results.stream()
+                    .map(result -> parse(result, new ParserContext(registry, functions,
+                            locals.getOrDefault(result.file().name(), Map.of()))))
+                    .toList();
+        }
+        return parsed;
     }
 
     /**
