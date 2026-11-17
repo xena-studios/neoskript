@@ -280,6 +280,8 @@ registrar.timeout("MyAddonEffQuery", Duration.ofSeconds(30));
 
 At most 10,000 triggers wait at once; past that, a pausing element fails at once with a runtime error. `/sk info` shows how many are waiting.
 
+**Closing what scripts use.** An addon disables before NeoSkript, which then runs its `on unload` triggers, so what those may still use (a database's connections) is closed in `NeoSkript.get().whenStopped(...)`, which runs once NeoSkript has stopped running scripts, rather than in the addon's own `onDisable`.
+
 **Reloads and stopping.** A trigger whose script is reloaded or unloaded while it waits carries on with the code it started with, as after a `wait`. When the server stops, `on unload` triggers run first, and what they pause for (a last write to a database) gets up to 3 seconds to finish before the server exits. Then triggers still waiting are dropped without carrying on, as after a `wait`. Their stages aren't cancelled: the work may still be running, and finishing or stopping it is up to your addon's own `onDisable`. A stage that completes after a timeout or a stop is ignored, and NeoSkript keeps nothing of the trigger or its event once its pause is over, so holding on to a stage doesn't hold on to old scripts or players.
 
 ### Sections that pause
@@ -303,9 +305,13 @@ batch on "orders":
     ...
 ```
 
-Each pause is a pausing effect's, with its timeout and failures. The code runs once after `start`, unless its stage fails, times out or completes with `false`; `end` runs whenever the trigger reaches the end of the section, whether or not the code ran. Code that leaves the section another way (`stop`, `return`) skips `end`, so clean up what such a section left open yourself, after a while. The element is shared by every run of the trigger: keep what a run opened by its event, not in the element.
+Each pause is a pausing effect's, with its timeout and failures. The code runs once after `start`, unless its stage fails, times out or completes with `false`; `end` runs whenever the trigger reaches the end of the section, whether or not the code ran. Code that leaves the section another way (`stop`, `return`, an error) skips `end`. The element is shared by every run of the trigger: keep what a run opened by its event, not in the element.
+
+When the trigger leaves the code another way, `abandoned(context)` is called at once instead of `end`, on the trigger's thread: let go of what `start` opened there (without blocking). `exit section` counts as reaching the end.
 
 A pausing effect inside the section leaves it by completing its stage with `PausingSection.LEAVE`: the rest of the code is skipped and `end` runs, as a failed statement leaves skript-db's transaction.
+
+`PausingSection` and `TemplateAware` (below) are `@Experimental` until a second addon uses them.
 
 ### The expressions in a text
 

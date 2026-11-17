@@ -38,7 +38,7 @@ class PartsTest {
         config.put("pool-size", 0);
         config.put("connection-timeout", "fast");
         config.put("query-timeout", 0);
-        config.put("max-rows", List.of(1));
+        config.put("max-cells", List.of(1));
         config.put("thread-pool-size", "4");
         config.put("sql-driver-class-name", "org.mariadb.jdbc.Driver");
         List<String> warnings = new ArrayList<>();
@@ -47,12 +47,12 @@ class PartsTest {
         assertEquals(30_000, settings.connectionTimeoutMillis());
         assertEquals(0, settings.queryTimeoutSeconds());
         assertEquals(Settings.UNLIMITED_WAIT_MILLIS, settings.waitMillis());
-        assertEquals(100_000, settings.maxRows());
+        assertEquals(1_000_000, settings.maxCells());
         assertEquals(4, settings.workerThreads());
         assertEquals("org.mariadb.jdbc.Driver", settings.driverClassName());
         assertEquals(List.of("pool-size is 0, but it has to be from 1 to 1024: using 10",
                 "connection-timeout is \"fast\", which isn't a whole number: using 30000",
-                "max-rows is a list, which isn't a whole number: using 100000"), warnings);
+                "max-cells is a list, which isn't a whole number: using 1000000"), warnings);
     }
 
     @Test
@@ -64,6 +64,12 @@ class PartsTest {
         assertFalse(said.contains("hunter2"), said);
         assertFalse(said.contains("s3cret"), said);
         assertEquals("jdbc:sqlite:plugins/x.db", Secrets.mask("jdbc:sqlite:plugins/x.db"));
+        assertEquals(new Secrets.Split("jdbc:mysql://localhost:3306/db?user=admin&useSSL=false", "admin", "s3cret!"),
+                Secrets.split("jdbc:mysql://admin:s3cret%21@localhost:3306/db?password=s3cret%21&user=admin&useSSL=false"));
+        assertEquals(new Secrets.Split("jdbc:sqlite:x.db", null, null), Secrets.split("jdbc:sqlite:x.db"));
+        // Short passwords too.
+        String shortOne = "jdbc:mariadb://h/db?user=u&password=q7";
+        assertFalse(Secrets.hide("bad password q7 for u", shortOne).contains("q7"));
     }
 
     @Test

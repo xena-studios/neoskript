@@ -51,26 +51,32 @@ public final class NeoSkriptDb extends JavaPlugin {
         if (stopping == null) {
             return;
         }
-        Plugin neoskript = getServer().getPluginManager().getPlugin("NeoSkript");
-        if (!getServer().isStopping() || neoskript == null || !neoskript.isEnabled()) {
+        // NeoSkript disables after this (it's a dependency), and runs its 'on unload' triggers then, whose writes
+        // still need the databases: on a server stop, /reload, or a plugin manager disabling both. They close once
+        // NeoSkript has stopped running scripts.
+        try {
+            NeoSkript.get().whenStopped(() -> stopping.close(GRACE));
+        } catch (RuntimeException | LinkageError gone) {
             stopping.close(GRACE);
             return;
         }
-        // The server is stopping, and NeoSkript, which this depends on, disables after this: its 'on unload'
-        // triggers run then, and what they write still needs the databases. They close once NeoSkript is done.
+        // Disabled alone, with NeoSkript still running (a plugin manager): scripts using the syntax fail from now
+        // on, and the connections close once running statements have had their grace.
         Thread closer = new Thread(() -> {
-            long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
-            while (neoskript.isEnabled() && System.nanoTime() < deadline) {
-                try {
-                    Thread.sleep(25);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
+            try {
+                Thread.sleep(LONE_DISABLE.toMillis());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
-            stopping.close(GRACE);
+            Plugin neoskript = Bukkit.getPluginManager().getPlugin("NeoSkript");
+            if (neoskript != null && neoskript.isEnabled()) {
+                stopping.close(GRACE);
+            }
         }, "NeoSkriptDb-shutdown");
         closer.setDaemon(true);
         closer.start();
     }
+
+    /** How long NeoSkriptDb waits, disabled alone, before it closes its connections anyway. */
+    private static final Duration LONE_DISABLE = Duration.ofSeconds(30);
 }

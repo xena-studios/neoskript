@@ -26,4 +26,6 @@ dependencies {
     testImplementation(libs.sqlite.jdbc)
     // NeoSkript's own values (keyed lists, dates), which the addon reads by their accessors.
     testImplementation(project(":neoskript-runtime"))
+    // HikariCP's and the drivers' logging, through java.util.logging, for the test that no password reaches it.
+    testRuntimeOnly("org.slf4j:slf4j-jdk14:2.0.17")
 }
