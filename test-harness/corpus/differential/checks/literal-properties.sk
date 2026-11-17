@@ -1,0 +1,35 @@
+# Checks: words a type reads, used where any value goes (issue #50's follow-up).
+# Words with 'the' aren't a literal: Skript's parsers don't take it, so the expression's error stands.
+function embedded_articles():
+	set {_b::*} to the player
+	set {_b::*} to the item
+	set {_b::*} to the entity
+	set {_b::*} to the stone
+	set {_b::*} to a stone
+
+# A literal whose type hasn't the property gets Skript's error for the property's types.
+function embedded_takes(o: objects):
+	stop
+
+function embedded_properties():
+	send "%name of arrow%" to console
+	send "%name of boat%" to console
+	send "%name of sunny%" to console
+	send "%name of red%" to console
+	send "%name of day%" to console
+	send "%name of night%" to console
+	send "%name of survival%" to console
+	send "%name of zombie%" to console
+	send "%name of pig%" to console
+	send "%name of lava%" to console
+	send "%name of trident%" to console
+	send "%name of spawner%" to console
+	send "%name of potion%" to console
+	send "%name of stone%" to console
+	send "%size of arrow%" to console
+	send "%amount of sunny%" to console
+	embedded_takes(name of arrow)
+	embedded_takes(name of sunny)
+	embedded_takes(name of stone)
+	set {_n} to name of zombie
+	set {_n} to arrow's name
