@@ -306,4 +306,18 @@ class SkriptMigrationTest {
         assertTrue(notice != null && notice.contains("synced (mysql)"), notice);
         assertEquals(null, SkriptMigration.databasesNotice(skript, neoskript, false), "only once");
     }
+
+    @Test
+    void aRetryThatKeepsTheAliasFilesThereDoesntSayItCopiedThem() throws Exception {
+        Path skript = skript();
+        Files.createDirectories(skript.resolve("aliases"));
+        Files.writeString(skript.resolve("aliases/gems.sk"), "gems:\n\truby = minecraft:red_dye\n");
+        Path neoskript = plugins.resolve("NeoSkript");
+        assertEquals(List.of("scripts", "variables.csv", "aliases"), SkriptMigration.migrate(skript, neoskript).copied());
+        // config.yml couldn't take the settings: the next start tries again, and the files are there already.
+        SkriptMigration.Result retry = SkriptMigration.migrate(skript, neoskript);
+        assertEquals(List.of(), retry.copied());
+        SkriptMigration.finish(neoskript, skript, retry.copied());
+        assertTrue(Files.readString(neoskript.resolve(SkriptMigration.MARKER)).contains("Copied []"));
+    }
 }

@@ -760,4 +760,79 @@ class SqlVariableStorageTest {
         assertEquals(text("3 newer"), next.get("x"));
         assertArrayEquals("3 newer".getBytes(StandardCharsets.UTF_8), (byte[]) rows().get("x")[1]);
     }
+
+    private static Properties quickLocks() {
+        Properties quick = new Properties();
+        quick.setProperty("busy_timeout", "100");
+        return quick;
+    }
+
+    @Test
+    void aVariableDeletedAfterALateLoadWhoseFirstWriteFailedStaysDeleted() throws Exception {
+        SqlVariableStorage.pendingEveryMillis = 50;
+        SqlVariableStorage.startupTimeoutMillis = 500;
+        SqlVariableStorage.closeTimeoutMillis = 1_000;
+        SqlVariableStorage.extraProperties = quickLocks();
+        try (Connection locker = open()) {
+            lock(locker);
+            VariableStore first = new VariableStore();
+            try (SqlVariableStorage storage = storage(first)) {
+                storage.load();
+                first.set("kept", text("1"));
+                first.set("gone", text("1"));
+            }
+            assertTrue(Files.exists(unloadedFile()));
+            VariableStore second = new VariableStore();
+            try (SqlVariableStorage storage = storage(second)) {
+                storage.load();
+                // The database answers, and loads, but its first write doesn't go through.
+                storage.writesHeld = true;
+                unlock(locker);
+                waitFor(storage::loaded);
+                assertFalse(Files.exists(storage.unloadedFile()), "applied, so not kept to apply again");
+                second.set("gone", null);
+                lock(locker);
+            }
+            unlock(locker);
+        }
+        VariableStore third = new VariableStore();
+        try (SqlVariableStorage storage = storage(third)) {
+            storage.load();
+            waitFor(storage::written);
+        }
+        assertEquals(text("1"), third.get("kept"));
+        assertNull(third.get("gone"));
+        assertFalse(rows().containsKey("gone"));
+    }
+
+    @Test
+    void deletingEveryKeptVariableWhileStillUnreachedKeepsThemDeleted() throws Exception {
+        SqlVariableStorage.pendingEveryMillis = 50;
+        SqlVariableStorage.startupTimeoutMillis = 500;
+        SqlVariableStorage.closeTimeoutMillis = 1_000;
+        SqlVariableStorage.extraProperties = quickLocks();
+        try (Connection locker = open()) {
+            lock(locker);
+            VariableStore first = new VariableStore();
+            try (SqlVariableStorage storage = storage(first)) {
+                storage.load();
+                first.set("a", text("1"));
+            }
+            assertTrue(Files.exists(unloadedFile()));
+            VariableStore second = new VariableStore();
+            try (SqlVariableStorage storage = storage(second)) {
+                storage.load();
+                assertEquals(text("1"), second.get("a"));
+                second.set("a", null);
+            }
+            assertFalse(Files.exists(unloadedFile()), "nothing left to keep");
+            unlock(locker);
+        }
+        VariableStore third = new VariableStore();
+        try (SqlVariableStorage storage = storage(third)) {
+            storage.load();
+            waitFor(storage::written);
+        }
+        assertNull(third.get("a"));
+    }
 }

@@ -152,8 +152,8 @@ final class SkriptMigration {
                     String shown = neoskriptDir.relativize(to).toString().replace('\\', '/');
                     try {
                         if (Files.isDirectory(file)) {
+                            // A folder alone isn't something copied: only files count.
                             Files.createDirectories(to);
-                            any = true;
                         } else if (Files.exists(to)) {
                             notes.add("Kept plugins/NeoSkript/" + shown + ", which was there already, rather than Skript's");
                         } else {

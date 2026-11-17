@@ -398,14 +398,18 @@ public final class SqlVariableStorage implements VariableBackend {
         }
         if (result == null) {
             Exception cause = failure;
+            // What an earlier start kept goes into memory first, and the kept file isn't written again for an
+            // interval: until then memory may not hold it all yet (with several databases, it's merged in after
+            // this returns), and an emptier file written meanwhile would lose it.
+            loadUnloaded(loadInto);
+            synchronized (this) {
+                pendingWrittenAt = System.currentTimeMillis();
+            }
             // The thread may still be finishing the abandoned load: what happens next happens there, in order.
             thread.execute(() -> {
                 closeConnection();
                 down(cause, true);
             });
-            // Here, at once: the database's thread may still be stuck on a load that doesn't answer, and that load,
-            // abandoned or failed, never applies anything.
-            loadUnloaded(loadInto);
             if (cause instanceof MissingDriver) {
                 console.error("Can't use " + describe() + ": " + message(cause) + ". Its variables aren't loaded, "
                         + "and nothing is written to it.");
@@ -534,6 +538,15 @@ public final class SqlVariableStorage implements VariableBackend {
             recentRows.clear();
             if (!pending.isEmpty()) {
                 applyPending(into, pending);
+            }
+            // What was kept while it was never reached is in memory now: from here on memory holds the truth, and
+            // the pending file covers what isn't written yet. Kept, the file would bring back variables scripts
+            // delete before the next write goes through.
+            try {
+                Files.deleteIfExists(unloadedFile);
+            } catch (IOException e) {
+                console.warn("Couldn't remove " + unloadedFile + ", which is loaded now: " + e.getMessage()
+                        + ". Remove it by hand, or its variables come back at the next start.");
             }
             connecting = null;
         }
@@ -1078,9 +1091,8 @@ public final class SqlVariableStorage implements VariableBackend {
         Path target = unloaded ? unloadedFile : pendingFile;
         try {
             if (entries.isEmpty()) {
-                if (!unloaded) {
-                    Files.deleteIfExists(pendingFile);
-                }
+                // Nothing left to keep: an old file would bring back variables scripts deleted.
+                Files.deleteIfExists(target);
                 return true;
             }
             Files.createDirectories(target.toAbsolutePath().getParent());
@@ -1093,7 +1105,13 @@ public final class SqlVariableStorage implements VariableBackend {
         }
     }
 
-    /** A row's state for a pending file: its update_guid and a hash of its value, or {@code -} if there was none. */
+    /**
+     * A row's state for a pending file: its update_guid and a hash of its value, or {@code -} if there was none.
+     *
+     * <p>A known limit: another server that changes a row and then changes it back to exactly what this server last
+     * saw, from the same start (the same update_guid), leaves it looking unchanged, so a kept change is applied over
+     * it. Telling those apart would need a version column Skript's table doesn't have.
+     */
     private static String rowState(Saved row) {
         if (row == null) {
             return "-";
@@ -1386,7 +1404,9 @@ public final class SqlVariableStorage implements VariableBackend {
         state = State.CLOSED;
         if (!done) {
             // The thread is stuck on the database: abandon it, and keep what's waiting from this thread.
-            last.cancel(true);
+            // Not interrupted: a write it's in the middle of finishes or fails by itself, rather than failing
+            // half-way with nothing to say why.
+            last.cancel(false);
             abortConnection();
             if (loaded) {
                 writePending(false);

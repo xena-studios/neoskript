@@ -108,7 +108,7 @@ Skript's own test suite, run by NeoSkript, through the long tail ([step 6 of M4]
   - Saving writes a temporary file and swaps it in. Skript only writes at shutdown, so a crash loses everything since start; NeoSkript loses at most the last interval.
   - `-` variables stay in memory, as in Skript.
   - Addons register codecs through `Registrar.storage`.
-- **Databases:** came later, in M6 step 20 (D20).
+- **Databases:** came later, in M6 step 21 (D20).
 
 ## M4: Standard library
 
@@ -813,7 +813,7 @@ Planned for 1.x, done early: an optional store of NeoSkript's own, `variables.st
 - **Downgrading:** older versions and Skript only read `variables.csv`, so native storage warns on every start to switch to `csv` before downgrading. The warning and the check above were chosen over keeping a CSV copy, which would undo the point of saving only what changed.
 - **Benchmark** (`variable-benchmark`, paper-26.3, median of 3, 140,000 variables, with the final format): **Skript 400 ms, NeoSkript from `variables.csv` 489 ms, NeoSkript native 275 ms**. The CSV is 7.8 MB, the native file 2.5 MB. The machine was busy (load average about 12), and starts vary: across this and earlier runs, NeoSkript's CSV took 423 to 618 ms and Skript's 400 to 800, native 271 to 328, apart from one run during heavy load (308, 505, 524).
 - **Tested** by `NativeVariableStorageTest`: a round trip of every value type, a save cut off at every byte, a large save cut off or torn between its records, zero-filled tails of 8, 64 and 4096 bytes, damage anywhere in a compacted file or an earlier save, a flipped bit in the last save with and without its commit, values that look like records, a whole record it can't read and reserved header flags, a compaction cut off, a read-only file's backup, a CSV save that fails midway, repair from a snapshot, a snapshot of another file, the one-shot recovery, a garbled first page, a full disk after a crash, a failed backup, a file over 2 GiB, unsigned sequences, a newer commit, a failed load's channel, appending only changes, deleted lists, compaction over 500 saves, saving while 4 threads write, CSV to native to CSV byte for byte with Skript's file, an import and an export cut off, a newer CSV beside the native file, and bulk loading against setting one by one. `NativeVariableStorageFailureTest` makes a write, a sync and reopening the file fail mid-save. The `neoskript-native-variables` harness scenario saves in CSV, switches to native, changes values, restarts and reads them back, then switches back to CSV, on Paper and Folia 26.3 and 1.21.4.
-- **Not done:** there's no command to export while staying native; switching to `csv` does it. (Skript's `databases` section came in step 20.)
+- **Not done:** there's no command to export while staying native; switching to `csv` does it. (Skript's `databases` section came in step 21.)
 
 ### Step 12: Deleted variables, large files and `loop N times`
 
