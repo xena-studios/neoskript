@@ -1,0 +1,24 @@
+# Harness: console commands the MySQL scenarios drive servers sharing a database with.
+command /dbset <text> <text>:
+	trigger:
+		set {db_%arg-1%} to arg-2
+		send "[harness] dbset %arg-1%" to console
+
+command /dbdel <text>:
+	trigger:
+		delete {db_%arg-1%}
+		send "[harness] dbdel %arg-1%" to console
+
+command /dbget <text>:
+	trigger:
+		send "[harness] dbget %arg-1% = %{db_%arg-1%} ? "<none>"%" to console
+
+command /dbfill <text> <number>:
+	trigger:
+		loop arg-2 times:
+			set {db_%arg-1%::%loop-number%} to "value %loop-number%"
+		send "[harness] dbfill %arg-1% %arg-2%" to console
+
+command /dbcount <text>:
+	trigger:
+		send "[harness] dbcount %arg-1% = %size of {db_%arg-1%::*}%" to console
