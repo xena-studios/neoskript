@@ -185,4 +185,22 @@ class PlaceholdersTest {
         assertEquals("PlaceholderAPI prefixes cannot contain the character '_'", Syntax.invalid("my_server"));
         assertEquals("PlaceholderAPI prefixes cannot contain the character '%'", Syntax.invalid("50%"));
     }
+
+    @Test
+    void aRequestRunsAtMostItsBudgetOfTriggers() {
+        // Each asks for itself twice: 2^16 runs within the depth limit, without the budget.
+        int[] calls = {0};
+        placeholders.update(List.of(trigger("fan", false, (event, owner) -> {
+            calls[0]++;
+            String a = placeholders.request("fan", "x", null);
+            String b = placeholders.request("fan", "x", null);
+            event.result("<" + a + b + ">");
+        })));
+        assertTrue(placeholders.request("fan", "x", null) != null);
+        assertEquals(Placeholders.MAX_RUNS, calls[0]);
+        // The next request has its own budget.
+        calls[0] = 0;
+        placeholders.request("fan", "x", null);
+        assertEquals(Placeholders.MAX_RUNS, calls[0]);
+    }
 }

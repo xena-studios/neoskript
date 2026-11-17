@@ -23,7 +23,8 @@ import org.bukkit.entity.Player;
  * The placeholders scripts register, by prefix, and the expansions registered for them.
  *
  * <p>NeoSkript says which placeholder triggers are loaded each time scripts load, reload or unload ({@link #update}).
- * The lookup by prefix switches over at once, so a request never runs an unloaded trigger; the expansions follow on
+ * The lookup by prefix switches over at once, and NeoSkript runs nothing for a trigger whose script has unloaded,
+ * so a request never runs unloaded code; the expansions follow on
  * the global thread, where PlaceholderAPI wants them registered: one for each prefix in use, and none for a prefix
  * no script uses any more, so nothing is left behind.
  *
@@ -35,6 +36,11 @@ final class Placeholders {
 
     /** How deep placeholders may ask for placeholders, as one that asks for itself would forever. */
     static final int MAX_DEPTH = 16;
+    /**
+     * How many triggers one request may run, the placeholders it asks for included: depth alone doesn't bound the
+     * work, as a placeholder asking for itself twice runs 2^16 triggers in 16 levels.
+     */
+    static final int MAX_RUNS = 256;
 
     /** Where expansions are registered: PlaceholderAPI, or a stand-in in tests. */
     interface Expansions {
@@ -68,7 +74,8 @@ final class Placeholders {
     /** The expansions registered, by prefix in lower case. Only changed on the global thread, in {@link #apply}. */
     private final Map<String, Object> registered = new HashMap<>();
     private boolean closed;
-    private final ThreadLocal<int[]> depth = ThreadLocal.withInitial(() -> new int[1]);
+    /** For this thread's request: how deep placeholders are asking for placeholders, and the triggers run. */
+    private final ThreadLocal<int[]> depth = ThreadLocal.withInitial(() -> new int[2]);
     private final AtomicLong lastWarning = new AtomicLong(Long.MIN_VALUE);
 
     /**
@@ -199,12 +206,21 @@ final class Placeholders {
                     + " deep, so the last one got no value: does a placeholder ask for itself?");
             return null;
         }
+        if (level[0] == 0) {
+            level[1] = 0;
+        }
         level[0]++;
         try {
             for (Entry entry : entries) {
                 if (entry.relational() != relational) {
                     continue;
                 }
+                if (level[1] >= MAX_RUNS) {
+                    warn("A request for placeholders with the prefix \"" + prefix + "\" ran " + MAX_RUNS
+                            + " placeholder triggers, so the rest got no value: do placeholders ask for each other?");
+                    return null;
+                }
+                level[1]++;
                 PlaceholderRequestEvent request = event.apply(entry);
                 try {
                     entry.trigger().run(request, owner);
