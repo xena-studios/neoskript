@@ -1474,7 +1474,16 @@ final class TriggerCompiler {
         // Its start throwing is a failed stage, as a stage completing exceptionally is.
         constant(co.xenastudios.neoskript.runtime.Pauses.guard(regional(element, type, syntax, site), type), type);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
-        if (withArguments) {
+        if (withArguments && element instanceof KeyAware aware) {
+            // List variables with their indices, or every value under them.
+            boolean outerRecursive = recursiveKeys;
+            recursiveKeys = aware.recursiveKeys();
+            try {
+                arguments(syntax, true, aware.implicitKeys() || aware.recursiveKeys());
+            } finally {
+                recursiveKeys = outerRecursive;
+            }
+        } else if (withArguments) {
             arguments(syntax);
         } else {
             pushInt(0);
@@ -4443,6 +4452,9 @@ final class TriggerCompiler {
         argumentsIn(syntax, keyed, implicit);
     }
 
+    /** Whether list variables in the arguments being compiled are passed with every value under them. */
+    private boolean recursiveKeys;
+
     /** Whether arguments are being tried in the order Skript parses them, last first, without writing anything. */
     private boolean skriptOrder;
 
@@ -6625,7 +6637,7 @@ final class TriggerCompiler {
             case Expr.Variable variable when variable.list() -> {
                 variableStore(variable);
                 variableName(variable);
-                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "keyedList",
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, recursiveKeys ? "recursiveKeyedList" : "keyedList",
                         "(" + STRING_DESC + ")" + Type.getDescriptor(KeyedValues.class), false);
             }
             case Expr.FunctionCall call -> call(call, true);

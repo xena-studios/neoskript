@@ -10,7 +10,7 @@ import co.xenastudios.neoskript.api.annotation.Experimental;
  * An expression that keeps its values' indices, as {@code first 2 elements of keyed {_list::*}} does. An
  * argument written keyed (or a list variable, where indices are wanted anyway, as in a loop) is passed as
  * {@code co.xenastudios.neoskript.runtime.KeyedValues}, and the expression may return one; where only values
- * are wanted, the indices are dropped. Experimental until keyed values have a type in the API.
+ * are wanted, the indices are dropped. A pausing effect may be key-aware too, for its arguments. Experimental until keyed values have a type in the API.
  */
 @Experimental
 public interface KeyAware {
@@ -32,6 +32,17 @@ public interface KeyAware {
      * @return whether they are
      */
     default boolean keysRecommended() {
+        return false;
+    }
+
+    /**
+     * Whether a list variable is passed with every value under it, each at its path ({@code {_rows::1::2}} at
+     * {@code 1::2}), as {@code recursive {_rows::*}} gives them, rather than only the values directly in it. For
+     * skript-db's batch arguments, a list of lists. Implies {@link #implicitKeys}.
+     *
+     * @return whether they are
+     */
+    default boolean recursiveKeys() {
         return false;
     }
 }
