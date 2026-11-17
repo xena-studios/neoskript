@@ -36,6 +36,8 @@ type ParseResult = {
   diagnostics: { severity: "error" | "warning"; line: number; column: number; length: number; message: string }[];
   outline: { kind: string; line: number; text: string; name?: string; signature?: string }[];
   elements: { line: number; start: number; end: number; kind: string; id?: string; name?: string; signature?: string }[];
+  /** The NeoSkript language extensions the script asks for (`using neoskript <name>`); absent from older parsers. */
+  extensions?: string[];
 };
 type Docs = typeof docs;
 type ElementDoc = Docs["elements"][keyof Docs["elements"]];
@@ -139,6 +141,18 @@ function validate(document: TextDocument) {
       source: "NeoSkript",
     };
   });
+  // A script that asks for NeoSkript's language extensions won't run on Skript: said on its 'using' lines.
+  for (const extension of result.extensions ?? []) {
+    const index = lines.findIndex((line) => line.trim().toLowerCase().replace(/\s+/g, " ") === `using neoskript ${extension}`);
+    if (index < 0) continue;
+    const line = lines[index];
+    diagnostics.push({
+      severity: DiagnosticSeverity.Information,
+      range: { start: { line: index, character: line.length - line.trimStart().length }, end: { line: index, character: line.length } },
+      message: `This uses NeoSkript's language extension '${extension}', so the script won't run on Skript.`,
+      source: "NeoSkript",
+    });
+  }
   connection.sendDiagnostics({ uri: document.uri, diagnostics });
 }
 

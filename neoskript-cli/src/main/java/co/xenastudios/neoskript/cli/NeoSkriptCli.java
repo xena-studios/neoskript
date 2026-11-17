@@ -457,6 +457,13 @@ public final class NeoSkriptCli {
                 lines.add(String.format(Locale.ROOT, "  %-11s line %d: %s", kind, finding.get("line").getAsInt(),
                         finding.get("message").getAsString()));
             }
+            JsonArray extensions = script.has("extensions") ? script.getAsJsonArray("extensions") : new JsonArray();
+            if (!extensions.isEmpty() && !hintsOnly) {
+                List<String> names = new ArrayList<>();
+                extensions.forEach(name -> names.add(name.getAsString()));
+                lines.addFirst(String.format(Locale.ROOT, "  %-11s uses NeoSkript's language %s %s, so it won't run on"
+                        + " Skript", "extensions", names.size() == 1 ? "extension" : "extensions", String.join(", ", names)));
+            }
             if (!lines.isEmpty()) {
                 out.println();
                 out.println(script.get("name").getAsString());

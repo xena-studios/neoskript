@@ -46,7 +46,15 @@ public final class ScriptCheck {
 
     public record Finding(Kind kind, int line, String message) {}
 
-    public record ScriptReport(String name, List<Finding> findings) {
+    /**
+     * @param extensions the NeoSkript language extensions the script asks for ({@code using neoskript <name>}): if
+     *     any, it won't run on Skript
+     */
+    public record ScriptReport(String name, List<Finding> findings, java.util.SortedSet<String> extensions) {
+
+        public ScriptReport(String name, List<Finding> findings) {
+            this(name, findings, new java.util.TreeSet<>());
+        }
 
         /** Whether NeoSkript loads it: it has no errors. */
         public boolean loads() {
@@ -102,7 +110,7 @@ public final class ScriptCheck {
                 hints(structure, findings);
             }
             findings.sort(Comparator.comparingInt(Finding::line).thenComparing(Finding::kind));
-            reports.add(new ScriptReport(name, List.copyOf(findings)));
+            reports.add(new ScriptReport(name, List.copyOf(findings), script.extensions()));
         }
         return reports;
     }

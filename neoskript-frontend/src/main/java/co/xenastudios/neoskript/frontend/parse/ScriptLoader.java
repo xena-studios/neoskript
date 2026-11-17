@@ -157,6 +157,13 @@ public final class ScriptLoader {
             String name = structure.kind() == Structure.Kind.USING ? Structure.usingName(structure.node().line()) : null;
             if (name != null) {
                 experiments.add(registry.experimentName(name));
+                // An opt-in language extension that doesn't exist: an error, as its syntax won't be there.
+                String extension = LanguageExtensions.extensionName(name);
+                if (extension != null && !registry.languageExtensions().contains(extension)) {
+                    Line line = structure.node().line();
+                    diagnostics.error(line.number(), line.column(), line.text().length(),
+                            LanguageExtensions.unknown(extension));
+                }
             }
         }
         context.experiments(experiments);

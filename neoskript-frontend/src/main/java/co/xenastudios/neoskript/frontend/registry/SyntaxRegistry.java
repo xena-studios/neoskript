@@ -252,6 +252,12 @@ public final class SyntaxRegistry {
      */
     public record Experimental(String experiment, boolean silent) {
 
+        public Experimental {
+            // A language extension's syntax is never named to a script that didn't ask for it: such a script gets
+            // Skript's own errors, as on Skript.
+            silent = silent || co.xenastudios.neoskript.frontend.parse.LanguageExtensions.extensionName(experiment) != null;
+        }
+
         /** Skript's error for using the element without its experiment. */
         public String error() {
             return "This element is experimental. To use this, enable '" + experiment + "'.";
@@ -261,6 +267,21 @@ public final class SyntaxRegistry {
     /** The experiment the syntax element needs, or {@code null} if it needs none. */
     public Experimental experimental(SyntaxInfo syntax) {
         return experimental.isEmpty() ? null : experimental.get(syntax.id());
+    }
+
+    /**
+     * The NeoSkript language extensions there are, by name: those some syntax element needs as its experiment
+     * ({@code neoskript <name>}). See {@link co.xenastudios.neoskript.frontend.parse.LanguageExtensions}.
+     */
+    public java.util.Set<String> languageExtensions() {
+        java.util.Set<String> names = new java.util.TreeSet<>();
+        for (Experimental element : experimental.values()) {
+            String name = co.xenastudios.neoskript.frontend.parse.LanguageExtensions.extensionName(element.experiment());
+            if (name != null) {
+                names.add(name);
+            }
+        }
+        return names;
     }
 
     /** The code name of the experiment {@code using <name>} turns on, or the name itself if it names none. */
