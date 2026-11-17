@@ -23,4 +23,10 @@ public final class ReflectAddon extends JavaPlugin {
         Imports imports = new Imports(getClassLoader());
         NeoSkript.get().addon(getName(), getPluginMeta().getVersion(), registrar -> Syntax.register(registrar, imports));
     }
+
+    @Override
+    public void onDisable() {
+        // The members looked up are kept with each class, the JDK's too: let go of them, and of this addon's classes.
+        CallSite.forgetAll();
+    }
 }

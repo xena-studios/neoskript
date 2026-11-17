@@ -42,23 +42,22 @@ final class JavaCall implements Expression, Changeable {
     private final Descriptor descriptor;
     private final int argumentsIndex;
     private final boolean singleArgument;
-    private final String script;
-    private final Imports imports;
+    /** The script's imports, as they were when the call was set up: a later reload doesn't change them. */
+    private final java.util.Map<String, JavaType> imports;
 
     private JavaCall(CallSite site, boolean quiet, Descriptor descriptor, int argumentsIndex, boolean singleArgument,
-            String script, Imports imports) {
+            java.util.Map<String, JavaType> imports) {
         this.site = site;
         this.quiet = quiet;
         this.descriptor = descriptor;
         this.argumentsIndex = argumentsIndex;
         this.singleArgument = singleArgument;
-        this.script = script;
         this.imports = imports;
     }
 
     /** Sets up the call where a script uses it, with skript-reflect's errors for what can't work. */
-    static JavaCall create(ElementInfo info, Imports imports) {
-        String script = NeoSkript.get().scriptBeingLoaded();
+    static JavaCall create(ElementInfo info, Imports all) {
+        java.util.Map<String, JavaType> imports = all.of(NeoSkript.get().scriptBeingLoaded());
         boolean quiet = info.hasTag("try");
         int pattern = info.pattern();
         CallSite.Kind kind = switch (pattern) {
@@ -81,7 +80,7 @@ final class JavaCall implements Expression, Changeable {
                 throw new SyntaxError("This Java call can't be read: " + info.text());
             }
             try {
-                descriptor = Descriptor.parse(text, script, imports);
+                descriptor = Descriptor.parse(text, imports);
             } catch (Descriptor.NotFound missing) {
                 throw new SyntaxError("The class " + missing.name + " could not be found.");
             }
@@ -89,7 +88,7 @@ final class JavaCall implements Expression, Changeable {
                 throw new SyntaxError(text + " is not a valid descriptor.");
             }
             String target = info.argumentLiterals().isEmpty() ? null : info.argumentLiterals().getFirst();
-            JavaType imported = target == null ? null : imports.lookup(script, target.strip());
+            JavaType imported = target == null ? null : imports.get(target.strip());
             if (descriptor.javaClass() == null && imported != null) {
                 descriptor = descriptor.orClass(imported.javaClass());
             }
@@ -99,14 +98,21 @@ final class JavaCall implements Expression, Changeable {
             if (descriptor.javaClass() != null) {
                 CallSite probe = new CallSite(kind);
                 boolean isStatic = imported != null;
-                if (probe.candidates(descriptor, isStatic, false).isEmpty()
-                        && probe.candidates(descriptor, !isStatic, false).isEmpty()
-                        && !nestedClass(descriptor.javaClass(), descriptor.name())) {
+                boolean missing;
+                try {
+                    missing = probe.candidates(descriptor, isStatic, false).isEmpty()
+                            && probe.candidates(descriptor, !isStatic, false).isEmpty()
+                            && !nestedClass(descriptor.javaClass(), descriptor.name());
+                } catch (LinkageError broken) {
+                    // Its members can't be looked at now: the call says why when it runs.
+                    missing = false;
+                }
+                if (missing) {
                     throw new SyntaxError(text + " refers to a non-existent " + kind);
                 }
             }
         }
-        return new JavaCall(new CallSite(kind), quiet, descriptor, arguments, single, script, imports);
+        return new JavaCall(new CallSite(kind), quiet, descriptor, arguments, single, imports);
     }
 
     /** The descriptor written in a call's text: what follows its last {@code .} outside brackets, quotes and calls. */
@@ -178,11 +184,11 @@ final class JavaCall implements Expression, Changeable {
         if (target == null) {
             return null;
         }
-        Descriptor base = descriptor != null ? descriptor : dynamic(arguments[1]);
+        Descriptor base = descriptor != null ? descriptor : dynamic(context, arguments[1]);
         if (base == null) {
             return null;
         }
-        return invoke(target, base, values(arguments), false);
+        return invoke(context, target, base, values(arguments), false);
     }
 
     /** The call's arguments, one each, as skript-reflect passes them: an argument with no value is {@code null}. */
@@ -198,70 +204,85 @@ final class JavaCall implements Expression, Changeable {
             if (several.length == 0 && singleArgument) {
                 return new Object[] {Null.NULL};
             }
-            return several.clone();
+            // The array is the call's own: nothing here changes it.
+            return several;
         }
         return new Object[] {raw};
     }
 
-    private Descriptor dynamic(Object text) {
+    private Descriptor dynamic(TriggerContext context, Object text) {
         if (!(text instanceof String written)) {
-            warn(new JavaCallException("Dynamic descriptor returned null"),
+            warn(context, new JavaCallException("Dynamic descriptor returned null"),
                     "Dynamic descriptor " + text + " returned null");
             return null;
         }
         try {
-            Descriptor parsed = Descriptor.parse(written, script, imports);
+            Descriptor parsed = Descriptor.parse(written, imports);
             if (parsed == null) {
-                warn(new JavaCallException("Invalid dynamic descriptor (" + written + ")"),
+                warn(context, new JavaCallException("Invalid dynamic descriptor (" + written + ")"),
                         "Invalid dynamic descriptor (" + written + ")");
             }
             return parsed;
         } catch (Descriptor.NotFound missing) {
-            warn(new JavaCallException("The class " + missing.name + " could not be found."),
+            warn(context, new JavaCallException("The class " + missing.name + " could not be found."),
                     "The class " + missing.name + " could not be found.");
             return null;
         }
     }
 
     /** Calls it, with skript-reflect's messages for what goes wrong. */
-    private Object invoke(Object rawTarget, Descriptor base, Object[] arguments, boolean setter) {
+    private Object invoke(TriggerContext context, Object rawTarget, Descriptor base, Object[] arguments,
+            boolean setter) {
         Object target = rawTarget instanceof ObjectWrapper wrapper ? wrapper.array() : rawTarget;
         boolean isStatic = target instanceof JavaType;
         Class<?> targetClass = isStatic ? ((JavaType) target).javaClass() : target.getClass();
         Descriptor described = base.orClass(targetClass);
         CallSite.Kind kind = site.kind();
         if (!described.javaClass().isAssignableFrom(targetClass)) {
-            warn(null, "Incompatible " + kind + " call: " + described.text(false) + " on "
+            warn(context, null, "Incompatible " + kind + " call: " + described.text(false) + " on "
                     + Coercion.debugName(targetClass));
             return null;
         }
-        if (isStatic && kind == CallSite.Kind.FIELD && !setter) {
-            for (Class<?> nested : targetClass.getClasses()) {
-                if (described.name().equals(nested.getSimpleName())) {
-                    return new JavaType(nested);
+        boolean staticCall = isStatic || kind == CallSite.Kind.CONSTRUCTOR;
+        CallSite.Target chosen;
+        try {
+            if (isStatic && kind == CallSite.Kind.FIELD && !setter) {
+                for (Class<?> nested : targetClass.getClasses()) {
+                    if (described.name().equals(nested.getSimpleName())) {
+                        return new JavaType(nested);
+                    }
                 }
             }
+            chosen = site.find(described, targetClass, staticCall, arguments, setter);
+        } catch (LinkageError | RuntimeException broken) {
+            // A member whose signature names a class that isn't there (a plugin built against another's API): the
+            // class can't be looked at, so the call can't be made, as a call that threw.
+            warn(context, broken, kind + " " + described.text(false) + argumentsMessage(kind, arguments)
+                    + " couldn't be looked up: " + broken.getClass().getSimpleName() + ": " + broken.getMessage());
+            return null;
         }
-        boolean staticCall = isStatic || kind == CallSite.Kind.CONSTRUCTOR;
-        CallSite.Target chosen = site.find(described, targetClass, staticCall, arguments, setter);
         if (chosen == null) {
             List<String> lines = new ArrayList<>();
             lines.add("No matching " + (isStatic ? "static" : "non-static") + " " + kind + ": "
                     + described.text(isStatic) + argumentsMessage(kind, arguments));
-            suggestParameters(lines, described, isStatic);
-            suggestTypo(lines, described, isStatic);
-            warn(null, String.join("\n", lines));
+            try {
+                suggestParameters(lines, described, isStatic);
+                suggestTypo(lines, described, isStatic);
+            } catch (LinkageError | RuntimeException broken) {
+                // Its members can't all be looked at: no suggestions.
+            }
+            warn(context, null, String.join("\n", lines));
             return null;
         }
         Object returned;
         try {
             returned = CallSite.call(chosen, target, staticCall, arguments);
         } catch (Throwable thrown) {
-            warn(thrown, kind + " " + described.text(false) + argumentsMessage(kind, arguments) + " threw a "
+            warn(context, thrown, kind + " " + described.text(false) + argumentsMessage(kind, arguments) + " threw a "
                     + thrown.getClass().getSimpleName() + ": " + thrown.getMessage());
             return null;
         }
-        LastError.clear();
+        LastError.clear(context);
         return returned == null ? null : Coercion.fromJava(returned);
     }
 
@@ -376,10 +397,11 @@ final class JavaCall implements Expression, Changeable {
     }
 
     /** As skript-reflect: the error's kept for {@code the last java error}, and said unless the call is a {@code try}. */
-    private void warn(Throwable cause, String message) {
-        LastError.set(cause != null ? cause : new JavaCallException(message));
+    private void warn(TriggerContext context, Throwable cause, String message) {
+        LastError.set(context, cause != null ? cause : new JavaCallException(message));
         if (!quiet) {
-            NeoSkript.get().runtimeWarning(message);
+            // Each line indented as the first is, as Skript prints skript-reflect's.
+            NeoSkript.get().runtimeWarning(message.replace("\n", "\n    "));
         }
     }
 
@@ -397,12 +419,12 @@ final class JavaCall implements Expression, Changeable {
         if (target == null) {
             return;
         }
-        Descriptor base = descriptor != null ? descriptor : dynamic(arguments[1]);
+        Descriptor base = descriptor != null ? descriptor : dynamic(context, arguments[1]);
         if (base == null) {
             return;
         }
         Object value = mode == Mode.SET && delta != null && delta.length > 0 ? delta[0] : Null.NULL;
-        invoke(target, base, new Object[] {value}, true);
+        invoke(context, target, base, new Object[] {value}, true);
     }
 
     /** The value as a condition: true unless it's {@code false}, {@code null} or zero, as in skript-reflect. */

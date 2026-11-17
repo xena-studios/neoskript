@@ -41,6 +41,7 @@ public final class NeoSkriptReflectScenario implements Scenario {
             "class of: java.util.ArrayList", "class named: java.lang.Thread", "dot class: class java.util.ArrayList",
             "world: world", "location x: 1", "field: 5", "nested: <none>",
             "fields: 6", "field names: x, y and serialVersionUID", "typed collect: [a, b]",
+            "contains size: true", "letter 5: false", "letter ab: <none>",
             "error: java.lang.IndexOutOfBoundsException: Index 9 out of bounds for length 2", "system: yes", "loaded",
             "event: reflect-event", "missing done");
 
@@ -71,6 +72,7 @@ public final class NeoSkriptReflectScenario implements Scenario {
         Path runs = context.config().runsDir().resolve(context.environment().name()).resolve(name());
         List<String> expected = EXPECTED;
         String skriptBench = null;
+        String skriptPolyBench = null;
         if (context.environment().skriptReference()) {
             ServerBuilder skript = context.server(runs.resolve("skript"))
                     .plugin(context.skriptJar())
@@ -79,6 +81,7 @@ public final class NeoSkriptReflectScenario implements Scenario {
             Result result = run(skript, false);
             expected = result.lines;
             skriptBench = result.bench;
+            skriptPolyBench = result.polyBench;
             if (!result.missingWarned) {
                 throw new HarnessFailure("skript-reflect didn't warn about the missing method. See " + skript.runDir());
             }
@@ -93,8 +96,10 @@ public final class NeoSkriptReflectScenario implements Scenario {
         Result result = run(neoskript, true);
         context.summary("lines", result.lines.size());
         context.summary("neoskript ns per call", result.bench);
+        context.summary("neoskript ns per call, 6 classes", result.polyBench);
         if (skriptBench != null) {
             context.summary("skript-reflect ns per call", skriptBench);
+            context.summary("skript-reflect ns per call, 6 classes", skriptPolyBench);
         }
         List<String> differences = new ArrayList<>();
         for (int i = 0; i < Math.max(expected.size(), result.lines.size()); i++) {
@@ -114,7 +119,8 @@ public final class NeoSkriptReflectScenario implements Scenario {
         }
     }
 
-    private record Result(List<String> lines, String bench, boolean missingWarned, List<String> problems) {}
+    private record Result(List<String> lines, String bench, String polyBench, boolean missingWarned,
+            List<String> problems) {}
 
     private static Result run(ServerBuilder builder, boolean original) throws Exception {
         try (ServerProcess server = builder.start()) {
@@ -148,6 +154,9 @@ public final class NeoSkriptReflectScenario implements Scenario {
             Matcher bench = server.await(Pattern.compile(Pattern.quote("[reflect] bench ns per call: ") + "(\\S+)"),
                     mark, Duration.ofMinutes(5));
             String ns = bench.group(1);
+            Matcher poly = server.await(Pattern.compile(Pattern.quote("[reflect] poly bench ns per call: ") + "(\\S+)"),
+                    mark, Duration.ofMinutes(5));
+            String polyNs = poly.group(1);
             List<String> problems = new ArrayList<>();
             Pattern problem = Pattern.compile("Exception|thread violation|another region", Pattern.CASE_INSENSITIVE);
             for (String line : server.lines(from)) {
@@ -160,13 +169,14 @@ public final class NeoSkriptReflectScenario implements Scenario {
             }
             server.stop();
             List<String> lines = new ArrayList<>();
-            for (String line : server.linesMatching(Pattern.compile(Pattern.quote("[reflect] ")))) {
-                String text = line.substring(line.indexOf("[reflect] ") + "[reflect] ".length()).strip();
-                if (!text.startsWith("bench")) {
+            // Only what the script printed: a warning quoting a line of it ("Line 78: send "[reflect] ...") isn't.
+            for (String line : server.linesMatching(Pattern.compile("]: \\[reflect] "))) {
+                String text = line.substring(line.indexOf("]: [reflect] ") + "]: [reflect] ".length()).strip();
+                if (!text.contains("bench ns per call")) {
                     lines.add(text);
                 }
             }
-            return new Result(lines, ns, warned, problems);
+            return new Result(lines, ns, polyNs, warned, problems);
         }
     }
 

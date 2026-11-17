@@ -61,8 +61,8 @@ class JavaCallTest {
         assertTrue(said.get(2).contains("IndexOutOfBoundsException"), said.toString());
         assertEquals(2, harness.warnings.size(), harness.warnings.toString());
         assertTrue(harness.warnings.get(0).startsWith("No matching non-static method: ArrayList#sise called without "
-                + "arguments\nDid you misspell the method? You may have meant to type one of the following:\n"
-                + "* %ArrayList%.size"), harness.warnings.get(0));
+                + "arguments\n    Did you misspell the method? You may have meant to type one of the following:\n"
+                + "    * %ArrayList%.size"), harness.warnings.get(0));
         assertTrue(harness.warnings.get(1).startsWith("method ArrayList#get called with (5 (Long)) threw a "
                 + "IndexOutOfBoundsException: "), harness.warnings.get(1));
     }
@@ -218,5 +218,145 @@ class JavaCallTest {
                 \tjava.lang.Math
                 """);
         assertEquals(List.of("4"), said);
+    }
+
+    @Test
+    void aMemberChosenForOneValueIsCheckedAgainstTheNext() {
+        // A text is a char only if it's one letter: "ab" has the same class as "5", but no isLetter takes it.
+        List<String> said = harness.run("""
+                import:
+                \tjava.lang.Character
+
+                on load:
+                \tloop "5", "ab", "x":
+                \t\tsay Character.isLetter(loop-value)
+                """.replace("\\t", "\t"));
+        assertEquals(List.of("false", "<none>", "true"), said);
+        assertTrue(harness.warnings.stream().anyMatch(w -> w.contains("No matching static method: Character.isLetter")),
+                harness.warnings.toString());
+    }
+
+    @Test
+    void wholeNumbersFromJavaKeepTheirType() {
+        // skript-reflect gives Java's Integer back as it is, so a set of integers contains a list's size.
+        List<String> said = harness.run("""
+                import:
+                \tjava.util.ArrayList
+                \tjava.util.stream.IntStream
+                \tjava.util.stream.Collectors
+
+                on load:
+                \tset {_l} to new ArrayList()
+                \t{_l}.add("a")
+                \t{_l}.add("b")
+                \tset {_s} to IntStream.range(0, 3).boxed().collect(Collectors.toSet())
+                \tsay {_s}.contains({_l}.size())
+                \tsay {_l}.size()'s class
+                \tsay {_l}.size() + 1
+                \tif {_l}.size() is 2:
+                \t\tsay "compares"
+                \tsay "%{_l}.size()% items"
+                """);
+        assertEquals(List.of("true", "java.lang.Integer", "3", "compares", "2 items"), said);
+    }
+
+    @Test
+    void aCallOnManyClassesLooksEachUpOnce() {
+        List<String> said = harness.run("""
+                import:
+                \tjava.util.ArrayList
+                \tjava.util.LinkedList
+                \tjava.util.HashSet
+                \tjava.util.TreeSet
+                \tjava.util.ArrayDeque
+                \tjava.util.LinkedHashSet
+
+                on load:
+                \tset {_all::*} to new ArrayList(), new LinkedList(), new HashSet(), new TreeSet(), new ArrayDeque() and new LinkedHashSet()
+                \tset {_total} to 0
+                \tloop 50 times:
+                \t\tloop {_all::*}:
+                \t\t\tadd loop-value-2.size() to {_total}
+                \tsay {_total}
+                """);
+        assertEquals(List.of("0"), said);
+        long before = CallSite.LOOK_UPS.get();
+        harness.run();
+        // Six classes, more than a call site keeps itself: each class's size() is still only looked up once.
+        assertEquals(before, CallSite.LOOK_UPS.get(), "nothing looked up again");
+    }
+
+    @Test
+    void aClassWhoseMembersCantBeLookedAtIsAWarningNotAStop() {
+        List<String> said = harness.run("""
+                on load:
+                \tset {_c} to the broken class
+                \tsay {_c}.ok()
+                \tsay fields of {_c}
+                \tsay "after"
+                """);
+        assertEquals(List.of("<none>", "<none>", "after"), said);
+        assertTrue(harness.warnings.stream().anyMatch(w -> w.contains("couldn't be looked up: NoClassDefFoundError")),
+                harness.warnings.toString());
+    }
+
+    @Test
+    void severalLinesOfAWarningAreAllIndented() {
+        harness.run("""
+                import:
+                \tjava.util.ArrayList
+
+                on load:
+                \tset {_l} to new ArrayList()
+                \ttry {_l}.sise()
+                \t{_l}.sise()
+                """);
+        String warning = harness.warnings.stream().filter(w -> w.contains("sise")).findFirst().orElseThrow();
+        assertTrue(warning.contains("\n    Did you misspell the method?"), warning);
+        assertTrue(warning.contains("\n    * %ArrayList%.size"), warning);
+        assertEquals(1, harness.warnings.stream().filter(w -> w.contains("sise")).count(), "a try says nothing");
+    }
+
+    @Test
+    void theLastErrorIsEachRunsOwnAndGoesWithIt() throws Exception {
+        harness.load("test.sk", """
+                import:
+                \tjava.util.ArrayList
+
+                on load:
+                \tsay last java error
+                \tset {_l} to new ArrayList()
+                \ttry {_l}.get(3)
+                \tsay last java error
+                """);
+        harness.run();
+        harness.run();
+        // The second run doesn't see the first's error, and neither keeps it once it's over.
+        assertEquals("<none>", harness.said.get(0));
+        assertTrue(harness.said.get(1).startsWith("java.lang.IndexOutOfBoundsException"), harness.said.toString());
+        assertEquals("<none>", harness.said.get(2));
+        long until = System.currentTimeMillis() + 10_000;
+        while (LastError.size() > 0 && System.currentTimeMillis() < until) {
+            System.gc();
+            Thread.sleep(20);
+        }
+        assertEquals(0, LastError.size());
+    }
+
+    @Test
+    void aTriggerFromBeforeAReloadKeepsItsImports() {
+        harness.load("a.sk", """
+                import:
+                \tjava.lang.Math
+
+                on load:
+                \tsay Math..("[Math]abs")(-3)
+                """);
+        List<co.xenastudios.neoskript.compiler.CompiledScripts.CompiledTrigger> before = harness.triggers();
+        // Scripts load again, and a.sk's imports are read again from the start; the old trigger still runs meanwhile.
+        harness.load("b.sk", "on load:\n\tsay 1\n");
+        harness.run(before);
+        assertEquals("3", harness.said.get(0));
+        assertTrue(harness.warnings.stream().noneMatch(w -> w.contains("could not be found")), harness.warnings.toString());
     }
 }

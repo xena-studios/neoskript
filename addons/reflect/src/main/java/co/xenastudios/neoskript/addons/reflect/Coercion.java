@@ -148,16 +148,12 @@ final class Coercion {
     }
 
     /**
-     * A Java result as scripts have it: a whole number as a {@code Long} and a decimal as a {@code Double}, as all of
-     * NeoSkript's numbers are, and an array as one value ({@link ObjectWrapper}).
+     * A Java result as scripts have it: an array as one value ({@link ObjectWrapper}), and everything else as it is.
+     * Numbers keep their boxed type, as in skript-reflect, so an {@code Integer} passed back to Java is still one
+     * ({@code {_set}.contains({_list}.size())} on a set of integers): NeoSkript's arithmetic, comparisons and texts
+     * take any of Java's numbers, and widen them where they need to.
      */
     static Object fromJava(Object value) {
-        if (value instanceof Integer || value instanceof Short || value instanceof Byte) {
-            return ((Number) value).longValue();
-        }
-        if (value instanceof Float f) {
-            return f.doubleValue();
-        }
         if (value != null && value.getClass().isArray()) {
             return ObjectWrapper.of(value);
         }

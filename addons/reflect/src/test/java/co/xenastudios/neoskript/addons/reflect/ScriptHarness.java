@@ -61,6 +61,9 @@ final class ScriptHarness {
         StandardLibrary.register(library);
         library.effect("TestSay", info -> (context, args) -> said.add(co.xenastudios.neoskript.runtime.Values.text(args[0])),
                 "say %objects%");
+        // A class whose methods can't be looked at: Broken, loaded where Missing, which one of them names, isn't.
+        library.expression("TestBrokenClass", "javatype", info -> (context, args) -> new JavaType(brokenClass()),
+                "the broken class");
         // Like 'send %objects% [to %audiences%]', which needs a server.
         library.effect("TestSayTo", info -> (context, args) -> said.add(
                 co.xenastudios.neoskript.runtime.Values.text(args[0]) + " to " + co.xenastudios.neoskript.runtime.Values.text(args[1])),
@@ -90,6 +93,57 @@ final class ScriptHarness {
     }
 
     private CompiledScripts compiled;
+
+    /** The triggers loaded now, to run after a later load has replaced them. */
+    List<CompiledScripts.CompiledTrigger> triggers() {
+        return List.copyOf(compiled.triggers());
+    }
+
+    /** Runs {@code triggers}, as {@link #run()} does. */
+    void run(List<CompiledScripts.CompiledTrigger> triggers) {
+        for (CompiledScripts.CompiledTrigger trigger : triggers) {
+            trigger.trigger().execute(new SimpleTriggerContext(null, null));
+        }
+    }
+
+    private static Class<?> broken;
+
+    static synchronized Class<?> brokenClass() {
+        if (broken != null) {
+            return broken;
+        }
+        String name = "co.xenastudios.neoskript.addons.reflect.fixture.Broken";
+        ClassLoader parent = ScriptHarness.class.getClassLoader();
+        ClassLoader hiding = new ClassLoader(null) {
+            @Override
+            protected Class<?> loadClass(String className, boolean resolve) throws ClassNotFoundException {
+                synchronized (getClassLoadingLock(className)) {
+                    Class<?> loaded = findLoadedClass(className);
+                    if (loaded != null) {
+                        return loaded;
+                    }
+                    if (className.endsWith("fixture.Missing")) {
+                        throw new ClassNotFoundException(className);
+                    }
+                    if (!className.equals(name)) {
+                        return parent.loadClass(className);
+                    }
+                    try (java.io.InputStream in = parent.getResourceAsStream(name.replace('.', '/') + ".class")) {
+                        byte[] bytes = in.readAllBytes();
+                        return defineClass(name, bytes, 0, bytes.length);
+                    } catch (java.io.IOException e) {
+                        throw new ClassNotFoundException(name, e);
+                    }
+                }
+            }
+        };
+        try {
+            broken = hiding.loadClass(name);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(e);
+        }
+        return broken;
+    }
 
     /** Runs every load trigger. */
     void run() {

@@ -35,13 +35,13 @@ record Descriptor(Class<?> javaClass, String name, Class<?>[] parameterTypes) {
         }
     }
 
-    /** Parses {@code text} with the classes {@code script} imports, or {@code null} if it isn't a descriptor. */
-    static Descriptor parse(String text, String script, Imports imports) throws NotFound {
+    /** Parses {@code text} with a script's imports, by name, or {@code null} if it isn't a descriptor. */
+    static Descriptor parse(String text, java.util.Map<String, JavaType> imports) throws NotFound {
         Matcher matcher = DESCRIPTOR.matcher(text);
         if (!matcher.matches()) {
             return null;
         }
-        Class<?> javaClass = matcher.group(1) == null ? null : lookup(matcher.group(1), script, imports);
+        Class<?> javaClass = matcher.group(1) == null ? null : lookup(matcher.group(1), imports);
         Class<?>[] parameters = null;
         if (matcher.group(3) != null) {
             String[] raw = matcher.group(3).split(",");
@@ -54,14 +54,14 @@ record Descriptor(Class<?> javaClass, String name, Class<?>[] parameterTypes) {
                     depth++;
                 }
                 Class<?> base = Coercion.PRIMITIVES.get(type);
-                parameters[i] = Coercion.arrayOf(base != null ? base : lookup(type, script, imports), depth);
+                parameters[i] = Coercion.arrayOf(base != null ? base : lookup(type, imports), depth);
             }
         }
         return new Descriptor(javaClass, matcher.group(2), parameters);
     }
 
-    private static Class<?> lookup(String name, String script, Imports imports) throws NotFound {
-        JavaType imported = imports.lookup(script, name);
+    private static Class<?> lookup(String name, java.util.Map<String, JavaType> imports) throws NotFound {
+        JavaType imported = imports.get(name);
         if (imported == null) {
             throw new NotFound(name);
         }

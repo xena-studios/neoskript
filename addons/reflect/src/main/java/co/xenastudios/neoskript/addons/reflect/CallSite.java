@@ -13,7 +13,12 @@ import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * One call in a script ({@code player.getName()}), compiled once: the member it calls is looked up and its overload
@@ -65,7 +70,12 @@ final class CallSite {
         for (Entry entry : entries) {
             if (entry != null && entry.target == targetClass && entry.descriptor.equals(descriptor)
                     && entry.chosen.setter == setter && sameClasses(entry.arguments, arguments)) {
-                return entry.chosen;
+                // Checked against these values too: some conversions depend on the value, not only its class (a text
+                // is a char only if it's one letter), so the same classes can need another member, or none.
+                if (matches(entry.chosen, arguments)) {
+                    return entry.chosen;
+                }
+                break;
             }
         }
         Target chosen = choose(descriptor, isStatic, arguments, setter);
@@ -83,20 +93,25 @@ final class CallSite {
             return false;
         }
         for (int i = 0; i < arguments.length; i++) {
-            Object argument = arguments[i];
-            Class<?> type = argument == null || argument == Null.NULL ? null : argument.getClass();
-            if (type != classes[i]) {
+            if (classOf(arguments[i]) != classes[i]) {
                 return false;
             }
         }
         return true;
     }
 
+    /** What an argument is for choosing a member: an array by the array's class, not by its wrapper. */
+    private static Class<?> classOf(Object argument) {
+        if (argument == null || argument == Null.NULL) {
+            return null;
+        }
+        return argument instanceof ObjectWrapper wrapper ? wrapper.array().getClass() : argument.getClass();
+    }
+
     private static Class<?>[] classes(Object[] arguments) {
         Class<?>[] classes = new Class<?>[arguments.length];
         for (int i = 0; i < arguments.length; i++) {
-            Object argument = arguments[i];
-            classes[i] = argument == null || argument == Null.NULL ? null : argument.getClass();
+            classes[i] = classOf(arguments[i]);
         }
         return classes;
     }
@@ -163,8 +178,60 @@ final class CallSite {
         return type == Long.class || type == Integer.class || type == Short.class || type == Byte.class;
     }
 
-    /** Every member the descriptor names, as targets: each made accessible where Java allows. */
+    /** What {@link #candidates} looked up for a class: a kind of member, its name and parameter types, static or not. */
+    private record Lookup(Kind kind, String name, List<Class<?>> parameterTypes, boolean isStatic, boolean setter) {}
+
+    /**
+     * Each class's members, looked up once, for every call site: a call site that sees many classes
+     * ({@code loop-entity.getHandle()}) looks each one's up once rather than at every call. Kept with the class, so they
+     * go when it's unloaded, and dropped when the addon disables ({@link #forgetAll}), as a {@code ClassValue}'s values
+     * would otherwise keep this addon's classes for as long as a class of the JDK's is loaded.
+     */
+    private static final ClassValue<Map<Lookup, List<Target>>> MEMBERS = new ClassValue<>() {
+        @Override
+        protected Map<Lookup, List<Target>> computeValue(Class<?> type) {
+            synchronized (LOOKED_AT) {
+                LOOKED_AT.add(type);
+            }
+            return new ConcurrentHashMap<>();
+        }
+    };
+
+    /** The classes {@link #MEMBERS} has something for, held weakly. */
+    private static final Set<Class<?>> LOOKED_AT = Collections.newSetFromMap(new WeakHashMap<>());
+
+    /** Forgets every class's members, as the addon disables. */
+    static void forgetAll() {
+        List<Class<?>> all;
+        synchronized (LOOKED_AT) {
+            all = new ArrayList<>(LOOKED_AT);
+            LOOKED_AT.clear();
+        }
+        all.forEach(MEMBERS::remove);
+    }
+
+    /**
+     * Every member the descriptor names, as targets: each made accessible where Java allows. Looked up once per class;
+     * a class whose members can't be looked at (a signature naming a class that isn't there) throws
+     * {@link LinkageError} every time, and nothing is kept.
+     */
     List<Target> candidates(Descriptor descriptor, boolean isStatic, boolean setter) {
+        Lookup key = new Lookup(kind, descriptor.name(), descriptor.parameterTypes() == null ? null
+                : List.of(descriptor.parameterTypes()), isStatic, setter);
+        Map<Lookup, List<Target>> known = MEMBERS.get(descriptor.javaClass());
+        List<Target> found = known.get(key);
+        if (found == null) {
+            found = List.copyOf(lookUp(descriptor, isStatic, setter));
+            known.put(key, found);
+        }
+        return found;
+    }
+
+    /** How many times members were looked up rather than found in {@link #MEMBERS}. For tests. */
+    static final java.util.concurrent.atomic.AtomicLong LOOK_UPS = new java.util.concurrent.atomic.AtomicLong();
+
+    private List<Target> lookUp(Descriptor descriptor, boolean isStatic, boolean setter) {
+        LOOK_UPS.incrementAndGet();
         Class<?> type = descriptor.javaClass();
         List<Target> targets = new ArrayList<>();
         switch (kind) {
@@ -262,38 +329,35 @@ final class CallSite {
      */
     static Object call(Target target, Object receiver, boolean isStatic, Object[] arguments) throws Throwable {
         Class<?>[] parameters = target.parameters;
-        Object[] converted;
+        int offset = isStatic ? 0 : 1;
+        // One array: the receiver, then the arguments converted, as the handle spreads them.
+        Object[] all = parameters.length + offset == 0 ? NONE : new Object[parameters.length + offset];
+        if (!isStatic) {
+            all[0] = receiver;
+        }
+        int last = parameters.length - 1;
         if (target.varargs && !(arguments.length == parameters.length
-                && Coercion.canConvert(arguments[parameters.length - 1], parameters[parameters.length - 1])
-                && Coercion.toJava(arguments[parameters.length - 1]) != null
-                && Coercion.toJava(arguments[parameters.length - 1]).getClass().isArray())) {
-            int last = parameters.length - 1;
+                && Coercion.canConvert(arguments[last], parameters[last])
+                && Coercion.toJava(arguments[last]) != null
+                && Coercion.toJava(arguments[last]).getClass().isArray())) {
             Class<?> component = parameters[last].getComponentType();
-            converted = new Object[parameters.length];
             for (int i = 0; i < last; i++) {
-                converted[i] = Coercion.convert(arguments[i], parameters[i]);
+                all[offset + i] = Coercion.convert(arguments[i], parameters[i]);
             }
             Object rest = Array.newInstance(component, arguments.length - last);
             for (int i = last; i < arguments.length; i++) {
                 Array.set(rest, i - last, Coercion.convert(arguments[i], component));
             }
-            converted[last] = rest;
+            all[offset + last] = rest;
         } else {
-            converted = new Object[arguments.length];
             for (int i = 0; i < arguments.length; i++) {
-                converted[i] = Coercion.convert(arguments[i], parameters[i]);
+                all[offset + i] = Coercion.convert(arguments[i], parameters[i]);
             }
-        }
-        Object[] all;
-        if (isStatic) {
-            all = converted;
-        } else {
-            all = new Object[converted.length + 1];
-            all[0] = receiver;
-            System.arraycopy(converted, 0, all, 1, converted.length);
         }
         return (Object) target.invoker.invokeExact(all);
     }
+
+    private static final Object[] NONE = new Object[0];
 
     /** The members named {@code name}, for skript-reflect's suggestions: executables of this kind. */
     static List<Executable> executables(Kind kind, Class<?> type) {
