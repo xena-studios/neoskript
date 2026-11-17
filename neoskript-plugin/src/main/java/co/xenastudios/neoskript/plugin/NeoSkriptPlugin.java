@@ -591,18 +591,25 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         current.notes().forEach(line -> getSLF4JLogger().warn(line));
     }
 
+    /** How long the server's stop waits, at most, for what its unload triggers paused for. */
+    private static final java.time.Duration PAUSE_GRACE = java.time.Duration.ofSeconds(3);
+
     @Override
     public void onDisable() {
         co.xenastudios.neoskript.api.Installed.install(null);
-        // Triggers waiting for an addon's result don't carry on, and the pauses' timer stops.
-        co.xenastudios.neoskript.runtime.Pauses.close();
         if (runtimeErrorFrames != null) {
             runtimeErrorFrames.run();
         }
+        // What the unload triggers pause for gets a moment to finish, below.
+        co.xenastudios.neoskript.runtime.Pauses.stopping();
         if (scripts != null) {
             co.xenastudios.neoskript.paper.EventBridges.stop();
             scripts.unloadAll();
         }
+        // After the unload triggers, which may have started work an addon pauses for (a last database write): it
+        // gets a moment to finish before the server exits. Then triggers still waiting are dropped, as after a
+        // wait, and the pauses' timer stops.
+        co.xenastudios.neoskript.runtime.Pauses.close(PAUSE_GRACE);
         getServer().getAsyncScheduler().cancelTasks(this);
         co.xenastudios.neoskript.runtime.region.Regions.uninstall();
         if (commands != null) {

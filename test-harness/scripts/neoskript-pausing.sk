@@ -3,6 +3,11 @@
 on load:
 	send "[pausetest] loaded" to console
 
+# The work an unload trigger pauses for finishes while the server stops; the line after it doesn't run.
+on unload:
+	file the lottery report
+	send "[pausetest] after the report" to console
+
 command /pausetest <text>:
 	trigger:
 		if arg-1 is "values":

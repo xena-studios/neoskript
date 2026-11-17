@@ -1108,7 +1108,13 @@ final class TriggerCompiler {
                         leaveGlobal();
                     }
                     if (startsConditional(statement)) {
-                        i = conditional(statements, i) - 1;
+                        try {
+                            i = conditional(statements, i) - 1;
+                        } catch (CompileException | RuntimeException e) {
+                            // A branch failed: carry on after it, not with it again as a statement of its own.
+                            i = chainAt;
+                            throw e;
+                        }
                     } else {
                         statement(statement);
                     }
@@ -1422,7 +1428,8 @@ final class TriggerCompiler {
             throw unsupported(syntax.syntax().id());
         }
         co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site = site(syntax, element.getClass());
-        constant(regional(element, type, syntax, site), type);
+        // Its start throwing is a failed stage, as a stage completing exceptionally is.
+        constant(co.xenastudios.neoskript.runtime.Pauses.guard(regional(element, type, syntax, site), type), type);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         arguments(syntax);
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(type), "start",
@@ -1625,8 +1632,20 @@ final class TriggerCompiler {
      */
     private int conditional(List<Statement> statements, int i) throws CompileException {
         Label chainEnd = new Label();
+        int[] at = {i};
+        try {
+            return conditionalChain(statements, i, chainEnd, at);
+        } catch (CompileException | RuntimeException e) {
+            chainAt = at[0];
+            throw e;
+        }
+    }
+
+    /** {@link #conditional}, with the statement it's at kept in {@code at}. */
+    private int conditionalChain(List<Statement> statements, int i, Label chainEnd, int[] at) throws CompileException {
         boolean first = true;
         while (i < statements.size()) {
+            at[0] = i;
             Statement statement = statements.get(i);
             String key = statement.line().key().strip().toLowerCase(Locale.ROOT);
             if (!first && !isElse(key)) {
@@ -1692,6 +1711,9 @@ final class TriggerCompiler {
         method.visitLabel(chainEnd);
         return i;
     }
+
+    /** The statement of the {@code if} chain being compiled, so a failure in it carries on after it. */
+    private int chainAt;
 
     /** Whether {@code statements} compile on their own, as {@code parse if} code has to for its condition to hold. */
     private boolean compilesApart(List<Statement> statements) {
@@ -2364,6 +2386,11 @@ final class TriggerCompiler {
                 method.visitJumpInsn(GOTO, loop.next());
             }
             case CoreSyntax.RETURN -> {
+                if (!co.xenastudios.neoskript.frontend.parse.PausingExpressions.in(effect, registry).isEmpty()) {
+                    // The line waits for its value first, so the caller has gone on by then: as after a wait.
+                    throw new CompileException(line, "A return statement after a delay is useless, as the calling"
+                            + " trigger will resume when the delay starts (and won't get any returned value)");
+                }
                 Block handler = returnHandler();
                 if (handler != null) {
                     returnFromSection(handler, (Expr) effect.match().values().getFirst());

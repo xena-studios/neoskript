@@ -22,7 +22,8 @@ import java.util.regex.Pattern;
  * and loops, and a map the service gives sets a list's indices. A failure and a timeout are runtime errors on their
  * lines, after which the trigger carries on. On Folia, a trigger in {@code run on} a pig carries on on the pig's
  * thread, and a console command's on the global thread. A trigger waiting while its script is reloaded carries on
- * with its old code, as after a {@code wait}, and the server stops cleanly with a trigger still waiting.
+ * with its old code, as after a {@code wait}, and the server stops cleanly with a trigger still waiting. What an
+ * {@code on unload} trigger pauses for finishes while the server stops, though the trigger doesn't carry on.
  */
 public final class NeoSkriptPausingScenario implements Scenario {
 
@@ -109,9 +110,17 @@ public final class NeoSkriptPausingScenario implements Scenario {
             mark = server.mark();
             server.command("pausetest hang");
             server.await(line("[pausetest] hanging"), mark, WAIT);
+            // A reload ran the unload trigger while the server ran; only what happens as it stops counts here.
+            int stopping = server.mark();
             server.stop();
-            if (!server.linesMatching(line("[pausetest] after hang")).isEmpty()) {
+            List<String> afterStop = server.lines(stopping);
+            if (afterStop.stream().anyMatch(l -> l.endsWith("[pausetest] after hang")
+                    || l.endsWith("[pausetest] after the report"))) {
                 throw new HarnessFailure("A trigger carried on while the server stopped. See " + server.logFile());
+            }
+            if (afterStop.stream().noneMatch(l -> l.endsWith("[lottery] report filed"))) {
+                throw new HarnessFailure("The work an unload trigger paused for didn't finish before the server"
+                        + " stopped. See " + server.logFile());
             }
             List<String> problems = new java.util.ArrayList<>(server.linesMatching(NeoSkriptRegionsScenario.THREAD_VIOLATION));
             problems.addAll(server.linesMatching(EXCEPTION));

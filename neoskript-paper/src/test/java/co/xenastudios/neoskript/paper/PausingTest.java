@@ -110,6 +110,12 @@ class PausingTest {
                 info -> (context, args) -> CompletableFuture.completedFuture("ready " + args[0]), "ready %text%");
         library.pausingEffect("TestEffSlow", info -> (context, args) -> new CompletableFuture<>(), "hang");
         library.timeout("TestEffSlow", Duration.ofMillis(50));
+        // 'explode': its start throws. 'odd': a stage that can't be waited for.
+        library.pausingEffect("TestEffExplode", info -> (context, args) -> {
+            throw new IllegalStateException("Database is down");
+        }, "explode");
+        library.pausingEffect("TestEffOdd", info -> (context, args) -> new BrokenStage(), "odd");
+        library.timeout("TestEffOdd", Duration.ofMillis(50));
     }
 
     @AfterEach
@@ -307,7 +313,7 @@ class PausingTest {
         assertEquals(1, Pauses.pending());
         Pauses.close();
         assertEquals(0, Pauses.pending());
-        assertTrue(stages.getFirst().isCancelled(), "its stage should be cancelled");
+        assertTrue(!stages.getFirst().isCancelled(), "its stage is the addon's: it isn't cancelled");
         tick();
         assertEquals(List.of(), said);
         // A trigger that pauses while the server stops doesn't carry on either.
@@ -348,6 +354,162 @@ class PausingTest {
         assertEquals(List.of("after"), said);
         // On Folia, the scheduler runs it on the thread that owns what the trigger's event happened to.
         assertEquals(List.of(pig), owners);
+    }
+
+    @Test
+    void aLineWithAPausingExpressionIsAfterADelayFromItsStart() {
+        run("""
+                on load:
+                \tsay "%fetched "x"% %has delay before%"
+                """);
+        stages.getFirst().complete("got");
+        tick();
+        assertEquals(List.of("got true"), said);
+    }
+
+    @Test
+    void aReturnOnALineThatPausesIsRefusedAsAfterAWait() {
+        CompiledScripts compiled = compile("""
+                function f() :: text:
+                \treturn fetched "x"
+                """);
+        assertEquals(List.of("A return statement after a delay is useless, as the calling trigger will resume when"
+                + " the delay starts (and won't get any returned value)"), errors(compiled.diagnostics()));
+    }
+
+    @Test
+    void anExpressionInAnElseIfHeaderGivesOneError() {
+        CompiledScripts compiled = compile("""
+                on load:
+                \tif 1 is 2:
+                \t\tsay "no"
+                \telse if fetched "x" is 1:
+                \t\tsay "no"
+                """);
+        assertEquals(1, errors(compiled.diagnostics()).size(), compiled.diagnostics().toString());
+        assertTrue(errors(compiled.diagnostics()).getFirst().contains("waits for its value"),
+                compiled.diagnostics().toString());
+    }
+
+    @Test
+    void aStartThatThrowsIsAFailedStage() {
+        run("""
+                on load:
+                \texplode
+                \tsay "carried on"
+                """);
+        assertEquals(List.of("carried on"), said);
+        assertEquals(List.of("2: Database is down"), errors);
+    }
+
+    @Test
+    void aStageThatCantBeWaitedForFailsAndNeverResumesLater() throws InterruptedException {
+        run("""
+                on load:
+                \todd
+                \tsay "carried on"
+                """);
+        assertEquals(List.of("carried on"), said);
+        assertEquals(List.of("2: can't wait"), errors);
+        // Its timeout was cancelled with it: nothing resumes the trigger a second time.
+        assertNull(later.poll(300, TimeUnit.MILLISECONDS));
+        assertEquals(0, Pauses.pending());
+    }
+
+    @Test
+    void aFinishedPauseLetsGoOfItsEvent() {
+        CompiledScripts compiled = compile("""
+                on load:
+                \tfetch "a"
+                \tsay "after"
+                """);
+        Object event = new Object();
+        java.lang.ref.WeakReference<Object> held = new java.lang.ref.WeakReference<>(event);
+        compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(event));
+        event = null;
+        // The addon keeps its stage for good, as a long-lived upstream future would.
+        CompletableFuture<Object> kept = stages.getFirst();
+        kept.complete(null);
+        tick();
+        assertEquals(List.of("after"), said);
+        for (int i = 0; i < 20 && held.get() != null; i++) {
+            System.gc();
+        }
+        assertNull(held.get(), "the stage kept the event alive");
+        assertTrue(kept.isDone());
+    }
+
+    @Test
+    void stoppingWaitsALittleForWhatUnloadTriggersPausedFor() {
+        run("""
+                on load:
+                \tfetch "before stopping"
+                """);
+        Pauses.stopping();
+        run("""
+                on load:
+                \tfetch "in an unload trigger"
+                \tsay "never"
+                """);
+        CompletableFuture<Object> early = stages.get(0);
+        CompletableFuture<Object> late = stages.get(1);
+        // The unload trigger's work finishes while the stop waits for it.
+        CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS).execute(() -> late.complete("written"));
+        long start = System.nanoTime();
+        Pauses.close(Duration.ofSeconds(5));
+        long took = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        assertTrue(late.isDone() && took < 4000, "waited " + took + " ms");
+        // Neither is cancelled: the work is the addon's to finish.
+        assertTrue(!early.isCancelled() && !late.isCancelled());
+        tick();
+        assertEquals(List.of(), said, "a trigger doesn't carry on while the server stops");
+        assertEquals(0, Pauses.pending());
+        // And a stage that never ends makes the stop wait no longer than the grace.
+        Waits.install(null, e -> {
+            throw e;
+        });
+    }
+
+    @Test
+    void aPauseAfterStoppingDoesntUncountAnotherWait() {
+        Waits.track();
+        Object event = new Object();
+        CompiledScripts waiting = compile("""
+                on load:
+                \tfetch "a"
+                """);
+        waiting.triggers().getFirst().trigger().execute(new SimpleTriggerContext(event));
+        assertTrue(Waits.pending(event));
+        Pauses.close();
+        // close() dropped that one; a new pause on the same event now stops without counting anything.
+        assertTrue(!Waits.pending(event));
+        CompiledScripts other = compile("""
+                on load:
+                \twait 1 second
+                \tfetch "b"
+                """);
+        other.triggers().getFirst().trigger().execute(new SimpleTriggerContext(event));
+        assertTrue(Waits.pending(event));
+        Runnable afterWait = later.poll();
+        assertNotNull(afterWait);
+        // The wait carries on, uncounting itself, and its pause, refused while stopped, counts nothing.
+        afterWait.run();
+        assertTrue(!Waits.pending(event));
+    }
+
+    /** A stage that can't be waited for: whenComplete throws. */
+    private static final class BrokenStage extends CompletableFuture<Object> {
+
+        @Override
+        public CompletableFuture<Object> toCompletableFuture() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public CompletableFuture<Object> whenComplete(
+                java.util.function.BiConsumer<? super Object, ? super Throwable> action) {
+            throw new IllegalStateException("can't wait");
+        }
     }
 
     @Test

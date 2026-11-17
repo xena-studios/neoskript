@@ -222,7 +222,7 @@ set {_status} to the status of the server "lobby"
 send "Lobby: %{_status}%"
 ```
 
-Do the slow part on your own executor (or `threads().runAsync`), and complete the stage from there. `start` itself runs on the trigger's thread, so it mustn't block.
+Do the slow part on your own executor (or `threads().runAsync`), and complete the stage from there. `start` itself runs on the trigger's thread, so it mustn't block. Read what you need from the arguments and `context.event()` in `start`, and don't touch the `TriggerContext`, the event or anything a region owns from your executor's thread: the trigger has stopped, and on Folia only the owner's thread may touch those. If `start` throws, that's the same as a failed stage.
 
 When the stage completes, the trigger carries on from where it stopped, with its local variables and the loops it's in, on the thread it was on: the main thread on Paper; on Folia, the thread of what started the trigger, or of the `run on` section it's in. A stage that's complete already carries straight on. A pausing expression's value arrives before its line runs: each one on a line is worked out first, in the order written. They can be used in effects, conditions and function calls on a line of their own, not in `if`, `loop` or `while` headers; set a variable first.
 
@@ -236,13 +236,15 @@ registrar.pausingEffect("MyAddonEffQuery", info -> PausingEffect.storing(1, (con
 
 The value is stored as `set` would. A `Map` sets a list's indices, and a map or list in it makes a list under its index: `{"name": ["Steve", "Alex"]}` gives `{_rows::name::1}` and `{_rows::name::2}`. A `Collection` or an array is several values, numbered from 1.
 
-**What scripts see.** A pausing element is a delay for Skript's rules, as `wait` is: after it, the event has passed. A stage that fails is a runtime error on the line, with its exception's message, and the trigger carries on: the expression has no value, the variable isn't changed. If the stage takes longer than a minute, the same happens, and NeoSkript tries to cancel it. Change the limit per element:
+**What scripts see.** A pausing element is a delay for Skript's rules, as `wait` is, from the start of its line: the line runs once the value is there, so on that line and after it the event has passed. `return` can't be used there, nor `cancel event` and the like. A stage that fails is a runtime error on the line, with its exception's message, and the trigger carries on: the expression has no value, the variable isn't changed. If the stage takes longer than its timeout, the same happens, and NeoSkript tries to cancel it. The timeout is a minute unless you set one; an addon whose work has its own time limit (a database query, a web request) should set the element's to match it, so scripts see the addon's error rather than NeoSkript's:
 
 ```java
 registrar.timeout("MyAddonEffQuery", Duration.ofSeconds(30));
 ```
 
-**Reloads and stopping.** A trigger whose script is reloaded or unloaded while it waits carries on with the code it started with, as after a `wait`. When the server stops, triggers still waiting are dropped and their stages cancelled. A stage that completes after a timeout or a stop is ignored, and NeoSkript keeps nothing of the trigger once its pause is over, so holding on to a stage doesn't hold on to old scripts.
+At most 10,000 triggers wait at once; past that, a pausing element fails at once with a runtime error. `/sk info` shows how many are waiting.
+
+**Reloads and stopping.** A trigger whose script is reloaded or unloaded while it waits carries on with the code it started with, as after a `wait`. When the server stops, `on unload` triggers run first, and what they pause for (a last write to a database) gets up to 3 seconds to finish before the server exits. Then triggers still waiting are dropped without carrying on, as after a `wait`. Their stages aren't cancelled: the work may still be running, and finishing or stopping it is up to your addon's own `onDisable`. A stage that completes after a timeout or a stop is ignored, and NeoSkript keeps nothing of the trigger or its event once its pause is over, so holding on to a stage doesn't hold on to old scripts or players.
 
 ## Converters, comparisons and arithmetic
 

@@ -53,22 +53,59 @@ public final class Pauses {
      */
     public record Point(ErrorSites.Site site, long timeoutMillis) {}
 
+    /**
+     * The most triggers paused at once. Past it, a pausing element fails at once with a runtime error, so a script
+     * looping over a slow service can't pile up frames without end.
+     */
+    public static final int MAX_PENDING = 10_000;
+
     private static final Set<Pending> PENDING = ConcurrentHashMap.newKeySet();
+    /** Whether the server is stopping: pauses started from now on stop their triggers, as a wait's would. */
     private static volatile boolean closed;
     private static ScheduledThreadPoolExecutor timer;
 
     private Pauses() {}
 
+    /** Whether the server has started stopping: pauses started from now on get {@link #close}'s grace. */
+    private static volatile boolean stopping;
+
     /** Lets triggers pause, as when the plugin enables. */
     static synchronized void open() {
         closed = false;
+        stopping = false;
     }
 
     /**
-     * Stops every pause, as when the server stops: their triggers don't carry on, their stages are cancelled
-     * where they can be, and the timer's thread ends. Stages that complete later are ignored.
+     * Says the server is stopping, before its {@code on unload} triggers run: what they pause for gets
+     * {@link #close(java.time.Duration)}'s grace. Pauses from before don't.
      */
-    public static void close() {
+    public static void stopping() {
+        stopping = true;
+    }
+
+    /**
+     * Stops every pause, as when the server stops. First it gives the stages paused for since {@link #stopping}
+     * up to {@code grace} to complete, so work an {@code on unload} trigger started (a last database write) can
+     * finish before the server exits; then their triggers are dropped without carrying on, as after a {@code wait}, and the timer's thread
+     * ends. Stages aren't cancelled: the work they stand for may still be running, and it's the addon's to finish
+     * or stop. A stage completing after this is ignored. It never waits longer than {@code grace}.
+     */
+    public static void close(java.time.Duration grace) {
+        long deadline = System.nanoTime() + Math.max(grace.toNanos(), 0);
+        synchronized (PENDING) {
+            while (PENDING.stream().anyMatch(pending -> pending.late)) {
+                long left = deadline - System.nanoTime();
+                if (left <= 0) {
+                    break;
+                }
+                try {
+                    TimeUnit.NANOSECONDS.timedWait(PENDING, Math.min(left, TimeUnit.MILLISECONDS.toNanos(50)));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
         ScheduledThreadPoolExecutor stopped;
         synchronized (Pauses.class) {
             closed = true;
@@ -84,12 +121,28 @@ public final class Pauses {
         }
     }
 
+    /** {@link #close(java.time.Duration)} with no grace. */
+    public static void close() {
+        close(java.time.Duration.ZERO);
+    }
+
     /** How many triggers are paused now. */
     public static int pending() {
         return PENDING.size();
     }
 
+    private static void removed(Pending pending) {
+        PENDING.remove(pending);
+        synchronized (PENDING) {
+            PENDING.notifyAll();
+        }
+    }
+
+    /** The timer for timeouts, or {@code null} once the server is stopping, so none is made then. */
     private static synchronized ScheduledThreadPoolExecutor timer() {
+        if (closed) {
+            return null;
+        }
         if (timer == null) {
             ScheduledThreadPoolExecutor made = new ScheduledThreadPoolExecutor(1, task -> {
                 Thread thread = new Thread(task, "NeoSkript pause timeouts");
@@ -106,12 +159,13 @@ public final class Pauses {
     /**
      * Called by the generated code at a pausing element: carries on with {@code frame} once {@code stage}
      * completes, with what it completed with in {@link Frame#result}. Whether the trigger paused; if not, the
-     * stage had completed already (or there was none), the result is in the frame, and the caller carries
-     * straight on. Either way the event counts as waited for, as after a {@code wait}.
+     * stage had completed already (or there was none, or it couldn't be waited for), the result is in the frame,
+     * and the caller carries straight on. Either way the event counts as waited for, as after a {@code wait}.
      */
     public static boolean pause(Resumable trigger, TriggerContext context, Frame frame, CompletionStage<?> stage,
             Point point) {
         Object event = context.event();
+        Waits.delay(event);
         CompletableFuture<?> future = null;
         if (stage != null) {
             try {
@@ -122,30 +176,99 @@ public final class Pauses {
         }
         if (stage == null || future != null && future.isDone()) {
             frame.result = stage == null ? null : now(future, point);
-            Waits.delay(event);
+            return false;
+        }
+        if (PENDING.size() >= MAX_PENDING) {
+            frame.result = failed(point, new IllegalStateException("Too many triggers are waiting (" + MAX_PENDING
+                    + "), so this one didn't: is a script starting slow work in a loop?"));
             return false;
         }
         Scheduler scheduler = Waits.scheduler();
         if (scheduler == null) {
             throw new IllegalStateException("Waiting isn't available: no scheduler is installed");
         }
-        Pending pending = new Pending(trigger, context, frame, point, Waits.ownerOf(context, frame), scheduler, future);
         if (closed) {
-            // The server is stopping: the trigger stops here, as a wait's would.
+            // The server has stopped: the trigger stops here, as a wait's would.
+            return true;
+        }
+        Pending pending = new Pending(trigger, context, frame, point, Waits.ownerOf(context, frame), scheduler, future);
+        PENDING.add(pending);
+        Waits.scheduled(event);
+        pending.counted = true;
+        ScheduledThreadPoolExecutor timeouts = timer();
+        if (timeouts == null || closed) {
+            // The server stopped meanwhile: close() may not have seen this one.
             pending.abandon();
             return true;
         }
-        PENDING.add(pending);
-        Waits.scheduled(event);
         try {
-            pending.timeout = timer().schedule(() -> pending.finish(null, new Timeout(point.timeoutMillis())),
+            pending.timeout = timeouts.schedule(() -> pending.finish(null, new Timeout(point.timeoutMillis())),
                     Math.max(point.timeoutMillis(), 1), TimeUnit.MILLISECONDS);
         } catch (java.util.concurrent.RejectedExecutionException stopping) {
             pending.abandon();
             return true;
         }
-        stage.whenComplete(pending::finish);
+        try {
+            stage.whenComplete(pending::finish);
+        } catch (RuntimeException | LinkageError broken) {
+            // A stage that can't be waited for is a failed one: the trigger carries on now, never later.
+            pending.abandon();
+            frame.result = failed(point, broken);
+            return false;
+        }
         return true;
+    }
+
+    /** Reports {@code failure} on the trigger's thread and gives the result of a failed pause. */
+    private static Object failed(Point point, Throwable failure) {
+        report(point, failure);
+        return FAILED;
+    }
+
+    /**
+     * {@code element}, called as {@code type} ({@code PausingEffect} or {@code PausingExpression}), so that its
+     * {@code start} throwing is a failed stage, as a stage completing exceptionally is: a runtime error, after which
+     * the trigger carries on.
+     */
+    public static Object guard(Object element, Class<?> type) {
+        if (type == co.xenastudios.neoskript.api.element.PausingEffect.class) {
+            return new GuardedEffect((co.xenastudios.neoskript.api.element.PausingEffect) element);
+        }
+        if (type == co.xenastudios.neoskript.api.element.PausingExpression.class) {
+            return new GuardedExpression((co.xenastudios.neoskript.api.element.PausingExpression) element);
+        }
+        return element;
+    }
+
+    private static CompletionStage<?> started(java.util.function.Supplier<CompletionStage<?>> start) {
+        try {
+            return start.get();
+        } catch (RuntimeException | LinkageError e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private record GuardedEffect(co.xenastudios.neoskript.api.element.PausingEffect element)
+            implements co.xenastudios.neoskript.api.element.PausingEffect, ErrorSites.Transparent {
+
+        @Override
+        public CompletionStage<?> start(TriggerContext context, Object[] arguments) {
+            return started(() -> element.start(context, arguments));
+        }
+
+        @Override
+        public int target() {
+            return element.target();
+        }
+    }
+
+    private record GuardedExpression(co.xenastudios.neoskript.api.element.PausingExpression element)
+            implements co.xenastudios.neoskript.api.element.PausingExpression, ErrorSites.Transparent {
+
+        @Override
+        public CompletionStage<?> start(TriggerContext context, Object[] arguments) {
+            return started(() -> element.start(context, arguments));
+        }
     }
 
     /** The outcome of a stage that's done, on the trigger's thread: an error is reported now. */
@@ -264,16 +387,20 @@ public final class Pauses {
     private static final class Pending {
 
         private final AtomicBoolean over = new AtomicBoolean();
-        private final Object event;
-        private final Point point;
-        private final Scheduler scheduler;
-        // Let go of once it's over, so a stage kept after that keeps nothing of the trigger.
+        // All let go of once it's over, so a stage kept after that keeps nothing of the trigger or its event.
+        private Object event;
+        private Point point;
+        private Scheduler scheduler;
         private Resumable trigger;
         private TriggerContext context;
         private Frame frame;
         private Object owner;
         private CompletableFuture<?> future;
         volatile ScheduledFuture<?> timeout;
+        /** Whether it was counted in {@link Waits#scheduled}, so it's uncounted once. */
+        volatile boolean counted;
+        /** Whether it was started while the server was stopping, so the stop waits a little for it. */
+        final boolean late = stopping;
 
         Pending(Resumable trigger, TriggerContext context, Frame frame, Point point, Object owner, Scheduler scheduler,
                 CompletableFuture<?> future) {
@@ -296,7 +423,6 @@ public final class Pauses {
             if (timer != null) {
                 timer.cancel(false);
             }
-            PENDING.remove(this);
             if (failure instanceof Timeout && future != null) {
                 try {
                     future.cancel(false);
@@ -308,9 +434,15 @@ public final class Pauses {
             TriggerContext in = context;
             Frame carried = frame;
             Object on = owner;
+            Object of = event;
+            Point at = point;
+            Scheduler with = scheduler;
+            boolean wasCounted = counted;
             release();
-            if (closed) {
-                Waits.ran(event);
+            removed(this);
+            if (closed || stopping) {
+                // The server is stopping: the work is done, but the trigger doesn't carry on, as after a wait.
+                uncount(of, wasCounted);
                 return;
             }
             Object result;
@@ -328,26 +460,29 @@ public final class Pauses {
             Throwable reported = problem;
             carried.result = result;
             try {
-                scheduler.runLater(on, 0, () -> {
-                    Waits.delay(event);
+                with.runLater(on, 0, () -> {
+                    Waits.delay(of);
                     try {
                         if (reported != null) {
-                            report(point, reported);
+                            report(at, reported);
                         }
                         resumed.resume(in, carried);
                     } catch (ScriptRuntimeException e) {
                         Waits.errors().accept(e);
                     } finally {
-                        Waits.ran(event);
+                        uncount(of, wasCounted);
                     }
                 });
             } catch (RuntimeException stopping) {
                 // The plugin is disabling (Bukkit refuses its tasks): the trigger stops here.
-                Waits.ran(event);
+                uncount(of, wasCounted);
             }
         }
 
-        /** Ends it without carrying on: the server is stopping. */
+        /**
+         * Ends it without carrying on: the server stopped, or its stage can't be waited for. Its stage isn't
+         * cancelled: the work may still be running, and it's the addon's.
+         */
         void abandon() {
             if (!over.compareAndSet(false, true)) {
                 return;
@@ -356,15 +491,16 @@ public final class Pauses {
             if (timer != null) {
                 timer.cancel(false);
             }
-            CompletableFuture<?> stage = future;
+            Object of = event;
+            boolean wasCounted = counted;
             release();
-            Waits.ran(event);
-            if (stage != null) {
-                try {
-                    stage.cancel(false);
-                } catch (RuntimeException ignored) {
-                    // Only a courtesy to the addon.
-                }
+            removed(this);
+            uncount(of, wasCounted);
+        }
+
+        private static void uncount(Object event, boolean counted) {
+            if (counted) {
+                Waits.ran(event);
             }
         }
 
@@ -374,6 +510,9 @@ public final class Pauses {
             frame = null;
             owner = null;
             future = null;
+            event = null;
+            point = null;
+            scheduler = null;
         }
     }
 }

@@ -155,8 +155,13 @@ public interface Registrar {
      *
      * <p>For Skript's rules it's a delay, as {@code wait} is: after it, the event has passed, so it can't be
      * cancelled, and {@code is delayed} is true. A script reloaded or unloaded while a trigger waits doesn't stop
-     * it: it carries on with the code it started with, as after a {@code wait}. When the server stops, triggers
-     * still waiting don't carry on, and NeoSkript tries to cancel their stages.
+     * it: it carries on with the code it started with, as after a {@code wait}. When the server stops, what
+     * {@code on unload} triggers pause for gets a few seconds to finish; then triggers still waiting are dropped
+     * without carrying on. Their stages aren't cancelled: finishing or stopping the work is the addon's.
+     *
+     * <p>{@code start} runs on the trigger's thread and mustn't block. The thread that completes the stage mustn't
+     * use the {@code TriggerContext}, the event, or anything a region owns. If {@code start} throws, it's a failed
+     * stage: a runtime error, after which the trigger carries on.
      *
      * <p>On Folia, it's given the entities, blocks and locations of the trigger's own thread only: given one another
      * thread owns, it's a runtime error and doesn't start (see {@link #affinity}).
@@ -185,7 +190,8 @@ public interface Registrar {
     /**
      * How long a trigger waits for pausing effect or expression {@code id} before it gives up: a runtime error on
      * the line, after which the trigger carries on without the result, and NeoSkript tries to cancel the stage.
-     * Without this, it's one minute.
+     * Without this, it's one minute. An element whose work has a time limit of its own (a query, a request) should
+     * set this to match it, so scripts see the addon's error rather than NeoSkript's.
      *
      * @param id the element's id: one this addon registered with {@link #pausingEffect} or
      *     {@link #pausingExpression}

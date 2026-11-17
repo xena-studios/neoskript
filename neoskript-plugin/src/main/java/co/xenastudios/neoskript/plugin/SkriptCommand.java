@@ -516,6 +516,13 @@ final class SkriptCommand implements TabExecutor {
         int disabled = ScriptFiles.disabledScripts(scripts.scriptsFolder()).size();
         line(sender, "Scripts", Component.text(enabled + " enabled, " + disabled + " disabled"));
         line(sender, "Addons", names(addons()));
+        int paused = co.xenastudios.neoskript.runtime.Pauses.pending();
+        if (paused > 0) {
+            // Triggers waiting for an addon's slow work (a query, a request): a number that keeps growing is a script
+            // starting work faster than it finishes.
+            line(sender, "Waiting", Component.text(paused + (paused == 1 ? " trigger" : " triggers")
+                    + " for an addon's result"));
+        }
         List<String> hooks = new ArrayList<>();
         for (String name : plugin.getPluginMeta().getPluginSoftDependencies()) {
             Plugin hooked = Bukkit.getPluginManager().getPlugin(name);

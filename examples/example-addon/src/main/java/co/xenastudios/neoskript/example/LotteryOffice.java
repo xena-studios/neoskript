@@ -70,5 +70,12 @@ final class LotteryOffice {
         registrar.pausingEffect("NeoSkriptExampleEffAwaitOffice", info -> (context, arguments) -> new CompletableFuture<>(),
                 "wait for [the] lottery office to answer");
         registrar.timeout("NeoSkriptExampleEffAwaitOffice", Duration.ofSeconds(2));
+
+        // Slow work worth finishing even as the server stops, as a last database write would be: from an 'on unload'
+        // trigger, it gets a few seconds to finish.
+        registrar.pausingEffect("NeoSkriptExampleEffFileReport", info -> (context, arguments) ->
+                CompletableFuture.runAsync(() -> java.util.logging.Logger.getLogger("NeoSkriptExampleAddon")
+                        .info("[lottery] report filed"), after(500)), "file [the] lottery report");
+        registrar.affinity("NeoSkriptExampleEffFileReport", ThreadAffinity.ANY);
     }
 }

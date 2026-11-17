@@ -18,8 +18,8 @@ import java.util.function.BiFunction;
  * {@link co.xenastudios.neoskript.api.Threads#runAsync}, and complete the stage from there. Never block in
  * {@code start}: it runs on the trigger's thread.
  *
- * <p>A stage that completes exceptionally is a runtime error on the line, with the exception's message, and the
- * trigger carries on, as after Skript's other runtime errors. So is one that takes longer than the element's
+ * <p>A stage that completes exceptionally, or a {@code start} that throws, is a runtime error on the line, with the
+ * exception's message, and the trigger carries on, as after Skript's other runtime errors. So is one that takes longer than the element's
  * timeout ({@link co.xenastudios.neoskript.api.registration.Registrar#timeout}); NeoSkript then tries to cancel it.
  *
  * <p>With a {@link #target()}, the stage's value is stored in that placeholder, as {@code set} would, once it
