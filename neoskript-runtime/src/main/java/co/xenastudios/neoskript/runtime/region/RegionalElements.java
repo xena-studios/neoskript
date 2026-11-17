@@ -8,7 +8,10 @@ import co.xenastudios.neoskript.api.element.Changeable;
 import co.xenastudios.neoskript.api.element.Condition;
 import co.xenastudios.neoskript.api.element.Effect;
 import co.xenastudios.neoskript.api.element.Expression;
+import co.xenastudios.neoskript.api.element.PausingEffect;
+import co.xenastudios.neoskript.api.element.PausingExpression;
 import co.xenastudios.neoskript.api.element.Section;
+import java.util.concurrent.CompletionStage;
 import co.xenastudios.neoskript.api.element.SettableCondition;
 import co.xenastudios.neoskript.api.element.TriggerContext;
 import co.xenastudios.neoskript.runtime.errors.ErrorSites;
@@ -52,6 +55,12 @@ public final class RegionalElements {
         }
         if (type == Changeable.class) {
             return new RegionalChangeable((Changeable) element, access, site, subject);
+        }
+        if (type == PausingEffect.class) {
+            return new RegionalPausingEffect((PausingEffect) element, access, site, reads);
+        }
+        if (type == PausingExpression.class) {
+            return new RegionalPausingExpression((PausingExpression) element, access, site, reads);
         }
         return element;
     }
@@ -169,6 +178,49 @@ public final class RegionalElements {
         @Override
         public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
             Regions.run(access, site, arguments, subject, args -> element.change(context, args, delta, mode));
+        }
+    }
+
+    /**
+     * A pausing element starts on the trigger's thread, which goes on after it, so it can't run elsewhere: it's
+     * read like an expression, and given what another thread owns, it doesn't start.
+     */
+    private static CompletionStage<?> start(RegionAccess access, ErrorSites.Site site, long reads,
+            Object[] arguments, java.util.function.Supplier<CompletionStage<?>> start) {
+        if (!readable(access, site, arguments, reads)) {
+            return null;
+        }
+        try {
+            return start.get();
+        } catch (RuntimeException e) {
+            if (!Regions.violation(e)) {
+                throw e;
+            }
+            Regions.violationError(site, e);
+            return null;
+        }
+    }
+
+    private record RegionalPausingEffect(PausingEffect element, RegionAccess access, ErrorSites.Site site, long reads)
+            implements PausingEffect, ErrorSites.Transparent {
+
+        @Override
+        public CompletionStage<?> start(TriggerContext context, Object[] arguments) {
+            return RegionalElements.start(access, site, reads, arguments, () -> element.start(context, arguments));
+        }
+
+        @Override
+        public int target() {
+            return element.target();
+        }
+    }
+
+    private record RegionalPausingExpression(PausingExpression element, RegionAccess access, ErrorSites.Site site,
+            long reads) implements PausingExpression, ErrorSites.Transparent {
+
+        @Override
+        public CompletionStage<?> start(TriggerContext context, Object[] arguments) {
+            return RegionalElements.start(access, site, reads, arguments, () -> element.start(context, arguments));
         }
     }
 }

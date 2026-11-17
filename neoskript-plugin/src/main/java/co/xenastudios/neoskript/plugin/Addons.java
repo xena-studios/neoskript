@@ -32,7 +32,7 @@ final class Addons {
 
     /** The registrar methods whose first argument is the id of an element they register. */
     private static final Set<String> REGISTERS_ELEMENT = Set.of("effect", "condition", "section", "expression",
-            "typedExpression", "property", "propertyCondition", "event");
+            "typedExpression", "property", "propertyCondition", "event", "pausingEffect", "pausingExpression");
 
     private final Logger logger;
     private final List<Addon> addons = new ArrayList<>();
@@ -157,6 +157,9 @@ final class Addons {
                     }
                     if (method.getName().equals("affinity") && args.length == 2 && args[1] instanceof ThreadAffinity) {
                         checkAffinity(addon, (String) args[0], own, taken);
+                    } else if (method.getName().equals("timeout") && args.length == 2
+                            && args[1] instanceof java.time.Duration) {
+                        checkOwn(addon, "timeout", (String) args[0], own, taken);
                     } else if (method.getName().equals("storage") && args.length == 3 && args[1] instanceof Class<?> type
                             && saved.test(type)) {
                         // Replacing a codec would lose it for good when the addon disables.
@@ -174,6 +177,14 @@ final class Addons {
     }
 
     private static void checkAffinity(Addon addon, String id, Set<String> own, Set<String> taken) {
+        checkOwn(addon, "affinity", id, own, taken);
+    }
+
+    /** {@code id}, given to a registrar method about one of the addon's elements, has to be the addon's own. */
+    private static void checkOwn(Addon addon, String what, String id, Set<String> own, Set<String> taken) {
+        if (id == null) {
+            throw new IllegalArgumentException("An element's id can't be null");
+        }
         if (id.indexOf('-') >= 0) {
             throw new IllegalArgumentException("An element's id can't contain '-': " + id);
         }
@@ -182,7 +193,7 @@ final class Addons {
                     + ": register it first, and give only your own elements' ids");
         }
         if (taken.contains(id)) {
-            throw new IllegalArgumentException(id + " is also an id NeoSkript or another addon uses, so its affinity"
+            throw new IllegalArgumentException(id + " is also an id NeoSkript or another addon uses, so its " + what
                     + " can't be set: start your ids with your addon's name");
         }
     }

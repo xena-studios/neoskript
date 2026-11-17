@@ -20,6 +20,7 @@ import co.xenastudios.neoskript.harness.scenario.NeoSkriptItemsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptSkriptSuiteScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptAddonScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptOfficialAddonsScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptPausingScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptRegionsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptReloadScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptAutoReloadScenario;
@@ -85,7 +86,8 @@ public final class HarnessMain {
             new VariableBenchmark(),
             new NeoSkriptRegionsScenario(),
             new NeoSkriptAddonScenario(),
-            new NeoSkriptOfficialAddonsScenario());
+            new NeoSkriptOfficialAddonsScenario(),
+            new NeoSkriptPausingScenario());
 
     record Result(String environment, String scenario, boolean passed, Duration duration, String message,
             Map<String, Object> summary) {}

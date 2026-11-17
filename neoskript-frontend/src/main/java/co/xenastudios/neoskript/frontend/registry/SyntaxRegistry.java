@@ -49,6 +49,7 @@ public final class SyntaxRegistry {
     private final Map<String, Set<String>> conversions;
     private final Set<String> entityNames;
     private final Set<String> delaying;
+    private final boolean delayingExpressions;
     private final Set<String> stopping;
     private final Set<String> ending;
     private final Set<String> suppressing;
@@ -111,6 +112,7 @@ public final class SyntaxRegistry {
         this.conversions = Frozen.map(conversions);
         this.entityNames = Frozen.set(builder.entityNames);
         this.delaying = Frozen.set(builder.delaying);
+        this.delayingExpressions = builder.delaying.stream().anyMatch(key -> key.startsWith(SyntaxKind.EXPRESSION + ":"));
         this.stopping = Frozen.set(builder.stopping);
         this.ending = Frozen.set(builder.ending);
         this.suppressing = Frozen.set(builder.suppressing);
@@ -129,6 +131,11 @@ public final class SyntaxRegistry {
     /** Which event values code can use, or {@code null} if this registry can't tell. */
     public EventValues eventValues() {
         return eventValues;
+    }
+
+    /** Whether some expression makes the trigger wait for its value: an addon's pausing expression. */
+    public boolean delayingExpressions() {
+        return delayingExpressions;
     }
 
     /** Whether the syntax element makes the trigger wait, like {@code wait 1 second}. */
@@ -656,6 +663,11 @@ public final class SyntaxRegistry {
         }
 
         private Builder() {}
+
+        /** Whether a syntax element is marked as making the trigger wait. */
+        public boolean isDelaying(SyntaxKind kind, String id) {
+            return delaying.contains(kind + ":" + id);
+        }
 
         /** Marks a syntax element as making the trigger wait. */
         public Builder delays(SyntaxKind kind, String id) {

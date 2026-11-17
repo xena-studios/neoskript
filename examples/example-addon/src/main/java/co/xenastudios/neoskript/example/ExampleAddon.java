@@ -12,8 +12,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 /**
  * An example addon: a lottery of tickets. It registers a type ({@code ticket}), an event ({@code on lottery draw}),
  * an effect ({@code draw the lottery with %tickets%}), an expression ({@code [a] new ticket for %text%}), a
- * condition ({@code %tickets% (is|are) winning}) and a function ({@code lotteryPrize(n: integer)}), and its
- * {@code /lottery} command reads a script's variable.
+ * condition ({@code %tickets% (is|are) winning}), a function ({@code lotteryPrize(n: integer)}) and syntax that
+ * pauses the trigger until a slow service answers ({@link LotteryOffice}), and its {@code /lottery} command reads a
+ * script's variable.
  */
 public final class ExampleAddon extends JavaPlugin {
 

@@ -58,6 +58,8 @@ import co.xenastudios.neoskript.api.element.Expression;
 import co.xenastudios.neoskript.api.element.Function;
 import co.xenastudios.neoskript.api.element.SettableCondition;
 import co.xenastudios.neoskript.api.element.TriggerContext;
+import co.xenastudios.neoskript.api.element.PausingEffect;
+import co.xenastudios.neoskript.api.element.PausingExpression;
 import co.xenastudios.neoskript.api.element.Update;
 import co.xenastudios.neoskript.frontend.parse.CommandPattern;
 import co.xenastudios.neoskript.frontend.parse.Expr;
@@ -123,6 +125,7 @@ final class TriggerCompiler {
     private static final String PACKAGE = HOST.substring(0, HOST.lastIndexOf('/') + 1);
     private static final String CONTEXT = Type.getDescriptor(TriggerContext.class);
     private static final String VALUES = Type.getInternalName(Values.class);
+    private static final String PAUSES = Type.getInternalName(co.xenastudios.neoskript.runtime.Pauses.class);
     /** {@code keyed %objects%}: values with their indices, where something keeps them. */
     private static final String KEYED = "ExprKeyed";
     private static final String COMMAND_EVENT = Type.getInternalName(CommandEvent.class);
@@ -202,6 +205,12 @@ final class TriggerCompiler {
 
     /** The {@code run on} sections around the code being compiled for Folia, innermost first. */
     private final Deque<RunOn> runOns = new ArrayDeque<>();
+
+    /**
+     * The slots of the pausing expressions' values worked out so far for the statement being compiled, which a
+     * later pause on the same line keeps with the frame.
+     */
+    private final Deque<Integer> pausedValues = new ArrayDeque<>();
 
     /** A {@code wait}: where the trigger carries on, and the loop state it saves. */
     private record WaitPoint(Label resume, int line, List<int[]> savedSlots) {}
@@ -912,6 +921,9 @@ final class TriggerCompiler {
                 saved.add(new int[] {carried, SAVED_VALUES});
             }
         }
+        for (int paused : pausedValues) {
+            saved.add(new int[] {paused, SAVED_OBJECT});
+        }
         WaitPoint wait = new WaitPoint(new Label(), line, saved);
         int state = waits.size();
         waits.add(wait);
@@ -1096,7 +1108,13 @@ final class TriggerCompiler {
                         leaveGlobal();
                     }
                     if (startsConditional(statement)) {
-                        i = conditional(statements, i) - 1;
+                        try {
+                            i = conditional(statements, i) - 1;
+                        } catch (CompileException | RuntimeException e) {
+                            // A branch failed: carry on after it, not with it again as a statement of its own.
+                            i = chainAt;
+                            throw e;
+                        }
                     } else {
                         statement(statement);
                     }
@@ -1354,6 +1372,136 @@ final class TriggerCompiler {
 
     private void statement(Statement statement) throws CompileException {
         lineOf(statement, statement instanceof Statement.Section s ? s.line().key() : statement.line().text());
+        Object parsed = switch (statement) {
+            case Statement.Effect effect -> effect.effect();
+            case Statement.Condition condition -> condition.condition();
+            case Statement.Call call -> call.call();
+            default -> null;
+        };
+        List<Expr.Syntax> pausing = parsed == null ? List.of()
+                : co.xenastudios.neoskript.frontend.parse.PausingExpressions.in(parsed, registry);
+        if (pausing.isEmpty()) {
+            statementHere(statement);
+            return;
+        }
+        // The line's pausing expressions are worked out first, each waited for in turn, then the line runs with
+        // their values.
+        int carried = pausedValues.size();
+        try {
+            for (Expr.Syntax expression : pausing) {
+                int frame = pause(expression.syntax(), PausingExpression.class);
+                int slot = nextSlot++;
+                method.visitVarInsn(ALOAD, frame);
+                method.visitMethodInsn(INVOKESTATIC, PAUSES, "value", "(" + FRAME_DESC + ")" + OBJECT_DESC, false);
+                method.visitVarInsn(ASTORE, slot);
+                precomputed.put(expression, slot);
+                pausedValues.push(slot);
+            }
+            statementHere(statement);
+        } finally {
+            pausing.forEach(precomputed::remove);
+            while (pausedValues.size() > carried) {
+                pausedValues.pop();
+            }
+        }
+    }
+
+    /**
+     * Starts pausing element {@code syntax}, called as {@code type}, and waits for it: the trigger returns, and
+     * carries on here once its stage completes, or straight away if it had. Returns the slot of the frame, whose
+     * {@code result} the stage completed with ({@link co.xenastudios.neoskript.runtime.Pauses}).
+     */
+    private int pause(ParsedSyntax syntax, Class<?> type) throws CompileException {
+        if (!(library.binding(syntax.syntax()) instanceof ElementFactory<?> factory)) {
+            throw unsupported(syntax.syntax().id());
+        }
+        // It carries on on the trigger's own thread, so it doesn't start on the global one.
+        leaveGlobal();
+        int frameSlot = nextSlot++;
+        method.visitVarInsn(ALOAD, 0);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        WaitPoint wait = saveFrame();
+        method.visitInsn(DUP);
+        method.visitVarInsn(ASTORE, frameSlot);
+        Object element = factory.create(info(syntax));
+        if (!type.isInstance(element)) {
+            throw unsupported(syntax.syntax().id());
+        }
+        co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site = site(syntax, element.getClass());
+        // Its start throwing is a failed stage, as a stage completing exceptionally is.
+        constant(co.xenastudios.neoskript.runtime.Pauses.guard(regional(element, type, syntax, site), type), type);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        arguments(syntax);
+        method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(type), "start",
+                "(" + CONTEXT + OBJECTS + ")Ljava/util/concurrent/CompletionStage;", true);
+        constant(new co.xenastudios.neoskript.runtime.Pauses.Point(site, library.timeoutMillis(baseId(syntax))),
+                co.xenastudios.neoskript.runtime.Pauses.Point.class);
+        method.visitMethodInsn(INVOKESTATIC, PAUSES, "pause", "(" + Type.getDescriptor(Resumable.class) + CONTEXT
+                + FRAME_DESC + "Ljava/util/concurrent/CompletionStage;"
+                + Type.getDescriptor(co.xenastudios.neoskript.runtime.Pauses.Point.class) + ")Z", false);
+        Label now = new Label();
+        method.visitJumpInsn(IFEQ, now);
+        exitTrigger();
+        method.visitLabel(wait.resume());
+        method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
+        method.visitTypeInsn(CHECKCAST, Type.getInternalName(Frame.class));
+        method.visitVarInsn(ASTORE, frameSlot);
+        method.visitLabel(now);
+        return frameSlot;
+    }
+
+    /** An element's id without its variant ({@code id-2}), as addons name it. */
+    private static String baseId(ParsedSyntax syntax) {
+        String id = syntax.syntax().id();
+        int variant = id.indexOf('-');
+        return variant < 0 ? id : id.substring(0, variant);
+    }
+
+    /**
+     * A pausing effect: waits for it, then stores what it gave in its target, if it has one and didn't fail.
+     */
+    private void pausingEffect(ParsedSyntax effect, PausingEffect element) throws CompileException {
+        int target = element.target();
+        Expr stored = null;
+        if (target >= 0) {
+            if (target >= effect.match().values().size()) {
+                throw unsupported("'" + source + "'");
+            }
+            Object value = effect.match().values().get(target);
+            if (value != null && !(value instanceof Expr)) {
+                throw unsupported("'" + source + "'");
+            }
+            stored = (Expr) value;
+            if (stored != null && !settable(stored)) {
+                throw new CompileException(line, source.substring(stored.start(), stored.end()).strip()
+                        + " can't be set to anything");
+            }
+        }
+        int frame = pause(effect, PausingEffect.class);
+        if (stored == null) {
+            return;
+        }
+        Label skip = new Label();
+        method.visitVarInsn(ALOAD, frame);
+        method.visitMethodInsn(INVOKESTATIC, PAUSES, "failed", "(" + FRAME_DESC + ")Z", false);
+        method.visitJumpInsn(IFNE, skip);
+        if (stored instanceof Expr.Variable list && list.list()) {
+            // A map's keys are the list's indices: 'store the result in {_rows::*}'.
+            variableStore(list);
+            variableName(list);
+            method.visitVarInsn(ALOAD, frame);
+            method.visitMethodInsn(INVOKESTATIC, PAUSES, "keyed", "(" + FRAME_DESC + ")" + OBJECT_DESC, false);
+            method.visitMethodInsn(INVOKEVIRTUAL, STORE, "setListKeyed", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
+        } else {
+            setTo(stored, () -> {
+                method.visitVarInsn(ALOAD, frame);
+                method.visitMethodInsn(INVOKESTATIC, PAUSES, "value", "(" + FRAME_DESC + ")" + OBJECT_DESC, false);
+            });
+        }
+        method.visitLabel(skip);
+    }
+
+    private void statementHere(Statement statement) throws CompileException {
         switch (statement) {
             case Statement.Effect effect -> effect(effect.effect());
             case Statement.Condition condition -> {
@@ -1484,8 +1632,20 @@ final class TriggerCompiler {
      */
     private int conditional(List<Statement> statements, int i) throws CompileException {
         Label chainEnd = new Label();
+        int[] at = {i};
+        try {
+            return conditionalChain(statements, i, chainEnd, at);
+        } catch (CompileException | RuntimeException e) {
+            chainAt = at[0];
+            throw e;
+        }
+    }
+
+    /** {@link #conditional}, with the statement it's at kept in {@code at}. */
+    private int conditionalChain(List<Statement> statements, int i, Label chainEnd, int[] at) throws CompileException {
         boolean first = true;
         while (i < statements.size()) {
+            at[0] = i;
             Statement statement = statements.get(i);
             String key = statement.line().key().strip().toLowerCase(Locale.ROOT);
             if (!first && !isElse(key)) {
@@ -1551,6 +1711,9 @@ final class TriggerCompiler {
         method.visitLabel(chainEnd);
         return i;
     }
+
+    /** The statement of the {@code if} chain being compiled, so a failure in it carries on after it. */
+    private int chainAt;
 
     /** Whether {@code statements} compile on their own, as {@code parse if} code has to for its condition to hold. */
     private boolean compilesApart(List<Statement> statements) {
@@ -2198,6 +2361,11 @@ final class TriggerCompiler {
     }
 
     private void effectHere(ParsedSyntax effect) throws CompileException {
+        if (registry.delays(effect.syntax()) && library.binding(effect.syntax()) instanceof ElementFactory<?> pausing
+                && pausing.create(info(effect)) instanceof PausingEffect element) {
+            pausingEffect(effect, element);
+            return;
+        }
         if (library.binding(effect.syntax()) instanceof ElementFactory<?> factory
                 && factory.create(info(effect))
                         instanceof Update update) {
@@ -2218,6 +2386,11 @@ final class TriggerCompiler {
                 method.visitJumpInsn(GOTO, loop.next());
             }
             case CoreSyntax.RETURN -> {
+                if (!co.xenastudios.neoskript.frontend.parse.PausingExpressions.in(effect, registry).isEmpty()) {
+                    // The line waits for its value first, so the caller has gone on by then: as after a wait.
+                    throw new CompileException(line, "A return statement after a delay is useless, as the calling"
+                            + " trigger will resume when the delay starts (and won't get any returned value)");
+                }
                 Block handler = returnHandler();
                 if (handler != null) {
                     returnFromSection(handler, (Expr) effect.match().values().getFirst());
@@ -3840,6 +4013,11 @@ final class TriggerCompiler {
             throw unsupported(syntax.syntax().id());
         }
         Object element = factory.create(info(syntax));
+        if (element instanceof PausingExpression || element instanceof PausingEffect) {
+            String text = textOf(syntax);
+            throw new CompileException(line, "'" + (text == null ? syntax.syntax().id() : text) + "' waits for its value, so it can only be"
+                    + " used in an effect or a condition on a line of its own. Set a variable to it first.");
+        }
         co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site = site(syntax, element.getClass());
         constant(regional(element, type, syntax, site), type);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);

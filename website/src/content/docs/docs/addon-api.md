@@ -202,6 +202,50 @@ registrar.function("lotteryPrize", List.of(Parameter.of("tickets", "integer")), 
 
 Scripts call it as `lotteryPrize(3)`. A script's own function with the same name takes precedence.
 
+## Waiting for a result
+
+Some syntax has to wait for something slow: a database query, a web request, another server. Never make the server wait for it. A **pausing** element starts the work and returns a `CompletionStage`, and the trigger stops there, as it does at `wait`, until the stage completes:
+
+```java
+registrar.pausingEffect("MyAddonEffPing", info -> (context, args) ->
+        CompletableFuture.runAsync(() -> ping((String) args[0]), executor),
+        "ping %text%");
+
+registrar.pausingExpression("MyAddonExprStatus", "text", info -> (context, args) ->
+        CompletableFuture.supplyAsync(() -> fetchStatus((String) args[0]), executor),
+        "[the] status of [the] server %text%");
+```
+
+```
+ping "lobby"
+set {_status} to the status of the server "lobby"
+send "Lobby: %{_status}%"
+```
+
+Do the slow part on your own executor (or `threads().runAsync`), and complete the stage from there. `start` itself runs on the trigger's thread, so it mustn't block. Read what you need from the arguments and `context.event()` in `start`, and don't touch the `TriggerContext`, the event or anything a region owns from your executor's thread: the trigger has stopped, and on Folia only the owner's thread may touch those. If `start` throws, that's the same as a failed stage.
+
+When the stage completes, the trigger carries on from where it stopped, with its local variables and the loops it's in, on the thread it was on: the main thread on Paper; on Folia, the thread of what started the trigger, or of the `run on` section it's in. A stage that's complete already carries straight on. A pausing expression's value arrives before its line runs: each one on a line is worked out first, in the order written. They can be used in effects, conditions and function calls on a line of their own, not in `if`, `loop` or `while` headers; set a variable first.
+
+To store the result where the script says, as `execute ... and store the result in {_rows::*}` does, give the placeholder's index to `PausingEffect.storing`:
+
+```java
+registrar.pausingEffect("MyAddonEffQuery", info -> PausingEffect.storing(1, (context, args) ->
+        CompletableFuture.supplyAsync(() -> query((String) args[0]), executor)),
+        "query %text% [and store [the] result in %-objects%]");
+```
+
+The value is stored as `set` would. A `Map` sets a list's indices, and a map or list in it makes a list under its index: `{"name": ["Steve", "Alex"]}` gives `{_rows::name::1}` and `{_rows::name::2}`. A `Collection` or an array is several values, numbered from 1.
+
+**What scripts see.** A pausing element is a delay for Skript's rules, as `wait` is, from the start of its line: the line runs once the value is there, so on that line and after it the event has passed. `return` can't be used there, nor `cancel event` and the like. A stage that fails is a runtime error on the line, with its exception's message, and the trigger carries on: the expression has no value, the variable isn't changed. If the stage takes longer than its timeout, the same happens, and NeoSkript tries to cancel it. The timeout is a minute unless you set one; an addon whose work has its own time limit (a database query, a web request) should set the element's to match it, so scripts see the addon's error rather than NeoSkript's:
+
+```java
+registrar.timeout("MyAddonEffQuery", Duration.ofSeconds(30));
+```
+
+At most 10,000 triggers wait at once; past that, a pausing element fails at once with a runtime error. `/sk info` shows how many are waiting.
+
+**Reloads and stopping.** A trigger whose script is reloaded or unloaded while it waits carries on with the code it started with, as after a `wait`. When the server stops, `on unload` triggers run first, and what they pause for (a last write to a database) gets up to 3 seconds to finish before the server exits. Then triggers still waiting are dropped without carrying on, as after a `wait`. Their stages aren't cancelled: the work may still be running, and finishing or stopping it is up to your addon's own `onDisable`. A stage that completes after a timeout or a stop is ignored, and NeoSkript keeps nothing of the trigger or its event once its pause is over, so holding on to a stage doesn't hold on to old scripts or players.
+
 ## Converters, comparisons and arithmetic
 
 ```java
@@ -248,7 +292,8 @@ On Paper, everything runs on the main thread. On Folia, an entity, a block and a
 Your elements run on the trigger's thread. By default, NeoSkript treats them as touching the entities, blocks and locations they're given:
 
 - an expression or condition given one that another thread owns is a runtime error naming the line, and gives nothing;
-- an effect given one runs on the owner's thread, soon, while the trigger carries on.
+- an effect given one runs on the owner's thread, soon, while the trigger carries on;
+- a pausing effect or expression given one is a runtime error, and doesn't start: it starts where the trigger is, so it can't run elsewhere.
 
 Say so when an element is different, by the id of one of your own elements:
 

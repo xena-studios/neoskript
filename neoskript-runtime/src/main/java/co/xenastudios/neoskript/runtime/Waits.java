@@ -43,13 +43,13 @@ public final class Waits {
         return PENDING.containsKey(event);
     }
 
-    private static void scheduled(Object event) {
+    static void scheduled(Object event) {
         if (tracking && event != null) {
             PENDING.merge(event, 1, Integer::sum);
         }
     }
 
-    private static void ran(Object event) {
+    static void ran(Object event) {
         if (tracking && event != null) {
             PENDING.computeIfPresent(event, (key, count) -> count == 1 ? null : count - 1);
         }
@@ -58,6 +58,22 @@ public final class Waits {
     public static void install(Scheduler scheduler, Consumer<ScriptRuntimeException> errors) {
         Waits.scheduler = scheduler;
         Waits.errors = errors;
+        Pauses.open();
+    }
+
+    /** The installed scheduler, or {@code null}. */
+    static Scheduler scheduler() {
+        return scheduler;
+    }
+
+    /** Where errors in resumed code go. */
+    static Consumer<ScriptRuntimeException> errors() {
+        return errors;
+    }
+
+    /** What the trigger's event happened to, whose thread it carries on on (Folia), for {@link Pauses}. */
+    static Object ownerOf(TriggerContext context, Frame frame) {
+        return frame.owner != null ? frame.owner : owner(context);
     }
 
     /** How long a {@code wait} waits, in ticks. Anything that isn't a timespan waits nothing. */

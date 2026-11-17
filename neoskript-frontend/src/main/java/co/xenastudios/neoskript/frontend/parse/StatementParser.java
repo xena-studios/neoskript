@@ -249,7 +249,33 @@ final class StatementParser {
         return statement;
     }
 
+    /** Set by {@link #simpleOnce} when the line has a pausing expression and was read as not after a delay. */
+    private boolean pausing;
+
+    /**
+     * A line on its own. One with an addon's pausing expression waits for its value before anything else on the line
+     * runs, so for Skript's rules it's as if the line started with a {@code wait}: certainly after a delay, from the
+     * line itself on. Skript has no such expressions; reading the line again from that state makes its own checks
+     * ({@code return}, {@code cancel event}, changing the event's values) follow the rules they follow after a wait.
+     */
     private Statement simple(Line line) {
+        int mark = diagnostics.mark();
+        pausing = false;
+        Statement statement = simpleOnce(line);
+        if (!pausing) {
+            return statement;
+        }
+        pausing = false;
+        diagnostics.takeSince(mark);
+        delay = DelayState.DELAYED;
+        delays.put(line, delay);
+        statement = simpleOnce(line);
+        // It stays certain after the line, whatever the line does.
+        delay = DelayState.DELAYED;
+        return statement;
+    }
+
+    private Statement simpleOnce(Line line) {
         if (line.text().strip().equalsIgnoreCase(PARSE_SECTION + ":")) {
             error(line, "A parse section must contain code");
             return new Statement.Invalid(line);
@@ -287,6 +313,12 @@ final class StatementParser {
         String unusable = parsed instanceof ParsedSyntax syntax ? unusableChanger(line.text(), syntax) : null;
         if (unusable != null) {
             error(line, unusable);
+            return new Statement.Invalid(line);
+        }
+        if (delay != DelayState.DELAYED && parsed != null && PausingExpressions.any(parsed, context.registry())) {
+            // The line waits for an addon's value before anything else on it runs, so it's read again as after a
+            // wait (see pausingLine).
+            pausing = true;
             return new Statement.Invalid(line);
         }
         if (parsed instanceof Expr.FunctionCall call) {
