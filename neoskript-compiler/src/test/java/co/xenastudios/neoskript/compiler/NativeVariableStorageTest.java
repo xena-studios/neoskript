@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.variables.VariableStore;
@@ -21,6 +22,7 @@ import co.xenastudios.neoskript.runtime.variables.storage.RawValue;
 import co.xenastudios.neoskript.runtime.variables.storage.VariableBackend;
 import co.xenastudios.neoskript.runtime.variables.storage.VariableBackends;
 import co.xenastudios.neoskript.runtime.variables.storage.VariableCodecs;
+import co.xenastudios.neoskript.runtime.variables.storage.VariableFile;
 import co.xenastudios.neoskript.runtime.variables.storage.VariableStorage;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -167,12 +169,22 @@ class NativeVariableStorageTest {
         assertEquals(1L, loaded.get("other"));
     }
 
+    /**
+     * The file as a crash during the save that made {@code after} would leave it: {@code after} cut at {@code cut},
+     * with the header as it was before the save, as the save's commit comes last.
+     */
+    private static byte[] crashed(byte[] before, byte[] after, int cut) {
+        byte[] file = Arrays.copyOf(after, cut);
+        System.arraycopy(before, 0, file, 0, NativeVariableFile.HEADER_LENGTH);
+        return file;
+    }
+
     @Test
     void aSaveCutOffAnywhereLeavesThePreviousSave() throws Exception {
         VariableStore store = new VariableStore();
         Path file = dir.resolve("variables.nsv");
         Map<String, String> before;
-        long end;
+        byte[] first;
         byte[] whole;
         try (NativeVariableStorage storage = open(store)) {
             for (int i = 0; i < 100; i++) {
@@ -180,7 +192,7 @@ class NativeVariableStorageTest {
             }
             storage.save();
             before = saved(store);
-            end = Files.size(file);
+            first = Files.readAllBytes(file);
             store.set("v::1", "one");
             store.set("v::2", null);
             store.set("v::new", true);
@@ -188,23 +200,24 @@ class NativeVariableStorageTest {
             whole = Files.readAllBytes(file);
         }
         Map<String, String> after = saved(store);
-        assertTrue(whole.length > end);
-        // A crash at every byte of the second save: each loads exactly the first.
-        for (long cut = end; cut < whole.length; cut++) {
-            Files.write(file, Arrays.copyOf(whole, (int) cut));
+        assertTrue(whole.length > first.length);
+        // A crash at every byte of the second save, before its commit: each loads exactly the first.
+        for (int cut = first.length; cut <= whole.length; cut++) {
+            byte[] crashed = crashed(first, whole, cut);
+            Files.write(file, crashed);
             VariableStore loaded = new VariableStore();
             try (NativeVariableStorage storage = open(loaded)) {
-                assertEquals(before, saved(loaded), "cut at " + cut);
-                assertEquals(cut - end, storage.recoveredBytes());
-                if (cut > end) {
-                    assertNotNull(storage.recoveryBackup());
-                    assertArrayEquals(Arrays.copyOf(whole, (int) cut), Files.readAllBytes(storage.recoveryBackup()));
+                // Cut at the very end, the save is whole without its commit, and is kept.
+                assertEquals(cut == whole.length ? after : before, saved(loaded), "cut at " + cut);
+                boolean tail = cut > first.length && cut < whole.length;
+                assertEquals(tail ? cut - first.length : 0, storage.recoveredBytes());
+                if (tail) {
+                    assertArrayEquals(crashed, Files.readAllBytes(storage.recoveryBackup()));
                 }
             }
-            assertEquals(end, Files.size(file), "the broken record is dropped");
         }
-        // A save after recovering appends where the good records end.
-        Files.write(file, Arrays.copyOf(whole, whole.length - 3));
+        // A save after recovering appends where the good saves end, and commits.
+        Files.write(file, crashed(first, whole, whole.length - 3));
         VariableStore recovered = new VariableStore();
         try (NativeVariableStorage storage = open(recovered)) {
             recovered.set("v::after", "crash");
@@ -213,32 +226,55 @@ class NativeVariableStorageTest {
         VariableStore loaded = reload();
         assertEquals("crash", loaded.get("v::after"));
         assertEquals(1L, loaded.get("v::1"), "the cut save isn't there");
-        // And the whole file, uncut, has the second save.
-        Files.write(file, whole);
-        assertEquals(after, saved(reload()));
     }
 
     @Test
-    void aDamagedRecordIsntApplied() throws Exception {
+    void aZeroFilledTailIsACrash() throws Exception {
         VariableStore store = new VariableStore();
         Path file = dir.resolve("variables.nsv");
-        long end;
+        try (NativeVariableStorage storage = open(store)) {
+            store.set("a", "kept");
+            storage.save();
+        }
+        byte[] good = Files.readAllBytes(file);
+        // What XFS or ext4 (data=writeback) leave after a power cut: the file's new length, but zeros in it.
+        for (int zeros : new int[] {8, 64, 4096}) {
+            Files.write(file, Arrays.copyOf(good, good.length + zeros));
+            VariableStore loaded = new VariableStore();
+            try (NativeVariableStorage storage = open(loaded)) {
+                assertEquals("kept", loaded.get("a"), zeros + " zeros");
+                assertEquals(zeros, storage.recoveredBytes());
+            }
+            assertArrayEquals(good, Files.readAllBytes(file));
+        }
+    }
+
+    @Test
+    void aFlippedBitInACommittedSaveIsRefusedButInAnUncommittedOneIsACrash() throws Exception {
+        VariableStore store = new VariableStore();
+        Path file = dir.resolve("variables.nsv");
+        byte[] first;
         try (NativeVariableStorage storage = open(store)) {
             store.set("a", 1L);
             storage.save();
-            end = Files.size(file);
+            first = Files.readAllBytes(file);
             store.set("a", 2L);
             storage.save();
         }
         byte[] bytes = Files.readAllBytes(file);
         bytes[bytes.length - 1] ^= 0x01;
+        // The last save was synced and committed, so a bad byte in it is damage: refused, and left alone.
         Files.write(file, bytes);
+        assertThrows(IOException.class, () -> open(new VariableStore()));
+        assertArrayEquals(bytes, Files.readAllBytes(file));
+        // Without its commit, it's a save a crash cut off.
+        Files.write(file, crashed(first, bytes, bytes.length));
         VariableStore loaded = new VariableStore();
         try (NativeVariableStorage storage = open(loaded)) {
             assertEquals(1L, loaded.get("a"));
             assertNotNull(storage.recoveryBackup());
         }
-        assertEquals(end, Files.size(file));
+        assertEquals(first.length, Files.size(file));
     }
 
     @Test
@@ -455,12 +491,12 @@ class NativeVariableStorageTest {
     }
 
     @Test
-    void aLargeSaveCutOffBetweenItsRecordsIsntHalfApplied() throws Exception {
+    void aLargeSaveCutOffOrTornBetweenItsRecordsIsntHalfApplied() throws Exception {
         VariableStore store = new VariableStore();
         Path file = dir.resolve("variables.nsv");
         String kilobyte = "k".repeat(1000);
         Map<String, String> before;
-        long end;
+        byte[] first;
         byte[] whole;
         try (NativeVariableStorage storage = open(store)) {
             for (int i = 1; i <= 3_000; i++) {
@@ -468,7 +504,7 @@ class NativeVariableStorageTest {
             }
             storage.save();
             before = saved(store);
-            end = Files.size(file);
+            first = Files.readAllBytes(file);
             // delete {x::*}, set {x::1}, and enough more that the save takes several records.
             store.deleteList("x");
             store.set("x::1", "new");
@@ -478,43 +514,96 @@ class NativeVariableStorageTest {
             storage.save();
             whole = Files.readAllBytes(file);
         }
-        int first = java.nio.ByteBuffer.wrap(whole, (int) end, 4).getInt() + 8;
-        assertTrue(end + first < whole.length - 8, "the save took more than one record");
-        for (long cut : new long[] {end + first, end + first + 9, whole.length - 1}) {
-            Files.write(file, Arrays.copyOf(whole, (int) cut));
+        int end = first.length;
+        int firstRecord = java.nio.ByteBuffer.wrap(whole, end, 4).getInt() + 8;
+        assertTrue(end + firstRecord < whole.length - 8, "the save took more than one record");
+        for (int cut : new int[] {end + firstRecord, end + firstRecord + 9, whole.length - 1}) {
+            Files.write(file, crashed(first, whole, cut));
             VariableStore loaded = new VariableStore();
             try (NativeVariableStorage storage = open(loaded)) {
                 assertEquals(before, saved(loaded), "cut at " + cut);
                 assertEquals(cut - end, storage.recoveredBytes());
             }
         }
+        // Torn: the later records reached the disk, but a page of the first one didn't.
+        byte[] torn = crashed(first, whole, whole.length);
+        Arrays.fill(torn, end + 100, end + 100 + 4096, (byte) 0);
+        Files.write(file, torn);
+        VariableStore loaded = new VariableStore();
+        try (NativeVariableStorage storage = open(loaded)) {
+            assertEquals(before, saved(loaded));
+            assertEquals(whole.length - end, storage.recoveredBytes());
+        }
         Files.write(file, whole);
-        VariableStore loaded = reload();
+        loaded = reload();
         assertEquals("new", loaded.get("x::1"));
         assertNull(loaded.get("x::2"));
     }
 
     @Test
-    void damageInTheMiddleIsRefusedAndNeverWrittenOver() throws Exception {
+    void damageInTheCompactedSnapshotIsRefusedAndNeverWrittenOver() throws Exception {
+        // A compacted file: written whole to a temporary file, synced and renamed, so never a crash's tail.
+        Path csv = skriptFile();
+        VariableBackends.open(VariableBackends.Kind.NATIVE, new VariableStore(), codecs, csv);
+        Path file = dir.resolve("variables.nsv");
+        byte[] good = Files.readAllBytes(file);
+        for (int at : new int[] {NativeVariableFile.HEADER_LENGTH + 3, good.length / 2, good.length - 1, 10}) {
+            byte[] bytes = good.clone();
+            bytes[at] ^= 0x10;
+            Files.write(file, bytes);
+            NativeVariableStorage storage = new NativeVariableStorage(new VariableStore(), codecs, file);
+            assertThrows(IOException.class, storage::load, "flipped at " + at);
+            assertFalse(storage.loaded());
+            assertThrows(IllegalStateException.class, storage::save);
+            assertArrayEquals(bytes, Files.readAllBytes(file), "left alone");
+        }
+        assertFalse(Files.exists(dir.resolve("backups").resolve("variables.nsv")), "nothing was cut off");
+    }
+
+    @Test
+    void damageInAnEarlierSaveIsRefused() throws Exception {
         VariableStore store = new VariableStore();
         Path file = dir.resolve("variables.nsv");
+        int secondSave;
         try (NativeVariableStorage storage = open(store)) {
-            for (int round = 0; round < 5; round++) {
+            store.set("v::0", 0L);
+            storage.save();
+            secondSave = (int) Files.size(file);
+            for (int round = 1; round < 5; round++) {
                 store.set("v::" + round, (long) round);
                 storage.save();
             }
         }
         byte[] bytes = Files.readAllBytes(file);
-        // A flipped bit in the first save's entries, with four good saves after it.
-        bytes[NativeVariableFile.HEADER_LENGTH + 8 + 3] ^= 0x10;
+        bytes[secondSave + 9] ^= 0x10;
         Files.write(file, bytes);
-        NativeVariableStorage storage = new NativeVariableStorage(new VariableStore(), codecs, file);
-        IOException refused = assertThrows(IOException.class, storage::load);
-        assertTrue(refused.getMessage().contains("isn't a save cut off by a crash"), refused.getMessage());
-        assertFalse(storage.loaded());
-        assertThrows(IllegalStateException.class, storage::save);
+        IOException refused = assertThrows(IOException.class, () -> open(new VariableStore()));
+        assertTrue(refused.getMessage().contains("damaged"), refused.getMessage());
         assertArrayEquals(bytes, Files.readAllBytes(file));
-        assertFalse(Files.exists(dir.resolve("backups")), "nothing to recover from: it isn't touched");
+    }
+
+    @Test
+    void valuesThatLookLikeRecordsDontMatter() throws Exception {
+        VariableStore store = new VariableStore();
+        Path file = dir.resolve("variables.nsv");
+        byte[] first;
+        byte[] whole;
+        try (NativeVariableStorage storage = open(store)) {
+            store.set("a", "kept");
+            storage.save();
+            first = Files.readAllBytes(file);
+            // A player's text holding a whole, well-formed save of its own.
+            byte[] fake = Arrays.copyOfRange(first, NativeVariableFile.HEADER_LENGTH, first.length);
+            store.set("text", new String(fake, java.nio.charset.StandardCharsets.ISO_8859_1).repeat(3));
+            storage.save();
+            whole = Files.readAllBytes(file);
+        }
+        Files.write(file, crashed(first, whole, whole.length - 2));
+        VariableStore loaded = new VariableStore();
+        try (NativeVariableStorage storage = open(loaded)) {
+            assertEquals("kept", loaded.get("a"));
+            assertNull(loaded.get("text"));
+        }
     }
 
     @Test
@@ -525,7 +614,7 @@ class NativeVariableStorageTest {
             store.set("a", 1L);
             storage.save();
         }
-        // A record of a kind a newer NeoSkript might write, with a good checksum, at the end of the file.
+        // A record of a kind a newer NeoSkript might write, with a good checksum, after the committed saves.
         byte[] payload = {7, 0, 0};
         java.util.zip.CRC32C crc = new java.util.zip.CRC32C();
         crc.update(payload);
@@ -543,6 +632,43 @@ class NativeVariableStorageTest {
         Files.write(file, bytes);
         assertThrows(IOException.class, () -> open(new VariableStore()));
         assertArrayEquals(bytes, Files.readAllBytes(file));
+    }
+
+    @Test
+    void aReadOnlyFileIsBackedUp() throws Exception {
+        Path csv = skriptFile();
+        assumeTrue(Files.getFileStore(csv).supportsFileAttributeView("posix"));
+        Files.setPosixFilePermissions(csv, java.nio.file.attribute.PosixFilePermissions.fromString("r--r--r--"));
+        Path backup = VariableStorage.backup(csv);
+        assertArrayEquals(Files.readAllBytes(csv), Files.readAllBytes(backup));
+        assertEquals(Files.getLastModifiedTime(csv), Files.getLastModifiedTime(backup));
+    }
+
+    @Test
+    void aCsvSaveThatFailsMidwayLeavesTheOldFile() throws Exception {
+        Path csv = skriptFile();
+        byte[] old = Files.readAllBytes(csv);
+        Iterable<VariableFile.Entry> failing = () -> new java.util.Iterator<>() {
+            int n;
+
+            @Override
+            public boolean hasNext() {
+                return true;
+            }
+
+            @Override
+            public VariableFile.Entry next() {
+                if (++n > 1_000) {
+                    throw new IllegalStateException("stopped midway");
+                }
+                return new VariableFile.Entry("v::" + n, "long", new byte[8]);
+            }
+        };
+        assertThrows(IllegalStateException.class, () -> VariableFile.write(csv, failing));
+        assertArrayEquals(old, Files.readAllBytes(csv));
+        try (Stream<Path> files = Files.list(dir)) {
+            assertEquals(List.of("variables.csv"), files.map(p -> p.getFileName().toString()).toList(), "no temp left");
+        }
     }
 
     @Test

@@ -7,6 +7,7 @@ package co.xenastudios.neoskript.runtime.variables.storage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import co.xenastudios.neoskript.runtime.variables.VariableStore;
 import java.io.IOException;
@@ -82,6 +83,12 @@ class NativeVariableStorageFailureTest {
             assertThrows(IOException.class, storage::save);
             assertEquals(size, Files.size(dir.resolve("variables.nsv")), "the part written is cut off again");
             writeBudget = Long.MAX_VALUE;
+            // The compaction that's due counts as a change, so the next save happens even with nothing changed.
+            long modifications = store.modifications();
+            storage.save();
+            assertFalse(storage.changed());
+            store.set("v::3", value("again"));
+            assertEquals(modifications + 1, store.modifications());
             storage.save();
             assertEquals(1, storage.compactions(), "a new file instead of appending after a broken save");
         }
@@ -219,7 +226,12 @@ class NativeVariableStorageFailureTest {
 
         @Override
         public int write(ByteBuffer src, long position) throws IOException {
-            throw new UnsupportedOperationException();
+            if (writeBudget <= 0) {
+                throw new IOException("disk full");
+            }
+            int written = file.write(src, position);
+            writeBudget -= written;
+            return written;
         }
 
         @Override

@@ -51,6 +51,13 @@ public final class VariableBackends {
         }
     }
 
+    /** Both files hold different variables and only the owner can say which to keep. Neither was changed. */
+    public static final class Conflict extends IOException {
+        Conflict(String message) {
+            super(message);
+        }
+    }
+
     /** The storage to load from, what was done to get there, and warnings, for the log. */
     public record Opened(VariableBackend backend, List<String> log, List<String> warnings) {}
 
@@ -115,7 +122,7 @@ public final class VariableBackends {
             return;
         }
         if (csvTime.isAfter(nativeTime)) {
-            throw new IOException(csv.getFileName() + " and " + nsv.getFileName() + " are both there with different "
+            throw new Conflict(csv.getFileName() + " and " + nsv.getFileName() + " are both there with different "
                     + "variables, and " + csv.getFileName() + " is newer, so something that doesn't read "
                     + nsv.getFileName() + " (an older NeoSkript, or Skript) saved it. NeoSkript won't pick one: move "
                     + "the one you don't want out of the folder and restart. " + times);

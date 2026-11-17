@@ -4,7 +4,9 @@
  */
 package co.xenastudios.neoskript.runtime.variables.storage;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -92,23 +94,27 @@ public final class VariableFile {
 
     /**
      * Writes the entries, in the order given, to a temporary file that's synced to disk and then replaces
-     * {@code file}, so a crash or power cut leaves either the old file or the new one.
+     * {@code file}, so a crash or power cut leaves either the old file or the new one. The file is streamed, never
+     * held in memory whole.
      */
     public static void write(Path file, Iterable<Entry> entries) throws IOException {
-        Durable.replace(file, render(entries));
-    }
-
-    /** The file's bytes for {@code entries}, in the order given. */
-    public static byte[] render(Iterable<Entry> entries) {
-        StringBuilder out = new StringBuilder(HEADER);
-        HexFormat hex = HexFormat.of().withUpperCase();
-        for (Entry entry : entries) {
-            out.append(quote(entry.name())).append(", ").append(entry.type()).append(", ")
-                    .append(hex.formatHex(entry.bytes())).append('\n');
-        }
-        // Skript ends the file with an empty line.
-        out.append('\n');
-        return out.toString().getBytes(StandardCharsets.UTF_8);
+        Durable.replace(file, stream -> {
+            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(stream, StandardCharsets.UTF_8), 1 << 16);
+            out.write(HEADER);
+            HexFormat hex = HexFormat.of().withUpperCase();
+            for (Entry entry : entries) {
+                out.write(quote(entry.name()));
+                out.write(", ");
+                out.write(entry.type());
+                out.write(", ");
+                out.write(hex.formatHex(entry.bytes()));
+                out.write('\n');
+            }
+            // Skript ends the file with an empty line.
+            out.write('\n');
+            // Flushed, not closed: the file is synced before it's closed.
+            out.flush();
+        });
     }
 
     static String quote(String field) {

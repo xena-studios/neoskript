@@ -6,6 +6,7 @@ package co.xenastudios.neoskript.runtime.variables.storage;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,11 +17,13 @@ import java.util.Map;
 import java.util.zip.CRC32C;
 
 /**
- * NeoSkript's own variable file ({@code variables.nsv}): an 8-byte header, then records. Each save is one record,
- * or several when it's large, applied whole or not at all:
+ * NeoSkript's own variable file ({@code variables.nsv}): a header, then saves. Each save is one record, or several
+ * when it's large, applied whole or not at all:
  *
  * <pre>
- *   record  = length (u32) crc32c (u32) payload
+ *   header  = "NSKV" version (u16, 1) flags (u16, 0) commit commit
+ *   commit  = sequence (u64) end (u64) crc32c of the 16 bytes before (u32)
+ *   record  = length (u32, at least 1) crc32c (u32) payload
  *   payload = kind (u8) types entries
  *   kind    = 0 for a save's last (or only) record, 1 for a record the next one continues
  *   types   = count (varint) then each type name (varint length, UTF-8)
@@ -30,24 +33,29 @@ import java.util.zip.CRC32C;
  * <p>A name is the first {@code shared} bytes of the previous name in the record, then its suffix, so names in
  * the same list cost a few bytes. The type is {@code 0} to delete the variable, or {@code 1 + its index} in the
  * record's types followed by the value (varint length, then the bytes of Skript's binary value format, as in
- * {@code variables.csv}). Later records win over earlier ones.
+ * {@code variables.csv}). Later saves win over earlier ones.
  *
- * <p>Saves append their records. Compaction writes the whole set to a new file, in Skript's order, and swaps it
- * in. The records of a save are only applied once its last record has been read.
+ * <p><b>Commits.</b> Compaction writes the whole set to a new file, whose first commit's end is the end of the
+ * file, syncs it and renames it over the old one. A save appends its records and syncs them, then writes the other
+ * commit slot with the next sequence number and the new end, and syncs that. The valid commit with the highest
+ * sequence says where the committed saves end; a commit slot torn by a crash fails its checksum, and the other
+ * still holds the commit before it.
  *
- * <p>A save cut off by a crash leaves a tail that can't be read: a record that runs past the end of the file or
- * fails its checksum, with no good record after it, or a save whose last record never came. Everything before that
- * save is kept and the reader says where it stopped. A bad record with good ones after it is damage, not a crash,
- * and so is a record whose checksum is right but that can't be read (written by a newer NeoSkript): then reading
- * fails, and the file must not be written over.
+ * <p><b>Crash or damage.</b> Everything before the committed end was synced before the commit was written, so it
+ * must read perfectly: anything wrong there is damage, and reading fails rather than dropping it. After the
+ * committed end is at most one save whose commit didn't happen. If it's whole, it's applied. Anything else after
+ * the committed end, in any state (cut short, torn in any order, zero-filled by the file system), is the tail of a
+ * save a crash cut off, and is dropped. No bytes after it are looked at, so values can't look like records.
  */
 public final class NativeVariableFile {
 
     /** {@code NSKV}, then the format version (1) and two bytes reserved for flags, zero in version 1. */
-    static final byte[] HEADER = {'N', 'S', 'K', 'V', 0, 1, 0, 0};
+    static final byte[] MAGIC = {'N', 'S', 'K', 'V', 0, 1, 0, 0};
+
+    static final int COMMIT_LENGTH = 20;
 
     /** The header's length: the first record starts here. */
-    public static final int HEADER_LENGTH = 8;
+    public static final int HEADER_LENGTH = MAGIC.length + 2 * COMMIT_LENGTH;
 
     static final int RECORD_HEADER = 8;
 
@@ -71,90 +79,128 @@ public final class NativeVariableFile {
     }
 
     /**
-     * What a file holds, in the order last written, where its last whole save ends, and how many saves it holds.
+     * What a file holds, in the order last written. {@code committed} is where the committed saves end, by the
+     * commit with sequence {@code sequence} in slot {@code slot}; {@code validEnd} is where the last whole save ends
+     * (after {@code committed} when a save's commit didn't happen); {@code length} is the file's length.
      */
-    public record Contents(LinkedHashMap<String, VariableFile.Entry> entries, long validEnd, long length,
-            int records) {
+    public record Contents(LinkedHashMap<String, VariableFile.Entry> entries, long committed, long sequence, int slot,
+            long validEnd, long length, int records) {
 
-        /** Whether bytes after the last whole save were ignored: a save that was cut off by a crash. */
+        /** Whether bytes after the last whole save are dropped: a save a crash cut off. */
         public boolean damaged() {
             return validEnd < length;
         }
     }
 
+    /** A commit slot's bytes. */
+    static byte[] commit(long sequence, long end) {
+        ByteBuffer buffer = ByteBuffer.allocate(COMMIT_LENGTH);
+        buffer.putLong(sequence).putLong(end);
+        CRC32C crc = new CRC32C();
+        crc.update(buffer.array(), 0, 16);
+        buffer.putInt((int) crc.getValue());
+        return buffer.array();
+    }
+
+    /** Where commit slot {@code slot} (0 or 1) is in the file. */
+    static long commitOffset(int slot) {
+        return MAGIC.length + (long) slot * COMMIT_LENGTH;
+    }
+
+    /** A new file's header, committed up to {@code end}. */
+    static byte[] header(long end) {
+        byte[] header = new byte[HEADER_LENGTH];
+        System.arraycopy(MAGIC, 0, header, 0, MAGIC.length);
+        System.arraycopy(commit(1, end), 0, header, MAGIC.length, COMMIT_LENGTH);
+        // The other slot is left zero, which fails its checksum.
+        return header;
+    }
+
     /**
      * Reads a whole file. Throws if it isn't one of NeoSkript's variable files, if it's of a newer version, or if
-     * it's damaged anywhere but in a save cut off at its end.
+     * anything before the committed end is damaged.
      */
     public static Contents read(byte[] data) throws IOException {
-        if (data.length < HEADER.length || !Arrays.equals(data, 0, 4, HEADER, 0, 4)) {
+        if (data.length < MAGIC.length || !Arrays.equals(data, 0, 4, MAGIC, 0, 4)) {
             throw new IOException("not a NeoSkript variable file (it doesn't start with NSKV)");
         }
-        if (data[4] != HEADER[4] || data[5] != HEADER[5] || data[6] != 0 || data[7] != 0) {
+        if (data[4] != MAGIC[4] || data[5] != MAGIC[5] || data[6] != 0 || data[7] != 0) {
             throw new IOException("a NeoSkript variable file of version " + ((data[4] & 0xFF) << 8 | data[5] & 0xFF)
                     + (data[6] != 0 || data[7] != 0 ? " with features" : "") + " newer than this NeoSkript reads");
         }
-        LinkedHashMap<String, VariableFile.Entry> entries = new LinkedHashMap<>();
-        List<Op> save = new ArrayList<>();
-        int position = HEADER.length;
-        int saveStart = position;
-        int saves = 0;
-        CRC32C crc = new CRC32C();
-        while (position < data.length) {
-            if (data.length - position >= RECORD_HEADER) {
-                int length = readInt(data, position);
-                int checksum = readInt(data, position + 4);
-                if (length >= 0 && length <= data.length - position - RECORD_HEADER) {
-                    crc.reset();
-                    crc.update(data, position + RECORD_HEADER, length);
-                    if ((int) crc.getValue() == checksum) {
-                        Boolean continues = parse(data, position + RECORD_HEADER, length, save);
-                        if (continues == null) {
-                            throw new IOException("the record at byte " + position + " is whole but can't be read, so it"
-                                    + " was written by a newer NeoSkript or damaged");
-                        }
-                        position += RECORD_HEADER + length;
-                        if (!continues) {
-                            apply(save, entries);
-                            save.clear();
-                            saveStart = position;
-                            saves++;
-                        }
-                        continue;
-                    }
-                }
-            }
-            // A record that can't be read: the end of a save cut off by a crash, unless good records follow.
-            int next = recordAfter(data, position + 1);
-            if (next >= 0) {
-                throw new IOException("the record at byte " + position + " is damaged and the one at byte " + next
-                        + " after it isn't, so this isn't a save cut off by a crash");
-            }
-            break;
+        if (data.length < HEADER_LENGTH) {
+            throw new IOException("damaged: its header is cut short");
         }
-        // A save whose last record never came is dropped too.
-        return new Contents(entries, saveStart, data.length, saves);
+        int slot = -1;
+        long sequence = 0;
+        long committed = 0;
+        for (int i = 0; i < 2; i++) {
+            int at = (int) commitOffset(i);
+            CRC32C crc = new CRC32C();
+            crc.update(data, at, 16);
+            long seq = ByteBuffer.wrap(data, at, 8).getLong();
+            if ((int) crc.getValue() == readInt(data, at + 16) && seq > sequence) {
+                slot = i;
+                sequence = seq;
+                committed = ByteBuffer.wrap(data, at + 8, 8).getLong();
+            }
+        }
+        if (slot < 0) {
+            throw new IOException("damaged: neither copy of its commit can be read");
+        }
+        if (committed < HEADER_LENGTH || committed > data.length) {
+            throw new IOException("damaged: its commit says the saves end at byte " + committed + ", but the file is "
+                    + data.length + " bytes");
+        }
+        LinkedHashMap<String, VariableFile.Entry> entries = new LinkedHashMap<>();
+        // The committed saves: synced before their commit, so anything wrong is damage.
+        int[] saves = {0};
+        int end = saves(data, HEADER_LENGTH, (int) committed, entries, saves);
+        if (end != committed) {
+            throw new IOException("damaged: the save at byte " + end + " can't be read, before the end of the saves"
+                    + " committed at byte " + committed);
+        }
+        // After them, a save whose commit didn't happen: applied if it's whole, else the tail of a crash.
+        int validEnd = saves(data, end, data.length, entries, saves);
+        return new Contents(entries, committed, sequence, slot, validEnd, data.length, saves[0]);
     }
 
-    /** Where a whole record with a good checksum starts at or after {@code from}, or -1. */
-    private static int recordAfter(byte[] data, int from) {
+    /**
+     * Applies the whole saves in {@code data[from, to)}, stopping at the first one that can't be read; where it
+     * stopped. Throws only for a record whose checksum is right but that can't be read: a newer NeoSkript wrote it.
+     */
+    private static int saves(byte[] data, int from, int to, Map<String, VariableFile.Entry> into, int[] count)
+            throws IOException {
+        List<Op> save = new ArrayList<>();
+        int position = from;
+        int saveStart = from;
         CRC32C crc = new CRC32C();
-        for (int at = from; at <= data.length - RECORD_HEADER - 1; at++) {
-            int length = readInt(data, at);
-            if (length < 1 || length > data.length - at - RECORD_HEADER) {
-                continue;
-            }
-            int kind = data[at + RECORD_HEADER];
-            if (kind != KIND_ENTRIES && kind != KIND_CONTINUES) {
-                continue;
+        while (to - position >= RECORD_HEADER) {
+            int length = readInt(data, position);
+            int checksum = readInt(data, position + 4);
+            // A record has at least its kind, so a length of 0 (a zero-filled tail) is never one.
+            if (length < 1 || length > to - position - RECORD_HEADER) {
+                break;
             }
             crc.reset();
-            crc.update(data, at + RECORD_HEADER, length);
-            if ((int) crc.getValue() == readInt(data, at + 4)) {
-                return at;
+            crc.update(data, position + RECORD_HEADER, length);
+            if ((int) crc.getValue() != checksum) {
+                break;
+            }
+            Boolean continues = parse(data, position + RECORD_HEADER, length, save);
+            if (continues == null) {
+                throw new IOException("the record at byte " + position + " is whole but can't be read, so it was"
+                        + " written by a newer NeoSkript");
+            }
+            position += RECORD_HEADER + length;
+            if (!continues) {
+                apply(save, into);
+                save.clear();
+                saveStart = position;
+                count[0]++;
             }
         }
-        return -1;
+        return saveStart;
     }
 
     private static void apply(List<Op> ops, Map<String, VariableFile.Entry> into) {

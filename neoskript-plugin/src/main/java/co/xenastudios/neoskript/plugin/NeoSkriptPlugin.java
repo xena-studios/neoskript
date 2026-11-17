@@ -26,6 +26,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class NeoSkriptPlugin extends JavaPlugin {
 
     private VariableBackend storage;
+    /** Whether the saved variables couldn't be opened or loaded, so scripts run without them and nothing is saved. */
+    private boolean variablesUnavailable;
     private ScriptCommands commands;
     private ScriptManager scripts;
     /** What stops the runtime error frames. */
@@ -259,11 +261,23 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             opened.log().forEach(line -> getSLF4JLogger().info(line));
             opened.warnings().forEach(line -> getSLF4JLogger().warn(line));
             return opened.backend();
+        } catch (VariableBackends.Conflict e) {
+            getSLF4JLogger().error(e.getMessage());
+            variablesUnavailable();
+            return null;
         } catch (IOException | RuntimeException e) {
-            getSLF4JLogger().error("Couldn't move the variables to {} storage. They're left as they were, and won't "
-                    + "be loaded or saved until it's fixed.", kind.name().toLowerCase(java.util.Locale.ROOT), e);
+            getSLF4JLogger().error("Couldn't read the saved variables ({} storage). The variable files are left as "
+                    + "they were.", kind.name().toLowerCase(java.util.Locale.ROOT), e);
+            variablesUnavailable();
             return null;
         }
+    }
+
+    /** Says plainly that scripts run without their saved variables, and that nothing is saved. */
+    private void variablesUnavailable() {
+        variablesUnavailable = true;
+        getSLF4JLogger().error("Saved variables weren't loaded. Scripts run without them, and nothing they set is "
+                + "saved, until this is fixed and the server restarts.");
     }
 
     /** Loads saved variables, then saves changed ones every {@code variables.save-interval}. */
@@ -306,6 +320,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             getSLF4JLogger().error("Couldn't load variables from {}. Variables won't be saved until it's fixed.",
                     storage.file(), e);
             storage = null;
+            variablesUnavailable();
             return;
         }
         Timespan interval = Timespan.parse(getConfig().getString("variables.save-interval", "5 minutes"));
@@ -344,6 +359,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             commands.unregister(getServer().getCommandMap());
         }
         saveVariables(false);
+        if (variablesUnavailable) {
+            getSLF4JLogger().error("Variables weren't saved: they couldn't be loaded when the server started (see the "
+                    + "error then), so the variable files are as they were and changes since are lost.");
+        }
         if (storage != null) {
             try {
                 storage.close();

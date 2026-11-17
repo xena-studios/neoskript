@@ -20,7 +20,7 @@ The variables are then saved in `variables.nsv`, next to where `variables.csv` w
 
 - **Faster to load.** 140,000 variables load in 277 ms, against 465 ms from `variables.csv` (see below), and the file is a third the size.
 - **A save writes only what changed.** Each save adds the variables that changed since the last one to the end of the file, instead of writing every variable again. Now and then, when the file has grown to more than twice what its variables need, a save writes it afresh.
-- **A crash can't cut a save in half.** Each save carries a checksum and is synced to disk. If the server stops in the middle of one, the next start reads everything up to the last whole save, backs the file up to `backups/`, and drops the rest. Damage anywhere else in the file isn't treated as a crash: NeoSkript says where it is, doesn't load the variables, and never writes over the file, so you can restore it from `backups/`.
+- **A crash can't cut a save in half.** Each save is synced to disk and then committed: its end is written into the file's header and synced too. If the server stops before a save is committed, the next start keeps every committed save, backs the file up to `backups/`, and drops the rest of the cut-off save, however the crash left it. Committed saves were already on disk, so anything wrong with them is damage, not a crash: NeoSkript says where it is, doesn't load the variables, and never writes over the file. Restore it from your server's backups.
 
 Values are kept in Skript's own format inside it, as in `variables.csv`, so moving between the two loses nothing, values NeoSkript can't read yet included.
 

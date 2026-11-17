@@ -9,10 +9,8 @@ import co.xenastudios.neoskript.runtime.variables.VariableStore;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,9 +25,10 @@ import java.util.Map;
  * way loses nothing.
  *
  * <ul>
- *   <li>A save appends one record with only the variables that changed or were deleted since the last one, and
- *       syncs it to disk. A record that's cut off by a crash is ignored when the file is next read, so a save
- *       either happened or didn't.
+ *   <li>A save appends only the variables that changed or were deleted since the last one, syncs them, and then
+ *       commits them: it writes their end into the header and syncs that ({@link NativeVariableFile}). A save
+ *       a crash cuts off before its commit is dropped when the file is next read, so a save either happened or
+ *       didn't, and damage to committed saves is refused rather than dropped.
  *   <li>When the file is more than twice what its variables need (and at least 1 MiB more), a save writes the
  *       whole set to a new file and swaps it in instead.
  * </ul>
@@ -70,7 +69,9 @@ public final class NativeVariableStorage implements VariableBackend {
     private long fileBytes;
     private long liveBytes;
     private long round;
-    private boolean compactNext;
+    private volatile boolean compactNext;
+    private long sequence;
+    private int slot;
     private Path recoveryBackup;
     private long recoveredBytes;
     private int appends;
@@ -126,6 +127,8 @@ public final class NativeVariableStorage implements VariableBackend {
         if (!Files.exists(file)) {
             write(file, List.of());
             fileBytes = Files.size(file);
+            sequence = 1;
+            slot = 0;
             openChannel();
             savedAt = store.modifications();
             loaded = true;
@@ -133,7 +136,7 @@ public final class NativeVariableStorage implements VariableBackend {
         }
         NativeVariableFile.Contents contents = NativeVariableFile.read(Files.readAllBytes(file));
         if (contents.damaged()) {
-            // Keep the file as it was, synced, before the save cut off at its end is dropped.
+            // Keep the file as it was, synced, before the save a crash cut off after the last commit is dropped.
             recoveryBackup = VariableStorage.backup(file);
             recoveredBytes = contents.length() - contents.validEnd();
             try (FileChannel truncate = FileChannel.open(file, StandardOpenOption.WRITE)) {
@@ -172,9 +175,15 @@ public final class NativeVariableStorage implements VariableBackend {
         // A compacted file is in Skript's order, which the store takes in one pass.
         store.load(names, values);
         fileBytes = contents.validEnd();
+        sequence = contents.sequence();
+        slot = contents.slot();
         // A file of many saves that's grown past its limit is compacted by the first save.
         compactNext = !skipped.isEmpty() || contents.records() > 1 && fileBytes > 2 * liveBytes + COMPACT_SLACK;
         openChannel();
+        if (contents.validEnd() != contents.committed()) {
+            // A whole save whose commit didn't happen, or a tail just dropped: commit where the saves end now.
+            commit(contents.validEnd());
+        }
         savedAt = store.modifications();
         loaded = true;
         return new VariableStorage.Result(values.size(), raw, 0, List.copyOf(skipped), backup, 0);
@@ -182,7 +191,8 @@ public final class NativeVariableStorage implements VariableBackend {
 
     @Override
     public boolean changed() {
-        return loaded && store.modifications() != savedAt;
+        // A compaction that's due counts, so it happens at the next save even with nothing changed.
+        return loaded && (store.modifications() != savedAt || compactNext);
     }
 
     @Override
@@ -282,26 +292,49 @@ public final class NativeVariableStorage implements VariableBackend {
             for (byte[] record : records) {
                 Durable.writeFully(channel, record);
             }
-            channel.force(false);
-            fileBytes += appended;
-            appends++;
+            // force(true): the file's new length is metadata, and must be on disk before the commit says so.
+            channel.force(true);
         } catch (IOException | RuntimeException e) {
-            // Whatever was written of the save isn't whole, so the next save writes a new file instead of
-            // appending after it.
+            // Nothing committed it, so what was written is cut off again, and the next save writes a new file.
             compactNext = true;
             try {
                 channel.truncate(fileBytes);
             } catch (IOException | RuntimeException ignored) {
-                // A reader drops the cut-off save anyway.
+                // A reader drops it anyway: it's after the committed end.
             }
             throw e;
         }
+        try {
+            commit(fileBytes + appended);
+        } catch (IOException | RuntimeException e) {
+            // The commit may or may not be on disk, so the save is kept where it is (a reader applies it if it's
+            // whole either way) and the next save writes a new file.
+            compactNext = true;
+            throw e;
+        }
+        fileBytes += appended;
+        appends++;
+    }
+
+    /** Writes the other commit slot with the next sequence and {@code end}, and syncs it. */
+    private void commit(long end) throws IOException {
+        int next = 1 - slot;
+        ByteBuffer bytes = ByteBuffer.wrap(NativeVariableFile.commit(sequence + 1, end));
+        long position = NativeVariableFile.commitOffset(next);
+        while (bytes.hasRemaining()) {
+            position += channel.write(bytes, position);
+        }
+        channel.force(true);
+        slot = next;
+        sequence++;
     }
 
     private void compact(List<NativeVariableFile.Op> all) throws IOException {
         closeChannel();
         try {
             write(file, all);
+            sequence = 1;
+            slot = 0;
             compactNext = false;
             compactions++;
         } catch (IOException | RuntimeException e) {
@@ -319,12 +352,23 @@ public final class NativeVariableStorage implements VariableBackend {
         }
     }
 
-    /** Writes the ops as a whole new file: a temporary file, synced, then moved over {@code target}. */
+    /**
+     * Writes the ops as a whole new file, committed to its end: a temporary file, synced, then moved over
+     * {@code target}.
+     */
     static void write(Path target, List<NativeVariableFile.Op> ops) throws IOException {
-        List<byte[]> chunks = new ArrayList<>();
-        chunks.add(NativeVariableFile.HEADER);
-        chunks.addAll(NativeVariableFile.records(ops));
-        Durable.replace(target, chunks);
+        List<byte[]> records = NativeVariableFile.records(ops);
+        long end = NativeVariableFile.HEADER_LENGTH;
+        for (byte[] record : records) {
+            end += record.length;
+        }
+        byte[] header = NativeVariableFile.header(end);
+        Durable.replace(target, out -> {
+            out.write(header);
+            for (byte[] record : records) {
+                out.write(record);
+            }
+        });
     }
 
     /** Removes temporary files a compaction left when the server stopped in the middle of it. */

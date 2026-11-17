@@ -4,7 +4,10 @@
  */
 package co.xenastudios.neoskript.runtime.variables.storage;
 
+import java.io.BufferedOutputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -21,21 +24,25 @@ final class Durable {
 
     private Durable() {}
 
-    /** Writes {@code chunks} to a temporary file beside {@code target}, syncs it, and moves it over {@code target}. */
-    static void replace(Path target, byte[]... chunks) throws IOException {
-        replace(target, java.util.List.of(chunks));
+    /** What goes in a file, written to a stream. */
+    interface Content {
+        void writeTo(OutputStream out) throws IOException;
     }
 
-    static void replace(Path target, Iterable<byte[]> chunks) throws IOException {
+    /**
+     * Streams {@code content} into a temporary file beside {@code target}, syncs it, and moves it over
+     * {@code target}. Nothing is held in memory but a small buffer.
+     */
+    static void replace(Path target, Content content) throws IOException {
         Path parent = target.toAbsolutePath().getParent();
         Files.createDirectories(parent);
         Path temp = Files.createTempFile(parent, target.getFileName().toString(), ".tmp");
         try {
-            try (FileChannel out = FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
-                for (byte[] chunk : chunks) {
-                    writeFully(out, chunk);
-                }
-                out.force(true);
+            try (FileOutputStream file = new FileOutputStream(temp.toFile())) {
+                BufferedOutputStream out = new BufferedOutputStream(file, 1 << 16);
+                content.writeTo(out);
+                out.flush();
+                file.getChannel().force(true);
             }
             try {
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -48,10 +55,27 @@ final class Durable {
         syncDirectory(parent);
     }
 
-    /** Copies {@code from} to a new file {@code to}, synced, with its directory. */
+    /**
+     * Copies {@code from} to a new file {@code to}, synced, with its directory. Only the time it was last changed is
+     * copied, not its other attributes: a copy of a read-only file would be read-only too, and couldn't be synced on
+     * Windows, which needs write access for that.
+     */
     static Path copy(Path from, Path to) throws IOException {
-        Files.copy(from, to, StandardCopyOption.COPY_ATTRIBUTES);
-        force(to);
+        // Copied through a channel opened here, not Files.copy, which gives the copy the source's permissions.
+        try (FileChannel in = FileChannel.open(from, StandardOpenOption.READ);
+                FileChannel out = FileChannel.open(to, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+            long size = in.size();
+            long done = 0;
+            while (done < size) {
+                long copied = out.transferFrom(in, done, size - done);
+                if (copied <= 0) {
+                    throw new IOException(from + " got shorter while it was copied");
+                }
+                done += copied;
+            }
+            out.force(true);
+        }
+        Files.setLastModifiedTime(to, Files.getLastModifiedTime(from));
         syncDirectory(to.toAbsolutePath().getParent());
         return to;
     }
