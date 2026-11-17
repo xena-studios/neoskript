@@ -489,7 +489,8 @@ public final class Values {
         return (Runnable) () -> code.resume(context, frame);
     }
 
-    private static final ThreadLocal<Object> RETURNED = new ThreadLocal<>();
+    /** Not a thread local: what's kept may be one of NeoSkript's values, which would keep the plugin after it's gone. */
+    private static final PerThread<Object> RETURNED = new PerThread<>();
 
     /** Keeps what a returnable section returned, for Skript's test expression {@code the last return values}. */
     public static void returned(Object values) {
@@ -499,7 +500,7 @@ public final class Values {
     /** What the last returnable section returned, once: reading it forgets it, as in Skript. */
     public static Object takeReturned() {
         Object values = RETURNED.get();
-        RETURNED.remove();
+        RETURNED.set(null);
         return values;
     }
 

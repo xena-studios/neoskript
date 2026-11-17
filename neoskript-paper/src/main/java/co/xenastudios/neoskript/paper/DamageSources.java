@@ -126,7 +126,9 @@ final class DamageSources {
     }
 
     /** The custom damage source last made on this thread, whose section is running: {@code created damage source}. */
-    private static final ThreadLocal<CustomDamageSource> CREATED = new ThreadLocal<>();
+    /** Not a thread local, which would keep the plugin in the server's threads after it's disabled. */
+    private static final co.xenastudios.neoskript.runtime.PerThread<CustomDamageSource> CREATED =
+            new co.xenastudios.neoskript.runtime.PerThread<>();
 
     /** Stored in a variable, a custom damage source becomes the damage source it describes, as in Skript. */
     @SuppressWarnings({"unchecked", "rawtypes"})

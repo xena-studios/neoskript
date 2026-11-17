@@ -238,7 +238,10 @@ public final class EventBridges {
             LAST_CHECKED.clear();
             return;
         }
-        for (World world : Bukkit.getWorlds()) {
+        java.util.List<World> worlds = Bukkit.getWorlds();
+        // A world that was unloaded isn't kept.
+        LAST_CHECKED.keySet().retainAll(worlds);
+        for (World world : worlds) {
             int now = (int) world.getTime();
             Integer last = LAST_CHECKED.get(world);
             int checked = last == null ? now - 1 : last;

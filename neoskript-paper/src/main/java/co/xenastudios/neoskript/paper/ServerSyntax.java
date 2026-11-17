@@ -159,6 +159,40 @@ final class ServerSyntax {
                 "[the] [last[ly]] loaded server icon");
     }
 
+    /** Closes the log files scripts wrote to, as the plugin is disabled, so none stays open after. */
+    static void closeLogs() {
+        for (String file : java.util.List.copyOf(LOGS.keySet())) {
+            PrintWriter writer = LOGS.remove(file);
+            if (writer != null) {
+                synchronized (writer) {
+                    writer.close();
+                }
+            }
+        }
+    }
+
+    /** The open writer for {@code file} in {@code logs}, opening it to append if it isn't. */
+    static PrintWriter writer(String file, File logs) throws IOException {
+        PrintWriter writer = LOGS.get(file);
+        if (writer != null) {
+            return writer;
+        }
+        File target = new File(logs, file);
+        target.getParentFile().mkdirs();
+        writer = new PrintWriter(new BufferedWriter(new FileWriter(target, true)));
+        PrintWriter existing = LOGS.putIfAbsent(file, writer);
+        if (existing != null) {
+            writer.close();
+            return existing;
+        }
+        return writer;
+    }
+
+    /** How many log files are open, for tests. */
+    static int openLogs() {
+        return LOGS.size();
+    }
+
     /** Writes a line to a file in the plugin's logs folder, or to the server log for {@code server.log}. */
     private static void log(String name, Level level, String message) {
         String file = name.toLowerCase(Locale.ENGLISH);
@@ -169,22 +203,14 @@ final class ServerSyntax {
             Bukkit.getLogger().log(level, message);
             return;
         }
-        PrintWriter writer = LOGS.get(file);
-        if (writer == null) {
-            File target = new File(new File(PlayerSyntax.plugin().getDataFolder(), "logs"), file);
-            try {
-                target.getParentFile().mkdirs();
-                writer = new PrintWriter(new BufferedWriter(new FileWriter(target, true)));
-                PrintWriter existing = LOGS.putIfAbsent(file, writer);
-                if (existing != null) {
-                    writer.close();
-                    writer = existing;
-                }
-            } catch (IOException e) {
-                co.xenastudios.neoskript.runtime.RuntimeErrors.report("Cannot write to log file '" + file + "' ("
-                        + target.getPath() + "): " + e);
-                return;
-            }
+        File logs = new File(PlayerSyntax.plugin().getDataFolder(), "logs");
+        PrintWriter writer;
+        try {
+            writer = writer(file, logs);
+        } catch (IOException e) {
+            co.xenastudios.neoskript.runtime.RuntimeErrors.report("Cannot write to log file '" + file + "' ("
+                    + new File(logs, file).getPath() + "): " + e);
+            return;
         }
         String timestamp = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.MEDIUM)
                 .format(new java.util.Date());

@@ -849,3 +849,20 @@ Nothing a script does, at load or while it runs, may take NeoSkript or the serve
 - **Endless loops:** as in Skript, a loop without a wait holds its thread until it ends. Paper's watchdog can't say where: compiled scripts are hidden classes, which stack traces leave out. So a loop that runs for 5 seconds without waiting is named in the console with its script and line, before the watchdog steps in. Compiled loops check every 65,536 times round, and a wait starts the loop's time again, so a loop that waits each time round is never named.
 - **Damaged variables:** a value in `variables.csv` whose length said a gigabyte ran the server out of memory, an error the load didn't catch, so NeoSkript didn't start. Lengths are now checked against the bytes there, and such a value is kept as saved.
 - **Variables under stress** (`VariableStorageStressTest`): saving while 16 threads write, as Folia's regions do, always leaves a file that loads back whole; a save into a folder that can't be written keeps the old file, and the next save has everything. A 300 MB `variables.csv` (2.2 million variables) loads in 20 seconds.
+
+### Step 12: Reloading hundreds of times
+
+**`neoskript-reload-soak`** (baseline, 26.3) reloads a varied set of scripts 350 times: events, commands with aliases and a cooldown, a GUI, functions and a function reference, list variables, `every` timers, a timer whose trigger is still waiting when the reload comes, a command waiting across reloads, `auto reload`, a script disabled and enabled again, and one broken every other time, which keeps its last version. After 50 to warm up, the harness bot forces a full GC every 50 reloads and samples the loaded classes, the heap, and NeoSkript's listeners, commands (in Brigadier's tree too), tasks and threads.
+
+| 300 reloads | Paper 26.3 | Folia 26.3 |
+|---|---|---|
+| Loaded classes | 36,184 → 36,310 | 35,452 → 35,552 |
+| Heap after GC | 292 → 290 MB | 287 → 285 MB |
+| Listeners, script commands | 11, 7 → 11, 7 | 11, 7 → 11, 7 |
+| Scheduled tasks | 12 → 12 | 12 → 13 |
+
+The classes that come are the JDK's and the server's, loaded the first time something is used: each compiled trigger and function is a hidden class, and they're all unloaded. `every 1 tick` still runs 40 times in 2 seconds after them. Then `/sk disable all` leaves the listeners, Brigadier's tree and the tasks exactly as they were before any script loaded, and the scripts' classes are unloaded.
+
+- **Bukkit's `/reload confirm`**, 8 times: each old NeoSkript is let go of, though the server keeps up to five for a few reloads (the harness bot's plugin isn't kept at all; what holds NeoSkript's for a while is still to be found). Fixed on the way: bStats' thread outlived the plugin (it's now shut down with it), and a potion effect or damage source made in a section stayed in the server thread's thread-locals, keeping the old plugin and all its classes for good. They're kept beside the threads now.
+- **Stopping the server** with a trigger waiting and variables just changed: it stops by itself, nothing throws, and the variables are saved.
+- **Also let go of:** each player's last click event, kept to run a two-handed click once, which kept every player who ever clicked after they left; the files `log ... to "x.log"` writes to, now closed with the plugin; and worlds that were unloaded, which the time-of-day check kept.

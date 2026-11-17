@@ -1,0 +1,9 @@
+# The reload soak's auto reload, function references and a script disabled and enabled again.
+using reflection
+
+auto reload
+
+on load:
+	set {_f} to function named "soakAdd"
+	set {-soak::ref} to result of {_f} with arguments 4 and 5
+	send "[harness] soak extras VERSION" to console

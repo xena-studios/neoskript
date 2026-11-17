@@ -56,6 +56,8 @@ import org.bukkit.plugin.Plugin;
  *       {@code [bot] bench <event> <count> <nanoseconds>ns}.
  *   <li>{@code bot mspt}: logs {@code [bot] mspt <mean> <p95>}, the server's milliseconds per tick over its
  *       last 100 ticks, as a benchmark of everything the server runs.
+ *   <li>{@code bot stats <label>}: forces a full GC and logs NeoSkript's footprint ({@link ServerStats}), for the
+ *       reload soak.
  *   <li>{@code bot list}.
  * </ul>
  *
@@ -134,6 +136,10 @@ final class Bots implements Listener {
             double mean = Arrays.stream(ticks).average().orElse(0) / 1_000_000.0;
             double p95 = sorted.length == 0 ? 0 : sorted[(int) Math.min(sorted.length - 1, sorted.length * 0.95)] / 1_000_000.0;
             LOG.info(String.format(Locale.ROOT, "[bot] mspt %.3f %.3f", mean, p95));
+            return true;
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("stats")) {
+            LOG.info("[bot] stats " + args[1] + " " + ServerStats.sample("NeoSkript"));
             return true;
         }
         if (args.length < 2) {
