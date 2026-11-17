@@ -1,0 +1,71 @@
+/*
+ * Copyright (c) 2026 Xena Studios
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+package co.xenastudios.neoskript.paper;
+
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.ItemStack;
+
+/**
+ * NeoSkript's own values that NeoSkriptCompat gives Skript addons as Skript's classes (D24): enchantment types and
+ * slots. For NeoSkriptCompat only; not part of the addon API.
+ */
+public final class CompatBridge {
+
+    private CompatBridge() {}
+
+    /** NeoSkript's enchantment type: {@code sharpness 5}, or with level -1, any level of it. */
+    public static Object enchantmentType(Enchantment enchantment, int level) {
+        return new Enchantments.Levelled(enchantment, level);
+    }
+
+    public static boolean isEnchantmentType(Object value) {
+        return value instanceof Enchantments.Levelled;
+    }
+
+    public static Enchantment enchantment(Object enchantmentType) {
+        return ((Enchantments.Levelled) enchantmentType).enchantment();
+    }
+
+    /** The level, or -1 for any. */
+    public static int level(Object enchantmentType) {
+        return ((Enchantments.Levelled) enchantmentType).level();
+    }
+
+    public static boolean isSlot(Object value) {
+        return value instanceof Items.Slot;
+    }
+
+    /** NeoSkript's slot of an inventory, by index. */
+    public static Object inventorySlot(org.bukkit.inventory.Inventory inventory, int index) {
+        return new Items.Slot(inventory, index);
+    }
+
+    /** The inventory a slot is in, or null if it isn't one of an inventory's (an entity's armour, a cursor). */
+    public static org.bukkit.inventory.Inventory slotInventory(Object slot) {
+        Items.Slot s = (Items.Slot) slot;
+        return s.holder() == null && s.equipment() == null && s.index() >= 0 ? s.inventory() : null;
+    }
+
+    public static int slotIndex(Object slot) {
+        return ((Items.Slot) slot).index();
+    }
+
+    public static ItemStack slotItem(Object slot) {
+        return ((Items.Slot) slot).item();
+    }
+
+    public static void setSlotItem(Object slot, ItemStack item) {
+        ((Items.Slot) slot).set(item);
+    }
+
+    /** The class of NeoSkript's slots, and of its enchantment types. */
+    public static Class<?> slotClass() {
+        return Items.Slot.class;
+    }
+
+    public static Class<?> enchantmentTypeClass() {
+        return Enchantments.Levelled.class;
+    }
+}

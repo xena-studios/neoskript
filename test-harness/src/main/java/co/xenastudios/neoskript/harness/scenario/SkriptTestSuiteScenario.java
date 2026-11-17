@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -41,14 +42,14 @@ public final class SkriptTestSuiteScenario implements Scenario {
         return environment.skriptReference();
     }
 
-    @Override
-    public void run(ScenarioContext context) throws Exception {
+    /**
+     * Runs Skript's suite on the reference Skript, with {@code plugins} next to it, in {@code build/test_runners/<dir>}
+     * of Skript's corpus (where Skript's own runner runs, so tests that check relative script paths pass), and returns
+     * its results: {@code succeeded}, a list of test names, and {@code failed}, by test name.
+     */
+    static JsonObject results(ScenarioContext context, String dir, List<Path> plugins) throws Exception {
         Path tests = context.config().skriptTests();
-        if (!Files.isDirectory(tests)) {
-            throw new HarnessFailure("Skript's test corpus is missing at " + tests + ". Run :test-harness:fetchSkriptTests");
-        }
-        // Run where Skript's own runner does, so tests that check relative script paths pass.
-        Path runDir = context.config().skriptCorpus().resolve("build/test_runners").resolve(context.environment().name());
+        Path runDir = context.config().skriptCorpus().resolve("build/test_runners").resolve(dir);
         ServerBuilder builder = context.server(runDir)
                 .plugin(context.skriptJar())
                 .jvmArg("-ea")
@@ -58,16 +59,27 @@ public final class SkriptTestSuiteScenario implements Scenario {
                 .jvmArg("-Dskript.testing.genDocs=false")
                 .jvmArg("-Dskript.testing.junit=false")
                 .jvmArg("-Dskript.testing.results=test_results.json");
+        for (Path plugin : plugins) {
+            builder.plugin(plugin);
+        }
         try (ServerProcess server = builder.start()) {
             // Skript stops the server by itself once the tests finish.
             server.awaitExit(Duration.ofMinutes(30));
         }
-
         Path resultsFile = builder.runDir().resolve("test_results.json");
         if (!Files.isRegularFile(resultsFile)) {
             throw new HarnessFailure("Skript didn't write " + resultsFile);
         }
-        JsonObject results = JsonParser.parseString(Files.readString(resultsFile)).getAsJsonObject();
+        return JsonParser.parseString(Files.readString(resultsFile)).getAsJsonObject();
+    }
+
+    @Override
+    public void run(ScenarioContext context) throws Exception {
+        Path tests = context.config().skriptTests();
+        if (!Files.isDirectory(tests)) {
+            throw new HarnessFailure("Skript's test corpus is missing at " + tests + ". Run :test-harness:fetchSkriptTests");
+        }
+        JsonObject results = results(context, context.environment().name(), List.of());
         int succeeded = results.getAsJsonArray("succeeded").size();
         int failed = results.getAsJsonObject("failed").size();
 

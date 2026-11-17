@@ -1,0 +1,75 @@
+# The same script on Skript 2.17 with SkBee 3.26.0 and on NeoSkript with NeoSkriptCompat and SkBee: the
+# skbee-differential scenario compares each "[skbee] label: value" line. It runs each /skbeetest-<part> command from the
+# console, and /skbeeping after each, so a part that fails on one of them doesn't stop the others. Each part ends with
+# "[skbee] end <part>". The parts use SkBee's syntax that NeoSkriptCompat supports: see docs/SKRIPT-ADDONS.md.
+
+function skbee(label: text, value: objects):
+	send "[skbee] %{_label}%: %{_value::*}%" to console
+
+command /skbeeping <text>:
+	trigger:
+		send "[skbee] ping %arg-1%" to console
+
+command /skbeetest-worlds:
+	trigger:
+		set {_w} to world "world"
+		skbee("max height", max height of {_w})
+		skbee("min height", min height of {_w})
+		skbee("heights of all worlds", max height of all worlds)
+		skbee("min heights of all worlds", min height of all worlds)
+		set {_h} to {_w}'s max height
+		skbee("possessive height", {_h})
+		skbee("autosave", world autosave of {_w})
+		set world autosave of {_w} to false
+		skbee("autosave off", world autosave of {_w})
+		set world autosave of {_w} to true
+		skbee("autosave on", world autosave of {_w})
+		skbee("game ticks set", whether game ticks of {_w} is set)
+		send "[skbee] end worlds" to console
+
+command /skbeetest-chunks:
+	trigger:
+		set {_w} to world "world"
+		set {_c} to chunk at location(40, 64, -40, {_w})
+		skbee("chunk x", chunk x of {_c})
+		skbee("chunk z", chunk z of {_c})
+		skbee("chunk key", chunk key of {_c})
+		skbee("chunk key at location", chunk key at location(-300, 64, 500, {_w}))
+		set {_k} to chunk key at 7, -9
+		skbee("chunk key at numbers", {_k})
+		set {_n} to chunk x of {_c}
+		add 1 to {_n}
+		skbee("chunk x plus one", {_n})
+		send "[skbee] end chunks" to console
+
+command /skbeetest-keys:
+	trigger:
+		set {_k} to minecraft key of stone
+		skbee("key of stone", {_k})
+		set {_k} to namespaced key of diamond sword
+		skbee("key of sword", {_k})
+		set {_k} to mc key from "my_server:custom_log"
+		skbee("key from text", {_k})
+		set {_k} to namespaced key from "le_test"
+		skbee("key from text without namespace", {_k})
+		set {_k} to resource location of world "world"
+		skbee("key of world", {_k})
+		set {_k::*} to minecraft keys of stone, dirt and world "world"
+		skbee("keys of a list", {_k::*})
+		set {_t} to translation key of stone
+		skbee("translation of stone", {_t})
+		set {_t} to translation key of diamond sword
+		skbee("translation of sword", {_t})
+		set {_t::*} to translation keys of stone and dirt
+		skbee("translations of a list", {_t::*})
+		send "[skbee] end keys" to console
+
+command /skbeetest-conditions:
+	trigger:
+		if server is paused:
+			skbee("paused", "yes")
+		else:
+			skbee("paused", "no")
+		if server is not paused:
+			skbee("not paused", "yes")
+		send "[skbee] end conditions" to console

@@ -46,6 +46,7 @@ include(
     "neoskript-paper",
     "neoskript-plugin",
     "neoskript-cli",
+    "neoskript-compat",
     "neoskript-web",
     "test-harness",
     "example-addon",

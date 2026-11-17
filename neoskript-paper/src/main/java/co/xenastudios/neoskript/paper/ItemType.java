@@ -75,6 +75,19 @@ public final class ItemType {
         return type;
     }
 
+    /**
+     * A material as an item type, as Skript's item type of a material: a block with no item, like a wall sign, is
+     * that block, with air as its item. For NeoSkriptCompat.
+     */
+    public static ItemType ofMaterial(Material material) {
+        if (material.isItem()) {
+            return new ItemType(new ItemStack(material), false);
+        }
+        ItemType type = new ItemType(new ItemStack(Material.AIR), false);
+        type.block = material.isBlock() ? material : null;
+        return type;
+    }
+
     /** An item that may be any of {@code items}, as an alias of several stands for. */
     static ItemType anyOf(List<ItemType> items) {
         List<ItemType> all = new ArrayList<>();
@@ -198,6 +211,15 @@ public final class ItemType {
         }
         if (alternatives != null) {
             alternatives.forEach(each -> each.editMeta(change));
+        }
+    }
+
+    /** Replaces its meta in place, as Skript's item types' {@code setItemMeta}: for NeoSkriptCompat. */
+    public void setMeta(ItemMeta replacement) {
+        stack.setItemMeta(replacement);
+        meta = replacement == null ? null : replacement.clone();
+        if (alternatives != null) {
+            alternatives.forEach(each -> each.setMeta(replacement));
         }
     }
 
