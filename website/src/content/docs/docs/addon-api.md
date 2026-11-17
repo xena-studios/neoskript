@@ -209,9 +209,11 @@ registrar.eventTriggers("MyAddonEvtQuestion", triggers -> {
 });
 ```
 
-Each `LoadedTrigger` can `run(event, owner)` right away on the calling thread: its filter, then its code, until it ends or waits. A runtime error in it is logged as any trigger's, and doesn't reach your code. `owner` is the entity, block or location whose thread it carries on on after a `wait`, or `null` for the global thread. The list is given on the thread that loaded the scripts, the global thread on Folia, with an empty list once none are left, so what you register for them can follow scripts as they reload, with nothing left behind. NeoSkript's own [placeholders addon](/docs/addons/placeholders/) is built this way.
+Each list replaces the one before: drop the old triggers when it arrives. A trigger whose script has unloaded or reloaded since runs nothing. Each `LoadedTrigger` can `run(event, owner)` right away, from any thread, on that thread: its filter, then its code, until it ends or waits. A runtime error in it is logged as any trigger's, and doesn't reach your code. `owner` is the entity, block or location whose thread it carries on on after a `wait`, or `null` for the global thread. The list is given on the thread that loaded the scripts, the global thread on Folia, with an empty list once none are left, so what you register for them can follow scripts as they reload, with nothing left behind. On Folia, NeoSkript's region rules apply to what the code reads, as for any trigger. A trigger's code may run another (a placeholder asking for one); limit how deep and how much yourself. NeoSkript's own [placeholders addon](/docs/addons/placeholders/) is built this way.
 
 ### Syntax for some events only
+
+This is experimental: it may change in a minor release.
 
 Skript's elements that only work in some events fail to set up elsewhere, and Skript then tries the line's other readings: `the result` is the smelted item in a smelting event and a placeholder's result in a placeholder. Say which events an element is for, and NeoSkript does the same:
 

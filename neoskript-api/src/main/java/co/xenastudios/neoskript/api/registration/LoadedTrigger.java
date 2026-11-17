@@ -10,6 +10,9 @@ import co.xenastudios.neoskript.api.element.Condition;
  * A loaded script's trigger of one of an addon's events, as {@link Registrar#eventTriggers} gives them: for an event
  * the addon runs itself, rather than through Bukkit, like a placeholder asked for by another plugin. Addons are
  * given these; they don't implement them.
+ *
+ * <p>Each list {@link Registrar#eventTriggers} gives replaces the one before: drop the old triggers when it arrives.
+ * A trigger whose script has unloaded or reloaded since runs nothing.
  */
 public interface LoadedTrigger {
 
@@ -37,7 +40,13 @@ public interface LoadedTrigger {
 
     /**
      * Runs the trigger now, on this thread, for {@code event}: its filter first, then its code, until it ends or
-     * waits. A runtime error in it is logged as any trigger's is, and doesn't reach the caller.
+     * waits. A runtime error in it is logged as any trigger's is, and doesn't reach the caller. If its script has
+     * unloaded or reloaded since this trigger was given, it does nothing.
+     *
+     * <p>It can be called from any thread. On Folia, NeoSkript's region rules apply to what the code reads and
+     * changes, as for any trigger: reading an entity another region's thread owns is a runtime error naming the line.
+     * It may be called again from inside the code it runs, as a placeholder asking for another; that's allowed, and
+     * it's up to the caller to limit how deep and how much, as nothing else does.
      *
      * @param event the event, which the trigger's event values and syntax read
      * @param owner the entity, block or location whose thread the trigger carries on on after a {@code wait} (the

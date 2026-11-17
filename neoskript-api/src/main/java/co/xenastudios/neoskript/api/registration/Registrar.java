@@ -375,13 +375,15 @@ public interface Registrar {
      * @param pattern the index of the pattern, or -1 for all of them
      * @param eventClasses the classes of the events it works in
      */
+    @Experimental
     default void onlyInEvents(String id, int pattern, Class<?>... eventClasses) {}
 
     /**
      * Tells the addon which triggers of its server event {@code id} are loaded, for an event it runs itself with
      * {@link LoadedTrigger#run} rather than firing it through Bukkit: {@code loaded} gets every such trigger of the
      * loaded scripts, in their order, each time scripts load, reload or unload (an empty list when none are left).
-     * It's called on the thread that loaded them, the global thread on Folia; an exception from it is logged.
+     * It's called on the thread that loaded them, the global thread on Folia; an exception from it is logged. Each
+     * list replaces the one before: drop the old triggers, which run nothing once their script has unloaded.
      *
      * @param id the id of one of this addon's server events
      * @param loaded what gets the loaded triggers
