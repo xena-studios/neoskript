@@ -816,8 +816,8 @@ final class Items {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
-            return mode == Mode.SET || mode == Mode.ADD || mode == Mode.DELETE
-                    ? new Class<?>[] {String.class, Component.class} : null;
+            return mode == Mode.SET || mode == Mode.ADD || mode == Mode.DELETE || mode == Mode.REMOVE
+                    || mode == Mode.REMOVE_ALL ? new Class<?>[] {String.class, Component.class} : null;
         }
 
         @Override
@@ -826,6 +826,11 @@ final class Items {
                 List<Component> lore = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
                 Object value = delta == null || delta.length == 0 ? null : delta[0];
                 String text = value == null || value instanceof Component ? null : Values.text(value);
+                if ((mode == Mode.REMOVE || mode == Mode.REMOVE_ALL) && value != null) {
+                    remove(lore, line ? arguments[0] : null, value, mode == Mode.REMOVE_ALL);
+                    meta.lore(lore.isEmpty() ? null : lore);
+                    return;
+                }
                 if (line) {
                     int n = arguments[0] instanceof Number number ? co.xenastudios.neoskript.runtime.Values.toInt(number.doubleValue()) : 0;
                     while (lore.size() < n) {
@@ -850,6 +855,41 @@ final class Items {
                 meta.lore(lore.isEmpty() ? null : lore);
             }));
         }
+    }
+
+    /**
+     * As Skript's lore: from the whole lore, the first line equal to {@code value} (every one with {@code all});
+     * from one line, its first match of the text (every one with {@code all}), with case only when config.yml's
+     * text.case-sensitive is on.
+     */
+    private static void remove(List<Component> lore, Object lineNumber, Object value, boolean all) {
+        TextComponentParser parser = TextComponentParser.instance();
+        if (lineNumber == null) {
+            Component removed = value instanceof Component component ? component : parser.parseSafe(Values.text(value));
+            if (all) {
+                lore.removeIf(removed::equals);
+            } else {
+                lore.remove(removed);
+            }
+            return;
+        }
+        int n = lineNumber instanceof Number number ? co.xenastudios.neoskript.runtime.Values.toInt(number.doubleValue()) : 0;
+        if (n < 1) {
+            return;
+        }
+        while (lore.size() < n) {
+            lore.add(Component.empty());
+        }
+        String text = value instanceof Component component ? parser.toLegacyString(component) : Values.text(value);
+        net.kyori.adventure.text.TextReplacementConfig.Builder builder = net.kyori.adventure.text.TextReplacementConfig.builder()
+                .match(java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(text),
+                        co.xenastudios.neoskript.runtime.Settings.caseSensitive() ? 0
+                                : java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE))
+                .replacement(Component.empty());
+        if (!all) {
+            builder.once();
+        }
+        lore.set(n - 1, lore.get(n - 1).replaceText(builder.build()));
     }
 
     /** Bukkit's inventory types, by name, so registering them doesn't load the enum. */

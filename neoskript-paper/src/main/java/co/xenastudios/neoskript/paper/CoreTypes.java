@@ -48,7 +48,6 @@ final class CoreTypes {
         return Double.parseDouble(text);
     }
     private static final Pattern INTEGER = Pattern.compile("[-+]?\\d{1,18}");
-    private static final Pattern PLAYER_NAME = Pattern.compile("[A-Za-z0-9_]{1,16}");
 
     private CoreTypes() {}
 
@@ -81,7 +80,9 @@ final class CoreTypes {
         if (cached != null) {
             return cached;
         }
-        return PLAYER_NAME.matcher(text).matches() ? Bukkit.getOfflinePlayer(text) : null;
+        // Skript's 'player name regex pattern' (config.yml's syntax.player-name-pattern).
+        return co.xenastudios.neoskript.runtime.Settings.playerNamePattern().matcher(text).matches()
+                ? Bukkit.getOfflinePlayer(text) : null;
     }
 
     static void register(Registrar registrar) {

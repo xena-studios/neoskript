@@ -90,7 +90,8 @@ class NeoSkriptConfigTest {
         assertEquals(List.of(), result.warnings());
         assertEquals(List.of(
                 "Carried config.yml forward from config version 1 to 3, keeping your settings. The old file is config.yml.bak-v1.",
-                "Added 3 new settings with their defaults: theme, aliases, variables.recover."), result.notices());
+                "Added 7 new settings with their defaults: theme, aliases, language, text, variables.recover,"
+                        + " variables.player-variable-fix, syntax."), result.notices());
         assertEquals(old, Files.readString(folder.resolve("config.yml.bak-v1")));
 
         NeoSkriptConfig config = result.config();
@@ -325,7 +326,7 @@ class NeoSkriptConfigTest {
         assertEquals("Kept variables.compression, custom, nested, lists, which aren't NeoSkript's, as they were. Comments on"
                 + " NeoSkript's settings are its own now; yours are in config.yml.bak-v1.", result.notices().getLast());
         String text = Files.readString(file());
-        assertTrue(text.contains("  player-uuids-in-names: true\n  # A newer NeoSkript's.\n  compression: \"zstd\"\n"), text);
+        assertTrue(text.contains("  player-variable-fix: true\n  # A newer NeoSkript's.\n  compression: \"zstd\"\n"), text);
         assertTrue(text.contains("# Mine.\ncustom: [\"a\", \"b\"]\n"), text);
         assertTrue(text.contains("nested:\n  deeper:\n    value: 1\n"), text);
 

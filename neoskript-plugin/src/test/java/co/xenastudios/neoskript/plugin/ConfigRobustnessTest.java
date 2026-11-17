@@ -66,6 +66,12 @@ class ConfigRobustnessTest {
                     throw new AssertionError(label + " threw " + e, e);
                 }
                 complete(result.config(), label);
+                try {
+                    // What scripts read takes whatever loaded.
+                    ScriptSettings.apply(result.config(), folder);
+                } catch (RuntimeException e) {
+                    throw new AssertionError(label + ": applying it threw " + e, e);
+                }
                 if (path.startsWith("databases.")) {
                     // The owner's own section: a database with a value it can't use is kept, with why, so it still
                     // owns its pattern. Never thrown, never without databases.
@@ -80,6 +86,11 @@ class ConfigRobustnessTest {
                 }
             }
         }
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void defaults() {
+        ScriptSettings.apply(NeoSkriptConfig.DEFAULTS, folder);
     }
 
     @Test
@@ -124,6 +135,12 @@ class ConfigRobustnessTest {
 
                     @Override
                     public void playerUuids(boolean uuids) {}
+
+                    @Override
+                    public void scripts(NeoSkriptConfig settings) {
+                        // What scripts read is applied for real: it must take whatever loaded.
+                        ScriptSettings.apply(settings, folder);
+                    }
 
                     @Override
                     public void effectCommands(EffectCommands.Settings settings) {}
@@ -180,7 +197,10 @@ class ConfigRobustnessTest {
             if (value instanceof Record nested) {
                 complete(nested, label);
             } else if (value instanceof Integer number) {
-                assertTrue(number >= 0, label + ": " + component.getName() + " is " + number);
+                // From 0 up, or from where the setting says, as -1000 for the number accuracy.
+                co.xenastudios.neoskript.plugin.config.Range range =
+                        component.getAnnotation(co.xenastudios.neoskript.plugin.config.Range.class);
+                assertTrue(number >= (range == null ? 0 : range.min()), label + ": " + component.getName() + " is " + number);
             }
         }
     }

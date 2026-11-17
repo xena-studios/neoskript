@@ -45,8 +45,6 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
 
     private static final String DEFAULT_PERMISSION_MESSAGE =
             "You don't have the required permission to use this command";
-    private static final String DEFAULT_COOLDOWN_MESSAGE =
-            "You are using this command too often, please try again later";
 
     private final Plugin plugin;
     private final Logger logger;
@@ -142,7 +140,8 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
             if (previous != null && now - previous < command.cooldown().millis()) {
                 event.cooldown(command.cooldown(), new Timespan(now - previous), command.cooldownBypass());
                 String message = message(command.cooldownMessage(), event);
-                send(sender, message == null ? DEFAULT_COOLDOWN_MESSAGE : message);
+                send(sender, message == null
+                        ? co.xenastudios.neoskript.runtime.Language.get("commands.cooldown message") : message);
                 return;
             }
             event.cooldown(command.cooldown(), previous == null ? null : new Timespan(now - previous),

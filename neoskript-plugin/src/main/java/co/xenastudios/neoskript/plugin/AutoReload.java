@@ -99,11 +99,21 @@ final class AutoReload {
     /** {@link #describe(Diagnostic, SourceFile)} with the line of code given. */
     static String describe(Diagnostic problem, String code) {
         TextComponentParser parser = TextComponentParser.instance();
-        boolean error = problem.severity() == Severity.ERROR;
-        String lineInfo = error ? "<light red><bold>Line %s:<gray> (%s)<reset>\n" : "<gold><bold>Line %s:<gray> (%s)<reset>\n";
-        String details = error ? "<light red>    %s<reset>\n" : "<yellow>    %s<reset>\n";
-        return String.format(lineInfo, problem.line(), problem.file()) + String.format(details, parser.escape(problem.message()))
-                + String.format("<gold>    Line: <gray>%s<reset>\n <reset>", parser.escape(code));
+        String kind = problem.severity() == Severity.ERROR ? "error" : "warning";
+        // In config.yml's language, as Skript's: 'Satır 5: (script.sk)' in Turkish.
+        return format(kind + " line info", problem.line(), problem.file())
+                + format(kind + " details", parser.escape(problem.message()))
+                + format("line details", parser.escape(code));
+    }
+
+    /** One of Skript's {@code skript command.reload} messages, or the English one if a language file's is broken. */
+    private static String format(String key, Object... args) {
+        String full = "skript command.reload." + key;
+        try {
+            return String.format(co.xenastudios.neoskript.runtime.Language.get(full).replace("\\n", "\n"), args);
+        } catch (java.util.IllegalFormatException e) {
+            return String.format(co.xenastudios.neoskript.runtime.Language.ENGLISH.get(full).replace("\\n", "\n"), args);
+        }
     }
 
     /** Sends a formatted message, a line at a time to the console, as Skript's log redirection does. */

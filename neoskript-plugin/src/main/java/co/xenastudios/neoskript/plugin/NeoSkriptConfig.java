@@ -40,6 +40,15 @@ public record NeoSkriptConfig(
             "logged to the console and shown to players with skript.admin when they join. Development builds never check."})
         boolean updateChecker,
         Aliases aliases,
+        @Comment({
+            "The language of the messages scripts show from Skript's language files, as Skript's 'language': what",
+            "nothing is in text (<none>), a command's default cooldown message, and how a script's problems are",
+            "reported when it loads ('Line 5: (script.sk)'). Skript's languages are built in:",
+            "english, german, french, spanish, dutch, polish, russian, turkish, catalan, japanese, korean and",
+            "simplifiedchinese. A <name>.lang file in plugins/NeoSkript/lang adds a language, or changes one's",
+            "messages. NeoSkript's own messages (/sk, reloads) are in English."})
+        String language,
+        Text text,
         Variables variables,
         @Comment({
             "Where global variables are saved, as the databases: section of Skript's config.sk. Each variable is saved",
@@ -49,6 +58,7 @@ public record NeoSkriptConfig(
             "to plugins/NeoSkript. Moving over from Skript copies its section and the files it names. Applies on restart.",
             "Every option, and how to share variables between servers: https://neoskript.dev/docs/server/variables/"})
         DatabaseSettings databases,
+        Syntax syntax,
         Events events,
         RuntimeErrors runtimeErrors,
         EffectCommands effectCommands) {
@@ -60,8 +70,12 @@ public record NeoSkriptConfig(
             true,
             true,
             new Aliases(true),
-            new Variables(false, Interval.parse("5 minutes"), true),
+            "english",
+            new Text(DatePattern.DEFAULT, 2, false, true,
+                    co.xenastudios.neoskript.paper.TextComponentParser.DEFAULT_SAFE_TAGS, LinkParsing.DISABLED),
+            new Variables(false, Interval.parse("5 minutes"), true, true),
             DatabaseSettings.DEFAULTS,
+            new Syntax(100, NamePattern.DEFAULT),
             new Events(Priority.HIGH, false),
             new RuntimeErrors(Interval.parse("1 second"), 8, 2, 4, 10, 8, 2, 4, 10),
             new EffectCommands(false, "!", false, false));
@@ -94,6 +108,9 @@ public record NeoSkriptConfig(
             .section(DatabaseSettings.class, DatabaseSettings.CODEC)
             .codec(TextStyle.class, TextStyle.CODEC)
             .codec(Interval.class, Interval.CODEC)
+            .codec(DatePattern.class, DatePattern.CODEC)
+            .codec(NamePattern.class, NamePattern.CODEC)
+            .codec(LinkParsing.class, LinkParsing.CODEC)
             .build();
 
     public record Aliases(
@@ -103,6 +120,47 @@ public record NeoSkriptConfig(
                 "potions of each kind, have no names. Moving over from Skript copies its setting. Applies on",
                 "/sk reload aliases (which reads it from this file), /sk reload all or restart."})
             boolean loadDefaults) {}
+
+    /** How scripts write and compare text, as Skript's options of the same names. All apply on /sk reload config. */
+    public record Text(
+            @Comment({
+                "How dates are written as text, as Skript's 'date format': default, the server locale's short date and",
+                "time (1/15/24, 10:30 AM), or a pattern such as yyyy-MM-dd HH:mm, written as Java's SimpleDateFormat:",
+                "https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html"})
+            DatePattern dateFormat,
+            @Comment({
+                "Skript's 'number accuracy': the most decimal places numbers are written with as text, without",
+                "trailing zeros (2 writes 1/3 as 0.33, and 0.5 as 0.5). 0 or below rounds to whole numbers, and below 0",
+                "'numbers from X to Y' steps by 10s, 100s and so on, as in Skript. From -1000 to 1000."})
+            @Range(min = -1000, max = 1000) int numberAccuracy,
+            @Comment({
+                "Skript's 'case sensitive': whether comparing texts, 'contains', replace, split and finding text heed",
+                "case, so \"Hello\" isn't \"hello\". Replace and split read it when a script loads."})
+            boolean caseSensitive,
+            @Comment({
+                "Skript's 'color codes reset formatting': whether a colour (&a, <red>) turns off the bold, italics and",
+                "so on before it, as in Minecraft's own codes."})
+            boolean colorCodesResetFormatting,
+            @Comment({
+                "Skript's 'safe tags': the MiniMessage tags read in text that isn't the script's own, such as a",
+                "player's chat message made 'colored'. Tag names, or groups of them (color, decorations). Other tags,",
+                "such as click events, are only read in a script's own text."})
+            List<String> safeTags,
+            @Comment({
+                "Skript's 'parse links in chat messages': whether text that looks like a link is clickable. disabled,",
+                "strict (only http:// and https:// links) or lenient (anything with a dot, like example.com)."})
+            LinkParsing parseLinks) {}
+
+    /** Settings for particular syntax, as Skript's options of the same names. All apply on /sk reload config. */
+    public record Syntax(
+            @Comment({
+                "Skript's 'maximum target block distance': how many blocks away 'targeted block', 'target' and",
+                "'blocks in front of' look, from 0 to 1000."})
+            @Range(min = 0, max = 1000) int targetBlockDistance,
+            @Comment({
+                "Skript's 'player name regex pattern': the text that can be read as an offline player's name, as a",
+                "Java regular expression. Names that don't match aren't players (UUIDs always are)."})
+            NamePattern playerNamePattern) {}
 
     public record Variables(
             @Comment({
@@ -118,7 +176,11 @@ public record NeoSkriptConfig(
                 "Whether players are their UUIDs in variable names ({money::%player%}) or their names, as Skript's",
                 "'use player UUIDs in variable names' (on in Skript's default config). Moving over from Skript copies",
                 "its setting, so the variables it saved are found."})
-            boolean playerUuidsInNames) {}
+            boolean playerUuidsInNames,
+            @Comment({
+                "Skript's 'player variable fix': a player in a variable who leaves and joins again is read as the",
+                "player now online. Off, it stays the old player, whom messages and changes no longer reach."})
+            boolean playerVariableFix) {}
 
     public record Events(
             @Comment({
@@ -161,6 +223,129 @@ public record NeoSkriptConfig(
             boolean allowOps,
             @Comment("Skript's 'log effect commands': players' effect commands are logged as '<player> issued effect command: <command>'.")
             boolean log) {}
+
+    /** Skript's {@code parse links in chat messages}: {@code disabled}, {@code strict} or {@code lenient}. */
+    public enum LinkParsing {
+        DISABLED, STRICT, LENIENT;
+
+        static final Codec<LinkParsing> CODEC = new Codec<>() {
+            @Override
+            public LinkParsing decode(Object raw) {
+                LinkParsing parsing = parse(raw.toString());
+                if (parsing == null) {
+                    throw new IllegalArgumentException("should be disabled, strict or lenient");
+                }
+                return parsing;
+            }
+
+            @Override
+            public Object encode(LinkParsing value) {
+                return value.name().toLowerCase(java.util.Locale.ROOT);
+            }
+        };
+
+        /** As Skript reads the option, where {@code true} is lenient and {@code false} disabled, or {@code null}. */
+        static LinkParsing parse(String text) {
+            return switch (text.strip().toLowerCase(java.util.Locale.ROOT)) {
+                case "false", "disabled" -> DISABLED;
+                case "true", "lenient" -> LENIENT;
+                case "strict" -> STRICT;
+                default -> null;
+            };
+        }
+
+        co.xenastudios.neoskript.paper.TextComponentParser.LinkParseMode mode() {
+            return co.xenastudios.neoskript.paper.TextComponentParser.LinkParseMode.valueOf(name());
+        }
+    }
+
+    /** Skript's {@code date format}: {@code default} or a {@link java.text.SimpleDateFormat} pattern, kept as written. */
+    public record DatePattern(String text) {
+
+        static final DatePattern DEFAULT = new DatePattern("default");
+
+        static final Codec<DatePattern> CODEC = new Codec<>() {
+            @Override
+            public DatePattern decode(Object raw) {
+                return parse(raw.toString());
+            }
+
+            @Override
+            public Object encode(DatePattern value) {
+                return value.text;
+            }
+        };
+
+        /**
+         * @throws IllegalArgumentException if it isn't {@code default} or a valid pattern
+         */
+        static DatePattern parse(String text) {
+            String pattern = text.strip();
+            if (!pattern.equalsIgnoreCase("default")) {
+                try {
+                    new java.text.SimpleDateFormat(pattern);
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException("isn't a date format: " + e.getMessage());
+                }
+            }
+            return new DatePattern(pattern);
+        }
+    }
+
+    /** Skript's {@code player name regex pattern}: a regular expression, kept as written. */
+    public static final class NamePattern {
+
+        static final NamePattern DEFAULT = parse(co.xenastudios.neoskript.runtime.Settings.DEFAULT_PLAYER_NAME_PATTERN);
+
+        static final Codec<NamePattern> CODEC = new Codec<>() {
+            @Override
+            public NamePattern decode(Object raw) {
+                return parse(raw.toString());
+            }
+
+            @Override
+            public Object encode(NamePattern value) {
+                return value.pattern.pattern();
+            }
+        };
+
+        private final java.util.regex.Pattern pattern;
+
+        private NamePattern(java.util.regex.Pattern pattern) {
+            this.pattern = pattern;
+        }
+
+        /**
+         * @throws IllegalArgumentException if it isn't a valid regular expression
+         */
+        static NamePattern parse(String text) {
+            try {
+                return new NamePattern(java.util.regex.Pattern.compile(text));
+            } catch (java.util.regex.PatternSyntaxException | StackOverflowError e) {
+                throw new IllegalArgumentException("isn't a regular expression: "
+                        + (e.getMessage() == null ? e : e.getMessage().lines().findFirst().orElse("")));
+            }
+        }
+
+        java.util.regex.Pattern pattern() {
+            return pattern;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof NamePattern that && pattern.pattern().equals(that.pattern.pattern());
+        }
+
+        @Override
+        public int hashCode() {
+            return pattern.pattern().hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return pattern.pattern();
+        }
+    }
 
     /** The priorities Bukkit has, as config.yml writes them. */
     public enum Priority {

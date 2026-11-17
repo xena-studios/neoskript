@@ -8,6 +8,7 @@ import co.xenastudios.neoskript.api.element.Update;
 import co.xenastudios.neoskript.api.element.Condition;
 import co.xenastudios.neoskript.api.registration.Parameter;
 import co.xenastudios.neoskript.api.registration.Registrar;
+import co.xenastudios.neoskript.runtime.Settings;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,7 +54,8 @@ final class Texts {
 
         registrar.expression("ExprJoinSplit", "string", info -> {
             int pattern = info.pattern();
-            boolean caseSensitive = info.hasTag("case");
+            // As Skript reads its 'case sensitive' option: when the line is parsed.
+            boolean caseSensitive = Settings.caseSensitive() || info.hasTag("case");
             boolean dropTrailing = info.hasTag("trailing");
             // A regular expression written out is checked while parsing.
             String written = pattern >= 3 ? info.argumentLiteral(1) : null;
@@ -168,7 +170,8 @@ final class Texts {
             int pattern = info.pattern();
             boolean regex = pattern >= 2;
             boolean first = info.hasTag("first");
-            boolean caseSensitive = info.hasTag("case");
+            // As Skript reads its 'case sensitive' option: when the line is parsed.
+            boolean caseSensitive = Settings.caseSensitive() || info.hasTag("case");
             // 'replace X in T with R' or 'replace X with R in T'.
             boolean targetLast = pattern % 2 == 1;
             // Items are replaced in their inventories, which needn't be settable; text has to be, as in Skript.
@@ -227,7 +230,8 @@ final class Texts {
         registrar.expression("ExprReplace", "string", info -> {
             boolean regex = info.pattern() == 1 || info.hasTag("regex");
             boolean first = info.hasTag("first");
-            boolean caseSensitive = info.hasTag("case");
+            // As Skript reads its 'case sensitive' option: when the line is parsed.
+            boolean caseSensitive = Settings.caseSensitive() || info.hasTag("case");
             return (context, args) -> {
                 Object[] haystacks = (Object[]) args[0];
                 if (args[2] == null) {

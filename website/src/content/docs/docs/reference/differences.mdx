@@ -14,7 +14,7 @@ What's on this page is what's left: the deliberate differences, what NeoSkript a
 - **A reload with errors keeps the running version.** Skript unloads a script before loading it again; NeoSkript compiles first, and keeps the version that's running if the new one has errors. See [reloading](/docs/server/reloading/).
 - **It won't start next to Skript.** The two would fight over the same scripts and `/skript` command.
 - **Its own folder.** Scripts and variables live in `plugins/NeoSkript`, copied from `plugins/Skript` on the first start.
-- **`config.yml`, not `config.sk`,** with the settings NeoSkript has. See [configuration](/docs/server/configuration/).
+- **`config.yml`, not `config.sk`,** with Skript's settings that change how scripts behave, copied from `config.sk` on the first start. See [configuration](/docs/server/configuration/).
 - **Folia.** Skript doesn't run on Folia; NeoSkript runs on its region threads. See [Folia](/docs/server/folia/).
 - **`/sk reload aliases`** also reloads the scripts that use the aliases that changed, and those that had errors. Skript only reads the alias files again, so scripts keep the items they loaded with until they're reloaded.
 - **`/sk update`** uses NeoSkript's [update checker](/docs/server/updates-and-metrics/), and **`/sk gen-docs`** points to the [syntax reference](/syntax/) instead of writing docs files.
@@ -26,6 +26,8 @@ Where Skript 2.17 has a bug, NeoSkript does what Skript meant rather than copy i
 
 - **Script folders in `/sk`:** Skript 2.17 never finds folders given to `/sk reload`, `enable` or `disable`, because of a bug. NeoSkript finds them; a name ending in `/` is a folder.
 - **Warning frames:** Skript 2.17's runtime warning frames never reset. NeoSkript resets them as intended.
+- **Numbers copied from `config.sk` that could stall the server:** a `number accuracy` beyond 1000 either way is copied as 1000 or -1000, and a `maximum target block distance` above 1000 as 1000, as tracing that far or writing every number with that many digits can stall a server. A negative distance, which Skript's `target`, `targeted block` and `blocks in front of` each read differently, is copied as 0. At 0, `targeted block` (not `actual targeted block`) looks 1 block: Bukkit's line of sight never ends at 0.
+- **`case sensitive` in `positions of`:** Skript 2.17 has its option the wrong way round there: off, `all positions of "a" in "Abca"` heeds case (4), and on, it doesn't (1 and 4). NeoSkript follows the option, like the rest of Skript's text syntax.
 - **Comparisons of words:** `projectile is an arrow` was false because of how words were read. NeoSkript reads words in comparisons as Skript's `CondCompare` means to, so it's true.
 - **Alias files that stop Skript loading aliases:** in Skript 2.17, an alias starting with `{`, a block state without `=` (`[facing]`), components the server can't read, a `minecraft version` that isn't a version, or a lone `}` in a name stop it loading any aliases, and can disable it. NeoSkript reports an error for the line and loads the rest.
 - **Alias names with capitals:** Skript keeps `Ruby = minecraft:red_dye` as written but looks names up in lower case, so it never finds it. NeoSkript finds it, and writes the item as `Ruby`.

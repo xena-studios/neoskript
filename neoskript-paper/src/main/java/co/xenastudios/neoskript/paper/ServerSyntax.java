@@ -225,8 +225,8 @@ final class ServerSyntax {
                     + new File(logs, file).getPath() + "): " + e);
             return;
         }
-        String timestamp = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.MEDIUM)
-                .format(new java.util.Date());
+        // As Skript stamps log lines: in its date format (config.yml's text.date-format).
+        String timestamp = co.xenastudios.neoskript.runtime.Settings.formatDate(System.currentTimeMillis());
         synchronized (writer) {
             writer.println((level == Level.INFO ? "[" + timestamp + "]" : "[" + timestamp + " " + level + "]") + " " + message);
             writer.flush();

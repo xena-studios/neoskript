@@ -13,11 +13,12 @@ import java.util.Deque;
  * <p>{@code #} starts a comment in code, including in {@code %expressions%} inside strings and variable
  * names. It's an ordinary character inside a string or a variable name, so {@code "#ff0000"} and
  * {@code {##x}} keep theirs. Outside strings and variable names, {@code ##} stands for one {@code #}.
+ * Skript reads every config file this way, config.sk and its language files too.
  */
-final class Comments {
+public final class Comments {
 
     /** A line containing only this opens or closes a block comment. */
-    static final String BLOCK_DELIMITER = "###";
+    public static final String BLOCK_DELIMITER = "###";
 
     private enum Context {
         CODE,
@@ -29,7 +30,7 @@ final class Comments {
     private Comments() {}
 
     /** Returns {@code line} without its comment. Unclosed strings or variables are left for the parser. */
-    static String strip(String line) {
+    public static String strip(String line) {
         StringBuilder out = new StringBuilder(line.length());
         Deque<Context> contexts = new ArrayDeque<>();
         contexts.push(Context.CODE);
