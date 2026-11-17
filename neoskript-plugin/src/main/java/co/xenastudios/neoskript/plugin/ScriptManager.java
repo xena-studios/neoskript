@@ -449,20 +449,48 @@ final class ScriptManager {
         // In the files' order, though scripts were added or enabled since: addons told of their triggers get them so.
         reorder(loaded, files);
         reorder(loadedCommands, files);
+        // Skript's load order: each script in turn, each of its triggers in the order of its lines. Skript registers
+        // each event's trigger when it gets to it and runs each 'on load' then, so what an 'on load' does reaches
+        // only the triggers before it, and those of the scripts that weren't loaded again.
+        List<CompiledScripts.CompiledTrigger> order = new ArrayList<>();
+        for (String name : switching) {
+            List<CompiledScripts.CompiledTrigger> own = new ArrayList<>(loaded.get(name));
+            own.sort(java.util.Comparator.comparingInt(CompiledScripts.CompiledTrigger::line));
+            order.addAll(own);
+        }
+        int firstLoad = 0;
+        while (firstLoad < order.size() && order.get(firstLoad).event() != ScriptEvent.LOAD) {
+            firstLoad++;
+        }
+        if (walk != null) {
+            // An earlier load's walk that hasn't run yet: its triggers listen now, as these scripts load after it.
+            walk.finish();
+        }
+        for (CompiledScripts.CompiledTrigger trigger : order) {
+            registeredAt.put(trigger.trigger(), registrations++);
+        }
+        LoadWalk loadWalk = firstLoad == order.size() ? null
+                : new LoadWalk(order.stream().map(CompiledScripts.CompiledTrigger::trigger).toList(), firstLoad);
+        walk = loadWalk;
+        events.walk(loadWalk);
         updateListenersAndCommands();
         tellUnloaded(stopped);
         long millis = (System.nanoTime() - start) / 1_000_000;
 
+        if (loadWalk != null) {
+            Runnable walking = () -> walk(order, loadWalk);
+            if (now) {
+                walking.run();
+            } else {
+                scheduler.runGlobal(walking);
+            }
+        }
         for (String name : switching) {
             periodic.getOrDefault(name, List.of()).forEach(Runnable::run);
             List<Runnable> stops = new ArrayList<>();
             for (CompiledScripts.CompiledTrigger trigger : loaded.get(name)) {
                 if (trigger.event() == ScriptEvent.LOAD) {
-                    if (now) {
-                        run(trigger);
-                    } else {
-                        scheduler.runGlobal(() -> run(trigger));
-                    }
+                    continue;
                 } else if (trigger.period() != null && trigger.worlds() != null) {
                     // As in Skript, each world's runs come when its full time is a multiple of the period.
                     long ticks = Math.max(trigger.period().ticks(), 1);
@@ -778,9 +806,21 @@ final class ScriptManager {
      * Listens for the loaded scripts' events and registers their commands. Each goes ahead even if the other
      * fails, so a server that refuses one doesn't leave the scripts half switched over.
      */
+    /**
+     * When each loaded trigger was registered, by identity: as in Skript, an event's triggers run in that order, so
+     * those of a script reloaded on its own run after the others'.
+     */
+    private final Map<co.xenastudios.neoskript.runtime.Trigger, Long> registeredAt = new java.util.IdentityHashMap<>();
+    private long registrations;
+
     private void updateListenersAndCommands() {
+        List<CompiledScripts.CompiledTrigger> all = new ArrayList<>(loaded.values().stream().flatMap(List::stream).toList());
+        Set<co.xenastudios.neoskript.runtime.Trigger> listening = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        all.forEach(trigger -> listening.add(trigger.trigger()));
+        registeredAt.keySet().retainAll(listening);
+        all.sort(java.util.Comparator.comparingLong(trigger -> registeredAt.getOrDefault(trigger.trigger(), Long.MAX_VALUE)));
         try {
-            events.update(loaded.values().stream().flatMap(List::stream).toList());
+            events.update(all);
         } catch (RuntimeException e) {
             logger.error("Couldn't listen for the scripts' events", e);
         }
@@ -855,6 +895,33 @@ final class ScriptManager {
         }
     }
 
+    /** The scripts being loaded whose triggers don't all listen yet, or {@code null}: see {@link LoadWalk}. */
+    private volatile LoadWalk walk;
+
+    /**
+     * Goes through the triggers of the scripts loaded, in Skript's load order: each {@code on load} runs when it's
+     * reached, and each other trigger listens from then on.
+     */
+    private void walk(List<CompiledScripts.CompiledTrigger> order, LoadWalk loadWalk) {
+        try {
+            for (int i = 0; i < order.size(); i++) {
+                CompiledScripts.CompiledTrigger trigger = order.get(i);
+                if (trigger.event() == ScriptEvent.LOAD) {
+                    run(trigger);
+                }
+                loadWalk.reach(i);
+            }
+        } finally {
+            loadWalk.finish();
+            synchronized (this) {
+                if (walk == loadWalk) {
+                    walk = null;
+                    events.walk(null);
+                }
+            }
+        }
+    }
+
     /** The loaded triggers, by identity, as addons running their own events were last told. */
     private volatile Set<CompiledScripts.CompiledTrigger> live = Set.of();
 
@@ -881,6 +948,11 @@ final class ScriptManager {
         public void run(Object event, Object owner) {
             if (!manager.live.contains(compiled)) {
                 // Its script has unloaded or reloaded since: its code doesn't run any more.
+                return;
+            }
+            LoadWalk loading = manager.walk;
+            if (loading != null && loading.pending(compiled.trigger())) {
+                // As in Skript, an 'on load' before it in the load order caused the event: it isn't registered yet.
                 return;
             }
             try {

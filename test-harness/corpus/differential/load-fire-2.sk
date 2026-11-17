@@ -1,0 +1,16 @@
+# Probe: see load-fire-1. This script's 'on load' reaches load-fire-1's trigger and the one above it here, not the
+# one below it, nor load-fire-3's.
+
+on spawn of armadillo:
+	add "2: spawn, above the on load" to {diff::load-fire::*}
+
+on load:
+	add "2: load" to {diff::load-fire::*}
+	spawn an armadillo at location(0.5, 300, 0.5, world "world")
+	add "2: load, after the spawn" to {diff::load-fire::*}
+
+on spawn of armadillo:
+	add "2: spawn, below the on load" to {diff::load-fire::*}
+
+function probe_load_fire_2():
+	stop
