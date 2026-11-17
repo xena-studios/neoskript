@@ -25,7 +25,6 @@ import org.yaml.snakeyaml.comments.CommentLine;
 import org.yaml.snakeyaml.composer.Composer;
 import org.yaml.snakeyaml.nodes.Node;
 import org.yaml.snakeyaml.parser.ParserImpl;
-import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.reader.UnicodeReader;
 import org.yaml.snakeyaml.resolver.Resolver;
 
@@ -57,7 +56,7 @@ final class YamlText {
     private YamlText() {}
 
     /** What a file holds once read. */
-    record Read(Map<String, Object> root, String header, Map<String, YamlFile.Comment> comments) {}
+    record Read(Map<String, Object> root, String header, Map<String, YamlFile.Comment> comments, long values) {}
 
     /** A file that can't be read: it isn't YAML, isn't a map of keys, or is too big. */
     static final class Unreadable extends Exception {
@@ -73,16 +72,28 @@ final class YamlText {
      * @throws Unreadable if it can't be read as skript-yaml's files are, so nothing is loaded and the file is kept
      */
     static Read read(byte[] bytes, Values values) throws Unreadable {
+        return read(new ByteArrayInputStream(bytes), values);
+    }
+
+    /**
+     * Reads a file as it's streamed, so its bytes aren't held next to its text and what's built from it.
+     * @throws Unreadable if it can't be read as skript-yaml's files are, so nothing is loaded and the file is kept
+     */
+    static Read read(java.io.InputStream bytes, Values values) throws Unreadable {
         StringBuilder yaml = new StringBuilder();
         List<String> pending = new ArrayList<>();
         String[] header = {null};
         Map<String, YamlFile.Comment> comments = new HashMap<>();
-        try (BufferedReader input = new BufferedReader(new UnicodeReader(new ByteArrayInputStream(bytes)), 65536)) {
+        // Comment and header lines kept count against the values a file may hold, as each is kept apart from the
+        // text: a file of millions of commented keys would otherwise fill memory before the values are counted.
+        int[] kept = {0};
+        try (BufferedReader input = new BufferedReader(new UnicodeReader(bytes), 65536)) {
             String line = input.readLine();
             append(yaml, line);
             while (line != null) {
                 if (line.startsWith(HEADER_PREFIX)) {
                     while (line != null && line.startsWith(HEADER_PREFIX)) {
+                        keep(kept);
                         pending.add(line.replaceFirst(HEADER_PREFIX, ""));
                         line = input.readLine();
                         append(yaml, line);
@@ -97,6 +108,7 @@ final class YamlText {
                 }
                 if (line.startsWith(COMMENT_PREFIX)) {
                     while (line != null && line.startsWith(COMMENT_PREFIX)) {
+                        keep(kept);
                         pending.add(line.replaceFirst(COMMENT_PREFIX, ""));
                         line = input.readLine();
                         append(yaml, line);
@@ -107,6 +119,7 @@ final class YamlText {
                             // Root keys only, as skript-yaml.
                             String[] lines = pending.stream().map(text -> text.matches("^# ?") ? text : COMMENT_PREFIX + text)
                                     .toArray(String[]::new);
+                            keep(kept);
                             comments.put(key, new YamlFile.Comment(tabs(String.join(LINE_BREAK, lines)), false));
                         }
                     }
@@ -119,15 +132,19 @@ final class YamlText {
             throw new Unreadable("it can't be read: " + e.getMessage());
         }
         Object document;
+        int[] composed = {0};
         try {
-            document = compose(yaml.toString(), values);
+            String text = yaml.toString();
+            // Only the text from here: the builder's copy can go before the file's values are built.
+            yaml = null;
+            document = compose(text, values, composed);
         } catch (TooManyValues e) {
-            throw new Unreadable("it holds more than " + MAX_VALUES + " values");
+            throw tooManyValues();
         } catch (YAMLException | IllegalArgumentException | ClassCastException | StackOverflowError e) {
             throw new Unreadable("it isn't valid YAML: " + describe(e));
         }
         if (document == null) {
-            return new Read(new LinkedHashMap<>(), header[0], comments);
+            return new Read(new LinkedHashMap<>(), header[0], comments, composed[0] + kept[0]);
         }
         if (!(document instanceof Map<?, ?> map)) {
             throw new Unreadable("its top level is a " + (document instanceof List ? "list" : "value")
@@ -143,9 +160,9 @@ final class YamlText {
             throw new Unreadable("a list or node in it holds itself");
         }
         if (budget[0] < 0) {
-            throw new Unreadable("it holds more than " + MAX_VALUES + " values");
+            throw tooManyValues();
         }
-        return new Read(root, header[0], comments);
+        return new Read(root, header[0], comments, composed[0] + kept[0]);
     }
 
     private static void append(StringBuilder yaml, String line) throws Unreadable {
@@ -156,6 +173,16 @@ final class YamlText {
                 throw tooBig();
             }
         }
+    }
+
+    private static void keep(int[] kept) throws Unreadable {
+        if (++kept[0] > MAX_VALUES) {
+            throw tooManyValues();
+        }
+    }
+
+    static Unreadable tooManyValues() {
+        return new Unreadable("it holds more than " + MAX_VALUES + " values");
     }
 
     static Unreadable tooBig() {
@@ -222,7 +249,7 @@ final class YamlText {
      * {@link #MAX_VALUES}, before the nodes for millions of values are held: a 30 MB list of zeros would otherwise take
      * gigabytes before anything could count it.
      */
-    private static Object compose(String text, Values values) {
+    private static Object compose(String text, Values values, int[] count) {
         LoaderOptions options = new LoaderOptions();
         options.setCodePointLimit(MAX_CHARACTERS);
         // skript-yaml allows any number of aliases; a few thousand covers real files, and the value budget stops the
@@ -230,8 +257,7 @@ final class YamlText {
         options.setMaxAliasesForCollections(10_000);
         options.setAllowRecursiveKeys(false);
         options.setTagInspector(tag -> true);
-        int[] count = {0};
-        Composer composer = new Composer(new ParserImpl(new StreamReader(text), options), new Resolver(), options) {
+        Composer composer = new Composer(new ParserImpl(new WholeTextReader(text), options), new Resolver(), options) {
             private void counted() {
                 if (++count[0] > MAX_VALUES) {
                     throw new TooManyValues();
@@ -267,10 +293,16 @@ final class YamlText {
      * A file's contents, as skript-yaml saves them: the header, then each root key with its comment, and a blank line
      * between root keys unless {@code extraLines} is off.
      */
-    static String write(YamlFile.Snapshot file, boolean extraLines, Values values) {
+    /** A file's text, and how many values reading it back counts, as {@link #read} counts them. */
+    record Written(String text, long values) {}
+
+    static Written write(YamlFile.Snapshot file, boolean extraLines, Values values) {
         Yaml yaml = dumper(file.indent());
         StringWriter out = new StringWriter();
+        // As read counts: the document's node, each key and what's under it, and each header and comment line.
+        long count = 1;
         if (file.header() != null) {
+            count += file.header().split("\\r?\\n", -1).length;
             out.append(file.header()).append(LINE_BREAK);
             if (file.extraHeaderLine()) {
                 out.append(LINE_BREAK);
@@ -287,14 +319,72 @@ final class YamlText {
             first = false;
             YamlFile.Comment comment = file.comments().get(entry.getKey());
             if (comment != null) {
+                count += 1 + comment.text().split("\\r?\\n", -1).length;
                 if (comment.extraLine()) {
                     out.append(LINE_BREAK);
                 }
                 out.append(comment.text()).append(LINE_BREAK);
             }
-            yaml.dump(Collections.singletonMap(entry.getKey(), YamlValues.toYaml(entry.getValue(), values)), out);
+            Object value = YamlValues.toYaml(entry.getValue(), values);
+            count += 1 + nodes(value);
+            yaml.dump(Collections.singletonMap(entry.getKey(), value), out);
         }
-        return out.toString();
+        return new Written(out.toString(), count);
+    }
+
+    /** How many YAML nodes a value is written as, as the composer counts them when it's read. */
+    static long nodes(Object value) {
+        return switch (value) {
+            case Map<?, ?> map -> {
+                long count = 1;
+                for (Object item : map.values()) {
+                    count += 1 + nodes(item);
+                }
+                yield count;
+            }
+            case List<?> list -> {
+                long count = 1;
+                for (Object item : list) {
+                    count += nodes(item);
+                }
+                yield count;
+            }
+            case org.bukkit.Location location -> 13;
+            case org.bukkit.util.Vector vector -> 7;
+            case YamlValues.SkriptClass skriptClass -> 5;
+            case YamlValues.Kept kept -> nodes(kept.node());
+            case org.bukkit.configuration.ConfigurationSection section -> nodes(section.getValues(false));
+            case org.bukkit.configuration.serialization.ConfigurationSerializable serializable -> {
+                // Its '==' key and value, then its own.
+                long count = 3;
+                for (Object item : serializable.serialize().values()) {
+                    count += 1 + nodes(item);
+                }
+                yield count;
+            }
+            case Node node -> nodes(node);
+            case null, default -> 1;
+        };
+    }
+
+    private static long nodes(Node node) {
+        return switch (node) {
+            case org.yaml.snakeyaml.nodes.MappingNode mapping -> {
+                long count = 1;
+                for (org.yaml.snakeyaml.nodes.NodeTuple tuple : mapping.getValue()) {
+                    count += nodes(tuple.getKeyNode()) + nodes(tuple.getValueNode());
+                }
+                yield count;
+            }
+            case org.yaml.snakeyaml.nodes.SequenceNode sequence -> {
+                long count = 1;
+                for (Node item : sequence.getValue()) {
+                    count += nodes(item);
+                }
+                yield count;
+            }
+            default -> 1;
+        };
     }
 
     private static Yaml dumper(int indent) {

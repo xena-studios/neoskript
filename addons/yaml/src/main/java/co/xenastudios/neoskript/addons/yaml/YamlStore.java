@@ -109,7 +109,6 @@ final class YamlStore implements AutoCloseable {
             return false;
         }
         saver.await(file);
-        byte[] bytes;
         try {
             if (!Files.exists(file)) {
                 if (file.getParent() != null) {
@@ -122,18 +121,17 @@ final class YamlStore implements AutoCloseable {
                 refused(id, file, YamlText.tooBig().getMessage(), where);
                 return false;
             }
-            bytes = Files.readAllBytes(file);
         } catch (IOException | RuntimeException e) {
             warn.accept("[Load Yaml] " + e + " (" + file + ")" + where);
             return false;
         }
         YamlText.Read read;
-        try {
+        try (java.io.InputStream bytes = Files.newInputStream(file)) {
             read = YamlText.read(bytes, values);
         } catch (YamlText.Unreadable e) {
             refused(id, file, e.getMessage(), where);
             return false;
-        } catch (RuntimeException | StackOverflowError e) {
+        } catch (IOException | RuntimeException | StackOverflowError e) {
             refused(id, file, e.toString(), where);
             return false;
         }
@@ -232,9 +230,40 @@ final class YamlStore implements AutoCloseable {
         // as values like items and locations are the scripts' own, which only their thread may read. The number
         // makes sure the newest copy is the one written, whichever thread finishes its dump first.
         YamlFile.Snapshot snapshot = file.saving();
-        String content = afterDump.apply(YamlText.write(snapshot, extraLines, values));
+        YamlText.Written written = YamlText.write(snapshot, extraLines, values);
+        // The limits loading has, so a file saved can always be loaded again: a save past them is refused, and the
+        // file on disk kept.
+        long bytes = utf8Length(written.text());
+        if (bytes > YamlText.MAX_CHARACTERS || written.values() > YamlText.MAX_VALUES) {
+            file.modified(true);
+            warn.accept("Not saving '" + id + "' to " + to + ": it would be " + (bytes > YamlText.MAX_CHARACTERS
+                    ? (bytes / 1024 / 1024) + " MB, more than the " + (YamlText.MAX_CHARACTERS / 1024 / 1024) + " MB"
+                    : written.values() + " values, more than the " + YamlText.MAX_VALUES) + " a file can have to be"
+                    + " loaded again. The file is left as it was" + where);
+            return false;
+        }
+        String content = afterDump.apply(written.text());
         saver.save(to, content, snapshot.sequence(), () -> file.modified(true));
         return true;
+    }
+
+    /** How many bytes text is in UTF-8, without encoding it. */
+    static long utf8Length(String text) {
+        long bytes = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c < 0x80) {
+                bytes++;
+            } else if (c < 0x800) {
+                bytes += 2;
+            } else if (Character.isHighSurrogate(c) && i + 1 < text.length() && Character.isLowSurrogate(text.charAt(i + 1))) {
+                bytes += 4;
+                i++;
+            } else {
+                bytes += 3;
+            }
+        }
+        return bytes;
     }
 
     /** For tests: runs between turning a snapshot into text and handing it to the saver. */

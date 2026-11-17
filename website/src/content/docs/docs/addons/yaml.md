@@ -96,9 +96,11 @@ Loaded files are shared by every script on every thread. Each change, read and s
 
 To keep a bad file from taking the server down, a file is refused (and left alone) if it:
 
-- is larger than 32 MB, or holds more than a million values (keys, list items and values each count). Values are counted as the file is read, before it takes up memory, and again once YAML's aliases are followed, which can make a small file read as billions;
+- is larger than 32 MB, or holds more than a million values (keys, list items, values, and comment and header lines each count). Values are counted as the file is read, before it takes up memory, and again once YAML's aliases are followed, which can make a small file read as billions;
 - nests more than 50 levels deep, or has a list or node that holds itself;
 - has a list or a single value at its top level, rather than keys.
+
+A save that would make a file past these limits is refused, with a warning, and the file is left as it was, so a file NeoSkriptYaml saves always loads again. A single long value, even of many megabytes, reads in a fraction of a second.
 
 A value with a tag nobody knows, a location in a world that isn't loaded, or a `!skriptclass` of a type no plugin has, reads as nothing, and is written back unchanged when the file is saved.
 

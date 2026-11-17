@@ -99,11 +99,26 @@ public final class YamlDifferentialScenario implements Scenario {
         // What skript-yaml can't save on 26.3, compared where it can: the reference Skript on Paper 1.21.11, which
         // skript-yaml reads as a version after 1.13. Only the parts that fail on 26.3, as items and the rest are
         // written differently from one Minecraft version to the next.
-        ServerBuilder older = context.server(PAPER_1_21, runs.resolve("skript-1.21"))
-                .plugin(context.skriptJar())
-                .plugin(context.download(SKRIPT_YAML.url(), SKRIPT_YAML.sha256(), SKRIPT_YAML.fileName()))
-                .file("plugins/Skript/scripts/yaml.sk", script);
-        Result onOlder = run(given(older), ON_1_21, "plugins/YamlTest");
+        // If it can't run here (no Java 21, or Paper 1.21.11 can't be downloaded), that part is skipped with a note;
+        // once its server has started, anything that goes wrong fails the scenario as usual.
+        Result onOlder = null;
+        String olderSkipped = null;
+        ServerBuilder older = null;
+        try {
+            Path java = context.config().javaExecutable(PAPER_1_21.javaVersion());
+            if (java == null || !Files.isExecutable(java)) {
+                throw new IOException("no Java " + PAPER_1_21.javaVersion() + " at " + java);
+            }
+            older = context.server(PAPER_1_21, runs.resolve("skript-1.21"))
+                    .plugin(context.skriptJar())
+                    .plugin(context.download(SKRIPT_YAML.url(), SKRIPT_YAML.sha256(), SKRIPT_YAML.fileName()))
+                    .file("plugins/Skript/scripts/yaml.sk", script);
+        } catch (IOException | RuntimeException unavailable) {
+            olderSkipped = unavailable.toString();
+        }
+        if (older != null) {
+            onOlder = run(given(older), ON_1_21, "plugins/YamlTest");
+        }
 
         Map<String, String> known = NeoSkriptYamlScenario.knownDifferences(context);
         List<String> unexpected = new ArrayList<>();
@@ -112,19 +127,24 @@ public final class YamlDifferentialScenario implements Scenario {
         compareLines(original.lines(), ours.lines(), known, unexpected, expected);
         compareFiles(original.files(), ours.files(), known, unexpected, expected);
         List<String> olderCompared = new ArrayList<>();
-        for (String olderPart : ON_1_21) {
+        if (onOlder == null) {
+            report.put("paper1_21Skipped", olderSkipped);
+            context.summary("1.21.11 comparison", "skipped: " + olderSkipped);
+            System.out.println("[harness] yaml-differential: the Paper 1.21.11 comparison is skipped: " + olderSkipped);
+        }
+        for (String olderPart : onOlder == null ? List.<String>of() : ON_1_21) {
             if (onOlder.unfinished().contains(olderPart)) {
                 unexpected.add("skript-yaml on Paper 1.21.11 didn't finish /yamltest-" + olderPart);
             }
         }
-        List<String[]> olderLines = onOlder.lines();
-        List<String[]> ourLines = ours.lines().stream()
+        List<String[]> olderLines = onOlder == null ? List.of() : onOlder.lines();
+        List<String[]> ourLines = onOlder == null ? List.of() : ours.lines().stream()
                 .filter(line -> ON_1_21.stream().anyMatch(p -> line[0].startsWith(p + " / "))).toList();
         List<String> olderUnexpected = new ArrayList<>();
         compareLines(olderLines, ourLines, Map.of(), olderUnexpected, new ArrayList<>());
         Map<String, String> olderFiles = new TreeMap<>();
         Map<String, String> ourFiles = new TreeMap<>();
-        for (String file : ON_1_21_FILES) {
+        for (String file : onOlder == null ? List.<String>of() : ON_1_21_FILES) {
             olderFiles.put(file, onOlder.files().get(file));
             ourFiles.put(file, ours.files().get(file));
             olderCompared.add(file);

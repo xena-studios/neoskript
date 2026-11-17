@@ -30,7 +30,7 @@ class YamlTextTest {
     }
 
     private static String save(YamlFile file, boolean extraLines) {
-        return YamlText.write(file.snapshot(), extraLines, VALUES);
+        return YamlText.write(file.snapshot(), extraLines, VALUES).text();
     }
 
     @Test

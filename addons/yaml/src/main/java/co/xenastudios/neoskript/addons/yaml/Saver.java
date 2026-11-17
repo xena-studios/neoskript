@@ -164,21 +164,26 @@ final class Saver implements AutoCloseable {
         }
     }
 
-    /** Where a file's saves go: the file a link points to, so the link stays a link. */
-    private static Path key(Path file) {
+    /**
+     * Where a file's saves go, as one key for every way of naming it: the file a link points to, so the link stays a
+     * link, or for a file that doesn't exist yet, the real path of its nearest folder that does with the rest after it,
+     * so a linked server folder or another spelling on a file system that ignores case shares one queue.
+     */
+    static Path key(Path file) {
         Path path = file.toAbsolutePath().normalize();
+        Path existing = path;
+        while (existing != null && !Files.exists(existing)) {
+            existing = existing.getParent();
+        }
+        if (existing == null) {
+            return path;
+        }
         try {
-            if (Files.exists(path)) {
-                return path.toRealPath();
-            }
-            Path parent = path.getParent();
-            if (parent != null && Files.exists(parent)) {
-                return parent.toRealPath().resolve(path.getFileName());
-            }
+            return existing.toRealPath().resolve(existing.relativize(path));
         } catch (IOException | RuntimeException unresolved) {
             // Written where it's named.
+            return path;
         }
-        return path;
     }
 
     /** Writes the whole file to a temporary file next to it, then moves it into place and syncs the folder. */

@@ -308,4 +308,106 @@ class YamlStoreTest {
         assertTrue(warnings.stream().anyMatch(w -> w.contains("larger than 32 MB")), warnings.toString());
         assertTrue(warnings.stream().anyMatch(w -> w.contains("more than 1000000 values")), warnings.toString());
     }
+
+    /** Writes a file of {@code megabytes} with {@code start}, then {@code fill} until it's that big, then {@code end}. */
+    private Path big(String name, int megabytes, String start, String fill, String end) throws IOException {
+        Path path = file(name);
+        try (var out = new java.io.BufferedWriter(Files.newBufferedWriter(path), 1 << 20)) {
+            out.write(start);
+            for (long written = 0; written < megabytes * 1024L * 1024L; written += fill.length()) {
+                out.write(fill);
+            }
+            out.write(end);
+        }
+        return path;
+    }
+
+    @Test
+    void aLongValueLoadsInTimeThatGrowsWithItsLength() throws Exception {
+        // SnakeYAML's own reader took 15 seconds for 8 MB and four minutes for 29 MB, on the script's thread.
+        for (String[] kind : new String[][] {{"plain", "a: ", "x", "\n"}, {"quoted", "a: \"", "x", "\"\n"}}) {
+            for (int megabytes : new int[] {8, 29}) {
+                Path path = big(kind[0] + megabytes + ".yml", megabytes, kind[1], kind[2], kind[3]);
+                long start = System.nanoTime();
+                assertTrue(store.load("long", path, ""), warnings.toString());
+                long millis = (System.nanoTime() - start) / 1_000_000;
+                System.out.println("Loaded a " + megabytes + " MB " + kind[0] + " value in " + millis + " ms");
+                assertTrue(millis < 10_000, kind[0] + " " + megabytes + " MB took " + millis + " ms");
+                assertEquals(megabytes * 1024L * 1024L, ((String) store.get("long").get("a")).length());
+                store.unload("long");
+            }
+        }
+    }
+
+    @Test
+    void manyCommentedKeysAreRefusedBeforeTheyFillMemory() throws Exception {
+        // 30 MB of '# c' over a key, under the size limit: about two million comments, each kept apart from the text.
+        Path path = file("comments.yml");
+        try (var out = new java.io.BufferedWriter(Files.newBufferedWriter(path), 1 << 20)) {
+            long written = 0;
+            for (int i = 0; written < 30L * 1024 * 1024; i++) {
+                String pair = "# c\nk" + i + ": 1\n";
+                out.write(pair);
+                written += pair.length();
+            }
+        }
+        assertTrue(Files.size(path) <= YamlText.MAX_CHARACTERS);
+        assertFalse(store.load("comments", path, ""));
+        assertTrue(warnings.stream().anyMatch(w -> w.contains("more than 1000000 values")), warnings.toString());
+    }
+
+    @Test
+    void aSaveTooBigToLoadAgainIsRefused() throws Exception {
+        Path path = file("growing.yml");
+        store.load("growing", path, "");
+        YamlFile growing = store.get("growing");
+        growing.set("a", 1L);
+        assertTrue(store.save(growing, null, false, "growing", ""));
+        store.await(path);
+        List<Object> items = new ArrayList<>(1_000_000);
+        for (int i = 0; i < 1_000_000; i++) {
+            items.add((long) i);
+        }
+        growing.set("list", items);
+        assertFalse(store.save(growing, null, false, "growing", ""));
+        assertTrue(growing.modified());
+        store.await(path);
+        assertEquals("a: 1" + YamlText.LINE_BREAK, Files.readString(path));
+        assertTrue(warnings.stream().anyMatch(w -> w.startsWith("Not saving 'growing'") && w.contains("values")),
+                warnings.toString());
+        growing.set("list", "x".repeat(YamlText.MAX_CHARACTERS));
+        assertFalse(store.save(growing, null, false, "growing", ""));
+        assertTrue(warnings.stream().anyMatch(w -> w.startsWith("Not saving 'growing'") && w.contains("MB")),
+                warnings.toString());
+    }
+
+    @Test
+    void savingCountsValuesAsLoadingDoes() throws Exception {
+        String text = "## Header" + YamlText.LINE_BREAK + "## two" + YamlText.LINE_BREAK + YamlText.LINE_BREAK
+                + "# about a" + YamlText.LINE_BREAK + "a:" + YamlText.LINE_BREAK + "    b: 1" + YamlText.LINE_BREAK
+                + "    c:" + YamlText.LINE_BREAK + "    - x" + YamlText.LINE_BREAK + "    - k: v" + YamlText.LINE_BREAK
+                + "odd: !unknown" + YamlText.LINE_BREAK + "    m: [1, 2]" + YamlText.LINE_BREAK + "e: ''" + YamlText.LINE_BREAK;
+        YamlText.Read read = YamlText.read(text.getBytes(java.nio.charset.StandardCharsets.UTF_8), new FakeValues());
+        YamlFile file = new YamlFile(file("counted.yml"));
+        file.replace(read.root(), read.header(), read.comments());
+        YamlText.Written written = YamlText.write(file.snapshot(), true, new FakeValues());
+        assertEquals(read.values(), written.values());
+        YamlText.Read again = YamlText.read(written.text().getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                new FakeValues());
+        assertEquals(written.values(), again.values());
+    }
+
+    @Test
+    void oneFileHasOneQueueHoweverItsNamed() throws Exception {
+        Path real = Files.createDirectories(server.resolve("real"));
+        Path link = server.resolve("link");
+        try {
+            Files.createSymbolicLink(link, real);
+        } catch (UnsupportedOperationException | IOException noLinks) {
+            return;
+        }
+        // Neither the file nor its folder exists yet.
+        assertEquals(Saver.key(real.resolve("sub/new.yml")), Saver.key(link.resolve("sub/new.yml")));
+        assertEquals(Saver.key(real.resolve("new.yml")), Saver.key(link.resolve("./x/../new.yml")));
+    }
 }
