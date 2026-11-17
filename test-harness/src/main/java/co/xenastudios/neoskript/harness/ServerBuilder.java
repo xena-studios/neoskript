@@ -26,6 +26,7 @@ public final class ServerBuilder {
     private final Map<String, String> files = new LinkedHashMap<>();
     private final Map<String, byte[]> binaryFiles = new LinkedHashMap<>();
     private final List<String> jvmArgs = new ArrayList<>();
+    private int port;
 
     ServerBuilder(HarnessConfig config, Environment environment, Path serverJar, Path runDir) {
         this.config = config;
@@ -59,6 +60,12 @@ public final class ServerBuilder {
         return this;
     }
 
+    /** The port the server listens on, for a proxy to reach it; a free one otherwise. */
+    public ServerBuilder port(int port) {
+        this.port = port;
+        return this;
+    }
+
     public ServerBuilder jvmArg(String arg) {
         jvmArgs.add(arg);
         return this;
@@ -71,7 +78,7 @@ public final class ServerBuilder {
     public ServerProcess start() throws IOException {
         Files.createDirectories(runDir.resolve("plugins"));
         Files.writeString(runDir.resolve("eula.txt"), "eula=true\n");
-        Files.writeString(runDir.resolve("server.properties"), serverProperties());
+        Files.writeString(runDir.resolve("server.properties"), serverProperties(port > 0 ? port : freePort()));
         // Test servers must never report to bStats.
         Files.createDirectories(runDir.resolve("plugins/bStats"));
         Files.writeString(runDir.resolve("plugins/bStats/config.yml"), "enabled: false\n");
@@ -108,7 +115,7 @@ public final class ServerBuilder {
         return ServerProcess.start(command, runDir, config.echo());
     }
 
-    private static String serverProperties() {
+    private static String serverProperties(int port) {
         return """
                 online-mode=false
                 white-list=false
@@ -124,10 +131,11 @@ public final class ServerBuilder {
                 spawn-npcs=false
                 enable-query=false
                 enable-rcon=false
-                """.formatted(freePort());
+                """.formatted(port);
     }
 
-    private static int freePort() {
+    /** A port nothing listens on now. */
+    public static int freePort() {
         try (ServerSocket socket = new ServerSocket(0)) {
             return socket.getLocalPort();
         } catch (IOException e) {
