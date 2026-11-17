@@ -10,6 +10,7 @@ public interface co.xenastudios.neoskript.api.NeoSkript
   public abstract co.xenastudios.neoskript.api.Variables variables()
   public abstract java.lang.String version()
   public abstract void whenReady(java.lang.Runnable)
+  public abstract void whenStopped(java.lang.Runnable)
 
 public interface co.xenastudios.neoskript.api.Scripts
   public abstract java.lang.Object call(java.lang.String, java.lang.Object[])
@@ -85,8 +86,12 @@ public interface co.xenastudios.neoskript.api.element.ElementFactory signature <
 
 public final record co.xenastudios.neoskript.api.element.ElementInfo
   public boolean and(int)
+  public java.lang.String argumentElement(int)
+  public java.util.List argumentElements() signature ()Ljava/util/List<Ljava/lang/String;>;
   public java.lang.String argumentLiteral(int)
   public java.util.List argumentLiterals() signature ()Ljava/util/List<Ljava/lang/String;>;
+  public co.xenastudios.neoskript.api.element.TextTemplate argumentText(int)
+  public java.util.List argumentTexts() signature ()Ljava/util/List<Lco/xenastudios/neoskript/api/element/TextTemplate;>;
   public java.lang.String argumentType(int)
   public java.util.List argumentTypes() signature ()Ljava/util/List<Ljava/lang/String;>;
   public long defaultArguments()
@@ -145,11 +150,18 @@ public interface co.xenastudios.neoskript.api.element.LoopValue
   public abstract java.lang.Object get(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[], java.lang.Object)
 
 public interface co.xenastudios.neoskript.api.element.PausingEffect
+  public static final java.lang.Object UNCHANGED
   public abstract java.util.concurrent.CompletionStage start(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[]) signature (Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;)Ljava/util/concurrent/CompletionStage<*>;
   public static co.xenastudios.neoskript.api.element.PausingEffect storing(int, java.util.function.BiFunction) signature (ILjava/util/function/BiFunction<Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;+Ljava/util/concurrent/CompletionStage<*>;>;)Lco/xenastudios/neoskript/api/element/PausingEffect;
   public int target()
 
 public interface co.xenastudios.neoskript.api.element.PausingExpression
+  public abstract java.util.concurrent.CompletionStage start(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[]) signature (Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;)Ljava/util/concurrent/CompletionStage<*>;
+
+public interface co.xenastudios.neoskript.api.element.PausingSection @Experimental
+  public static final java.lang.Object LEAVE
+  public void abandoned(co.xenastudios.neoskript.api.element.TriggerContext)
+  public java.util.concurrent.CompletionStage end(co.xenastudios.neoskript.api.element.TriggerContext) signature (Lco/xenastudios/neoskript/api/element/TriggerContext;)Ljava/util/concurrent/CompletionStage<*>;
   public abstract java.util.concurrent.CompletionStage start(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[]) signature (Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;)Ljava/util/concurrent/CompletionStage<*>;
 
 public interface co.xenastudios.neoskript.api.element.Section
@@ -160,6 +172,27 @@ public interface co.xenastudios.neoskript.api.element.SettableCondition extends 
 
 public final class co.xenastudios.neoskript.api.element.SyntaxError extends java.lang.RuntimeException
   public SyntaxError(java.lang.String)
+
+public interface co.xenastudios.neoskript.api.element.TemplateAware @Experimental
+  public abstract boolean template(int)
+
+public final record co.xenastudios.neoskript.api.element.TextTemplate
+  public TextTemplate(java.util.List, java.util.List) signature (Ljava/util/List<Ljava/lang/String;>;Ljava/util/List<Lco/xenastudios/neoskript/api/element/TextTemplate$Hole;>;)V
+  public final boolean equals(java.lang.Object)
+  public final int hashCode()
+  public java.util.List holes() signature ()Ljava/util/List<Lco/xenastudios/neoskript/api/element/TextTemplate$Hole;>;
+  public java.util.List pieces() signature ()Ljava/util/List<Ljava/lang/String;>;
+  public final java.lang.String toString()
+
+public final record co.xenastudios.neoskript.api.element.TextTemplate$Hole
+  public Hole(java.lang.String, java.lang.String, java.util.List, java.util.List) signature (Ljava/lang/String;Ljava/lang/String;Ljava/util/List<Ljava/lang/Object;>;Ljava/util/List<Ljava/lang/String;>;)V
+  public java.lang.String element()
+  public final boolean equals(java.lang.Object)
+  public final int hashCode()
+  public java.util.List texts() signature ()Ljava/util/List<Ljava/lang/String;>;
+  public final java.lang.String toString()
+  public java.util.List values() signature ()Ljava/util/List<Ljava/lang/Object;>;
+  public java.lang.String written()
 
 public interface co.xenastudios.neoskript.api.element.TriggerContext
   public abstract java.lang.Object event()
@@ -251,6 +284,7 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public abstract void parser(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/String;*>;)V
   public abstract void pausingEffect(java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/PausingEffect;>;[Ljava/lang/String;)V
   public abstract void pausingExpression(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/PausingExpression;>;[Ljava/lang/String;)V
+  public void pausingSection(java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/PausingSection;>;[Ljava/lang/String;)V
   public void priority(java.lang.String, co.xenastudios.neoskript.api.registration.SyntaxPriority) @Experimental
   public void property(java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Function) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/function/Function<-TT;*>;)V
   public void propertyCondition(java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Predicate) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/function/Predicate<-TT;>;)V
