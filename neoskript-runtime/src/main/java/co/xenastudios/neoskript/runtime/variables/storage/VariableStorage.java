@@ -207,6 +207,19 @@ public final class VariableStorage implements VariableBackend {
     private volatile boolean backupCancelled;
 
     /**
+     * Gzips a scheduled backup, as Skript's {@code compress backups} does, at its best compression, into
+     * {@code <backup>.gz}, written as {@link Durable#copy} writes a copy ({@link Durable#gzip}), then removes the
+     * uncompressed backup. Returns the compressed backup. It reads only the backup, so it holds no lock on the
+     * variables; once {@code cancelled} is true, as when the server stops, it stops. If it fails, the uncompressed
+     * backup stays.
+     */
+    public static Path compress(Path backup, java.util.function.BooleanSupplier cancelled) throws IOException {
+        Path compressed = Durable.gzip(backup, backup.resolveSibling(backup.getFileName() + ".gz"), cancelled);
+        Durable.delete(backup);
+        return compressed;
+    }
+
+    /**
      * What a scheduled backup's name has after its time ({@code variables_<time>_scheduled.csv}), so removing old ones
      * ({@link #purgeBackups}) never matches the backups NeoSkript makes to keep something safe.
      */
@@ -229,7 +242,9 @@ public final class VariableStorage implements VariableBackend {
         String base = dot < 0 ? name : name.substring(0, dot);
         String extension = dot < 0 ? "" : name.substring(dot);
         java.util.regex.Pattern shape = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(base)
-                + "_\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}(-\\d+)?" + java.util.regex.Pattern.quote(SCHEDULED + extension));
+                + "_\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}(-\\d+)?" + java.util.regex.Pattern.quote(SCHEDULED + extension)
+                // Compressed or not ({@link #compress}).
+                + "(\\.gz)?");
         List<Path> backups = new ArrayList<>();
         try (DirectoryStream<Path> found = Files.newDirectoryStream(dir,
                 path -> shape.matcher(path.getFileName().toString()).matches() && Files.isRegularFile(path))) {
@@ -278,8 +293,8 @@ public final class VariableStorage implements VariableBackend {
      * once it's whole, so they're never a backup. Only names of exactly the shape a copy's temporary file has are
      * removed: a backup's or snapshot's name ({@code variables_2026-11-17_01-02-03.csv}, {@code
      * variables_2026-11-17_01-02-03_scheduled.csv}, {@code variables_2026-11-17_01-02-03-004.nsv}), then
-     * {@code .copying.tmp} ({@link Durable#temporary}), or, from versions before it, the digits the system added and
-     * {@code .tmp}. A backup's name with just {@code .tmp} after may be an owner's own copy, and is kept. How many were
+     * {@code .copying.tmp} ({@link Durable#temporary}), or {@code .gz.copying.tmp} for a backup being compressed
+     * ({@link #compress}), or, from versions before it, the digits the system added and {@code .tmp}. A backup's name with just {@code .tmp} after may be an owner's own copy, and is kept. How many were
      * removed.
      */
     public static int removeBackupLeftovers(Path file) throws IOException {
@@ -291,7 +306,7 @@ public final class VariableStorage implements VariableBackend {
         java.util.regex.Pattern shape = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(
                 dot < 0 ? name : name.substring(0, dot))
                 + "_\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}(-\\d{3})?([-_]\\d+)?(" + java.util.regex.Pattern.quote(SCHEDULED)
-                + ")?" + java.util.regex.Pattern.quote(dot < 0 ? "" : name.substring(dot)) + "(\\d+\\.tmp|"
+                + ")?" + java.util.regex.Pattern.quote(dot < 0 ? "" : name.substring(dot)) + "(\\d+\\.tmp|(\\.gz)?"
                 + java.util.regex.Pattern.quote(Durable.TEMPORARY) + ")");
         int removed = 0;
         for (Path dir : List.of(backups, backups.resolve("snapshots"))) {
