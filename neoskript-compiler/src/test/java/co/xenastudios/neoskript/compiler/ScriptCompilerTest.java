@@ -77,6 +77,22 @@ class ScriptCompilerTest {
     }
 
     @Test
+    void wordsOnlyATypeWithoutArithmeticReadsArentAnOperand() {
+        // As SkBee's data component types read 'custom model data': 'stone with custom model data -1' isn't the item
+        // with an NBT compound of 'custom model data' take away 1, as Skript's arithmetic can't read those words as a
+        // number: with nothing else to take it, the line is words Skript can't understand.
+        library.type("component", "component", String.class);
+        library.literalParser("component", words -> words.equals("model data") ? words : null);
+        library.type("compound", "compound", java.util.Map.class);
+        library.expression("WithCompound", "string", info -> (context, args) -> "compound " + args[0],
+                "tagged %compound%");
+        CompiledScripts compiled = compile("on load:\n\tsay tagged model data -1\n");
+        assertEquals(1, compiled.diagnostics().size(), compiled.diagnostics().toString());
+        assertTrue(compiled.diagnostics().getFirst().message().startsWith("Can't understand"),
+                compiled.diagnostics().toString());
+    }
+
+    @Test
     void conditionsStopTheTriggerWhenFalse() {
         run("on load:\n\tsay \"a\"\n\talways\n\tsay \"b\"\n\tnever\n\tsay \"c\"\n");
         assertEquals(List.of("[a]", "[b]"), said);
