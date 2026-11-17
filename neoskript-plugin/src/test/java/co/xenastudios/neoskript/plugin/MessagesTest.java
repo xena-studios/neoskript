@@ -186,4 +186,20 @@ class MessagesTest {
         assertEquals("[NeoSkript] NeoSkript 0.2.0 is out (you have 0.1.0): " + url, plain(out));
         assertEquals(ClickEvent.openUrl(url), click(out));
     }
+    @Test
+    void theEnableCommandListOffersWorks(@org.junit.jupiter.api.io.TempDir java.nio.file.Path scripts) throws Exception {
+        java.nio.file.Files.createDirectories(scripts.resolve("sub"));
+        java.nio.file.Files.createDirectories(scripts.resolve("-off"));
+        java.nio.file.Files.writeString(scripts.resolve("-a.sk"), "");
+        java.nio.file.Files.writeString(scripts.resolve("sub/-b.sk"), "");
+        java.nio.file.Files.writeString(scripts.resolve("-off/c.sk"), "");
+        for (String path : List.of("-a.sk", "sub/-b.sk")) {
+            String command = SkriptCommand.enableCommand("sk", path);
+            String name = command.substring("/sk enable ".length());
+            assertEquals(scripts.resolve(path), ScriptFiles.find(scripts, name), command);
+        }
+        // /sk enable can't enable a script in a disabled folder, so nothing is offered.
+        assertNull(SkriptCommand.enableCommand("sk", "-off/c.sk"));
+        assertNull(ScriptFiles.find(scripts, "-off/c.sk"));
+    }
 }

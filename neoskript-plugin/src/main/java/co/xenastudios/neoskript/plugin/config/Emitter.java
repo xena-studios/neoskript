@@ -29,7 +29,6 @@ final class Emitter {
 
     private final ConfigSpec<?> spec;
     private final StringBuilder out = new StringBuilder();
-    private java.util.Set<String> blanks = java.util.Set.of();
 
     private Emitter(ConfigSpec<?> spec) {
         this.spec = spec;
@@ -37,16 +36,16 @@ final class Emitter {
 
     /** The default config. */
     static String render(ConfigSpec<?> spec) {
-        return render(spec, null, java.util.Set.of());
+        return render(spec, null);
     }
 
     /**
-     * The config with the values in {@code existing} where it has them, or the defaults if it's {@code null}.
-     * {@code blanks} are the paths of text settings left empty ({@code prefix:}), which mean none.
+     * The config with the values in {@code existing} where it has them, or the defaults if it's {@code null}. A
+     * text setting that may be empty and was left empty ({@code prefix:}) is written as {@code ""}; any other
+     * setting left empty gets its default.
      */
-    static String render(ConfigSpec<?> spec, ConfigurationSection existing, java.util.Set<String> blanks) {
+    static String render(ConfigSpec<?> spec, ConfigurationSection existing) {
         Emitter emitter = new Emitter(spec);
-        emitter.blanks = blanks;
         for (String line : spec.header) {
             emitter.out.append(line.isEmpty() ? "#" : "# " + line).append('\n');
         }
@@ -82,7 +81,12 @@ final class Emitter {
                 continue;
             }
             Object raw = existing == null ? null : existing.get(key);
-            String text = raw == null ? (blanks.contains(at) ? "\"\"" : null) : raw(raw);
+            String text;
+            if (Reader.BLANK.equals(raw)) {
+                text = component.isAnnotationPresent(AllowBlank.class) ? "\"\"" : null;
+            } else {
+                text = raw == null ? null : raw(raw);
+            }
             indent(depth).append(key(key)).append(": ").append(text != null ? text : scalarOrList(child)).append('\n');
         }
         if (existing == null) {
@@ -119,9 +123,16 @@ final class Emitter {
             }
             return;
         }
-        String text = value == null ? null : raw(value);
+        List<String> inline = parent.getInlineComments(key);
+        String after = inline.isEmpty() || inline.getFirst() == null ? "" : " # " + inline.getFirst().strip();
+        if (value == null || Reader.BLANK.equals(value)) {
+            // "foo:" or "foo: ~", kept empty.
+            indent(depth).append(key(key)).append(":").append(after).append('\n');
+            return;
+        }
+        String text = raw(value);
         if (text != null) {
-            indent(depth).append(key(key)).append(": ").append(text).append('\n');
+            indent(depth).append(key(key)).append(": ").append(text).append(after).append('\n');
             return;
         }
         // A list of lists or of maps: as YAML writes it, under the key.

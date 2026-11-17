@@ -21,6 +21,9 @@ public final class TextStyle {
 
     public static final TextStyle NONE = new TextStyle("", Style.empty());
 
+    /** Longer than any colour with decorations needs. */
+    private static final int MAX_LENGTH = 256;
+
     // Stands in for the text the tags would style, to find the style they give it.
     private static final String MARK = "";
 
@@ -63,14 +66,23 @@ public final class TextStyle {
             return NONE;
         }
         String mini = trimmed.startsWith("<") ? trimmed : "<" + String.join("><", trimmed.split("\\s+")) + ">";
-        // Two marks: a gradient or rainbow would colour them differently.
-        Component parsed = MiniMessage.miniMessage().deserialize(mini + MARK + MARK);
+        if (mini.length() > MAX_LENGTH) {
+            throw new IllegalArgumentException("is too long for a colour or style");
+        }
+        Component parsed;
+        List<Style> styles = new ArrayList<>();
+        try {
+            // Two marks: a gradient or rainbow would colour them differently.
+            parsed = MiniMessage.miniMessage().deserialize(mini + MARK + MARK);
+            collectMarkStyles(parsed, Style.empty(), styles);
+        } catch (RuntimeException | StackOverflowError e) {
+            // Such as thousands of nested tags.
+            throw new IllegalArgumentException("isn't a colour or style that can be read");
+        }
         // Anything MiniMessage didn't recognise is left as text beside the marks.
         if (!PlainTextComponentSerializer.plainText().serialize(parsed).equals(MARK + MARK)) {
             throw new IllegalArgumentException("isn't a colour or style, such as <gray> or <#FF4D9D><bold>");
         }
-        List<Style> styles = new ArrayList<>();
-        collectMarkStyles(parsed, Style.empty(), styles);
         if (styles.stream().distinct().count() > 1) {
             throw new IllegalArgumentException("can't be a gradient or rainbow; put those in the prefix instead");
         }

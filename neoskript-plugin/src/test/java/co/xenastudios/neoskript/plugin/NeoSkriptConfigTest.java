@@ -430,6 +430,97 @@ class NeoSkriptConfigTest {
                 result.warnings());
     }
 
+    // --- Review 2: what mustn't crash or lose lines ---
+
+    @Test
+    void aFileWithManyAliasesLoadsAsBukkitReadsIt() throws Exception {
+        load();
+        StringBuilder text = new StringBuilder(Files.readString(file())).append("base: &base {k: 1}\nmany:\n");
+        for (int i = 0; i < 80; i++) {
+            text.append("- *base\n");
+        }
+        Files.writeString(file(), text.toString());
+        ConfigLoader.Result<NeoSkriptConfig> result = load();
+        assertEquals(NeoSkriptConfig.DEFAULTS, result.config());
+        assertEquals(List.of(), result.warnings());
+    }
+
+    @Test
+    void anyParseFailureIsAConfigException() throws Exception {
+        // Deeper than YAML's nesting limit, which Bukkit keeps.
+        String deep = "x: " + "[".repeat(500) + "]".repeat(500) + "\n";
+        Files.writeString(file(), deep);
+        ConfigException e = assertThrows(ConfigException.class, this::load);
+        assertTrue(e.getMessage().startsWith("config.yml isn't valid YAML: "), e.getMessage());
+        assertEquals(deep, Files.readString(file()));
+    }
+
+    @Test
+    void aStyleThatCannotBeParsedFallsBack() throws Exception {
+        load();
+        String nested = "<bold>".repeat(20_000);
+        Files.writeString(file(), Files.readString(file()).replace("  highlight: \"<#FF4D9D>\"", "  highlight: \"" + nested + "\""));
+        ConfigLoader.Result<NeoSkriptConfig> result = load();
+        assertEquals(NeoSkriptConfig.DEFAULTS.theme().highlight(), result.config().theme().highlight());
+        assertTrue(result.warnings().getFirst().startsWith("theme.highlight (\"<bold><bold>"), result.warnings().toString());
+    }
+
+    @Test
+    void aPrefixThatCannotBeParsedOrSentFallsBack() throws Exception {
+        load();
+        String original = Files.readString(file());
+        for (String prefix : new String[] {"<bold>".repeat(20_000) + "x", "<red>x<blue>x".repeat(20)}) {
+            // A stack overflow while parsing, and tags nested 40 deep.
+            Files.writeString(file(), original.replaceFirst("  prefix: \".*\"\n", "  prefix: \"" + prefix + "\"\n"));
+            ConfigLoader.Result<NeoSkriptConfig> result = load();
+            assertEquals(NeoSkriptConfig.DEFAULTS.theme(), result.config().theme());
+            assertEquals(1, result.warnings().size(), result.warnings().toString());
+            assertTrue(result.warnings().getFirst().startsWith("theme: the prefix "), result.warnings().toString());
+        }
+    }
+
+    @Test
+    void emptyKeysKeepTheirLinesWhenTheFileIsRewritten() throws Exception {
+        load();
+        String text = Files.readString(file())
+                .replace("  highlight: \"<#FF4D9D>\"", "  highlight: #FF4D9D")
+                .replaceFirst("  prefix: \".*\"\n", "  prefix:\n")
+                .replace("metrics: true\n", "metrics: true\nmine: ~\n")
+                .replaceAll("(?s)\neffect-commands:.*", "\n");
+        Files.writeString(file(), text);
+        ConfigLoader.Result<NeoSkriptConfig> result = load();
+        assertEquals(List.of("Added effect-commands with its default."), result.notices());
+        assertEquals("", result.config().theme().prefix());
+        String after = Files.readString(file());
+        // In place, with the comment YAML read the colour as.
+        assertTrue(after.contains("  # <highlight>: names and values, such as a script or a number.\n  highlight: # FF4D9D\n"),
+                after);
+        assertTrue(after.contains("\n  prefix:\n"), after);
+        assertTrue(after.contains("\nmetrics: true\nmine:\n"), after);
+        assertFalse(after.contains(Reader_BLANK), after);
+
+        // Setting a value keeps them too.
+        ConfigLoader.set(NeoSkriptConfig.SPEC, file(), Map.of("metrics", false));
+        String set = Files.readString(file());
+        assertTrue(set.contains("  highlight: # FF4D9D\n"), set);
+        assertTrue(set.contains("\n  prefix:\n"), set);
+        assertTrue(set.contains("\nmetrics: false\nmine:\n"), set);
+    }
+
+    private static final String Reader_BLANK = "neoskript-blank";
+
+    @Test
+    void carryingForwardKeepsEmptyKeysThatAreNotSettings() throws Exception {
+        Files.writeString(file(), version1() + "foo:\nchar: ~ # mine\n");
+        ConfigLoader.Result<NeoSkriptConfig> result = load();
+        assertTrue(result.notices().getLast().startsWith("Kept foo, char, which aren't NeoSkript's"), result.notices().toString());
+        String text = Files.readString(file());
+        assertTrue(text.contains("\nfoo:\n"), text);
+        assertTrue(text.contains("\nchar: # mine\n"), text);
+        assertFalse(text.contains(Reader_BLANK), text);
+        assertEquals(List.of(), load().notices());
+    }
+
     @Test
     void theDocsShowTheDefaultConfig() throws IOException {
         Path page = Path.of("../website/src/content/docs/docs/configuration.md");

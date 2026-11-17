@@ -26,14 +26,12 @@ final class Reader {
     record Missing(ConfigurationSection parent, String key, RecordComponent component, Object value) {}
 
     /**
-     * What stands for a key with nothing after it in {@link #blankTree}. Bukkit drops such keys, so this is how
-     * "prefix:" (meaning blank) is told apart from a setting that isn't there.
+     * What stands for a key with nothing after it ({@code prefix:}) in the file as read. Bukkit would drop such
+     * keys, so this is how a setting left empty is told apart from one that isn't there.
      */
-    static final String BLANK = "\u0000blank";
+    static final String BLANK = "neoskript-blank-7f3c";
 
     private final ConfigSpec<?> spec;
-    // The file with BLANK for keys with no value, migrated as the file is.
-    private final ConfigurationSection blankTree;
     final List<String> warnings = new ArrayList<>();
     final List<Missing> missing = new ArrayList<>();
     /** The paths of text settings left empty that may be. */
@@ -41,9 +39,8 @@ final class Reader {
     /** The paths of keys that aren't settings, in the order they're found. */
     final List<String> unknown = new ArrayList<>();
 
-    Reader(ConfigSpec<?> spec, ConfigurationSection blankTree) {
+    Reader(ConfigSpec<?> spec) {
         this.spec = spec;
-        this.blankTree = blankTree;
     }
 
     <R extends Record> R readRoot(Class<R> type, ConfigurationSection root, R defaults) {
@@ -63,8 +60,13 @@ final class Reader {
             types[i] = component.getType();
             String key = Names.key(component);
             Object defaultValue = get(component, fallback);
-            if (!section.contains(key)) {
-                boolean empty = isBlank(join(path, key));
+            boolean empty = BLANK.equals(section.get(key));
+            if (empty && spec.isSection(component.getType())) {
+                // "variables:" with nothing under it: the section's settings get their defaults.
+                section.set(key, null);
+                empty = false;
+            }
+            if (!section.contains(key) || empty) {
                 if (empty && component.getType() == String.class && component.isAnnotationPresent(AllowBlank.class)) {
                     values[i] = "";
                     blanks.add(join(path, key));
@@ -232,11 +234,6 @@ final class Reader {
             return "at least " + Writer.number(range.min());
         }
         return "from " + Writer.number(range.min()) + " to " + Writer.number(range.max());
-    }
-
-    /** Whether the file has this key with nothing after it. */
-    private boolean isBlank(String path) {
-        return blankTree != null && BLANK.equals(blankTree.get(path));
     }
 
     private static Object get(RecordComponent component, Record from) {

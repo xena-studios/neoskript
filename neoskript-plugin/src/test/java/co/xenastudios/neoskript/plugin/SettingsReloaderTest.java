@@ -134,4 +134,66 @@ class SettingsReloaderTest {
         edit("metrics: true", "metrics: maybe");
         assertEquals(1, reloader.reload().warnings());
     }
+    @Test
+    void aFailureWhileApplyingPutsBackTheRunningSettings() throws Exception {
+        List<String> applied = new ArrayList<>();
+        boolean[] fail = {true};
+        SettingsReloader.Effects failing = new SettingsReloader.Effects() {
+            @Override
+            public void accept(ConfigLoader.Result<NeoSkriptConfig> result) {
+                applied.add("settings " + result.config().variables().saveInterval());
+            }
+
+            @Override
+            public void playerUuids(boolean uuids) {}
+
+            @Override
+            public void effectCommands(EffectCommands.Settings settings) {}
+
+            @Override
+            public void runtimeErrors(NeoSkriptConfig.RuntimeErrors limits) {
+                if (fail[0] && limits.totalErrorsPerFrame() == 3) {
+                    throw new StackOverflowError();
+                }
+                applied.add("runtime-errors " + limits.totalErrorsPerFrame());
+            }
+
+            @Override
+            public void saveInterval(NeoSkriptConfig.Interval interval) {
+                applied.add("save-interval " + interval);
+            }
+
+            @Override
+            public void updateChecker(boolean enabled, boolean turnedOn) {}
+
+            @Override
+            public void failed(String message) {
+                applied.add("failed: " + message);
+            }
+        };
+        SettingsReloader reloader = new SettingsReloader(file, ConfigLoader.load(NeoSkriptConfig.SPEC, file).config(), failing);
+        edit("save-interval: \"5 minutes\"", "save-interval: \"1 minute\"");
+        edit("total-errors-per-frame: 8", "total-errors-per-frame: 3");
+        SettingsReloader.Outcome outcome = reloader.reload();
+        assertEquals("Couldn't apply config.yml: java.lang.StackOverflowError", outcome.failure());
+        // The new settings, up to the failure, then all the running ones put back.
+        assertEquals(List.of("settings 1 minute", "settings 5 minutes", "runtime-errors 8", "save-interval 5 minutes",
+                "failed: Couldn't apply config.yml: java.lang.StackOverflowError"), applied);
+
+        // The running settings are still what the next reload compares with.
+        fail[0] = false;
+        applied.clear();
+        reloader.reload();
+        assertEquals(List.of("settings 1 minute", "runtime-errors 3", "save-interval 1 minute"), applied);
+    }
+
+    @Test
+    void aReloadOfAFileWithManyAliasesWorks() throws Exception {
+        StringBuilder text = new StringBuilder(Files.readString(file)).append("base: &base [1, 2]\nmany:\n");
+        for (int i = 0; i < 80; i++) {
+            text.append("- *base\n");
+        }
+        Files.writeString(file, text.toString());
+        assertEquals(null, reloader.reload().failure());
+    }
 }

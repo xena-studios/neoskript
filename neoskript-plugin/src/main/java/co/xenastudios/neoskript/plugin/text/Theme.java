@@ -27,6 +27,42 @@ public record Theme(
         @Comment("<success>: something done, such as a script reloaded.") TextStyle success,
         @Comment("<error>: something that went wrong, such as a script's errors.") TextStyle error) {
 
+    /** The deepest the prefix's tags may nest: far more than any prefix needs, far less than breaks sending it. */
+    static final int MAX_PREFIX_DEPTH = 32;
+
+    /**
+     * @throws IllegalArgumentException if the prefix can't be read or nests too deep to send safely
+     */
+    public Theme {
+        Component parsed;
+        try {
+            parsed = MiniMessage.miniMessage().deserialize(prefix);
+        } catch (RuntimeException | StackOverflowError e) {
+            throw new IllegalArgumentException("the prefix can't be read as MiniMessage");
+        }
+        if (depth(parsed) > MAX_PREFIX_DEPTH) {
+            throw new IllegalArgumentException("the prefix nests its tags more than " + MAX_PREFIX_DEPTH + " deep");
+        }
+    }
+
+    /** How deep a component's children go, counted without recursion. */
+    private static int depth(Component root) {
+        int deepest = 0;
+        java.util.ArrayDeque<java.util.Map.Entry<Component, Integer>> stack = new java.util.ArrayDeque<>();
+        stack.push(java.util.Map.entry(root, 1));
+        while (!stack.isEmpty()) {
+            var next = stack.pop();
+            deepest = Math.max(deepest, next.getValue());
+            if (next.getValue() > MAX_PREFIX_DEPTH) {
+                return next.getValue();
+            }
+            for (Component child : next.getKey().children()) {
+                stack.push(java.util.Map.entry(child, next.getValue() + 1));
+            }
+        }
+        return deepest;
+    }
+
     /** NeoSkript's own colours: its magenta, #FF4D9D, for the prefix and highlights. */
     public static final Theme DEFAULTS = new Theme(
             "<dark_gray>[<#FF4D9D>NeoSkript</#FF4D9D>]</dark_gray> ",

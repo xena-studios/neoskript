@@ -70,20 +70,42 @@ final class SettingsReloader {
         } catch (ConfigException e) {
             effects.failed(e.getMessage());
             return new Outcome(e.getMessage(), 0, List.of());
+        } catch (RuntimeException | StackOverflowError e) {
+            String message = "Couldn't read config.yml: " + e;
+            effects.failed(message);
+            return new Outcome(message, 0, List.of());
         }
         NeoSkriptConfig before = current;
         NeoSkriptConfig now = result.config();
+        try {
+            apply(result, before);
+        } catch (RuntimeException | StackOverflowError e) {
+            // Put back what was running, so nothing is left half applied.
+            try {
+                apply(new ConfigLoader.Result<>(before, List.of(), List.of(), 0), now);
+            } catch (RuntimeException | StackOverflowError again) {
+                e.addSuppressed(again);
+            }
+            String message = "Couldn't apply config.yml: " + e;
+            effects.failed(message);
+            return new Outcome(message, 0, List.of());
+        }
         current = now;
-        effects.accept(result);
-        effects.playerUuids(now.variables().playerUuidsInNames());
-        effects.effectCommands(EffectCommands.Settings.of(now.effectCommands()));
-        if (!now.runtimeErrors().equals(before.runtimeErrors())) {
-            effects.runtimeErrors(now.runtimeErrors());
-        }
-        if (!now.variables().saveInterval().equals(before.variables().saveInterval())) {
-            effects.saveInterval(now.variables().saveInterval());
-        }
-        effects.updateChecker(now.updateChecker(), now.updateChecker() && !before.updateChecker());
         return new Outcome(null, result.warnings().size(), now.restartOnlyChanges(startup));
+    }
+
+    /** Applies {@code result}'s settings, where {@code from} is what's running. */
+    private void apply(ConfigLoader.Result<NeoSkriptConfig> result, NeoSkriptConfig from) {
+        NeoSkriptConfig to = result.config();
+        effects.accept(result);
+        effects.playerUuids(to.variables().playerUuidsInNames());
+        effects.effectCommands(EffectCommands.Settings.of(to.effectCommands()));
+        if (!to.runtimeErrors().equals(from.runtimeErrors())) {
+            effects.runtimeErrors(to.runtimeErrors());
+        }
+        if (!to.variables().saveInterval().equals(from.variables().saveInterval())) {
+            effects.saveInterval(to.variables().saveInterval());
+        }
+        effects.updateChecker(to.updateChecker(), to.updateChecker() && !from.updateChecker());
     }
 }

@@ -455,10 +455,32 @@ final class SkriptCommand implements TabExecutor {
         send(sender, Messages.LIST_HEADER, text("enabled", enabled.size()),
                 text("scripts", Messages.plural(enabled.size(), "script")), text("disabled", disabled.size()));
         group(sender, "Enabled", enabled, path -> "/" + label + " reload " + path);
-        group(sender, "Disabled", disabled, path -> "/" + label + " enable " + enabledName(path));
+        group(sender, "Disabled", disabled, path -> enableCommand(label, path));
     }
 
-    /** One group of {@code /sk list}: the scripts in the scripts folder on one line, then each folder's. */
+    /**
+     * The command that enables the disabled script at {@code path}, or {@code null} for a script in a disabled
+     * folder ({@code -games/shop.sk}): {@code /sk enable} doesn't rename folders, as in Skript, so the folder has
+     * to be renamed.
+     */
+    static String enableCommand(String label, String path) {
+        int slash = path.lastIndexOf('/');
+        if (slash > 0) {
+            for (String folder : path.substring(0, slash).split("/")) {
+                if (folder.startsWith(ScriptFiles.DISABLED_PREFIX)) {
+                    return null;
+                }
+            }
+        }
+        return "/" + label + " enable " + enabledName(path);
+    }
+
+    private static final String IN_DISABLED_FOLDER = "In a disabled folder: rename the folder without its - to enable it.";
+
+    /**
+     * One group of {@code /sk list}: the scripts in the scripts folder on one line, then each folder's. Clicking a
+     * script types {@code command}'s command for it, if there is one.
+     */
     private static void group(CommandSender sender, String label, List<String> paths,
             java.util.function.Function<String, String> command) {
         if (paths.isEmpty()) {
@@ -469,9 +491,17 @@ final class SkriptCommand implements TabExecutor {
             int slash = path.lastIndexOf('/');
             String folder = slash < 0 ? "" : path.substring(0, slash + 1);
             String file = path.substring(slash + 1);
-            folders.computeIfAbsent(folder, f -> new ArrayList<>()).add(Messages.chat(sender)
-                    ? Messages.command(file, command.apply(path))
-                    : Component.text(file));
+            String typed = command.apply(path);
+            Component entry;
+            if (!Messages.chat(sender)) {
+                entry = Component.text(file);
+            } else if (typed != null) {
+                entry = Messages.command(file, typed);
+            } else {
+                entry = Messages.highlight(file).hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
+                        co.xenastudios.neoskript.plugin.text.Message.base(Component.text(IN_DISABLED_FOLDER))));
+            }
+            folders.computeIfAbsent(folder, f -> new ArrayList<>()).add(entry);
         }
         List<Component> top = folders.remove("");
         send(sender, Messages.LIST_GROUP, text("label", label), component("scripts",

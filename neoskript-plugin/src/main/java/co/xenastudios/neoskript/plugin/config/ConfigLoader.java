@@ -13,12 +13,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.nodes.MappingNode;
+import org.yaml.snakeyaml.nodes.Node;
+import org.yaml.snakeyaml.nodes.NodeTuple;
+import org.yaml.snakeyaml.nodes.ScalarNode;
+import org.yaml.snakeyaml.nodes.SequenceNode;
+import org.yaml.snakeyaml.nodes.Tag;
+import org.yaml.snakeyaml.representer.Representer;
 
 /**
  * Loads a config file against its {@link ConfigSpec}.
@@ -31,6 +38,9 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 public final class ConfigLoader {
 
     private static final Pattern BLANK_WITH_SPACES = Pattern.compile("(?m)^[ \\t]+$");
+    /** {@link Reader#BLANK} as Bukkit writes it, in any quotes, before the end of the line or a comment. */
+    private static final Pattern BLANK_VALUE =
+            Pattern.compile(":[ \\t]+([\"']?)" + Pattern.quote(Reader.BLANK) + "\\1(?=[ \\t]|$)", Pattern.MULTILINE);
 
     private ConfigLoader() {}
 
@@ -92,7 +102,7 @@ public final class ConfigLoader {
             migrate(spec, version, parsed);
         }
 
-        Reader reader = new Reader(spec, parsed.blanks());
+        Reader reader = new Reader(spec);
         C config = reader.readRoot(spec.type, yaml, spec.defaults);
         warnings.addAll(reader.warnings);
         List<String> added = new ArrayList<>();
@@ -104,7 +114,7 @@ public final class ConfigLoader {
         if (older) {
             try {
                 Path backup = backup(file, version);
-                write(file, Emitter.render(spec, yaml, reader.blanks));
+                write(file, Emitter.render(spec, yaml));
                 notices.add("Carried %s forward from config version %d to %d, keeping your settings. The old file is %s."
                         .formatted(file.getFileName(), version, spec.version, backup.getFileName()));
                 added(notices, added);
@@ -127,7 +137,7 @@ public final class ConfigLoader {
             }
             if (changed) {
                 try {
-                    write(file, save(yaml, reader.blanks));
+                    write(file, save(yaml));
                     added(notices, added);
                 } catch (IOException e) {
                     warnings.add(couldNotUpdate(file, e));
@@ -161,18 +171,17 @@ public final class ConfigLoader {
             migrate(spec, version, parsed);
         }
         values.forEach(yaml::set);
-        values.forEach(parsed.blanks()::set);
-        Reader reader = new Reader(spec, parsed.blanks());
+        Reader reader = new Reader(spec);
         reader.readRoot(spec.type, yaml, spec.defaults);
         try {
             if (older) {
                 Path backup = backup(file, version);
-                write(file, Emitter.render(spec, yaml, reader.blanks));
+                write(file, Emitter.render(spec, yaml));
                 notices.add("Carried %s forward from config version %d to %d, keeping your settings. The old file is %s."
                         .formatted(file.getFileName(), version, spec.version, backup.getFileName()));
                 kept(notices, reader.unknown, backup);
             } else {
-                write(file, save(yaml, reader.blanks));
+                write(file, save(yaml));
             }
         } catch (IOException e) {
             warnings.add(couldNotUpdate(file, e));
@@ -181,41 +190,80 @@ public final class ConfigLoader {
         return new Change(true, List.copyOf(warnings), List.copyOf(notices));
     }
 
-    /**
-     * The file as Bukkit reads it, and as a tree with {@link Reader#BLANK} for keys left empty, which Bukkit drops.
-     * Migrations change both.
-     */
-    private record Parsed(YamlConfiguration yaml, YamlConfiguration blanks) {}
+    /** The file as Bukkit reads it, with {@link Reader#BLANK} for keys that have no value. */
+    private record Parsed(YamlConfiguration yaml) {}
 
+    /**
+     * Reads the file. Keys with no value ({@code prefix:}, {@code foo: ~}) are given {@link Reader#BLANK} before
+     * Bukkit reads it, as Bukkit would drop them with their comments; {@link #save} writes them back empty, in
+     * place. Any failure to read or parse it is a {@link ConfigException}.
+     */
     private static Parsed read(Path file) throws ConfigException {
         String text;
         try {
             text = Files.readString(file, StandardCharsets.UTF_8);
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             throw new ConfigException("Couldn't read " + file.getFileName() + ": " + e.getMessage(), e);
         }
         YamlConfiguration yaml = new YamlConfiguration();
         try {
-            yaml.loadFromString(text);
-        } catch (InvalidConfigurationException e) {
+            yaml.loadFromString(marked(text));
+        } catch (InvalidConfigurationException | RuntimeException | StackOverflowError e) {
             throw new ConfigException(file.getFileName() + " isn't valid YAML: " + firstLine(e), e);
         }
-        YamlConfiguration blanks = new YamlConfiguration();
-        if (new Yaml(new SafeConstructor(new LoaderOptions())).load(text) instanceof Map<?, ?> root) {
-            fill(blanks, root);
-        }
-        return new Parsed(yaml, blanks);
+        return new Parsed(yaml);
     }
 
-    private static void fill(ConfigurationSection section, Map<?, ?> map) {
-        map.forEach((key, value) -> {
-            String name = String.valueOf(key);
-            if (value instanceof Map<?, ?> child) {
-                fill(section.createSection(name), child);
-            } else {
-                section.set(name, value == null ? Reader.BLANK : value);
+    /** The YAML with {@link Reader#BLANK} as the value of each key that has none, comments kept. */
+    private static String marked(String text) {
+        // As Bukkit reads YAML: any number of aliases, any length.
+        LoaderOptions loader = new LoaderOptions();
+        loader.setMaxAliasesForCollections(Integer.MAX_VALUE);
+        loader.setCodePointLimit(Integer.MAX_VALUE);
+        loader.setProcessComments(true);
+        DumperOptions dumper = new DumperOptions();
+        dumper.setProcessComments(true);
+        dumper.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        dumper.setSplitLines(false);
+        Yaml yaml = new Yaml(new SafeConstructor(loader), new Representer(dumper), dumper, loader);
+        Node root = yaml.compose(new java.io.StringReader(text));
+        if (root == null || !mark(root, new java.util.IdentityHashMap<>())) {
+            return text;
+        }
+        java.io.StringWriter out = new java.io.StringWriter();
+        yaml.serialize(root, out);
+        return out.toString();
+    }
+
+    /** Puts {@link Reader#BLANK} in place of the null values in mappings. Returns whether there were any. */
+    private static boolean mark(Node node, java.util.IdentityHashMap<Node, Boolean> seen) {
+        if (seen.put(node, Boolean.TRUE) != null) {
+            return false;
+        }
+        boolean marked = false;
+        if (node instanceof MappingNode mapping) {
+            List<NodeTuple> tuples = mapping.getValue();
+            for (int i = 0; i < tuples.size(); i++) {
+                NodeTuple tuple = tuples.get(i);
+                Node value = tuple.getValueNode();
+                if (value instanceof ScalarNode scalar && Tag.NULL.equals(scalar.getTag())) {
+                    ScalarNode blank = new ScalarNode(Tag.STR, Reader.BLANK, scalar.getStartMark(), scalar.getEndMark(),
+                            DumperOptions.ScalarStyle.PLAIN);
+                    blank.setBlockComments(scalar.getBlockComments());
+                    blank.setInLineComments(scalar.getInLineComments());
+                    blank.setEndComments(scalar.getEndComments());
+                    tuples.set(i, new NodeTuple(tuple.getKeyNode(), blank));
+                    marked = true;
+                } else {
+                    marked |= mark(value, seen);
+                }
             }
-        });
+        } else if (node instanceof SequenceNode sequence) {
+            for (Node item : sequence.getValue()) {
+                marked |= mark(item, seen);
+            }
+        }
+        return marked;
     }
 
     /**
@@ -240,18 +288,14 @@ public final class ConfigLoader {
     private static void migrate(ConfigSpec<?> spec, int version, Parsed parsed) {
         for (Map.Entry<Integer, Migration> step : spec.migrations.tailMap(Math.max(version, 1)).entrySet()) {
             step.getValue().apply(parsed.yaml());
-            step.getValue().apply(parsed.blanks());
         }
     }
 
-    /** The file as Bukkit writes it, with the empty text settings kept empty. */
-    private static String save(YamlConfiguration yaml, java.util.Set<String> blanks) {
-        // Bukkit would drop "prefix:" on save; keep it as an explicit blank.
-        for (String blank : blanks) {
-            yaml.set(blank, "");
-        }
+    /** The file as Bukkit writes it, with the keys that had no value written back empty, in place. */
+    private static String save(YamlConfiguration yaml) {
+        String text = BLANK_VALUE.matcher(yaml.saveToString()).replaceAll(":");
         // Bukkit indents the blank lines it writes; trim them.
-        return BLANK_WITH_SPACES.matcher(yaml.saveToString()).replaceAll("");
+        return BLANK_WITH_SPACES.matcher(text).replaceAll("");
     }
 
     private static String couldNotUpdate(Path file, IOException e) {
@@ -297,7 +341,7 @@ public final class ConfigLoader {
         }
     }
 
-    private static String firstLine(Exception e) {
+    private static String firstLine(Throwable e) {
         Throwable cause = e.getCause() != null ? e.getCause() : e;
         String message = String.valueOf(cause.getMessage()).strip();
         return message.lines().limit(4).map(String::strip).reduce((a, b) -> a + " " + b).orElse(message);

@@ -214,17 +214,23 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         } catch (ConfigException e) {
             getSLF4JLogger().error("{} Running on the default settings until it's fixed and reloaded with /sk reload config.",
                     e.getMessage());
+            Message.theme(NeoSkriptConfig.DEFAULTS.theme());
             settings = NeoSkriptConfig.DEFAULTS;
-            Message.theme(settings.theme());
+        } catch (RuntimeException | StackOverflowError e) {
+            getSLF4JLogger().error("Couldn't read config.yml. Running on the default settings until it's fixed and reloaded"
+                    + " with /sk reload config.", e);
+            Message.theme(NeoSkriptConfig.DEFAULTS.theme());
+            settings = NeoSkriptConfig.DEFAULTS;
         }
     }
 
     /** Uses what loading config.yml found, and logs what it changed and what it couldn't use. */
     private void accept(ConfigLoader.Result<NeoSkriptConfig> result) {
+        // The theme first: if it fails, the settings stay as they were.
+        Message.theme(result.config().theme());
+        settings = result.config();
         result.notices().forEach(notice -> getSLF4JLogger().info(notice));
         result.warnings().forEach(warning -> getSLF4JLogger().warn("config.yml: {}", warning));
-        settings = result.config();
-        Message.theme(settings.theme());
     }
 
     /**
@@ -255,6 +261,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             accept(ConfigLoader.load(NeoSkriptConfig.SPEC, configFile()));
         } catch (ConfigException e) {
             getSLF4JLogger().error("Couldn't copy Skript's settings to config.yml: {}", e.getMessage());
+            return;
+        } catch (RuntimeException | StackOverflowError e) {
+            getSLF4JLogger().error("Couldn't copy Skript's settings to config.yml", e);
             return;
         }
         if (copied.containsKey("variables.player-uuids-in-names")) {
