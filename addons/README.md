@@ -17,6 +17,13 @@ addons/
 
 Every folder in `addons/` with a `build.gradle.kts` is part of the build (`settings.gradle.kts` finds them), so `./gradlew build` builds and tests them, and CI does too.
 
+## The addons
+
+| Folder | Plugin | Replaces | Docs |
+|---|---|---|---|
+| `db/` | NeoSkriptDb | skript-db | [neoskript.dev/docs/addons/db](https://neoskript.dev/docs/addons/db/) |
+| `placeholders/` | NeoSkriptPlaceholders | skript-placeholders | [neoskript.dev/docs/addons/placeholders](https://neoskript.dev/docs/addons/placeholders/) |
+
 ## Starting one
 
 1. Copy `addons/template` to `addons/<name>`, and rename its package to `co.xenastudios.neoskript.addons.<name>`.
@@ -33,7 +40,7 @@ Every folder in `addons/` with a `build.gradle.kts` is part of the build (`setti
 - **plugin.yml** is made from `neoskriptAddon { ... }`: name, the version, main class, NeoSkript's own `api-version` (read from its plugin.yml), `folia-supported: true`, `depend: [NeoSkript]` (so it enables after NeoSkript, which waits for its syntax), `softdepend` with the addons it replaces (so one that can load loads first, and the check below sees it whatever the order), description, website and authors. Don't write one by hand.
 - **neoskript-addon.properties**, next to it, records the NeoSkript version it was built with, the addons it replaces and whether its syntax is exported; the support code and the harness read it.
 - **Version:** the addon's version is NeoSkript's (`gradle.properties`). They're released together.
-- **One jar:** `build/libs/<PluginName>-<version>.jar`, with its libraries shaded and relocated into `co.xenastudios.neoskript.addons.<name>.libs`, so another plugin's copy of HikariCP or Jackson can't clash. The jar without them is `-plain`, and isn't for servers.
+- **One jar:** `build/libs/<PluginName>-<version>.jar`, with its libraries shaded and relocated into `co.xenastudios.neoskript.addons.<name>.libs`, so another plugin's copy of HikariCP or Jackson can't clash. Their `META-INF/services` files are merged, renamed and rewritten to match, so a shaded JDBC driver still finds its parts. The jar without them is `-plain`, and isn't for servers.
 - **Nothing outside its package:** `checkShadedPackages`, part of `check` and so of `./gradlew build`, fails if the jar has a class outside `co.xenastudios.neoskript.addons.<name>`. A library pulls in others (HikariCP brings slf4j-api): relocate each package it names, or make the dependency `compileOnly` when the server already has it.
 - **Licence:** the SPDX GPL-3.0-only header on every source file, checked by Spotless as everywhere else, and `LICENSE` in the jar's `META-INF`.
 
@@ -84,3 +91,13 @@ Each addon gets its own Modrinth project, which only the owner can create. For e
 - Description: it replaces skript-placeholders, scripts written for it load unchanged, it needs NeoSkript and PlaceholderAPI, and it links to [the docs](https://neoskript.dev/docs/addons/placeholders/), which list the differences.
 - Dependencies: **required** NeoSkript (`FuVeJ2X5`) and **required** PlaceholderAPI (`lKEzGugV`). skript-placeholders itself isn't on Modrinth; a fork by someone else is (`skript-placeholders-fork`), which can be marked **incompatible**.
 - Once it exists, an entry in `website/src/data/addons.json` lists it on neoskript.dev/addons with its Modrinth link.
+
+### NeoSkript DB (`addons/db`)
+
+- **Name** NeoSkript DB, **slug** `neoskript-db`, **summary**: "SQL from NeoSkript scripts with skript-db's syntax. MySQL, MariaDB, PostgreSQL and SQLite; queries never hold up the server."
+- **Description:** replaces skript-db, so scripts written for it run unchanged (tested against skript-db 2.0.0); needs NeoSkript at the same version; drivers for MySQL and SQLite come with Paper, MariaDB's and PostgreSQL's with the addon; Folia supported. Link the docs page, `https://neoskript.dev/docs/addons/db/`.
+- **Categories:** library, utility (Modrinth's closest to skript-db's "admin tools" on Hangar). **Licence** GPL-3.0-only, **source** this repository's `addons/db`, **issues** this repository's issues.
+- **Loaders** Paper and Folia, the Minecraft versions NeoSkript supports; **environment** server only.
+- **Dependencies:** required, NeoSkript (`FuVeJ2X5`). skript-db isn't on Modrinth (it's on Hangar), so there's no incompatible dependency to add; the addon says to remove its jar.
+- **Icon:** NeoSkript's, with a database mark, in the family look.
+- **Files:** `addons/db/build/libs/NeoSkriptDb-<version>.jar`, about 2.4 MB (HikariCP, MariaDB's and PostgreSQL's drivers, relocated).

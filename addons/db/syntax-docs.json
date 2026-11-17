@@ -1,0 +1,86 @@
+{
+  "elements": {
+    "NeoSkriptDbEffExecute": {
+      "name": "Execute",
+      "description": [
+        "Runs SQL on a database. The trigger pauses at the line while the statement runs on NeoSkriptDb's own threads, then carries on on its own thread, as after <code>wait</code>.",
+        "Each expression in the query's text is sent as a parameter, so a value can't change what the query does. <code>with arguments</code> fills the query's question marks in order, and <code>with batch arguments</code> runs it once for each list in a list of lists.",
+        "In a list variable, the rows are stored as <code>{_rows::&lt;column&gt;::&lt;row&gt;}</code>, with each column's name at <code>{_rows::&lt;column&gt;}</code>. In a single variable, the number of rows found or changed, or with <code>generated keys</code>, the key an insert made. If it fails, the variable keeps its value and <code>the last sql error</code> says why.",
+        "<code>quickly</code> and <code>synchronously</code> are accepted for older scripts and change nothing."
+      ],
+      "examples": [
+        "execute \"SELECT * FROM homes WHERE owner = %player's uuid%\" in {db} and store the result in {_homes::*}",
+        "execute \"INSERT INTO scores (name, score) VALUES (?, ?)\" in {db} with arguments \"Steve\" and 100",
+        "execute \"INSERT INTO homes (owner) VALUES (%player's uuid%)\" in {db} and store the generated keys in {_id}"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptDbExprDatabase": {
+      "name": "Database",
+      "description": [
+        "A database from its JDBC URL: MySQL, MariaDB, PostgreSQL or SQLite. The same URL is the same database everywhere. It connects when the first statement runs, not here.",
+        "The lifetime is how long a connection is kept; the driver is a JDBC driver's class."
+      ],
+      "examples": [
+        "set {db} to the database \"mysql://localhost:3306/server?user=minecraft&password=secret\"",
+        "set {db} to the database \"sqlite:plugins/MyScripts/data.db\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptDbExprLastError": {
+      "name": "Last SQL Error",
+      "description": [
+        "What went wrong in the trigger's last statement or transaction, or nothing if it worked. A trigger that hasn't run one gets the last error of any."
+      ],
+      "examples": [
+        "if the last sql error is set:",
+        "\tsend \"Couldn't save: %the last sql error%\" to console"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptDbExprUnsafe": {
+      "name": "Unsafe",
+      "description": [
+        "Puts a text into a statement as it is, rather than as a parameter: for what can't be a parameter, like a table's name. Never use it for anything a player typed."
+      ],
+      "examples": [
+        "execute \"SELECT COUNT(*) AS total FROM %unsafe {_table}%\" in {db} and store the result in {_count::*}"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptDbSecTransaction": {
+      "name": "Transaction",
+      "description": [
+        "Runs the statements in the section on that database in one transaction, committed at the end. If one fails, it's all rolled back, the rest of the section is skipped, and <code>the last sql error</code> says why."
+      ],
+      "examples": [
+        "transaction on {db}:",
+        "\texecute \"UPDATE accounts SET balance = balance - 10 WHERE id = 1\" in {db}",
+        "\texecute \"UPDATE accounts SET balance = balance + 10 WHERE id = 2\" in {db}"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    }
+  },
+  "types": {
+    "datasource": {
+      "name": "Data Source",
+      "description": [
+        "A database, from <code>the database \"...\"</code>. Shown with passwords as <code>***</code>. It can be saved in a variable."
+      ],
+      "examples": [
+        "set {db} to the database \"mariadb://localhost:3306/server?user=minecraft&password=secret\""
+      ]
+    }
+  },
+  "functions": {}
+}

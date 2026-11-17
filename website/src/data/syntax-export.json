@@ -5584,6 +5584,17 @@
     },
     {
       "kind": "section",
+      "id": "NeoSkriptDbSecTransaction",
+      "patterns": [
+        "[(sql|database)] transaction (on|in) %datasource%"
+      ],
+      "parser": {
+        "delays": true
+      },
+      "addon": "NeoSkriptDb"
+    },
+    {
+      "kind": "section",
       "id": "SecRunOn",
       "patterns": [
         "run on %entity/location%"
@@ -6361,6 +6372,17 @@
       "patterns": [
         "(cancel|interrupt) [the] us[ag]e of %livingentities%'[s] [active|current] item"
       ]
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptDbEffExecute",
+      "patterns": [
+        "[(quickly|synchronously)] execute %string% (in|on) %datasource% [with [batch:batch] arg[ument][s] %-objects%] [and store [the] [keys:generated keys] [(output|result)[s]] (to|in) [the] [var[iable]] %-objects%]"
+      ],
+      "parser": {
+        "delays": true
+      },
+      "addon": "NeoSkriptDb"
     },
     {
       "kind": "effect",
@@ -12854,6 +12876,33 @@
     },
     {
       "kind": "expression",
+      "id": "NeoSkriptDbExprDatabase",
+      "patterns": [
+        "[the] data(base|[ ]source) [(of|at)] %string% [with [a] [max[imum]] [connection] life[ ]time of %-timespan%] [[(using|with)] [a] driver %-string%]"
+      ],
+      "returnType": "datasource",
+      "addon": "NeoSkriptDb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptDbExprLastError",
+      "patterns": [
+        "[the] [last] (sql|db|data(base|[ ]source)) error"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptDb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptDbExprUnsafe",
+      "patterns": [
+        "unsafe %string%"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptDb"
+    },
+    {
+      "kind": "expression",
       "id": "ExprAmount",
       "patterns": [
         "[the] (amount|number:number|size:size)[s:s] of %objects%",
@@ -17587,6 +17636,22 @@
           "queues"
         ]
       }
+    },
+    {
+      "id": "datasource",
+      "name": "data source",
+      "plural": "data sources",
+      "parser": {
+        "names": [
+          "data source",
+          "datasource"
+        ],
+        "pluralNames": [
+          "data sources",
+          "datasources"
+        ]
+      },
+      "addon": "NeoSkriptDb"
     },
     {
       "id": "bannerpatterntype",
