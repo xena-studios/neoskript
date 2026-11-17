@@ -252,6 +252,12 @@ Three more for syntax that reads like Java:
 - `TriggerContext.outermostRun()`: the run a context is part of: a trigger's own, and for a function the run that called it, however deep. Keep something for one run by its identity, and the functions the run calls share it.
 - `NeoSkript.get().runtimeWarning(message)` and `runtimeError(message)`: report something that went wrong while a trigger runs, as Skript's syntax does, with the script, line and element, and the trigger carries on.
 
+### Syntax scripts declare
+
+A structure can declare syntax for scripts to use, as skript-reflect's `effect <pattern>:` does: `Registrar.scriptSyntax(id, handler, patterns)`. Before any script's code is parsed, NeoSkript gives each use of the structure to the handler, which returns a `ScriptSyntax`: whether it's an effect, a condition or an expression, its patterns, for an expression its return type and whether it's one value or several, whether only its own script can use it, whether it's a property of its first argument, and which section holds its code. `ScriptStructure.section(name)` gives that section's lines, nested ones included, and `line()` the header's line.
+
+NeoSkript adds the syntax to what every script (or its own script) is parsed with, for that load only, and compiles the code in the named section as it compiles a function. Where the syntax is used, the code runs as part of that trigger's run, with its event, and finds what it was given through `context.scriptSyntaxCall()`: `arguments()`, `pattern()`, `mark()` and `tags()`. In that code, `continue` outside a loop calls `proceed()` and ends the code: a condition passes if its code proceeded. Every load reads the declarations again, so a script's syntax goes when it changes or unloads, with nothing to unregister; where no script declares syntax, scripts are parsed exactly as without it.
+
 ## Functions
 
 ```java
