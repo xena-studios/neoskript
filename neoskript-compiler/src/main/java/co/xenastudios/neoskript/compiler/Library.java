@@ -444,6 +444,47 @@ public final class Library implements Registrar {
     }
 
     /** The type of the values a library section's code runs for, or {@code null} if {@code id} isn't one. */
+    /** A section whose code runs later, for events of its own: what they're called and their classes. */
+    public record Later(String eventName, List<Class<?>> eventClasses) {}
+
+    private final Map<String, Later> laterSections = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    public void laterSection(String id, String eventName, List<Class<?>> eventClasses,
+            ElementFactory<co.xenastudios.neoskript.api.element.LaterSection> factory, String... patterns) {
+        checkOpen();
+        if (eventClasses.isEmpty()) {
+            throw new IllegalArgumentException("Section " + id + " has no event classes");
+        }
+        java.util.Objects.requireNonNull(eventName, "eventName");
+        laterSections.put(id, new Later(eventName, List.copyOf(eventClasses)));
+        add(SyntaxKind.SECTION, id, null, factory, patterns);
+        add(SyntaxKind.EFFECT, id, null, (ElementFactory<Effect>) info -> {
+            co.xenastudios.neoskript.api.element.LaterSection section = factory.create(info);
+            return (context, arguments) -> section.run(context, arguments, null);
+        }, patterns);
+    }
+
+    /** The events the code under section {@code id} runs for later, or {@code null} if it isn't such a section. */
+    public Later later(String id) {
+        return id == null ? null : laterSections.get(id);
+    }
+
+    /** What's told which scripts' code stopped ({@link #scriptsUnloaded}). */
+    private final List<java.util.function.Consumer<? super java.util.Set<String>>> unloadWatchers =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    @Override
+    public void scriptsUnloaded(java.util.function.Consumer<? super java.util.Set<String>> scripts) {
+        checkOpen();
+        unloadWatchers.add(java.util.Objects.requireNonNull(scripts, "scripts"));
+    }
+
+    /** What's told which scripts' code stopped. */
+    public List<java.util.function.Consumer<? super java.util.Set<String>>> unloadWatchers() {
+        return java.util.Collections.unmodifiableList(unloadWatchers);
+    }
+
     String sectionType(String id) {
         return sectionTypes.get(id);
     }

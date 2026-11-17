@@ -577,6 +577,15 @@ public final class Values {
         return (Runnable) () -> code.resume(context, frame);
     }
 
+    /**
+     * The code under an addon's section that runs later, from {@code frame}: with a copy of the trigger's local
+     * variables as they are now, which every run shares, as Skript's {@code copyLocalVariables} once.
+     */
+    public static Object laterSection(Resumable code, Frame frame, String script) {
+        frame.locals = frame.locals == null ? null : frame.locals.copy();
+        return new LaterCode(code, frame, script);
+    }
+
     /** Not a thread local: what's kept may be one of NeoSkript's values, which would keep the plugin after it's gone. */
     private static final PerThread<Object> RETURNED = new PerThread<>();
 

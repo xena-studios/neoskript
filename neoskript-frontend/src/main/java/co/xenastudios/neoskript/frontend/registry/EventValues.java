@@ -53,6 +53,14 @@ public interface EventValues {
     /** Puts back what was used up when {@link #save} was called. */
     default void restore(Object saved) {}
 
+    /**
+     * What the code of a section that runs later, for events of its own, can use, as an addon's {@code make gui
+     * slot 0 with dirt:}; or {@code null} if {@code header} isn't such a section. Its code also starts with no delay.
+     */
+    default Scope later(SyntaxInfo header) {
+        return null;
+    }
+
     /** The event values some code can use. */
     interface Scope {
 
