@@ -519,7 +519,7 @@ public final class NativeVariableStorage implements VariableBackend {
 
     @Override
     public synchronized Path backupNow() throws IOException {
-        return Files.exists(file) ? VariableStorage.backup(file) : null;
+        return Files.exists(file) ? VariableStorage.backup(file, VariableStorage.SCHEDULED) : null;
     }
 
     @Override

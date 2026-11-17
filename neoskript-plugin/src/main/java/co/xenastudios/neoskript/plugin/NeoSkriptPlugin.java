@@ -62,6 +62,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             return;
         }
 
+        // Carrying an old config.yml forward with an unknown variables.storage keeps the file that's in use.
+        NeoSkriptConfig.nativeInUse = file -> java.nio.file.Files.exists(
+                VariableBackends.nativeFile(getDataPath().resolve(file)));
         loadSettings();
         Platform platform = Platform.detect();
         // D15: bStats, opt-out with `metrics: false` (or globally in plugins/bStats/config.yml).
@@ -89,7 +92,17 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 getSLF4JLogger().info("Backed up Skript's variables as {} before loading them",
                         getDataPath().toAbsolutePath().relativize(migration.variablesBackup().toAbsolutePath()));
             }
-            copySkriptSettings(migration);
+            java.nio.file.Path skriptDir = getDataPath().resolveSibling("Skript");
+            if (copySkriptSettings(migration)) {
+                // Only now: if config.yml couldn't take Skript's settings, the next start copies them again.
+                SkriptMigration.finish(getDataPath(), skriptDir, migration.copied());
+            }
+            String notice = SkriptMigration.databasesNotice(skriptDir, getDataPath(), settings.databases().all()
+                    .stream().anyMatch(d -> d.type() == DatabaseSettings.Type.SQLITE
+                            || d.type() == DatabaseSettings.Type.MYSQL));
+            if (notice != null) {
+                getSLF4JLogger().warn(notice);
+            }
         } catch (IOException e) {
             getSLF4JLogger().error("Couldn't copy Skript's scripts and variables", e);
         }
@@ -314,7 +327,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
      * Copies the settings Skript's config.sk had to config.yml, so variables are found and effect commands work
      * as they did in Skript.
      */
-    private void copySkriptSettings(SkriptMigration.Result migration) {
+    /** Whether config.yml has them now, or there were none to copy. */
+    private boolean copySkriptSettings(SkriptMigration.Result migration) {
         java.util.Map<String, Object> copied = new java.util.LinkedHashMap<>();
         if (migration.playerUuids() != null) {
             copied.put("variables.player-uuids-in-names", migration.playerUuids());
@@ -324,24 +338,24 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile().toFile());
         copied.entrySet().removeIf(setting -> setting.getValue().equals(current.get(setting.getKey())));
         if (copied.isEmpty()) {
-            return;
+            return true;
         }
         try {
             ConfigLoader.Change change = ConfigLoader.set(NeoSkriptConfig.SPEC, configFile(), copied);
             change.notices().forEach(notice -> getSLF4JLogger().info(notice));
             change.warnings().forEach(warning -> getSLF4JLogger().warn("config.yml: {}", warning));
             if (!change.written()) {
-                getSLF4JLogger().warn("Skript's settings weren't copied to config.yml: {}. Set them there by hand.",
-                        String.join(", ", copied.keySet()));
-                return;
+                getSLF4JLogger().warn("Skript's settings weren't copied to config.yml: {}. NeoSkript tries again at "
+                        + "the next start, or set them there by hand.", String.join(", ", copied.keySet()));
+                return false;
             }
             accept(ConfigLoader.load(NeoSkriptConfig.SPEC, configFile()));
         } catch (ConfigException e) {
             getSLF4JLogger().error("Couldn't copy Skript's settings to config.yml: {}", e.getMessage());
-            return;
+            return false;
         } catch (RuntimeException | StackOverflowError e) {
             getSLF4JLogger().error("Couldn't copy Skript's settings to config.yml", e);
-            return;
+            return false;
         }
         if (copied.containsKey("variables.player-uuids-in-names")) {
             getSLF4JLogger().info("Players are their {} in variable names, as in Skript's config.sk.",
@@ -355,6 +369,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                     settings.databases().all().stream().map(DatabaseSettings.Database::toString)
                             .collect(java.util.stream.Collectors.joining(", ")));
         }
+        return true;
     }
 
     /** The settings from config.yml. */
@@ -490,10 +505,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                                         database.name(), database.host(), database.port(), database.database(),
                                         database.user(), database.password(), database.table(),
                                         database.monitorChanges(), database.monitorInterval().millis());
-                java.nio.file.Path pending = data.resolve("pending").resolve(
-                        database.name().replaceAll("[^A-Za-z0-9_-]", "_") + ".pending.csv");
+                // Kept per database, by a hash of its type, where it is and its table.
                 return new co.xenastudios.neoskript.runtime.variables.storage.SqlVariableStorage(globals, codecs, sql,
-                        routing, pending, console);
+                        routing, data.resolve("pending"), console);
             }
             default -> throw new IOException("type " + database.typeText() + " can't hold variables");
         }

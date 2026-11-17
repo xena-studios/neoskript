@@ -28,6 +28,13 @@ import java.util.Map;
 final class SkriptMigration {
 
     static final String MARKER = ".migrated-from-skript";
+    /**
+     * Written before anything is copied, and replaced by {@link #MARKER} once config.yml has Skript's settings too: if
+     * that write fails, the next start copies the settings again (but not the files that are there).
+     */
+    static final String STARTED = ".migrating-from-skript";
+    /** Written once the notice for a server that moved before the databases section was copied has been shown. */
+    static final String DATABASES_NOTICE = ".skript-databases-notice";
     /** What's copied from {@code plugins/Skript}: the scripts and the saved variables. */
     static final List<String> COPIED = List.of("scripts", "variables.csv");
 
@@ -58,17 +65,23 @@ final class SkriptMigration {
     private SkriptMigration() {}
 
     static Result migrate(Path skriptDir, Path neoskriptDir) throws IOException {
+        boolean retry = Files.exists(neoskriptDir.resolve(STARTED));
         if (!Files.isDirectory(skriptDir) || Files.exists(neoskriptDir.resolve(MARKER))
-                || Files.exists(neoskriptDir.resolve("scripts"))) {
+                || (!retry && Files.exists(neoskriptDir.resolve("scripts")))) {
             return new Result(List.of(), 0, null);
         }
         Files.createDirectories(neoskriptDir);
+        if (!retry) {
+            Files.writeString(neoskriptDir.resolve(STARTED), "Copying from " + skriptDir.toAbsolutePath() + " since "
+                    + Instant.now() + "\n");
+        }
         List<String> copied = new ArrayList<>();
         int[] scripts = {0};
         List<SkriptDatabase> databases = databases(skriptDir.resolve("config.sk"));
         for (String name : COPIED) {
             Path source = skriptDir.resolve(name);
-            if (!Files.exists(source) || (name.equals("variables.csv") && !databases.isEmpty())) {
+            if (!Files.exists(source) || (name.equals("variables.csv") && !databases.isEmpty())
+                    || (retry && Files.exists(neoskriptDir.resolve(name)))) {
                 continue;
             }
             copy(source, neoskriptDir.resolve(name), scripts);
@@ -98,8 +111,6 @@ final class SkriptMigration {
             }
             settings.put("databases", section);
         }
-        Files.writeString(neoskriptDir.resolve(MARKER),
-                "Copied " + copied + " from " + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n");
         return new Result(copied, scripts[0], playerUuids(skriptDir.resolve("config.sk")), settings, backup);
     }
 
@@ -127,7 +138,8 @@ final class SkriptMigration {
         String relative = skript.relativize(source).toString().replace('\\', '/');
         Path target = neoskriptDir.resolve(relative);
         boolean csv = type.equals("csv") || type.equals("file") || type.equals("flatfile");
-        if (!(csv || sqlite) || !Files.isRegularFile(source) || copied.contains(relative)) {
+        if (!(csv || sqlite) || !Files.isRegularFile(source) || copied.contains(relative) || Files.exists(target)) {
+            // A copy that's there already is from an earlier start that didn't finish, and may be in use: kept.
             return new Moved(relative, null);
         }
         Files.createDirectories(target.toAbsolutePath().getParent());
@@ -144,6 +156,45 @@ final class SkriptMigration {
         copied.add(relative);
         // Before NeoSkript first loads or saves it, the copy is backed up as Skript left it.
         return new Moved(relative, VariableStorage.backup(target));
+    }
+
+    /**
+     * Marks the move from Skript done, once config.yml has Skript's settings: it never happens again. Until then, each
+     * start copies the settings again.
+     */
+    static void finish(Path neoskriptDir, Path skriptDir, List<String> copied) throws IOException {
+        if (!Files.exists(neoskriptDir.resolve(STARTED))) {
+            return;
+        }
+        Files.writeString(neoskriptDir.resolve(MARKER),
+                "Copied " + copied + " from " + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n");
+        Files.deleteIfExists(neoskriptDir.resolve(STARTED));
+    }
+
+    /**
+     * For a server that moved from Skript before NeoSkript copied the {@code databases:} section: if config.sk has SQL
+     * databases and config.yml has none, what to tell the owner, once. {@code null} if there's nothing to say.
+     */
+    static String databasesNotice(Path skriptDir, Path neoskriptDir, boolean configHasSql) throws IOException {
+        if (configHasSql || !Files.exists(neoskriptDir.resolve(MARKER))
+                || Files.exists(neoskriptDir.resolve(DATABASES_NOTICE))) {
+            return null;
+        }
+        List<String> sql = new ArrayList<>();
+        for (SkriptDatabase database : databases(skriptDir.resolve("config.sk"))) {
+            String type = database.options().getOrDefault("type", "").strip().toLowerCase(java.util.Locale.ROOT);
+            if (type.equals("sqlite") || type.equals("mysql")) {
+                sql.add(database.name() + " (" + type + ")");
+            }
+        }
+        if (sql.isEmpty()) {
+            return null;
+        }
+        Files.writeString(neoskriptDir.resolve(DATABASES_NOTICE), "Shown " + Instant.now() + "\n");
+        return "Skript's config.sk has SQL databases (" + String.join(", ", sql) + ") that this server's config.yml "
+                + "doesn't: it moved from Skript before NeoSkript copied the databases section. Their variables aren't "
+                + "loaded. To use them, copy them under databases: in config.yml (Skript's option names work there) "
+                + "and restart. See https://neoskript.dev/docs/server/variables/#databases. This is said once.";
     }
 
     /**

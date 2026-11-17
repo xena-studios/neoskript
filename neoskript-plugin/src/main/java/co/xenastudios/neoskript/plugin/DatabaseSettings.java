@@ -141,6 +141,12 @@ public final class DatabaseSettings {
                     database = withProblem(database, "the file " + database.file() + " is already used by another "
                             + "database");
                 }
+                if (database.problem() == null && database.type() == Type.MYSQL && !files.add("mysql|"
+                        + database.host().toLowerCase(Locale.ROOT) + "|" + database.port() + "|" + database.database()
+                        + "|" + database.table().toLowerCase(Locale.ROOT))) {
+                    database = withProblem(database, "the table " + database.table() + " in " + database.host() + ":"
+                            + database.port() + "/" + database.database() + " is already used by another database");
+                }
                 if (database.problem() != null) {
                     warnings.add(at + ": " + database.problem() + ". Its variables aren't saved until it's fixed.");
                 }

@@ -104,7 +104,7 @@ public final class ConfigLoader {
                     + " know are ignored, and the file is left as it is.").formatted(file.getFileName(), version,
                     spec.version));
         } else if (older) {
-            migrate(spec, version, parsed);
+            migrate(spec, version, parsed, warnings);
         }
 
         Reader reader = new Reader(spec);
@@ -173,7 +173,7 @@ public final class ConfigLoader {
         }
         boolean older = version < spec.version;
         if (older) {
-            migrate(spec, version, parsed);
+            migrate(spec, version, parsed, warnings);
         }
         values.forEach(yaml::set);
         Reader reader = new Reader(spec);
@@ -290,9 +290,9 @@ public final class ConfigLoader {
         return spec.version;
     }
 
-    private static void migrate(ConfigSpec<?> spec, int version, Parsed parsed) {
+    private static void migrate(ConfigSpec<?> spec, int version, Parsed parsed, List<String> warnings) {
         for (Map.Entry<Integer, Migration> step : spec.migrations.tailMap(Math.max(version, 1)).entrySet()) {
-            step.getValue().apply(parsed.yaml());
+            step.getValue().apply(parsed.yaml(), warnings);
         }
     }
 

@@ -54,6 +54,14 @@ public interface VariableBackend extends AutoCloseable {
         throw new IOException(describe() + " isn't a file, so it can't be backed up this way");
     }
 
+    /**
+     * {@link #previous} for many names in a row, as when an addon is disabled: storage that would read a file for each
+     * reads it once.
+     */
+    default java.util.function.Function<String, VariableFile.Entry> previousLookup() {
+        return this::previous;
+    }
+
     /** What the last load or saves did that the console should hear about; each is given once. */
     default java.util.List<String> notes() {
         return java.util.List.of();

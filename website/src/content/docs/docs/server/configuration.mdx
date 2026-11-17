@@ -110,7 +110,7 @@ databases:
 | `host`, `port`, `user`, `password`, `database` | | `mysql`: where the database is. The password is never shown in the console or `/sk info`. |
 | `table` | `variables21` | `sqlite` and `mysql`: the table, Skript's by default. |
 
-Keys can be written as in `config.sk` too (`monitor changes`, `backup interval`), so a section can be pasted from Skript. A database whose settings can't be used, such as a missing `file` or an unknown `type`, isn't used, and the console says why; it still owns its pattern, so its variables aren't saved in another database by mistake.
+Keys can be written as in `config.sk` too (`monitor changes`, `backup interval`), so a section can be pasted from Skript. A database whose settings can't be used, such as a missing `file`, an unknown `type`, or a file or MySQL table another database already uses, isn't used, and the console says why; it still owns its pattern, so its variables aren't saved in another database by mistake.
 
 ## events
 

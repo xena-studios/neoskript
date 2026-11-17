@@ -78,7 +78,17 @@ public record NeoSkriptConfig(
             // Version 1 had the same settings, without the theme, which loading adds with its defaults.
             .migrate(1, root -> {})
             // Version 2 had variables.file and variables.storage: they're the default database now.
-            .migrate(2, NeoSkriptConfig::moveToDatabases)
+            .migrate(2, new co.xenastudios.neoskript.plugin.config.Migration() {
+                @Override
+                public void apply(org.bukkit.configuration.ConfigurationSection root) {
+                    moveToDatabases(root, new ArrayList<>());
+                }
+
+                @Override
+                public void apply(org.bukkit.configuration.ConfigurationSection root, List<String> warnings) {
+                    moveToDatabases(root, warnings);
+                }
+            })
             .section(DatabaseSettings.class, DatabaseSettings.CODEC)
             .codec(TextStyle.class, TextStyle.CODEC)
             .codec(Interval.class, Interval.CODEC)
@@ -209,7 +219,14 @@ public record NeoSkriptConfig(
      * Version 2 to 3: {@code variables.file} and {@code variables.storage} become the {@code default} database, with
      * the same file and type.
      */
-    private static void moveToDatabases(org.bukkit.configuration.ConfigurationSection root) {
+    /**
+     * Whether NeoSkript's own file is in use beside a variables file, by its path in config.yml: set by the plugin
+     * before config.yml is read, so carrying an unknown {@code variables.storage} forward keeps the file in use, as
+     * version 2 did.
+     */
+    static volatile java.util.function.Predicate<String> nativeInUse = file -> false;
+
+    private static void moveToDatabases(org.bukkit.configuration.ConfigurationSection root, List<String> warnings) {
         Object file = root.get("variables.file");
         Object storage = root.get("variables.storage");
         root.set("variables.file", null);
@@ -219,11 +236,23 @@ public record NeoSkriptConfig(
         }
         java.util.Map<String, Object> database = new java.util.LinkedHashMap<>(
                 DatabaseSettings.settings(DatabaseSettings.DEFAULTS.all().getFirst()));
-        if (!ConfigLoader.isBlank(storage) && !String.valueOf(storage).isBlank()) {
-            database.put("type", String.valueOf(storage).strip());
-        }
         if (!ConfigLoader.isBlank(file) && !String.valueOf(file).isBlank()) {
             database.put("file", String.valueOf(file).strip());
+        }
+        if (!ConfigLoader.isBlank(storage) && !String.valueOf(storage).isBlank()) {
+            String text = String.valueOf(storage).strip();
+            String type = switch (text.toLowerCase(java.util.Locale.ROOT)) {
+                case "csv", "native" -> text.toLowerCase(java.util.Locale.ROOT);
+                default -> null;
+            };
+            if (type == null) {
+                // As version 2 did with an unknown storage: keep whichever file is in use, rather than move the
+                // variables because of a typo.
+                type = nativeInUse.test(String.valueOf(database.get("file"))) ? "native" : "csv";
+                warnings.add("Unknown variables.storage '" + text + "' in config.yml (csv or native); the default "
+                        + "database's type is " + type + ", the file in use.");
+            }
+            database.put("type", type);
         }
         root.createSection("databases").createSection("default", database);
     }

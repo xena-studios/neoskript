@@ -70,7 +70,7 @@ class DatabasesTest {
     private Databases.Definition sqlite(VariableStore store, String name, String pattern, String file) {
         return new Databases.Definition(name, "sqlite", pattern, routing -> new SqlVariableStorage(store,
                 new VariableCodecs(), SqlVariableStorage.Settings.sqlite(name, dir.resolve(file), "variables21", false,
-                        20_000), routing, dir.resolve("pending").resolve(name + ".pending.csv"), console));
+                        20_000), routing, dir.resolve("pending"), console));
     }
 
     private Map<String, VariableFile.Entry> file(String name) throws IOException {
@@ -143,6 +143,9 @@ class DatabasesTest {
                 sqlite(store, "sqlite", "db_.*", "variables.db"),
                 csv(store, "default", ".*", "variables.csv")), console)) {
             databases.load();
+            databases.save();
+            // The SQL database writes on its own thread; the CSV lets go once it has.
+            waitUntilWritten(databases);
             databases.save();
         }
         assertEquals(List.of("money"), List.copyOf(file("variables.csv").keySet()));
@@ -226,5 +229,79 @@ class DatabasesTest {
             assertNotNull(databases.previous("a_x"));
             assertNull(databases.previous("nothing"));
         }
+    }
+
+    @Test
+    void aDatabaseThatLoadsLateNeverReplacesAnotherDatabasesVariables() throws Exception {
+        SqlVariableStorage.startupTimeoutMillis = 500;
+        try {
+            // An old money row in the SQL table, from before the patterns changed; the CSV has the current money.
+            VariableStore before = new VariableStore();
+            try (Databases databases = Databases.open(before, new VariableCodecs(), List.of(
+                    sqlite(before, "players", ".*", "players.db")), console)) {
+                databases.load();
+                before.set("money", text("stale"));
+                before.set("player_1", text("p"));
+                databases.save();
+                waitUntilWritten(databases);
+            }
+            VariableFile.write(dir.resolve("variables.csv"),
+                    List.of(new VariableFile.Entry("money", "string", "current".getBytes(StandardCharsets.UTF_8))));
+            VariableStore store = new VariableStore();
+            try (java.sql.Connection locker = java.sql.DriverManager.getConnection("jdbc:sqlite:" + dir.resolve("players.db"))) {
+                try (java.sql.Statement s = locker.createStatement()) {
+                    s.execute("BEGIN EXCLUSIVE");
+                }
+                try (Databases databases = Databases.open(store, new VariableCodecs(), List.of(
+                        sqlite(store, "players", "player_.*", "players.db"),
+                        csv(store, "default", ".*", "variables.csv")), console)) {
+                    databases.load();
+                    assertEquals(text("current"), store.get("money"));
+                    try (java.sql.Statement s = locker.createStatement()) {
+                        s.execute("ROLLBACK");
+                    }
+                    SqlVariableStorage sql = (SqlVariableStorage) databases.byName().get("players").backend();
+                    long until = System.currentTimeMillis() + 10_000;
+                    while (!sql.loaded() && System.currentTimeMillis() < until) {
+                        Thread.sleep(20);
+                    }
+                    assertTrue(sql.loaded());
+                    assertEquals(text("current"), store.get("money"), "the late load left the CSV's money alone");
+                    assertEquals(text("p"), store.get("player_1"));
+                    databases.save();
+                }
+            }
+            assertEquals("current", new String(file("variables.csv").get("money").bytes(), StandardCharsets.UTF_8));
+        } finally {
+            SqlVariableStorage.startupTimeoutMillis = 10_000;
+        }
+    }
+
+    private static void waitUntilWritten(Databases databases) throws InterruptedException {
+        for (Databases.Database database : databases.databases()) {
+            if (database.backend() instanceof SqlVariableStorage sql) {
+                long until = System.currentTimeMillis() + 10_000;
+                while (!(sql.written() && sql.status().waiting() == 0) && System.currentTimeMillis() < until) {
+                    Thread.sleep(20);
+                }
+            }
+        }
+    }
+
+    @Test
+    void purgingOldBackupsNeverRemovesTheOnesKeptForSafety() throws Exception {
+        Path file = dir.resolve("variables.csv");
+        write(file, "x");
+        Path safety = VariableStorage.backup(file);
+        Path older = dir.resolve("backups").resolve("variables_2020-01-01_00-00-00.csv");
+        Files.writeString(older, "from an older NeoSkript");
+        VariableStorage storage = new VariableStorage(new VariableStore(), new VariableCodecs(), file);
+        storage.load();
+        Path scheduled = storage.backupNow();
+        assertTrue(scheduled.getFileName().toString().endsWith("_scheduled.csv"), scheduled.toString());
+        assertEquals(1, VariableStorage.purgeBackups(file, 0));
+        assertTrue(Files.exists(safety));
+        assertTrue(Files.exists(older));
+        assertFalse(Files.exists(scheduled));
     }
 }

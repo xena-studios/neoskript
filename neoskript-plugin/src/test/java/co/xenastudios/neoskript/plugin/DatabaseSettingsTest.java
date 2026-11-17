@@ -153,4 +153,66 @@ class DatabaseSettingsTest {
         assertTrue(text.contains("  # Mine.\n  shop:\n"), text);
         assertFalse(text.contains("storage:"), text);
     }
+
+    @Test
+    void anUnknownVersion2StorageKeepsTheFileInUse() throws Exception {
+        Path file = folder.resolve("config.yml");
+        Files.writeString(file, "config-version: 2\ntheme: {}\nvariables:\n  storage: nativ\n");
+        ConfigLoader.Result<NeoSkriptConfig> result = ConfigLoader.load(NeoSkriptConfig.SPEC, file);
+        DatabaseSettings.Database database = result.config().databases().enabled().getFirst();
+        assertNull(database.problem(), "the variables still load");
+        assertEquals(DatabaseSettings.Type.CSV, database.type());
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("Unknown variables.storage 'nativ'")),
+                result.warnings().toString());
+
+        java.util.function.Predicate<String> before = NeoSkriptConfig.nativeInUse;
+        try {
+            NeoSkriptConfig.nativeInUse = name -> name.equals("variables.csv");
+            Files.writeString(file, "config-version: 2\ntheme: {}\nvariables:\n  storage: nativ\n");
+            assertEquals(DatabaseSettings.Type.NATIVE,
+                    ConfigLoader.load(NeoSkriptConfig.SPEC, file).config().databases().enabled().getFirst().type());
+        } finally {
+            NeoSkriptConfig.nativeInUse = before;
+        }
+    }
+
+    @Test
+    void twoDatabasesOnOneTableOrFileAreRefused() throws Exception {
+        ConfigLoader.Result<NeoSkriptConfig> result = load("""
+                  a:
+                    type: mysql
+                    pattern: a_.*
+                    host: DB.example
+                    port: 3306
+                    user: x
+                    password: y
+                    database: skript
+                  b:
+                    type: mysql
+                    pattern: b_.*
+                    host: db.example
+                    port: 3306
+                    user: other
+                    password: z
+                    database: skript
+                    table: VARIABLES21
+                  c:
+                    type: sqlite
+                    pattern: c_.*
+                    file: data/../vars
+                  d:
+                    type: sqlite
+                    pattern: d_.*
+                    file: vars.db
+                  default:
+                    type: csv
+                    pattern: .*
+                    file: variables.csv
+                """);
+        List<DatabaseSettings.Database> all = result.config().databases().enabled();
+        assertNull(all.get(0).problem());
+        assertTrue(all.get(1).problem().contains("already used by another database"), all.get(1).problem());
+        assertNull(all.get(2).problem());
+        assertTrue(all.get(3).problem().contains("already used by another database"), all.get(3).problem());
+    }
 }

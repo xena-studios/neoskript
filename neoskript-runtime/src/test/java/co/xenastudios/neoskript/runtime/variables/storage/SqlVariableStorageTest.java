@@ -76,6 +76,8 @@ class SqlVariableStorageTest {
         SqlVariableStorage.maxRetryMillis = 30_000;
         SqlVariableStorage.closeTimeoutMillis = 15_000;
         SqlVariableStorage.extraProperties = null;
+        SqlVariableStorage.startupTimeoutMillis = 10_000;
+        SqlVariableStorage.pendingEveryMillis = 30_000;
     }
 
     private Path db() {
@@ -87,9 +89,21 @@ class SqlVariableStorageTest {
     }
 
     private SqlVariableStorage storage(VariableStore store, boolean monitor) {
+        return storage(store, monitor, "variables21");
+    }
+
+    private SqlVariableStorage storage(VariableStore store, boolean monitor, String table) {
         return new SqlVariableStorage(store, new VariableCodecs(),
-                SqlVariableStorage.Settings.sqlite("test", db(), "variables21", monitor, 100), Routing.ALL,
-                dir.resolve("pending").resolve("test.pending.csv"), log);
+                SqlVariableStorage.Settings.sqlite("test", db(), table, monitor, 100), Routing.ALL,
+                dir.resolve("pending"), log);
+    }
+
+    private Path pendingFile() {
+        return storage(new VariableStore()).pendingFile();
+    }
+
+    private Path unloadedFile() {
+        return storage(new VariableStore()).unloadedFile();
     }
 
     private static RawValue text(String text) {
@@ -364,7 +378,7 @@ class SqlVariableStorageTest {
             }
             unlock(locker);
         }
-        Path pending = dir.resolve("pending").resolve("test.pending.csv");
+        Path pending = pendingFile();
         assertTrue(Files.exists(pending));
         assertArrayEquals("1".getBytes(StandardCharsets.UTF_8), (byte[]) rows().get("a")[1]);
 
@@ -398,7 +412,7 @@ class SqlVariableStorageTest {
             }
             unlock(locker);
         }
-        assertTrue(Files.exists(dir.resolve("pending").resolve("test.unloaded.csv")));
+        assertTrue(Files.exists(unloadedFile()));
         VariableStore next = new VariableStore();
         try (SqlVariableStorage storage = storage(next)) {
             storage.load();
@@ -407,7 +421,7 @@ class SqlVariableStorageTest {
         assertEquals(text("5000"), next.get("bal::alice"));
         assertEquals(text("100"), next.get("bal::bob"));
         assertTrue(rows().containsKey("bal::bob"));
-        assertFalse(Files.exists(dir.resolve("pending").resolve("test.unloaded.csv")));
+        assertFalse(Files.exists(unloadedFile()));
     }
 
     @Test
@@ -506,5 +520,139 @@ class SqlVariableStorageTest {
             p.setString(4, "skript");
             assertEquals(1, p.executeUpdate());
         }
+    }
+
+    @Test
+    void aLocalChangeNotYetWrittenIsntOverwrittenByAnotherServersOlderRow() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        try (SqlVariableStorage a = storage(one, true); SqlVariableStorage b = storage(two, true)) {
+            a.load();
+            b.load();
+            one.set("x", text("first"));
+            a.save();
+            waitFor(() -> text("first").equals(two.get("x")));
+            // b changes x, but its write is held back, as a slow write would be; meanwhile a writes an older idea of x.
+            b.writesHeld = true;
+            two.set("x", text("b local"));
+            one.set("x", text("a remote"));
+            one.set("y", text("unrelated"));
+            a.save();
+            // b reads a's rows: y arrives, x keeps b's own change.
+            waitFor(() -> two.get("y") != null);
+            Thread.sleep(400);
+            assertEquals(text("b local"), two.get("x"));
+            b.writesHeld = false;
+            waitFor(() -> text("b local").equals(one.get("x")));
+            assertEquals(text("b local"), two.get("x"));
+        }
+    }
+
+    @Test
+    void startupDoesntWaitLongerThanItsBoundAndTheDatabaseLoadsLater() throws Exception {
+        VariableStore first = new VariableStore();
+        try (SqlVariableStorage storage = storage(first)) {
+            storage.load();
+            first.set("a", text("1"));
+            storage.save();
+        }
+        SqlVariableStorage.startupTimeoutMillis = 500;
+        VariableStore store = new VariableStore();
+        try (Connection locker = open()) {
+            lock(locker);
+            try (SqlVariableStorage storage = storage(store)) {
+                long start = System.nanoTime();
+                assertEquals(0, storage.load().variables());
+                assertTrue(System.nanoTime() - start < 3_000_000_000L, "startup waited past its bound");
+                assertFalse(storage.loaded());
+                unlock(locker);
+                waitFor(storage::loaded);
+            }
+        }
+        assertEquals(text("1"), store.get("a"));
+    }
+
+    @Test
+    void whatANeverReachedDatabaseWouldSaveIsKeptWhileTheServerRuns() throws Exception {
+        SqlVariableStorage.pendingEveryMillis = 50;
+        SqlVariableStorage.startupTimeoutMillis = 500;
+        Properties quick = new Properties();
+        quick.setProperty("busy_timeout", "100");
+        SqlVariableStorage.extraProperties = quick;
+        VariableStore store = new VariableStore();
+        try (Connection locker = open()) {
+            lock(locker);
+            SqlVariableStorage storage = storage(store);
+            storage.load();
+            store.set("crash::safe", text("1"));
+            // No clean shutdown: the file is there while the server still runs, in case it crashes.
+            waitFor(() -> Files.exists(storage.unloadedFile()));
+            assertTrue(VariableFile.read(storage.unloadedFile()).containsKey("crash::safe"));
+            unlock(locker);
+            storage.close();
+        }
+    }
+
+    @Test
+    void aPendingFileKeptForAnotherTableIsSetAsideNotApplied() throws Exception {
+        SqlVariableStorage.closeTimeoutMillis = 1_000;
+        VariableStore store = new VariableStore();
+        Path pending;
+        try (Connection locker = open()) {
+            try (SqlVariableStorage storage = storage(store, false, "first")) {
+                storage.load();
+                store.set("a", text("1"));
+                storage.save();
+                lock(locker);
+                store.set("a", text("2"));
+                pending = storage.pendingFile();
+            }
+            unlock(locker);
+        }
+        assertTrue(Files.exists(pending));
+        // The same name for another table: the file names differ, and a file moved over is refused by its identity.
+        Path other = storage(new VariableStore(), false, "second").pendingFile();
+        assertFalse(other.equals(pending));
+        Files.move(pending, other);
+        VariableStore next = new VariableStore();
+        try (SqlVariableStorage storage = storage(next, false, "second")) {
+            storage.load();
+            assertNull(next.get("a"));
+        }
+        assertFalse(Files.exists(other));
+        try (var files = Files.list(other.getParent())) {
+            assertTrue(files.anyMatch(f -> f.getFileName().toString().contains(".other-database-")));
+        }
+    }
+
+    @Test
+    void aKeptChangeDoesntOverrideARowAnotherServerWroteSince() throws Exception {
+        SqlVariableStorage.closeTimeoutMillis = 1_000;
+        VariableStore store = new VariableStore();
+        try (Connection locker = open()) {
+            try (SqlVariableStorage storage = storage(store)) {
+                storage.load();
+                store.set("x", text("1"));
+                store.set("z", text("1"));
+                storage.save();
+                lock(locker);
+                store.set("x", text("2 kept"));
+                store.set("z", text("2 kept"));
+            }
+            unlock(locker);
+        }
+        // Another server writes x after this one went away.
+        try (Connection c = open(); PreparedStatement p = c.prepareStatement("REPLACE INTO variables21 (rowid, name, "
+                + "type, value, update_guid) VALUES ((SELECT MAX(rowid) + 1 FROM variables21), 'x', 'string', ?, 'other')")) {
+            p.setBytes(1, "3 newer".getBytes(StandardCharsets.UTF_8));
+            p.executeUpdate();
+        }
+        VariableStore next = new VariableStore();
+        try (SqlVariableStorage storage = storage(next)) {
+            storage.load();
+            waitFor(storage::written);
+        }
+        assertEquals(text("3 newer"), next.get("x"));
+        assertEquals(text("2 kept"), next.get("z"));
     }
 }

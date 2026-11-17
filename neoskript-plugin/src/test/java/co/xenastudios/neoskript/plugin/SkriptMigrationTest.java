@@ -190,4 +190,33 @@ class SkriptMigrationTest {
         assertTrue(text.matches("(?s).*backups-to-keep: ['\"]?-1['\"]?\n.*"), text);
         assertFalse(text.contains("backups-to-keep: 12"), text);
     }
+
+    @Test
+    void theMoveIsOnlyMarkedDoneOnceConfigYmlHasTheSettings() throws Exception {
+        Path skript = skript();
+        Path neoskript = plugins.resolve("NeoSkript");
+        SkriptMigration.migrate(skript, neoskript);
+        assertFalse(Files.exists(neoskript.resolve(SkriptMigration.MARKER)), "not before config.yml is written");
+        // config.yml couldn't be written: the next start copies the settings again, not the files.
+        Files.writeString(neoskript.resolve("scripts/a.sk"), "changed");
+        SkriptMigration.Result again = SkriptMigration.migrate(skript, neoskript);
+        assertEquals(List.of(), again.copied());
+        assertEquals("changed", Files.readString(neoskript.resolve("scripts/a.sk")));
+        SkriptMigration.finish(neoskript, skript, again.copied());
+        assertTrue(Files.exists(neoskript.resolve(SkriptMigration.MARKER)));
+        assertFalse(Files.exists(neoskript.resolve(SkriptMigration.STARTED)));
+    }
+
+    @Test
+    void aServerThatMovedBeforeHearsOnceAboutSkriptsSqlDatabases() throws Exception {
+        Path skript = skript();
+        Files.writeString(skript.resolve("config.sk"), "databases:\n\tsynced:\n\t\ttype: MySQL\n\t\tpattern: s_.*\n"
+                + "\tdefault:\n\t\ttype: CSV\n\t\tpattern: .*\n");
+        Path neoskript = plugins.resolve("NeoSkript");
+        Files.createDirectories(neoskript);
+        Files.writeString(neoskript.resolve(SkriptMigration.MARKER), "moved by an older NeoSkript\n");
+        String notice = SkriptMigration.databasesNotice(skript, neoskript, false);
+        assertTrue(notice != null && notice.contains("synced (mysql)"), notice);
+        assertEquals(null, SkriptMigration.databasesNotice(skript, neoskript, false), "only once");
+    }
 }

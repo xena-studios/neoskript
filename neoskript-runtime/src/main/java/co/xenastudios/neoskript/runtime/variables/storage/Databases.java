@@ -182,7 +182,7 @@ public final class Databases implements VariableBackend {
             }
             database.loadInto = several ? new VariableStore() : null;
             Routing routing = new Routing(name -> all.owns(index, name), name -> all.movedAway(index, name),
-                    database.loadInto);
+                    name -> all.loadedElsewhere(index, name), database.loadInto);
             try {
                 database.backend = definition.opener().open(routing);
             } catch (IOException | RuntimeException e) {
@@ -235,6 +235,17 @@ public final class Databases implements VariableBackend {
         String name = variable.toLowerCase(Locale.ROOT);
         int owner = owner(name);
         return owner >= 0 && owner != index && hasSaved(databases.get(owner));
+    }
+
+    /** Whether a database other than {@code index} loaded {@code variable} at startup and holds it still. */
+    private boolean loadedElsewhere(int index, String variable) {
+        String name = variable.toLowerCase(Locale.ROOT);
+        for (int i = 0; i < databases.size(); i++) {
+            if (i != index && databases.get(i).movedOut.contains(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether a database has saved since it loaded, so what belongs to it is safe there. */
@@ -433,8 +444,11 @@ public final class Databases implements VariableBackend {
             if (!database.available()) {
                 continue;
             }
-            boolean sql = database.backend instanceof SqlVariableStorage;
-            if (!sql && !database.releasing && !database.backend.changed()) {
+            if (database.backend instanceof SqlVariableStorage) {
+                // Writes on its own thread within a second or so, and once more when it closes.
+                continue;
+            }
+            if (!database.releasing && !database.backend.changed()) {
                 continue;
             }
             try {
@@ -447,10 +461,6 @@ public final class Databases implements VariableBackend {
                 database.saved = true;
                 database.releasing = false;
             } catch (IOException | RuntimeException | LinkageError e) {
-                if (sql) {
-                    // It says so itself, and catches up when it's back.
-                    continue;
-                }
                 failed.add("database '" + database.name + "' (" + database.backend.describe() + "): "
                         + (e.getMessage() == null ? e.toString() : e.getMessage()));
             }
@@ -491,6 +501,8 @@ public final class Databases implements VariableBackend {
      */
     @Override
     public VariableStorage.Detached detach(ClassLoader loader) {
+        // Each database's lookup is made once, so a file is read once however many variables need it.
+        Map<Integer, Function<String, VariableFile.Entry>> lookups = new HashMap<>();
         return detach(store, codecs, loader, name -> {
             int owner = owner(name.toLowerCase(Locale.ROOT));
             for (int i = 0; i < databases.size(); i++) {
@@ -498,7 +510,8 @@ public final class Databases implements VariableBackend {
                 if (database.backend == null || (owner >= 0 && i != owner)) {
                     continue;
                 }
-                VariableFile.Entry before = database.backend.previous(name);
+                VariableFile.Entry before = lookups.computeIfAbsent(i, n -> database.backend.previousLookup())
+                        .apply(name);
                 if (before != null) {
                     return before;
                 }
@@ -560,26 +573,49 @@ public final class Databases implements VariableBackend {
         notes.add(line);
     }
 
-    /** Closes every database, the SQL ones writing what's left first. */
+    /**
+     * Closes every database at once, the SQL ones writing what's left first, and waits for them all together, at most
+     * a little longer than one SQL database may take. One still going then is named in the console; it keeps what it
+     * couldn't write for the next start itself.
+     */
     @Override
     public void close() throws IOException {
-        IOException failure = null;
+        List<IOException> failures = java.util.Collections.synchronizedList(new ArrayList<>());
+        List<Thread> closing = new ArrayList<>();
+        Map<Thread, Database> which = new HashMap<>();
         for (Database database : databases) {
             if (database.backend == null) {
                 continue;
             }
-            try {
-                database.backend.close();
-            } catch (IOException e) {
-                if (failure == null) {
-                    failure = e;
-                } else {
-                    failure.addSuppressed(e);
+            Thread thread = new Thread(() -> {
+                try {
+                    database.backend.close();
+                } catch (IOException e) {
+                    failures.add(e);
                 }
+            }, "NeoSkript closing database '" + database.name + "'");
+            thread.setDaemon(true);
+            thread.start();
+            closing.add(thread);
+            which.put(thread, database);
+        }
+        long until = System.currentTimeMillis() + SqlVariableStorage.closeTimeoutMillis + 5_000;
+        for (Thread thread : closing) {
+            try {
+                thread.join(Math.max(1, until - System.currentTimeMillis()));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+            if (thread.isAlive()) {
+                console.error("Database '" + which.get(thread).name + "' was still closing when the server stopped; "
+                        + "what it couldn't write is kept for the next start if it got that far.");
             }
         }
-        if (failure != null) {
-            throw failure;
+        if (!failures.isEmpty()) {
+            IOException first = failures.getFirst();
+            failures.stream().skip(1).forEach(first::addSuppressed);
+            throw first;
         }
     }
 
