@@ -1,0 +1,32 @@
+# NeoSkriptWeb: HTTP requests and JSON for scripts.
+# Docs: https://neoskript.dev/docs/addons/web/
+# Changes take effect when the server restarts. A value that isn't valid is replaced by its default, and the
+# console says so.
+
+# How long a request may take, in seconds, from sending it to the last byte of the answer, redirects included.
+# A script waiting for it carries on with an error after this. 1 to 600.
+timeout-seconds: 30
+
+# How long connecting to a server may take, in seconds. 1 to 120.
+connect-timeout-seconds: 10
+
+# The largest answer kept, in kilobytes (after unpacking a compressed one). A bigger answer is an error, so one
+# script can't make the server run out of memory. 1 to 262144 (256 MB).
+max-response-kilobytes: 8192
+
+# How many redirects a request follows. A redirect from https to http is never followed. 0 to 20.
+max-redirects: 5
+
+# How many requests can be waiting for an answer at once, from all scripts. Past this, a request fails straight
+# away. 1 to 1024.
+max-requests-in-flight: 64
+
+# How many requests scripts can start in a minute, all together. Past this, a request fails straight away, so a
+# loop can't make the server hammer an API. 1 to 100000.
+max-requests-per-minute: 1200
+
+# Whether requests to this machine and to private networks are refused: localhost, 10.x, 172.16-31.x, 192.168.x,
+# link-local addresses (169.254.x, where cloud servers keep their metadata), and their IPv6 equivalents. Off by
+# default, as scripts are written by the server's own staff and often talk to services on the same machine. Turn it
+# on if scripts send requests to addresses players can choose.
+block-private-addresses: false
