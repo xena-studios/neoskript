@@ -20,7 +20,7 @@ import java.util.Map;
  * {@code variables.csv} has them, so either can read what the other saved. Fields of text, numbers, booleans and
  * nothing, which is what SkBee's serializers write.
  */
-final class CompatStorage<T> implements VariableCodec<T> {
+final class CompatStorage<T> implements VariableCodec<T>, co.xenastudios.neoskript.runtime.variables.storage.CodecLoader {
 
     private final ClassInfo<T> info;
     private final Serializer<? super T> serializer;
@@ -30,13 +30,20 @@ final class CompatStorage<T> implements VariableCodec<T> {
         this.serializer = serializer;
     }
 
+    /** The addon's class loader: its serializer's, which this runs and which goes when the addon is disabled. */
+    @Override
+    public ClassLoader dependsOn() {
+        return serializer.getClass().getClassLoader();
+    }
+
     @Override
     public void encode(T value, BinaryWriter out) {
         Fields fields;
         try {
             fields = serializer.serialize(value);
         } catch (NotSerializableException e) {
-            throw new IllegalArgumentException(info.getCodeName() + " can't be saved: " + e.getMessage(), e);
+            // As Skript: the variable isn't saved (rather than keeping what was saved before).
+            throw new UnsupportedOperationException(info.getCodeName() + " can't be saved: " + e.getMessage(), e);
         }
         out.beginObject(fields.size());
         for (Map.Entry<String, Object> field : fields.values().entrySet()) {
@@ -54,7 +61,7 @@ final class CompatStorage<T> implements VariableCodec<T> {
                 case Number number -> out.boxedField(name, number);
                 case Boolean flag -> out.boxedField(name, flag);
                 case Character letter -> out.boxedField(name, letter);
-                default -> throw new IllegalArgumentException(info.getCodeName() + " can't be saved: its field '"
+                default -> throw new UnsupportedOperationException(info.getCodeName() + " can't be saved: its field '"
                         + name + "' is a " + field.getValue().getClass().getName()
                         + ", which NeoSkriptCompat doesn't save yet");
             }

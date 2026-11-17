@@ -200,6 +200,14 @@ command /skbeetest-nbt:
 		set {_e} to nbt compound from "{}"
 		if {_e} is an empty nbt compound:
 			skbee("empty compound", "yes")
+		# 'has tag' on an item's custom nbt doesn't give the item custom data, as on Skript (SkBee reads Skript's
+		# parsing stack for that).
+		set {_plain} to stone
+		if custom nbt of {_plain} has tag "x":
+			skbee("plain item has x", "yes")
+		set {_full} to full nbt of {_plain}
+		skbee("plain item after has tag", {_full})
+		set {skbee::saved-key} to minecraft key of stone
 		set {skbee::saved-nbt} to {_n}
 		skbee("saved", {skbee::saved-nbt})
 		send "[skbee] end nbt" to console
@@ -207,5 +215,7 @@ command /skbeetest-nbt:
 command /skbeetest-after-restart-nbt:
 	trigger:
 		skbee("loaded", {skbee::saved-nbt})
+		skbee("loaded key", {skbee::saved-key})
 		delete {skbee::saved-nbt}
+		delete {skbee::saved-key}
 		send "[skbee] end after-restart-nbt" to console

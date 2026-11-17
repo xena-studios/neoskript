@@ -64,15 +64,21 @@ public final class VariableCodecs {
             return true;
         }
         Registration registration = registration(value.getClass());
-        return registration != null && registration.codec() != null
-                && registration.codec().getClass().getClassLoader() == loader;
+        return registration != null && dependsOn(registration, loader);
+    }
+
+    /** Whether a registration needs {@code loader}: its class's, its codec's, or what its codec runs. */
+    private static boolean dependsOn(Registration registration, ClassLoader loader) {
+        Object codec = registration.codec();
+        return registration.type().getClassLoader() == loader
+                || codec != null && (codec.getClass().getClassLoader() == loader
+                        || codec instanceof CodecLoader other && other.dependsOn() == loader);
     }
 
     /** Whether a codec, or the class it saves, is {@code loader}'s: whether its plugin's values need saving first. */
     public synchronized boolean owns(ClassLoader loader) {
         for (Registration registration : byName.values()) {
-            if (registration.type().getClassLoader() == loader
-                    || (registration.codec() != null && registration.codec().getClass().getClassLoader() == loader)) {
+            if (dependsOn(registration, loader)) {
                 return true;
             }
         }
@@ -84,8 +90,7 @@ public final class VariableCodecs {
      * freed. Values they saved stay as their bytes ({@link RawValue}).
      */
     public synchronized void forget(ClassLoader loader) {
-        java.util.function.Predicate<Registration> owned = registration -> registration.type().getClassLoader() == loader
-                || (registration.codec() != null && registration.codec().getClass().getClassLoader() == loader);
+        java.util.function.Predicate<Registration> owned = registration -> dependsOn(registration, loader);
         Map<String, Registration> names = new HashMap<>(byName);
         names.values().removeIf(owned);
         Map<Class<?>, Registration> classes = new LinkedHashMap<>(byClass);

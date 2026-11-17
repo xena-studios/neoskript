@@ -10,8 +10,9 @@ import java.util.List;
 import org.skriptlang.skript.registration.SyntaxInfo;
 
 /**
- * The syntax around the element being set up, innermost first, as Skript's parser has it. NeoSkript sets each addon
- * element up on its own, so this is empty: the elements around it aren't Skript's.
+ * The syntax around the element being set up, innermost on top, as Skript's parser has it: NeoSkriptCompat fills it
+ * from what NeoSkript is compiling around the element, an addon's syntax with its info and NeoSkript's own as an
+ * element of no addon's.
  */
 public class ParsingStack implements Iterable<ParsingStack.Element> {
 

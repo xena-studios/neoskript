@@ -39,6 +39,12 @@ final class CompatElements {
 
     private static final Set<String> IDS = ConcurrentHashMap.newKeySet();
 
+    /** Each element's syntax info, by its id on NeoSkript: what Skript's parsing stack gives an addon. */
+    private static final java.util.Map<String, SyntaxInfo<?>> INFOS = new ConcurrentHashMap<>();
+
+    /** What the parsing stack has for NeoSkript's own syntax: an element that isn't an addon's. */
+    private static final SyntaxInfo<?> NEOSKRIPTS = SyntaxInfo.builder(SyntaxElement.class).build();
+
     private CompatElements() {}
 
     /** A placeholder of a pattern: the class its values are. */
@@ -264,6 +270,7 @@ final class CompatElements {
         for (int i = 2; !IDS.add(id); i++) {
             id = base + "#" + i;
         }
+        INFOS.put(id, info);
         return id;
     }
 
@@ -331,6 +338,12 @@ final class CompatElements {
         Class<? extends Event>[] events = parser.getCurrentEvents();
         String eventName = parser.getCurrentEventName();
         parser.setCurrentEvent(element.eventName(), eventClasses(element));
+        // The syntax around the line's element, as Skript's parsing stack has it while the element is set up.
+        ch.njol.skript.lang.parser.ParsingStack stack = parser.getParsingStack();
+        int depth = stack.size();
+        for (String around : compat.library().enclosingSyntax()) {
+            stack.push(new ch.njol.skript.lang.parser.ParsingStack.Element(INFOS.getOrDefault(around, NEOSKRIPTS), 0));
+        }
         boolean[] ok = {false};
         String error;
         try {
@@ -345,6 +358,9 @@ final class CompatElements {
             }
             throw new SyntaxError(addon + "'s " + kind + " failed to set up for '" + text + "': " + e);
         } finally {
+            while (stack.size() > depth) {
+                stack.pop();
+            }
             parser.setCurrentEvent(eventName, events);
             if (events == null) {
                 parser.reset();

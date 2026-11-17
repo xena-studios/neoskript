@@ -111,6 +111,37 @@ public final class Library implements Registrar {
         return false;
     }
 
+    /** The syntax whose arguments are being compiled on this thread, innermost last. */
+    private static final ThreadLocal<java.util.ArrayDeque<String>> enclosing = new ThreadLocal<>();
+
+    void enterSyntax(String id) {
+        java.util.ArrayDeque<String> stack = enclosing.get();
+        if (stack == null) {
+            stack = new java.util.ArrayDeque<>();
+            enclosing.set(stack);
+        }
+        stack.addLast(id);
+    }
+
+    void leaveSyntax() {
+        java.util.ArrayDeque<String> stack = enclosing.get();
+        if (stack != null) {
+            stack.pollLast();
+            if (stack.isEmpty()) {
+                enclosing.remove();
+            }
+        }
+    }
+
+    /**
+     * The ids of the syntax around the element being set up on this thread, outermost first: for NeoSkriptCompat,
+     * which gives an addon Skript's parsing stack.
+     */
+    public List<String> enclosingSyntax() {
+        java.util.ArrayDeque<String> stack = enclosing.get();
+        return stack == null ? List.of() : List.copyOf(stack);
+    }
+
     private final Set<String> wordsAsLiterals = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     /**

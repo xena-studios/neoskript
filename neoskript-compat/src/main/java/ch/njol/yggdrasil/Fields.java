@@ -5,16 +5,24 @@
 package ch.njol.yggdrasil;
 
 import java.io.StreamCorruptedException;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/** A value's fields, by name, as a serializer saves it: primitives and objects. */
+/**
+ * A value's fields, by name, as a serializer saves it: primitives and objects. As Skript's: names are lowercased
+ * ({@code boundID} is {@code boundid}), and kept in a hash map, whose order is the order they're written in.
+ */
 public final class Fields {
 
-    private final Map<String, Object> values = new LinkedHashMap<>();
+    private final Map<String, Object> values = new HashMap<>();
     private final Set<String> primitives = new HashSet<>();
+
+    private static String name(String field) {
+        return field.toLowerCase(Locale.ENGLISH);
+    }
 
     public Fields() {}
 
@@ -35,38 +43,38 @@ public final class Fields {
     }
 
     public void putObject(String field, Object value) {
-        values.put(field, value);
-        primitives.remove(field);
+        values.put(name(field), value);
+        primitives.remove(name(field));
     }
 
     public void putPrimitive(String field, Object value) {
-        values.put(field, value);
-        primitives.add(field);
+        values.put(name(field), value);
+        primitives.add(name(field));
     }
 
     public boolean contains(String field) {
-        return values.containsKey(field);
+        return values.containsKey(name(field));
     }
 
     public boolean hasField(String field) {
-        return values.containsKey(field);
+        return values.containsKey(name(field));
     }
 
     /** Whether a field holds a primitive: not one of Skript's methods. */
     public boolean isPrimitive(String field) {
-        return primitives.contains(field);
+        return primitives.contains(name(field));
     }
 
-    /** The fields, by name, in order: not one of Skript's methods. */
+    /** The fields, by (lowercased) name, in the order Skript writes them: not one of Skript's methods. */
     public Map<String, Object> values() {
         return java.util.Collections.unmodifiableMap(values);
     }
 
     public Object getObject(String field) throws StreamCorruptedException {
-        if (!values.containsKey(field)) {
+        if (!values.containsKey(name(field))) {
             throw new StreamCorruptedException("Nonexistent field " + field);
         }
-        return values.get(field);
+        return values.get(name(field));
     }
 
     public <T> T getObject(String field, Class<T> expectedType) throws StreamCorruptedException {
@@ -105,7 +113,7 @@ public final class Fields {
     }
 
     public boolean removeField(String field) {
-        primitives.remove(field);
-        return values.remove(field) != null;
+        primitives.remove(name(field));
+        return values.remove(name(field)) != null;
     }
 }
