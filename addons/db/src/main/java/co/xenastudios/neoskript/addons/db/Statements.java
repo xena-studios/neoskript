@@ -15,7 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Runs statements and turns their results into what scripts store, as skript-db 2.0 does:
@@ -58,11 +57,11 @@ final class Statements {
      *     {@code null} for nothing
      * @throws SQLException if it fails, or a list would get more than {@code max-rows} rows
      */
-    Object execute(Connection connection, Query query, boolean keys, Target target, AtomicReference<Statement> running)
+    Object execute(Connection connection, Query query, boolean keys, Target target, Running running)
             throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(query.sql(),
                 keys ? Statement.RETURN_GENERATED_KEYS : Statement.NO_GENERATED_KEYS)) {
-            running.set(statement);
+            running.started(statement);
             bind(statement, query.parameters());
             if (settings.queryTimeoutSeconds() > 0) {
                 statement.setQueryTimeout(settings.queryTimeoutSeconds());
@@ -89,7 +88,7 @@ final class Statements {
                 case NONE -> null;
             };
         } finally {
-            running.set(null);
+            running.finished();
         }
     }
 
@@ -100,7 +99,7 @@ final class Statements {
      * @return how many rows were affected in all
      */
     long executeBatch(Connection connection, String sql, List<List<Object>> rows, boolean ownTransaction,
-            AtomicReference<Statement> running) throws SQLException {
+            Running running) throws SQLException {
         if (rows.isEmpty()) {
             return 0;
         }
@@ -109,7 +108,7 @@ final class Statements {
             connection.setAutoCommit(false);
         }
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            running.set(statement);
+            running.started(statement);
             if (settings.queryTimeoutSeconds() > 0) {
                 statement.setQueryTimeout(settings.queryTimeoutSeconds());
             }
@@ -137,7 +136,7 @@ final class Statements {
             }
             throw e;
         } finally {
-            running.set(null);
+            running.finished();
             if (own) {
                 connection.setAutoCommit(true);
             }

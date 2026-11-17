@@ -1,0 +1,57 @@
+[dbtest] start
+[dbtest] created, error: <none>
+[dbtest] inserted 1
+[dbtest] injection stored as text, found 1
+[dbtest] injection matched 0
+[dbtest] generated key 3
+[dbtest] columns id, name, score, Ratio
+[dbtest] indices id, name, ratio and score
+[dbtest] names O'Brien, x'); DROP TABLE players; -- and Alex
+[dbtest] scores 42, 7 and 250, first plus one 43, ratio 1.5
+[dbtest] a null isn't set
+[dbtest] count 3
+[dbtest] changed 2
+[dbtest] in Alex and O'Brien
+[dbtest] unsafe total 3
+[dbtest] unsafe query 250
+[dbtest] arguments 1
+[dbtest] batch 2
+[dbtest] bad: kept, error: [SQLITE_ERROR] SQL error or missing database (near "SELEKT": syntax error)
+[dbtest] cleared: <none>
+[dbtest] empty: 2 id and name
+[dbtest] null: <none> 5 five and missing <none>
+[dbtest] committed: <none>
+[dbtest] rolled back: [SQLITE_ERROR] SQL error or missing database (no such table: nowhere)
+[dbtest] quickly 7
+[dbtest] done
+[load] Line 8: (neoskript-db-errors.sk)
+[load] Do not surround expressions with quotes!
+[load] Line: execute "SELECT * FROM players WHERE name = '%{_x}%'" in {@db}
+[load] Line 9: (neoskript-db-errors.sk)
+[load] Unsafe may have been used unnecessarily. Try replacing 'unsafe {_x}' with {_x}
+[load] Line: execute "SELECT * FROM players WHERE name = '%unsafe {_x}%'" in {@db}
+[load] Line 10: (neoskript-db-errors.sk)
+[load] Your query string contains expressions, but you also provided arguments. The embedded expressions are inserted as plain text; consider using only question marks.
+[load] Line: execute "SELECT * FROM players WHERE name = %{_x}% OR name = ?" in {@db} with arguments "b"
+[load] Line 11: (neoskript-db-errors.sk)
+[load] Variables cannot be used here.
+[load] Line: execute {_x} in {@db}
+[load] Line 12: (neoskript-db-errors.sk)
+[load] Variables cannot be used here.
+[load] Line: execute name of {_x} in {@db}
+[load] Line 13: (neoskript-db-errors.sk)
+[load] Can't understand this condition/effect: execute {_x} and {_x} in the database "sqlite:plugins/dbtest/test.db"
+[load] Line: execute {_x} and {_x} in {@db}
+[load] Line 14: (neoskript-db-errors.sk)
+[load] Batch arguments must be a list variable holding one list per row, for example {_rows::*}
+[load] Line: execute "SELECT 1" in {@db} with batch arguments "a" and "b"
+[load] Line 15: (neoskript-db-errors.sk)
+[load] "nowhere" is not a variable
+[load] Line: execute "SELECT 1" in {@db} and store the result in "nowhere"
+[table] 1 | O'Brien | 43 | 1.5
+[table] 2 | x'); DROP TABLE players; -- | 8 | null
+[table] 3 | Alex | 250 | 0.25
+[table] 4 | Robin | 0 | null
+[table] 5 | P1 | 1 | null
+[table] 6 | P2 | 2 | null
+[table] 7 | T1 | 1 | null

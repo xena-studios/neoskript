@@ -1,0 +1,99 @@
+# Harness check: skript-db's syntax, run the same on Skript 2.17.0 with skript-db 2.0.0 and on NeoSkript with
+# NeoSkriptDb, against a fresh SQLite file each. Each line prints "[dbtest] <check>"; the harness compares them,
+# and the tables after.
+options:
+	db: the database "sqlite:plugins/dbtest/test.db"
+
+on load:
+	send "[dbtest] start" to console
+	execute "CREATE TABLE players (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, score INTEGER, ratio REAL)" in {@db}
+	execute "CREATE TABLE log (what TEXT)" in {@db}
+	send "[dbtest] created, error: %last sql error%" to console
+
+	# Values in a query are parameters: quotes and SQL in them are only text.
+	set {_name} to "O'Brien"
+	execute "INSERT INTO players (name, score, ratio) VALUES (%{_name}%, 42, 1.5)" in {@db} and store the result in {_n}
+	send "[dbtest] inserted %{_n}%" to console
+	set {_evil} to "x'); DROP TABLE players; --"
+	execute "INSERT INTO players (name, score) VALUES (%{_evil}%, 7)" in {@db}
+	execute "SELECT * FROM players WHERE name = %{_evil}%" in {@db} and store the result in {_found}
+	send "[dbtest] injection stored as text, found %{_found}%" to console
+	set {_attack} to "' OR '1'='1"
+	execute "SELECT * FROM players WHERE name = %{_attack}%" in {@db} and store the result in {_none}
+	send "[dbtest] injection matched %{_none}%" to console
+
+	# Generated keys.
+	set {_alex} to "Alex"
+	execute "INSERT INTO players (name, score, ratio) VALUES (%{_alex}%, 250, 0.25)" in {@db} and store the generated keys in {_id}
+	send "[dbtest] generated key %{_id}%" to console
+
+	# Rows in a list, by column and row.
+	execute "SELECT id, name, score, ratio AS Ratio FROM players ORDER BY id" in {@db} and store the result in {_rows::*}
+	send "[dbtest] columns %{_rows::id}%, %{_rows::name}%, %{_rows::score}%, %{_rows::ratio}%" to console
+	send "[dbtest] indices %indices of {_rows::*}%" to console
+	send "[dbtest] names %{_rows::name::*}%" to console
+	send "[dbtest] scores %{_rows::score::*}%, first plus one %{_rows::score::1} + 1%, ratio %{_rows::ratio::1}%" to console
+	if {_rows::ratio::2} is set:
+		send "[dbtest] a null is set" to console
+	else:
+		send "[dbtest] a null isn't set" to console
+
+	# A count in a single variable, and the rows a change affected.
+	execute "SELECT * FROM players" in {@db} and store the result in {_count}
+	send "[dbtest] count %{_count}%" to console
+	execute "UPDATE players SET score = score + 1 WHERE score < 100" in {@db} and store the result in {_changed}
+	send "[dbtest] changed %{_changed}%" to console
+
+	# A list in an IN clause is a parameter for each value.
+	set {_wanted::*} to "Alex" and "O'Brien"
+	execute "SELECT name FROM players WHERE name IN (%{_wanted::*}%) ORDER BY name" in {@db} and store the result in {_in::*}
+	send "[dbtest] in %{_in::name::*}%" to console
+
+	# Unsafe text goes in as it is, for names that can't be parameters.
+	set {_table} to "players"
+	execute "SELECT COUNT(*) AS total FROM %unsafe {_table}%" in {@db} and store the result in {_t::*}
+	send "[dbtest] unsafe total %{_t::total::1}%" to console
+	set {_query} to "SELECT MAX(score) AS top FROM players"
+	execute unsafe {_query} in {@db} and store the result in {_top::*}
+	send "[dbtest] unsafe query %{_top::top::1}%" to console
+
+	# Question marks and arguments, and batch arguments.
+	execute "INSERT INTO players (name, score) VALUES (?, ?)" in {@db} with arguments "Robin" and 9 and store the result in {_args}
+	send "[dbtest] arguments %{_args}%" to console
+	set {_batch::1::*} to "P1" and 1
+	set {_batch::2::*} to "P2" and 2
+	execute "INSERT INTO players (name, score) VALUES (?, ?)" in {@db} with batch arguments {_batch::*} and store the result in {_batched}
+	send "[dbtest] batch %{_batched}%" to console
+
+	# A bad statement: the last error, and the variable keeps its value. A good one clears the error.
+	set {_kept} to "kept"
+	execute "SELEKT nonsense" in {@db} and store the result in {_kept}
+	send "[dbtest] bad: %{_kept}%, error: %last sql error%" to console
+	execute "SELECT 1" in {@db}
+	send "[dbtest] cleared: %last sql error%" to console
+
+	# No rows: the list has its columns' names only.
+	set {_old::*} to "a" and "b"
+	execute "SELECT id, name FROM players WHERE score > 100000" in {@db} and store the result in {_old::*}
+	send "[dbtest] empty: %size of {_old::*}% %indices of {_old::*}%" to console
+	execute "SELECT NULL AS missing, 5 AS five" in {@db} and store the result in {_nulls::*}
+	send "[dbtest] null: %{_nulls::missing::1}% %{_nulls::five::1}% %indices of {_nulls::*}% %last sql error%" to console
+
+	# A transaction that commits, and one with a failing statement: rolled back, and the rest of it skipped.
+	transaction on {@db}:
+		execute "UPDATE players SET score = 0 WHERE name = 'Robin'" in {@db}
+		execute "INSERT INTO players (name, score) VALUES ('T1', 1)" in {@db}
+	send "[dbtest] committed: %last sql error%" to console
+	transaction on {@db}:
+		execute "DELETE FROM players" in {@db}
+		execute "INSERT INTO nowhere VALUES (1)" in {@db}
+		send "[dbtest] never" to console
+	send "[dbtest] rolled back: %last sql error%" to console
+
+	quickly execute "SELECT * FROM players" in {@db} and store the result in {_q}
+	send "[dbtest] quickly %{_q}%" to console
+	send "[dbtest] done" to console
+
+# A last write as the server stops.
+on unload:
+	execute "INSERT INTO log (what) VALUES ('unload')" in {@db}

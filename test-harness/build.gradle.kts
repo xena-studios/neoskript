@@ -26,6 +26,8 @@ val officialAddons = configurations.create("officialAddons") {
 
 dependencies {
     implementation(libs.gson)
+    // Reads the SQLite files of the neoskript-db scenario.
+    implementation(libs.sqlite.jdbc)
     // The frontend with the stub registry from the reference Skript's docs, for parse checks without a server.
     implementation(testFixtures(project(":neoskript-frontend")))
     neoskriptPlugin(project(path = ":neoskript-plugin", configuration = "shadowRuntimeElements"))
