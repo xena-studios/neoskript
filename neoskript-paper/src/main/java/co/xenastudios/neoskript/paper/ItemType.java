@@ -30,9 +30,9 @@ import org.bukkit.inventory.meta.ItemMeta;
 public final class ItemType {
 
     private static final Pattern AMOUNT = Pattern.compile("(\\d+)\\s+(?:of\\s+)?(.+)");
-    private static final Pattern ENCHANTMENT = Pattern.compile("(.+?)(?:\\s+(\\d+|[ivx]+))?");
+    /** An enchantment and its level in digits, as Skript's EnchantmentType reads them: never in Roman numerals. */
+    private static final Pattern ENCHANTMENT = Pattern.compile("(.+?)(?:\\s+(\\d+))?");
     private static final Pattern ENCHANTMENT_SEPARATOR = Pattern.compile("\\s*,\\s*(?:and\\s+)?|\\s+and\\s+");
-    private static final String[] ROMAN = {"i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"};
 
     /** Every item's names, singular and plural, built the first time an item is written. */
     private static volatile Map<String, Material> aliases;
@@ -517,8 +517,7 @@ public final class ItemType {
         if (text == null) {
             return 1;
         }
-        int roman = List.of(ROMAN).indexOf(text);
-        return roman >= 0 ? roman + 1 : Integer.parseInt(text);
+        return Enchantments.level(text);
     }
 
     /** An item's name or its Minecraft id ({@code minecraft:diamond_axe}, {@code oak_stairs}), or {@code null}. */

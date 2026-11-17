@@ -196,6 +196,8 @@ final class EntityEvents {
         registrar.eventValue(EntityShootBowEvent.class, "itemstack", EntityShootBowEvent::getBow);
         // The projectile shot, not the shooter.
         registrar.eventValue(EntityShootBowEvent.class, "entity", EntityShootBowEvent::getProjectile);
+        registrar.eventValueChanger(EntityShootBowEvent.class, "entity", 0,
+                (event, entity) -> event.setProjectile((org.bukkit.entity.Entity) entity));
         registrar.eventValue(EntityShootBowEvent.class, "slot", event -> {
             EntityEquipment equipment = event.getEntity().getEquipment();
             return equipment == null ? null : Items.Slot.of(event.getEntity(), event.getHand());
@@ -346,6 +348,8 @@ final class EntityEvents {
         registrar.eventValue(HorseJumpEvent.class, "entity", HorseJumpEvent::getEntity);
         registrar.eventValue(VillagerCareerChangeEvent.class, "villagercareerchangereason", VillagerCareerChangeEvent::getReason);
         registrar.eventValue(VillagerCareerChangeEvent.class, "villagerprofession", VillagerCareerChangeEvent::getProfession);
+        registrar.eventValueChanger(VillagerCareerChangeEvent.class, "villagerprofession", 0,
+                (event, profession) -> event.setProfession((org.bukkit.entity.Villager.Profession) profession));
         registrar.eventValue(VillagerCareerChangeEvent.class, "villagerprofession", -1,
                 event -> event.getEntity().getProfession());
         var pathfind = com.destroystokyo.paper.event.entity.EntityPathfindEvent.class;

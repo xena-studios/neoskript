@@ -81,7 +81,7 @@ final class EventSyntax {
                     }
                     default -> sample.clear();
                 }
-            });
+            }).passed("Can't change the hover list anymore after the server list ping event has already passed");
         }, "[the] [custom] [player|server] (hover|sample) ([message] list|message)", "[the] [custom] player [hover|sample] list");
         registrar.condition("CondChangedSide", info -> {
             Side expected = info.hasTag("back") ? Side.BACK : Side.FRONT;

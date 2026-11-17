@@ -229,6 +229,18 @@ final class ParserContext {
         return experiments.contains(experiment);
     }
 
+    /** Whether the code may have waited before the line being parsed, for elements Skript refuses after a wait. */
+    private co.xenastudios.neoskript.frontend.registry.DelayState delay =
+            co.xenastudios.neoskript.frontend.registry.DelayState.NOT_DELAYED;
+
+    void delay(co.xenastudios.neoskript.frontend.registry.DelayState delay) {
+        this.delay = delay;
+    }
+
+    co.xenastudios.neoskript.frontend.registry.DelayState delay() {
+        return delay;
+    }
+
     /** The name of the script being parsed ({@code folder/script.sk}), for warnings that suggest it. */
     private String scriptName = "";
 

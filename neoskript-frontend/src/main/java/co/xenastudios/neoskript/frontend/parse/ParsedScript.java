@@ -27,7 +27,25 @@ import java.util.Set;
  */
 public record ParsedScript(SourceFile file, List<ParsedStructure> structures, List<Diagnostic> diagnostics,
         Map<Line, DelayState> delays, Map<Line, Set<String>> suppressions, Map<Line, String> statementErrors,
-        Map<Integer, Integer> unreachableAfter) {
+        Map<Integer, Integer> unreachableAfter, Map<Line, WaitingSection> waitingSections,
+        Map<Line, Statement> sectionStatements) {
+
+    /**
+     * A section Skript loads as a trigger of its own ({@code spawn a pig:}) whose code may wait, so it fails. Skript
+     * then keeps only the first error its code gave, which may be one only compiling finds.
+     *
+     * @param id the section's or its section expression's syntax id
+     * @param name its name in the error ({@code spawn})
+     * @param body its code
+     * @param firstErrorLine the line of the first error parsing its code gave, or -1
+     */
+    public record WaitingSection(String id, String name, List<Statement> body, int firstErrorLine) {}
+
+    public ParsedScript(SourceFile file, List<ParsedStructure> structures, List<Diagnostic> diagnostics,
+            Map<Line, DelayState> delays, Map<Line, Set<String>> suppressions, Map<Line, String> statementErrors,
+            Map<Integer, Integer> unreachableAfter) {
+        this(file, structures, diagnostics, delays, suppressions, statementErrors, unreachableAfter, Map.of(), Map.of());
+    }
 
     public ParsedScript(SourceFile file, List<ParsedStructure> structures, List<Diagnostic> diagnostics,
             Map<Line, DelayState> delays, Map<Line, Set<String>> suppressions) {
@@ -37,6 +55,19 @@ public record ParsedScript(SourceFile file, List<ParsedStructure> structures, Li
     public ParsedScript(SourceFile file, List<ParsedStructure> structures, List<Diagnostic> diagnostics,
             Map<Line, DelayState> delays, Map<Line, Set<String>> suppressions, Map<Line, String> statementErrors) {
         this(file, structures, diagnostics, delays, suppressions, statementErrors, Map.of());
+    }
+
+    /** The section on {@code line} that failed because its code may wait, or {@code null}. */
+    public WaitingSection waitingSection(Line line) {
+        return line == null ? null : waitingSections.get(line);
+    }
+
+    /**
+     * The line of a section header that nothing would take the section of, read as a statement, for the compiler:
+     * Skript keeps that statement's error if it has one. {@code null} if there's none.
+     */
+    public Statement sectionStatement(Line line) {
+        return line == null ? null : sectionStatements.get(line);
     }
 
     /**
@@ -50,6 +81,8 @@ public record ParsedScript(SourceFile file, List<ParsedStructure> structures, Li
     public ParsedScript {
         statementErrors = Collections.unmodifiableMap(new IdentityHashMap<>(statementErrors));
         unreachableAfter = Map.copyOf(unreachableAfter);
+        waitingSections = Collections.unmodifiableMap(new IdentityHashMap<>(waitingSections));
+        sectionStatements = Collections.unmodifiableMap(new IdentityHashMap<>(sectionStatements));
         structures = List.copyOf(structures);
         diagnostics = List.copyOf(diagnostics);
         delays = Collections.unmodifiableMap(new IdentityHashMap<>(delays));

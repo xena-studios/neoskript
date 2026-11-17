@@ -36,9 +36,13 @@ import java.util.regex.Pattern;
  * and the checks in {@code corpus/differential/checks} (load only), the probes in {@code corpus/differential} (each runs its {@code probe_<name>()}) and the
  * real-world corpus (each runs its self-test). Variables left at the end are compared too.
  *
- * <p>Some of Skript's results vary between runs, so it's run {@code -Pharness.differential.skriptRuns} times (3 by
- * default), and a unit is identical when NeoSkript gives what Skript gave in any of them. The report lists the units
- * that vary in Skript.
+ * <p>Some of Skript's results vary between runs (it breaks ties by identity hash), so it's run
+ * {@code -Pharness.differential.skriptRuns} times (3 by default), and a unit is identical when NeoSkript gives what
+ * Skript gave in any of them. The units seen to vary, and every answer Skript has given for them, are kept in
+ * {@code corpus/differential/skript-varies.json}, so a unit there is also identical when NeoSkript gives one of
+ * those, though this time's few runs didn't. An entry counts only while the unit's script is the one it was recorded
+ * for. {@code -Pharness.differential.recordVariations=true} adds what this time's runs found to it; the report lists
+ * what it would add. Only Skript's own variation is accepted so: any other difference still fails.
  *
  * <p>Skript doesn't run on Folia, so Folia is compared with Skript on Paper of the same Minecraft
  * version. Skript's results are cached by their inputs in {@code .harness-cache/differential}.
@@ -50,7 +54,7 @@ public final class DifferentialScenario implements Scenario {
 
     static final int REQUIRED = 95;
     /** Bump when the way results are gathered changes, so cached results of the reference Skript go stale. */
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
 
     private static final Pattern LOADED = Pattern.compile("Loaded \\d+ scripts? with");
     private static final Pattern PREFIX = Pattern.compile("^\\[\\d\\d:\\d\\d:\\d\\d (\\w+)]: ");
@@ -70,7 +74,18 @@ public final class DifferentialScenario implements Scenario {
 
     private record Implementation(String name, String folder, Path jar) {}
 
-    private record Inputs(Map<String, String> loadOnly, Map<String, String> running, List<String> runnable) {}
+    private record Inputs(Map<String, String> loadOnly, Map<String, String> running, List<String> runnable) {
+
+        String script(String unit) {
+            return loadOnly.containsKey(unit) ? loadOnly.get(unit) : running.get(unit);
+        }
+    }
+
+    /** One answer Skript gave for a unit: its load messages and, for scripts that run, its output. */
+    record Answer(List<String> messages, List<String> output) {}
+
+    /** A unit seen to vary in Skript: the script it varied for (a hash of it), and every answer Skript gave. */
+    record Variation(String script, List<Answer> answers) {}
 
     @Override
     public String name() {
@@ -133,27 +148,79 @@ public final class DifferentialScenario implements Scenario {
 
         List<String> units = new ArrayList<>(inputs.loadOnly().keySet());
         units.addAll(inputs.running().keySet());
+        Map<String, Variation> recorded = variations(context);
+        // The answers recorded are of one Skript build: its jar's hash leads each entry's key.
+        String build = context.referenceSkript().jarSha256().substring(0, 16) + " ";
+        Map<String, Variation> rerecorded = new TreeMap<>();
+        boolean changed = false;
         Map<String, Object> differences = new TreeMap<>();
         List<String> varying = new ArrayList<>();
+        List<String> matchedRecorded = new ArrayList<>();
+        java.util.Set<String> toRecord = new java.util.TreeSet<>();
         for (String unit : units) {
-            // The difference from Skript's first run, unless NeoSkript gives what Skript gave in another.
-            Map<String, Object> difference = null;
+            // Every answer Skript gave for it: this time's runs, then those recorded for the same script.
+            List<Answer> answers = new ArrayList<>();
             for (Results skript : skriptRuns) {
-                Map<String, Object> found = difference(skript.messages().getOrDefault(unit, List.of()),
-                        neo.messages().getOrDefault(unit, List.of()), skript.output().get(unit), neo.output().get(unit));
+                answers.add(new Answer(skript.messages().getOrDefault(unit, List.of()), skript.output().get(unit)));
+            }
+            int fresh = answers.size();
+            String script = scriptHash(inputs.script(unit));
+            Variation variation = recorded.get(build + unit);
+            answers.addAll(recordedAnswers(variation, script));
+            // The difference from Skript's first run, unless NeoSkript gives an answer Skript gave.
+            Map<String, Object> difference = null;
+            for (int i = 0; i < answers.size(); i++) {
+                Answer answer = answers.get(i);
+                Map<String, Object> found = difference(answer.messages(), neo.messages().getOrDefault(unit, List.of()),
+                        answer.output(), neo.output().get(unit));
                 if (difference == null || found.isEmpty()) {
                     difference = found;
                 }
                 if (found.isEmpty()) {
+                    if (i >= fresh) {
+                        matchedRecorded.add(unit);
+                    }
                     break;
                 }
             }
             if (variesBetween(skriptRuns, unit)) {
                 varying.add(unit);
             }
+            // What recording would keep: the distinct answers this time's runs gave, if they still vary. What Skript no
+            // longer gives is dropped.
+            List<Answer> given = new ArrayList<>();
+            for (Answer answer : answers.subList(0, fresh)) {
+                if (recordable(answer) && given.stream().noneMatch(known -> same(known, answer))) {
+                    given.add(answer);
+                }
+            }
+            Variation now = given.size() > 1 ? new Variation(script, given) : null;
+            if (now != null) {
+                rerecorded.put(build + unit, now);
+            }
+            if (!java.util.Objects.equals(now, variation == null || !variation.script().equals(script) ? null
+                    : new Variation(variation.script(), variation.answers()))) {
+                changed |= now != null || variation != null;
+                if (now != null && (variation == null || !sameAnswers(variation.answers(), given))) {
+                    toRecord.add(unit);
+                }
+            }
             if (difference != null && !difference.isEmpty()) {
                 differences.put(unit, difference);
             }
+        }
+        if (Boolean.getBoolean("harness.differential.recordVariations") && changed) {
+            // Other Skript builds' entries are kept; this build's are what this time's runs found.
+            Map<String, Variation> merged = new TreeMap<>();
+            recorded.forEach((entry, value) -> {
+                if (!entry.startsWith(build)) {
+                    merged.put(entry, value);
+                }
+            });
+            merged.putAll(rerecorded);
+            Files.writeString(probesDir(context).resolve(VARIATIONS),
+                    new com.google.gson.GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(merged)
+                            + "\n");
         }
         boolean variablesMatch = skriptRuns.stream().anyMatch(skript -> skript.variables().equals(neo.variables()));
         int total = units.size() + 1;
@@ -175,6 +242,8 @@ public final class DifferentialScenario implements Scenario {
         report.put("knownAndNowIdentical", fixed);
         report.put("skriptRuns", skriptRuns.size());
         report.put("varyInSkript", varying);
+        report.put("matchedARecordedSkriptAnswer", matchedRecorded);
+        report.put("skriptAnswersToRecord", toRecord);
         if (!variablesMatch) {
             report.put("variables", Map.of("skript", skriptRuns.getFirst().variables(), "neoskript", neo.variables()));
         }
@@ -191,6 +260,62 @@ public final class DifferentialScenario implements Scenario {
                     "%.1f%% of %d units behave identically (%d%% needed); %d unexpected differences%s: %s. See %s",
                     percent, total, REQUIRED, unexpected.size(), variablesMatch ? "" : ", and the variables differ",
                     unexpected.stream().limit(20).toList(), reportFile));
+        }
+    }
+
+    /** The units seen to vary in Skript, and the answers it gave: see the class's documentation. */
+    private static final String VARIATIONS = "skript-varies.json";
+
+    private static Map<String, Variation> variations(ScenarioContext context) throws IOException {
+        Path file = probesDir(context).resolve(VARIATIONS);
+        if (!Files.exists(file)) {
+            return Map.of();
+        }
+        Map<String, Variation> read = new Gson().fromJson(Files.readString(file),
+                new com.google.gson.reflect.TypeToken<Map<String, Variation>>() {}.getType());
+        return read == null ? Map.of() : read;
+    }
+
+    /**
+     * The answers recorded for a unit that count for its script now: none if it was recorded for another, and none
+     * whose capture was cut short ({@link #recordable}).
+     */
+    static List<Answer> recordedAnswers(Variation variation, String script) {
+        return variation != null && variation.script().equals(script)
+                ? variation.answers().stream().filter(DifferentialScenario::recordable).toList() : List.of();
+    }
+
+    /**
+     * Whether an answer can be kept as one Skript gives: a message whose text is empty ({@code 2 INFO: }) is a console
+     * capture cut short, never Skript's answer.
+     */
+    static boolean recordable(Answer answer) {
+        return answer.messages().stream().noneMatch(message -> message.matches("\\d+ \\w+: ?"));
+    }
+
+    private static boolean sameAnswers(List<Answer> one, List<Answer> two) {
+        return one.size() == two.size() && one.stream().allMatch(a -> two.stream().anyMatch(b -> same(a, b)));
+    }
+
+    /** Whether NeoSkript's messages and output for a unit are one of Skript's answers. */
+    static boolean matchesAny(List<Answer> answers, List<String> messages, List<String> output) {
+        return answers.stream().anyMatch(answer -> difference(answer.messages(), messages, answer.output(), output).isEmpty());
+    }
+
+    /** Whether two of Skript's answers are the same, as the comparison counts them. */
+    private static boolean same(Answer one, Answer two) {
+        return eventListsSorted(one.messages()).equals(eventListsSorted(two.messages()))
+                && java.util.Objects.equals(one.output(), two.output());
+    }
+
+    /** A short hash of a unit's script, so an answer recorded for it counts only while the script is the same. */
+    static String scriptHash(String script) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest((script == null ? "" : script).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest).substring(0, 16);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
         }
     }
 
@@ -379,8 +504,14 @@ public final class DifferentialScenario implements Scenario {
                 continue;
             }
             StringBuilder message = new StringBuilder();
+            int skipped = 0;
             for (int j = i + 1; j < console.size(); j++) {
                 String text = PREFIX.matcher(console.get(j)).replaceFirst("");
+                if (message.isEmpty() && !text.startsWith("    ") && !HEADER.matcher(text).find() && skipped < 5) {
+                    // Another thread's line between the header and its message: the message is still to come.
+                    skipped++;
+                    continue;
+                }
                 if (!text.startsWith("    ") || text.startsWith("    Line: ")) {
                     break;
                 }

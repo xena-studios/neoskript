@@ -1,0 +1,348 @@
+# Checks: what Skript refuses once a trigger may have waited (its Delay rules): cancelling the event, changing what
+# the event will do, and waiting in a section it loads apart. Each trigger is one case.
+
+on damage:
+	wait 1 tick
+	cancel event
+
+on damage:
+	wait 1 tick
+	uncancel the event
+
+on damage:
+	wait 0 ticks
+	cancel event
+
+on damage:
+	if attacker is a player:
+		wait 1 tick
+	cancel event
+
+on damage:
+	if attacker is a player:
+		wait 1 tick
+	else:
+		wait 2 ticks
+	cancel event
+
+on damage:
+	if attacker is a player:
+		wait 1 tick
+	else if victim is a player:
+		wait 2 ticks
+	cancel event
+
+on damage:
+	if attacker is a player:
+		wait 1 tick
+	else if victim is a player:
+		wait 1 tick
+	else:
+		wait 1 tick
+	cancel event
+
+on damage:
+	if any:
+		attacker is a player
+		victim is a player
+	then:
+		wait 1 tick
+	else:
+		wait 1 tick
+	cancel event
+
+on damage:
+	if attacker is a player:
+		wait 1 tick
+		stop
+	cancel event
+
+on damage:
+	if attacker is a player:
+		wait 1 tick
+	else:
+		stop
+	cancel event
+
+on damage:
+	wait 1 tick
+	if attacker is a player:
+		cancel event
+
+on damage:
+	loop 3 times:
+		wait 1 tick
+	cancel event
+
+on damage:
+	loop 3 times:
+		wait 1 tick
+		cancel event
+
+on damage:
+	loop 2 times:
+		if attacker is a player:
+			wait 1 tick
+		cancel event
+
+on damage:
+	while attacker is a player:
+		wait 1 tick
+		cancel event
+
+on damage:
+	do while attacker is a player:
+		wait 1 tick
+	cancel event
+
+on damage:
+	teleport victim to victim
+	cancel event
+
+on damage:
+	wait 1 tick
+	teleport victim to victim
+	cancel event
+
+on damage:
+	wait 1 tick if attacker is a player
+	cancel event
+
+on damage:
+	wait 1 tick
+	cancel event if attacker is a player
+
+on damage:
+	wait 1 tick:
+		cancel event
+		set damage to 3
+		wait 1 tick
+		cancel event
+		set damage to 4
+	cancel event
+
+on damage:
+	loop 2 times:
+		wait 1 tick:
+			cancel event
+	cancel event
+
+on damage:
+	delay_check_wait()
+	cancel event
+
+on damage:
+	wait 1 tick
+	set damage to 5
+
+on damage:
+	if attacker is a player:
+		wait 1 tick
+	set damage to 5
+
+on damage:
+	loop 2 times:
+		wait 1 tick
+	set damage to 5
+
+on damage:
+	teleport victim to victim
+	set damage to 5
+
+on damage:
+	force teleport victim to victim
+	set damage to 5
+
+on damage:
+	teleport victim to victim if attacker is a player
+	set damage to 2
+
+on damage:
+	wait 1 tick
+	add 1 to damage
+
+on damage:
+	wait 1 tick
+	reset damage
+
+on damage:
+	wait 1 tick
+	broadcast "%damage%"
+
+on damage:
+	wait 1 tick
+	set {_y} to past damage
+
+on damage:
+	wait 1 tick
+	spawn a pig at victim:
+		set {_a} to 1
+	cancel event
+
+on damage:
+	spawn a pig at victim:
+		wait 1 tick
+
+on damage:
+	spawn a pig at victim:
+		loop 2 times:
+			wait 1 tick
+
+on damage:
+	shoot an arrow from victim:
+		wait 1 tick
+
+on damage:
+	set {_b} to a new bossbar:
+		wait 1 tick
+
+on damage:
+	wait 1 tick
+	set {_b} to a new bossbar:
+		set {_x} to 1
+	cancel event
+
+on damage:
+	set {_w} to a virtual worldborder:
+		loop 2 times:
+			wait 1 tick
+
+on heal:
+	wait 1 tick
+	set heal amount to 2
+
+on heal:
+	if healing amount is 1:
+		wait 1 tick
+	set heal amount to 2
+
+on join:
+	wait 1 tick
+	set join message to "hi"
+
+on join:
+	if player is op:
+		wait 1 tick
+	set join message to "hi"
+
+on quit:
+	wait 1 tick
+	set quit message to "bye"
+
+on chat:
+	wait 1 tick
+	set chat message to "x"
+
+on chat:
+	wait 1 tick
+	set chat format to "x"
+
+on chat:
+	wait 1 tick
+	clear chat recipients
+
+on kick:
+	wait 1 tick
+	set kick message to "x"
+
+on kick:
+	wait 1 tick
+	set on-screen kick message to "x"
+
+on death:
+	wait 1 tick
+	set death message to "x"
+
+on death:
+	wait 1 tick
+	clear drops
+
+on death:
+	wait 1 tick
+	set drops to stone
+
+on death:
+	if victim is a player:
+		wait 1 tick
+	set drops to stone
+
+on death:
+	wait 1 tick
+	keep the inventory
+
+on death:
+	wait 1 tick
+	cancel the drops
+
+on unknown command:
+	wait 1 tick
+	set unknown command message to "x"
+
+on broadcast:
+	wait 1 tick
+	set broadcast message to "x"
+
+on piglin barter:
+	wait 1 tick
+	set barter drops to stone
+
+on piglin barter:
+	if barter input is gold ingot:
+		wait 1 tick
+	set barter drops to stone
+
+on send command list:
+	wait 1 tick
+	set {_x::*} to command list
+
+on send command list:
+	if player is op:
+		wait 1 tick
+	set {_x::*} to command list
+
+on respawn:
+	wait 1 tick
+	set level of player to 5
+
+on server list ping:
+	wait 1 tick
+	set motd to "x"
+
+on server list ping:
+	wait 1 tick
+	set version string to "x"
+
+on server list ping:
+	wait 1 tick
+	set protocol version to 5
+
+on server list ping:
+	wait 1 tick
+	set hover list to "x"
+
+on server list ping:
+	wait 1 tick
+	reset shown server icon
+
+on server list ping:
+	wait 1 tick
+	set shown online player count to 5
+
+on server list ping:
+	wait 1 tick
+	set shown max players to 5
+
+on server list ping:
+	wait 1 tick
+	hide all players from the server list
+
+on server list ping:
+	wait 1 tick
+	hide player info
+
+on server list ping:
+	load server icon from file "server-icon.png"
+	set motd to "x"
+
+function delay_check_wait():
+	wait 1 tick

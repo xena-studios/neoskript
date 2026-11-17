@@ -29,8 +29,8 @@ final class Enchantments {
     private static final Map<String, String> NAMES = Map.of("curse of binding", "binding_curse",
             "curse of vanishing", "vanishing_curse", "sweeping", "sweeping_edge");
 
-    private static final Pattern LEVELLED = Pattern.compile("(.+?)(?:\\s+(\\d+|[ivx]+))?");
-    private static final List<String> ROMAN = List.of("i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x");
+    /** An enchantment and its level in digits, as Skript's EnchantmentType reads them: never in Roman numerals. */
+    private static final Pattern LEVELLED = Pattern.compile("(.+?)(?:\\s+(\\d+))?");
 
     /**
      * An enchantment with a level, Skript's {@code enchantment type}: {@code sharpness 5}, or {@code sharpness}
@@ -165,7 +165,7 @@ final class Enchantments {
         return namespaced == null ? null : RegistryAccess.registryAccess().getRegistry(RegistryKey.ENCHANTMENT).get(namespaced);
     }
 
-    /** {@code sharpness 5}, {@code sharpness v} or {@code sharpness}: an enchantment with a level, or {@code null}. */
+    /** {@code sharpness 5} or {@code sharpness}: an enchantment with a level, or {@code null}. */
     static Levelled levelled(String text) {
         Matcher matcher = LEVELLED.matcher(text.strip().toLowerCase(Locale.ROOT));
         if (!matcher.matches()) {
@@ -181,8 +181,16 @@ final class Enchantments {
         if (level == null) {
             return new Levelled(enchantment, -1);
         }
-        int roman = ROMAN.indexOf(level);
-        return new Levelled(enchantment, roman >= 0 ? roman + 1 : Integer.parseInt(level));
+        return new Levelled(enchantment, level(level));
+    }
+
+    /** A level written in digits, as Skript's {@code Utils.parseInt}: too many digits are the most an int holds. */
+    static int level(String digits) {
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException e) {
+            return Integer.MAX_VALUE;
+        }
     }
 
     /** How Skript writes an enchantment: {@code sharpness}, {@code curse of vanishing}. */

@@ -34,6 +34,21 @@ public final class Values {
         return value;
     }
 
+    /**
+     * {@code set event-item to bread}: sets the event's value with {@code setter} to the value given, converted to its
+     * class as Skript's change effect converts it. If nothing given is one (none, or text where an item goes), nothing
+     * is set, as in Skript. On Folia, an entity another region owns is an error, as reading it would be.
+     */
+    public static void setEventValue(java.util.function.BiConsumer<Object, Object> setter,
+            co.xenastudios.neoskript.api.element.TriggerContext context, Object value, Class<?> valueClass,
+            co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site) {
+        Object[] given = narrow(convert(value, valueClass), new Class<?>[] {valueClass});
+        if (given.length == 0 || co.xenastudios.neoskript.runtime.region.Regions.refuseForeign(site, given[0])) {
+            return;
+        }
+        setter.accept(context.event(), given[0]);
+    }
+
     /** The values that are instances of one of {@code classes}: what a changed expression accepts. */
     public static Object[] narrow(Object value, Class<?>[] classes) {
         List<Object> values = new ArrayList<>();

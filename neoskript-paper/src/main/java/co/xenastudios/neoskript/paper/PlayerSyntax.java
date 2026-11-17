@@ -449,6 +449,7 @@ final class PlayerSyntax {
         registrar.effect("EffKeepInventory", info -> {
             boolean items = info.pattern() == 0 || info.mark() == 1;
             boolean experience = info.pattern() == 1 || info.mark() == 1;
+            EventPassed.refuse("Can't keep the inventory/experience anymore after the event has already passed");
             return (context, args) -> {
                 if (context.event() instanceof org.bukkit.event.entity.PlayerDeathEvent death) {
                     if (items) {

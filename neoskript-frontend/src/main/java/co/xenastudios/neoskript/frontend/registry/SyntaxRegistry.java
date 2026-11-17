@@ -223,7 +223,8 @@ public final class SyntaxRegistry {
         }
         try {
             return describer.describe(syntax, pattern, match, arguments);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
+            // A describer that needs what isn't there (a server's registries, in a test) describes nothing.
             return null;
         }
     }

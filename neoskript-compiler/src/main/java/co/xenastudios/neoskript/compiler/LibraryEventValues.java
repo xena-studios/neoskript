@@ -137,6 +137,26 @@ final class LibraryEventValues implements EventValues {
     }
 
     /** The event values of events of some classes (none outside events). */
+    @Override
+    public long usedUp() {
+        return library.usedUp();
+    }
+
+    @Override
+    public long usedUpHere() {
+        return library.usedUpHere();
+    }
+
+    @Override
+    public Object save() {
+        return library.saveUsedUp();
+    }
+
+    @Override
+    public void restore(Object saved) {
+        library.restoreUsedUp(saved);
+    }
+
     private final class EventScope implements Scope {
 
         private final List<Class<?>> classes;
@@ -157,6 +177,8 @@ final class LibraryEventValues implements EventValues {
             }
             // As the compiler says it, without using up a value's own error ('Use 'attacker' and/or 'victim'...').
             Library.EventValueRequest request = library.request(type, words);
+            // Which script asks first for a value whose error Skript gives once depends on the order: noted.
+            library.askedExcluded(classes, request.valueClass(), request.type());
             Library.EventValueLookup lookup = library.eventValue(classes, request.valueClass(), request.type(), 0, null);
             if (lookup.getter() != null || "multiple".equals(lookup.error())) {
                 return null;

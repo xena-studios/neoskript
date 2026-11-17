@@ -27,6 +27,8 @@ final class EventChangeable<E> implements Expression, Changeable {
     private final Class<?> valueClass;
     private final Set<Mode> modes;
     private final Changer<E> changer;
+    /** Skript's error for changing it once a wait has let the event pass, or {@code null}. */
+    private String passed;
 
     /**
      * @param valueClass the class of the values the change takes; an array class for several
@@ -46,6 +48,12 @@ final class EventChangeable<E> implements Expression, Changeable {
         this(eventClass, getter, null, Property.modes(), null);
     }
 
+    /** Refuses changes with {@code error} once the code has certainly waited, as Skript's expression does. */
+    EventChangeable<E> passed(String error) {
+        this.passed = error;
+        return this;
+    }
+
     @Override
     public Object get(TriggerContext context, Object[] arguments) {
         return eventClass.isInstance(context.event()) ? getter.apply(eventClass.cast(context.event())) : null;
@@ -53,6 +61,9 @@ final class EventChangeable<E> implements Expression, Changeable {
 
     @Override
     public Class<?>[] acceptChange(Mode mode) {
+        if (passed != null) {
+            EventPassed.refuse(passed);
+        }
         if (!modes.contains(mode)) {
             return null;
         }

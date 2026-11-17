@@ -310,8 +310,13 @@ final class LineParser {
             // level' is the difference of two levels. (Which event values have one is for the compiler to say.)
             if (syntax.id().equals("ExprTimeState") && parsed.match().values().getFirst() instanceof Expr timed
                     && !mayHaveTimeState(timed)) {
-                problem(input.substring(timed.start(), timed.end()).strip() + " does not have a "
-                        + (candidate.pattern() >= 2 ? "future" : "past") + " state");
+                // Skript's init first refuses any time state after a wait; else it names the expression as it writes it.
+                boolean future = candidate.pattern() >= 2;
+                problem(() -> context.delay() == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED
+                        ? "Cannot use time states after the event has already passed"
+                        : (timed instanceof Expr.Syntax inner ? described(inner.syntax(),
+                                input.substring(timed.start(), timed.end())) : input.substring(timed.start(), timed.end()).strip())
+                                + " does not have a " + (future ? "future" : "past") + " state", SEMANTIC_ERROR);
                 continue;
             }
             // A direction after a direction word is another one written out, as Skript's init refuses anything else:
@@ -2092,6 +2097,17 @@ final class LineParser {
 
     /** The quality of {@link #problem}. */
     private int problemQuality;
+
+    /** {@link #problem(String, int)}, worked out only if it's kept. */
+    private void problem(java.util.function.Supplier<String> found, int quality) {
+        boolean kept = problem == null || quality > problemQuality;
+        for (String[] frame : frames) {
+            kept |= frame[0] == null || quality > Integer.parseInt(frame[1]);
+        }
+        if (kept) {
+            problem(found.get(), quality);
+        }
+    }
 
     /**
      * A problem found while parsing, of a quality, kept as Skript's parse log keeps its error: the first of the

@@ -477,6 +477,26 @@ public interface Registrar {
     <E> void eventValue(Class<E> eventClass, String typeId, int time, java.util.function.Function<? super E, ?> getter);
 
     /**
+     * Lets {@code set event-<type>} change the event value of {@code typeId} at {@code time} in events of
+     * {@code eventClass}, as Skript's event values with a changer: {@code set event-item to bread} in a consume event,
+     * {@code set past event-location} where a teleport starts. It's for {@code set} only: other changes go through the
+     * type's changer, as in Skript. The value set is converted to the type's class first; if there's none, or it isn't
+     * one, nothing is set. Once the code has surely waited, setting it is Skript's error ({@code Event values cannot be
+     * changed after the event has already passed.}).
+     *
+     * @param <E> the event's class
+     * @param eventClass the event's class
+     * @param typeId the id of the value's type, as {@link #eventValue(Class, String, java.util.function.Function)}
+     *     registers it
+     * @param time -1 for the value before the event, 0 now, 1 after it, as
+     *     {@link #eventValue(Class, String, int, java.util.function.Function)}
+     * @param setter sets the value in an event, given the one value set, never {@code null}
+     */
+    @Experimental
+    default <E> void eventValueChanger(Class<E> eventClass, String typeId, int time,
+            java.util.function.BiConsumer<? super E, Object> setter) {}
+
+    /**
      * Events of {@code eventClass} (and subclasses) don't have a value of {@code typeId}, though a superclass
      * does: asking for it is an error with {@code message}, as Skript's {@code event-entity} in a damage event.
      *

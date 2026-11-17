@@ -249,6 +249,12 @@ final class TriggerCompiler {
     private MethodVisitor method;
     private int nextSlot = PARSE_LOGS_SLOT + 1;
     private FunctionInfo function;
+    /**
+     * How many blocks were open when the code Skript loads as a trigger of its own began ({@code wait 1 tick:},
+     * {@code spawn a pig:}), or -1. Skript resets its parser for that code, so the function's {@code return} can't be
+     * used in it, nor a returnable section's from around it.
+     */
+    private int detachedAt = -1;
     /** The text expression positions refer to: the current line, a section header's key, or a default value. */
     private String source;
     private int line;
@@ -1085,10 +1091,21 @@ final class TriggerCompiler {
                 "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + "J)V", false);
         method.visitJumpInsn(GOTO, after);
         method.visitLabel(start.resume());
-        statements(section.body());
+        detached(section.body());
         // The delayed code's own end: the code after the section, which already ran, goes on with any section.
         suspendTrigger();
         method.visitLabel(after);
+    }
+
+    /** Compiles code Skript loads as a trigger of its own: see {@link #detachedAt}. */
+    private void detached(List<Statement> body) throws CompileException {
+        int outer = detachedAt;
+        detachedAt = blocks.size();
+        try {
+            statements(body);
+        } finally {
+            detachedAt = outer;
+        }
     }
 
     private Object define(byte[] bytes) {
@@ -1310,6 +1327,86 @@ final class TriggerCompiler {
         } catch (CompileException e) {
             return e.alreadyReported() || e.getMessage() == null || e.getMessage().startsWith("NeoSkript can't")
                     ? null : e.getMessage();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * For a line that failed while parsing, the error Skript would keep instead of the one parsing gave, when only
+     * compiling finds it; the parsing one is then left out. A section header nothing takes the section of is read as
+     * a statement, whose error Skript keeps unless it isn't understood at all. A section Skript loads apart that may
+     * wait keeps the first error in its code, if compiling finds one before the first parsing found. Skript keeps the
+     * error of the highest quality, so words nothing understands lose to its own error that the code waits.
+     */
+    private CompileException keptError(co.xenastudios.neoskript.frontend.structure.Line failed) {
+        Statement statement = script.sectionStatement(failed);
+        if (statement != null) {
+            CompileException error = firstErrorApart(List.of(statement), eventClasses, eventLabel, null, false, false);
+            if (error == null || error.getMessage().contains("Can't understand this condition/effect:")) {
+                return null;
+            }
+            unparsed.accept(failed.number());
+            return new CompileException(failed.number(), error.getMessage());
+        }
+        co.xenastudios.neoskript.frontend.parse.ParsedScript.WaitingSection waiting = script.waitingSection(failed);
+        if (waiting == null) {
+            return null;
+        }
+        String event = library.sectionEvent(waiting.id());
+        String type = library.sectionType(waiting.id()) != null ? library.sectionType(waiting.id())
+                : library.sectionExpressionType(waiting.id());
+        CompileException error = firstErrorApart(waiting.body(), event == null ? eventClasses
+                : List.of(co.xenastudios.neoskript.runtime.SectionEvent.class), event == null ? eventLabel : event, type, true,
+                true);
+        if (error == null || waiting.firstErrorLine() >= 0 && error.line() >= waiting.firstErrorLine()) {
+            return null;
+        }
+        // The section's line and its code's are left out of what parsing found, and this is the one error.
+        unparsed.accept(failed.number());
+        unparsed(waiting.body());
+        return new CompileException(error.line(), error.getMessage());
+    }
+
+    /**
+     * The first error compiling {@code statements} on their own, for an event of {@code classes} called {@code label},
+     * gives, with its line, if it's the script's fault, else {@code null}. In a section of {@code sectionType}'s values
+     * if that isn't {@code null}; {@code detached} for code Skript loads as a trigger of its own. With
+     * {@code semantic}, errors about words nothing understands, of a lower quality in Skript, don't count.
+     */
+    private CompileException firstErrorApart(List<Statement> statements, List<Class<?>> classes, String label,
+            String sectionType, boolean detached, boolean semantic) {
+        try {
+            TriggerCompiler apart = new TriggerCompiler(library, functions, globals, script);
+            apart.eventClasses = classes;
+            apart.eventLabel = label;
+            apart.warnings = (at, message) -> { };
+            for (Block block : blocks) {
+                if (block.kind() == BlockKind.SECTION && block.valueType() != null) {
+                    apart.outerSections.add(block.valueType());
+                }
+            }
+            apart.outerSections.addAll(outerSections);
+            if (sectionType != null) {
+                apart.outerSections.add(sectionType);
+            }
+            if (detached) {
+                apart.detachedAt = 0;
+            }
+            apart.compileTrigger(constantsScript, statements);
+            return null;
+        } catch (CompileException e) {
+            List<Throwable> all = new ArrayList<>();
+            all.add(e);
+            all.addAll(List.of(e.getSuppressed()));
+            for (Throwable found : all) {
+                if (found instanceof CompileException error && !error.alreadyReported() && error.getMessage() != null
+                        && !error.getMessage().startsWith("NeoSkript can't") && !(semantic && (error.unknownWords()
+                                || co.xenastudios.neoskript.frontend.source.Diagnostic.lesserQuality(error.getMessage())))) {
+                    return error;
+                }
+            }
+            return null;
         } catch (RuntimeException e) {
             return null;
         }
@@ -1866,7 +1963,10 @@ final class TriggerCompiler {
                 method.visitVarInsn(ASTORE, PARSE_LOGS_SLOT);
             }
             // The parser reported it; the trigger is left out without a second error.
-            case Statement.Invalid invalid -> throw new CompileException(line, null);
+            case Statement.Invalid invalid -> {
+                CompileException kept = keptError(invalid.line());
+                throw kept != null ? kept : new CompileException(line, null);
+            }
         }
     }
 
@@ -2093,7 +2193,9 @@ final class TriggerCompiler {
             throws CompileException {
         // As Skript's loops, what's certainly one value can't be looped. A variable may hold a queue, which can.
         if (!(looped instanceof Expr.Variable) && !"queue".equals(looped.type()) && surelySingle(looped)) {
-            throw new CompileException(line, "Can't loop '" + skriptText(looped) + "' because it's only a single value");
+            // A list is in brackets, as Skript's ExpressionList writes itself: '("a" or "b")'.
+            String written = looped instanceof Expr.ListOf ? "(" + skriptText(looped) + ")" : skriptText(looped);
+            throw new CompileException(line, "Can't loop '" + written + "' because it's only a single value");
         }
         int valuesSlot = nextSlot++;
         int indicesSlot = -1;
@@ -2270,7 +2372,7 @@ final class TriggerCompiler {
         blocks.push(new Block(BlockKind.SECTION, end, next, valuesSlot, -1, indexSlot,
                 library.sectionType(header.syntax().id())));
         try {
-            statements(section.body());
+            detached(section.body());
         } finally {
             blocks.pop();
             if (place >= 0) {
@@ -2351,7 +2453,7 @@ final class TriggerCompiler {
             eventLabel = sectionEvent;
         }
         try {
-            statements(section.body());
+            detached(section.body());
         } finally {
             eventClasses = outerClasses;
             eventLabel = outerLabel;
@@ -2421,9 +2523,30 @@ final class TriggerCompiler {
         return ref.type().id();
     }
 
+    /**
+     * What {@code return} returns to, after Skript's EffReturn checks, in its order: there's something to return to,
+     * and the code can't have waited. A returnable section, or {@code null} for the function.
+     */
+    private Block returnable() throws CompileException {
+        Block handler = returnHandler();
+        if (handler == null && (function == null || detachedAt >= 0)) {
+            throw new CompileException(line, "The return statement cannot be used here");
+        }
+        if (currentLine != null && script.delayBefore(currentLine)
+                != co.xenastudios.neoskript.frontend.registry.DelayState.NOT_DELAYED) {
+            throw new CompileException(line, "A return statement after a delay is useless, as the calling trigger"
+                    + " will resume when the delay starts (and won't get any returned value)");
+        }
+        return handler;
+    }
+
     /** The innermost returnable section {@code return} gives its values to, or {@code null} for the function's. */
     private Block returnHandler() {
+        int open = detachedAt < 0 ? blocks.size() : blocks.size() - detachedAt;
         for (Block block : blocks) {
+            if (open-- <= 0) {
+                break;
+            }
             if (block.kind() == BlockKind.RETURNABLE || block.kind() == BlockKind.RETURNABLE_PLURAL) {
                 return block;
             }
@@ -2741,21 +2864,14 @@ final class TriggerCompiler {
                 method.visitJumpInsn(GOTO, loop.next());
             }
             case CoreSyntax.RETURN -> {
-                if (!co.xenastudios.neoskript.frontend.parse.PausingExpressions.in(effect, registry).isEmpty()) {
-                    // The line waits for its value first, so the caller has gone on by then: as after a wait.
-                    throw new CompileException(line, "A return statement after a delay is useless, as the calling"
-                            + " trigger will resume when the delay starts (and won't get any returned value)");
-                }
-                Block handler = returnHandler();
+                Block handler = returnable();
                 if (handler != null) {
                     returnFromSection(handler, (Expr) effect.match().values().getFirst());
                     return;
                 }
-                if (function == null || function.returnType() == null) {
-                    throw new CompileException(line, function == null
-                            ? "The return statement cannot be used here"
-                            : "function " + function.name() + " (simple event) doesn't return any value. Please use"
-                                    + " 'stop' or 'exit' if you want to stop the trigger.");
+                if (function.returnType() == null) {
+                    throw new CompileException(line, "function " + function.name() + " (simple event) doesn't return any"
+                            + " value. Please use 'stop' or 'exit' if you want to stop the trigger.");
                 }
                 Expr returned = (Expr) effect.match().values().getFirst();
                 List<String> outerLiteralTypes = literalTypes;
@@ -2861,6 +2977,10 @@ final class TriggerCompiler {
                     throw unsupported("'" + source + "'");
                 }
                 Label skip = new Label();
+                if (effect.match().regexValues().getFirst() instanceof ParsedSyntax inner && isCore(inner, CoreSyntax.RETURN)) {
+                    // Skript sets the effect up before the condition, so a return that can't be used fails first.
+                    returnable();
+                }
                 try {
                     condition(condition);
                 } catch (CompileException e) {
@@ -3100,6 +3220,53 @@ final class TriggerCompiler {
         }
     }
 
+    /**
+     * {@code set event-item to bread}: sets an event value that has a changer for the trigger's events, as Skript's
+     * {@code EventValueExpression}, which refuses once the code has surely waited. Whether it was one.
+     */
+    private boolean setEventValue(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr.Syntax target)
+            throws CompileException {
+        int time = 0;
+        if (isCore(target.syntax(), CoreSyntax.TIME_STATE)
+                && target.syntax().match().values().getFirst() instanceof Expr.Syntax inner) {
+            // 'set past event-location to X': where a teleport starts. After a sure wait, Skript's time state error.
+            if (currentLine != null && script.delayBefore(currentLine)
+                    == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED) {
+                return false;
+            }
+            time = target.syntax().pattern() < 2 ? -1 : 1;
+            target = inner;
+        }
+        if (!isCore(target.syntax(), CoreSyntax.EVENT_VALUE) || eventClasses == null
+                || !(target.syntax().match().regexValues().getFirst() instanceof TypeRef ref) || ref.plural()) {
+            return false;
+        }
+        String type = ref.type().id();
+        if (sectionFor(type) != null || widerSection(type) != null) {
+            return false;
+        }
+        java.util.function.BiConsumer<Object, Object> setter = library.eventValueChanger(eventClasses, type, time);
+        if (setter == null) {
+            return false;
+        }
+        if (currentLine != null && script.delayBefore(currentLine)
+                == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED) {
+            throw new CompileException(line, "Event values cannot be changed after the event has already passed.");
+        }
+        // As Skript's change effect, a value known not to be of the type is refused while loading.
+        checkChanger((Expr) effect.match().values().get(mode.value), new Class<?>[] {library.javaClass(type)},
+                Changeable.Mode.SET, skriptText(target));
+        constant(setter, java.util.function.BiConsumer.class);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        expression((Expr) effect.match().values().get(mode.value));
+        constant(library.javaClass(type), Class.class);
+        constant(site(effect, Values.class), co.xenastudios.neoskript.runtime.errors.ErrorSites.Site.class);
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "setEventValue", "(Ljava/util/function/BiConsumer;" + CONTEXT
+                + OBJECT_DESC + "Ljava/lang/Class;" + Type.getDescriptor(co.xenastudios.neoskript.runtime.errors.ErrorSites.Site.class)
+                + ")V", false);
+        return true;
+    }
+
     /** Fails as Skript does if {@code value} has an event value the trigger's event doesn't have. */
     private void checkEventValues(Object value) throws CompileException {
         switch (value) {
@@ -3128,6 +3295,9 @@ final class TriggerCompiler {
 
     private void changeAll(ParsedSyntax effect, CoreSyntax.ChangeMode mode) throws CompileException {
         Object target = effect.match().values().get(mode.target);
+        if (mode == CoreSyntax.ChangeMode.SET && target instanceof Expr.Syntax syntax && setEventValue(effect, mode, syntax)) {
+            return;
+        }
         // 'add 1 to {_a::*} and {_b::*}': each variable is changed.
         if (target instanceof Expr.ListOf list && list.items().stream().allMatch(Expr.Variable.class::isInstance)) {
             if (!list.and() && list.items().size() > 1) {
@@ -5075,7 +5245,9 @@ final class TriggerCompiler {
             method.visitMethodInsn(INVOKESTATIC, VALUES, "list", "(" + OBJECTS + ")" + OBJECTS, false);
             return;
         }
-        String text = inner instanceof Expr expr && expr.end() <= source.length()
+        // As Skript writes the expression ('the damage', 'event-damage cause').
+        String text = inner instanceof Expr.Syntax syntax && syntax.end() <= source.length() ? skriptText(syntax)
+                : inner instanceof Expr expr && expr.end() <= source.length()
                 ? source.substring(expr.start(), expr.end()) : source.substring(whole.start(), whole.end());
         throw new CompileException(line, text + " does not have a " + (time < 0 ? "past" : "future") + " state");
     }
