@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A newer push supersedes an older run, on main too: only the newest commit's results matter.
+  cancel-in-progress: true
 
 jobs:
   build:
