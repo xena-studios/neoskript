@@ -1,0 +1,20 @@
+# Where NeoSkriptWeb gives something other than Reqn 1.2.3 or skJson 6.0.0 on Skript 2.17.0, on purpose, for the
+# neoskript-web scenario. Each line: '<suite> <label> | <what NeoSkript gives> | <why>'. The scenario fails if
+# NeoSkript gives anything else, or if the original now gives the same (then the line goes).
+
+# Reqn 1.2.3
+reqn local after request | kept | Reqn carried the trigger on without its local variables, so every local set before a request was gone after it.
+reqn custom header | 42 | Reqn looked a header up by its name as written, so "x-answer" didn't find X-Answer; a header's name has no case.
+reqn none url | carried on | A request to an address that's none stopped Reqn's trigger with a NullPointerException in the console; here it's a runtime error and the trigger carries on.
+
+# skJson 6.0.0
+skjson compact | {"name":"Steve","level":5,"ratio":1.5,"admin":false,"none":null,"tags":["a","b",3],"home":{"world":"world","x":10,"y":64}} | skJson printed 'as compact json' indented, the same as 'as pretty printed'.
+skjson minified | {"name":"Steve","level":5,"ratio":1.5,"admin":false,"none":null,"tags":["a","b",3],"home":{"world":"world","x":10,"y":64}} | skJson printed 'as minified json' indented too.
+skjson ratio plus one | 2.5 | skJson gave JSON's numbers to scripts as Gson's LazilyParsedNumber, which Skript's arithmetic reads as a whole number: 1.5 + 1 was 2.
+skjson values | [1,2.0,"x",{"b":true}] and {"e":"f"} | skJson's 'values of' gave nothing at all when the JSON held a null; here the null is left out.
+skjson gzip | true | skJson read a gzip-compressed answer as text, so its body was the compressed bytes; it's unpacked here, as Reqn did.
+skjson header with colon | {"body":"","content-type":"","method":"GET","query":"","x-test":"a:b"} | skJson split a 'Name: value' header at every colon and dropped one with a colon in its value (a URL, a token).
+skjson quoted header 2 | {"body":"","content-type":"","method":"GET","query":"","x-test":"quoted"} | skJson's own example, "{'Content-Type':'application/json'}", sent a header named 'Content-Type' with the quotes; a text that's a JSON object is read as one here.
+skjson event | Response{statusCode=200, content=with hea..., headers={"conten..., status=OK} | On Skript 2.17, skJson's event-response is none in 'on received http response', so a request sent without waiting could never be read.
+skjson event status code | 200 | As above: skJson's event-response is none on Skript 2.17.
+skjson event body | with headers | As above: skJson's event-response is none on Skript 2.17.

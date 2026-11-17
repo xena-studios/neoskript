@@ -1,0 +1,186 @@
+# skJson 6.0.0's requests and JSON, run on Skript 2.17.0 with skJson and on NeoSkript with NeoSkriptWeb (the
+# neoskript-web scenario). Each '[web] skjson <label>: <value>' line is compared; test-harness/corpus/web/
+# known-differences.txt lists where NeoSkript differs on purpose. @PORT@ is the harness's test server, @DEAD@ a port
+# nothing listens on.
+
+function sj(label: text, value: objects):
+    set {_text} to "%{_value::*}%"
+    replace all nl with "\n" in {_text}
+    send "[web] skjson %{_label}%: %{_text}%" to console
+
+command /webskjson:
+    trigger:
+        set {_before} to "kept"
+        set {_req} to prepare GET request on "http://127.0.0.1:@PORT@/json"
+        sj("request before", {_req})
+        sj("response before", last response of {_req})
+        execute {_req}
+        sj("local after request", {_before})
+        set {_res} to last response of {_req}
+        sj("response", {_res})
+        sj("request", {_req})
+        sj("status", {_res}'s status)
+        sj("status code", {_res}'s status code)
+        sj("body", {_res}'s body)
+        sj("headers", {_res}'s headers)
+        set {_j} to {_res}'s body
+        sj("json is object", whether {_j} is a json object)
+        map {_j} to {_m::*}
+        sj("mapped indices", indices of {_m::*})
+        sj("mapped values", {_m::*})
+        sj("mapped home indices", indices of {_m::home::*})
+        sj("mapped home", {_m::home::*})
+        sj("mapped tags indices", indices of {_m::tags::*})
+        sj("mapped tags", {_m::tags::*})
+        sj("mapped none", {_m::none})
+        sj("level plus one", {_m::level} + 1)
+        sj("ratio plus one", {_m::ratio} + 1)
+        sj("formatted", {_m::*}'s formatted json)
+        set {_l::*} to 1, "two", true and 4.5
+        set {_l::x::*} to "a" and "b"
+        sj("formatted list", {_l::*}'s formatted json)
+        set {_n::a::1} to "1"
+        set {_n::a::3} to "{""q"":2}"
+        set {_n::b} to "text"
+        set {_n::c::k} to "v"
+        sj("formatted nested", formatted json of {_n::*})
+        copy json {_j} to {_copy::*}
+        sj("copied", {_copy::name})
+        store json {_j} in {_stored::*}
+        sj("stored", {_stored::home::world})
+        set {_merge::kept} to "yes"
+        map {_j} to {_merge::*}
+        sj("map keeps the rest 1", {_merge::kept})
+        sj("map keeps the rest 2", {_merge::name})
+        sj("pretty", {_j} as pretty printed)
+        sj("formatted json", {_j} as formatted json)
+        sj("uncolored", {_j} as uncolored pretty printed)
+        sj("unformatted", {_j} as unformatted pretty printed)
+        sj("compact", {_j} as compact json)
+        sj("minified", {_j} as minified json)
+        set {_p} to parse "{""a"": [1, 2.0, ""x"", {""b"": true}], ""c"": null, ""d"": {""e"": ""f""}}" as json
+        sj("parsed", {_p})
+        sj("size", json size of {_p})
+        sj("keys", keys of {_p})
+        sj("all keys at path", all keys "d" of {_p})
+        sj("values", values of {_p})
+        sj("values at path", values at path "a" in {_p})
+        sj("value at path", value at path "a.2" in {_p})
+        sj("value with index", value "a[3]" of {_p})
+        sj("nested value", value at path "a.3.b" in {_p})
+        sj("path of", path "d.e" of {_p})
+        sj("missing path", value at path "nope.x" in {_p})
+        sj("value of object", value "d" of {_p})
+        sj("json of text", json from "plain text")
+        sj("json of number", json of 12)
+        sj("json of numbers", json from (1, 2 and 3))
+        sj("broken json", parse "{oops" as json)
+        sj("lenient json", parse "{a: 'b'}" as json)
+        sj("json created", json created from "[1,2]")
+        sj("is array", whether {_p} is a json array)
+        sj("is not object", whether {_p} is not a json object)
+        sj("type of", whether json type of {_p} is json object)
+        sj("primitive", whether json of 5 is a json primitive)
+        set {_empty} to parse "{}" as json
+        sj("empty", whether json {_empty} is empty)
+        sj("empty json", whether {_empty} is empty json)
+        sj("not empty", whether json {_p} is not empty)
+        sj("has key", whether {_p} has key "a")
+        sj("has keys", whether {_p} has keys "a" and "zzz")
+        sj("contains value", whether {_p} contains value "x")
+        set {_arr} to parse "[1, 3, ""TEST""]" as json
+        sj("array has values", whether {_arr} has values 1 and 3)
+        sj("array has value", whether {_arr} has value "TEST")
+        sj("array lacks value", whether {_arr} doesn't have value 8)
+        set {_post} to prepare POST request on "127.0.0.1:@PORT@/echo"
+        set {_post}'s headers to "X-Test: yes"
+        set {_post}'s body to "{""k"": 1, ""html"": ""<b>&</b>""}"
+        add "q:1" to query params of {_post}
+        add "r:2, s:3" to {_post}'s query params
+        sj("post headers", {_post}'s headers)
+        sj("post body", body of {_post})
+        sj("post params", query params of {_post})
+        execute {_post}
+        sj("post", body of last response of {_post})
+        set {_put} to prepare a PUT request to url "http://127.0.0.1:@PORT@/echo"
+        set headers of {_put} to parse "{""X-Test"": ""from json"", ""Content-Type"": ""text/plain""}" as json
+        set body of {_put} to parse "[1, 2]" as json
+        execute {_put}
+        sj("put", body of last response of {_put})
+        set {_patch} to create a PATCH request for "http://127.0.0.1:@PORT@/echo"
+        set {_patch}'s body to "plain words"
+        run {_patch}
+        sj("patch", body of last response of {_patch})
+        set {_del} to prepare DELETE request on "http://127.0.0.1:@PORT@/echo"
+        execute {_del}
+        sj("delete", body of last response of {_del})
+        set {_get} to prepare GET request on "http://127.0.0.1:@PORT@/echo"
+        set body of {_get} to "{""ignored"": true}"
+        set query params of {_get} to "x:1"
+        execute {_get}
+        sj("get with body", body of last response of {_get})
+        reset query params of {_get}
+        reset body of {_get}
+        sj("reset 1", query params of {_get})
+        sj("reset 2", body of {_get})
+        set {_colon} to prepare GET request on "http://127.0.0.1:@PORT@/echo"
+        set {_colon}'s headers to "X-Test: a:b"
+        execute {_colon}
+        sj("header with colon", body of last response of {_colon})
+        set {_quoted} to prepare GET request on "http://127.0.0.1:@PORT@/echo"
+        set {_quoted}'s headers to "{'X-Test':'quoted'}"
+        execute {_quoted}
+        sj("quoted header 1", status of last response of {_quoted})
+        sj("quoted header 2", body of last response of {_quoted})
+        set {_e} to prepare GET request on "http://127.0.0.1:@PORT@/status/500"
+        execute {_e}
+        sj("500 1", last response of {_e})
+        sj("500 2", status of last response of {_e})
+        sj("500 3", {_e})
+        set {_nf} to prepare GET request on "http://127.0.0.1:@PORT@/status/404"
+        execute {_nf}
+        sj("404 1", status of last response of {_nf})
+        sj("404 2", body of last response of {_nf})
+        set {_t} to prepare GET request on "http://127.0.0.1:@PORT@/text"
+        execute {_t}
+        sj("text", body of last response of {_t})
+        sj("text is json", whether body of last response of {_t} is a json primitive)
+        set {_h} to prepare HEAD request on "http://127.0.0.1:@PORT@/text"
+        execute {_h}
+        sj("head 1", status code of last response of {_h})
+        sj("head 2", body of last response of {_h})
+        set {_rd} to prepare GET request on "http://127.0.0.1:@PORT@/redirect"
+        execute {_rd}
+        sj("redirect 1", status code of last response of {_rd})
+        sj("redirect 2", body of last response of {_rd})
+        set {_gz} to prepare GET request on "http://127.0.0.1:@PORT@/gzip"
+        execute {_gz}
+        set {_gzbody} to body of last response of {_gz}
+        sj("gzip", whether {_gzbody} is "compressed text")
+        set {_x} to prepare GET request on "http://127.0.0.1:@DEAD@/x"
+        execute {_x}
+        sj("refused 1", last response of {_x})
+        sj("refused 2", status of last response of {_x})
+        sj("refused 3", {_x})
+        set {_mock} to prepare MOCK request on "http://127.0.0.1:@PORT@/x"
+        execute {_mock}
+        sj("mock 1", last response of {_mock})
+        sj("mock 2", body of last response of {_mock})
+        sj("mock 3", headers of last response of {_mock})
+        set {_fetched} to json from url "http://127.0.0.1:@PORT@/json"
+        sj("json from url", {_fetched})
+        set {_fetched} to fetch json from "http://127.0.0.1:@PORT@/status/404"
+        sj("json from 404", {_fetched})
+        set {_nb} to prepare GET request on "http://127.0.0.1:@PORT@/headers"
+        execute {_nb} as non blocking
+        sj("non blocking status", status of last response of {_nb})
+        wait 2 seconds
+        sj("non blocking after 1", status of last response of {_nb})
+        sj("non blocking after 2", body of last response of {_nb})
+        send "[web] skjson done" to console
+
+on received http response:
+    set {_r} to event-response
+    sj("event", {_r})
+    sj("event status code", status code of {_r})
+    sj("event body", body of {_r})
