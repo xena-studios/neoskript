@@ -19,6 +19,11 @@ import java.util.Objects;
  */
 public record TextTemplate(List<String> pieces, List<Hole> holes) {
 
+    /**
+     * Checks there's one more piece than holes, and copies both.
+     *
+     * @throws IllegalArgumentException if there isn't
+     */
     public TextTemplate {
         pieces = List.copyOf(pieces);
         holes = List.copyOf(holes);
@@ -41,6 +46,7 @@ public record TextTemplate(List<String> pieces, List<Hole> holes) {
      */
     public record Hole(String element, String written, List<Object> values, List<String> texts) {
 
+        /** Copies the values and texts. */
         public Hole {
             Objects.requireNonNull(written, "written");
             values = List.copyOf(values);
