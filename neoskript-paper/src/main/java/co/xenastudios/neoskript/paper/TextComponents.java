@@ -38,11 +38,12 @@ final class TextComponents {
         registrar.converter(String.class, Component.class, PARSER::parseSafe);
         // As a conversion, legacy formatting is what's probably wanted.
         registrar.converter(Component.class, String.class, PARSER::toLegacyString);
-        // Components can hold virtual parts that don't compare, so they're compared as they're written.
+        // Components can hold virtual parts that don't compare, so they're compared as they're written, as texts.
         registrar.comparison(Component.class, String.class, (component, text) ->
-                PARSER.toString(component).equalsIgnoreCase(PARSER.toString(PARSER.parse(text))));
+                co.xenastudios.neoskript.runtime.Comparison.equal(PARSER.toString(component),
+                        PARSER.toString(PARSER.parse(text))));
         registrar.comparison(Component.class, Component.class, (a, b) ->
-                PARSER.toString(a).equalsIgnoreCase(PARSER.toString(b)));
+                co.xenastudios.neoskript.runtime.Comparison.equal(PARSER.toString(a), PARSER.toString(b)));
         registrar.arithmetic('+', Component.class, Component.class, TextComponents::appendToEnd);
         registrar.arithmetic('+', Component.class, String.class,
                 (component, text) -> appendToEnd(component, PARSER.parseSafe(text)));

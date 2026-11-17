@@ -116,6 +116,15 @@ public final class StandardLibrary {
         Players.uuidsInVariableNames = use;
     }
 
+    /**
+     * Skript's {@code player variable fix}, on in its default config: a player saved in a variable who leaves and
+     * joins again is a new player object to the server, so reading the variable gives (and stores) the player now
+     * online. Off, it gives the old one, which messages and changes no longer reach.
+     */
+    public static void playerVariableFix(boolean fix) {
+        co.xenastudios.neoskript.runtime.variables.VariableStore.refreshOnRead(fix ? Players::current : null);
+    }
+
     public static void registerTesting(Registrar registrar) {
         WorldSyntax.registerTesting(registrar);
         Scripts.registerTesting(registrar);

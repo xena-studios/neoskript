@@ -735,7 +735,7 @@ final class WorldSyntax {
                             return new Object[0];
                         }
                         // The start block and as many more as the maximum target block distance, less one.
-                        int distance = 100 - 1;
+                        int distance = co.xenastudios.neoskript.runtime.Settings.targetBlockDistance() - 1;
                         if (expression && direction.writtenAmount() != null) {
                             distance = direction.writtenAmount().intValue();
                         }

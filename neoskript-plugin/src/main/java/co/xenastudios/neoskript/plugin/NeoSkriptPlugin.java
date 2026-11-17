@@ -149,6 +149,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         StandardLibrary.usePlayerUuidsInVariableNames(settings.variables().playerUuidsInNames());
         Runnable registerSyntax = () -> library.insertingAtMark(() -> addons.registerAll(library));
         aliases = new AliasManager(getDataPath(), getSLF4JLogger());
+        // The settings scripts read, before any script loads.
+        applyScriptSettings(settings);
         if (co.xenastudios.neoskript.plugin.check.CheckMode.requested()) {
             // Started by NeoSkript's CLI to check scripts: check them, write the report, and stop.
             try {
@@ -365,11 +367,14 @@ public final class NeoSkriptPlugin extends JavaPlugin {
      */
     /** Whether config.yml has them now, or there were none to copy. */
     private boolean copySkriptSettings(SkriptMigration.Result migration) {
-        java.util.Map<String, Object> copied = new java.util.LinkedHashMap<>();
-        if (migration.playerUuids() != null) {
-            copied.put("variables.player-uuids-in-names", migration.playerUuids());
+        if (migration.caseClashes() != null) {
+            caseClashes(migration);
         }
-        copied.putAll(migration.settings());
+        if (migration.settingsProblem() != null) {
+            getSLF4JLogger().warn("Couldn't read Skript's config.sk ({}), so its settings weren't copied. NeoSkript runs"
+                    + " on its defaults, which are Skript's; set any you changed in config.yml.", migration.settingsProblem());
+        }
+        java.util.Map<String, Object> copied = new java.util.LinkedHashMap<>(migration.settings());
         org.bukkit.configuration.file.YamlConfiguration current =
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile().toFile());
         copied.entrySet().removeIf(setting -> setting.getValue().equals(current.get(setting.getKey())));
@@ -393,6 +398,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             getSLF4JLogger().error("Couldn't copy Skript's settings to config.yml", e);
             return false;
         }
+        getSLF4JLogger().info("Copied {} from Skript's config.sk to config.yml: {}", copied.size() == 1 ? "a setting"
+                : copied.size() + " settings", String.join(", ", copied.keySet()));
         if (copied.containsKey("variables.player-uuids-in-names")) {
             getSLF4JLogger().info("Players are their {} in variable names, as in Skript's config.sk.",
                     settings.variables().playerUuidsInNames() ? "UUIDs" : "names");
@@ -410,6 +417,50 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                             .collect(java.util.stream.Collectors.joining(", ")));
         }
         return true;
+    }
+
+    /**
+     * Skript's {@code case-insensitive variables} was off, which NeoSkript doesn't have: its variable names always
+     * ignore case. Says so, and names the variables that now read as one, loudly, as only one of each is kept.
+     */
+    private void caseClashes(SkriptMigration.Result migration) {
+        if (migration.caseClashes().isEmpty()) {
+            getSLF4JLogger().warn("Skript's config.sk has 'case-insensitive variables: false'. NeoSkript's variable names"
+                    + " always ignore case, as Skript's do by default: {coins::Bob} and {coins::bob} are the same"
+                    + " variable. No saved variables differ only by case, so none are affected.");
+            return;
+        }
+        int count = migration.caseClashes().size();
+        getSLF4JLogger().error("Skript's config.sk has 'case-insensitive variables: false', but NeoSkript's variable"
+                + " names always ignore case. {} {} of saved variables differ only by case, and NeoSkript keeps only one"
+                + " of each (the last in {}); the next save drops the others. Skript's own file is left as it was{}. Rename"
+                + " them in your scripts and variables before relying on them:", count, count == 1 ? "group" : "groups",
+                migration.caseClashFile() == null ? "the file" : shown(migration.caseClashFile()),
+                migration.variablesBackup() == null ? ""
+                        : ", and the copy NeoSkript read is backed up as " + shown(migration.variablesBackup()));
+        int shown = 0;
+        for (java.util.List<String> names : migration.caseClashes()) {
+            if (shown++ == 50) {
+                getSLF4JLogger().error("  ... and {} more", count - 50);
+                break;
+            }
+            getSLF4JLogger().error("  {}", names.stream().map(name -> "{" + name + "}")
+                    .collect(java.util.stream.Collectors.joining(", ")));
+        }
+    }
+
+    /** A path as the console shows it: relative to NeoSkript's folder when it's in it. */
+    private String shown(java.nio.file.Path path) {
+        java.nio.file.Path absolute = path.toAbsolutePath().normalize();
+        java.nio.file.Path folder = getDataPath().toAbsolutePath().normalize();
+        return absolute.startsWith(folder) ? "plugins/NeoSkript/" + folder.relativize(absolute).toString().replace('\\', '/')
+                : absolute.toString();
+    }
+
+    /** Applies the settings scripts read, logging what couldn't be used. */
+    private void applyScriptSettings(NeoSkriptConfig settings) {
+        ScriptSettings.apply(settings, getDataPath().resolve("lang"))
+                .forEach(warning -> getSLF4JLogger().warn("config.yml: {}", warning));
     }
 
     /** The settings from config.yml. */
@@ -465,6 +516,11 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             @Override
             public void playerUuids(boolean uuids) {
                 StandardLibrary.usePlayerUuidsInVariableNames(uuids);
+            }
+
+            @Override
+            public void scripts(NeoSkriptConfig settings) {
+                applyScriptSettings(settings);
             }
 
             @Override

@@ -12,6 +12,7 @@ import co.xenastudios.neoskript.api.registration.Registrar;
 import org.bukkit.inventory.Inventory;
 import co.xenastudios.neoskript.runtime.Comparison;
 import co.xenastudios.neoskript.runtime.KeyedValues;
+import co.xenastudios.neoskript.runtime.Settings;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
 import java.util.List;
@@ -506,18 +507,22 @@ final class Logic {
             return Condition.check(containers, containersAnd, container -> Condition.check(values, valuesAnd, value -> {
                 String needle = value instanceof net.kyori.adventure.text.Component component ? parser.toString(component)
                         : value instanceof String text ? parser.toString(parser.parse(text)) : null;
-                return needle != null && parser.toString((net.kyori.adventure.text.Component) container)
-                        .toLowerCase(java.util.Locale.ROOT).contains(needle.toLowerCase(java.util.Locale.ROOT));
+                return needle != null && contains(parser.toString((net.kyori.adventure.text.Component) container), needle);
             }));
         }
         if (java.util.Arrays.stream(containers).allMatch(String.class::isInstance)
                 && Condition.check(containers, containersAnd, container -> Condition.check(values, valuesAnd,
-                        value -> value instanceof String text && ((String) container).toLowerCase(java.util.Locale.ROOT)
-                                .contains(text.toLowerCase(java.util.Locale.ROOT))))) {
+                        value -> value instanceof String text && contains((String) container, text)))) {
             return true;
         }
         // Not all of them hold things: whether the values are among them, unless only what's in them counts.
         return direct && among(containers, values, valuesAnd);
+    }
+
+    /** Skript's {@code StringUtils.contains}: with case only when config.yml's text.case-sensitive is on. */
+    static boolean contains(String haystack, String needle) {
+        return Settings.caseSensitive() ? haystack.contains(needle)
+                : haystack.toLowerCase(java.util.Locale.ROOT).contains(needle.toLowerCase(java.util.Locale.ROOT));
     }
 
     /** Whether the values (all, or any) are among {@code containers}, as Skript compares them. */
@@ -552,12 +557,12 @@ final class Logic {
 
     /**
      * {@code decimals from 3.94 to 4}: the numbers between, in steps of the first's decimal places, at most
-     * two as Skript's default number accuracy: 3.94, 3.95 ... 4.
+     * the number accuracy (two by default): 3.94, 3.95 ... 4.
      */
     private static Object[] decimals(Number first, double to) {
         double from = first.doubleValue();
         String[] split = first.toString().split("\\.");
-        double multiplier = Math.pow(10, Math.min(split.length > 1 ? split[1].length() : 0, 2));
+        double multiplier = Math.pow(10, Math.min(split.length > 1 ? split[1].length() : 0, Settings.writtenNumberAccuracy()));
         int low = (int) Math.ceil(Math.min(from, to) * multiplier);
         int high = (int) Math.floor(Math.max(from, to) * multiplier);
         List<Object> numbers = new ArrayList<>();
@@ -817,9 +822,12 @@ final class Logic {
                     if (!(value instanceof String part) || part.isEmpty()) {
                         continue;
                     }
-                    // Without case, as Skript compares text by default.
+                    // Without case unless config.yml's text.case-sensitive is on. (Skript 2.17 has its option the
+                    // wrong way round here, finding text with case when it's off.)
+                    boolean ignoreCase = !Settings.caseSensitive();
                     List<Long> positions = new java.util.ArrayList<>();
-                    for (int at = indexOf(text, part, 0); at >= 0; at = indexOf(text, part, at + 1)) {
+                    for (int at = indexOf(text, part, 0, ignoreCase); at >= 0;
+                            at = indexOf(text, part, at + 1, ignoreCase)) {
                         positions.add((long) at + 1);
                     }
                     if (which == 2 && !positions.isEmpty()) {
@@ -844,10 +852,10 @@ final class Logic {
             return found.size() == 1 && which != 0 ? found.getFirst() : found.toArray();
         }
 
-        /** Where {@code part} is in {@code text} from {@code from} on, without case, or -1. */
-        private static int indexOf(String text, String part, int from) {
+        /** Where {@code part} is in {@code text} from {@code from} on, or -1. */
+        private static int indexOf(String text, String part, int from, boolean ignoreCase) {
             for (int i = from; i + part.length() <= text.length(); i++) {
-                if (text.regionMatches(true, i, part, 0, part.length())) {
+                if (text.regionMatches(ignoreCase, i, part, 0, part.length())) {
                     return i;
                 }
             }

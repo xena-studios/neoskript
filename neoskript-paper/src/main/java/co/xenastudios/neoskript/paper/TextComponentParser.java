@@ -8,6 +8,8 @@ import co.xenastudios.neoskript.runtime.Values;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -18,6 +20,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -42,10 +46,47 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
  * <p>
  * There are two parsers. The <b>safe</b> one only reads the tags that are fine in any message, whoever wrote
  * it: colours and decorations (Skript's {@code safe tags} option). The <b>unsafe</b> one reads every tag,
- * click events included; {@code formatted} and literal texts use it. Skript's defaults for its options apply:
- * links aren't parsed, and colours reset the formatting before them.
+ * click events included; {@code formatted} and literal texts use it. Its options are config.yml's, as Skript's
+ * config.sk options: {@code safe tags}, {@code parse links in chat messages} and {@code color codes reset
+ * formatting}. By default links aren't parsed, and colours reset the formatting before them.
  */
 public final class TextComponentParser {
+
+    /** How text that looks like a link, outside tags, is treated: Skript's {@code parse links in chat messages}. */
+    public enum LinkParseMode {
+        /** Nothing is made a link. */
+        DISABLED(null),
+        /** Text starting with {@code http://} or {@code https://} is a link. */
+        STRICT(Pattern.compile("https?://[-\\w.]+\\.\\w{2,}(?:/\\S*)?")),
+        /** Anything with a {@code .} in it, like {@code example.com}, is a link. */
+        LENIENT(Pattern.compile("(?:https?://)?[-\\w.]+\\.\\w{2,}(?:/\\S*)?"));
+
+        private final TextReplacementConfig replacement;
+
+        LinkParseMode(Pattern pattern) {
+            this.replacement = pattern == null ? null
+                    : TextReplacementConfig.builder().match(pattern).replacement(LinkParseMode::link).build();
+        }
+
+        /** The text as a link, as far as it's a valid URI. */
+        private static TextComponent.Builder link(TextComponent.Builder builder) {
+            String url = builder.content();
+            URI uri;
+            try {
+                uri = new URI(url);
+            } catch (URISyntaxException e) {
+                if (e.getIndex() == -1) {
+                    return builder;
+                }
+                try {
+                    uri = new URI(url.substring(0, e.getIndex()));
+                } catch (URISyntaxException ignored) {
+                    return builder;
+                }
+            }
+            return builder.clickEvent(ClickEvent.openUrl(uri.toString()));
+        }
+    }
 
     private record SkriptTag(Tag tag, String parent, boolean reset) {}
 
@@ -64,9 +105,8 @@ public final class TextComponentParser {
     private static final Pattern LEGACY_HEX_PATTERN = Pattern.compile("[&§]x(?:[&§][a-fA-F0-9]){6}");
 
     /** Skript's default {@code safe tags}. */
-    private static final String[] DEFAULT_SAFE_TAGS = {
-        "color", "decorations", "gradient", "rainbow", "reset", "transition", "pride", "shadowColor"
-    };
+    public static final List<String> DEFAULT_SAFE_TAGS = List.of(
+        "color", "decorations", "gradient", "rainbow", "reset", "transition", "pride", "shadowColor");
 
     // After the constants it uses.
     private static final TextComponentParser INSTANCE = new TextComponentParser();
@@ -78,8 +118,9 @@ public final class TextComponentParser {
 
     private final Map<String, SkriptTag> simplePlaceholders = new HashMap<>();
     private final Set<SkriptTagResolver> resolvers = new LinkedHashSet<>();
-    private TagResolver safeTagResolver = TagResolver.empty();
-    private final boolean colorsCauseReset = true;
+    private volatile TagResolver safeTagResolver = TagResolver.empty();
+    private volatile boolean colorsCauseReset = true;
+    private volatile LinkParseMode linkParseMode = LinkParseMode.DISABLED;
 
     private final MiniMessage parser = MiniMessage.builder()
             .strict(false)
@@ -109,7 +150,7 @@ public final class TextComponentParser {
 
     private TextComponentParser() {
         registerCompatibilityTags();
-        setSafeTags(DEFAULT_SAFE_TAGS);
+        safeTags(DEFAULT_SAFE_TAGS);
     }
 
     /** {@code tag} with every decoration it leaves unset turned off, for a colour that resets formatting. */
@@ -168,11 +209,27 @@ public final class TextComponentParser {
         };
     }
 
-    /** Sets the tags the safe parser reads: tag names, or the names of MiniMessage's groups of them. */
-    void setSafeTags(String... safeTags) {
+    /** Whether a colour resets the formatting before it, as Skript's {@code color codes reset formatting}. */
+    public void colorsCauseReset(boolean reset) {
+        colorsCauseReset = reset;
+    }
+
+    /** How text that looks like a link is treated, as Skript's {@code parse links in chat messages}. */
+    public void linkParseMode(LinkParseMode mode) {
+        linkParseMode = mode;
+    }
+
+    /**
+     * Sets the tags the safe parser reads, as Skript's {@code safe tags}: tag names, or the names of MiniMessage's
+     * groups of them ({@code color}, {@code decorations}).
+     */
+    public void safeTags(List<String> safeTags) {
         List<TagResolver> groups = new ArrayList<>();
         MethodHandles.Lookup lookup = MethodHandles.publicLookup();
         for (String safeTag : safeTags) {
+            if (safeTag.isEmpty() || !Character.isJavaIdentifierStart(safeTag.charAt(0))) {
+                continue;
+            }
             try {
                 MethodHandle handle = lookup.findStatic(StandardTags.class, safeTag, MethodType.methodType(TagResolver.class));
                 groups.add((TagResolver) handle.invoke());
@@ -180,7 +237,7 @@ public final class TextComponentParser {
                 // Not a group on this version of MiniMessage: a tag name.
             }
         }
-        Set<String> names = Set.of(safeTags);
+        Set<String> names = Set.copyOf(safeTags);
         safeTagResolver = new TagResolver() {
             @Override
             public Tag resolve(String name, ArgumentQueue arguments, Context ctx) throws ParsingException {
@@ -218,11 +275,14 @@ public final class TextComponentParser {
             return Component.empty();
         }
         String reformatted = reformatText(text);
+        Component component;
         try {
-            return safe ? safeParser.deserialize(reformatted) : parser.deserialize(reformatted);
+            component = safe ? safeParser.deserialize(reformatted) : parser.deserialize(reformatted);
         } catch (ParsingException e) {
             return Component.text(text);
         }
+        LinkParseMode links = linkParseMode;
+        return links == LinkParseMode.DISABLED ? component : component.replaceText(links.replacement);
     }
 
     /** Text with Skript's forms of tags and legacy codes written as MiniMessage reads them. */
