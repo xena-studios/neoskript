@@ -280,7 +280,8 @@ final class ScriptManager {
 
         // Scripts that load cleanly, or for the first time, switch to the new version; a script with
         // errors keeps its previous version if it has one.
-        Set<String> switching = new HashSet<>();
+        // In the files' order, which Skript loads them in: their load events run in it.
+        Set<String> switching = new java.util.LinkedHashSet<>();
         int inScope = 0;
         for (SourceFile file : files) {
             String name = file.name();
