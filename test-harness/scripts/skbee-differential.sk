@@ -205,6 +205,8 @@ command /skbeetest-nbt:
 		set {_plain} to stone
 		if custom nbt of {_plain} has tag "x":
 			skbee("plain item has x", "yes")
+		else:
+			skbee("plain item has x", "no")
 		set {_full} to full nbt of {_plain}
 		skbee("plain item after has tag", {_full})
 		set {skbee::saved-key} to minecraft key of stone
