@@ -1200,6 +1200,86 @@ final class TriggerCompiler {
         }
     }
 
+    /**
+     * For a line that failed while parsing, the error Skript would keep instead of the one parsing gave, when only
+     * compiling finds it; the parsing one is then left out. A section header nothing takes the section of is read as
+     * a statement, whose error Skript keeps unless it isn't understood at all. A section Skript loads apart that may
+     * wait keeps the first error in its code, if compiling finds one before the first parsing found. Skript keeps the
+     * error of the highest quality, so words nothing understands lose to its own error that the code waits.
+     */
+    private CompileException keptError(co.xenastudios.neoskript.frontend.structure.Line failed) {
+        Statement statement = script.sectionStatement(failed);
+        if (statement != null) {
+            CompileException error = firstErrorApart(List.of(statement), eventClasses, eventLabel, null, false, false);
+            if (error == null || error.getMessage().contains("Can't understand this condition/effect:")) {
+                return null;
+            }
+            unparsed.accept(failed.number());
+            return new CompileException(failed.number(), error.getMessage());
+        }
+        co.xenastudios.neoskript.frontend.parse.ParsedScript.WaitingSection waiting = script.waitingSection(failed);
+        if (waiting == null) {
+            return null;
+        }
+        String event = library.sectionEvent(waiting.id());
+        String type = library.sectionType(waiting.id()) != null ? library.sectionType(waiting.id())
+                : library.sectionExpressionType(waiting.id());
+        CompileException error = firstErrorApart(waiting.body(), event == null ? eventClasses
+                : List.of(co.xenastudios.neoskript.runtime.SectionEvent.class), event == null ? eventLabel : event, type, true,
+                true);
+        if (error == null || waiting.firstErrorLine() >= 0 && error.line() >= waiting.firstErrorLine()) {
+            return null;
+        }
+        // The section's line and its code's are left out of what parsing found, and this is the one error.
+        unparsed.accept(failed.number());
+        unparsed(waiting.body());
+        return new CompileException(error.line(), error.getMessage());
+    }
+
+    /**
+     * The first error compiling {@code statements} on their own, for an event of {@code classes} called {@code label},
+     * gives, with its line, if it's the script's fault, else {@code null}. In a section of {@code sectionType}'s values
+     * if that isn't {@code null}; {@code detached} for code Skript loads as a trigger of its own. With
+     * {@code semantic}, errors about words nothing understands, of a lower quality in Skript, don't count.
+     */
+    private CompileException firstErrorApart(List<Statement> statements, List<Class<?>> classes, String label,
+            String sectionType, boolean detached, boolean semantic) {
+        try {
+            TriggerCompiler apart = new TriggerCompiler(library, functions, globals, script);
+            apart.eventClasses = classes;
+            apart.eventLabel = label;
+            apart.warnings = (at, message) -> { };
+            for (Block block : blocks) {
+                if (block.kind() == BlockKind.SECTION && block.valueType() != null) {
+                    apart.outerSections.add(block.valueType());
+                }
+            }
+            apart.outerSections.addAll(outerSections);
+            if (sectionType != null) {
+                apart.outerSections.add(sectionType);
+            }
+            if (detached) {
+                apart.detachedAt = 0;
+            }
+            apart.compileTrigger(constantsScript, statements);
+            return null;
+        } catch (CompileException e) {
+            List<Throwable> all = new ArrayList<>();
+            all.add(e);
+            all.addAll(List.of(e.getSuppressed()));
+            for (Throwable found : all) {
+                if (found instanceof CompileException error && !error.alreadyReported() && error.getMessage() != null
+                        && !error.getMessage().startsWith("NeoSkript can't") && !(semantic && (error.unknownWords()
+                                || error.getMessage().startsWith("Can't understand this expression:")))) {
+                    return error;
+                }
+            }
+            return null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     private static boolean parsedHasInvalid(List<Statement> statements) {
         for (Statement statement : statements) {
             if (statement instanceof Statement.Invalid
@@ -1467,7 +1547,10 @@ final class TriggerCompiler {
                 method.visitVarInsn(ASTORE, PARSE_LOGS_SLOT);
             }
             // The parser reported it; the trigger is left out without a second error.
-            case Statement.Invalid invalid -> throw new CompileException(line, null);
+            case Statement.Invalid invalid -> {
+                CompileException kept = keptError(invalid.line());
+                throw kept != null ? kept : new CompileException(line, null);
+            }
         }
     }
 
@@ -4446,7 +4529,9 @@ final class TriggerCompiler {
             method.visitMethodInsn(INVOKESTATIC, VALUES, "list", "(" + OBJECTS + ")" + OBJECTS, false);
             return;
         }
-        String text = inner instanceof Expr expr && expr.end() <= source.length()
+        // As Skript writes the expression ('the damage', 'event-damage cause').
+        String text = inner instanceof Expr.Syntax syntax && syntax.end() <= source.length() ? skriptText(syntax)
+                : inner instanceof Expr expr && expr.end() <= source.length()
                 ? source.substring(expr.start(), expr.end()) : source.substring(whole.start(), whole.end());
         throw new CompileException(line, text + " does not have a " + (time < 0 ? "past" : "future") + " state");
     }

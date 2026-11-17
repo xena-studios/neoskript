@@ -151,6 +151,8 @@ final class EventExpressions {
                 return null;
             };
         }, withThe);
+        // As Skript's EventValueExpression writes itself.
+        registrar.describe(id, (info, args) -> "event-" + typeName);
     }
 
     // ---------------------------------------------------------------- damage
@@ -178,10 +180,12 @@ final class EventExpressions {
                 }
             }, false, false, "Can't change the damage anymore after the event has already passed");
         }, "[the:the] damage");
+        registrar.describe("ExprDamage", (info, args) -> "the damage");
         registrar.expression("ExprFinalDamage", "number", info -> {
             restrict(info, the(info, "final damage"), EntityDamageEvent.class);
             return (context, args) -> context.event() instanceof EntityDamageEvent event ? event.getFinalDamage() / 2 : null;
         }, "[the:the] final damage");
+        registrar.describe("ExprFinalDamage", (info, args) -> "the final damage");
         eventValue(registrar, "ExprDamageCause", "damagecause", "damage cause", event -> switch (event) {
             case EntityDamageEvent damage -> damage.getCause();
             case EntityDeathEvent death -> death.getEntity().getLastDamageCause() == null ? null
@@ -215,6 +219,7 @@ final class EventExpressions {
                     VehicleDamageEvent.class, VehicleDestroyEvent.class, io.papermc.paper.event.player.PrePlayerAttackEntityEvent.class);
             return (context, args) -> attacker(context.event());
         }, "[the] (attacker|damager)");
+        registrar.describe("ExprAttacker", (info, args) -> "the attacker");
         registrar.expression("ExprAttacked", "entity", info -> {
             restrict(info, "the victim", EntityDamageEvent.class,
                     EntityDeathEvent.class, VehicleDamageEvent.class, VehicleDestroyEvent.class, ProjectileHitEvent.class,
@@ -230,6 +235,8 @@ final class EventExpressions {
                 return entity != null && (args[0] == null || Events.isKind(args[0], entity)) ? entity : null;
             };
         }, "[the] (attacked|damaged|victim) [%-*entitytype%]");
+        registrar.describe("ExprAttacked", (info, args) -> "the attacked " + (args.isEmpty() || args.getFirst() == null
+                ? "entity" : args.getFirst()));
     }
 
     /** Skript's ExprAttacker: who did it, the shooter for a projectile. */

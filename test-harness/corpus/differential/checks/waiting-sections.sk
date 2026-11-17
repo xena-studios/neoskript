@@ -1,0 +1,40 @@
+# Checks: a section Skript loads apart that may wait fails, and keeps only the first error its code gave, of the highest
+# quality; teleporting in a spawn section is refused before it could wait.
+
+on damage:
+	spawn a pig at victim:
+		set {_x} to a new potion effect of speed for 1 second
+		wait 1 tick
+
+on damage:
+	spawn a pig at victim:
+		zzz
+		set {_x} to a new potion effect of speed for 1 second
+		wait 1 tick
+
+on damage:
+	spawn a pig at victim:
+		set {_x} to a new potion effect of speed for 1 second
+		zzz
+		wait 1 tick
+
+on damage:
+	spawn a pig at victim:
+		teleport event-entity to {_l}
+	spawn a pig at victim:
+		set {_x} to 1
+		teleport event-entity to {_l}
+		set {_y} to 2
+
+on damage:
+	set {_b} to a new bossbar:
+		set {_x} to a new potion effect of speed for 1 second
+		wait 1 tick
+
+on damage:
+	set {_y} to a new potion effect of speed for 1 second:
+		set {_z} to 1
+	set {_y} to a new bossbar named "x" for 5 seconds:
+		set {_z} to 1
+	broadcast "x":
+		set {_z} to 1

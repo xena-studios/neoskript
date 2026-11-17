@@ -56,6 +56,8 @@ final class StatementParser {
      * can't be used: a delayed section's or a spawn section's.
      */
     private boolean detached;
+    /** The id of the section Skript loads as a trigger of its own that the code is in ({@code EffSecSpawn}), or null. */
+    private String linkedId;
     /** The warnings the script suppresses so far, by the tag naming them ({@code unreachable}). */
     private final java.util.Set<String> suppressed = new java.util.HashSet<>();
     /** What was suppressed at each statement's and structure's line, for the compiler's warnings (by identity). */
@@ -65,12 +67,29 @@ final class StatementParser {
     private static final class Chain {
         final DelayState before;
         final List<DelayState> ends = new ArrayList<>();
+        /** How each branch's code stops execution, as {@link #intent}s ({@code null} for not at all). */
+        final List<Integer> intents = new ArrayList<>();
         boolean hasElse;
 
         Chain(DelayState before) {
             this.before = before;
         }
     }
+
+    /**
+     * Skript's execution intents, which say how far a statement stops execution: {@link #STOP_TRIGGER} for the whole
+     * trigger ({@code stop}, a function's {@code return}), or a number of sections ({@code exit 2 loops}). A statement
+     * that doesn't stop execution has none. By identity.
+     */
+    private final Map<Statement, Integer> intents = new IdentityHashMap<>();
+    private static final int STOP_TRIGGER = 0;
+
+    /**
+     * The sections the code being parsed is in, outermost first, as Skript's parser's current sections: {@code loop}
+     * for its loops, {@code conditional}, {@code returnable} for its returnable section, {@code section} for others.
+     * Code Skript loads as a trigger of its own starts with none.
+     */
+    private java.util.List<String> sections = new ArrayList<>();
 
     StatementParser(ParserContext context, Diagnostics diagnostics) {
         this.context = context;
@@ -85,6 +104,19 @@ final class StatementParser {
 
     Map<Line, String> statementErrors() {
         return statementErrors;
+    }
+
+    /** Sections Skript loads as triggers of their own that failed as their code may wait: see {@link ParsedScript}. */
+    private final Map<Line, ParsedScript.WaitingSection> waitingSections = new IdentityHashMap<>();
+    /** Section headers nothing takes the section of, read as statements: see {@link ParsedScript#sectionStatement}. */
+    private final Map<Line, Statement> sectionStatements = new IdentityHashMap<>();
+
+    Map<Line, ParsedScript.WaitingSection> waitingSections() {
+        return waitingSections;
+    }
+
+    Map<Line, Statement> sectionStatements() {
+        return sectionStatements;
     }
 
     /**
@@ -136,6 +168,7 @@ final class StatementParser {
     List<Statement> body(List<Node> nodes, Map<String, java.util.Set<String>> hints) {
         delay = DelayState.NOT_DELAYED;
         detached = false;
+        sections = new ArrayList<>();
         context.hints().reset(hints);
         return statements(nodes);
     }
@@ -146,10 +179,6 @@ final class StatementParser {
         Chain chain = null;
         boolean ended = false;
         for (Node node : nodes) {
-            if (ended && !suppressed.contains("unreachable")) {
-                diagnostics.warning(node.line().number(), node.line().column(), node.line().text().length(),
-                        "Unreachable code. The previous statement stops further execution.");
-            }
             String key = Text.lower(node.line().key().strip());
             boolean section = node instanceof Node.Section;
             boolean continuesChain = section && (key.startsWith("else") || key.startsWith("then"));
@@ -165,9 +194,22 @@ final class StatementParser {
                     : line(node, previous);
             statements.add(statement);
             previous = statement;
-            ended = statement instanceof Statement.Effect effect && context.registry().ends(effect.effect().syntax())
-                    && !failingReturn(effect);
-            if (statement instanceof Statement.Effect effect && !failingReturn(effect)) {
+            // As Skript's ScriptLoader: a line that fails is left out, and the first one after a statement that stops
+            // execution that doesn't is unreachable.
+            if (statement instanceof Statement.Invalid
+                    || statement instanceof Statement.Effect effect && failingReturn(effect)) {
+                continue;
+            }
+            if (ended && !suppressed.contains("unreachable")) {
+                diagnostics.warning(node.line().number(), node.line().column(), node.line().text().length(),
+                        "Unreachable code. The previous statement stops further execution.");
+            }
+            Integer intent = intent(statement, chain);
+            if (intent != null) {
+                intents.put(statement, intent);
+            }
+            ended = intent != null;
+            if (statement instanceof Statement.Effect effect) {
                 stopsHints(effect.effect(), false);
             }
         }
@@ -253,8 +295,157 @@ final class StatementParser {
         // A multi-line condition's code is in the 'then' that follows, so its branch ends there.
         if (!(statement instanceof Statement.Conditions)) {
             chain.ends.add(delay);
+            chain.intents.add(statement instanceof Statement.Section branch ? use(bodyIntent(branch.body())) : null);
         }
         return statement;
+    }
+
+    /** How far {@code statement} stops execution, as its {@code executionIntent} in Skript, or {@code null}. */
+    private Integer intent(Statement statement, Chain chain) {
+        if (statement instanceof Statement.Effect effect) {
+            return effectIntent(effect.effect());
+        }
+        if (!(statement instanceof Statement.Section section) || section.header() == null) {
+            return null;
+        }
+        ParsedSyntax header = section.header();
+        switch (header.syntax().id()) {
+            case "SecConditional" -> {
+                // Only a chain with an 'else' can stop execution: at least as little as its branch that stops least.
+                if (chain == null || !Text.lower(section.line().key().strip()).equals("else")) {
+                    return null;
+                }
+                Integer least = null;
+                for (Integer branch : chain.intents) {
+                    if (branch == null) {
+                        return null;
+                    }
+                    if (least == null || rank(branch) < rank(least)) {
+                        least = branch;
+                    }
+                }
+                return least;
+            }
+            // A loop stops execution as its code does only if it surely runs: over literal values.
+            case "SecLoop" -> {
+                return guaranteed(header.match().values().getFirst()) ? use(bodyIntent(section.body())) : null;
+            }
+            case "SecFor" -> {
+                return guaranteed(header.match().values().getLast()) ? use(bodyIntent(section.body())) : null;
+            }
+            case "SecWhile" -> {
+                return header.match().tags().contains("do") ? use(bodyIntent(section.body())) : null;
+            }
+            default -> {
+                return null;
+            }
+        }
+    }
+
+    /** As Skript's EffExit, EffContinue and EffReturn: how far they stop, or {@code null} if they can't be used. */
+    private Integer effectIntent(ParsedSyntax effect) {
+        List<Object> regex = effect.match().regexValues();
+        switch (effect.syntax().id()) {
+            case "EffExit" -> {
+                if (effect.pattern() == 0) {
+                    return STOP_TRIGGER;
+                }
+                String type = effect.match().tags().contains("loop") ? "loop"
+                        : effect.match().tags().contains("conditional") ? "conditional" : "section";
+                List<Integer> typed = sectionsOf(type);
+                if (effect.pattern() == 3) {
+                    // Up to the outermost section of that type.
+                    return typed.isEmpty() ? null : sections.size() - typed.getFirst();
+                }
+                int levels = effect.pattern() == 1 ? 1 : regex.getFirst() instanceof java.util.regex.MatchResult n
+                        ? Integer.parseInt(n.group().replace("_", "")) : 1;
+                // Skript's quirk: the levels given, not the sections between.
+                return levels < 1 || levels > typed.size() ? null : levels;
+            }
+            case "EffContinue" -> {
+                List<Integer> loops = sectionsOf("loop");
+                int level = effect.pattern() == 0 ? loops.size() : regex.getFirst() instanceof java.util.regex.MatchResult n
+                        ? Integer.parseInt(n.group()) : 0;
+                int levels = loops.size() - level + 1;
+                if (loops.isEmpty() || level < 1 || levels <= 0) {
+                    return null;
+                }
+                return sections.size() - loops.get(Math.max(loops.size() - levels, 0));
+            }
+            case "EffReturn" -> {
+                // To the returnable section it's in, else out of the function.
+                int returnable = sections.lastIndexOf("returnable");
+                return returnable < 0 ? STOP_TRIGGER : sections.size() - returnable;
+            }
+            default -> {
+                return null;
+            }
+        }
+    }
+
+    /** Where the current sections of {@code type} are, outermost first ({@code section} is any). */
+    private List<Integer> sectionsOf(String type) {
+        List<Integer> found = new ArrayList<>();
+        for (int i = 0; i < sections.size(); i++) {
+            String kind = sections.get(i);
+            if (type.equals("section") || kind.equals(type)) {
+                found.add(i);
+            }
+        }
+        return found;
+    }
+
+    /** How the first statement in {@code body} that stops execution stops it, or {@code null}. */
+    private Integer bodyIntent(List<Statement> body) {
+        for (Statement statement : body) {
+            Integer intent = intents.get(statement);
+            if (intent != null) {
+                return intent;
+            }
+        }
+        return null;
+    }
+
+    /** An intent as seen from the section around: one level fewer, as Skript's {@code ExecutionIntent.use}. */
+    private static Integer use(Integer intent) {
+        return intent == null || intent == STOP_TRIGGER ? intent : intent > 1 ? intent - 1 : null;
+    }
+
+    /** Skript's order of intents: stopping fewer sections is less, stopping the trigger the most. */
+    private static int rank(int intent) {
+        return intent == STOP_TRIGGER ? Integer.MAX_VALUE : intent;
+    }
+
+    /** As Skript's SecLoop: whether looping {@code value} surely runs at least once. */
+    private static boolean guaranteed(Object value) {
+        return switch (value) {
+            case Expr.Literal literal -> true;
+            case Expr.Unresolved words -> true;
+            case Expr.ListOf list -> list.and() ? list.items().stream().anyMatch(StatementParser::guaranteed)
+                    : list.items().stream().allMatch(StatementParser::guaranteed);
+            case null, default -> false;
+        };
+    }
+
+    /** Parses code in a section of {@code kind} (see {@link #sections}). */
+    private <T> T inSection(String kind, java.util.function.Supplier<T> code) {
+        sections.add(kind);
+        try {
+            return code.get();
+        } finally {
+            sections.removeLast();
+        }
+    }
+
+    /** Parses code Skript loads as a trigger of its own, which starts in no sections. */
+    private <T> T apart(java.util.function.Supplier<T> code) {
+        java.util.List<String> outer = sections;
+        sections = new ArrayList<>();
+        try {
+            return code.get();
+        } finally {
+            sections = outer;
+        }
     }
 
     private Statement simple(Line line) {
@@ -321,6 +512,12 @@ final class StatementParser {
             check(line, effect);
             if (context.registry().suppressesWarnings(effect.syntax())) {
                 suppress(line, effect);
+            }
+            if (effect.syntax().id().equals("EffTeleport") && "EffSecSpawn".equals(linkedId)) {
+                // Skript's EffTeleport refuses it first thing, so it doesn't make the code wait either.
+                error(line, "You cannot teleport an entity that hasn't spawned yet. Ensure you're using the location"
+                        + " expression from the spawn section pattern.");
+                return new Statement.Invalid(line);
             }
             hint(effect);
             delayAfter(effect);
@@ -566,7 +763,7 @@ final class StatementParser {
             // Skript's parse section: its code counts towards the trigger (including any delay), but
             // its problems are captured for the test.
             int mark = diagnostics.mark();
-            List<Statement> body = statements(section.children());
+            List<Statement> body = inSection("section", () -> statements(section.children()));
             List<Diagnostic> captured = diagnostics.takeSince(mark);
             return new Statement.Parse(line, body, captured);
         }
@@ -601,23 +798,25 @@ final class StatementParser {
                 // Skript's delayed section: its code runs after the delay, the code after it straight away.
                 parser.listWarnings(effect);
                 warn(line, parser);
-                return new Statement.Section(line, effect, delayedBody(section.children()));
+                return new Statement.Section(line, effect, apart(() -> delayedBody(section.children())));
             }
             if (effect != null && hasSectionExpression(effect)) {
                 parser.listWarnings(effect);
                 warn(line, parser);
                 String linked = LINKED.get(sectionExpressionId(effect));
-                List<Statement> body = sectionCode(null, () -> linked == null ? repeatable(section.children())
-                        : linkedBody(line, linked, section.children()));
+                List<Statement> body = sectionCode(null, () -> linked == null
+                        ? inSection("section", () -> repeatable(section.children()))
+                        : apart(() -> linkedBody(line, sectionExpressionId(effect), linked, section.children())));
                 return body == null ? new Statement.Invalid(line) : new Statement.Section(line, effect, body);
             }
             Expr.FunctionCall call = parser.call(0, key.length());
             if (call != null && call.arguments().stream().anyMatch(a -> a != null && hasSectionExpression(a))) {
-                String linked = call.arguments().stream().filter(a -> a != null && hasSectionExpression(a))
-                        .map(a -> LINKED.get(sectionExpressionId(a))).filter(java.util.Objects::nonNull).findFirst()
-                        .orElse(null);
-                List<Statement> body = sectionCode(null, () -> linked == null ? repeatable(section.children())
-                        : linkedBody(line, linked, section.children()));
+                String linkedId = call.arguments().stream().filter(a -> a != null && hasSectionExpression(a))
+                        .map(StatementParser::sectionExpressionId).filter(LINKED::containsKey).findFirst().orElse(null);
+                String linked = LINKED.get(linkedId);
+                List<Statement> body = sectionCode(null, () -> linked == null
+                        ? inSection("section", () -> repeatable(section.children()))
+                        : apart(() -> linkedBody(line, linkedId, linked, section.children())));
                 return body == null ? new Statement.Invalid(line) : new Statement.Section(line, null, body, call);
             }
             if (call != null && effect == null) {
@@ -630,6 +829,13 @@ final class StatementParser {
                 // Skript's change effect fails to set up before anything claims the section, with its error.
                 error(line, unusable);
                 return new Statement.Invalid(line);
+            }
+            if (effect != null) {
+                // Skript then reads the line as a statement: if that fails, its error is kept, which the compiler may find.
+                Line statement = new Line(line.number(), line.indent(), key);
+                delays.put(statement, delay);
+                note(statement);
+                sectionStatements.put(line, new Statement.Effect(statement, effect));
             }
             if (effect != null || call != null || parser.condition(0, key.length()) != null) {
                 error(line, "The line '" + key + "' is a valid statement but cannot function as a section (:) because"
@@ -699,19 +905,19 @@ final class StatementParser {
             // 'parse if' only parses its code when the condition is true while loading, which can't be
             // known here: parse it, but keep its problems out of the report.
             int mark = diagnostics.mark();
-            List<Statement> body = sectionBody(section.children());
+            List<Statement> body = inSection("conditional", () -> sectionBody(section.children()));
             diagnostics.takeSince(mark);
             return new Statement.Section(line, header, body);
         }
         if (isConditional(lower)) {
             statementError(line, key);
-            return new Statement.Section(line, header, sectionBody(section.children()));
+            return new Statement.Section(line, header, inSection("conditional", () -> sectionBody(section.children())));
         }
         if (header.syntax().id().equals(SUPPRESS_HINTS)) {
             boolean before = context.hints().suppressed();
             context.hints().suppress(!header.match().tags().contains("stop"));
             // Its code runs once, in place: a delay in it carries on after it.
-            List<Statement> body = sectionBody(section.children());
+            List<Statement> body = inSection("section", () -> sectionBody(section.children()));
             context.hints().suppress(before);
             return new Statement.Section(line, header, body);
         }
@@ -719,7 +925,7 @@ final class StatementParser {
             // Only for the section's code.
             java.util.Set<String> before = java.util.Set.copyOf(suppressed);
             suppress(line, header);
-            List<Statement> body = sectionBody(section.children());
+            List<Statement> body = inSection("section", () -> sectionBody(section.children()));
             suppressed.clear();
             suppressed.addAll(before);
             return new Statement.Section(line, header, body);
@@ -727,10 +933,14 @@ final class StatementParser {
         String id = header.syntax().id();
         String linked = LINKED.get(id);
         if (linked != null) {
-            List<Statement> body = sectionCode(header, () -> linkedBody(line, linked, section.children()));
+            List<Statement> body = sectionCode(header, () -> apart(() -> linkedBody(line, id, linked, section.children())));
             return body == null ? new Statement.Invalid(line) : new Statement.Section(line, header, body);
         }
-        List<Statement> body = switch (id) {
+        List<Statement> body = inSection(switch (id) {
+            case "SecLoop", "SecFor", "SecWhile" -> "loop";
+            case "SecReturnable" -> "returnable";
+            default -> "section";
+        }, () -> switch (id) {
             case "SecCatchErrors" -> catchErrorsBody(line, section.children());
             // Skript's test sections that run their code once, in place.
             case "SecReturnable" -> {
@@ -751,7 +961,7 @@ final class StatementParser {
                 yield sectionCode(header, () -> repeatable(section.children()));
             }
             default -> sectionCode(header, () -> repeatable(section.children(), id.equals("SecFor") ? header : null));
-        };
+        });
         return body == null ? new Statement.Invalid(line) : new Statement.Section(line, header, body);
     }
 
@@ -775,11 +985,13 @@ final class StatementParser {
      * may, the section fails and this is {@code null}. As the section's line then fails as a whole, Skript keeps only
      * the first error its code gave, or else its own, and none of the warnings.
      */
-    private List<Statement> linkedBody(Line line, String name, List<Node> nodes) {
+    private List<Statement> linkedBody(Line line, String id, String name, List<Node> nodes) {
         DelayState before = delay;
         boolean outer = detached;
+        String outerId = linkedId;
         delay = DelayState.NOT_DELAYED;
         detached = true;
+        linkedId = id;
         int mark = diagnostics.mark();
         context.hints().enter();
         boolean waits;
@@ -791,6 +1003,7 @@ final class StatementParser {
             context.hints().exit();
             delay = before;
             detached = outer;
+            linkedId = outerId;
         }
         if (!waits) {
             return body;
@@ -802,6 +1015,8 @@ final class StatementParser {
         } else {
             error(line, "Delays can't be used within a '" + name + "' section");
         }
+        // An earlier error only compiling finds is the one Skript keeps instead: the compiler checks.
+        waitingSections.put(line, new ParsedScript.WaitingSection(id, name, body, first == null ? -1 : first.line()));
         return null;
     }
 
@@ -1169,15 +1384,10 @@ final class StatementParser {
         warnings.clear();
     }
 
+    /** Whether {@code body} surely stops the trigger, as Skript's {@code triggerExecutionIntent} being StopTrigger. */
     private boolean stops(List<Statement> body) {
-        for (Statement statement : body) {
-            if (statement instanceof Statement.Effect effect
-                    && context.registry().stops(effect.effect().syntax(), effect.effect().pattern())
-                    && !failingReturn(effect)) {
-                return true;
-            }
-        }
-        return false;
+        Integer intent = bodyIntent(body);
+        return intent != null && intent == STOP_TRIGGER;
     }
 
     /**

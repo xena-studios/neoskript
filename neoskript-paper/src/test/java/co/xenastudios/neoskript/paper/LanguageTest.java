@@ -524,6 +524,38 @@ class LanguageTest {
     }
 
     @Test
+    void unreachableCodeFollowsSkriptsExecutionIntents() {
+        Library library = new Library();
+        StandardLibrary.register(library);
+        List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk", """
+                function a(x: number):
+                \tif {_x} is 1:
+                \t\tstop
+                \telse:
+                \t\tstop
+                \tset {_y} to 1
+
+                function b(x: number):
+                \tloop 2 times:
+                \t\tif {_x} is 1:
+                \t\t\texit loop
+                \t\telse:
+                \t\t\texit loop
+                \t\tset {_y} to 1
+                \tloop 1, 2 and 3:
+                \t\tstop
+                \tset {_y} to 1
+
+                function c(x: number):
+                \tstop
+                \tzzz
+                \tset {_y} to 1
+                """)));
+        assertEquals(List.of(6, 17, 22), parsed.getFirst().diagnostics().stream()
+                .filter(d -> d.message().startsWith("Unreachable code")).map(d -> d.line()).toList());
+    }
+
+    @Test
     void chanceDatesAndText() {
         assertEquals(List.of("true", "false", "true", "true", "false", "true", "false", "x: 2, y: 0, z: 0"), run("""
                 on load:
