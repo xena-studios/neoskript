@@ -3,11 +3,12 @@
 // brand repo (pnpm brand:sync); their exported clear space is cropped by the
 // viewBox trim below, as xenastudios.co's Logo does.
 import neoskript from "../brand/logo-dark.svg?raw";
+import neoskriptLight from "../brand/logo-light.svg?raw";
 import xena from "../brand/xena.svg?raw";
 import icon from "../brand/icon.svg?raw";
-interface Props { name: "neoskript" | "icon" | "xena"; label: string; class?: string }
+interface Props { name: "neoskript" | "neoskript-light" | "icon" | "xena"; label: string; class?: string }
 const { name, label, class: className } = Astro.props;
-const raw = { neoskript, icon, xena }[name];
+const raw = { neoskript, "neoskript-light": neoskriptLight, icon, xena }[name];
 // The logo exports carry 50 units of clear space on every side (scripts/build.mjs
 // in the brand repo), the icon none; the page spaces the logo itself. The Xena endorsement
 // takes the text colour; NeoSkript's own colours are never changed.

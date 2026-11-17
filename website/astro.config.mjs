@@ -5,6 +5,15 @@
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 import starlightLinksValidator from "starlight-links-validator";
+import { readFileSync } from "node:fs";
+import { dark, light } from "./src/lib/code-themes.mjs";
+
+// Skript in the guides' code blocks (```sk or ```skript), from the grammar the VS Code extension ships.
+const skript = {
+  ...JSON.parse(readFileSync(new URL("../editors/vscode/syntaxes/skript.tmLanguage.json", import.meta.url), "utf8")),
+  name: "skript",
+  aliases: ["sk"],
+};
 
 export default defineConfig({
   site: "https://neoskript.dev",
@@ -23,25 +32,52 @@ export default defineConfig({
       favicon: "/favicon.svg",
       customCss: ["./src/styles/theme.css"],
       expressiveCode: {
-        themes: ["github-dark-default", "github-light-default"],
-        // GitHub's token colours, on the site's own surfaces: raised night (or the light theme's tint) under a
-        // hairline, the frame's bar in the page colour, and flat, as everything else (DESIGN.md).
+        // The brand's code colours (src/lib/code-themes.mjs), Skript included, on the site's raised surface
+        // under a hairline. Editor frames show the file name as a tab; terminal frames are the console panes
+        // the custom pages use: a title strip over the output, flat, as everything else (DESIGN.md).
+        themes: [dark, light],
+        shiki: { langs: [skript] },
         styleOverrides: {
           borderRadius: "12px",
           borderColor: "var(--sl-color-hairline)",
           codeBackground: "var(--sl-color-gray-6)",
+          codeFontFamily: "var(--__sl-font-mono)",
+          codeFontSize: "0.875rem",
+          codeLineHeight: "1.7",
+          codePaddingBlock: "1rem",
+          codePaddingInline: "1.25rem",
+          uiFontFamily: "var(--__sl-font)",
+          focusBorder: "var(--sl-color-accent)",
           frames: {
             frameBoxShadowCssValue: "none",
             shadowColor: "transparent",
             editorBackground: "var(--sl-color-gray-6)",
             editorTabBarBackground: "var(--sl-color-black)",
             editorTabBarBorderBottomColor: "var(--sl-color-hairline)",
+            editorTabBorderRadius: "0",
             editorActiveTabBackground: "var(--sl-color-gray-6)",
-            editorActiveTabIndicatorTopColor: "var(--sl-color-accent)",
+            editorActiveTabForeground: "var(--sl-color-white)",
+            editorActiveTabIndicatorTopColor: "transparent",
+            editorActiveTabIndicatorBottomColor: "var(--sl-color-accent)",
+            editorActiveTabIndicatorHeight: "2px",
             terminalBackground: "var(--sl-color-gray-6)",
             terminalTitlebarBackground: "var(--sl-color-black)",
+            terminalTitlebarForeground: "var(--sl-color-gray-3)",
             terminalTitlebarBorderBottomColor: "var(--sl-color-hairline)",
-            terminalTitlebarDotsForeground: "var(--sl-color-gray-4)",
+            terminalTitlebarDotsForeground: "var(--sl-color-gray-5)",
+            terminalTitlebarDotsOpacity: "1",
+            inlineButtonBorder: "var(--sl-color-hairline)",
+            inlineButtonForeground: "var(--sl-color-gray-3)",
+            tooltipSuccessBackground: "var(--sl-color-accent)",
+            tooltipSuccessForeground: "var(--sl-color-black)",
+          },
+          textMarkers: {
+            markBackground: "color-mix(in srgb, var(--sl-color-accent) 14%, transparent)",
+            markBorderColor: "var(--sl-color-accent)",
+            insBackground: "color-mix(in srgb, var(--sl-color-accent) 14%, transparent)",
+            insBorderColor: "var(--sl-color-accent)",
+            delBackground: "color-mix(in srgb, var(--sl-color-gray-3) 12%, transparent)",
+            delBorderColor: "var(--sl-color-gray-4)",
           },
         },
       },
@@ -49,6 +85,7 @@ export default defineConfig({
       components: {
         SocialIcons: "./src/components/starlight/SocialIcons.astro",
         Footer: "./src/components/starlight/Footer.astro",
+        PageTitle: "./src/components/starlight/PageTitle.astro",
       },
       editLink: { baseUrl: "https://github.com/xena-studios/neoskript/edit/main/website/" },
       lastUpdated: true,

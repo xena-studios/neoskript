@@ -134,23 +134,24 @@ function palette() {
   const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   const mix = (a: string, b: string, weight: number) =>
     "#" + rgb(a).map((v, i) => Math.round(v * weight + rgb(b)[i] * (1 - weight)).toString(16).padStart(2, "0")).join("");
+  // The theme's tokens (tokens.css): the brand's night and magenta in the dark, ink and paper in the light.
   const c = {
-    night: read("--neoskript-night"),
-    raised: read("--neoskript-night-raised"),
-    rule: read("--neoskript-night-rule"),
-    text: read("--neoskript-text"),
-    muted: read("--neoskript-muted"),
-    magenta: read("--neoskript-magenta"),
-    string: read("--neoskript-string"),
+    night: read("--ground"),
+    raised: read("--raised"),
+    rule: read("--rule"),
+    text: read("--text"),
+    muted: read("--muted"),
+    magenta: read("--accent"),
+    string: read("--string"),
   };
-  return { ...c, mix };
+  return { ...c, mix, light: document.documentElement.dataset.theme === "light" };
 }
 
 function defineTheme() {
-  const { night, raised, rule, text, muted, magenta, string, mix } = palette();
+  const { night, raised, rule, text, muted, magenta, string, mix, light } = palette();
   const bare = (hex: string) => hex.slice(1);
   monaco.editor.defineTheme(THEME, {
-    base: "vs-dark",
+    base: light ? "vs" : "vs-dark",
     inherit: true,
     rules: [
       { token: "", foreground: bare(text) },
@@ -268,11 +269,11 @@ function defineTheme() {
       "inputValidation.infoBackground": night,
       "inputValidation.infoBorder": rule,
       "button.background": magenta,
-      "button.foreground": night,
+      "button.foreground": light ? "#ffffff" : night,
       "button.hoverBackground": mix(magenta, "#ffffff", 0.85),
       "button.border": "#00000000",
       "badge.background": magenta,
-      "badge.foreground": night,
+      "badge.foreground": light ? "#ffffff" : night,
       "progressBar.background": magenta,
       "list.activeSelectionBackground": mix(magenta, night, 0.25),
       "list.activeSelectionForeground": text,

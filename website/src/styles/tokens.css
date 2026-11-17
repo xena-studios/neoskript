@@ -1,0 +1,54 @@
+/* The site's colours, in both themes, for every page: the custom pages
+   (site.css) and the guides (theme.css). Dark is NeoSkript's brand as the
+   brand repo sets it (src/brand/neoskript.css, synced by pnpm brand:sync).
+   Light is the brand's ink and magenta-daylight on a pale paper tinted toward
+   magenta; its neutrals are fixed values so the parser's editor can read
+   them, and each is checked for contrast in DESIGN.md.
+
+   Dark is the default. The theme is the one Starlight's picker stores
+   (localStorage "starlight-theme"), or the system's: Starlight sets
+   data-theme on the guides, and Base.astro's head script does the same on
+   the custom pages. */
+@import "../brand/neoskript.css";
+
+:root {
+  --ground: var(--neoskript-night);
+  --raised: var(--neoskript-night-raised);
+  --rule: var(--neoskript-night-rule);
+  --text: var(--neoskript-text);
+  --muted: var(--neoskript-muted);
+  /* Magenta as text and marks, and as a fill under --on-accent. */
+  --accent: var(--neoskript-magenta);
+  --accent-fill: var(--neoskript-magenta);
+  --on-accent: var(--neoskript-night);
+  /* Code: keywords in the accent, strings pale. */
+  --string: var(--neoskript-string);
+
+  /* The names the tools' stylesheets grew up with. */
+  --night: var(--ground);
+  --magenta: var(--accent);
+
+  --sans: "Geist Variable", system-ui, sans-serif;
+  --mono: "Geist Mono Variable", ui-monospace, monospace;
+  --label: "JetBrains Mono Variable", ui-monospace, monospace;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --gutter: clamp(1rem, 0.4rem + 3vw, 4rem);
+  --max: 90rem;
+  --pane-radius: 12px;
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --ground: #fbf8fa;
+  --raised: #f3edf1;
+  --rule: #e3d8e0;
+  --text: var(--neoskript-ink);
+  --muted: #6b5f69;
+  --accent: #c8196e;
+  --accent-fill: var(--neoskript-magenta-daylight);
+  --on-accent: #ffffff;
+  --string: #8a2f6a;
+
+  color-scheme: light;
+}

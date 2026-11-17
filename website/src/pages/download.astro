@@ -30,7 +30,7 @@ const main = release
 >
   <section class="page">
     <div class="wrap">
-      <h1>Download</h1>
+      <h1 class="page-title">Download</h1>
       <p class="lead">
         {release?.beta
           ? `NeoSkript ${release.version} is the public beta, released ${day(release.published)}. Try it on a test server before your live one.`
@@ -40,7 +40,11 @@ const main = release
       </p>
 
       {main ? (
-        <div class="get">
+        <div class="pane get">
+          <div class="pane-bar">
+            <span class="label">{release ? `NeoSkript ${release.version}` : "Development build"}</span>
+            <span class="label">{release?.beta ? "Public beta" : release ? "Release" : "Ahead of the release"} · {day(main.date)}</span>
+          </div>
           <div class="actions">
             <a class="btn btn-primary big" href={main.jar.url}>Download {main.name}</a>
             {release && <a class="btn btn-secondary big" href={modrinth}>Get it on Modrinth<External /></a>}
@@ -75,7 +79,10 @@ const main = release
         The script checker loads your scripts on a throwaway server, without running them, and lists every line
         NeoSkript won't load. Get <a href={cli}>neoskript-cli 0.1.0<External /></a> and run it on your scripts folder:
       </p>
-      <pre class="cmd"><code>java -jar neoskript-cli-0.1.0.jar check plugins/Skript/scripts</code></pre>
+      <div class="pane cmd">
+        <div class="pane-bar"><span class="label">Terminal</span></div>
+        <pre class="pane-body"><code><span class="prompt" aria-hidden="true">$ </span>java -jar neoskript-cli-0.1.0.jar check plugins/Skript/scripts</code></pre>
+      </div>
       <p class="check">Or paste a script into <a href="/parser/">the parser</a>, right here in your browser.</p>
 
       <h2>More</h2>
@@ -141,24 +148,28 @@ const main = release
   .page {
     padding-block: clamp(3.5rem, 2rem + 5vw, 6rem) clamp(4rem, 2.5rem + 5vw, 7rem);
   }
-  h1 {
-    font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
-    letter-spacing: -0.035em;
+  .page > .wrap {
+    max-width: 64rem;
+    margin-inline: 0;
+    margin-left: max(0px, calc((100% - var(--max)) / 2));
   }
   .lead {
     margin-top: 1.25rem;
   }
   h2 {
-    margin-top: clamp(3rem, 2rem + 3vw, 4.5rem);
-    font-size: clamp(1.375rem, 1.1rem + 1vw, 1.75rem);
-    letter-spacing: -0.02em;
+    margin-top: clamp(3.5rem, 2.5rem + 3vw, 5rem);
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--rule);
+    font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
+    letter-spacing: -0.03em;
   }
 
-  /* The download: the button, then what you need, on one hairline band. */
+  /* The download: a pane naming the release, the buttons, then what you need. */
   .get {
     margin-top: clamp(2rem, 1.5rem + 2vw, 3rem);
-    padding-block: clamp(1.75rem, 1.25rem + 2vw, 2.5rem);
-    border-block: 1px solid var(--rule);
+  }
+  .get .actions {
+    padding: clamp(1.25rem, 1rem + 1vw, 1.75rem) clamp(1rem, 0.75rem + 1vw, 1.75rem) 0;
   }
   .big {
     height: 52px;
@@ -169,8 +180,9 @@ const main = release
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem 2.5rem;
-    margin: 1.75rem 0 0;
-    padding: 0;
+    margin: 1.5rem 0 0;
+    padding: 1.25rem clamp(1rem, 0.75rem + 1vw, 1.75rem) clamp(1.25rem, 1rem + 1vw, 1.75rem);
+    border-top: 1px solid var(--rule);
     list-style: none;
     color: var(--text);
   }
@@ -192,21 +204,21 @@ const main = release
     counter-reset: step;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    border-top: 1px solid var(--rule);
+    gap: 1.5rem clamp(1rem, 0.5rem + 2vw, 2.5rem);
   }
   .steps li {
     counter-increment: step;
-    padding: 1.25rem clamp(1rem, 0.5rem + 2vw, 2.5rem) 0 0;
     color: var(--muted);
-    max-width: 34ch;
   }
   .steps li::before {
     content: counter(step);
     display: block;
-    margin-bottom: 0.75rem;
-    font-family: var(--label);
-    font-size: 0.75rem;
-    color: var(--magenta);
+    margin-bottom: 0.6rem;
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--accent);
   }
   .steps strong {
     display: block;
@@ -230,17 +242,21 @@ const main = release
   }
   .cmd {
     margin-top: 1rem;
-    padding: 0.9rem 1.25rem;
-    background: var(--raised);
-    border-left: 1px solid var(--magenta);
-    overflow-x: auto;
+  }
+  .cmd .pane-body {
     font-size: 0.875rem;
+  }
+  .prompt {
+    color: var(--accent);
+    user-select: none;
   }
 
   /* The rest, as hairline rows that open. */
   .more-rows {
     margin-top: 1.25rem;
-    border-top: 1px solid var(--rule);
+  }
+  .more-rows details:first-child {
+    border-top: 0;
   }
   .more-rows details {
     border-bottom: 1px solid var(--rule);
