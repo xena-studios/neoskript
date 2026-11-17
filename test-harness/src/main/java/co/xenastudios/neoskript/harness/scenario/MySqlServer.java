@@ -85,6 +85,15 @@ final class MySqlServer implements AutoCloseable {
         run(Duration.ofMinutes(1), "docker", "kill", container);
     }
 
+    /** Pauses it: connections still open, but nothing answers, as a database that hangs. */
+    void pause() throws IOException, InterruptedException {
+        run(Duration.ofMinutes(1), "docker", "pause", container);
+    }
+
+    void unpause() throws IOException, InterruptedException {
+        run(Duration.ofMinutes(1), "docker", "unpause", container);
+    }
+
     /** Starts it again after a kill, with its data. */
     void restart() throws IOException, InterruptedException, SQLException {
         Result result = run(Duration.ofMinutes(1), "docker", "start", container);
@@ -114,6 +123,7 @@ final class MySqlServer implements AutoCloseable {
 
     @Override
     public void close() throws IOException, InterruptedException {
+        run(Duration.ofMinutes(1), "docker", "unpause", container);
         run(Duration.ofMinutes(1), "docker", "rm", "-f", "-v", container);
     }
 
