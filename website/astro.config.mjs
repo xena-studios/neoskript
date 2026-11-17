@@ -94,6 +94,7 @@ export default defineConfig({
       sidebar: [
         { label: "Start here", items: ["docs", "docs/install", "docs/commands", "docs/configuration", "docs/moving-from-skript", "docs/ai"] },
         { label: "Tools", items: ["docs/editors", "docs/parser", "docs/parser-checks"] },
+        { label: "Addons", items: ["docs/addon-api"] },
       ],
     }),
   ],

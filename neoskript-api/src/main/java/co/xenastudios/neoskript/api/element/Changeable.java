@@ -30,12 +30,18 @@ public interface Changeable {
      * The classes of values this expression can be changed with in {@code mode}, or {@code null} if it
      * can't be changed that way. {@link Mode#DELETE} and {@link Mode#RESET} take no values: return an
      * empty array to support them.
+     *
+     * @param mode how it would be changed
+     * @return the classes accepted, or {@code null}
      */
     Class<?>[] acceptChange(Mode mode);
 
     /**
      * Whether {@code mode} takes only one value, as Skript's expressions that accept a class rather than an
      * array of it: {@code add all players to whitelist} is then an error. Most take several.
+     *
+     * @param mode how it's changed
+     * @return whether it takes one value
      */
     default boolean takesOne(Mode mode) {
         return false;
@@ -45,6 +51,9 @@ public interface Changeable {
      * Whether, in {@code mode}, which this doesn't take itself, its values are changed through their type
      * instead, as Skript's expressions that leave other modes to {@code super.acceptChange}: {@code delete the
      * vehicle of player} kills it, though only setting the vehicle is the expression's own.
+     *
+     * @param mode how it's changed
+     * @return whether its values are changed through their type
      */
     default boolean typeChanges(Mode mode) {
         return false;
@@ -53,9 +62,11 @@ public interface Changeable {
     /**
      * Changes the expression.
      *
+     * @param context the running trigger
      * @param arguments the expression's own arguments, as for {@link Expression#get}
      * @param delta the values to change it with, already narrowed to the accepted classes; {@code null}
      *     for {@link Mode#DELETE} and {@link Mode#RESET}
+     * @param mode how it's changed
      */
     void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode);
 }

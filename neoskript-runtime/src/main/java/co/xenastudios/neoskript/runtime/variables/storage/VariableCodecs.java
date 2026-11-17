@@ -30,14 +30,51 @@ public final class VariableCodecs {
 
     private record Registration(String name, Class<?> type, VariableCodec<?> codec) {}
 
-    private final Map<String, Registration> byName = new HashMap<>();
-    private final Map<Class<?>, Registration> byClass = new LinkedHashMap<>();
+    // Replaced whole, never changed in place, so a save reading them never sees one half changed.
+    private volatile Map<String, Registration> byName = new HashMap<>();
+    private volatile Map<Class<?>, Registration> byClass = new LinkedHashMap<>();
     private final Map<Class<?>, Optional<Registration>> resolved = new ConcurrentHashMap<>();
 
-    public <T> void register(String name, Class<T> type, VariableCodec<T> codec) {
+    public synchronized <T> void register(String name, Class<T> type, VariableCodec<T> codec) {
         Registration registration = new Registration(name, type, codec);
-        byName.put(name, registration);
-        byClass.put(type, registration);
+        Map<String, Registration> names = new HashMap<>(byName);
+        names.put(name, registration);
+        Map<Class<?>, Registration> classes = new LinkedHashMap<>(byClass);
+        classes.put(type, registration);
+        byName = names;
+        byClass = classes;
+        resolved.clear();
+    }
+
+    /**
+     * Whether saving {@code value} runs code {@code loader} loaded: its own class, or the codec that saves it, which
+     * an addon may register for a type it didn't load (a JDK or Bukkit type).
+     */
+    public boolean usesCodeOf(Object value, ClassLoader loader) {
+        if (value == null || value instanceof RawValue) {
+            return false;
+        }
+        if (value.getClass().getClassLoader() == loader) {
+            return true;
+        }
+        Registration registration = registration(value.getClass());
+        return registration != null && registration.codec() != null
+                && registration.codec().getClass().getClassLoader() == loader;
+    }
+
+    /**
+     * Drops the codecs {@code loader} loaded, and those for its classes, as when their addon is disabled, so it can be
+     * freed. Values they saved stay as their bytes ({@link RawValue}).
+     */
+    public synchronized void forget(ClassLoader loader) {
+        java.util.function.Predicate<Registration> owned = registration -> registration.type().getClassLoader() == loader
+                || (registration.codec() != null && registration.codec().getClass().getClassLoader() == loader);
+        Map<String, Registration> names = new HashMap<>(byName);
+        names.values().removeIf(owned);
+        Map<Class<?>, Registration> classes = new LinkedHashMap<>(byClass);
+        classes.values().removeIf(owned);
+        byName = names;
+        byClass = classes;
         resolved.clear();
     }
 
@@ -45,8 +82,10 @@ public final class VariableCodecs {
      * Values of {@code type} can't be saved, even where they're also of a type that can be, as Skript's type for
      * them has no serializer: money, which is a number.
      */
-    public void unsavable(Class<?> type) {
-        byClass.put(type, new Registration(null, type, null));
+    public synchronized void unsavable(Class<?> type) {
+        Map<Class<?>, Registration> classes = new LinkedHashMap<>(byClass);
+        classes.put(type, new Registration(null, type, null));
+        byClass = classes;
         resolved.clear();
     }
 
@@ -100,8 +139,9 @@ public final class VariableCodecs {
                 if (value != null && in.atEnd() && reencodes(value, type, bytes)) {
                     return value;
                 }
-            } catch (RuntimeException e) {
-                // Keep the bytes as they are.
+            } catch (RuntimeException | LinkageError e) {
+                // Keep the bytes as they are: a codec that fails, or one whose classes can't load (an addon's codec
+                // for a plugin that isn't installed), loses nothing.
             }
         }
         return new RawValue(type, bytes);

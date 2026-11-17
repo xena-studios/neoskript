@@ -1,0 +1,3 @@
+# Harness check: a value of the example addon's type, saved in variables.csv, loads again on the next start.
+on load:
+	send "[harness] addon saved: %{lottery::last}%" to console

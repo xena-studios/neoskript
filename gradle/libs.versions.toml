@@ -9,6 +9,8 @@ shadow = "9.6.1"
 teavm = "0.16.0"
 spotless = "8.10.4"
 run-paper = "3.1.0"
+# Publishes the addon API to Maven Central through the Central Portal.
+maven-publish = "0.37.0"
 # Plugins NeoSkript hooks into (compile-only).
 vault-api = "1.7.1"
 worldguard = "7.0.12"
@@ -18,6 +20,7 @@ griefprevention = "16.18.4"
 [libraries]
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
 asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
+asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
 bstats-bukkit = { module = "org.bstats:bstats-bukkit", version.ref = "bstats" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -35,3 +38,4 @@ spotless-gradle = { module = "com.diffplug.spotless:spotless-plugin-gradle", ver
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 run-paper = { id = "xyz.jpenilla.run-paper", version.ref = "run-paper" }
 teavm = { id = "org.teavm", version.ref = "teavm" }
+maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }

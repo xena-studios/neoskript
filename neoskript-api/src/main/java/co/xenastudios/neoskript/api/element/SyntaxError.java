@@ -10,6 +10,11 @@ package co.xenastudios.neoskript.api.element;
  */
 public final class SyntaxError extends RuntimeException {
 
+    /**
+     * An error for the script's author.
+     *
+     * @param message the error, as the author sees it
+     */
     public SyntaxError(String message) {
         super(message, null, false, false);
     }

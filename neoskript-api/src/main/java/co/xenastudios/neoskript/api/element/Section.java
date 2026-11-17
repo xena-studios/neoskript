@@ -13,6 +13,12 @@ package co.xenastudios.neoskript.api.element;
 @FunctionalInterface
 public interface Section {
 
-    /** Runs the section; returns a value or an {@code Object[]} of values for its code, or {@code null}. */
+    /**
+     * Runs the section.
+     *
+     * @param context the running trigger
+     * @param arguments the placeholders' values, by index
+     * @return a value or an {@code Object[]} of values for its code to run for, or {@code null} for none
+     */
     Object run(TriggerContext context, Object[] arguments);
 }

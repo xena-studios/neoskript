@@ -45,7 +45,7 @@ It starts a throwaway headless Paper server (downloaded once into `~/.neoskript/
 ## What's here
 
 ```
-neoskript-api        the public addon API
+neoskript-api        the public addon API (see the Addon API guide on neoskript.dev)
 neoskript-frontend   parser, type checker, diagnostics (no Bukkit)
 neoskript-compiler   compiles scripts to JVM bytecode
 neoskript-runtime    variables, storage, scheduling, waits
@@ -57,6 +57,7 @@ test-harness         real Paper and Folia servers, run against Skript
 website              neoskript.dev
 plugins/skript       the AI skill for writing Skript (Claude Code, Codex)
 editors              the language server, and the VS Code and Zed extensions
+examples             an example addon, built in CI, never shipped
 ```
 
 | Doc | What's in it |

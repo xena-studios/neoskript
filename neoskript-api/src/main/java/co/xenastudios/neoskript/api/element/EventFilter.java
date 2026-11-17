@@ -13,10 +13,20 @@ import java.util.List;
  */
 public interface EventFilter extends Condition {
 
-    /** The classes to listen to: some of the event's classes. */
+    /**
+     * The classes to listen to.
+     *
+     * @return some of the event's classes
+     */
     List<Class<?>> eventClasses();
 
-    /** A filter listening to {@code classes} that passes when {@code check} does. */
+    /**
+     * A filter listening to {@code classes} that passes when {@code check} does.
+     *
+     * @param classes the classes to listen to
+     * @param check whether an event passes
+     * @return the filter
+     */
     static EventFilter of(List<Class<?>> classes, Condition check) {
         List<Class<?>> copy = List.copyOf(classes);
         return new EventFilter() {
