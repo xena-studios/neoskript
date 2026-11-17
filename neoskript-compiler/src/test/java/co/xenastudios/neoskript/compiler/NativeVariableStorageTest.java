@@ -78,6 +78,32 @@ class NativeVariableStorageTest {
     }
 
     @Test
+    void aVariableTakenOutOfTheTreeIsSavedAsDeleted() throws IOException {
+        // Deleting {temp::x::a} takes temp out of memory whole: both storages still save it as deleted.
+        VariableStore store = new VariableStore();
+        store.set("keep", 1L);
+        try (NativeVariableStorage storage = open(store)) {
+            store.set("temp::x::a", "a");
+            storage.save();
+            store.set("temp::x::a", null);
+            assertTrue(storage.changed());
+            storage.save();
+        }
+        assertEquals(Map.of("keep", saved(store).get("keep")), saved(reload()));
+        Path csv = dir.resolve("variables.csv");
+        VariableStore csvStore = new VariableStore();
+        VariableStorage storage = new VariableStorage(csvStore, codecs, csv);
+        storage.load();
+        csvStore.set("temp::x::a", "a");
+        csvStore.set("keep", 1L);
+        storage.save();
+        csvStore.deleteList("temp::x");
+        assertTrue(storage.changed());
+        storage.save();
+        assertEquals(List.of("keep"), List.copyOf(VariableFile.read(csv).keySet()));
+    }
+
+    @Test
     void everyValueTypeRoundTrips() throws Exception {
         VariableStore original = new VariableStore();
         new VariableStorage(original, codecs, skriptFile()).load();

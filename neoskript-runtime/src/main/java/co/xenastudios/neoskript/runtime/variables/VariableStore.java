@@ -25,6 +25,13 @@ import java.util.function.UnaryOperator;
  *
  * <p>Safe to use from several threads. Each single operation is atomic, including {@link #update} (so
  * {@code add 1 to {x}} never loses an increment); sequences of operations aren't.
+ *
+ * <p>A variable that's deleted is taken out of the tree, and so is each list above it left with nothing in it, as
+ * Skript takes them out of its maps: a script that sets and deletes {@code {temp::%uuid%::x}} for every event uses
+ * no more memory after a million of them than after one. Values change without locks. Adding a node to a node's
+ * children, or taking one out, holds that node's lock, and taking one out holds its own too (always the parent's
+ * first). A node that's taken out is marked {@link #DEAD} first, under both locks and only if it has no value and
+ * nothing under it, so a change that found it just before then sees the mark and starts again from the top.
  */
 public final class VariableStore {
 
@@ -118,8 +125,9 @@ public final class VariableStore {
      * A node's children, in Skript's order of indices ({@link #INDEX_ORDER}) for going through them, with a hash
      * index beside it for finding one: comparing long indices like UUIDs in that order made a lookup most of what a
      * trigger using variables cost. Two indices are the same in that order when they're the same ignoring case, so
-     * the index is keyed by the lower-case index. Children are only ever added ({@link #computeIfAbsent}) and
-     * cleared ({@link #clear}); both keep the index.
+     * the index is keyed by the lower-case index. Children are added ({@link Node#child}), taken out when they're
+     * empty ({@link #removeChild}) and cleared ({@link #clear}), all of which keep the index, and all with the lock of
+     * the node they're the children of held.
      */
     private static final class Children extends ConcurrentSkipListMap<String, Node> {
 
@@ -175,34 +183,39 @@ public final class VariableStore {
             return byIndex.isEmpty();
         }
 
-        @Override
-        public Node computeIfAbsent(String key, java.util.function.Function<? super String, ? extends Node> make) {
-            String folded = fold(key);
-            Node found = byIndex.get(folded);
-            if (found != null) {
-                return found;
-            }
-            synchronized (this) {
-                Node node = super.computeIfAbsent(key, make);
-                byIndex.put(folded, node);
-                return node;
+        /** Adds {@code node} at {@code key}, which it doesn't have yet. With the owner's lock held. */
+        void addChild(String key, Node node) {
+            super.put(key, node);
+            byIndex.put(fold(key), node);
+        }
+
+        /** Takes {@code node} out, if it's the one at {@code key}. With the owner's lock held. */
+        void removeChild(String key, Node node) {
+            if (byIndex.remove(fold(key), node)) {
+                super.remove(key, node);
             }
         }
 
+        /** With the owner's lock held. */
         @Override
-        public synchronized void clear() {
+        public void clear() {
             super.clear();
             byIndex.clear();
         }
 
         @Override
         public Node put(String key, Node value) {
-            throw new UnsupportedOperationException("children are added with computeIfAbsent");
+            throw new UnsupportedOperationException("children are added with Node.child");
+        }
+
+        @Override
+        public Node computeIfAbsent(String key, java.util.function.Function<? super String, ? extends Node> make) {
+            throw new UnsupportedOperationException("children are added with Node.child");
         }
 
         @Override
         public Node remove(Object key) {
-            throw new UnsupportedOperationException("children are only cleared");
+            throw new UnsupportedOperationException("children are taken out with removeChild");
         }
 
         @Override
@@ -351,22 +364,83 @@ public final class VariableStore {
         }
     }
 
-    private static final class Node {
-        final AtomicReference<Object> value = new AtomicReference<>();
-        volatile ConcurrentSkipListMap<String, Node> children;
+    /**
+     * The value of a node that's been taken out of the tree: nothing can be set in it or added under it, so a
+     * change that finds it starts again from the top, where a new node is made.
+     */
+    private static final Object DEAD = new Object();
 
-        ConcurrentSkipListMap<String, Node> children() {
-            ConcurrentSkipListMap<String, Node> map = children;
-            if (map == null) {
-                synchronized (this) {
-                    map = children;
-                    if (map == null) {
-                        map = new Children();
-                        children = map;
-                    }
+    private static final class Node {
+        /** Its value, {@code null} if it has none, or {@link #DEAD}. */
+        final AtomicReference<Object> value = new AtomicReference<>();
+        volatile Children children;
+
+        /** Its value, or {@code null}. */
+        Object value() {
+            Object current = value.get();
+            return current == DEAD ? null : current;
+        }
+
+        boolean dead() {
+            return value.get() == DEAD;
+        }
+
+        /** Whether it has no value and nothing under it, so it can be taken out. */
+        boolean empty() {
+            Children map = children;
+            return value.get() == null && (map == null || map.isEmpty());
+        }
+
+        /**
+         * The child at {@code key} (in lower case), made if there's none, or {@code null} if this node has been taken
+         * out, so the caller starts again from the top.
+         */
+        Node child(String key) {
+            Children map = children;
+            if (map != null) {
+                Node found = map.get(key);
+                if (found != null && !found.dead()) {
+                    return found;
                 }
             }
-            return map;
+            synchronized (this) {
+                if (dead()) {
+                    return null;
+                }
+                map = children;
+                if (map == null) {
+                    map = new Children();
+                    children = map;
+                }
+                // A dead child is taken out with this lock held, so there isn't one here.
+                Node found = map.get(key);
+                if (found == null) {
+                    found = new Node();
+                    map.addChild(key, found);
+                }
+                return found;
+            }
+        }
+
+        /**
+         * {@link #child} for a node whose lock the caller holds, and which it's checked isn't dead: never
+         * {@code null}, and the child can't be taken out until the lock is let go.
+         */
+        Node lockedChild(String key) {
+            return child(key);
+        }
+
+        /** Sets the value, unless it's been taken out: whether it was set. */
+        boolean set(Object newValue) {
+            while (true) {
+                Object current = value.get();
+                if (current == DEAD) {
+                    return false;
+                }
+                if (value.compareAndSet(current, newValue)) {
+                    return true;
+                }
+            }
         }
     }
 
@@ -388,7 +462,7 @@ public final class VariableStore {
 
     private static void visit(Node node, String name, BiConsumer<String, Object> visitor) {
         if (name != null) {
-            Object value = node.value.get();
+            Object value = node.value();
             if (value != null) {
                 visitor.accept(name, value);
             }
@@ -399,6 +473,22 @@ public final class VariableStore {
                 visit(child.getValue(), name == null ? child.getKey() : name + SEPARATOR + child.getKey(), visitor);
             }
         }
+    }
+
+    /** How many nodes the tree has, the top one aside: what deleting frees. For tests. */
+    long nodes() {
+        return countNodes(root) - 1;
+    }
+
+    private static long countNodes(Node node) {
+        long count = 1;
+        Children children = node.children;
+        if (children != null) {
+            for (Node child : children.values()) {
+                count += countNodes(child);
+            }
+        }
+        return count;
     }
 
     /**
@@ -459,7 +549,7 @@ public final class VariableStore {
     /** The value of {@code {name}}, or {@code null} if it's not set. */
     public Object get(String name) {
         Node node = find(name);
-        return node == null ? null : node.value.get();
+        return node == null ? null : node.value();
     }
 
     /** Sets {@code {name}}; {@code null} deletes it. Values under it ({@code {name::*}}) are kept. */
@@ -467,18 +557,35 @@ public final class VariableStore {
         changed();
         if (value == null) {
             Node node = find(name);
-            if (node != null) {
-                node.value.set(null);
+            if (node != null && node.value() != null) {
+                node.set(null);
+                prune(name);
             }
             return;
         }
-        create(name).value.set(Values.copy(value));
+        Object copy = Values.copy(value);
+        while (!create(name).set(copy)) {
+            // Taken out just after it was found: made again.
+        }
     }
 
     /** Atomically replaces {@code {name}} with {@code change} applied to its current value. */
     public void update(String name, UnaryOperator<Object> change) {
         changed();
-        create(name).value.updateAndGet(change);
+        while (true) {
+            Node node = create(name);
+            Object current = node.value.get();
+            if (current == DEAD) {
+                continue;
+            }
+            Object result = change.apply(current);
+            if (node.value.compareAndSet(current, result)) {
+                if (result == null) {
+                    prune(name);
+                }
+                return;
+            }
+        }
     }
 
     /** Adds {@code values} to the number in {@code {name}} (an unset variable counts as nothing yet). */
@@ -544,7 +651,7 @@ public final class VariableStore {
     public Object[] list(String prefix) {
         List<Object> values = new ArrayList<>();
         for (Node child : children(prefix)) {
-            Object value = child.value.get();
+            Object value = child.value();
             if (value != null) {
                 values.add(value);
             }
@@ -562,7 +669,7 @@ public final class VariableStore {
         // Indices with a value or a list under them, as in Skript: {_list::c::e} makes c an index of {_list::*}.
         for (Map.Entry<String, Node> entry : node.children.entrySet()) {
             Node child = entry.getValue();
-            if (child.value.get() != null || (child.children != null && !child.children.isEmpty())) {
+            if (child.value() != null || (child.children != null && !child.children.isEmpty())) {
                 indices.add(entry.getKey());
             }
         }
@@ -617,22 +724,49 @@ public final class VariableStore {
     public void setList(String prefix, Object[] values) {
         changed();
         deleteList(prefix);
-        Node node = create(prefix);
-        int index = 1;
-        for (Object value : values) {
-            if (value instanceof Object[] group) {
-                // Several values in one place are a list there, as Skript sets {x::1::1}, {x::1::2}...
-                Node sublist = node.children().computeIfAbsent(Integer.toString(index++), k -> new Node());
-                int inner = 1;
-                for (Object each : group) {
-                    if (each != null) {
-                        sublist.children().computeIfAbsent(Integer.toString(inner++), k -> new Node()).value.set(Values.copy(each));
+        if (!hasValue(values)) {
+            return;
+        }
+        while (true) {
+            Node node = create(prefix);
+            synchronized (node) {
+                if (node.dead()) {
+                    continue;
+                }
+                int index = 1;
+                for (Object value : values) {
+                    if (value instanceof Object[] group) {
+                        // Several values in one place are a list there, as Skript sets {x::1::1}, {x::1::2}...
+                        if (!hasValue(group)) {
+                            // Nothing there, as Skript sets nothing: no empty list left behind.
+                            index++;
+                            continue;
+                        }
+                        Node sublist = node.lockedChild(Integer.toString(index++));
+                        synchronized (sublist) {
+                            int inner = 1;
+                            for (Object each : group) {
+                                if (each != null) {
+                                    sublist.lockedChild(Integer.toString(inner++)).value.set(Values.copy(each));
+                                }
+                            }
+                        }
+                    } else if (value != null) {
+                        node.lockedChild(Integer.toString(index++)).value.set(Values.copy(value));
                     }
                 }
-            } else if (value != null) {
-                node.children().computeIfAbsent(Integer.toString(index++), k -> new Node()).value.set(Values.copy(value));
+                return;
             }
         }
+    }
+
+    private static boolean hasValue(Object[] values) {
+        for (Object value : values) {
+            if (value instanceof Object[] group ? hasValue(group) : value != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -646,16 +780,33 @@ public final class VariableStore {
         }
         changed();
         deleteList(prefix);
-        Node node = create(prefix);
-        for (int i = 0; i < keyed.values().length; i++) {
-            if (keyed.values()[i] == null) {
-                continue;
+        if (!hasValue(keyed.values())) {
+            return;
+        }
+        while (true) {
+            Node node = create(prefix);
+            synchronized (node) {
+                if (node.dead()) {
+                    continue;
+                }
+                for (int i = 0; i < keyed.values().length; i++) {
+                    if (keyed.values()[i] == null) {
+                        continue;
+                    }
+                    String key = keyed.keys()[i].toLowerCase(java.util.Locale.ROOT);
+                    Object value = Values.copy(keyed.values()[i]);
+                    if (!key.contains(SEPARATOR)) {
+                        node.lockedChild(key).value.set(value);
+                        continue;
+                    }
+                    // A path ('a::b::c', from a recursive list) goes into the lists under the index. Nothing under
+                    // this node can be taken out while its lock is held, but deeper nodes can, so it's set as set does.
+                    while (!createUnder(node, key).set(value)) {
+                        // Taken out just after it was found: made again.
+                    }
+                }
+                return;
             }
-            String key = keyed.keys()[i].toLowerCase(java.util.Locale.ROOT);
-            // A path ('a::b::c', from a recursive list) goes into the lists under the index.
-            Node target = key.contains(SEPARATOR) ? create(prefix + SEPARATOR + key)
-                    : node.children().computeIfAbsent(key, k -> new Node());
-            target.value.set(Values.copy(keyed.values()[i]));
         }
     }
 
@@ -693,7 +844,7 @@ public final class VariableStore {
         List<Object> values = new ArrayList<>();
         List<String> keys = new ArrayList<>();
         for (Map.Entry<String, Node> entry : node.children.entrySet()) {
-            Object value = entry.getValue().value.get();
+            Object value = entry.getValue().value();
             if (value != null) {
                 values.add(value);
                 keys.add(entry.getKey());
@@ -705,24 +856,34 @@ public final class VariableStore {
     /** Adds {@code values} to {@code {prefix::*}}, each at the lowest free index from the list's size + 1. */
     public void addToList(String prefix, Object[] values) {
         changed();
-        Node node = create(prefix);
-        synchronized (node) {
-            ConcurrentSkipListMap<String, Node> children = node.children();
-            int index = children.size() + 1;
-            for (Object value : values) {
-                if (value == null) {
+        if (!hasValue(values)) {
+            return;
+        }
+        while (true) {
+            Node node = create(prefix);
+            synchronized (node) {
+                if (node.dead()) {
                     continue;
                 }
-                String key = Integer.toString(index);
-                Node slot = children.get(key);
-                while (slot != null && slot.value.get() != null) {
-                    key = Integer.toString(++index);
-                    slot = children.get(key);
+                Children children = node.children;
+                int index = children == null ? 1 : children.size() + 1;
+                for (Object value : values) {
+                    if (value == null) {
+                        continue;
+                    }
+                    String key = Integer.toString(index);
+                    Node slot = children == null ? null : children.get(key);
+                    while (slot != null && slot.value.get() != null) {
+                        key = Integer.toString(++index);
+                        slot = children.get(key);
+                    }
+                    if (slot == null) {
+                        slot = node.lockedChild(key);
+                        children = node.children;
+                    }
+                    slot.value.set(Values.copy(value));
                 }
-                if (slot == null) {
-                    slot = children.computeIfAbsent(key, k -> new Node());
-                }
-                slot.value.set(Values.copy(value));
+                return;
             }
         }
     }
@@ -734,14 +895,22 @@ public final class VariableStore {
         if (node == null || node.children == null) {
             return;
         }
+        boolean removed = false;
         for (Object value : values) {
             for (Node child : node.children.values()) {
                 Object current = child.value.get();
-                if (current != null && co.xenastudios.neoskript.runtime.Comparison.equal(current, value)
-                        && child.value.compareAndSet(current, null) && !all) {
-                    break;
+                if (current != null && current != DEAD
+                        && co.xenastudios.neoskript.runtime.Comparison.equal(current, value)
+                        && child.value.compareAndSet(current, null)) {
+                    removed = true;
+                    if (!all) {
+                        break;
+                    }
                 }
             }
+        }
+        if (removed) {
+            pruneChildren(prefix, node);
         }
     }
 
@@ -762,7 +931,7 @@ public final class VariableStore {
             if (child.children != null) {
                 collect(child, into);
             }
-            Object value = child.value.get();
+            Object value = child.value();
             if (value != null) {
                 into.add(value);
             }
@@ -787,7 +956,7 @@ public final class VariableStore {
             if (child.children != null) {
                 collectKeyed(child, key, values, keys);
             }
-            Object value = child.value.get();
+            Object value = child.value();
             if (value != null) {
                 values.add(value);
                 keys.add(key);
@@ -800,10 +969,19 @@ public final class VariableStore {
         changed();
         Node source = find(from);
         deleteList(to);
-        if (source == null || source.children == null) {
+        if (source == null || source.children == null || source.children.isEmpty()) {
             return;
         }
-        copy(source, create(to));
+        while (true) {
+            Node target = create(to);
+            synchronized (target) {
+                if (target.dead()) {
+                    continue;
+                }
+                copy(source, target);
+                return;
+            }
+        }
     }
 
     /**
@@ -812,20 +990,34 @@ public final class VariableStore {
      */
     public VariableStore copy() {
         VariableStore copy = new VariableStore();
-        copy.root.value.set(Values.copy(root.value.get()));
+        copy.root.value.set(Values.copy(root.value()));
         if (root.children != null) {
-            copy(root, copy.root);
+            synchronized (copy.root) {
+                copy(root, copy.root);
+            }
         }
         return copy;
     }
 
+    /**
+     * Copies what's under {@code from} to under {@code to}, whose lock the caller holds. Nodes with nothing in them
+     * or under them, which are about to be taken out, aren't copied.
+     */
     private static void copy(Node from, Node to) {
         for (Map.Entry<String, Node> entry : from.children.entrySet()) {
-            Node target = to.children().computeIfAbsent(entry.getKey(), k -> new Node());
-            Object value = entry.getValue().value.get();
+            Node source = entry.getValue();
+            Object value = source.value();
+            Children below = source.children;
+            boolean hasBelow = below != null && !below.isEmpty();
+            if (value == null && !hasBelow) {
+                continue;
+            }
+            Node target = to.lockedChild(entry.getKey());
             target.value.set(Values.copy(value));
-            if (entry.getValue().children != null) {
-                copy(entry.getValue(), target);
+            if (hasBelow) {
+                synchronized (target) {
+                    copy(source, target);
+                }
             }
         }
     }
@@ -833,9 +1025,15 @@ public final class VariableStore {
     public void deleteList(String prefix) {
         changed();
         Node node = find(prefix);
-        if (node != null && node.children != null) {
-            node.children.clear();
+        if (node == null || node.children == null) {
+            return;
         }
+        synchronized (node) {
+            if (node.children != null) {
+                node.children.clear();
+            }
+        }
+        prune(prefix);
     }
 
     private Iterable<Node> children(String prefix) {
@@ -851,7 +1049,7 @@ public final class VariableStore {
         while (true) {
             int end = name.indexOf(SEPARATOR, start);
             String part = end < 0 ? name.substring(start) : name.substring(start, end);
-            ConcurrentSkipListMap<String, Node> children = node.children;
+            Children children = node.children;
             node = children == null ? null : children.get(part);
             if (node == null || end < 0) {
                 return node;
@@ -860,18 +1058,107 @@ public final class VariableStore {
         }
     }
 
+    /**
+     * The node of {@code {name}}, made if there's none (with the lists above it). It may be taken out again as soon
+     * as it's returned, if it's empty: a change to it that finds it {@link #DEAD} calls this again.
+     */
     private Node create(String name) {
+        while (true) {
+            Node node = createUnder(root, name);
+            if (node != null) {
+                return node;
+            }
+            // A list on the way was taken out as it was gone through: from the top again.
+        }
+    }
+
+    /** The node at {@code path} under {@code node}, made if there's none, or {@code null} if one on the way is dead. */
+    private static Node createUnder(Node node, String path) {
+        int start = 0;
+        while (node != null) {
+            int end = path.indexOf(SEPARATOR, start);
+            String part = end < 0 ? path.substring(start) : path.substring(start, end);
+            // Names are kept in lower case, as Skript keeps them: {_list::Hello} is at index "hello".
+            node = node.child(part.toLowerCase(java.util.Locale.ROOT));
+            if (end < 0) {
+                return node;
+            }
+            start = end + SEPARATOR.length();
+        }
+        return null;
+    }
+
+    /**
+     * Takes {@code {name}} out of the tree if it has no value and nothing under it, then each list above it left
+     * with nothing in it, bottom up, so deleted variables don't keep using memory.
+     */
+    private void prune(String name) {
+        Node[] path = new Node[4];
+        String[] keys = new String[4];
+        int depth = 0;
         Node node = root;
         int start = 0;
         while (true) {
             int end = name.indexOf(SEPARATOR, start);
             String part = end < 0 ? name.substring(start) : name.substring(start, end);
-            // Names are kept in lower case, as Skript keeps them: {_list::Hello} is at index "hello".
-            node = node.children().computeIfAbsent(part.toLowerCase(java.util.Locale.ROOT), k -> new Node());
+            Children children = node.children;
+            node = children == null ? null : children.get(part);
+            if (node == null) {
+                return;
+            }
+            if (depth == path.length) {
+                path = java.util.Arrays.copyOf(path, depth * 2);
+                keys = java.util.Arrays.copyOf(keys, depth * 2);
+            }
+            path[depth] = node;
+            keys[depth] = part;
+            depth++;
             if (end < 0) {
-                return node;
+                break;
             }
             start = end + SEPARATOR.length();
+        }
+        for (int i = depth - 1; i >= 0; i--) {
+            if (!removeIfEmpty(i == 0 ? root : path[i - 1], keys[i], path[i])) {
+                return;
+            }
+        }
+    }
+
+    /** Takes the children of {@code node} (at {@code name}) that are empty out, then {@code node} and up if empty. */
+    private void pruneChildren(String name, Node node) {
+        Children children = node.children;
+        if (children == null) {
+            return;
+        }
+        for (Map.Entry<String, Node> entry : children.entrySet()) {
+            if (entry.getValue().empty()) {
+                removeIfEmpty(node, entry.getKey(), entry.getValue());
+            }
+        }
+        prune(name);
+    }
+
+    /**
+     * Takes {@code child} out of {@code parent}'s children at {@code key} if it's still there, has no value and
+     * nothing under it: marked {@link #DEAD} first, with both locks held. Whether it was taken out.
+     */
+    private static boolean removeIfEmpty(Node parent, String key, Node child) {
+        if (!child.empty()) {
+            return false;
+        }
+        synchronized (parent) {
+            Children children = parent.children;
+            if (children == null || children.get(key) != child) {
+                return false;
+            }
+            synchronized (child) {
+                if (!child.empty() || !child.value.compareAndSet(null, DEAD)) {
+                    return false;
+                }
+            }
+            children.removeChild(key, child);
+            return true;
         }
     }
 }
