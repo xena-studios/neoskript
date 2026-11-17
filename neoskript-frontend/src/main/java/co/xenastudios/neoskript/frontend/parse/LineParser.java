@@ -2100,6 +2100,14 @@ final class LineParser {
         if (functionProblem == null) {
             functionProblem = problem;
         }
+        // Skript logs it where it reads the call, so the words around it that nothing reads keep it as theirs
+        // ('%nosuchfunc(1)%' in a text): see Expr.Unresolved#problem.
+        for (String[] frame : frames) {
+            if (frame[0] == null || SEMANTIC_ERROR > Integer.parseInt(frame[1])) {
+                frame[0] = problem;
+                frame[1] = Integer.toString(SEMANTIC_ERROR);
+            }
+        }
     }
 
     /**

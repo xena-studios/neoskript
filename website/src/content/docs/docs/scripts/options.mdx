@@ -31,6 +31,6 @@ It also means an option doesn't go inside `%...%`. `"%{@price}%"` becomes `"%50%
 
 ## Options belong to their script
 
-Each script's options are its own. Another script can't use them; give it its own `options:`. A `{@name}` the script doesn't define is an error when it loads: `undefined option {@nope}`.
+Each script's options are its own. Another script can't use them; give it its own `options:`. In a script with `options:`, a `{@name}` it doesn't define is an error when it loads, `undefined option {@nope}`, and the line loads with `{@nope}` as written. A script with no `options:` leaves `{@name}` as written, with no error, as Skript does.
 
 The [code editor extensions](/docs/editors/) complete `{@` with the script's options and go from an option to its entry.

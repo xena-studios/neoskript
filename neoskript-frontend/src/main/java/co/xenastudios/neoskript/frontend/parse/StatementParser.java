@@ -81,12 +81,34 @@ final class StatementParser {
         return statementErrors;
     }
 
+    /** For each line warned to be unreachable, by number, the line of the statement that stops the code before it. */
+    private final Map<Integer, Integer> unreachableAfter = new java.util.HashMap<>();
+
+    Map<Integer, Integer> unreachableAfter() {
+        return unreachableAfter;
+    }
+
     /**
      * Skript reads a section header that fails as a statement too, and its error is the line's if it has one that
      * isn't that the statement isn't understood ({@code ScriptLoader.loadItems}): 'if the potion effect has
      * particles:', read as words compared, says 'particles' isn't an item type. The compiler may yet fail the header.
      */
     private void statementError(Line line, String key) {
+        String error = statementProblem(line, key);
+        if (error != null) {
+            statementErrors.put(line, error);
+        }
+    }
+
+    /**
+     * The error reading a section header as a statement gives, if it's one Skript keeps over the section's: not
+     * that the statement isn't understood. Nothing is reported.
+     */
+    private String statementProblem(Line line, String key) {
+        if (ELSE_IF_HEADER.matcher(key).matches()) {
+            // Read as a statement, an 'else if' says it doesn't understand the 'else' (or 'else parse').
+            return Statement.orphanElse(Text.lower(key.strip()));
+        }
         int mark = diagnostics.mark();
         DelayState before = delay;
         try {
@@ -96,11 +118,11 @@ final class StatementParser {
                 for (Diagnostic diagnostic : found) {
                     if (diagnostic.severity() == Severity.ERROR
                             && !diagnostic.message().startsWith("Can't understand this condition/effect:")) {
-                        statementErrors.put(line, diagnostic.message());
-                        return;
+                        return diagnostic.message();
                     }
                 }
             }
+            return null;
         } finally {
             delay = before;
         }
@@ -138,14 +160,13 @@ final class StatementParser {
         Statement previous = null;
         Chain chain = null;
         boolean ended = false;
+        Line endedBy = null;
         for (Node node : nodes) {
-            if (ended && !suppressed.contains("unreachable")) {
-                diagnostics.warning(node.line().number(), node.line().column(), node.line().text().length(),
-                        "Unreachable code. The previous statement stops further execution.");
-            }
             String key = Text.lower(node.line().key().strip());
             boolean section = node instanceof Node.Section;
             boolean continuesChain = section && (key.startsWith("else") || key.startsWith("then"));
+            Chain chainBefore = chain;
+            DelayState delayBefore = delay;
             if (chain != null && !continuesChain) {
                 delay = endChain(chain);
                 chain = null;
@@ -157,8 +178,24 @@ final class StatementParser {
                     ? branch((Node.Section) node, previous, chain)
                     : line(node, previous);
             statements.add(statement);
+            if (statement instanceof Statement.Invalid) {
+                // As in Skript, a line that fails isn't there: an 'if' before it goes on, so an 'else' after it
+                // belongs to that 'if' (Skript's ScriptLoader.loadItems leaves it out of the items an 'else' looks
+                // back at).
+                chain = chainBefore;
+                delay = delayBefore;
+                continue;
+            }
+            if (ended && !suppressed.contains("unreachable")) {
+                // After the line's own problems, and only for a line that loads, as in Skript. Only if the line that
+                // stops the code loads too, which the compiler may yet find it doesn't.
+                diagnostics.warning(node.line().number(), node.line().column(), node.line().text().length(),
+                        "Unreachable code. The previous statement stops further execution.");
+                unreachableAfter.put(node.line().number(), endedBy.number());
+            }
             previous = statement;
             ended = statement instanceof Statement.Effect effect && context.registry().ends(effect.effect().syntax());
+            endedBy = node.line();
             if (statement instanceof Statement.Effect effect) {
                 stopsHints(effect.effect(), false);
             }
@@ -255,11 +292,12 @@ final class StatementParser {
             delay = chain.before;
         }
         Statement statement = line(section, previous);
-        if (key.equals("else")) {
+        if (key.equals("else") && !(statement instanceof Statement.Invalid)) {
             chain.hasElse = true;
         }
-        // A multi-line condition's code is in the 'then' that follows, so its branch ends there.
-        if (!(statement instanceof Statement.Conditions)) {
+        // A multi-line condition's code is in the 'then' that follows, so its branch ends there. A branch that
+        // fails isn't one.
+        if (!(statement instanceof Statement.Conditions) && !(statement instanceof Statement.Invalid)) {
             chain.ends.add(delay);
         }
         return statement;
@@ -417,6 +455,9 @@ final class StatementParser {
 
     /** A one-line conditional's header, with its condition. */
     private static final Pattern IF_HEADER = Pattern.compile("(?i)(?:else )?(?:parse )?if (.+)");
+    private static final Pattern ELSE_IF_HEADER = Pattern.compile("(?i)else (?:parse )?if\\b.*");
+    /** Skript's while loop's header: {@code [do] while <.+>}. */
+    private static final Pattern WHILE_HEADER = Pattern.compile("(?i)(?:do )?while (.+)");
 
     /** Skript's change effect's shapes, with what's changed and what it's changed by. */
     private static final Pattern CHANGE = Pattern.compile(
@@ -669,11 +710,24 @@ final class StatementParser {
                 return new Statement.Invalid(line);
             }
             Matcher conditional = IF_HEADER.matcher(key);
+            Matcher whileLoop = WHILE_HEADER.matcher(key);
+            String lowerKey = Text.lower(key);
             if (parser.experimentProblem() != null) {
                 error(line, parser.experimentProblem());
+            } else if (ELSE_IF_HEADER.matcher(key).matches()) {
+                // Skript then reads the line as a statement, which says it doesn't understand the 'else' (or
+                // 'else parse'), and keeps that error.
+                error(line, Statement.orphanElse(lowerKey));
             } else if (conditional.matches()) {
-                String problem = compareProblem(conditional.group(1));
+                String problem = statementProblem(line, key);
+                if (problem == null) {
+                    problem = compareProblem(conditional.group(1));
+                }
                 error(line, problem != null ? problem : "Can't understand this condition: '" + conditional.group(1) + "'");
+            } else if (whileLoop.matches()) {
+                // Skript's while section's error, unless reading the line as a statement gives one it keeps.
+                String problem = statementProblem(line, key);
+                error(line, problem != null ? problem : "Can't understand this condition: " + whileLoop.group(1));
             } else if (key.regionMatches(true, 0, "loop ", 0, 5)) {
                 error(line, "Can't understand this loop: '" + key.substring(5) + "'");
             } else {
@@ -719,10 +773,16 @@ final class StatementParser {
         }
         if (MULTILINE_CONDITIONAL.matcher(key).matches() && !header.syntax().patterns().get(header.pattern())
                 .source().endsWith("<.+>")) {
+            String kind = any(lower) ? "'if any'" : "'if all'";
+            if (section.children().size() < 2) {
+                error(line, kind + " sections must contain at least two conditions");
+                return new Statement.Invalid(line);
+            }
             List<Line> lines = new ArrayList<>();
-            List<ParsedSyntax> conditions = conditions(section.children(), lines);
-            if (conditions.size() < 2 && lines.size() == section.children().size()) {
-                error(line, (any(lower) ? "'if any'" : "'if all'") + " sections must contain at least two conditions");
+            List<ParsedSyntax> conditions = conditions(section.children(), lines, kind);
+            if (conditions == null) {
+                // As in Skript, one condition that fails fails the whole 'if', so neither its 'then' nor its 'else'
+                // is there to run.
                 return new Statement.Invalid(line);
             }
             return new Statement.Conditions(line, header, conditions, lines);
@@ -755,8 +815,55 @@ final class StatementParser {
             suppressed.addAll(before);
             return new Statement.Section(line, header, body);
         }
+        if (header.syntax().id().equals(FILTER)) {
+            return filter(section, header);
+        }
         return new Statement.Section(line, header, sectionCode(header, () -> repeatable(section.children(),
                 header.syntax().id().equals("SecFor") ? header : null)));
+    }
+
+    /** Skript's filter section ({@code filter {_l::*} to match all:}), whose lines are conditions. */
+    private static final String FILTER = "SecFilter";
+
+    /**
+     * A filter section. As Skript's {@code SecFilter}, each line is a condition, and the first that isn't one fails
+     * the whole section with its error, and the lines after it aren't read: the filter isn't there to run.
+     */
+    private Statement filter(Node.Section section, ParsedSyntax header) {
+        Line line = section.line();
+        int mark = diagnostics.mark();
+        List<Statement> body = sectionCode(header, () -> repeatable(section.children(), null));
+        List<Diagnostic> found = new ArrayList<>(diagnostics.takeSince(mark));
+        Statement failed = null;
+        for (Statement statement : body) {
+            if (statement instanceof Statement.Condition) {
+                continue;
+            }
+            failed = statement;
+            Line at = statement.line();
+            if (section.children().stream().anyMatch(child -> child.line() == at && child instanceof Node.Section)) {
+                found.removeIf(d -> d.line() >= at.number());
+                error(at, "Filter sections may not contain other sections");
+            } else {
+                found.removeIf(d -> d.line() > at.number());
+                // Skript's error for a line no condition understands; a more particular one is kept.
+                found.replaceAll(d -> d.line() == at.number() && d.message().startsWith("Can't understand this condition/effect: ")
+                        ? new Diagnostic(d.severity(), d.file(), d.line(), d.column(), d.length(),
+                                "Can't understand this condition: '" + at.text().strip() + "'")
+                        : d);
+                if (!(statement instanceof Statement.Invalid)) {
+                    found.add(new Diagnostic(co.xenastudios.neoskript.frontend.source.Severity.ERROR, diagnostics.file()
+                            .name(), at.number(), at.column(), at.text().length(), "Can't understand this condition: '"
+                            + at.text().strip() + "'"));
+                }
+            }
+            break;
+        }
+        found.forEach(diagnostics::add);
+        if (failed != null) {
+            return new Statement.Invalid(line);
+        }
+        return new Statement.Section(line, header, body);
     }
 
     /** Whether a multiline conditional is an {@code if any} one. */
@@ -1069,10 +1176,18 @@ final class StatementParser {
         return body;
     }
 
-    private List<ParsedSyntax> conditions(List<Node> nodes, List<Line> lines) {
+    /**
+     * The conditions of a multiline {@code if}, each on its own line, or {@code null} once one fails, as Skript's
+     * {@code SecConditional} stops at the first: its error is reported and the rest aren't read.
+     */
+    private List<ParsedSyntax> conditions(List<Node> nodes, List<Line> lines, String kind) {
         List<ParsedSyntax> conditions = new ArrayList<>();
         for (Node node : nodes) {
             Line line = node.line();
+            if (node instanceof Node.Section) {
+                error(line, kind + " sections may not contain other sections");
+                return null;
+            }
             delays.put(line, delay);
             note(line);
             LineParser parser = new LineParser(context, line.text());
@@ -1094,8 +1209,14 @@ final class StatementParser {
                 condition = null;
             }
             if (condition == null) {
+                // Skript keeps an error from the code in a text, or about a function, over its own.
+                String specific = parser.functionProblem();
+                boolean kept = specific != null && (specific.startsWith("The function ")
+                        || specific.startsWith("Can't understand this expression: ")
+                                && !specific.startsWith("Can't understand this expression: '"));
                 error(line, parser.experimentProblem() != null ? parser.experimentProblem()
-                        : "Can't understand this condition: " + line.text());
+                        : kept ? specific : "Can't understand this condition: '" + line.text() + "'");
+                return null;
             } else {
                 check(line, condition);
                 parser.listWarnings(condition);
@@ -1256,6 +1377,29 @@ final class StatementParser {
         }
         if (expr == null) {
             error(line, "Can't understand this expression: '" + text + "'");
+        }
+        return expr;
+    }
+
+    /**
+     * Parses an entry's value as text that may have code in {@code %...%}, as Skript's variable string entries are,
+     * reporting Skript's error at {@code line} if it doesn't parse (its code's, if that's what fails).
+     */
+    Expr text(Line line, String value) {
+        String text = '"' + value.replace("\"", "\"\"") + '"';
+        TypeInfo info = context.registry().type("string");
+        Expected expected = info == null ? Expected.OBJECTS : context.expected(new TypeRef(info, false));
+        EventValues.Scope scope = context.eventScope(null);
+        LineParser parser = new LineParser(context, text);
+        Expr expr;
+        try {
+            expr = parser.expression(0, text.length(), expected);
+        } finally {
+            context.eventScope(scope);
+        }
+        if (expr == null) {
+            String problem = parser.functionProblem();
+            error(line, problem != null ? problem : "Can't understand this expression: '" + text + "'");
         }
         return expr;
     }

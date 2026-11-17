@@ -31,7 +31,7 @@ import java.util.stream.Stream;
  *
  * <p>Then, on NeoSkript: {@code /sk reload aliases} reloads the alias files and the scripts that use the names that
  * changed (a script that had errors, as an alias was missing, loads; one that doesn't use them isn't reloaded); a
- * script whose alias went away keeps its last version (D12); alias files that stop Skript loading aliases are errors
+ * script whose alias went away loads without the lines that use it, as in Skript (D12); alias files that stop Skript loading aliases are errors
  * of their own lines; {@code load-defaults: false} leaves Skript's default aliases out; and reloading the aliases
  * again and again leaves the server as it was.
  */
@@ -247,7 +247,8 @@ public final class NeoSkriptAliasesScenario implements Scenario {
             server.await(line("[aliasprobe] still fine => still fine | raw: minecraft:flint | two: 2 still fine"
                     + " | model: 0 | name: <none>"), mark, WAIT);
 
-            // An alias a running script uses goes away: the script keeps its last version (D12).
+            // An alias a running script uses goes away: the script loads without the lines that use it, as in Skript
+            // (D12).
             Files.writeString(aliases.resolve("sub/more.sk"), "later:\n\truby = minecraft:redstone\n\tjade = minecraft:lime_dye\n");
             Files.delete(aliases.resolve("crash.sk"));
             mark = server.mark();
@@ -257,7 +258,8 @@ public final class NeoSkriptAliasesScenario implements Scenario {
             // probe script only reads it from text, and another script only mentions it.
             server.await(Pattern.compile(" option-topaz\\.sk - 1 error$"), mark, WAIT);
             server.await(Pattern.compile(Pattern.quote("[NeoSkript] Reloaded the aliases and 2 scripts with ") + ".* in \\d+"
-                    + Pattern.quote(" ms. Scripts with errors keep their last version.") + "$"), mark, WAIT);
+                    + Pattern.quote(" ms. What has errors is left out.") + "$"), mark, WAIT);
+            server.await(line("[aliases] topaz script loaded: <none>"), mark, WAIT);
             if (server.lines(mark).stream().anyMatch(each -> each.contains("[aliases] mentions script loaded")
                     || each.contains("[aliasprobe] done"))) {
                 throw new HarnessFailure("/sk reload aliases reloaded a script that only mentions topaz. See "
@@ -265,8 +267,8 @@ public final class NeoSkriptAliasesScenario implements Scenario {
             }
             mark = server.mark();
             server.command("topazcheck");
-            // Its last version still runs. The gold ingot it makes is called by its own name now, as no alias names it.
-            server.await(line("[aliases] topaz is gold ingot"), mark, WAIT);
+            // Its command still runs, without the line that set the item.
+            server.await(line("[aliases] topaz is <none>"), mark, WAIT);
 
             // Without Skript's default aliases, only the files' and the items' own names.
             Path config = builder.runDir().resolve("plugins/NeoSkript/config.yml");

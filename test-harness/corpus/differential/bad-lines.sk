@@ -1,0 +1,188 @@
+# Probe: lines that fail to load are left out, and the rest of the code runs without them (issue #38). Each
+# kind of line: an effect, an expression in one, a condition, a section's header (its code goes with it), an
+# 'if' chain's branches, loops, and a line after one that stops the code.
+
+function probe_bad_lines():
+	send "start" to console
+	this line doesn't parse
+	send "after an effect" to console
+	set {_x} to 1
+	set {_y} to blahblah nonsense
+	send "x is %{_x}%, y is %{_y}%" to console
+	send "%nonexistent expression here%" to console
+	send "after an expression" to console
+	{_x} is frobnicated
+	send "after a condition" to console
+	send "%nosuchfunc(1)%" to console
+	nosuchfunc(1)
+	if frobnicate the wibble:
+		send "inside a bad if" to console
+	else:
+		send "else after a bad if" to console
+	send "after a bad if and its else" to console
+	if 1 is 2:
+		send "no" to console
+	else if frobnicate the wibble:
+		send "inside a bad else if" to console
+	else:
+		send "else after a bad else if" to console
+	if {_x} is 2:
+		send "no" to console
+	else if "%frob%" is "a":
+		send "inside a bad else if" to console
+	else if {_x} is frobnicated:
+		send "inside a bad else if" to console
+	else if {_x} is 1:
+		send "a good else if after bad ones" to console
+	if frobnicate the wibble:
+		send "inside a bad if" to console
+	else if {_x} is 1:
+		send "an else if after a bad if" to console
+	if {_x} is 2:
+		send "no" to console
+	nonsense between
+	else:
+		send "else after a line that failed" to console
+	if {_x} is 1:
+		send "a good if" to console
+		nonsense in nested code
+		send "after a bad line in it" to console
+	loop frobnicate the wibble:
+		send "inside a bad loop" to console
+	loop "%frob%":
+		send "inside a bad loop" to console
+	while frobnicate the wibble:
+		send "inside a bad while" to console
+	while "%frob%" is "a":
+		send "inside a bad while" to console
+	if "%frob%" is "a":
+		send "inside a bad if" to console
+	frobnicate stuff:
+		send "inside a bad section" to console
+	loop 3 times:
+		frob
+		if loop-number is 2:
+			continue
+		send "loop %loop-number%" to console
+	set {_n} to 0
+	while {_n} < 2:
+		add 1 to {_n}
+		frob nonsense
+	send "n is %{_n}%" to console
+	if all:
+		{_x} is 1
+		frobnicate the wibble
+		{_x} is more frobbed
+	then:
+		send "then of a bad if all" to console
+	else:
+		send "else of a bad if all" to console
+	if {_x} is 1:
+		send "an if before a bad if any" to console
+	if any:
+		frob one
+		{_x} is 1
+	then:
+		send "then of a bad if any" to console
+	if all:
+		{_x} is 1
+		"%frob%" is "a"
+	then:
+		send "then of a bad if all" to console
+	else if {_x} is 1:
+		send "else if after a bad if all" to console
+	set {_l::*} to 1, 2 and 3
+	filter {_l::*} to match:
+		frob
+		input > 1
+	send "filtered %{_l::*}%" to console
+	filter {_l::*} to match:
+		input > 1
+		"%frob%" is "a"
+	send "filtered %{_l::*}%" to console
+	if {_x} is 2:
+		send "no" to console
+	else if "%frob0%" is "a":
+		send "no" to console
+	else if "%frob1%" is "a":
+		send "no" to console
+	else if "%frob2%" is "a":
+		send "no" to console
+	else if "%frob3%" is "a":
+		send "no" to console
+	else if "%frob4%" is "a":
+		send "no" to console
+	else if "%frob5%" is "a":
+		send "no" to console
+	else if "%frob6%" is "a":
+		send "no" to console
+	else if "%frob7%" is "a":
+		send "no" to console
+	else if "%frob8%" is "a":
+		send "no" to console
+	else if "%frob9%" is "a":
+		send "no" to console
+	else if "%frob10%" is "a":
+		send "no" to console
+	else if "%frob11%" is "a":
+		send "no" to console
+	else if "%frob12%" is "a":
+		send "no" to console
+	else if "%frob13%" is "a":
+		send "no" to console
+	else if "%frob14%" is "a":
+		send "no" to console
+	else if "%frob15%" is "a":
+		send "no" to console
+	else if "%frob16%" is "a":
+		send "no" to console
+	else if "%frob17%" is "a":
+		send "no" to console
+	else if "%frob18%" is "a":
+		send "no" to console
+	else if "%frob19%" is "a":
+		send "no" to console
+	else if "%frob20%" is "a":
+		send "no" to console
+	else if "%frob21%" is "a":
+		send "no" to console
+	else if "%frob22%" is "a":
+		send "no" to console
+	else if "%frob23%" is "a":
+		send "no" to console
+	else if "%frob24%" is "a":
+		send "no" to console
+	else if "%frob25%" is "a":
+		send "no" to console
+	else if "%frob26%" is "a":
+		send "no" to console
+	else if "%frob27%" is "a":
+		send "no" to console
+	else if "%frob28%" is "a":
+		send "no" to console
+	else if "%frob29%" is "a":
+		send "no" to console
+	else if "%frob30%" is "a":
+		send "no" to console
+	else if "%frob31%" is "a":
+		send "no" to console
+	else if "%frob32%" is "a":
+		send "no" to console
+	else if "%frob33%" is "a":
+		send "no" to console
+	else if "%frob34%" is "a":
+		send "no" to console
+	else if "%frob35%" is "a":
+		send "no" to console
+	else if "%frob36%" is "a":
+		send "no" to console
+	else if "%frob37%" is "a":
+		send "no" to console
+	else if "%frob38%" is "a":
+		send "no" to console
+	else if "%frob39%" is "a":
+		send "no" to console
+	else:
+		send "else after 40 bad else ifs" to console
+	stop
+	nonsense after stop

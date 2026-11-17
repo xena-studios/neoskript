@@ -44,10 +44,17 @@ import org.slf4j.Logger;
  * problems the way Skript does, and runs their triggers. Files whose names start with {@code -} are
  * disabled, as in Skript.
  *
- * <p>A reload compiles everything before anything changes. A script that has errors keeps running its
- * previous version (D12); the others switch to their new version together.
+ * <p>A reload compiles everything before anything changes, then every script switches to its new version
+ * together. As in Skript, a script with errors loads without what has them (D12): a line that fails is left
+ * out, and a structure whose header fails. A script NeoSkript itself fails to compile part of (its bug, not the
+ * script's mistake) keeps the version that was running, and the error says so; if it can't compile at all, nothing
+ * changes.
  */
 final class ScriptManager {
+
+    /** The start of the error for what NeoSkript itself failed to compile, and what's added when that's kept. */
+    private static final String COULDNT_COMPILE = "NeoSkript couldn't compile this (";
+    private static final String KEPT = " The version that was running keeps running.";
 
     /** What a load or reload did. */
     record Outcome(int scripts, int errors, long millis) {}
@@ -273,7 +280,8 @@ final class ScriptManager {
                 uses.forEach((script, names) -> itemNames.put(script, Set.copyOf(names)));
             }
         } catch (StackOverflowError | LinkageError e) {
-            // Nothing has changed yet, so every script keeps running the version it had (D12).
+            // NeoSkript's failure, not the scripts': nothing has changed yet, so every script keeps running the
+            // version it had (D12).
             throw new IllegalStateException("Couldn't compile the scripts: " + e, e);
         }
 
@@ -281,7 +289,21 @@ final class ScriptManager {
         files.forEach(file -> byName.put(file.name(), file));
         List<Diagnostic> diagnostics = new ArrayList<>();
         parsed.forEach(script -> script.diagnostics().stream().filter(d -> !compiled.unparsed(d)).forEach(diagnostics::add));
-        diagnostics.addAll(compiled.diagnostics());
+        // NeoSkript's failure, not the script's: a script it failed to compile something in keeps the version that
+        // was running, if one was (D12), and the error says so.
+        Set<String> kept = new HashSet<>();
+        for (String name : compiled.crashed()) {
+            if (loaded.containsKey(name) && (scope == null || scope.test(name))) {
+                kept.add(name);
+            }
+        }
+        for (Diagnostic diagnostic : compiled.diagnostics()) {
+            if (kept.contains(diagnostic.file()) && diagnostic.message().startsWith(COULDNT_COMPILE)) {
+                diagnostic = new Diagnostic(diagnostic.severity(), diagnostic.file(), diagnostic.line(),
+                        diagnostic.column(), diagnostic.length(), diagnostic.message() + KEPT);
+            }
+            diagnostics.add(diagnostic);
+        }
         // Each script's problems in the order of their lines, as Skript gives them while it goes through the
         // script, though NeoSkript finds some while parsing and others while compiling. Problems with the file's
         // layout come first, in the order Skript finds them reading the file.
@@ -324,8 +346,7 @@ final class ScriptManager {
             }
         }
         withErrors.retainAll(byName.keySet());
-        // Scripts that load cleanly, or for the first time, switch to the new version; a script with
-        // errors keeps its previous version if it has one.
+        // Every script switches to its new version, as in Skript: one with errors, without what has them (D12).
         // In the files' order, which Skript loads them in: their load events run in it.
         Set<String> switching = new java.util.LinkedHashSet<>();
         int inScope = 0;
@@ -333,7 +354,7 @@ final class ScriptManager {
             String name = file.name();
             if (scope == null || scope.test(name)) {
                 inScope++;
-                if (!failed.contains(name) || !loaded.containsKey(name)) {
+                if (!kept.contains(name)) {
                     switching.add(name);
                 }
             }
@@ -428,8 +449,7 @@ final class ScriptManager {
 
     /**
      * Starts watching the scripts in {@code switching} that have Skript's {@code auto reload}, and stops
-     * watching their previous versions. A script with errors that keeps its previous version keeps
-     * watching as it did.
+     * watching their previous versions.
      */
     private void watch(Set<String> switching, List<ParsedScript> parsed) {
         for (String name : switching) {

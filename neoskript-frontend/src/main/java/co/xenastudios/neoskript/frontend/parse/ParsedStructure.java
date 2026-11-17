@@ -47,12 +47,13 @@ public sealed interface ParsedStructure {
      */
     record CommandNode(Line line, boolean group, List<CommandPattern.Part> pattern, Map<String, String> entries,
             Map<String, Expr> messages, List<Statement> trigger, List<CommandNode> subcommands,
-            List<Statement> suggestions, Line suggestionsLine) {
+            List<Statement> suggestions, Line suggestionsLine, Map<String, Line> entryLines) {
 
         public CommandNode {
             pattern = List.copyOf(pattern);
             entries = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(entries));
             messages = Map.copyOf(messages);
+            entryLines = Map.copyOf(entryLines);
             trigger = trigger == null ? null : List.copyOf(trigger);
             subcommands = List.copyOf(subcommands);
             suggestions = suggestions == null ? null : List.copyOf(suggestions);
