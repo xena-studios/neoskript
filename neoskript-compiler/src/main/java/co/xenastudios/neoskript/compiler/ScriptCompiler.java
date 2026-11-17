@@ -429,6 +429,8 @@ public final class ScriptCompiler {
             String line = child.line().text().strip();
             int equals = line.indexOf('=');
             if (equals < 0) {
+                // As Skript, which reads the section's lines as entries first.
+                problems.add(new AliasProblem(child.line().number(), "'" + line + "' is not an entry (like 'name = value')"));
                 continue;
             }
             String names = line.substring(0, equals).strip().toLowerCase(java.util.Locale.ROOT);

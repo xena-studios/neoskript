@@ -98,7 +98,7 @@ public final class MessageOrder {
             if (diagnostic.message().startsWith("Can't understand this structure: ")) {
                 return new long[] {1, INIT, 0, structure, 0, diagnostic.line()};
             }
-            if (kind.startsWith("variables")) {
+            if (kind.startsWith("variables") || kind.startsWith("aliases")) {
                 // Skript reads every line as an entry first, then each entry.
                 return new long[] {1, INIT, 0, structure, diagnostic.message().endsWith("is not an entry (like 'name = value')")
                         ? 0 : 1, diagnostic.line()};
