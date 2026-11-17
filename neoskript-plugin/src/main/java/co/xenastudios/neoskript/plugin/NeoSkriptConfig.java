@@ -6,6 +6,7 @@ package co.xenastudios.neoskript.plugin;
 
 import co.xenastudios.neoskript.plugin.config.Codec;
 import co.xenastudios.neoskript.plugin.config.Comment;
+import co.xenastudios.neoskript.plugin.config.ConfigLoader;
 import co.xenastudios.neoskript.plugin.config.ConfigSpec;
 import co.xenastudios.neoskript.plugin.config.Range;
 import co.xenastudios.neoskript.plugin.text.TextStyle;
@@ -47,7 +48,7 @@ public record NeoSkriptConfig(
             Theme.DEFAULTS,
             true,
             true,
-            new Variables("variables.csv", Interval.parse("5 minutes"), true),
+            new Variables("variables.csv", "csv", false, Interval.parse("5 minutes"), true),
             new Events(Priority.HIGH, false),
             new RuntimeErrors(Interval.parse("1 second"), 8, 2, 4, 10, 8, 2, 4, 10),
             new EffectCommands(false, "!", false, false));
@@ -73,6 +74,18 @@ public record NeoSkriptConfig(
                 "Where global variables are saved, in Skript's variables.csv format (Skript can read it too).",
                 "Relative to plugins/NeoSkript. Variables whose names start with - aren't saved. Applies on restart."})
             String file,
+            @Comment({
+                "csv saves to the file above, as Skript does. native saves to NeoSkript's own file beside it",
+                "(variables.nsv): faster to load, each save writes only what changed, and a crash can't cut a save in",
+                "half. Switching moves the variables over at the next start, after a backup in backups/. Switch back to",
+                "csv to write variables.csv again, for example before downgrading or going back to Skript. Applies on",
+                "restart. Docs: https://neoskript.dev/docs/server/variables/"})
+            String storage,
+            @Comment({
+                "Native storage only. If variables.nsv is damaged where no snapshot in backups/snapshots can repair it,",
+                "NeoSkript refuses to load it. Set this to true and restart to load everything up to the last good save",
+                "instead: this turns itself off first, then the damaged file is backed up and what's lost is logged."})
+            boolean recover,
             @Comment("How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops.")
             Interval saveInterval,
             @Comment({
@@ -187,6 +200,15 @@ public record NeoSkriptConfig(
     }
 
     /**
+     * Sets {@code variables.recover} back to false once a recovery has run: through the loader, so the file keeps its
+     * comments and other keys, and a file from a newer NeoSkript is left as it is.
+     */
+    static ConfigLoader.Change turnOffRecover(java.nio.file.Path file)
+            throws co.xenastudios.neoskript.plugin.config.ConfigException {
+        return ConfigLoader.set(SPEC, file, java.util.Map.of("variables.recover", false));
+    }
+
+    /**
      * The settings that only apply when the server restarts and that differ from {@code running}, the settings the
      * server started with.
      */
@@ -198,6 +220,12 @@ public record NeoSkriptConfig(
         }
         if (!variables.file.equals(before.variables.file)) {
             changed.add("variables.file");
+        }
+        if (!variables.storage.equals(before.variables.storage)) {
+            changed.add("variables.storage");
+        }
+        if (variables.recover != before.variables.recover) {
+            changed.add("variables.recover");
         }
         if (events.priority != before.events.priority) {
             changed.add("events.priority");

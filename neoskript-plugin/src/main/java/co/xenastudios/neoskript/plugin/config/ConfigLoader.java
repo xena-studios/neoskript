@@ -333,11 +333,31 @@ public final class ConfigLoader {
         Files.createDirectories(file.toAbsolutePath().getParent());
         Path temp = file.resolveSibling(file.getFileName() + ".tmp");
         try {
-            Files.writeString(temp, text, StandardCharsets.UTF_8);
+            // Synced before the rename and the folder after it, so a change (such as variables.recover turned off)
+            // is on disk once this returns.
+            try (java.nio.channels.FileChannel out = java.nio.channels.FileChannel.open(temp,
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE,
+                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)) {
+                java.nio.ByteBuffer bytes = java.nio.ByteBuffer.wrap(text.getBytes(StandardCharsets.UTF_8));
+                while (bytes.hasRemaining()) {
+                    out.write(bytes);
+                }
+                out.force(true);
+            }
             Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException e) {
-            Files.deleteIfExists(temp);
+            try {
+                Files.deleteIfExists(temp);
+            } catch (IOException deleting) {
+                e.addSuppressed(deleting);
+            }
             throw e;
+        }
+        try (java.nio.channels.FileChannel dir = java.nio.channels.FileChannel.open(file.toAbsolutePath().getParent(),
+                java.nio.file.StandardOpenOption.READ)) {
+            dir.force(true);
+        } catch (IOException | UnsupportedOperationException e) {
+            // Best effort: Windows can't open a folder, and doesn't need to.
         }
     }
 

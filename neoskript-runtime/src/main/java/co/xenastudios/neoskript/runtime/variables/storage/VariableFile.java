@@ -6,11 +6,10 @@ package co.xenastudios.neoskript.runtime.variables.storage;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -93,12 +92,14 @@ public final class VariableFile {
         return new Contents(entries, problems);
     }
 
-    /** Writes the entries, in the order given, to a temporary file that then replaces {@code file}. */
+    /**
+     * Writes the entries, in the order given, to a temporary file that's synced to disk and then replaces
+     * {@code file}, so a crash or power cut leaves either the old file or the new one. The file is streamed, never
+     * held in memory whole.
+     */
     public static void write(Path file, Iterable<Entry> entries) throws IOException {
-        Path parent = file.toAbsolutePath().getParent();
-        Files.createDirectories(parent);
-        Path temp = Files.createTempFile(parent, file.getFileName().toString(), ".tmp");
-        try (BufferedWriter out = Files.newBufferedWriter(temp, StandardCharsets.UTF_8)) {
+        Durable.replace(file, stream -> {
+            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(stream, StandardCharsets.UTF_8), 1 << 16);
             out.write(HEADER);
             HexFormat hex = HexFormat.of().withUpperCase();
             for (Entry entry : entries) {
@@ -111,12 +112,9 @@ public final class VariableFile {
             }
             // Skript ends the file with an empty line.
             out.write('\n');
-        }
-        try {
-            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException e) {
-            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
-        }
+            // Flushed, not closed: the file is synced before it's closed.
+            out.flush();
+        });
     }
 
     static String quote(String field) {

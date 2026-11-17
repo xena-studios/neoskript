@@ -114,6 +114,13 @@ class SettingsReloaderTest {
     }
 
     @Test
+    void variableStorageAndRecoveryWaitForARestart() throws Exception {
+        edit("storage: \"csv\"", "storage: \"native\"");
+        edit("recover: false", "recover: true");
+        assertEquals(List.of("variables.storage", "variables.recover"), reloader.reload().restartOnly());
+    }
+
+    @Test
     void aFileThatIsNotValidYamlKeepsTheRunningSettings() throws Exception {
         Files.writeString(file, "metrics: [oops\n");
         SettingsReloader.Outcome outcome = reloader.reload();

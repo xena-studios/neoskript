@@ -100,7 +100,7 @@ Rules on Folia:
 - Load and save **Skript's `variables.csv`** byte for byte, including its binary-encoded values (items, locations, and so on). Users can switch in both directions, so rolling back to Skript stays possible. SQLite and MySQL come in 1.x (D20).
 - List variables live in a concurrent sorted map that matches Skript's index ordering exactly.
 - Saving is write-behind with dirty tracking, off the main/region threads.
-- An optional new NeoSkript-native backend for speed is a later decision. 1.0 is compat-first.
+- An optional NeoSkript-native backend for speed (`variables.storage: native`), off by default: an append-only log with snapshots, in Skript's value format, convertible both ways. Done early, in M6 step 11. 1.0 is compat-first.
 
 ### 3.5 Standard library (`neoskript-paper`)
 

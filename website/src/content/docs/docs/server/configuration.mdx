@@ -48,7 +48,7 @@ Script problems at startup and runtime errors keep Skript's look, since tools an
 - the `runtime-errors` limits;
 - `effect-commands`.
 
-`metrics`, `variables.file` and the `events` settings apply when the server restarts. The reload says so when one of them changed.
+`metrics`, `variables.file`, `variables.storage`, `variables.recover` and the `events` settings apply when the server restarts. The reload says so when one of them changed.
 
 ## config-version
 
@@ -79,6 +79,8 @@ See [updates and bStats](/docs/server/updates-and-metrics/) for who hears about 
 | Setting | Default | What it does |
 |---|---|---|
 | `variables.file` | `variables.csv` | Where global variables are saved, relative to `plugins/NeoSkript`. The file is in Skript's format. Applies on restart. |
+| `variables.storage` | `csv` | `csv` saves to `variables.file` in Skript's format. `native` saves to NeoSkript's own `variables.nsv` beside it: faster to load, saves only what changed, crash-safe. Switching moves the variables over at the next start, after a backup. See [native storage](/docs/server/variables/#native-storage). Applies on restart. |
+| `variables.recover` | `false` | Native storage only: a one-shot recovery of a damaged `variables.nsv` that no snapshot can repair. Loads everything up to the last good save, turns itself off first, keeping the file's comments, then backs the damaged file up and lists what's lost. If config.yml can't be changed (read-only, or from a newer NeoSkript), it isn't used, and the console says so. Works with either storage. Applies on restart, and only does anything when the file is damaged. |
 | `variables.save-interval` | `5 minutes` | How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops. |
 | `variables.player-uuids-in-names` | `true` | Whether a player in a variable's name, as in `{money::%player%}`, is their UUID (`true`) or their name. Skript's `use player UUIDs in variable names`. |
 
@@ -181,6 +183,16 @@ variables:
   # Where global variables are saved, in Skript's variables.csv format (Skript can read it too).
   # Relative to plugins/NeoSkript. Variables whose names start with - aren't saved. Applies on restart.
   file: "variables.csv"
+  # csv saves to the file above, as Skript does. native saves to NeoSkript's own file beside it
+  # (variables.nsv): faster to load, each save writes only what changed, and a crash can't cut a save in
+  # half. Switching moves the variables over at the next start, after a backup in backups/. Switch back to
+  # csv to write variables.csv again, for example before downgrading or going back to Skript. Applies on
+  # restart. Docs: https://neoskript.dev/docs/server/variables/
+  storage: "csv"
+  # Native storage only. If variables.nsv is damaged where no snapshot in backups/snapshots can repair it,
+  # NeoSkript refuses to load it. Set this to true and restart to load everything up to the last good save
+  # instead: this turns itself off first, then the damaged file is backed up and what's lost is logged.
+  recover: false
   # How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops.
   save-interval: "5 minutes"
   # Whether players are their UUIDs in variable names ({money::%player%}) or their names, as Skript's

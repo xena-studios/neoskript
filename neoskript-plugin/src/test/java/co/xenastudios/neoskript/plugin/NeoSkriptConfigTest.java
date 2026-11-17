@@ -90,7 +90,7 @@ class NeoSkriptConfigTest {
         assertEquals(List.of(), result.warnings());
         assertEquals(List.of(
                 "Carried config.yml forward from config version 1 to 2, keeping your settings. The old file is config.yml.bak-v1.",
-                "Added theme with its default."), result.notices());
+                "Added 3 new settings with their defaults: theme, variables.storage, variables.recover."), result.notices());
         assertEquals(old, Files.readString(folder.resolve("config.yml.bak-v1")));
 
         NeoSkriptConfig config = result.config();
@@ -316,21 +316,21 @@ class NeoSkriptConfigTest {
     @Test
     void carryingForwardKeepsKeysThatAreNotSettings() throws Exception {
         String old = version1()
-                .replace("  file: variables.csv\n", "  file: variables.csv\n  # A newer NeoSkript's.\n  storage: native\n")
+                .replace("  file: variables.csv\n", "  file: variables.csv\n  # A newer NeoSkript's.\n  compression: zstd\n")
                 + "\n# Mine.\ncustom: [a, b]\nnested:\n  deeper:\n    value: 1\nlists:\n- [1, 2]\n- {x: y}\n";
         Files.writeString(file(), old);
         ConfigLoader.Result<NeoSkriptConfig> result = load();
-        assertEquals("Kept variables.storage, custom, nested, lists, which aren't NeoSkript's, as they were. Comments on"
+        assertEquals("Kept variables.compression, custom, nested, lists, which aren't NeoSkript's, as they were. Comments on"
                 + " NeoSkript's settings are its own now; yours are in config.yml.bak-v1.", result.notices().getLast());
         String text = Files.readString(file());
-        assertTrue(text.contains("  player-uuids-in-names: true\n  # A newer NeoSkript's.\n  storage: \"native\"\n"), text);
+        assertTrue(text.contains("  player-uuids-in-names: true\n  # A newer NeoSkript's.\n  compression: \"zstd\"\n"), text);
         assertTrue(text.contains("# Mine.\ncustom: [\"a\", \"b\"]\n"), text);
         assertTrue(text.contains("nested:\n  deeper:\n    value: 1\n"), text);
 
         // Read back, the keys are all there, and nothing changes.
         org.bukkit.configuration.file.YamlConfiguration yaml =
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file().toFile());
-        assertEquals("native", yaml.getString("variables.storage"));
+        assertEquals("zstd", yaml.getString("variables.compression"));
         assertEquals(List.of("a", "b"), yaml.getStringList("custom"));
         assertEquals(1, yaml.getInt("nested.deeper.value"));
         assertEquals(List.of(List.of(1, 2), Map.of("x", "y")), yaml.getList("lists"));
@@ -529,6 +529,27 @@ class NeoSkriptConfigTest {
         assertFalse(text.contains(Reader_BLANK), text);
         assertTrue(text.contains("a: null") || text.contains("a:\n") || text.contains("a: ~"), text);
         assertTrue(text.contains("b: 1"), text);
+    }
+
+    @Test
+    void recoverTurnsItselfOffKeepingTheFileAndLeavesANewerFileAlone() throws Exception {
+        String text = ConfigLoader.defaultText(NeoSkriptConfig.SPEC)
+                .replace("  recover: false\n", "  # Mine: turned on after the disk failed.\n  recover: true\n")
+                .replace("metrics: true", "metrics: false");
+        Files.writeString(file(), text);
+        assertTrue(load().config().variables().recover());
+        ConfigLoader.Change change = NeoSkriptConfig.turnOffRecover(file());
+        assertTrue(change.written());
+        String after = Files.readString(file());
+        assertTrue(after.contains("  # Mine: turned on after the disk failed.\n  recover: false\n"), after);
+        NeoSkriptConfig config = load().config();
+        assertFalse(config.variables().recover());
+        assertFalse(config.metrics(), "the other settings are kept");
+
+        String newer = "config-version: 3\nvariables:\n  recover: true\n";
+        Files.writeString(file(), newer);
+        assertFalse(NeoSkriptConfig.turnOffRecover(file()).written());
+        assertEquals(newer, Files.readString(file()));
     }
 
     @Test

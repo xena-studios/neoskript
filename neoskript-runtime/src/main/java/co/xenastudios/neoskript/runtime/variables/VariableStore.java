@@ -130,6 +130,14 @@ public final class VariableStore {
             super(INDEX_ORDER);
         }
 
+        /** The children in {@code sorted}, which are in {@link #INDEX_ORDER} already, linked in one pass. */
+        Children(SortedChildren sorted) {
+            super(sorted);
+            for (Pending child : sorted.children) {
+                byIndex.put(fold(child.key), child.node);
+            }
+        }
+
         /** The key {@link #byIndex} has for {@code index}: lower case, character by character, as the order compares. */
         static String fold(String index) {
             for (int i = 0; i < index.length(); i++) {
@@ -208,6 +216,141 @@ public final class VariableStore {
         }
     }
 
+    /** A node {@link #load} is building, with its children in order. */
+    private static final class Pending {
+        final String key;
+        final Node node = new Node();
+        final List<Pending> children = new ArrayList<>(0);
+        /** The children by index, made the first time one comes out of order. */
+        java.util.HashMap<String, Pending> byKey;
+        /** Whether a child came out of order, so the children are sorted once before linking. */
+        boolean unsorted;
+
+        Pending(String key) {
+            this.key = key;
+        }
+
+        /** The child at {@code key}: added at the end if it's new. */
+        Pending child(String index) {
+            if (children.isEmpty() || INDEX_ORDER.compare(children.getLast().key, index) < 0) {
+                Pending child = new Pending(index);
+                children.add(child);
+                if (byKey != null) {
+                    byKey.put(index, child);
+                }
+                return child;
+            }
+            if (byKey == null) {
+                byKey = new java.util.HashMap<>(children.size() * 2);
+                for (Pending child : children) {
+                    byKey.put(child.key, child);
+                }
+            }
+            Pending found = byKey.get(index);
+            if (found == null) {
+                found = new Pending(index);
+                children.add(found);
+                byKey.put(index, found);
+                unsorted = true;
+            }
+            return found;
+        }
+
+        /**
+         * Gives the node its children, and theirs, in one pass each, sorting them once first if any came out of
+         * order. False if two of them are the same in Skript's order but not equal, which only {@link #set} handles.
+         */
+        boolean link() {
+            if (children.isEmpty()) {
+                return true;
+            }
+            if (unsorted) {
+                children.sort((a, b) -> INDEX_ORDER.compare(a.key, b.key));
+                for (int i = 1; i < children.size(); i++) {
+                    if (INDEX_ORDER.compare(children.get(i - 1).key, children.get(i).key) == 0) {
+                        return false;
+                    }
+                }
+            }
+            byKey = null;
+            for (Pending child : children) {
+                if (!child.link()) {
+                    return false;
+                }
+            }
+            node.children = new Children(new SortedChildren(children));
+            return true;
+        }
+    }
+
+    /** Children already in order, as the sorted map a skip list is built from in one pass. */
+    private static final class SortedChildren extends java.util.AbstractMap<String, Node>
+            implements java.util.SortedMap<String, Node> {
+
+        final List<Pending> children;
+
+        SortedChildren(List<Pending> children) {
+            this.children = children;
+        }
+
+        @Override
+        public Comparator<? super String> comparator() {
+            return INDEX_ORDER;
+        }
+
+        @Override
+        public java.util.Set<Map.Entry<String, Node>> entrySet() {
+            return new java.util.AbstractSet<>() {
+                @Override
+                public java.util.Iterator<Map.Entry<String, Node>> iterator() {
+                    java.util.Iterator<Pending> each = children.iterator();
+                    return new java.util.Iterator<>() {
+                        @Override
+                        public boolean hasNext() {
+                            return each.hasNext();
+                        }
+
+                        @Override
+                        public Map.Entry<String, Node> next() {
+                            Pending child = each.next();
+                            return Map.entry(child.key, child.node);
+                        }
+                    };
+                }
+
+                @Override
+                public int size() {
+                    return children.size();
+                }
+            };
+        }
+
+        @Override
+        public java.util.SortedMap<String, Node> subMap(String from, String to) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public java.util.SortedMap<String, Node> headMap(String to) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public java.util.SortedMap<String, Node> tailMap(String from) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String firstKey() {
+            return children.getFirst().key;
+        }
+
+        @Override
+        public String lastKey() {
+            return children.getLast().key;
+        }
+    }
+
     private static final class Node {
         final AtomicReference<Object> value = new AtomicReference<>();
         volatile ConcurrentSkipListMap<String, Node> children;
@@ -256,6 +399,57 @@ public final class VariableStore {
                 visit(child.getValue(), name == null ? child.getKey() : name + SEPARATOR + child.getKey(), visitor);
             }
         }
+    }
+
+    /**
+     * Sets many variables in a store that has none yet, as loading saved variables does: the same as {@link #set}
+     * for each in turn, but each list is linked in one pass instead of having its indices sorted in one at a time,
+     * which was most of the time loading took. Names in the order {@link #forEach} gives them, the order a compacted
+     * file has, need no sorting; a list whose names come in any other order is sorted once, so it's never slower than
+     * {@link #set} one by one. If the store isn't empty, each is {@link #set}. Not for a store other threads are using
+     * yet.
+     */
+    public void load(List<String> names, List<Object> values) {
+        ConcurrentSkipListMap<String, Node> existing = root.children;
+        Pending top = existing != null && !existing.isEmpty() ? null : tree(names, values);
+        if (top == null || !top.link()) {
+            for (int i = 0; i < names.size(); i++) {
+                set(names.get(i), values.get(i));
+            }
+            return;
+        }
+        changed();
+        root.children = top.node.children;
+    }
+
+    /** The tree of {@code names}, not yet linked. */
+    private static Pending tree(List<String> names, List<Object> values) {
+        Pending top = new Pending(null);
+        List<Pending> path = new ArrayList<>();
+        for (int i = 0; i < names.size(); i++) {
+            String name = names.get(i);
+            int depth = 0;
+            int start = 0;
+            while (true) {
+                int end = name.indexOf(SEPARATOR, start);
+                String part = (end < 0 ? name.substring(start) : name.substring(start, end))
+                        .toLowerCase(java.util.Locale.ROOT);
+                if (depth >= path.size() || !path.get(depth).key.equals(part)) {
+                    while (path.size() > depth) {
+                        path.removeLast();
+                    }
+                    path.add((depth == 0 ? top : path.get(depth - 1)).child(part));
+                }
+                depth++;
+                if (end < 0) {
+                    break;
+                }
+                start = end + SEPARATOR.length();
+            }
+            Object value = values.get(i);
+            path.get(depth - 1).node.value.set(value == null ? null : Values.copy(value));
+        }
+        return top;
     }
 
     private void changed() {
