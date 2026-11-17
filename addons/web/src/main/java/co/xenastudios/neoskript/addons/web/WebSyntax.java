@@ -107,6 +107,12 @@ public final class WebSyntax {
             levels.put(property, SyntaxPriority.PROPERTY);
         }
         levels.forEach(registrar::priority);
+        // Their properties are several values when their owners are, as Skript's property expressions.
+        levels.forEach((id, level) -> {
+            if (level == SyntaxPriority.PROPERTY) {
+                registrar.pluralAsArguments(id);
+            }
+        });
     }
 
     private static void types(Registrar registrar) {
@@ -141,7 +147,11 @@ public final class WebSyntax {
         });
     }
 
-    /** The properties Reqn's and skJson's responses share, for whichever they're given. */
+    /**
+     * The properties Reqn's and skJson's responses share, for whichever they're given. {@code status} and
+     * {@code status code} are of one response, as skJson's are (Reqn's took several): so '(status of {_r} and body of
+     * {_r})' is two values, as on Skript, where a list can't be one response and the parser splits it (issue #44).
+     */
     private static void shared(Registrar registrar) {
         registrar.expression("NeoSkriptWebExprBody", "object", info -> new Body(),
                 Patterns.property("[response] bod(y|ies)", "httpresponses/requests/responses"));
@@ -149,13 +159,13 @@ public final class WebSyntax {
                         owner instanceof ReqnResponse r ? (Object) (long) r.code()
                                 : owner instanceof SkResponse s && s.statusCode() != null ? (Object) (long) s.statusCode()
                                 : null),
-                Patterns.property("[response] [status] code[s]", "httpresponses/responses"));
+                Patterns.property("[response] [status] code[s]", "httpresponse/response"));
         registrar.expression("NeoSkriptWebExprHeaders", "object", info -> new Headers(),
                 Patterns.property("[response] header[s]", "httpresponses/requests/responses"));
         registrar.expression("NeoSkriptWebExprStatus", "string", info -> (context, args) -> each(args[0], owner ->
                         owner instanceof ReqnResponse r ? r.statusLine()
                                 : owner instanceof SkResponse s ? s.status().toString() : null),
-                Patterns.property("[response] status[(es| line[s])]", "httpresponses/responses"));
+                Patterns.property("[response] status[(es| line[s])]", "httpresponse/response"));
     }
 
     private static void reqnProperties(Registrar registrar) {

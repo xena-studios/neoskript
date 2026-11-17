@@ -42,6 +42,7 @@ command /webreqn:
         send request to "http://127.0.0.1:@PORT@/text"
         show("text body", body of last response)
         send web request to "http://127.0.0.1:@PORT@/status/404"
+        show("404 together", (response code of last response and body of last response))
         show("404 1", response code of last response)
         show("404 2", status of last response)
         show("404 3", body of last response)
