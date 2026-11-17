@@ -126,7 +126,7 @@ class EngineTest {
         expected.put("owner::2", "Alex");
         expected.put("x::2", -2.25);
         assertEquals(expected, result);
-        assertNull(engine.errors().get(event));
+        assertNull(engine.errors().get(context));
     }
 
     @Test
@@ -160,13 +160,13 @@ class EngineTest {
     void aBadQueryIsTheLastErrorAndLeavesTheTargetAlone() throws Exception {
         Object result = run(execute(text("SELEKT nonsense"), true, true, Set.of(), false), database());
         assertEquals(PausingEffect.UNCHANGED, result);
-        String error = engine.errors().get(event);
+        String error = engine.errors().get(context);
         assertNotNull(error);
         assertTrue(error.contains("syntax error"), error);
         // A trigger that ran nothing sees the last error of any.
         assertEquals(error, engine.errors().get(new Object()));
         run(execute(text("SELECT 1"), false, false, Set.of(), false), database());
-        assertNull(engine.errors().get(event));
+        assertNull(engine.errors().get(context));
     }
 
     @Test
@@ -192,7 +192,7 @@ class EngineTest {
         engine = engine(new Settings(10, 2, 1_800_000, 30_000, 30, 30, null, 1, 600));
         Object result = run(execute(text("SELECT * FROM homes"), true, true, Set.of(), false), database());
         assertEquals(PausingEffect.UNCHANGED, result);
-        assertTrue(engine.errors().get(event).startsWith("The result has more than 1 values"), engine.errors().get(event));
+        assertTrue(engine.errors().get(context).startsWith("The result has more than 1 values"), engine.errors().get(context));
         // Counting needs no rows kept, so it has no limit.
         assertEquals(2L, run(execute(text("SELECT * FROM homes"), false, true, Set.of(), false), database()));
     }
@@ -220,7 +220,7 @@ class EngineTest {
         run(execute(text("DELETE FROM homes"), false, false, Set.of(), false), database());
         assertEquals(PausingSection.LEAVE, run(execute(text("NOT SQL"), false, false, Set.of(), false),
                 database()));
-        assertNotNull(engine.errors().get(event));
+        assertNotNull(engine.errors().get(context));
         assertNull(section.end(context), "rolled back already: nothing to wait for");
         assertEquals(1L, run(execute(text("SELECT * FROM homes"), false, true, Set.of(), false), database()));
         assertEquals(0, engine.transactions().open());
@@ -252,7 +252,7 @@ class EngineTest {
         // Longer than transaction-timeout: skript-db rolls back here, and the rest then commits on its own.
         Thread.sleep(2_500);
         run(execute(text("DELETE FROM homes WHERE owner = 'Alex'"), false, false, Set.of(), false), database());
-        assertNull(engine.errors().get(event));
+        assertNull(engine.errors().get(context));
         section.end(context).toCompletableFuture().get();
         assertEquals(0L, run(execute(text("SELECT * FROM homes"), false, true, Set.of(), false), database()));
     }
@@ -261,11 +261,11 @@ class EngineTest {
     void aTransactionRolledBackFromOutsideFailsItsLaterStatements() throws Exception {
         DbSyntax.Transaction section = new DbSyntax.Transaction(engine);
         section.start(context, new Object[] {database()}).toCompletableFuture().get();
-        Transactions.Transaction transaction = engine.transactions().find(event, database());
+        Transactions.Transaction transaction = engine.transactions().find(context, database());
         transaction.rollbackBy(System.nanoTime() + TimeUnit.SECONDS.toNanos(1), "a test rolled it back");
         assertEquals(PausingSection.LEAVE, run(execute(text("DELETE FROM homes"), false, false, Set.of(), false),
                 database()));
-        assertEquals("The transaction was rolled back: a test rolled it back", engine.errors().get(event));
+        assertEquals("The transaction was rolled back: a test rolled it back", engine.errors().get(context));
         assertNull(section.end(context));
         assertEquals(2L, run(execute(text("SELECT * FROM homes"), false, true, Set.of(), false), database()));
     }
@@ -323,7 +323,7 @@ class EngineTest {
                     "postgresql://127.0.0.1:1/game?user=admin&password=hunter22")) {
                 Database down = engine.database(url, null, null);
                 run(execute(text("SELECT 1"), false, false, Set.of(), false), down);
-                String error = engine.errors().get(event);
+                String error = engine.errors().get(context);
                 assertFalse(error.contains("hunter22") || error.contains("pw9"), error);
             }
         } finally {
@@ -361,7 +361,7 @@ class EngineTest {
         Object result = run(execute(text("SELECT 1"), false, false, Set.of(), false), down);
         assertEquals(PausingEffect.UNCHANGED, result);
         assertTrue(System.nanoTime() - started < TimeUnit.SECONDS.toNanos(10));
-        String error = engine.errors().get(event);
+        String error = engine.errors().get(context);
         assertNotNull(error);
         assertFalse(error.contains("hunter22"), error);
         assertEquals(0, down.inUse());
@@ -439,7 +439,29 @@ class EngineTest {
                 + " SELECT COUNT(*) FROM c"), false, true, Set.of(), false), database());
         assertEquals(PausingEffect.UNCHANGED, result);
         assertTrue(System.nanoTime() - started < TimeUnit.SECONDS.toNanos(15));
-        assertNotNull(engine.errors().get(event));
+        assertNotNull(engine.errors().get(context));
         assertEquals(0, database().inUse());
+    }
+
+    @Test
+    void twoRunsOfOneEventHaveTransactionsAndErrorsOfTheirOwn() throws Exception {
+        // Two triggers of the same event: the same event object, a context each.
+        TriggerContext first = () -> event;
+        TriggerContext second = () -> event;
+        DbSyntax.Transaction section = new DbSyntax.Transaction(engine);
+        assertEquals(Boolean.TRUE, section.start(first, new Object[] {database()}).toCompletableFuture().get());
+        assertEquals(Boolean.TRUE, section.start(second, new Object[] {database()}).toCompletableFuture().get(),
+                "the second trigger opens its own, rather than finding the first's 'already open'");
+        Call insert = execute(text("INSERT INTO homes (owner) VALUES ('second')"), false, false, Set.of(), false);
+        insert.effect().start(second, new Object[] {insert.query(), database(), null, null}).toCompletableFuture().get();
+        section.end(second).toCompletableFuture().get();
+        Call bad = execute(text("NOT SQL"), false, false, Set.of(), false);
+        assertEquals(PausingSection.LEAVE, bad.effect().start(first, new Object[] {bad.query(), database(), null, null})
+                .toCompletableFuture().get());
+        assertNotNull(engine.errors().get(first));
+        assertNull(engine.errors().get(second), "the first's failure isn't the second's");
+        // The second's row stayed, though the first's transaction rolled back.
+        assertEquals(1L, run(execute(text("SELECT * FROM homes WHERE owner = 'second'"), false, true, Set.of(), false),
+                database()));
     }
 }

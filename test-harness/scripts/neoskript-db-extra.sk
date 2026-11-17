@@ -20,3 +20,12 @@ command /dbextra <text>:
 		else if arg-1 is "shown":
 			set {_db} to the database "mysql://localhost:1/x?user=admin&password=hunter22"
 			send "[dbextra] shown %{_db}%" to console
+
+# Two scripts on one event, each with a transaction (the other is neoskript-db-pair.sk): this one fails, which must
+# roll back only its own, and say so only to itself.
+on command "dbpair":
+	transaction on {@db}:
+		execute "INSERT INTO log (what) VALUES ('pair a')" in {@db}
+		execute "NOT SQL" in {@db}
+	if last sql error is set:
+		send "[dbextra] pair a failed" to console

@@ -13,7 +13,6 @@ import java.util.regex.Pattern;
 final class Secrets {
 
     private static final Pattern PASSWORD_PARAMETER = Pattern.compile("(?i)([?&;](?:password|pass|pwd)=)([^&;]*)");
-    private static final Pattern USER_INFO = Pattern.compile("(//[^/@:]+:)([^/@]*)@");
 
     private Secrets() {}
 
@@ -24,8 +23,30 @@ final class Secrets {
      * @return it, masked
      */
     static String mask(String url) {
-        String masked = PASSWORD_PARAMETER.matcher(url).replaceAll("$1***");
-        return USER_INFO.matcher(masked).replaceAll("$1***@");
+        int[] info = userInfo(url);
+        String masked = info == null ? url : url.substring(0, info[1]) + "***" + url.substring(info[2]);
+        return PASSWORD_PARAMETER.matcher(masked).replaceAll("$1***");
+    }
+
+    /**
+     * Where {@code user:password@} is: {@code [the user's start, the password's start, the @]}, or {@code null}.
+     * The password runs to the last {@code @} before the query, so one with an {@code @} or a {@code /} in it,
+     * not encoded ({@code mysql://root:p@ss/w@host/db}), is still all of it. The user has neither.
+     */
+    private static int[] userInfo(String url) {
+        int slashes = url.indexOf("//");
+        if (slashes < 0) {
+            return null;
+        }
+        int from = slashes + 2;
+        int query = url.indexOf('?', from);
+        int at = url.lastIndexOf('@', (query < 0 ? url.length() : query) - 1);
+        int colon = url.indexOf(':', from);
+        if (at < from || colon < 0 || colon > at || url.substring(from, colon).contains("/")
+                || url.substring(from, colon).contains("@")) {
+            return null;
+        }
+        return new int[] {from, colon + 1, at};
     }
 
     /**
@@ -41,15 +62,20 @@ final class Secrets {
             return null;
         }
         String hidden = message.replace(url, mask(url));
-        for (Pattern pattern : new Pattern[] {PASSWORD_PARAMETER, USER_INFO}) {
-            Matcher matcher = pattern.matcher(url);
-            while (matcher.find()) {
-                String secret = java.net.URLDecoder.decode(matcher.group(2), java.nio.charset.StandardCharsets.UTF_8);
-                for (String form : new String[] {matcher.group(2), secret}) {
-                    // Every length: a short password is still one, and garbling a message beats showing it.
-                    if (!form.isEmpty() && !form.equals("***")) {
-                        hidden = hidden.replace(form, "***");
-                    }
+        java.util.List<String> secrets = new java.util.ArrayList<>();
+        Matcher parameter = PASSWORD_PARAMETER.matcher(url);
+        while (parameter.find()) {
+            secrets.add(parameter.group(2));
+        }
+        int[] info = userInfo(url);
+        if (info != null) {
+            secrets.add(url.substring(info[1], info[2]));
+        }
+        for (String secret : secrets) {
+            for (String form : new String[] {secret, decode(secret)}) {
+                // Every length: a short password is still one, and garbling a message beats showing it.
+                if (!form.isEmpty() && !form.equals("***")) {
+                    hidden = hidden.replace(form, "***");
                 }
             }
         }
@@ -76,11 +102,11 @@ final class Secrets {
         String user = null;
         String password = null;
         String rest = url;
-        Matcher info = USER_INFO.matcher(rest);
-        if (info.find()) {
-            user = decode(info.group(1).substring(2, info.group(1).length() - 1));
-            password = decode(info.group(2));
-            rest = rest.substring(0, info.start()) + "//" + rest.substring(info.end());
+        int[] info = userInfo(rest);
+        if (info != null) {
+            user = decode(rest.substring(info[0], info[1] - 1));
+            password = decode(rest.substring(info[1], info[2]));
+            rest = rest.substring(0, info[0]) + rest.substring(info[2] + 1);
         }
         int query = rest.indexOf('?');
         if (query >= 0) {

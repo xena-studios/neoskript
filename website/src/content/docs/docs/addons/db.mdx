@@ -123,7 +123,7 @@ if the last sql error is set:
 	send "Couldn't save you: %the last sql error%" to console
 ```
 
-It's the error of the trigger's own last statement; a trigger that hasn't run one sees the last error of any. A database that's down, a URL that's wrong and a query that takes too long are errors too. Passwords are never in them.
+It's the error of this run's own last statement (each trigger and function call is its own run); one that hasn't run a statement sees the last error of any. A database that's down, a URL that's wrong and a query that takes too long are errors too. Passwords are never in them.
 
 A database that isn't set (`execute "..." in {nothing}`) is a runtime error on the line, as in skript-db.
 
@@ -178,6 +178,7 @@ NeoSkript DB is tested against skript-db 2.0.0, the version that runs on Paper 2
 - **Threads:** with `quickly`, skript-db carries on on its own thread, off the server's, where touching the world isn't safe; on Folia, it carries every trigger on on the global thread, even a player's. NeoSkript DB always carries on on the trigger's own thread.
 - **Time limits:** skript-db's statements have no time limit by default, and SQLite's driver ignores one anyway. NeoSkript DB stops any statement at `query-timeout`, 30 seconds unless set.
 - **Large results:** skript-db reads every row into memory. NeoSkript DB stores at most `max-cells` values in a list, skips the rows where nothing stores them, and keeps none for a count (which still steps through them).
+- **Whose transaction:** skript-db keeps a transaction and `the last sql error` by event, and every trigger of an event shares it: a second script's statements join the first's open transaction, are rolled back with its failure while that script's `last sql error` stays empty, or a second transaction on the same database is refused as "already open". NeoSkript DB keeps them by run: each trigger's run, and each function call, has its own.
 - **Transactions:** skript-db rolls back a transaction idle for `transaction-timeout`, even under a trigger still in its section, after which the trigger's remaining statements commit one by one with no error. NeoSkript DB keeps a transaction open while its trigger waits inside it, and rolls one back the moment its trigger leaves the section another way. One rolled back from outside (as NeoSkript DB stops) fails the trigger's later statements, with `the last sql error` saying so.
 - **Connections:** skript-db keeps each pool, with up to `pool-size` idle connections, open until the server stops. NeoSkript DB keeps no idle connections for long, and closes a database's pool once nothing has used it for `idle-close`, so a URL a script stops using (after a reload, say) holds nothing.
 - **Passwords:** skript-db hides them where it shows a URL. NeoSkript DB also takes them out of errors, and gives them to the pool apart from the URL, so the pool's debug logging, which prints the URL, never shows one.

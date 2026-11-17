@@ -1,0 +1,8 @@
+# Harness check: NeoSkriptDb only. The other trigger on neoskript-db-extra.sk's event: its transaction is its own.
+options:
+	db: the database "sqlite:plugins/dbtest/test.db"
+
+on command "dbpair":
+	transaction on {@db}:
+		execute "INSERT INTO log (what) VALUES ('pair b')" in {@db}
+	send "[dbextra] pair b %last sql error%" to console

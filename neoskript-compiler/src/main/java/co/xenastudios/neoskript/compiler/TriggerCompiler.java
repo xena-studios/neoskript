@@ -698,6 +698,12 @@ final class TriggerCompiler {
             method.visitTypeInsn(CHECKCAST, OBJECTS);
             method.visitVarInsn(ASTORE, ARGUMENTS_SLOT);
         }
+        // A run of its own: every trigger run and function call has its own context, the same object across its
+        // waits and pauses, even where the caller shares one (an event's triggers, functions called from nowhere).
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(co.xenastudios.neoskript.runtime.SimpleTriggerContext.class),
+                "run", "(" + CONTEXT + ")" + CONTEXT, false);
+        method.visitVarInsn(ASTORE, CONTEXT_SLOT);
         method.visitTypeInsn(NEW, STORE);
         method.visitInsn(DUP);
         method.visitMethodInsn(INVOKESPECIAL, STORE, "<init>", "()V", false);

@@ -10,7 +10,7 @@ public interface co.xenastudios.neoskript.api.NeoSkript
   public abstract co.xenastudios.neoskript.api.Variables variables()
   public abstract java.lang.String version()
   public abstract void whenReady(java.lang.Runnable)
-  public abstract void whenStopped(java.lang.Runnable)
+  public abstract java.lang.Runnable whenStopped(java.lang.Runnable)
 
 public interface co.xenastudios.neoskript.api.Scripts
   public abstract java.lang.Object call(java.lang.String, java.lang.Object[])

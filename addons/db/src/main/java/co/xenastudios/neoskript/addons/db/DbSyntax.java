@@ -94,10 +94,14 @@ final class DbSyntax {
         registrar.timeout(TRANSACTION, Duration.ofMillis(engine.settings().waitMillis()));
     }
 
-    /** Which trigger a statement belongs to: its event, or the trigger itself where it has none. */
+    /**
+     * Which run a statement belongs to: the run's own context, compared by identity. skript-db keys transactions
+     * and the last error by the event, which every trigger of the event shares (and every function called from
+     * nowhere, in NeoSkript), so one trigger's statements joined another's transaction, rolled back with its
+     * failure, or found it "already open". Each run is its own here, as each function call is.
+     */
     static Object scope(TriggerContext context) {
-        Object event = context.event();
-        return event != null ? event : context;
+        return context;
     }
 
     /** {@code execute ... in ... [with arguments ...] [and store the result in ...]}. */
