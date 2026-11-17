@@ -1,0 +1,61 @@
+# Checks: comparisons of values Skript has no comparator for (issue #89). Words are read against the other side, as
+# Skript's comparison reads them, and in an 'if' header Skript keeps the error of reading the whole line first.
+
+function comparisons_player_entity():
+	if player is entity:
+		broadcast "x"
+
+function comparisons_text():
+	if 1 is "a":
+		broadcast "x"
+
+function comparisons_inline():
+	player is entity
+	broadcast "x"
+
+function comparisons_living():
+	if player is living entity:
+		broadcast "x"
+
+function comparisons_same():
+	if zombie is entity:
+		broadcast "x"
+
+function comparisons_name():
+	if name of zombie is "x":
+		broadcast "x"
+
+function comparisons_name_set():
+	set {_z} to name of zombie
+
+on load:
+	1 is "a"
+
+on load:
+	if "a" is 1:
+		broadcast "x"
+
+on load:
+	if 1 is 1.5:
+		broadcast "x"
+
+on load:
+	if 1 is "1":
+		broadcast "x"
+
+on load:
+	if 1 is stone:
+		broadcast "x"
+
+on load:
+	set {_l} to location(1, 2, 3)
+	if {_l} is "a":
+		broadcast "x"
+
+on load:
+	if location(1, 2, 3) is "a":
+		broadcast "x"
+
+on load:
+	if player is entity:
+		broadcast "x"

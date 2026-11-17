@@ -280,14 +280,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             co.xenastudios.neoskript.paper.Hooks.start(this, eventPriority());
             // Scripts and variables are there now (or what of them could load): addons waiting for them carry on.
         }, api::ready, getSLF4JLogger());
-        if (hooks || deferSyntax) {
-            // As Skript: with plugins to hook into, taking Vault's services and then loading scripts wait for the
-            // server to start, when every plugin has enabled and registered its services. With addons, so does
-            // registering the syntax, for theirs.
-            getServer().getGlobalRegionScheduler().run(this, task -> start.run());
-        } else {
-            start.run();
-        }
+        // As Skript: taking Vault's services and loading scripts wait for the server to start, when every plugin has
+        // enabled and registered its services, and the worlds have had their first save, which no 'on world save'
+        // sees. With addons, so does registering the syntax, for theirs.
+        getServer().getGlobalRegionScheduler().run(this, task -> start.run());
         // D15: tell admins about newer versions on Modrinth, opt-out with `update-checker: false`. Test servers
         // never check.
         if (!TestRunner.enabled()) {
