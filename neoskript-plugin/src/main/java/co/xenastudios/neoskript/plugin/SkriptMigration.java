@@ -49,15 +49,24 @@ final class SkriptMigration {
      * {@code use player UUIDs in variable names} from its config.sk, or {@code null} if it doesn't say, and its
      * other settings NeoSkript has, by their path in NeoSkript's config.yml ({@link #SETTINGS}), and the backup of
      * the variables copied, made before NeoSkript first loads them (or {@code null}), and what to tell the owner about
-     * alias files that weren't copied.
+     * alias files that weren't copied, and whether Skript's alias files were all dealt with ({@code false} if some
+     * couldn't be read or copied, so they're tried again on the next start).
      */
     record Result(List<String> copied, int scriptCount, Boolean playerUuids, Map<String, Object> settings,
-            Path variablesBackup, List<String> notes) {
+            Path variablesBackup, List<String> notes, boolean aliasesDone) {
 
         Result(List<String> copied, int scriptCount, Boolean playerUuids) {
-            this(copied, scriptCount, playerUuids, Map.of(), null, List.of());
+            this(copied, scriptCount, playerUuids, Map.of(), null, List.of(), true);
+        }
+
+        Result(List<String> copied, int scriptCount, Boolean playerUuids, Map<String, Object> settings,
+                Path variablesBackup, List<String> notes) {
+            this(copied, scriptCount, playerUuids, settings, variablesBackup, notes, true);
         }
     }
+
+    /** What copying Skript's alias files did: what was copied, at least in part, and whether nothing failed. */
+    private record AliasCopy(List<String> copied, boolean complete) {}
 
     /** The marker's line saying Skript's alias files were dealt with, so they're never copied again. */
     static final String ALIASES_DONE = "aliases: copied";
@@ -127,57 +136,128 @@ final class SkriptMigration {
         // The alias files last, and never at the cost of the rest: a file already there is kept, and one that can't
         // be copied is reported.
         List<String> notes = new ArrayList<>();
-        copied.addAll(copyAliases(skriptDir, neoskriptDir, notes));
+        AliasCopy aliases = copyAliases(skriptDir, neoskriptDir, notes);
+        copied.addAll(aliases.copied());
         // The marker is written by finish(), once config.yml has the settings.
         return new Result(copied, scripts[0], playerUuids(skriptDir.resolve("config.sk")), settings, backup,
-                List.copyOf(notes));
+                List.copyOf(notes), aliases.complete());
     }
 
     /**
-     * Copies Skript's alias files ({@link #ALIASES}) that are there, file by file, keeping any NeoSkript already has.
-     * Never throws: what couldn't be copied goes in {@code notes}. Returns what was copied, at least in part.
+     * Copies Skript's alias files ({@link #ALIASES}) that are there, file by file, keeping any NeoSkript already has
+     * (the owner's). A file or folder that can't be read or copied is named in {@code notes} and the rest are still
+     * copied. Never throws. Returns what was copied, at least in part, and whether nothing failed.
      */
-    private static List<String> copyAliases(Path skriptDir, Path neoskriptDir, List<String> notes) {
+    private static AliasCopy copyAliases(Path skriptDir, Path neoskriptDir, List<String> notes) {
         List<String> copied = new ArrayList<>();
+        boolean complete = true;
         for (String name : ALIASES) {
             Path source = skriptDir.resolve(name);
             if (!Files.exists(source)) {
                 continue;
             }
             Path target = neoskriptDir.resolve(name);
-            try (java.util.stream.Stream<Path> files = Files.isDirectory(source) ? Files.walk(source) : java.util.stream.Stream.of(source)) {
-                boolean any = false;
-                for (Path file : files.sorted().toList()) {
-                    Path to = Files.isDirectory(source) ? target.resolve(source.relativize(file).toString()) : target;
-                    String shown = neoskriptDir.relativize(to).toString().replace('\\', '/');
-                    try {
-                        if (Files.isDirectory(file)) {
-                            // A folder alone isn't something copied: only files count.
-                            Files.createDirectories(to);
-                        } else if (Files.exists(to)) {
-                            notes.add("Kept plugins/NeoSkript/" + shown + ", which was there already, rather than Skript's");
-                        } else {
-                            Files.copy(file, to, StandardCopyOption.COPY_ATTRIBUTES);
-                            any = true;
-                        }
-                    } catch (IOException | RuntimeException e) {
-                        notes.add("Couldn't copy Skript's " + shown + ": " + e);
-                    }
-                }
-                if (any) {
-                    copied.add(name);
-                }
+            AliasFiles files = new AliasFiles(source, target, neoskriptDir, notes);
+            try {
+                // A walk that goes on past what it can't read, rather than one that fails as a whole.
+                Files.walkFileTree(source, files);
             } catch (IOException | RuntimeException e) {
                 notes.add("Couldn't copy Skript's " + name + ": " + e);
+                files.failed = true;
+            }
+            if (files.any) {
+                copied.add(name);
+            }
+            complete &= !files.failed;
+        }
+        if (!complete) {
+            notes.add("Skript's other alias files were copied. What couldn't be is tried again the next time the server"
+                    + " starts.");
+        }
+        return new AliasCopy(copied, complete);
+    }
+
+    /** Copies one of Skript's alias folders (or its zip), file by file, noting what it can't. */
+    private static final class AliasFiles extends java.nio.file.SimpleFileVisitor<Path> {
+        private final Path source;
+        private final Path target;
+        private final Path neoskriptDir;
+        private final List<String> notes;
+        /** Whether a file was copied, and whether something couldn't be read or copied. */
+        boolean any;
+        boolean failed;
+
+        AliasFiles(Path source, Path target, Path neoskriptDir, List<String> notes) {
+            this.source = source;
+            this.target = target;
+            this.neoskriptDir = neoskriptDir;
+            this.notes = notes;
+        }
+
+        private Path to(Path file) {
+            return file.equals(source) ? target : target.resolve(source.relativize(file).toString());
+        }
+
+        private String shown(Path to) {
+            return neoskriptDir.relativize(to).toString().replace('\\', '/');
+        }
+
+        @Override
+        public java.nio.file.FileVisitResult preVisitDirectory(Path dir, java.nio.file.attribute.BasicFileAttributes attrs) {
+            try {
+                // A folder alone isn't something copied: only files count.
+                Files.createDirectories(to(dir));
+                return java.nio.file.FileVisitResult.CONTINUE;
+            } catch (IOException | RuntimeException e) {
+                notes.add("Couldn't copy Skript's " + shown(to(dir)) + ": " + e);
+                failed = true;
+                return java.nio.file.FileVisitResult.SKIP_SUBTREE;
             }
         }
-        return copied;
+
+        @Override
+        public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
+            Path to = to(file);
+            try {
+                if (Files.exists(to)) {
+                    // The same file is one copied before (a move tried again): nothing to say.
+                    if (Files.mismatch(file, to) != -1) {
+                        notes.add("Kept plugins/NeoSkript/" + shown(to) + ", which was there already, rather than Skript's");
+                    }
+                } else {
+                    Files.copy(file, to, StandardCopyOption.COPY_ATTRIBUTES);
+                    any = true;
+                }
+            } catch (IOException | RuntimeException e) {
+                notes.add("Couldn't copy Skript's " + shown(to) + ": " + e);
+                failed = true;
+            }
+            return java.nio.file.FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public java.nio.file.FileVisitResult visitFileFailed(Path file, IOException e) {
+            // A file or folder that can't be read: named, and the rest still copied.
+            notes.add("Couldn't read Skript's " + shown(to(file)) + ": " + e);
+            failed = true;
+            return java.nio.file.FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public java.nio.file.FileVisitResult postVisitDirectory(Path dir, IOException e) {
+            if (e != null) {
+                notes.add("Couldn't read all of Skript's " + shown(to(dir)) + ": " + e);
+                failed = true;
+            }
+            return java.nio.file.FileVisitResult.CONTINUE;
+        }
     }
 
     /**
      * For a server that moved over before NeoSkript read alias files: Skript's alias files and its
-     * {@code load default aliases}, once, unless NeoSkript has an aliases folder of its own by now. The marker records
-     * it, so deleting them later doesn't bring them back.
+     * {@code load default aliases}, as a first move copies them. Alias files NeoSkript already has (the owner's) are
+     * kept, and Skript's others are added. The marker records it once everything was dealt with, so deleting them
+     * later doesn't bring them back; if something couldn't be copied, it's tried again on the next start.
      */
     private static Result aliasesLater(Path skriptDir, Path neoskriptDir) throws IOException {
         Path marker = neoskriptDir.resolve(MARKER);
@@ -185,21 +265,17 @@ final class SkriptMigration {
         if (recorded.lines().anyMatch(ALIASES_DONE::equals)) {
             return new Result(List.of(), 0, null);
         }
-        if (Files.exists(neoskriptDir.resolve("aliases")) || Files.exists(neoskriptDir.resolve("aliases-english.zip"))) {
-            // NeoSkript has alias files of its own by now: they're the owner's, and Skript's are never copied.
-            Files.writeString(marker, recorded + ALIASES_DONE + "\n");
-            return new Result(List.of(), 0, null);
-        }
         List<String> notes = new ArrayList<>();
-        List<String> copied = copyAliases(skriptDir, neoskriptDir, notes);
+        AliasCopy aliases = copyAliases(skriptDir, neoskriptDir, notes);
+        List<String> copied = aliases.copied();
         Files.writeString(marker, recorded + (copied.isEmpty() ? "" : "Copied " + copied + " from "
-                + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n") + ALIASES_DONE + "\n");
+                + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n") + (aliases.complete() ? ALIASES_DONE + "\n" : ""));
         if (copied.isEmpty()) {
-            return new Result(List.of(), 0, null, Map.of(), null, List.copyOf(notes));
+            return new Result(List.of(), 0, null, Map.of(), null, List.copyOf(notes), aliases.complete());
         }
         Map<String, Object> settings = new java.util.LinkedHashMap<>(settings(skriptDir.resolve("config.sk")));
         settings.keySet().retainAll(List.of("aliases.load-defaults"));
-        return new Result(copied, 0, null, settings, null, List.copyOf(notes));
+        return new Result(copied, 0, null, settings, null, List.copyOf(notes), aliases.complete());
     }
 
     /** Where a database's file is for NeoSkript, and the backup of what was copied. */
@@ -251,11 +327,19 @@ final class SkriptMigration {
      * start copies the settings again.
      */
     static void finish(Path neoskriptDir, Path skriptDir, List<String> copied) throws IOException {
+        finish(neoskriptDir, skriptDir, copied, true);
+    }
+
+    /**
+     * Writes the marker once the first move is done. Without {@code aliasesDone} (some of Skript's alias files couldn't
+     * be read or copied), it doesn't say the alias files were dealt with, so the next start tries them again.
+     */
+    static void finish(Path neoskriptDir, Path skriptDir, List<String> copied, boolean aliasesDone) throws IOException {
         if (!Files.exists(neoskriptDir.resolve(STARTED))) {
             return;
         }
         Files.writeString(neoskriptDir.resolve(MARKER), "Copied " + copied + " from " + skriptDir.toAbsolutePath()
-                + " at " + Instant.now() + "\n" + ALIASES_DONE + "\n");
+                + " at " + Instant.now() + "\n" + (aliasesDone ? ALIASES_DONE + "\n" : ""));
         Files.deleteIfExists(neoskriptDir.resolve(STARTED));
     }
 

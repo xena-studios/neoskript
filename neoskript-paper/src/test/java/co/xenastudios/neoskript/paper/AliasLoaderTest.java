@@ -456,6 +456,7 @@ class AliasLoaderTest {
         assertNotNull(loader.finish());
         assertEquals(AliasLoader.MAX_PROBLEMS, loader.problems().size());
         assertEquals(5000 - AliasLoader.MAX_PROBLEMS, loader.moreProblems());
+        assertEquals(5000 - AliasLoader.MAX_PROBLEMS, loader.moreErrors(), "they're counted as what they are: errors");
         assertEquals(new AliasLoader.Problem("bad.sk", 2, true, "Minecraft id minecraft:nope is not valid",
                 "line 0 = minecraft:nope"), loader.problems().getFirst(), "a problem keeps its line, not the file");
     }

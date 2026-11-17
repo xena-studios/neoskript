@@ -239,7 +239,7 @@ final class SkriptCommand implements TabExecutor {
                 Set<String> changed;
                 try {
                     // aliases.load-defaults as config.yml has it now, without needing /sk reload config first.
-                    changed = plugin.aliases().reload(plugin.loadDefaultAliases(), report.aliases());
+                    changed = plugin.aliases().reload(plugin.loadDefaultAliases(), report);
                 } catch (RuntimeException | StackOverflowError | OutOfMemoryError | LinkageError e) {
                     plugin.getSLF4JLogger().error("Couldn't reload the aliases", e);
                     send(sender, Messages.READ_FAILED, text("reason", String.valueOf(e.getMessage())));
@@ -335,7 +335,7 @@ final class SkriptCommand implements TabExecutor {
     /** Reloads the aliases for {@code /sk reload all}, with their problems in {@code report}. Returns whether it could. */
     private boolean reloadAliases(ScriptReport report) {
         try {
-            plugin.aliases().reload(plugin.loadDefaultAliases(), report.aliases());
+            plugin.aliases().reload(plugin.loadDefaultAliases(), report);
             return true;
         } catch (RuntimeException | StackOverflowError | OutOfMemoryError | LinkageError e) {
             plugin.getSLF4JLogger().error("Couldn't reload the aliases", e);

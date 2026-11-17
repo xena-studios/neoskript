@@ -9,6 +9,7 @@ import static co.xenastudios.neoskript.plugin.Messages.text;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import co.xenastudios.neoskript.frontend.source.Diagnostic;
 import co.xenastudios.neoskript.frontend.source.Severity;
@@ -133,6 +134,24 @@ class MessagesTest {
                 "Can't understand this condition/effect: this is not valid syntax"), a);
         report.accept(new Diagnostic(Severity.WARNING, "sub/b.sk", 1, 1, 0, "A warning"), null);
         return report;
+    }
+
+    @Test
+    void problemsPastTheAliasFilesLimitCountAsWhatTheyAre() {
+        // 1,000 listed and 2,375 more, all errors: the summary says 3,375, and the line saying so isn't 'Line 0:'.
+        ScriptReport report = new ScriptReport("sk");
+        for (int i = 1; i <= 1000; i++) {
+            report.aliases().accept(new Diagnostic(Severity.ERROR, "bad.sk", i + 1, 0, 0, "Minecraft id minecraft:nope"
+                    + " is not valid"), "line " + i + " = minecraft:nope");
+        }
+        report.unlisted(2374, 1, "... and 2375 more problems in the alias files, not listed");
+        assertEquals(3374, report.errors());
+        assertEquals(1, report.warnings());
+        List<String> lines = report.lines(sender(CommandSender.class)).stream().map(MessagesTest::plain).toList();
+        assertEquals("   ... and 2375 more problems in the alias files, not listed", lines.getLast());
+        assertTrue(lines.stream().noneMatch(line -> line.contains("Line 0:")), lines.toString());
+        assertTrue(plain(report.summary("Reloaded", Component.text("the aliases"), 12))
+                .contains("with 3374 errors and 1 warning"));
     }
 
     @Test

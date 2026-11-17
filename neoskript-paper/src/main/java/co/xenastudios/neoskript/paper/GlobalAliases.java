@@ -61,13 +61,31 @@ public final class GlobalAliases {
         final AliasTable table;
         private final List<AliasLoader.Problem> problems;
         private final int moreProblems;
+        private final int moreErrors;
         private final int files;
 
-        Loaded(AliasTable table, List<AliasLoader.Problem> problems, int moreProblems, int files) {
+        Loaded(AliasTable table, List<AliasLoader.Problem> problems, int moreProblems, int moreErrors, int files) {
             this.table = table;
             this.problems = problems;
             this.moreProblems = moreProblems;
+            this.moreErrors = moreErrors;
             this.files = files;
+        }
+
+        /** How many errors there were past {@link AliasLoader#MAX_PROBLEMS}, which aren't listed. */
+        public int unlistedErrors() {
+            return moreErrors;
+        }
+
+        /** How many warnings there were past {@link AliasLoader#MAX_PROBLEMS}, which aren't listed. */
+        public int unlistedWarnings() {
+            return moreProblems - moreErrors;
+        }
+
+        /** The line saying how many problems weren't listed, or {@code null} if all were. */
+        public String unlistedNote() {
+            return moreProblems == 0 ? null : "... and " + moreProblems + " more "
+                    + (moreProblems == 1 ? "problem" : "problems") + " in the alias files, not listed";
         }
 
         /** How many files were read from the aliases folder. */
@@ -85,25 +103,21 @@ public final class GlobalAliases {
             return table == null;
         }
 
+        /** How many errors there were, the unlisted ones included. */
         public int errors() {
-            return (int) problems.stream().filter(AliasLoader.Problem::error).count();
+            return (int) problems.stream().filter(AliasLoader.Problem::error).count() + moreErrors;
         }
 
         /**
          * Gives each problem, in order, with the line of code it's on ({@code ""} for none): line 0 is the file as a
-         * whole, like Skript's {@code 'x.sk' is empty}. Past {@link AliasLoader#MAX_PROBLEMS}, one more line says how
-         * many more there were.
+         * whole, like Skript's {@code 'x.sk' is empty}. Those past {@link AliasLoader#MAX_PROBLEMS} aren't given:
+         * {@link #unlistedErrors}, {@link #unlistedWarnings} and {@link #unlistedNote} say how many there were.
          */
         public void problems(BiConsumer<Diagnostic, String> into) {
             for (AliasLoader.Problem problem : problems) {
                 into.accept(new Diagnostic(problem.error() ? co.xenastudios.neoskript.frontend.source.Severity.ERROR
                         : co.xenastudios.neoskript.frontend.source.Severity.WARNING, problem.file(), problem.line(), 0, 0,
                         problem.message()), problem.code());
-            }
-            if (moreProblems > 0) {
-                into.accept(new Diagnostic(co.xenastudios.neoskript.frontend.source.Severity.ERROR, "aliases", 0, 0, 0,
-                        "... and " + moreProblems + " more " + (moreProblems == 1 ? "problem" : "problems")
-                                + " in the alias files, not listed"), "");
             }
         }
     }
@@ -152,19 +166,22 @@ public final class GlobalAliases {
                 files[0] = readFolder(folder, current, 0, new int[] {0}, bytes, MAX_TOTAL_BYTES);
             }
             AliasTable table = current.finish();
-            return new Loaded(table, List.copyOf(current.problems()), current.moreProblems(), files[0]);
+            return new Loaded(table, List.copyOf(current.problems()), current.moreProblems(), current.moreErrors(),
+                    files[0]);
         } catch (RuntimeException | StackOverflowError | OutOfMemoryError | LinkageError e) {
             // Never stops the plugin: the aliases in use stay. What was found before the failure is still reported.
             List<AliasLoader.Problem> problems = new ArrayList<>();
             int more = 0;
+            int moreErrors = 0;
             if (loader != null) {
                 problems.addAll(loader.problems());
                 more = loader.moreProblems();
+                moreErrors = loader.moreErrors();
             }
             loader = null;
             problems.add(new AliasLoader.Problem("aliases", 0, true, "Couldn't load the aliases, so the aliases in use"
                     + " are kept: " + e, ""));
-            return new Loaded(null, problems, more, files[0]);
+            return new Loaded(null, problems, more, moreErrors, files[0]);
         }
     }
 
@@ -319,7 +336,7 @@ public final class GlobalAliases {
 
     /** The table in use, as a {@link Loaded} with no problems, to compare with a reload. */
     public static Loaded inUse() {
-        return new Loaded(current(), List.of(), 0, 0);
+        return new Loaded(current(), List.of(), 0, 0, 0);
     }
 
     static Set<String> changes(AliasTable before, AliasTable after, int limit) {

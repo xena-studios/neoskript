@@ -54,7 +54,7 @@ If Skript's `config.sk` has a `databases:` section, NeoSkript copies it to `conf
       - variables_2026-11-12_16-03-07.csv the copy, backed up before its first load
 </FileTree>
 
-Nothing is copied if `plugins/NeoSkript/scripts` already exists, for example after a start before you moved your scripts. Then copy them yourself. Alias files are copied last: one `plugins/NeoSkript/aliases` already has is kept, and the console says so. A server that moved over before NeoSkript read alias files gets `aliases/` copied once on its next start, unless `plugins/NeoSkript/aliases` exists by then.
+Nothing is copied if `plugins/NeoSkript/scripts` already exists, for example after a start before you moved your scripts. Then copy them yourself. Alias files are copied last, file by file: one `plugins/NeoSkript/aliases` already has is kept, and the console says so. A file or folder that can't be read is named in the console, the rest are still copied, and the next start tries again. A server that moved over before NeoSkript read alias files gets `aliases/` copied once on its next start, in the same way: files already in `plugins/NeoSkript/aliases` are kept, and Skript's others are added.
 
 A few of Skript's `config.sk` settings carry over to NeoSkript's `config.yml` in that first start: whether players are saved by UUID in variable names, `load default aliases`, the effect command settings, and the `databases:` section. The rest of `config.sk` isn't copied; NeoSkript's defaults match Skript's.
 

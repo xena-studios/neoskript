@@ -320,4 +320,67 @@ class SkriptMigrationTest {
         SkriptMigration.finish(neoskript, skript, retry.copied());
         assertTrue(Files.readString(neoskript.resolve(SkriptMigration.MARKER)).contains("Copied []"));
     }
+
+    @Test
+    void anUnreadableAliasFolderDoesntStopTheRestAndIsTriedAgain() throws Exception {
+        Path skript = skript();
+        Files.createDirectories(skript.resolve("aliases/locked"));
+        Files.writeString(skript.resolve("aliases/gems.sk"), "gems:\n\truby = minecraft:red_dye\n");
+        Files.writeString(skript.resolve("aliases/locked/more.sk"), "more:\n\ttopaz = minecraft:gold_ingot\n");
+        Files.writeString(skript.resolve("aliases/z.sk"), "z:\n\tjade = minecraft:lime_dye\n");
+        Path locked = skript.resolve("aliases/locked");
+        org.junit.jupiter.api.Assumptions.assumeTrue(locked.toFile().setReadable(false, false)
+                && locked.toFile().setExecutable(false, false) && !Files.isReadable(locked),
+                "needs a folder that can be made unreadable (not as root, not on Windows)");
+        Path neoskript = plugins.resolve("NeoSkript");
+        try {
+            SkriptMigration.Result first = SkriptMigration.migrate(skript, neoskript);
+            assertEquals(List.of("scripts", "variables.csv", "aliases"), first.copied());
+            assertTrue(Files.exists(neoskript.resolve("aliases/gems.sk")), "what can be read is copied");
+            assertTrue(Files.exists(neoskript.resolve("aliases/z.sk")), "what comes after it too");
+            assertTrue(first.notes().stream().anyMatch(note -> note.startsWith("Couldn't read Skript's aliases/locked")),
+                    first.notes().toString());
+            assertFalse(first.aliasesDone(), "it isn't done");
+            SkriptMigration.finish(neoskript, skript, first.copied(), first.aliasesDone());
+            assertFalse(Files.readString(neoskript.resolve(SkriptMigration.MARKER)).contains(SkriptMigration.ALIASES_DONE));
+        } finally {
+            locked.toFile().setReadable(true, false);
+            locked.toFile().setExecutable(true, false);
+        }
+        // The next start, with the folder readable: what was missing is copied, the rest isn't said to be kept, and
+        // now it's done.
+        SkriptMigration.Result again = SkriptMigration.migrate(skript, neoskript);
+        assertEquals(List.of("aliases"), again.copied());
+        assertTrue(Files.exists(neoskript.resolve("aliases/locked/more.sk")));
+        assertEquals(List.of(), again.notes());
+        assertTrue(again.aliasesDone());
+        assertTrue(Files.readString(neoskript.resolve(SkriptMigration.MARKER)).contains(SkriptMigration.ALIASES_DONE));
+        assertEquals(List.of(), SkriptMigration.migrate(skript, neoskript).copied(), "only once");
+    }
+
+    @Test
+    void aLaterMoveMergesIntoTheOwnersAliasFolderAsAFirstMoveDoes() throws Exception {
+        Path skript = skript();
+        Path neoskript = plugins.resolve("NeoSkript");
+        SkriptMigration.Result first = SkriptMigration.migrate(skript, neoskript);
+        SkriptMigration.finish(neoskript, skript, first.copied());
+        // A move from before NeoSkript read alias files, and an aliases folder the owner made since.
+        Path marker = neoskript.resolve(SkriptMigration.MARKER);
+        Files.writeString(marker, Files.readString(marker).replace(SkriptMigration.ALIASES_DONE + "\n", ""));
+        Files.createDirectories(neoskript.resolve("aliases"));
+        Files.writeString(neoskript.resolve("aliases/gems.sk"), "mine:\n\truby = minecraft:redstone\n");
+        Files.createDirectories(skript.resolve("aliases"));
+        Files.writeString(skript.resolve("aliases/gems.sk"), "gems:\n\truby = minecraft:red_dye\n");
+        Files.writeString(skript.resolve("aliases/more.sk"), "more:\n\ttopaz = minecraft:gold_ingot\n");
+
+        SkriptMigration.Result later = SkriptMigration.migrate(skript, neoskript);
+        assertEquals(List.of("aliases"), later.copied());
+        assertEquals("mine:\n\truby = minecraft:redstone\n", Files.readString(neoskript.resolve("aliases/gems.sk")),
+                "the owner's file is kept");
+        assertTrue(Files.exists(neoskript.resolve("aliases/more.sk")), "Skript's others are added");
+        assertEquals(List.of("Kept plugins/NeoSkript/aliases/gems.sk, which was there already, rather than Skript's"),
+                later.notes());
+        assertTrue(Files.readString(marker).contains(SkriptMigration.ALIASES_DONE));
+        assertEquals(List.of(), SkriptMigration.migrate(skript, neoskript).copied(), "only once");
+    }
 }
