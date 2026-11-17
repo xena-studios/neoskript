@@ -86,6 +86,13 @@ class SyntaxTest {
     }
 
     @Test
+    void skJsonsTaggedPatternsReadAsOnSkript() {
+        // '[json] :values [%-string%] of': on Skript the text before ':' is the tag and isn't matched, so 'json values
+        // "a" of' doesn't load there either.
+        assertEquals(1, scripts.problems("on load:\n\tset {_v::*} to json values \"a\" of {_j}\n").size());
+    }
+
+    @Test
     void skJsonJson() {
         loads("set {_j} to json from \"{}\"",
                 "set {_j} to json of 12",
@@ -114,9 +121,9 @@ class SyntaxTest {
                 "set {_k::*} to all keys \"a.b\" of {_j}",
                 "set {_k::*} to keys in path \"a\" of {_j}",
                 "set {_v::*} to values of {_j}",
-                "set {_v::*} to json values \"a\" of {_j}",
+                "set {_v::*} to values \"a\" of {_j}",
                 "set {_v} to value \"a\" of {_j}",
-                "set {_v} to json value \"a[1]\" of {_j}",
+                "set {_v} to value \"a[1]\" of {_j}",
                 "set {_v::*} to values at path \"a\" in {_j}",
                 "set {_v} to value at path \"a.1\" in {_j}",
                 "set {_v::*} to values of path \"a\" in {_j}",

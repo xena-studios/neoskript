@@ -14,6 +14,11 @@ function probe_types():
 	show("potions", (speed, potion effect of speed of tier 2 for 10 seconds))
 	show("enchantments", (sharpness 3, diamond sword of sharpness 2))
 	show("parsed", ("stone" parsed as item type, "zombie" parsed as entity type))
+	# A colon in a script's pattern is text to match: Skript escapes parse tags there (ExprParse.escapeParseTags).
+	show("parsed tag before", "apples 5" parsed as "fruit:apples %number%")
+	show("parsed tag text", "fruit:apples 5" parsed as "fruit:apples %number%")
+	show("parsed tag spaced", "5" parsed as "x :%number%")
+	show("parsed tag after", "all of 7" parsed as "[:all of] %number%")
 	show("game modes", (survival, creative))
 	show("console", console)
 	show("unset", ({_unset}, whether {_unset} is set))

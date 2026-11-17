@@ -6302,12 +6302,31 @@ final class TriggerCompiler {
      * as their types (a plural one as a list). Its values come one after another, or grouped by placeholder
      * when set into a list variable, as Skript's ExprParse does.
      */
+    /**
+     * A script's pattern with its {@code :} and {@code ¦} escaped, as Skript's {@code ExprParse.escapeParseTags}: in
+     * {@code parsed as "fruit:apples %number%"} the colon is text to match, not a parse tag.
+     */
+    static String escapeParseTags(String pattern) {
+        StringBuilder escaped = new StringBuilder(pattern.length());
+        for (int i = 0; i < pattern.length(); i++) {
+            char c = pattern.charAt(i);
+            if (c == '\\' && i + 1 < pattern.length()) {
+                escaped.append(c).append(pattern.charAt(++i));
+            } else if (c == ':' || c == '¦') {
+                escaped.append('\\').append(c);
+            } else {
+                escaped.append(c);
+            }
+        }
+        return escaped.toString();
+    }
+
     private void parsePattern(Expr.Syntax syntax) throws CompileException {
         Object regex = syntax.syntax().match().regexValues().getFirst();
         String text = regex instanceof java.util.regex.MatchResult match ? match.group() : String.valueOf(regex);
         co.xenastudios.neoskript.frontend.pattern.CompiledPattern pattern;
         try {
-            pattern = co.xenastudios.neoskript.frontend.pattern.PatternCompiler.compile(text);
+            pattern = co.xenastudios.neoskript.frontend.pattern.PatternCompiler.compile(escapeParseTags(text));
         } catch (RuntimeException e) {
             throw new CompileException(line, "Malformed pattern: " + e.getMessage());
         }

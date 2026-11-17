@@ -153,7 +153,7 @@ public final class PatternCompiler {
         boolean tagNext = false;
         List<PatternElement> elements = new ArrayList<>();
         StringBuilder literal = new StringBuilder();
-        // ':text' within a sequence: the text up to the next group or placeholder is tagged with itself.
+        // ':text' with nothing before the colon: the text up to the next group or placeholder is tagged with itself.
         String textTag = null;
         int textTagStart = 0;
         int textTagEnd = -1;
@@ -198,20 +198,26 @@ public final class PatternCompiler {
                     tagNext = false;
                 }
                 case ':' -> {
-                    // ':(a|b)' within a sequence: each choice tagged with its text, as in Skript.
+                    // A tag, as Skript's PatternCompiler reads one: the text since the last group, placeholder or
+                    // regex ('x ' in 'x :all') is the tag, and isn't matched. With no text before it, it tags the
+                    // literal after it ('[:all of]'), or each text choice of the group after it (':(a|b)').
                     char next = pos + 1 < source.length() ? source.charAt(pos + 1) : 0;
                     int end = textEnd(pos + 1);
-                    if (literal.isEmpty() && (next == '(' || next == '[')) {
+                    String before = textBefore(elements, literal);
+                    if (!before.isEmpty()) {
+                        literal.setLength(0);
+                        while (!elements.isEmpty() && (elements.getLast() instanceof PatternElement.Literal
+                                || elements.getLast() instanceof PatternElement.Whitespace)) {
+                            elements.removeLast();
+                        }
+                        elements.add(new PatternElement.Choice(List.of(new PatternElement.Alternative(
+                                new PatternElement.Sequence(List.of()), 0, Text.lower(before)))));
+                    } else if (next == '(' || next == '[') {
                         tagNext = true;
-                    } else if (literal.isEmpty() && textTag == null && end > pos + 1
-                            && !source.substring(pos + 1, end).isBlank()) {
-                        // ':values [%-string%]': 'values' is tagged 'values', as Skript tags the literal after it.
-                        flush(literal, elements);
+                    } else if (textTag == null && end > pos + 1 && !source.substring(pos + 1, end).isBlank()) {
                         textTag = Text.lower(source.substring(pos + 1, end).strip());
                         textTagStart = elements.size();
                         textTagEnd = end;
-                    } else {
-                        literal.append(c);
                     }
                     pos++;
                 }
@@ -241,6 +247,25 @@ public final class PatternCompiler {
         }
         linkLookahead(elements);
         return elements.size() == 1 ? elements.getFirst() : new PatternElement.Sequence(elements);
+    }
+
+    /**
+     * The text since the last group, placeholder or regex in this sequence, spaces included, as Skript's literal
+     * builder holds it when it reaches a {@code :}.
+     */
+    private static String textBefore(List<PatternElement> elements, StringBuilder literal) {
+        StringBuilder text = new StringBuilder();
+        for (int i = elements.size() - 1; i >= 0; i--) {
+            PatternElement element = elements.get(i);
+            if (element instanceof PatternElement.Literal l) {
+                text.insert(0, l.text());
+            } else if (element instanceof PatternElement.Whitespace) {
+                text.insert(0, ' ');
+            } else {
+                break;
+            }
+        }
+        return text.append(literal).toString();
     }
 
     /** Where the plain text starting at {@code from} ends: at a group, a placeholder, a regex or a choice's end. */
