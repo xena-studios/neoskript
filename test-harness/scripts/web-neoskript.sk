@@ -1,0 +1,94 @@
+# NeoSkriptWeb's own checks, on NeoSkript only (the neoskript-web scenario): what the originals had no answer to.
+# The harness sets timeout-seconds to 3, max-response-kilobytes to 1024, max-requests-in-flight to 64 and
+# max-requests-per-minute to 2000. Each check prints '[web] neo <label>: ok' or '[web] neo <label>: FAIL ...'.
+
+function neo(label: text, ok: boolean, detail: objects = ""):
+    if {_ok} is true:
+        send "[web] neo %{_label}%: ok" to console
+    else:
+        send "[web] neo %{_label}%: FAIL %{_detail::*}%" to console
+
+command /webneo [<text>]:
+    trigger:
+        if arg-1 is "hang":
+            send "[web] neo hanging" to console
+            send request to "http://127.0.0.1:@PORT@/trickle"
+            send "[web] neo after hang: old code carried on" to console
+            stop
+        if arg-1 is "flood":
+            delete {web::events::*}
+            loop 300 times:
+                set {_r} to prepare GET request on "http://127.0.0.1:@PORT@/text"
+                execute {_r} as non blocking
+            wait 5 seconds
+            neo("every flooded request answered once", whether size of {web::events::*} is 300, size of {web::events::*})
+            neo("some flooded requests refused", whether {web::events::*} contains "UNKNOWN", {web::events::*})
+            neo("some flooded requests answered", whether {web::events::*} contains "OK", {web::events::*})
+            send "[web] neo flood done" to console
+            stop
+        set {_start} to now
+        send request to "http://127.0.0.1:@PORT@/trickle"
+        neo("slow body times out", whether last response is not set, last response)
+        neo("timeout is the config's", whether difference between {_start} and now is less than 8 seconds, difference between {_start} and now)
+        set {_start} to now
+        send request to "http://127.0.0.1:@SILENT@/never"
+        neo("silent server times out", whether last response is not set, last response)
+        neo("silent timeout is the config's", whether difference between {_start} and now is less than 8 seconds, difference between {_start} and now)
+        send request to "http://127.0.0.1:@PORT@/huge"
+        neo("endless body is cut off", whether last response is not set, last response)
+        send request to "http://127.0.0.1:@PORT@/bomb"
+        neo("gzip bomb is cut off", whether last response is not set, last response)
+        send request to "http://127.0.0.1:@PORT@/loop"
+        neo("redirect loop stops", whether last response is not set, last response)
+        send request to "file:///etc/passwd"
+        neo("only web addresses", whether last response is not set, last response)
+        set {_deep} to prepare GET request on "http://127.0.0.1:@PORT@/deep"
+        execute {_deep}
+        set {_body} to body of last response of {_deep}
+        neo("deep json is text", whether length of "%{_body}%" is 200000, length of "%{_body}%")
+        set {_parsed} to parse {_body} as json
+        neo("deep json parses as a string", whether {_parsed} is a json primitive, {_parsed})
+        map {_parsed} to {_deepmap::*}
+        neo("deep json maps to nothing", whether size of {_deepmap::*} is 0, size of {_deepmap::*})
+        set {_open} to "[" repeated 200 times
+        set {_close} to "]" repeated 200 times
+        set {_nested} to parse "%{_open}%1%{_close}%" as json
+        map {_nested} to {_n::*}
+        neo("200 deep json maps without failing", true)
+        set {_bad} to prepare GET request on "http://127.0.0.1:@PORT@/bad-json"
+        execute {_bad}
+        neo("bad json is text", whether body of last response of {_bad} is "{""broken"": ", body of last response of {_bad})
+        set {_a::*} to "x" and "y"
+        set {_a::*} to {_a::*}'s formatted json
+        neo("formatted json of a list", true)
+        loop 200 times:
+            send request to "http://127.0.0.1:@PORT@/text"
+            if response code of last response is 200:
+                add 1 to {_ok}
+        neo("200 requests in a row", whether {_ok} is 200, {_ok})
+        set {_r1} to prepare GET request on "http://127.0.0.1:@PORT@/json"
+        set {_r2} to prepare GET request on "http://127.0.0.1:@PORT@/text"
+        execute {_r1}
+        execute {_r2}
+        set {_both} to false
+        if status code of last response of {_r1} is 200:
+            if status code of last response of {_r2} is 200:
+                set {_both} to true
+        neo("each request keeps its response", {_both}, last response of {_r1})
+        send a "GET" request to "http://127.0.0.1:@PORT@/json"
+        set {_reqn} to last response
+        set {_res} to last response of {_r1}
+        set {_bodies} to false
+        if body of {_reqn} is set:
+            if body of {_res} is set:
+                set {_bodies} to true
+        neo("reqn and skjson bodies side by side", {_bodies}, body of {_reqn})
+        set {_codes} to false
+        if status code of {_reqn} is 200:
+            if status code of {_res} is 200:
+                set {_codes} to true
+        neo("reqn and skjson status codes side by side", {_codes}, status code of {_reqn})
+        send "[web] neo done" to console
+
+on received http response:
+    add status of event-response to {web::events::*}
