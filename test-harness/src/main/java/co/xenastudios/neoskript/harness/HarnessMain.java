@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.harness;
 
+import co.xenastudios.neoskript.harness.scenario.ConfigSettingsScenario;
 import co.xenastudios.neoskript.harness.scenario.DifferentialScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptBootScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptCliScenario;
@@ -77,6 +78,7 @@ public final class HarnessMain {
             new NeoSkriptLoadBenchmark(),
             new SkillExamplesScenario(),
             new DifferentialScenario(),
+            new ConfigSettingsScenario(),
             new NeoSkriptCliScenario(),
             new SyntaxExportScenario(),
             new EventBenchmark(),

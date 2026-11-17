@@ -28,43 +28,36 @@ import java.util.Map;
 final class SkriptMigration {
 
     static final String MARKER = ".migrated-from-skript";
-    /** What's copied from {@code plugins/Skript}: the scripts and the saved variables. */
-    static final List<String> COPIED = List.of("scripts", "variables.csv");
+    /** What's copied from {@code plugins/Skript}: the scripts, the saved variables and its own language files. */
+    static final List<String> COPIED = List.of("scripts", "variables.csv", "lang");
 
     /**
-     * What was copied, relative to the folders, for the log (empty if nothing was), Skript's
-     * {@code use player UUIDs in variable names} from its config.sk, or {@code null} if it doesn't say, and its
-     * other settings NeoSkript has, by their path in NeoSkript's config.yml ({@link #SETTINGS}), and the backup of
-     * the variables copied, made before NeoSkript first loads them (or {@code null}).
+     * What was copied, relative to the folders, for the log (empty if nothing was), Skript's settings from its
+     * config.sk that NeoSkript has, by their path in NeoSkript's config.yml ({@link SkriptSettings}), and the backup
+     * of the variables copied, made before NeoSkript first loads them (or {@code null}). If config.sk couldn't be
+     * read, {@code settingsProblem} says why, and no settings are copied.
      */
-    record Result(List<String> copied, int scriptCount, Boolean playerUuids, Map<String, Object> settings,
-            Path variablesBackup) {
+    record Result(List<String> copied, int scriptCount, Map<String, Object> settings, Path variablesBackup,
+            String settingsProblem) {
 
-        Result(List<String> copied, int scriptCount, Boolean playerUuids) {
-            this(copied, scriptCount, playerUuids, Map.of(), null);
+        Result(List<String> copied, int scriptCount) {
+            this(copied, scriptCount, Map.of(), null, null);
         }
     }
-
-    /** Skript's config.sk options that NeoSkript's config.yml has too, by Skript's name, with NeoSkript's path. */
-    static final Map<String, String> SETTINGS = Map.of(
-            "enable effect commands", "effect-commands.enabled",
-            "effect command token", "effect-commands.token",
-            "allow ops to use effect commands", "effect-commands.allow-ops",
-            "log effect commands", "effect-commands.log");
 
     private SkriptMigration() {}
 
     static Result migrate(Path skriptDir, Path neoskriptDir) throws IOException {
         if (!Files.isDirectory(skriptDir) || Files.exists(neoskriptDir.resolve(MARKER))
                 || Files.exists(neoskriptDir.resolve("scripts"))) {
-            return new Result(List.of(), 0, null);
+            return new Result(List.of(), 0);
         }
         Files.createDirectories(neoskriptDir);
         List<String> copied = new ArrayList<>();
         int[] scripts = {0};
         for (String name : COPIED) {
             Path source = skriptDir.resolve(name);
-            if (!Files.exists(source)) {
+            if (!Files.exists(source) || Files.exists(neoskriptDir.resolve(name))) {
                 continue;
             }
             copy(source, neoskriptDir.resolve(name), scripts);
@@ -75,81 +68,14 @@ final class SkriptMigration {
         Path backup = copied.contains("variables.csv") ? VariableStorage.backup(variables) : null;
         Files.writeString(neoskriptDir.resolve(MARKER),
                 "Copied " + copied + " from " + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n");
-        return new Result(copied, scripts[0], playerUuids(skriptDir.resolve("config.sk")),
-                settings(skriptDir.resolve("config.sk")), backup);
-    }
-
-    /**
-     * The {@link #SETTINGS} Skript's config.sk has, by NeoSkript's path: booleans for its yes/no options, and the
-     * text of the others. Options it doesn't have, or whose value isn't valid, are left out.
-     */
-    static Map<String, Object> settings(Path config) throws IOException {
-        Map<String, Object> settings = new java.util.LinkedHashMap<>();
-        if (!Files.isRegularFile(config)) {
-            return settings;
+        Map<String, Object> settings = Map.of();
+        String problem = null;
+        try {
+            settings = SkriptSettings.read(skriptDir.resolve("config.sk"), neoskriptDir.resolve("lang"));
+        } catch (IOException | RuntimeException | StackOverflowError e) {
+            problem = String.valueOf(e.getMessage() == null ? e : e.getMessage());
         }
-        for (String line : Files.readAllLines(config)) {
-            int colon = line.indexOf(':');
-            if (colon < 0) {
-                continue;
-            }
-            String path = SETTINGS.get(line.substring(0, colon).strip().toLowerCase(java.util.Locale.ROOT));
-            if (path == null || settings.containsKey(path)) {
-                continue;
-            }
-            String value = value(line.substring(colon + 1));
-            if (path.equals("effect-commands.token")) {
-                if (!value.isEmpty()) {
-                    settings.put(path, value);
-                }
-                continue;
-            }
-            switch (value.toLowerCase(java.util.Locale.ROOT)) {
-                case "true", "yes", "on" -> settings.put(path, Boolean.TRUE);
-                case "false", "no", "off" -> settings.put(path, Boolean.FALSE);
-                default -> {}
-            }
-        }
-        return settings;
-    }
-
-    /** An option's value as Skript's config reads it: up to a {@code #} comment, where {@code ##} is a {@code #}. */
-    private static String value(String text) {
-        StringBuilder value = new StringBuilder();
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c == '#') {
-                if (i + 1 < text.length() && text.charAt(i + 1) == '#') {
-                    value.append('#');
-                    i++;
-                    continue;
-                }
-                break;
-            }
-            value.append(c);
-        }
-        return value.toString().strip();
-    }
-
-    /** Skript's {@code use player UUIDs in variable names} option, if its config has it. */
-    static Boolean playerUuids(Path config) throws IOException {
-        if (!Files.isRegularFile(config)) {
-            return null;
-        }
-        for (String line : Files.readAllLines(config)) {
-            String option = line.strip();
-            if (option.startsWith("use player UUIDs in variable names:")) {
-                String value = option.substring(option.indexOf(':') + 1).strip().toLowerCase(java.util.Locale.ROOT);
-                int comment = value.indexOf('#');
-                value = (comment >= 0 ? value.substring(0, comment) : value).strip();
-                return switch (value) {
-                    case "true", "yes", "on" -> Boolean.TRUE;
-                    case "false", "no", "off" -> Boolean.FALSE;
-                    default -> null;
-                };
-            }
-        }
-        return null;
+        return new Result(copied, scripts[0], settings, backup, problem);
     }
 
     private static void copy(Path source, Path target, int[] scripts) throws IOException {

@@ -5,7 +5,7 @@ description: Every setting in NeoSkript's config.yml, its default, when a change
 
 import { Aside } from "@astrojs/starlight/components";
 
-NeoSkript's settings are in `plugins/NeoSkript/config.yml`. It's written on the first start, with a comment on every setting. NeoSkript has no `config.sk`: the few Skript settings it has are here, and the rest of Skript's settings either match Skript's defaults or aren't needed.
+NeoSkript's settings are in `plugins/NeoSkript/config.yml`. It's written on the first start, with a comment on every setting. NeoSkript has no `config.sk`: Skript's settings that change how scripts behave are here, under the same names in kebab case, with Skript's defaults. Moving over copies the ones you changed. Those that don't apply to NeoSkript are [listed with why](#skript-settings-that-dont-apply).
 
 Apply changes with `/sk reload config`. Most settings apply at once; [some wait for a restart](#what-applies-when).
 
@@ -44,9 +44,12 @@ Script problems at startup and runtime errors keep Skript's look, since tools an
 
 - the theme;
 - `update-checker`;
-- `variables.player-uuids-in-names` and `variables.save-interval`;
+- `language`, `text` and `syntax`;
+- `variables.player-uuids-in-names`, `variables.player-variable-fix` and `variables.save-interval`;
 - the `runtime-errors` limits;
 - `effect-commands`.
+
+`text.case-sensitive` applies at once to comparisons and `contains`; replace and split read it when a script loads, as in Skript, so reload the scripts too.
 
 `metrics`, `variables.file`, `variables.storage`, `variables.recover` and the `events` settings apply when the server restarts. The reload says so when one of them changed.
 
@@ -74,6 +77,40 @@ bStats can also be turned off for every plugin at once in `plugins/bStats/config
 
 See [updates and bStats](/docs/server/updates-and-metrics/) for who hears about a new version.
 
+## language
+
+| Setting | Default | What it does |
+|---|---|---|
+| `language` | `english` | The language of the messages scripts show from Skript's language files. Skript's `language`. |
+
+Skript's language files are built in: `english`, `german`, `french`, `spanish`, `dutch`, `polish`, `russian`, `turkish`, `catalan`, `japanese`, `korean` and `simplifiedchinese`. A `<name>.lang` file in `plugins/NeoSkript/lang`, in Skript's format, adds a language or changes some of one's messages, as `plugins/Skript/lang` does for Skript. Moving over copies that folder.
+
+What scripts show from them is what nothing is in text (`<none>`, `<tanımsız>` in Turkish) and a command's default cooldown message. Skript's own messages for `/sk` and reloads don't apply: NeoSkript's are its own, in English. A language with no file falls back to English, with a warning.
+
+## text
+
+How scripts write and compare text. Skript's options of the same names.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `text.date-format` | `default` | How dates are written as text. `default` is the server locale's short date and time, as `1/15/24, 10:30 AM`, or write a [SimpleDateFormat](https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html) pattern such as `yyyy-MM-dd HH:mm`. `log` stamps its lines with it too. Skript's `date format`. |
+| `text.number-accuracy` | `2` | The most decimal places a number is written with, without trailing zeros: `1/3` is `0.33`. `0` rounds to whole numbers. Variable names always keep up to 8, as in Skript. Skript's `number accuracy`. |
+| `text.case-sensitive` | `false` | Whether comparing texts, `contains`, replace, split, `positions of` and comparing text components heed case. Skript's `case sensitive`. |
+| `text.color-codes-reset-formatting` | `true` | Whether a colour (`&a`, `<red>`) turns off bold, italics and the rest before it, as Minecraft's own codes do. Skript's `color codes reset formatting`. |
+| `text.safe-tags` | `color`, `decorations`, `gradient`, `rainbow`, `reset`, `transition`, `pride`, `shadowColor` | The MiniMessage tags read in text that isn't the script's own, such as a player's chat message made `colored`. Tag names, or [groups](https://docs.advntr.dev/minimessage/format) of them. Skript's `safe tags`. |
+| `text.parse-links` | `disabled` | Whether text that looks like a link is made clickable: `disabled`, `strict` (only `http://` and `https://` links) or `lenient` (anything with a dot, such as `example.com`). Skript's `parse links in chat messages`. |
+
+Skript has its `case sensitive` option the wrong way round in `positions of "a" in "Abc"`: off, it finds text with case, and on, without. NeoSkript follows the option.
+
+## syntax
+
+Settings for particular syntax. Skript's options of the same names.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `syntax.target-block-distance` | `100` | How many blocks away `targeted block`, `target` and `blocks in front of` look, from 1 to 1000. Skript's `maximum target block distance`. |
+| `syntax.player-name-pattern` | `[a-zA-Z0-9_]{1,16}` | The text that can be read as an offline player's name, as a Java regular expression. A UUID always can. Skript's `player name regex pattern`. |
+
 ## variables
 
 | Setting | Default | What it does |
@@ -83,6 +120,7 @@ See [updates and bStats](/docs/server/updates-and-metrics/) for who hears about 
 | `variables.recover` | `false` | Native storage only: a one-shot recovery of a damaged `variables.nsv` that no snapshot can repair. Loads everything up to the last good save, turns itself off first, keeping the file's comments, then backs the damaged file up and lists what's lost. If config.yml can't be changed (read-only, or from a newer NeoSkript), it isn't used, and the console says so. Works with either storage. Applies on restart, and only does anything when the file is damaged. |
 | `variables.save-interval` | `5 minutes` | How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops. |
 | `variables.player-uuids-in-names` | `true` | Whether a player in a variable's name, as in `{money::%player%}`, is their UUID (`true`) or their name. Skript's `use player UUIDs in variable names`. |
+| `variables.player-variable-fix` | `true` | A player kept in a variable who leaves and joins again is a new player to the server. On, reading the variable gives the player now online, and stores them. Off, it gives the old player, whom messages and changes no longer reach. Skript's `player variable fix`. |
 
 Moving over from Skript copies Skript's `use player UUIDs in variable names` setting into `player-uuids-in-names`, so the variables Skript saved are found. See [variables and storage](/docs/server/variables/).
 
@@ -124,7 +162,37 @@ These commands can do anything, so give the permission carefully. See [effect co
 
 ## Moving from Skript
 
-The first start copies Skript's settings for effect commands and `use player UUIDs in variable names` from `config.sk`. Skript's other `config.sk` settings aren't copied: NeoSkript's behaviour matches Skript's defaults for them. See [moving from Skript](/docs/moving-from-skript/).
+The first start copies these settings from Skript's `config.sk`, read as Skript reads it, so a server that changed one behaves as it did:
+
+| Skript's `config.sk` | NeoSkript's `config.yml` |
+|---|---|
+| `language` | `language` |
+| `date format` | `text.date-format` |
+| `number accuracy` | `text.number-accuracy` |
+| `case sensitive` | `text.case-sensitive` |
+| `color codes reset formatting` | `text.color-codes-reset-formatting` |
+| `safe tags` | `text.safe-tags` |
+| `parse links in chat messages` | `text.parse-links` |
+| `maximum target block distance` | `syntax.target-block-distance` |
+| `player name regex pattern` | `syntax.player-name-pattern` |
+| `use player UUIDs in variable names` | `variables.player-uuids-in-names` |
+| `player variable fix` | `variables.player-variable-fix` |
+| `plugin priority` | `events.priority` |
+| `listen to cancelled events by default` | `events.listen-to-cancelled` |
+| `runtime errors` | `runtime-errors` |
+| `enable effect commands`, `effect command token`, `allow ops to use effect commands`, `log effect commands` | `effect-commands` |
+
+A setting `config.sk` doesn't have keeps NeoSkript's default, which is the value in Skript's default `config.sk`. One Skript can't read, such as `plugin priority: hihg`, is copied as what Skript then runs with: its built-in default (`normal` for the priority). The console lists what was copied. See [moving from Skript](/docs/moving-from-skript/).
+
+## Skript settings that don't apply
+
+| Skript's `config.sk` | Why |
+|---|---|
+| `check for new version`, `update check interval`, `release channel` | NeoSkript checks Modrinth for its own versions instead: `update-checker`. |
+| `script loader thread size` | NeoSkript loads scripts its own way: each file is parsed in parallel, and nothing waits on the main thread. There's nothing to size. |
+| `version` | Skript's own record of its config's version. NeoSkript's is `config-version`. |
+| `load default aliases` | See custom aliases. |
+| `databases` | NeoSkript saves to Skript's `variables.csv` (`variables.file`). Database storage is planned. |
 
 ## Updating NeoSkript
 
@@ -179,6 +247,35 @@ metrics: true
 # logged to the console and shown to players with skript.admin when they join. Development builds never check.
 update-checker: true
 
+# The language of the messages scripts show from Skript's language files, as Skript's 'language': what
+# nothing is in text (<none>) and a command's default cooldown message. Skript's languages are built in:
+# english, german, french, spanish, dutch, polish, russian, turkish, catalan, japanese, korean and
+# simplifiedchinese. A <name>.lang file in plugins/NeoSkript/lang adds a language, or changes one's
+# messages. NeoSkript's own messages (/sk, reloads) are in English.
+language: "english"
+
+text:
+  # How dates are written as text, as Skript's 'date format': default, the server locale's short date and
+  # time (1/15/24, 10:30 AM), or a pattern such as yyyy-MM-dd HH:mm, written as Java's SimpleDateFormat:
+  # https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html
+  date-format: "default"
+  # Skript's 'number accuracy': the most decimal places numbers are written with as text, without
+  # trailing zeros (2 writes 1/3 as 0.33, and 0.5 as 0.5). 0 rounds to whole numbers.
+  number-accuracy: 2
+  # Skript's 'case sensitive': whether comparing texts, 'contains', replace, split and finding text heed
+  # case, so "Hello" isn't "hello". Replace and split read it when a script loads.
+  case-sensitive: false
+  # Skript's 'color codes reset formatting': whether a colour (&a, <red>) turns off the bold, italics and
+  # so on before it, as in Minecraft's own codes.
+  color-codes-reset-formatting: true
+  # Skript's 'safe tags': the MiniMessage tags read in text that isn't the script's own, such as a
+  # player's chat message made 'colored'. Tag names, or groups of them (color, decorations). Other tags,
+  # such as click events, are only read in a script's own text.
+  safe-tags: ["color", "decorations", "gradient", "rainbow", "reset", "transition", "pride", "shadowColor"]
+  # Skript's 'parse links in chat messages': whether text that looks like a link is clickable. disabled,
+  # strict (only http:// and https:// links) or lenient (anything with a dot, like example.com).
+  parse-links: "disabled"
+
 variables:
   # Where global variables are saved, in Skript's variables.csv format (Skript can read it too).
   # Relative to plugins/NeoSkript. Variables whose names start with - aren't saved. Applies on restart.
@@ -199,6 +296,17 @@ variables:
   # 'use player UUIDs in variable names' (on in Skript's default config). Moving over from Skript copies
   # its setting, so the variables it saved are found.
   player-uuids-in-names: true
+  # Skript's 'player variable fix': a player in a variable who leaves and joins again is read as the
+  # player now online. Off, it stays the old player, whom messages and changes no longer reach.
+  player-variable-fix: true
+
+syntax:
+  # Skript's 'maximum target block distance': how many blocks away 'targeted block', 'target' and
+  # 'blocks in front of' look.
+  target-block-distance: 100
+  # Skript's 'player name regex pattern': the text that can be read as an offline player's name, as a
+  # Java regular expression. Names that don't match aren't players (UUIDs always are).
+  player-name-pattern: "[a-zA-Z0-9_]{1,16}"
 
 events:
   # The priority scripts listen to events at: lowest, low, normal, high, highest or monitor. As in Skript,

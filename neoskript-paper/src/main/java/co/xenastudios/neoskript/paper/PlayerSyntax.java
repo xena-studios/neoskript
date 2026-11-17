@@ -935,13 +935,15 @@ final class PlayerSyntax {
                         default -> entity.getScoreboardTags().clear();
                     }
                 }), "[(all [[of] the]|the)] scoreboard tags of %entities%", "%entities%'[s] scoreboard tags");
-        // Blocks that aren't air count as solid; 'actual' targets the real hit box. Skript looks 100 blocks.
+        // Blocks that aren't air count as solid; 'actual' targets the real hit box. Skript looks as far as its
+        // 'maximum target block distance', 100 blocks by default (config.yml's syntax.target-block-distance).
         // Any time state is taken, and changes nothing, as in Skript.
         registrar.timeStates("ExprTargetedBlock", info -> true);
         registrar.expression("ExprTargetedBlock", "block", info -> {
             boolean actual = info.hasTag("actual");
             return (context, args) -> map(args[0], LivingEntity.class, living -> {
-                Block block = actual ? living.getTargetBlockExact(100) : living.getTargetBlock(null, 100);
+                int distance = co.xenastudios.neoskript.runtime.Settings.targetBlockDistance();
+                Block block = actual ? living.getTargetBlockExact(distance) : living.getTargetBlock(null, distance);
                 return block == null || block.getType().isAir() ? null : block;
             });
         }, "[the] [actual:(actual[ly]|exact)] target[ed] block[s] [of %livingentities%]",

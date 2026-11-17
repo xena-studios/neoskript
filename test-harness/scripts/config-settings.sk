@@ -1,0 +1,47 @@
+# For the config-settings scenario: what Skript's config.sk settings change, written to logs/cfg.log raw, so the
+# reference Skript and NeoSkript can be compared given the same config.sk. The players' part shows the language's
+# cooldown message and the player variable fix.
+
+on load:
+	log "number: %1/3%, %5/2%, %10/4%, %1/3 * 100%" to "cfg"
+	set {_names::%1/3%} to 1
+	log "variable name: %indices of {_names::*}%" to "cfg"
+	log "date: %date(2024, 1, 15, 10, 30)%" to "cfg"
+	if "Hello" is "hello":
+		log "equal: yes" to "cfg"
+	else:
+		log "equal: no" to "cfg"
+	if "Hello World" contains "world":
+		log "contains: yes" to "cfg"
+	else:
+		log "contains: no" to "cfg"
+	set {_text} to "AaA"
+	replace all "a" with "b" in {_text}
+	log "replace: %{_text}%" to "cfg"
+	log "split: %split "aXbxc" at "x"%" to "cfg"
+	log "positions: %all positions of "a" in "Abca"%" to "cfg"
+	log "nothing: %{_nothing}%" to "cfg"
+	set {_formatted} to formatted "<bold>a<red>b"
+	log "reset: %{_formatted}%" to "cfg"
+	set {_colored} to colored "<red>x<bold>y<click:run_command:/x>z"
+	log "safe tags: %{_colored}%" to "cfg"
+	set {_link} to formatted "see https://example.com/a and example.org"
+	log "links: %{_link}%" to "cfg"
+	log "blocks: %amount of (blocks north of location(0, 64, 0, world "world"))%" to "cfg"
+	log "player abcd: %"abcd" parsed as offline player%" to "cfg"
+	log "player Abc1: %"Abc1" parsed as offline player%" to "cfg"
+	log "end" to "cfg"
+	send "[harness] cfg loaded" to console
+
+command /cfgcool:
+	cooldown: 1 minute
+	trigger:
+		send "cooled"
+
+on join:
+	if {cfg::player} is set:
+		send "again" to {cfg::player}
+		send "marker" to player
+	else:
+		set {cfg::player} to player
+		send "first" to player

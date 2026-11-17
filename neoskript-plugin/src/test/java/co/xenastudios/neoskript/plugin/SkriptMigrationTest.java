@@ -64,20 +64,10 @@ class SkriptMigrationTest {
     }
 
     @Test
-    void readsSkriptsPlayerUuidSetting() throws Exception {
+    void readsSkriptsSettings() throws Exception {
         Path skript = skript();
-        assertEquals(null, SkriptMigration.migrate(skript, plugins.resolve("NeoSkript")).playerUuids());
-        Path config = skript.resolve("config.sk");
-        Files.writeString(config, "language: english\n\tuse player UUIDs in variable names: false # names\n");
-        assertEquals(Boolean.FALSE, SkriptMigration.playerUuids(config));
-        Files.writeString(config, "use player UUIDs in variable names: true\n");
-        assertEquals(Boolean.TRUE, SkriptMigration.playerUuids(config));
-    }
-
-    @Test
-    void readsSkriptsEffectCommandSettings() throws Exception {
-        Path skript = skript();
-        assertEquals(java.util.Map.of(), SkriptMigration.migrate(skript, plugins.resolve("NeoSkript")).settings());
+        assertEquals(java.util.Map.of("language", "english"),
+                SkriptMigration.migrate(skript, plugins.resolve("NeoSkript")).settings());
         Path config = skript.resolve("config.sk");
         Files.writeString(config, """
                 enable effect commands: true
@@ -85,8 +75,33 @@ class SkriptMigrationTest {
                 # If 'enable effect commands' is set to true, ...
                 allow ops to use effect commands: false
                 log effect commands: maybe
+                	use player UUIDs in variable names: false # names
                 """);
+        // 'maybe' isn't a yes or no, so Skript runs with its default, off.
         assertEquals(java.util.Map.of("effect-commands.enabled", true, "effect-commands.token", "#!",
-                "effect-commands.allow-ops", false), SkriptMigration.settings(config));
+                "effect-commands.allow-ops", false, "effect-commands.log", false,
+                "variables.player-uuids-in-names", false), SkriptSettings.read(config, null));
+    }
+
+    @Test
+    void anUnreadableConfigSkStillCopiesTheScripts() throws Exception {
+        Path skript = skript();
+        Files.write(skript.resolve("config.sk"), new byte[] {(byte) 0xff, (byte) 0xfe, 'x', '\n'});
+        SkriptMigration.Result result = SkriptMigration.migrate(skript, plugins.resolve("NeoSkript"));
+        assertEquals(List.of("scripts", "variables.csv"), result.copied());
+        assertEquals(java.util.Map.of(), result.settings());
+        assertTrue(result.settingsProblem().contains("UTF-8"), result.settingsProblem());
+    }
+
+    @Test
+    void copiesSkriptsLanguageFiles() throws Exception {
+        Path skript = skript();
+        Files.createDirectories(skript.resolve("lang"));
+        Files.writeString(skript.resolve("lang/pirate.lang"), "none: <naught>\n");
+        Files.writeString(skript.resolve("config.sk"), "language: Pirate\n");
+        SkriptMigration.Result result = SkriptMigration.migrate(skript, plugins.resolve("NeoSkript"));
+        assertEquals(List.of("scripts", "variables.csv", "lang"), result.copied());
+        assertEquals("pirate", result.settings().get("language"));
+        assertTrue(Files.exists(plugins.resolve("NeoSkript/lang/pirate.lang")));
     }
 }

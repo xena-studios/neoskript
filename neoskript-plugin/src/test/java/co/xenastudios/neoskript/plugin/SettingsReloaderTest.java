@@ -38,6 +38,11 @@ class SettingsReloaderTest {
         }
 
         @Override
+        public void scripts(NeoSkriptConfig settings) {
+            applied.add("scripts " + settings.text().numberAccuracy());
+        }
+
+        @Override
         public void effectCommands(EffectCommands.Settings settings) {
             applied.add("effect-commands " + settings.enabled() + " " + settings.token());
         }
@@ -80,7 +85,7 @@ class SettingsReloaderTest {
     void anUnchangedFileReappliesOnlyWhatsCheap() {
         SettingsReloader.Outcome outcome = reloader.reload();
         assertEquals(new SettingsReloader.Outcome(null, 0, List.of()), outcome);
-        assertEquals(List.of("settings", "player-uuids true", "effect-commands false !", "update-checker false"), applied);
+        assertEquals(List.of("settings", "player-uuids true", "scripts 2", "effect-commands false !", "update-checker false"), applied);
     }
 
     @Test
@@ -92,13 +97,13 @@ class SettingsReloaderTest {
         edit("  enabled: false\n  # Skript's 'effect command token'", "  enabled: true\n  # Skript's 'effect command token'");
         SettingsReloader.Outcome outcome = reloader.reload();
         assertEquals(List.of(), outcome.restartOnly());
-        assertEquals(List.of("settings", "player-uuids false", "effect-commands true !", "runtime-errors 3",
+        assertEquals(List.of("settings", "player-uuids false", "scripts 2", "effect-commands true !", "runtime-errors 3",
                 "save-interval 1 minute", "update-checker true check now"), applied);
 
         // A second reload with nothing new doesn't restart the frames or the saves, or check again.
         applied.clear();
         reloader.reload();
-        assertEquals(List.of("settings", "player-uuids false", "effect-commands true !", "update-checker true"), applied);
+        assertEquals(List.of("settings", "player-uuids false", "scripts 2", "effect-commands true !", "update-checker true"), applied);
     }
 
     @Test
@@ -153,6 +158,9 @@ class SettingsReloaderTest {
 
             @Override
             public void playerUuids(boolean uuids) {}
+
+            @Override
+            public void scripts(NeoSkriptConfig settings) {}
 
             @Override
             public void effectCommands(EffectCommands.Settings settings) {}

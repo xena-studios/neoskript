@@ -236,7 +236,7 @@ public final class Values {
     /** How a value reads in text, as when embedded in a string with {@code %...%}. */
     public static String text(Object value) {
         if (value == null || (value instanceof Object[] empty && empty.length == 0)) {
-            return "<none>";
+            return Language.none();
         }
         if (value instanceof Object[] array) {
             StringBuilder text = new StringBuilder();
@@ -261,11 +261,23 @@ public final class Values {
         return converter != null ? converter.apply(value) : value.toString();
     }
 
-    /** Decimals as Skript shows them: at most two decimal places, without trailing zeros. */
+    /**
+     * Decimals as Skript shows them: at most the {@linkplain Settings#numberAccuracy number accuracy} of decimal
+     * places (two by default), without trailing zeros.
+     */
     public static String decimal(double value) {
-        // Skript's StringUtils.toString with its number accuracy of 2: '%.2f' without trailing zeros, so -0.004
-        // is -0 and 1.005 is 1.01.
-        String text = String.format(java.util.Locale.ENGLISH, "%.2f", value);
+        return decimal(value, Settings.numberAccuracy());
+    }
+
+    /**
+     * Skript's {@code StringUtils.toString}: {@code value} with at most {@code accuracy} decimal places, without
+     * trailing zeros, so with two -0.004 is -0 and 1.005 is 1.01. An accuracy of 0 rounds to a whole number.
+     */
+    public static String decimal(double value, int accuracy) {
+        if (accuracy <= 0) {
+            return Long.toString(Math.round(value));
+        }
+        String text = String.format(java.util.Locale.ENGLISH, accuracy == 2 ? "%.2f" : "%." + accuracy + "f", value);
         int end = text.length() - 1;
         while (text.charAt(end) == '0') {
             end--;
@@ -275,6 +287,9 @@ public final class Values {
         }
         return text.substring(0, end + 1);
     }
+
+    /** As Skript writes decimals in variable names: up to 8 decimal places, whatever the number accuracy. */
+    private static final int NAME_ACCURACY = 8;
 
     private record Conversion(Class<?> from, Function<Object, Object> converter) {}
 
@@ -433,6 +448,9 @@ public final class Values {
                 text.append(nameText(array[i]));
             }
             return text.toString();
+        }
+        if (value instanceof Double || value instanceof Float) {
+            return decimal(((Number) value).doubleValue(), NAME_ACCURACY);
         }
         if (value != null && !NAME_CONVERTERS.isEmpty()) {
             for (Map.Entry<Class<?>, Function<Object, String>> named : NAME_CONVERTERS.entrySet()) {

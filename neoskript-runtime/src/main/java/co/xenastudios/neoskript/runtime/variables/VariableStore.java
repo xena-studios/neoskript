@@ -370,6 +370,32 @@ public final class VariableStore {
         }
     }
 
+    /**
+     * What a value read from a variable becomes, or {@code null} for itself: Skript's {@code player variable fix},
+     * which the standard library sets, swaps a player who left and joined again for the player now online.
+     */
+    private static volatile UnaryOperator<Object> refresh;
+
+    /** Sets what values read from variables become ({@link #refresh}), or {@code null} to read them as they are. */
+    public static void refreshOnRead(UnaryOperator<Object> refresh) {
+        VariableStore.refresh = refresh;
+    }
+
+    /** A node's value, {@linkplain #refresh refreshed}: a fresh value replaces the old one in the variable. */
+    private static Object read(Node node) {
+        Object value = node.value.get();
+        UnaryOperator<Object> refresh = VariableStore.refresh;
+        if (refresh == null || value == null) {
+            return value;
+        }
+        Object fresh = refresh.apply(value);
+        if (fresh == null || fresh == value) {
+            return value;
+        }
+        node.value.compareAndSet(value, fresh);
+        return fresh;
+    }
+
     private final Node root = new Node();
     private final AtomicLong modifications = new AtomicLong();
 
@@ -459,7 +485,7 @@ public final class VariableStore {
     /** The value of {@code {name}}, or {@code null} if it's not set. */
     public Object get(String name) {
         Node node = find(name);
-        return node == null ? null : node.value.get();
+        return node == null ? null : read(node);
     }
 
     /** Sets {@code {name}}; {@code null} deletes it. Values under it ({@code {name::*}}) are kept. */
@@ -544,7 +570,7 @@ public final class VariableStore {
     public Object[] list(String prefix) {
         List<Object> values = new ArrayList<>();
         for (Node child : children(prefix)) {
-            Object value = child.value.get();
+            Object value = read(child);
             if (value != null) {
                 values.add(value);
             }
@@ -693,7 +719,7 @@ public final class VariableStore {
         List<Object> values = new ArrayList<>();
         List<String> keys = new ArrayList<>();
         for (Map.Entry<String, Node> entry : node.children.entrySet()) {
-            Object value = entry.getValue().value.get();
+            Object value = read(entry.getValue());
             if (value != null) {
                 values.add(value);
                 keys.add(entry.getKey());

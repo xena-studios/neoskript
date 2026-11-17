@@ -33,7 +33,7 @@ The lines it reports are usually syntax from a Skript addon, which NeoSkript doe
 
 </Steps>
 
-On its first start, NeoSkript copies `scripts/` and `variables.csv` from `plugins/Skript` into `plugins/NeoSkript`, then leaves a marker so it never copies again. It **copies** rather than moves, so Skript's folder stays exactly as it was, and switching back means putting `Skript.jar` back. If you turned on [native variable storage](/docs/server/variables/#native-storage), set `variables.storage` back to `csv` and restart once first, so NeoSkript writes `variables.csv` for Skript, and copy that file to `plugins/Skript`.
+On its first start, NeoSkript copies `scripts/`, `variables.csv` and any `lang/` folder from `plugins/Skript` into `plugins/NeoSkript`, then leaves a marker so it never copies again. It **copies** rather than moves, so Skript's folder stays exactly as it was, and switching back means putting `Skript.jar` back. If you turned on [native variable storage](/docs/server/variables/#native-storage), set `variables.storage` back to `csv` and restart once first, so NeoSkript writes `variables.csv` for Skript, and copy that file to `plugins/Skript`.
 
 <FileTree>
 - plugins/
@@ -52,7 +52,7 @@ On its first start, NeoSkript copies `scripts/` and `variables.csv` from `plugin
 
 Nothing is copied if `plugins/NeoSkript/scripts` already exists, for example after a start before you moved your scripts. Then copy them yourself.
 
-A few of Skript's `config.sk` settings carry over to NeoSkript's `config.yml` in that first start: whether players are saved by UUID in variable names, and the effect command settings. The rest of `config.sk` isn't copied; NeoSkript's defaults match Skript's.
+Skript's `config.sk` settings that change how scripts behave carry over to NeoSkript's `config.yml` in that first start, read as Skript reads them, so a server that changed one keeps Skript's behaviour: the language, the date format, number accuracy, case sensitivity, how text is formatted (safe tags, links, colours resetting formatting), the target block distance, the player name pattern, player UUIDs in variable names, the player variable fix, the event priority, listening to cancelled events, the runtime error limits and effect commands. The console lists what was copied. [Configuration](/docs/server/configuration/#moving-from-skript) has the full list, and the settings that don't apply to NeoSkript with why.
 
 `/skript` and `/sk` keep Skript's subcommands and arguments, so what you type and any console automation still work. Their messages are NeoSkript's own: see [commands](/docs/server/commands/).
 

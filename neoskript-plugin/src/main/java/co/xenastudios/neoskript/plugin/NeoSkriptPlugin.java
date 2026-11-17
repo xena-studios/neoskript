@@ -118,6 +118,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (!deferSyntax) {
             registerSyntax.run();
         }
+        // The settings scripts read, before any script loads.
+        applyScriptSettings(settings);
         if (co.xenastudios.neoskript.plugin.check.CheckMode.requested()) {
             // Started by NeoSkript's CLI to check scripts: check them, write the report, and stop.
             try {
@@ -306,15 +308,15 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     }
 
     /**
-     * Copies the settings Skript's config.sk had to config.yml, so variables are found and effect commands work
-     * as they did in Skript.
+     * Copies the settings Skript's config.sk had to config.yml, so scripts behave as they did in Skript: variables
+     * are found, effect commands work, and text, events and runtime errors are as they were.
      */
     private void copySkriptSettings(SkriptMigration.Result migration) {
-        java.util.Map<String, Object> copied = new java.util.LinkedHashMap<>();
-        if (migration.playerUuids() != null) {
-            copied.put("variables.player-uuids-in-names", migration.playerUuids());
+        if (migration.settingsProblem() != null) {
+            getSLF4JLogger().warn("Couldn't read Skript's config.sk ({}), so its settings weren't copied. NeoSkript runs"
+                    + " on its defaults, which are Skript's; set any you changed in config.yml.", migration.settingsProblem());
         }
-        copied.putAll(migration.settings());
+        java.util.Map<String, Object> copied = new java.util.LinkedHashMap<>(migration.settings());
         org.bukkit.configuration.file.YamlConfiguration current =
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile().toFile());
         copied.entrySet().removeIf(setting -> setting.getValue().equals(current.get(setting.getKey())));
@@ -338,6 +340,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             getSLF4JLogger().error("Couldn't copy Skript's settings to config.yml", e);
             return;
         }
+        getSLF4JLogger().info("Copied {} from Skript's config.sk to config.yml: {}", copied.size() == 1 ? "a setting"
+                : copied.size() + " settings", String.join(", ", copied.keySet()));
         if (copied.containsKey("variables.player-uuids-in-names")) {
             getSLF4JLogger().info("Players are their {} in variable names, as in Skript's config.sk.",
                     settings.variables().playerUuidsInNames() ? "UUIDs" : "names");
@@ -345,6 +349,12 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (copied.keySet().stream().anyMatch(path -> path.startsWith("effect-commands."))) {
             getSLF4JLogger().info("Effect commands are set up as in Skript's config.sk.");
         }
+    }
+
+    /** Applies the settings scripts read, logging what couldn't be used. */
+    private void applyScriptSettings(NeoSkriptConfig settings) {
+        ScriptSettings.apply(settings, getDataPath().resolve("lang"))
+                .forEach(warning -> getSLF4JLogger().warn("config.yml: {}", warning));
     }
 
     /** The settings from config.yml. */
@@ -373,6 +383,11 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             @Override
             public void playerUuids(boolean uuids) {
                 StandardLibrary.usePlayerUuidsInVariableNames(uuids);
+            }
+
+            @Override
+            public void scripts(NeoSkriptConfig settings) {
+                applyScriptSettings(settings);
             }
 
             @Override

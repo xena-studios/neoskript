@@ -66,6 +66,12 @@ class ConfigRobustnessTest {
                     throw new AssertionError(label + " threw " + e, e);
                 }
                 complete(result.config(), label);
+                try {
+                    // What scripts read takes whatever loaded.
+                    ScriptSettings.apply(result.config(), folder);
+                } catch (RuntimeException e) {
+                    throw new AssertionError(label + ": applying it threw " + e, e);
+                }
                 Object value = valueAt(result.config(), path);
                 Object fallback = valueAt(NeoSkriptConfig.DEFAULTS, path);
                 if (result.warnings().isEmpty() && bad != null && value.equals(fallback)
@@ -74,6 +80,11 @@ class ConfigRobustnessTest {
                 }
             }
         }
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void defaults() {
+        ScriptSettings.apply(NeoSkriptConfig.DEFAULTS, folder);
     }
 
     @Test
@@ -118,6 +129,12 @@ class ConfigRobustnessTest {
 
                     @Override
                     public void playerUuids(boolean uuids) {}
+
+                    @Override
+                    public void scripts(NeoSkriptConfig settings) {
+                        // What scripts read is applied for real: it must take whatever loaded.
+                        ScriptSettings.apply(settings, folder);
+                    }
 
                     @Override
                     public void effectCommands(EffectCommands.Settings settings) {}
