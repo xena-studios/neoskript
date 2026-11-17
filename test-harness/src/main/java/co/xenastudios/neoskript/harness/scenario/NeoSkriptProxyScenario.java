@@ -82,6 +82,10 @@ public final class NeoSkriptProxyScenario implements Scenario {
         for (String[] original : ORIGINALS) {
             originals.add(context.download(original[0], original[1], original[2]));
         }
+        if (!dockerAvailable()) {
+            context.summary("skipped", "Docker isn't available");
+            return;
+        }
         int proxyPort = ServerBuilder.freePort();
         int portA = ServerBuilder.freePort();
         int portB = ServerBuilder.freePort();
@@ -109,13 +113,11 @@ public final class NeoSkriptProxyScenario implements Scenario {
             servers.put("a", portA);
             servers.put("b", portB);
             servers.put("c", portC);
-            try (ServerProcess serverA = a.start(); ServerProcess serverB = b.start(); ServerProcess serverC = c.start();
+            // One after another: servers of an environment unpack it into one cache, which two at once can garble.
+            try (ServerProcess serverA = started(a, null); ServerProcess serverB = started(b, null);
+                    // SkProxy doesn't say it needs Skript, so Paper loads it on c, and it fails to enable there.
+                    ServerProcess serverC = started(c, Pattern.compile("Error occurred while enabling SkProxy"));
                     ServerProcess proxy = VelocityProxy.start(context, runs.resolve("velocity"), proxyPort, servers)) {
-                // SkProxy doesn't say it needs Skript, so Paper loads it on c, and it fails to enable without Skript.
-                serverC.allowFailure(Pattern.compile("Error occurred while enabling SkProxy"));
-                for (ServerProcess server : List.of(serverA, serverB, serverC)) {
-                    server.await(ServerProcess.DONE, WAIT);
-                }
                 proxy.await(VelocityProxy.DONE, WAIT);
                 // D21: SkProxy's jar is in c's plugins; it can't work without Skript, so NeoSkriptProxy loads.
                 serverC.await(Pattern.compile(Pattern.quote("is SkProxy, which needs Skript, so it doesn't load with"
@@ -140,10 +142,20 @@ public final class NeoSkriptProxyScenario implements Scenario {
                     awaitCount(server, line("[proxytest] redis ping on net"), 2);
                     awaitCount(server, line("[proxytest] custom {\"kind\":\"custom\"} on net"), 2);
                 }
+                // An original's expression answers at once, so cancel event can come after it, as in the original.
+                for (ServerProcess server : List.of(serverA, serverB)) {
+                    int mark = server.mark();
+                    server.command("proxyquick");
+                    server.await(line("[proxytest] quick 3"), mark, WAIT);
+                }
                 List<String> original = checks(serverA, markA);
                 List<String> ours = checks(serverB, markB);
-                context.summary("skproxy's first answers, original and ours",
-                        first(serverA, markA) + " / " + first(serverB, markB));
+                // The originals' first reads are what they give before an answer; so are NeoSkriptProxy's.
+                if (!first(serverA, markA).equals(first(serverB, markB))) {
+                    throw new HarnessFailure("The first reads differ: " + first(serverA, markA) + " on Skript, "
+                            + first(serverB, markB) + " on NeoSkript");
+                }
+                context.summary("first reads", first(serverB, markB));
                 if (!original.equals(ours)) {
                     Files.write(runs.resolve("original.txt"), original);
                     Files.write(runs.resolve("neoskript.txt"), ours);
@@ -209,6 +221,31 @@ public final class NeoSkriptProxyScenario implements Scenario {
             }
         } finally {
             docker("rm", "-f", redis);
+        }
+    }
+
+    /** Starts a server and waits until it's up, closing it if it doesn't come up. */
+    private static ServerProcess started(ServerBuilder builder, Pattern allowedFailure) throws Exception {
+        ServerProcess server = builder.start();
+        try {
+            if (allowedFailure != null) {
+                server.allowFailure(allowedFailure);
+            }
+            server.await(ServerProcess.DONE, WAIT);
+            return server;
+        } catch (Exception | Error e) {
+            server.close();
+            throw e;
+        }
+    }
+
+    private static boolean dockerAvailable() {
+        try {
+            Process process = new ProcessBuilder("docker", "info").redirectErrorStream(true).start();
+            process.getInputStream().readAllBytes();
+            return process.waitFor(60, TimeUnit.SECONDS) && process.exitValue() == 0;
+        } catch (IOException | InterruptedException e) {
+            return false;
         }
     }
 

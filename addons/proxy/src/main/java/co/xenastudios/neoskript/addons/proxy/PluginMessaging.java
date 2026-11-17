@@ -112,9 +112,37 @@ final class PluginMessaging {
         }
     }
 
-    private record Waiting(Question question, List<CompletableFuture<Object>> answers) {}
+    /** A question waiting for its answer; compared by identity, so a timeout only ends its own. */
+    private static final class Waiting {
+        final Question question;
+        final List<CompletableFuture<Object>> answers;
+
+        Waiting(Question question, List<CompletableFuture<Object>> answers) {
+            this.question = question;
+            this.answers = answers;
+        }
+
+        Question question() {
+            return question;
+        }
+
+        List<CompletableFuture<Object>> answers() {
+            return answers;
+        }
+    }
 
     private record Queued(byte[] payload, long until) {}
+
+    /** The most answers kept for {@link #cached}: past it, the oldest go. */
+    static final int MAX_CACHED = 10_000;
+
+    /** The last answer to each question, for the originals' syntax, which answers from it (see {@link #cached}). */
+    private final Map<String, Object> answers = new java.util.LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Object> eldest) {
+            return size() > MAX_CACHED;
+        }
+    };
 
     private final Settings settings;
     private final Carrier carrier;
@@ -163,8 +191,11 @@ final class PluginMessaging {
         if (closed) {
             return CompletableFuture.failedFuture(new IllegalStateException("NeoSkriptProxy is disabled"));
         }
+        if (!settings.pluginMessaging()) {
+            return CompletableFuture.failedFuture(off());
+        }
         String key = question.key();
-        boolean first;
+        Waiting asked;
         synchronized (waiting) {
             Waiting existing = waiting.get(key);
             if (existing != null) {
@@ -175,26 +206,64 @@ final class PluginMessaging {
                 return CompletableFuture.failedFuture(new IllegalStateException("Too many questions to the proxy are"
                         + " waiting (" + MAX_WAITING + ")"));
             }
-            waiting.put(key, new Waiting(question, new ArrayList<>(List.of(answer))));
-            first = true;
+            asked = new Waiting(question, new ArrayList<>(List.of(answer)));
+            waiting.put(key, asked);
         }
-        if (first && !carrier.send(question.payload())) {
-            fail(key, new IllegalStateException("Nobody is online, so the proxy can't be asked: plugin messages"
+        boolean sent;
+        try {
+            sent = carrier.send(question.payload());
+        } catch (RuntimeException | LinkageError e) {
+            fail(key, asked, new IllegalStateException("The question couldn't be sent: " + e.getMessage(), e));
+            return answer;
+        }
+        if (!sent) {
+            fail(key, asked, new IllegalStateException("Nobody is online, so the proxy can't be asked: plugin messages"
                     + " travel through a player's connection"));
             return answer;
         }
-        timer.schedule(() -> timedOut(key), settings.proxyTimeoutMillis(), TimeUnit.MILLISECONDS);
+        try {
+            timer.schedule(() -> timedOut(key, asked), settings.proxyTimeoutMillis(), TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.RejectedExecutionException stopping) {
+            fail(key, asked, new IllegalStateException("NeoSkriptProxy is disabled"));
+        }
         return answer;
     }
 
-    private void timedOut(String key) {
-        Waiting gone;
-        synchronized (waiting) {
-            gone = waiting.remove(key);
+    private static IllegalStateException off() {
+        return new IllegalStateException("Plugin messaging is off (plugin-messaging.enabled in"
+                + " plugins/NeoSkriptProxy/config.yml), so the proxy can't be asked or told anything");
+    }
+
+    /**
+     * The originals' way (SkProxy's, Skelocity's): the last answer to {@code question}, at once, with the question
+     * asked again in the background so the next read has a fresher one. {@code null} until the first answer, which
+     * the caller turns into what the original gives then.
+     */
+    Object cached(Question question) {
+        if (!closed && settings.pluginMessaging()) {
+            ask(question).exceptionally(failure -> null);
         }
-        if (gone == null) {
+        synchronized (answers) {
+            return answers.get(question.key());
+        }
+    }
+
+    /** Whether any answer to {@code question} has come: SkProxy's "Online". */
+    boolean answered(Question question) {
+        synchronized (answers) {
+            return answers.containsKey(question.key());
+        }
+    }
+
+    private void timedOut(String key, Waiting asked) {
+        boolean removed;
+        synchronized (waiting) {
+            removed = waiting.remove(key, asked);
+        }
+        if (!removed) {
             return;
         }
+        Waiting gone = asked;
         if (gone.question().alwaysAnswered() && !warnedNoAnswer) {
             warnedNoAnswer = true;
             logger.warning("The proxy didn't answer " + gone.question().subchannel() + " within "
@@ -204,13 +273,13 @@ final class PluginMessaging {
         gone.answers().forEach(answer -> answer.complete(NO_ANSWER));
     }
 
-    private void fail(String key, Throwable why) {
-        Waiting gone;
+    private void fail(String key, Waiting asked, Throwable why) {
+        boolean removed;
         synchronized (waiting) {
-            gone = waiting.remove(key);
+            removed = waiting.remove(key, asked);
         }
-        if (gone != null) {
-            gone.answers().forEach(answer -> answer.completeExceptionally(why));
+        if (removed) {
+            asked.answers().forEach(answer -> answer.completeExceptionally(why));
         }
     }
 
@@ -220,11 +289,16 @@ final class PluginMessaging {
      * @return whether it was sent or queued; {@code false} if it was dropped
      */
     boolean send(byte[] payload) {
-        if (closed) {
+        if (closed || !settings.pluginMessaging()) {
             return false;
         }
-        if (carrier.send(payload)) {
-            return true;
+        try {
+            if (carrier.send(payload)) {
+                return true;
+            }
+        } catch (RuntimeException | LinkageError e) {
+            logger.warning("A plugin message couldn't be sent: " + e);
+            return false;
         }
         if (!settings.queueWithoutPlayers() || settings.maxQueued() == 0) {
             return false;
@@ -246,22 +320,32 @@ final class PluginMessaging {
 
     /** A player who can carry plugin messages is online: what waited for one is sent. */
     void carrierAvailable() {
-        List<byte[]> due = new ArrayList<>();
+        List<Queued> due = new ArrayList<>();
         synchronized (queued) {
             dropExpired();
             while (!queued.isEmpty()) {
-                due.add(queued.poll().payload());
+                due.add(queued.poll());
             }
             warnedQueueFull = false;
         }
         for (int i = 0; i < due.size(); i++) {
-            if (!carrier.send(due.get(i))) {
-                // Gone again: the rest wait for the next one.
+            boolean sent;
+            try {
+                sent = carrier.send(due.get(i).payload());
+            } catch (RuntimeException | LinkageError e) {
+                sent = false;
+            }
+            if (!sent) {
+                // Gone again: the rest wait for the next one, with the time they had left, ahead of what came since,
+                // and no more than the queue holds.
                 synchronized (queued) {
-                    long until = System.currentTimeMillis() + settings.queuedForMillis();
                     for (int j = due.size() - 1; j >= i; j--) {
-                        queued.addFirst(new Queued(due.get(j), until));
+                        if (queued.size() >= settings.maxQueued()) {
+                            queued.removeLast();
+                        }
+                        queued.addFirst(due.get(j));
                     }
+                    dropExpired();
                 }
                 return;
             }
@@ -341,6 +425,11 @@ final class PluginMessaging {
         Waiting answered;
         synchronized (waiting) {
             answered = waiting.remove(key);
+        }
+        if (answered != null) {
+            synchronized (answers) {
+                answers.put(key, value);
+            }
         }
         if (answered != null) {
             answered.answers().forEach(answer -> answer.complete(value));

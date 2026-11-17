@@ -176,21 +176,105 @@ class MessagingTest {
     @Test
     void anEnvelopeOnlyOpensWithTheSameSecretOnceAndFresh() throws Exception {
         Envelope sealer = new Envelope("s3cret", 1000);
-        byte[] sealed = sealer.seal("lobby", "a", "events", "hello");
+        byte[] sealed = sealer.seal("lobby", "a", "ALL", "events", "hello");
         Envelope receiver = new Envelope("s3cret", 1000);
         Envelope.Opened opened = receiver.open(sealed);
-        assertEquals(new Envelope.Opened(opened.sent(), "lobby", "a", "events", "hello"), opened);
+        assertEquals(new Envelope.Opened(opened.sent(), "lobby", "a", "ALL", "events", "hello"), opened);
         assertThrows(Envelope.Refused.class, () -> receiver.open(sealed), "a replay is refused");
         assertThrows(Envelope.Refused.class, () -> new Envelope("other", 1000).open(sealed));
         assertThrows(Envelope.Refused.class, () -> new Envelope("s3cret", 1000)
-                .open(new Envelope(null, 1000).seal("x", "b", "events", "forged")), "unsigned is refused");
-        byte[] tampered = sealer.seal("lobby", "a", "events", "hello");
+                .open(new Envelope("insecure", 1000).seal("x", "b", "ALL", "events", "forged")), "unsigned is refused");
+        byte[] tampered = sealer.seal("lobby", "a", "ALL", "events", "hello");
         tampered[tampered.length - 40] ^= 1;
         assertThrows(Envelope.Refused.class, () -> new Envelope("s3cret", 1000).open(tampered));
-        assertThrows(IllegalArgumentException.class, () -> sealer.seal("x", "a", "c", "y".repeat(1001)));
-        // Without a secret, anything well formed opens.
-        assertEquals("forged", new Envelope(null, 1000).open(new Envelope(null, 1000).seal("x", "b", "c", "forged"))
-                .message());
+        assertThrows(IllegalArgumentException.class, () -> sealer.seal("x", "a", "ALL", "c", "y".repeat(1001)));
+        // With no secret, nothing opens; with "insecure", anything well formed does.
+        Envelope none = new Envelope("", 1000);
+        assertFalse(none.usable());
+        assertThrows(Envelope.Refused.class, () -> none.open(sealed));
+        assertEquals("forged", new Envelope("insecure", 1000)
+                .open(new Envelope("insecure", 1000).seal("x", "b", "ALL", "c", "forged")).message());
+    }
+
+    @Test
+    void theOriginalsAnswerAtOnceFromTheLastAnswer() throws Exception {
+        PluginMessaging messaging = messaging(Map.of());
+        PluginMessaging.Question count = PluginMessaging.Question.playerCount("lobby");
+        assertNull(messaging.cached(count), "nothing yet: the original's default");
+        assertFalse(messaging.answered(count));
+        assertEquals(1, sent.size(), "and the question goes out behind it");
+        messaging.received(PluginMessaging.write(out -> {
+            out.writeUTF("PlayerCount");
+            out.writeUTF("lobby");
+            out.writeInt(4);
+        }));
+        assertEquals(4L, messaging.cached(count));
+        assertTrue(messaging.answered(count));
+        assertEquals(2, sent.size(), "each read asks again");
+    }
+
+    @Test
+    void aTimeoutOnlyEndsItsOwnQuestion() throws Exception {
+        PluginMessaging messaging = messaging(Map.of("plugin-messaging.timeout", 200));
+        CompletableFuture<Object> first = messaging.ask(PluginMessaging.Question.playerServer("Steve"));
+        messaging.received(PluginMessaging.write(out -> {
+            out.writeUTF("GetPlayerServer");
+            out.writeUTF("Steve");
+            out.writeUTF("lobby");
+        }));
+        assertEquals("lobby", first.get(1, TimeUnit.SECONDS));
+        // Asked again just before the first one's timeout would fire: that timeout leaves it alone.
+        Thread.sleep(150);
+        CompletableFuture<Object> second = messaging.ask(PluginMessaging.Question.playerServer("Steve"));
+        Thread.sleep(100);
+        assertFalse(second.isDone(), "the first question's timeout ended the second");
+        assertEquals(PluginMessaging.NO_ANSWER, second.get(5, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void withPluginMessagingOffNothingIsAskedOrSent() {
+        PluginMessaging messaging = messaging(Map.of("plugin-messaging.enabled", false));
+        Exception failure = assertThrows(Exception.class,
+                () -> messaging.ask(PluginMessaging.Question.servers()).get(1, TimeUnit.SECONDS));
+        assertTrue(failure.getCause().getMessage().startsWith("Plugin messaging is off"));
+        assertFalse(messaging.send(PluginMessaging.action("Message", "ALL", "x")));
+        assertEquals(0, messaging.waiting());
+        assertEquals(List.of(), sent);
+    }
+
+    @Test
+    void aCarrierThatThrowsLeavesNothingWaiting() {
+        PluginMessaging messaging = new PluginMessaging(settings(Map.of()), payload -> {
+            throw new IllegalStateException("channel not registered");
+        }, timer, Logger.getLogger("test"), forwarded::add);
+        assertThrows(Exception.class, () -> messaging.ask(PluginMessaging.Question.servers()).get(1, TimeUnit.SECONDS));
+        assertEquals(0, messaging.waiting(), "the subject isn't blocked for good");
+        assertFalse(messaging.send(PluginMessaging.action("Message", "ALL", "x")));
+    }
+
+    @Test
+    void messagesForNamedServersWaitUntilThisServerKnowsItsName() {
+        List<NetworkMessageEvent> fired = new ArrayList<>();
+        Network network = new Network(settings(Map.of()), Logger.getLogger("test"), Runnable::run, fired::add,
+                new Envelope(null, 1000), "me");
+        network.fromRedis("events", "{\"action\":\"neoskript-message\",\"message\":\"for lobby\",\"instance\":\"x\","
+                + "\"servers\":[\"lobby\"]}");
+        network.fromRedis("events", "{\"action\":\"neoskript-message\",\"message\":\"for survival\",\"instance\":\"x\","
+                + "\"servers\":[\"survival\"]}");
+        assertEquals(List.of(), fired);
+        network.learnName("lobby");
+        assertEquals(List.of("for lobby"), fired.stream().map(NetworkMessageEvent::message).toList());
+    }
+
+    @Test
+    void aForwardedMessageForAnotherServerIsDropped() {
+        List<NetworkMessageEvent> fired = new ArrayList<>();
+        Envelope envelope = new Envelope("k", 1000);
+        Network network = new Network(settings(Map.of("server-name", "lobby")), Logger.getLogger("test"), Runnable::run,
+                fired::add, envelope, "me");
+        network.fromForward(envelope.seal("x", "them", "survival", "c", "not for lobby"));
+        network.fromForward(envelope.seal("x", "them", "lobby", "c", "for lobby"));
+        assertEquals(List.of("for lobby"), fired.stream().map(NetworkMessageEvent::message).toList());
     }
 
     @Test
@@ -218,9 +302,9 @@ class MessagingTest {
         Envelope envelope = new Envelope("k", 1000);
         Network network = new Network(settings(Map.of()), Logger.getLogger("test"), Runnable::run, fired::add,
                 envelope, "me");
-        network.fromForward(envelope.seal("lobby", "me", "c", "own"));
-        network.fromForward(new Envelope("other", 1000).seal("x", "y", "c", "forged"));
-        network.fromForward(envelope.seal("survival", "them", "c", "real"));
+        network.fromForward(envelope.seal("lobby", "me", "ALL", "c", "own"));
+        network.fromForward(new Envelope("other", 1000).seal("x", "y", "ALL", "c", "forged"));
+        network.fromForward(envelope.seal("survival", "them", "ALL", "c", "real"));
         assertEquals(List.of("real"), fired.stream().map(NetworkMessageEvent::message).toList());
         assertEquals("survival", fired.getFirst().origin());
     }

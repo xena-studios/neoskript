@@ -46,10 +46,14 @@ public final class NeoSkriptProxy extends JavaPlugin implements Listener {
         Settings settings = Settings.read(key -> getConfig().get(key), warnings);
         warnings.forEach(warning -> getLogger().warning("config.yml: " + warning));
         Envelope envelope = new Envelope(settings.secret(), settings.maxMessageBytes());
-        if (settings.pluginMessaging() && !envelope.signed()) {
-            getLogger().warning("secret isn't set in config.yml: network messages over plugin messaging aren't"
-                    + " signed, so anyone who can send plugin messages on the BungeeCord channel could forge them."
-                    + " Set the same long random text on every server.");
+        if (settings.pluginMessaging() && !envelope.usable()) {
+            getLogger().warning("secret isn't set in config.yml, so network messages over plugin messaging are"
+                    + " neither sent nor taken. Set the same long random text on every server (or \"insecure\" to"
+                    + " send them unsigned, which anyone who can send plugin messages on the BungeeCord channel can"
+                    + " forge). Questions to the proxy and Redis work without it.");
+        } else if (settings.pluginMessaging() && !envelope.signed()) {
+            getLogger().warning("secret is \"insecure\": network messages over plugin messaging aren't signed, so"
+                    + " anyone who can send plugin messages on the BungeeCord channel can forge them.");
         }
         timer = new ScheduledThreadPoolExecutor(1, runnable -> {
             Thread thread = new Thread(runnable, "NeoSkriptProxy-timer");

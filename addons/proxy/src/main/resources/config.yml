@@ -6,8 +6,9 @@
 server-name: ""
 
 # Shared by every server on the network, the same on each: network messages sent over plugin messaging are signed
-# with it, and ones that aren't, or are signed with another, are dropped. Without it, a player who can send plugin
-# messages on the BungeeCord channel could forge network messages. Any long random text.
+# with it, and ones that aren't, or are signed with another, are dropped. Any long random text. Without it, network
+# messages over plugin messaging are neither sent nor taken ("insecure" sends and takes them unsigned, which anyone
+# who can send plugin messages on the BungeeCord channel could forge). Questions to the proxy and Redis don't need it.
 secret: ""
 
 plugin-messaging:
@@ -39,6 +40,10 @@ redis:
   on-outage: queue
   max-queued: 1000
   queued-for: 60
+  # Redis's database number doesn't keep pub/sub apart: every client of the Redis server hears every channel. To
+  # keep two networks on one Redis apart, give each a prefix, put in front of every channel. Servers still on
+  # SkRedis don't add one, so leave it blank to talk to them.
+  channel-prefix: ""
 
 # The longest network message, in bytes of UTF-8. Plugin messages can't be longer than about 32 KB.
 max-message-bytes: 16384
