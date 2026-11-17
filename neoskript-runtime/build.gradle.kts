@@ -5,6 +5,8 @@ plugins {
 dependencies {
     api(project(":neoskript-api"))
     compileOnly(libs.paper.api)
+    // Paper ships the JDBC drivers SQL variable storage uses; the tests bring their own.
+    testRuntimeOnly(libs.sqlite.jdbc)
 }
 
 tasks.test {

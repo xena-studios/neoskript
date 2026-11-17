@@ -33,7 +33,9 @@ The lines it reports are usually syntax from a Skript addon, which NeoSkript doe
 
 </Steps>
 
-On its first start, NeoSkript copies `scripts/`, `variables.csv` and `aliases/` (with `aliases-english.zip`, if you have one) from `plugins/Skript` into `plugins/NeoSkript`, then leaves a marker so it never copies again. It **copies** rather than moves, so Skript's folder stays exactly as it was, and switching back means putting `Skript.jar` back. If you turned on [native variable storage](/docs/server/variables/#native-storage), set `variables.storage` back to `csv` and restart once first, so NeoSkript writes `variables.csv` for Skript, and copy that file to `plugins/Skript`.
+On its first start, NeoSkript copies `scripts/`, `variables.csv` and `aliases/` (with `aliases-english.zip`, if you have one) from `plugins/Skript` into `plugins/NeoSkript`, then leaves a marker so it never copies again. It **copies** rather than moves, so Skript's folder stays exactly as it was, and switching back means putting `Skript.jar` back. If you turned on [native variable storage](/docs/server/variables/#native-storage), set the database's `type` back to `csv` and restart once first, so NeoSkript writes `variables.csv` for Skript, and copy that file to `plugins/Skript`.
+
+If Skript's `config.sk` has a `databases:` section, NeoSkript copies it to `config.yml` as is, backup settings included (Skript's default keeps every backup, and so does the copy), and with it every CSV and SQLite file it names in `plugins/Skript` (an SQLite file with its journal), each backed up before it's first loaded. A file outside Skript's folder, which other servers may share, is used where it is. A MySQL database is used as it is: NeoSkript reads and writes Skript's table, so switching back to Skript keeps those variables too. NeoSkript doesn't need SQLibrary. See [databases](/docs/server/variables/#databases).
 
 <FileTree>
 - plugins/
@@ -54,7 +56,7 @@ On its first start, NeoSkript copies `scripts/`, `variables.csv` and `aliases/` 
 
 Nothing is copied if `plugins/NeoSkript/scripts` already exists, for example after a start before you moved your scripts. Then copy them yourself. Alias files are copied last: one `plugins/NeoSkript/aliases` already has is kept, and the console says so. A server that moved over before NeoSkript read alias files gets `aliases/` copied once on its next start, unless `plugins/NeoSkript/aliases` exists by then.
 
-A few of Skript's `config.sk` settings carry over to NeoSkript's `config.yml` in that first start: whether players are saved by UUID in variable names, `load default aliases`, and the effect command settings. The rest of `config.sk` isn't copied; NeoSkript's defaults match Skript's.
+A few of Skript's `config.sk` settings carry over to NeoSkript's `config.yml` in that first start: whether players are saved by UUID in variable names, `load default aliases`, the effect command settings, and the `databases:` section. The rest of `config.sk` isn't copied; NeoSkript's defaults match Skript's.
 
 `/skript` and `/sk` keep Skript's subcommands and arguments, so what you type and any console automation still work. Their messages are NeoSkript's own: see [commands](/docs/server/commands/).
 

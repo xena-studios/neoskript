@@ -66,6 +66,12 @@ class ConfigRobustnessTest {
                     throw new AssertionError(label + " threw " + e, e);
                 }
                 complete(result.config(), label);
+                if (path.startsWith("databases.")) {
+                    // The owner's own section: a database with a value it can't use is kept, with why, so it still
+                    // owns its pattern. Never thrown, never without databases.
+                    assertTrue(!result.config().databases().all().isEmpty(), label);
+                    continue;
+                }
                 Object value = valueAt(result.config(), path);
                 Object fallback = valueAt(NeoSkriptConfig.DEFAULTS, path);
                 if (result.warnings().isEmpty() && bad != null && value.equals(fallback)
