@@ -407,28 +407,36 @@ public final class ScriptLoader {
             context.eventScope(values == null ? null : values.structure(custom.syntax()));
             return new ParsedStructure.Custom(structure, custom, statements.body(section.children()));
         }
-        ParsedSyntax event = eventHeader(context, key, ON_PREFIX);
+        java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
+        ParsedSyntax event = eventHeader(context, key, ON_PREFIX, warnings);
         if (event == null) {
-            event = eventHeader(context, key, EVENT_MODIFIERS);
+            event = eventHeader(context, key, EVENT_MODIFIERS, warnings);
         }
         if (event == null) {
             diagnostics.error(line.number(), line.column(), key.length(), "Can't understand this structure: " + key);
             return null;
         }
-        java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
-        LineParser.listWarnings(key, event, warnings, registry);
         statements.warn(line, warnings);
         context.eventScope(values == null ? null : values.event(event.syntax()));
         return new ParsedStructure.Event(structure, event, statements.body(section.children()));
     }
 
-    private static ParsedSyntax eventHeader(ParserContext context, String key, Pattern modifiers) {
+    /**
+     * The event a structure's key names, with Skript's warnings about its lists added to {@code warnings}, by the
+     * parser that read them (a list that's all that's in a pair of brackets doesn't warn).
+     */
+    private static ParsedSyntax eventHeader(ParserContext context, String key, Pattern modifiers,
+            java.util.Set<String> warnings) {
         Matcher matcher = modifiers.matcher(key);
         if (!matcher.matches() || matcher.group(1).isBlank()) {
             return null;
         }
         LineParser parser = new LineParser(context, key);
-        return parser.event(matcher.start(1), matcher.end(1));
+        ParsedSyntax event = parser.event(matcher.start(1), matcher.end(1));
+        if (event != null) {
+            parser.listWarnings(event, warnings);
+        }
+        return event;
     }
 
     private ParsedStructure function(Structure structure, StatementParser statements, Diagnostics diagnostics,

@@ -308,6 +308,12 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public void pluralAsArguments(String id) {
+        checkOpen();
+        builder.pluralAsArguments(id);
+    }
+
+    @Override
     public void effectBefore(String effectId, String otherId) {
         checkOpen();
         builder.before(SyntaxKind.EFFECT, effectId, otherId);

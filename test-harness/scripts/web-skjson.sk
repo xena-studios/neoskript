@@ -139,6 +139,7 @@ command /webskjson:
         sj("500 3", {_e})
         set {_nf} to prepare GET request on "http://127.0.0.1:@PORT@/status/404"
         execute {_nf}
+        sj("404 together", (status of last response of {_nf} and body of last response of {_nf}))
         sj("404 1", status of last response of {_nf})
         sj("404 2", body of last response of {_nf})
         set {_t} to prepare GET request on "http://127.0.0.1:@PORT@/text"
