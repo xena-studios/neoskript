@@ -21,6 +21,17 @@ function probe_types():
 	show("parsed several materials", ("any sword" parsed as itemstack))
 	set {_number} to 5
 	show("parsed number variable", ({_number} parsed as integer))
+	# Converted to text first, as Skript's: a UUID is its text (review of #81).
+	set {_u} to "00000000-0000-0000-0000-000000000001" parsed as uuid
+	show("parsed uuid variable", ({_u} parsed as uuid))
+	show("parsed block without item", ("fire" parsed as item stack))
+	# Skript's own wording here: neither reads these as several materials.
+	set {_ignored} to "any sword" parsed as itemstack
+	show("several materials error", last parse error)
+	set {_ignored} to "stone or dirt" parsed as itemstack
+	show("stone or dirt error", last parse error)
+	set {_ignored} to "fire" parsed as itemstack
+	show("block without item error", last parse error)
 	# A colon in a script's pattern is text to match: Skript escapes parse tags there (ExprParse.escapeParseTags).
 	show("parsed tag before", "apples 5" parsed as "fruit:apples %number%")
 	show("parsed tag text", "fruit:apples 5" parsed as "fruit:apples %number%")

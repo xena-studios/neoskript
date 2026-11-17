@@ -73,16 +73,30 @@ public final class Values {
     @SuppressWarnings("unchecked")
     public static Object parse(Function<?, ?> parser, Object text, String what) {
         Object value = single(text);
-        // Only text is parsed, as Skript's '%string% parsed as': a variable holding an item gives nothing.
-        if (!(value instanceof String string)) {
+        // Only text is parsed, as Skript's '%string% parsed as': what a converter turns into text (a UUID, a
+        // component) is that text, and anything else, like an item, gives nothing.
+        if (!(convertOne(value, String.class) instanceof String string)) {
             return null;
         }
         lastParseError = null;
+        parserError = null;
         Object parsed = ((Function<String, ?>) parser).apply(string.strip());
         if (parsed == null) {
-            lastParseError = string + " could not be parsed as " + what;
+            lastParseError = parserError != null ? parserError : string + " could not be parsed as " + what;
         }
+        parserError = null;
         return parsed;
+    }
+
+    /** What the running parser said was wrong, for {@link #parseError}; or {@code null}. */
+    private static volatile String parserError;
+
+    /**
+     * Says why the parser running for {@code parsed as} turns its text down, as Skript's parsers log an error
+     * ({@code 'any sword' represents multiple materials}): that's then the last parse error.
+     */
+    public static void parseError(String message) {
+        parserError = message;
     }
 
     /** Skript's {@code the last parse error}: why the last {@code parsed as} failed, or {@code null}. */
