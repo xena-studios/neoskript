@@ -519,4 +519,185 @@ class PausingTest {
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
                 () -> library.timeout("TestSay", Duration.ofSeconds(1)));
     }
+
+    /** What 'query' was given, and how its first argument was written while the script loaded. */
+    private final List<Object> queried = Collections.synchronizedList(new ArrayList<>());
+    private final List<Object> shapes = Collections.synchronizedList(new ArrayList<>());
+
+    /** 'query %text%' wants its text's expressions apart; 'raw %text%' is an expression the template names. */
+    private void templates() {
+        final class Query implements co.xenastudios.neoskript.api.element.PausingEffect,
+                co.xenastudios.neoskript.api.element.TemplateAware {
+            @Override
+            public java.util.concurrent.CompletionStage<?> start(co.xenastudios.neoskript.api.element.TriggerContext context,
+                    Object[] arguments) {
+                queried.add(arguments[0]);
+                return null;
+            }
+
+            @Override
+            public boolean template(int index) {
+                return index == 0;
+            }
+        }
+        library.pausingEffect("TestEffQuery", info -> {
+            shapes.add(info.argumentText(0) != null ? info.argumentText(0) : String.valueOf(info.argumentElement(0)));
+            return new Query();
+        }, "query %text%");
+        library.expression("TestExprRaw", "string", info -> (context, args) -> args[0], "shout %text%");
+    }
+
+    @Test
+    void aTemplateAwareElementGetsATextsExpressionsApart() {
+        templates();
+        run("""
+                on load:
+                	set {_name} to "Steve"
+                	set {_l::*} to 1 and 2.5
+                	query "SELECT * FROM t WHERE name = %{_name}% AND n IN (%{_l::*}%) -- %shout "x"% 100%%"
+                	query "plain"
+                	query {_name}
+                	query shout "y"
+                """);
+        co.xenastudios.neoskript.api.element.TextTemplate first =
+                (co.xenastudios.neoskript.api.element.TextTemplate) queried.get(0);
+        assertEquals(List.of("SELECT * FROM t WHERE name = ", " AND n IN (", ") -- ", " 100%"), first.pieces());
+        assertEquals(List.of("Steve"), first.holes().get(0).values());
+        assertEquals(null, first.holes().get(0).element());
+        assertEquals("{_name}", first.holes().get(0).written());
+        assertEquals(List.of(1L, 2.5), first.holes().get(1).values());
+        assertEquals(List.of("1", "2.5"), first.holes().get(1).texts());
+        assertEquals("TestExprRaw", first.holes().get(2).element());
+        assertEquals(List.of("x"), first.holes().get(2).values());
+        assertEquals(new co.xenastudios.neoskript.api.element.TextTemplate(List.of("plain"), List.of()), queried.get(1));
+        assertEquals(List.of("Steve", "y"), queried.subList(2, 4));
+        // While loading, the factory sees the text's shape, without values, or what the argument is.
+        co.xenastudios.neoskript.api.element.TextTemplate shape =
+                (co.xenastudios.neoskript.api.element.TextTemplate) shapes.getFirst();
+        assertEquals(first.pieces(), shape.pieces());
+        assertEquals(List.of(), shape.holes().getFirst().values());
+        assertTrue(shapes.contains("TestExprRaw"), shapes::toString);
+        assertTrue(shapes.contains("null"), shapes::toString);
+    }
+
+    @Test
+    void aStageCanLeaveItsTargetAsItIsWithoutAnError() {
+        run("""
+                on load:
+                	set {_kept} to "old"
+                	load "x" into {_kept}
+                	say "kept %{_kept}%"
+                	load "y" into {_when}
+                	say "%{_when}% is a date: %whether {_when} is a date%"
+                """);
+        stages.get(0).complete(PausingEffect.UNCHANGED);
+        tick();
+        stages.get(1).complete(java.time.Instant.ofEpochMilli(0));
+        tick();
+        assertEquals("kept old", said.getFirst());
+        assertTrue(said.get(1).endsWith("is a date: true"), said.get(1));
+        assertEquals(List.of(), errors);
+    }
+
+    /** 'tx %text%:' pauses before and after its code, with the test completing each stage. */
+    private final List<String> ends = Collections.synchronizedList(new ArrayList<>());
+
+    private void sections() {
+        library.pausingSection("TestSecTx", info -> new co.xenastudios.neoskript.api.element.PausingSection() {
+            @Override
+            public java.util.concurrent.CompletionStage<?> start(co.xenastudios.neoskript.api.element.TriggerContext context,
+                    Object[] arguments) {
+                return stage();
+            }
+
+            @Override
+            public java.util.concurrent.CompletionStage<?> end(co.xenastudios.neoskript.api.element.TriggerContext context) {
+                ends.add("end");
+                return stage();
+            }
+        }, "tx %text%");
+        library.timeout("TestSecTx", Duration.ofSeconds(5));
+    }
+
+    @Test
+    void aPausingSectionWaitsBeforeAndAfterItsCode() {
+        sections();
+        run("""
+                on load:
+                	set {_x} to "kept"
+                	tx "a":
+                		say "inside %{_x}%"
+                		fetch "b"
+                		say "after fetch"
+                	say "after %{_x}%"
+                	tx "skipped":
+                		say "never"
+                	say "done"
+                """);
+        assertEquals(List.of(), said);
+        stages.get(0).complete(true);
+        tick();
+        assertEquals(List.of("inside kept"), said);
+        stages.get(1).complete(null);
+        tick();
+        assertEquals(List.of("inside kept", "after fetch"), said);
+        assertEquals(List.of("end"), ends);
+        stages.get(2).complete(null);
+        tick();
+        assertEquals(List.of("inside kept", "after fetch", "after kept"), said);
+        // A start that gives false skips the code, and the end still runs.
+        stages.get(3).complete(false);
+        tick();
+        assertEquals(2, ends.size());
+        stages.get(4).complete(null);
+        tick();
+        assertEquals(List.of("inside kept", "after fetch", "after kept", "done"), said);
+        assertEquals(List.of(), errors);
+        assertEquals(0, Pauses.pending());
+    }
+
+    @Test
+    void aPausingSectionsCodeHasWaited() {
+        sections();
+        run("""
+                on load:
+                	tx "a":
+                		say has delay before
+                """);
+        stages.get(0).complete(null);
+        tick();
+        assertEquals(List.of("true"), said);
+        stages.get(1).complete(null);
+        tick();
+        assertEquals(0, Pauses.pending());
+    }
+
+    @Test
+    void anEffectCanLeaveThePausingSectionItsIn() {
+        sections();
+        library.pausingEffect("TestEffLeave", info -> (context, args) ->
+                java.util.concurrent.CompletableFuture.completedFuture(
+                        co.xenastudios.neoskript.api.element.PausingSection.LEAVE), "fail here");
+        run("""
+                on load:
+                \ttx "a":
+                \t\tsay "one"
+                \t\tloop 3 times:
+                \t\t\tfail here
+                \t\t\tsay "never"
+                \t\tsay "never either"
+                \tsay "after"
+                \tfail here
+                \tsay "outside, nothing to leave"
+                """);
+        stages.get(0).complete(null);
+        tick();
+        assertEquals(List.of("one"), said);
+        assertEquals(List.of("end"), ends);
+        stages.get(1).complete(null);
+        tick();
+        assertEquals(List.of("one", "after", "outside, nothing to leave"), said);
+        assertEquals(List.of(), errors);
+        assertEquals(0, Pauses.pending());
+    }
 }
