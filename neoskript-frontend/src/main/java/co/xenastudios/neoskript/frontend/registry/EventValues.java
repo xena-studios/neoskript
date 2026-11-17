@@ -102,5 +102,14 @@ public interface EventValues {
         default String missing(SyntaxInfo syntax, TypeRef type, String words) {
             return null;
         }
+
+        /**
+         * Skript's error for {@code event-<words>} where the words name no type, as its event expression asks for a
+         * value named so, which the event hasn't ({@code There's no message in an on chat event.}), or {@code null}
+         * if it can't tell.
+         */
+        default String unnamed(String words) {
+            return null;
+        }
     }
 }
