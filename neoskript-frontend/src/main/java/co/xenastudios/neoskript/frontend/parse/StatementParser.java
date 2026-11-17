@@ -232,7 +232,8 @@ final class StatementParser {
             if (statement instanceof Statement.Effect effect && failingReturn(effect)) {
                 continue;
             }
-            if (ended && !suppressed.contains("unreachable")) {
+            if (ended && !suppressed.contains(WarningSettings.UNREACHABLE_CODE)
+                    && !WarningSettings.disabled(WarningSettings.UNREACHABLE_CODE)) {
                 // After the line's own problems, and only for a line that loads, as in Skript. Only if the line that
                 // stops the code loads too, which the compiler may yet find it doesn't.
                 diagnostics.warning(node.line().number(), node.line().column(), node.line().text().length(),
@@ -541,6 +542,23 @@ final class StatementParser {
      * ({@code return}, {@code cancel event}, changing the event's values) follow the rules they follow after a wait.
      */
     private Statement simple(Line line) {
+        long threshold = WarningSettings.longParseMillis();
+        if (threshold <= 0) {
+            return simpleAfterPauses(line);
+        }
+        // As Skript, with config.yml's warnings.long-parse-time: a line that parses but takes longer gets a warning.
+        long start = WarningSettings.clock.getAsLong();
+        Statement statement = simpleAfterPauses(line);
+        long taken = WarningSettings.clock.getAsLong() - start;
+        if (taken > threshold && !(statement instanceof Statement.Invalid)) {
+            diagnostics.warning(line.number(), line.column(), line.text().length(), "The current line took a long time"
+                    + " to parse (" + WarningSettings.duration(taken) + "). Avoid using long lines and use parentheses"
+                    + " to create clearer instructions.");
+        }
+        return statement;
+    }
+
+    private Statement simpleAfterPauses(Line line) {
         int mark = diagnostics.mark();
         pausing = false;
         Statement statement = simpleOnce(line);
@@ -1570,7 +1588,8 @@ final class StatementParser {
     void warn(Line line, java.util.Set<String> warnings) {
         for (String warning : warnings) {
             int colon = warning.indexOf(':');
-            if (!suppressed.contains(warning.substring(0, colon))) {
+            String tag = warning.substring(0, colon);
+            if (!suppressed.contains(tag) && !WarningSettings.disabled(tag)) {
                 diagnostics.warning(line.number(), line.column(), line.text().length(), warning.substring(colon + 1));
             }
         }
