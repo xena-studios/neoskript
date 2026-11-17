@@ -266,9 +266,13 @@ final class ScriptManager {
      * touched, so it needn't wait for a reload.
      */
     ScriptCompiler.CompiledLine compileEffect(String effect, Class<?> eventClass) {
+        co.xenastudios.neoskript.frontend.registry.SyntaxRegistry syntax = declaredSyntax;
         return new ScriptCompiler(library, globals, functions).compileLine(EFFECT_COMMAND, effect, eventClass,
-                EFFECT_COMMAND);
+                EFFECT_COMMAND, syntax == null ? library.registry() : syntax);
     }
+
+    /** The syntax the loaded scripts declared, with the rest, for effect commands; {@code null} before any load. */
+    private volatile co.xenastudios.neoskript.frontend.registry.SyntaxRegistry declaredSyntax;
 
     /** What effect commands' code is called, as the script it runs in and its event. */
     private static final String EFFECT_COMMAND = "effect command";
@@ -297,7 +301,9 @@ final class ScriptManager {
         CompiledScripts compiled;
         ScriptCompiler compiler = new ScriptCompiler(library, globals, functions);
         try {
-            parsed = new ScriptLoader(library.registry()).load(files);
+            ScriptLoader loader = new ScriptLoader(library.registry());
+            parsed = loader.load(files);
+            declaredSyntax = loader.declaredRegistry();
             logStructures(parsed, scope);
             // Which item names each script looks up, so /sk reload aliases reloads the scripts a change affects.
             co.xenastudios.neoskript.paper.GlobalAliases.recordUses();
@@ -413,6 +419,10 @@ final class ScriptManager {
             }
         }
         compiled.linkFunctions(switching);
+        // Syntax a switching script no longer declares goes, and loaded scripts still using it are named.
+        for (String warning : compiled.switchSyntax(switching, functions, byName.keySet())) {
+            logger.warn(warning);
+        }
         Map<String, List<CompiledScripts.CompiledTrigger>> triggers = new LinkedHashMap<>();
         for (CompiledScripts.CompiledTrigger trigger : compiled.triggers()) {
             if (switching.contains(trigger.script())) {

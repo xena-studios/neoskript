@@ -43,6 +43,7 @@ final class CustomSyntax {
                 "[local] [(plural|non(-|[ ])single)] expression [<.+>]", "[local] <.+> property <.+>");
 
         registrar.expression("NeoSkriptReflectExprExpression", "object", info -> {
+            onlyInCustomSyntax("The expression 'expression' may only be used in a custom syntax structure");
             String written = info.text() == null ? "" : info.text();
             Matcher number = Pattern.compile("(\\d+)\\s*$").matcher(written);
             int index = number.find() ? Integer.parseInt(number.group(1)) - 1 : -1;
@@ -54,19 +55,35 @@ final class CustomSyntax {
                 return use.arguments()[index];
             };
         }, "[the] expr[ession][plural:s](-| )<\\d+>");
-        registrar.expression("NeoSkriptReflectExprMatchedPattern", "integer", info -> (context, arguments) -> {
+        registrar.expression("NeoSkriptReflectExprMatchedPattern", "integer", info -> {
+            onlyInCustomSyntax("The matched pattern may only be used in custom syntax.");
+            return (context, arguments) -> {
             ScriptSyntaxCall use = context.scriptSyntaxCall();
-            // Counted from 1, as skript-reflect's.
-            return use == null ? null : (Object) Integer.valueOf(use.pattern() + 1);
+                // Counted from 1, as skript-reflect's.
+                return use == null ? null : (Object) Integer.valueOf(use.pattern() + 1);
+            };
         }, "[the] [matched] pattern");
-        registrar.expression("NeoSkriptReflectExprParseMark", "integer", info -> (context, arguments) -> {
-            ScriptSyntaxCall use = context.scriptSyntaxCall();
-            return use == null ? null : (Object) Integer.valueOf(use.mark());
+        registrar.expression("NeoSkriptReflectExprParseMark", "integer", info -> {
+            onlyInCustomSyntax("The parse mark may only be used in custom syntax");
+            return (context, arguments) -> {
+                ScriptSyntaxCall use = context.scriptSyntaxCall();
+                return use == null ? null : (Object) Integer.valueOf(use.mark());
+            };
         }, "[the] [parse[r]] mark");
-        registrar.expression("NeoSkriptReflectExprParseTags", "string", info -> (context, arguments) -> {
-            ScriptSyntaxCall use = context.scriptSyntaxCall();
-            return use == null ? null : use.tags().toArray();
+        registrar.expression("NeoSkriptReflectExprParseTags", "string", info -> {
+            onlyInCustomSyntax("The parse tags may only be used in custom syntax");
+            return (context, arguments) -> {
+                ScriptSyntaxCall use = context.scriptSyntaxCall();
+                return use == null ? null : use.tags().toArray();
+            };
         }, "[the] parse[r] tags");
+    }
+
+    /** Refuses the line, with skript-reflect's {@code message}, outside custom syntax's code. */
+    private static void onlyInCustomSyntax(String message) {
+        if (!co.xenastudios.neoskript.api.NeoSkript.get().inDeclaredSyntaxCode()) {
+            throw new co.xenastudios.neoskript.api.element.SyntaxError(message);
+        }
     }
 
     /** Reads skript-reflect's structures, with its messages for what's missing. */

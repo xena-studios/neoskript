@@ -138,6 +138,7 @@ public final class ScriptLoader {
         Map<String, List<co.xenastudios.neoskript.frontend.registry.SyntaxInfo>> declaredLocally = new HashMap<>();
         this.declared = registry.hasScriptSyntax() ? declare(results, declaredGlobally, declaredLocally) : Map.of();
         SyntaxRegistry everyScript = registry.withScriptSyntax(declaredGlobally);
+        this.declaredRegistry = everyScript;
         java.util.function.Function<String, SyntaxRegistry> syntaxOf = name -> {
             List<co.xenastudios.neoskript.frontend.registry.SyntaxInfo> local = declaredLocally.get(name);
             if (local == null) {
@@ -363,6 +364,16 @@ public final class ScriptLoader {
         return handled;
     }
 
+    private SyntaxRegistry declaredRegistry;
+
+    /**
+     * After {@link #load}: the registry with the syntax the scripts declared for all of them (not local syntax), for
+     * code parsed later against the loaded scripts, as an effect command's. The registry itself if none was.
+     */
+    public SyntaxRegistry declaredRegistry() {
+        return declaredRegistry == null ? registry : declaredRegistry;
+    }
+
     /** What a script-syntax structure declared, found before any code was parsed, and its problems. */
     private record Declared(co.xenastudios.neoskript.frontend.registry.ScriptSyntaxDecl decl, List<Pending> problems) {}
 
@@ -414,9 +425,16 @@ public final class ScriptLoader {
                     problems.add(new Pending(header.number(), true, "The addon handling '" + key + "' failed: " + e));
                 }
                 co.xenastudios.neoskript.frontend.registry.ScriptSyntaxDecl decl = null;
+                if (syntax != null && child(structure.section(), syntax.body()) == null) {
+                    // Skript's entry validator's message, as skript-reflect's structures give it: nothing is declared.
+                    problems.add(new Pending(header.number(), true, "Required entry '" + syntax.body()
+                            + "' is missing"));
+                    syntax = null;
+                }
                 if (syntax != null) {
                     List<co.xenastudios.neoskript.frontend.pattern.CompiledPattern> patterns = new ArrayList<>();
-                    for (String pattern : syntax.patterns()) {
+                    for (String written : syntax.patterns()) {
+                        String pattern = knownTypes(written, header.number(), problems);
                         try {
                             patterns.add(co.xenastudios.neoskript.frontend.pattern.PatternCompiler.compile(pattern));
                         } catch (RuntimeException e) {
@@ -462,6 +480,36 @@ public final class ScriptLoader {
         return found;
     }
 
+    /**
+     * {@code pattern} with each placeholder type no type is called replaced by {@code object}, warned about as
+     * skript-reflect's custom syntax warns.
+     */
+    private String knownTypes(String pattern, int line, List<Pending> problems) {
+        Matcher placeholder = PLACEHOLDER.matcher(pattern);
+        StringBuilder known = new StringBuilder();
+        while (placeholder.find()) {
+            StringBuilder types = new StringBuilder();
+            for (String type : placeholder.group(2).split("/", -1)) {
+                if (!types.isEmpty()) {
+                    types.append('/');
+                }
+                if (registry.resolveType(type.strip()) == null) {
+                    problems.add(new Pending(line, false, "'" + type.strip()
+                            + "' is not a valid Skript type. Using 'object' instead."));
+                    types.append("object");
+                } else {
+                    types.append(type);
+                }
+            }
+            placeholder.appendReplacement(known, Matcher.quoteReplacement("%" + placeholder.group(1) + types + "%"));
+        }
+        placeholder.appendTail(known);
+        return known.toString();
+    }
+
+    /** A placeholder: its flags ({@code -*~}), then its types. */
+    private static final Pattern PLACEHOLDER = Pattern.compile("%([-*~]*)([^%]+)%");
+
     /** The id of the type called {@code name}, singular or plural, or {@code null} if there's none. */
     private String typeId(String name) {
         co.xenastudios.neoskript.frontend.registry.TypeRef ref = registry.resolveType(name.strip());
@@ -482,14 +530,8 @@ public final class ScriptLoader {
         if (decl == null) {
             return new ParsedStructure.Data(structure);
         }
-        String name = decl.declared().body();
-        Node.Section body = child(structure.section(), name);
-        Line header = structure.section().line();
-        if (body == null) {
-            diagnostics.error(header.number(), header.column(), header.key().length(), "'" + header.key().strip()
-                    + "' needs a '" + name + "' section");
-            return new ParsedStructure.Data(structure);
-        }
+        // There's one: a declaration without its body section declares nothing.
+        Node.Section body = child(structure.section(), decl.declared().body());
         // Its code is a function's: no event values of its own, but it runs with the event of where it's used.
         EventValues values = registry.eventValues();
         context.eventScope(values == null ? null : values.function());

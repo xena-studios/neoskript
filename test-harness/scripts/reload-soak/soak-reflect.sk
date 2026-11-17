@@ -1,0 +1,19 @@
+# The reload soak's custom syntax (NeoSkript Reflect): an effect and an expression whose headers stay the same, so their
+# code's handles are reused, and an effect whose header changes on every reload, so the old one's code has to be let
+# go of each time.
+effect soak declared shout %string%:
+	trigger:
+		set {-soak::declared} to expression-1
+
+expression soak declared doubled %number%:
+	get:
+		return expression-1 * 2
+
+effect soak declared VERSION %number%:
+	trigger:
+		set {-soak::declaredVersion} to expression-1
+
+on load:
+	soak declared shout "VERSION"
+	soak declared VERSION soak declared doubled 3
+	send "[harness] soak reflect VERSION" to console

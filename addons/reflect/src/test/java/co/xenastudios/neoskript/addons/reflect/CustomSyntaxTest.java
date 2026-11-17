@@ -118,4 +118,73 @@ class CustomSyntaxTest {
         assertEquals(List.of("ERROR 1: A custom effect without an inline pattern must have a 'patterns' entry",
                 "ERROR 5: A custom effect with an inline pattern cannot have a 'patterns' entry too"), problems);
     }
+
+    @Test
+    void reloadingTheDeclaringScriptAloneLetsGoOfItsOldSyntax() {
+        String use = "on load:\n\tshout \"hi\"\n";
+        assertEquals(List.of(), harness.load("defs.sk", "effect shout %string%:\n\ttrigger:\n\t\tsay \"one %expr-1%\"\n",
+                "use.sk", use));
+        List<co.xenastudios.neoskript.compiler.CompiledScripts.CompiledTrigger> oldUse = harness.triggers().stream()
+                .filter(trigger -> trigger.script().equals("use.sk")).toList();
+        // Only defs.sk switches, its effect renamed: use.sk keeps its old code, as after '/sk reload defs.sk'.
+        harness.switching = java.util.Set.of("defs.sk");
+        harness.load("defs.sk", "effect yell %string%:\n\ttrigger:\n\t\tsay \"two %expr-1%\"\n", "use.sk", use);
+        assertEquals(List.of("use.sk still uses the custom syntax 'effect shout %string% (defs.sk)', which defs.sk no"
+                + " longer declares: reload it"), harness.switchWarnings);
+        harness.run(oldUse);
+        // The old code is gone: the use says so rather than running it.
+        assertEquals(List.of(), harness.said);
+        org.junit.jupiter.api.Assertions.assertTrue(harness.warnings.stream().anyMatch(w -> w.contains(
+                "Couldn't resolve call for 'custom syntax: effect shout %string% (defs.sk)'")), harness.warnings.toString());
+    }
+
+    @Test
+    void aDeclarationWithoutItsCodeDeclaresNothing() {
+        List<String> problems = harness.load("defs.sk", """
+                effect nobody here:
+                \treturn type: string
+
+                on load:
+                \tnobody here
+                """);
+        assertEquals(List.of("ERROR 1: Required entry 'trigger' is missing",
+                "ERROR 5: Can't understand this condition/effect: nobody here"), problems);
+    }
+
+    @Test
+    void aTypeNoOneKnowsIsAnyValueWithSkriptReflectsWarning() {
+        List<String> problems = harness.load("defs.sk", """
+                effect frob %nosuchtype%:
+                \ttrigger:
+                \t\tsay "frob %expr-1%"
+
+                on load:
+                \tfrob "x"
+                """);
+        assertEquals(List.of("WARNING 1: 'nosuchtype' is not a valid Skript type. Using 'object' instead."), problems);
+        harness.run();
+        assertEquals(List.of("frob x"), harness.said);
+    }
+
+    @Test
+    void customSyntaxValuesOnlyInCustomSyntax() {
+        List<String> problems = harness.load("plain.sk", """
+                on load:
+                \tsay matched pattern
+                \tsay parser mark
+                \tsay expression-1
+                \tsay parse tags
+                """);
+        assertEquals(List.of("ERROR 2: The matched pattern may only be used in custom syntax.",
+                "ERROR 3: The parse mark may only be used in custom syntax",
+                "ERROR 4: The expression 'expression' may only be used in a custom syntax structure",
+                "ERROR 5: The parse tags may only be used in custom syntax"), problems);
+    }
+
+    @Test
+    void declaredSyntaxWorksInEffectCommands() {
+        assertEquals(List.of(), harness.load("defs.sk", "effect shout %string%:\n\ttrigger:\n\t\tsay \"shout %expr-1%\"\n"));
+        assertEquals(List.of(), harness.effectCommand("shout \"hi\""));
+        assertEquals(List.of("shout hi"), harness.said);
+    }
 }

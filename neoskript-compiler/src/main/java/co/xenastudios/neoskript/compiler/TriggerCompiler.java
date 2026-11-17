@@ -629,11 +629,25 @@ final class TriggerCompiler {
         declaredSyntax = parsed.declaredSyntax();
         function = parsed.signature();
         headerLine = parsed.structure().node().line();
-        byte[] bytes = generate(scriptName, () -> {
-                    parameters(parsed);
-                    statements(parsed.body());
-                });
-        return (CompiledFunction) define(bytes);
+        Boolean outer = DECLARED_SYNTAX_CODE.get();
+        DECLARED_SYNTAX_CODE.set(declaredSyntax);
+        try {
+            byte[] bytes = generate(scriptName, () -> {
+                        parameters(parsed);
+                        statements(parsed.body());
+                    });
+            return (CompiledFunction) define(bytes);
+        } finally {
+            DECLARED_SYNTAX_CODE.set(outer);
+        }
+    }
+
+    /** Whether declared syntax's code is being compiled on this thread: see {@code NeoSkript.inDeclaredSyntaxCode}. */
+    private static final ThreadLocal<Boolean> DECLARED_SYNTAX_CODE = new ThreadLocal<>();
+
+    /** Whether the code being compiled on this thread is the code of syntax a script declared. */
+    static boolean compilingDeclaredSyntax() {
+        return Boolean.TRUE.equals(DECLARED_SYNTAX_CODE.get());
     }
 
     @FunctionalInterface

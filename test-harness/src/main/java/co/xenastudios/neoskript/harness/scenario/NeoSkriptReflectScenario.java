@@ -187,7 +187,7 @@ public final class NeoSkriptReflectScenario implements Scenario {
         }
     }
 
-    private static Path addonJar(ScenarioContext context) throws IOException {
+    static Path addonJar(ScenarioContext context) throws IOException {
         for (Path jar : context.officialAddonJars()) {
             if ("NeoSkriptReflect".equals(NeoSkriptOfficialAddonsScenario.properties(jar).getProperty("name"))) {
                 return jar;

@@ -2,6 +2,7 @@ public interface co.xenastudios.neoskript.api.NeoSkript
   public abstract void addon(java.lang.String, java.lang.String, java.util.function.Consumer) signature (Ljava/lang/String;Ljava/lang/String;Ljava/util/function/Consumer<-Lco/xenastudios/neoskript/api/registration/Registrar;>;)V
   public abstract java.util.List addons() signature ()Ljava/util/List<Ljava/lang/String;>;
   public static co.xenastudios.neoskript.api.NeoSkript get()
+  public boolean inDeclaredSyntaxCode() @Experimental
   public static boolean isEnabled()
   public abstract boolean isReady()
   public void runtimeError(java.lang.String) @Experimental
