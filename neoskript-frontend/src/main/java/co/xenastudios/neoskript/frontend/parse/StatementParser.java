@@ -261,6 +261,19 @@ final class StatementParser {
      */
     private List<Statement> sectionCode(ParsedSyntax header, java.util.function.Supplier<List<Statement>> body) {
         EventValues values = context.registry().eventValues();
+        EventValues.Scope later = header == null || values == null ? null : values.later(header.syntax());
+        if (later != null) {
+            // Code that runs later, for its own event: that event's values, and no delay yet.
+            EventValues.Scope scope = context.eventScope(later);
+            DelayState before = delay;
+            delay = DelayState.NOT_DELAYED;
+            try {
+                return body.get();
+            } finally {
+                delay = before;
+                context.eventScope(scope);
+            }
+        }
         if (context.eventScope() == null || header != null && values != null && values.keepsEventValues(header.syntax())) {
             return body.get();
         }

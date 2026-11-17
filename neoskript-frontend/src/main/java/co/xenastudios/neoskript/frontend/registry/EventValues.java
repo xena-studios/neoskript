@@ -31,6 +31,14 @@ public interface EventValues {
      */
     boolean keepsEventValues(SyntaxInfo header);
 
+    /**
+     * What the code of a section that runs later, for events of its own, can use, as an addon's {@code make gui
+     * slot 0 with dirt:}; or {@code null} if {@code header} isn't such a section. Its code also starts with no delay.
+     */
+    default Scope later(SyntaxInfo header) {
+        return null;
+    }
+
     /** The event values some code can use. */
     interface Scope {
 

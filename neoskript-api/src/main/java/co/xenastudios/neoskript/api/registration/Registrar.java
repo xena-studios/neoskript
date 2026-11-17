@@ -118,6 +118,33 @@ public interface Registrar {
             String... patterns);
 
     /**
+     * A section whose code runs later, for events the addon fires itself, as skript-gui's {@code make gui slot 0
+     * with dirt:} keeps its code for when the slot is clicked. The code is checked as code in an event of
+     * {@code eventClasses} called {@code eventName}, with that event's values and syntax ({@code player},
+     * {@code cancel event}), and starts with no delay. The element gets the code when its line runs, and runs it
+     * with {@link co.xenastudios.neoskript.api.element.SectionCode#run} whenever the event happens. Written without
+     * code, it's an effect, and gets {@code null}.
+     *
+     * @param id the section's id
+     * @param eventName what Skript calls the event in errors, as {@code inventory click}
+     * @param eventClasses the classes of the events the code runs for
+     * @param factory makes the section for each place it's used
+     * @param patterns its patterns
+     */
+    void laterSection(String id, String eventName, List<Class<?>> eventClasses,
+            ElementFactory<co.xenastudios.neoskript.api.element.LaterSection> factory, String... patterns);
+
+    /**
+     * Tells the addon which scripts' code stopped, each time scripts reload or unload: those reloaded, unloaded
+     * or removed. Code from them it still holds, as {@link co.xenastudios.neoskript.api.element.SectionCode}, is
+     * the old version. It's called on the thread that loaded them, the global thread on Folia; an exception from it
+     * is logged.
+     *
+     * @param scripts what gets the scripts' names, as {@code menus/shop.sk}
+     */
+    default void scriptsUnloaded(java.util.function.Consumer<? super java.util.Set<String>> scripts) {}
+
+    /**
      * A property condition, {@code %owners% (is|are) <property>} and its negation (see
      * {@link Patterns#isProperty}). It's true when {@code test} holds for every owner, or for none when
      * negated.

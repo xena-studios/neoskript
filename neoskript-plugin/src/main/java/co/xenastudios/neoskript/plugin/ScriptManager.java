@@ -349,6 +349,8 @@ final class ScriptManager {
         // Every script switches to its new version, as in Skript: one with errors, without what has them (D12).
         // In the files' order, which Skript loads them in: their load events run in it.
         Set<String> switching = new java.util.LinkedHashSet<>();
+        // Scripts whose code stops: reloaded or gone.
+        Set<String> stopped = new java.util.LinkedHashSet<>();
         int inScope = 0;
         for (SourceFile file : files) {
             String name = file.name();
@@ -364,6 +366,7 @@ final class ScriptManager {
             loaded.forEach((name, old) -> {
                 if (!byName.containsKey(name)) {
                     runUnload(old);
+                    stopped.add(name);
                 }
             });
             loaded.keySet().removeIf(name -> !byName.containsKey(name));
@@ -394,6 +397,11 @@ final class ScriptManager {
             }
         }
         for (String name : switching) {
+            if (loaded.containsKey(name)) {
+                stopped.add(name);
+            }
+        }
+        for (String name : switching) {
             // The previous version of a script unloads before the new one loads.
             runUnload(loaded.getOrDefault(name, List.of()));
             loaded.put(name, triggers.getOrDefault(name, List.of()));
@@ -404,6 +412,7 @@ final class ScriptManager {
         reorder(loaded, files);
         reorder(loadedCommands, files);
         updateListenersAndCommands();
+        tellUnloaded(stopped);
         long millis = (System.nanoTime() - start) / 1_000_000;
 
         for (String name : switching) {
@@ -706,6 +715,24 @@ final class ScriptManager {
             autoReload.stop();
         }
         updateListenersAndCommands();
+        if (old != null) {
+            tellUnloaded(Set.of(name));
+        }
+    }
+
+    /** Tells addons ({@code Registrar.scriptsUnloaded}) which scripts' code stopped: reloaded or gone. */
+    private void tellUnloaded(Set<String> stopped) {
+        if (stopped.isEmpty()) {
+            return;
+        }
+        Set<String> names = java.util.Collections.unmodifiableSet(new java.util.LinkedHashSet<>(stopped));
+        for (var watcher : library.unloadWatchers()) {
+            try {
+                watcher.accept(names);
+            } catch (RuntimeException | LinkageError e) {
+                logger.error("An addon failed when told which scripts' code stopped", e);
+            }
+        }
     }
 
     /**
