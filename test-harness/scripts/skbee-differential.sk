@@ -261,8 +261,7 @@ command /skbeetest-text:
 		set {_r2} to text component from "aaa bbb"
 		component replace first "a" with "x" in {_r2}
 		skbee("component replace first", {_r2})
-		set {_prefix} to text component from "[skbee] sent component: "
-		set {_sent} to merge components {_prefix} and {_m}
+		set {_sent} to merge components text component from "[skbee] sent component: " and {_m}
 		send component {_sent} to console
 		set {_inv} to chest inventory with component name mini message from "<blue>Chest" with 2 rows
 		set {_title} to component inventory name of {_inv}
