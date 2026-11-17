@@ -1,0 +1,122 @@
+---
+title: NeoSkript Proxy
+description: "Messages and proxy actions across a BungeeCord or Velocity network: server lists, player counts, where a player is, and messages between servers over plugin messaging or Redis."
+sidebar:
+  label: Proxy
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+NeoSkript Proxy (`NeoSkriptProxy`) lets scripts on a network of servers, behind BungeeCord or Velocity, talk to each other and to the proxy: send messages between servers, list the servers and their players, find which server a player is on, broadcast and kick across the network.
+
+It's NeoSkript's own addon, with its own syntax, and it also takes the syntax of the Skript addons networks use, so their scripts load unchanged: [SkProxy](https://modrinth.com/plugin/skproxy) 2.4, [Skelocity](https://modrinth.com/plugin/skelocity) 1.1 and [SkRedis](https://modrinth.com/plugin/skredis) 2.3.5's messaging. NeoSkript's test harness runs a network with a real Velocity proxy, one server with Skript and those three addons, and two with NeoSkript and this addon, and checks that they print the same and hear each other.
+
+Messages travel over **plugin messaging**, through the proxy (nothing to set up, but it needs a player online), or over **Redis** (works with nobody online, and with SkRedis on servers still on Skript).
+
+## Installing
+
+1. Put `NeoSkriptProxy-<version>.jar` in `plugins/` on each server, next to NeoSkript, at the same version. Not on the proxy.
+2. Remove SkProxy's, Skelocity's or SkRedis's jar if one's there: they need Skript, and the console says to remove them.
+3. Restart the server. `plugins/NeoSkriptProxy/config.yml` is made on the first start.
+4. In it, set `secret` to the same long random text on every server. Network messages over plugin messaging aren't sent or taken without it (below).
+5. On Velocity, check `bungee-plugin-message-channel = true` in `velocity.toml` (it's the default).
+6. For Redis, set `redis.enabled: true` and its address on each server.
+
+## Messages between servers
+
+```
+send [the] [network] message %text% (on|in) [the] channel %text% to all [[of] the] [other] servers
+send [the] [network] message %text% (on|in) [the] channel %text% to [the] server[s] %texts%
+on network message [(on|in|from) [the] channel[s] %texts%]:
+[the] network message
+[the] network channel
+[the] network (sender|origin) [server]
+```
+
+```skript nocheck
+command /alert <text>:
+	permission: network.alert
+	trigger:
+		send network message arg-1 on channel "alerts" to all servers
+
+on network message on channel "alerts":
+	broadcast "<red>[Network] %network message% (from %network sender%)"
+```
+
+"All servers" is every other server, as BungeeCord's own forwarding is. With Redis on, messages go over Redis; otherwise through the proxy, which needs a player online on the sending server and on each receiving one (that's how plugin messages travel). A message sent with nobody online waits for the next player (`plugin-messaging.queue-without-players`), for up to a minute.
+
+A message's triggers run on the server's main thread (the global thread on Folia), never on a network thread, so they can touch the world.
+
+## Asking the proxy
+
+These wait for the proxy's answer, as `wait` waits, without holding up the server, then carry on on the trigger's own thread:
+
+```
+[all [of]] [the] network servers
+[the] network player count [(of|on) [[the] server] %text%]
+[all [of]] [the] network players [(of|on) [[the] server] %text%]
+[the] network server of %offline player%
+[the] [this] server's network name
+```
+
+```skript nocheck
+command /where <offline player>:
+	trigger:
+		set {_server} to the network server of arg-1
+		if {_server} is set:
+			send "%arg-1% is on %{_server}%."
+		else:
+			send "%arg-1% isn't online."
+```
+
+The proxy only answers about a server it knows, or a player who's online; otherwise the answer is nothing, after `plugin-messaging.timeout` (5 seconds). With nobody online on this server, nothing can be asked: it's a runtime error at once ("Nobody is online, so the proxy can't be asked"). Like other syntax that waits, they're used in effects and conditions on a line of their own, not in `if` or `loop` headers: set a variable first.
+
+Sending a player to another server is Skript's own `connect %players% to [proxy|bungeecord] server %text%`.
+
+## SkProxy, Skelocity and SkRedis
+
+| Original | Syntax |
+|---|---|
+| SkProxy 2.4 | `player count of %text%`, `status of %text%` (`Online` or `Offline`), `proxy player count` |
+| Skelocity 1.1 | `[the] [total] player count of [(proxy\|velocity)] server %text%`, `[the] [total] [(proxy\|velocity)] proxy player count`, `[all] (proxy\|velocity) players [on [server] %text%]`, `[the] [(sk\|v)elocity] server of %player%`, `(proxy\|velocity\|global\|network) broadcast %text%`, `(proxy\|velocity) kick %player% [(with reason\|due to) %text%]` |
+| SkRedis 2.3.5 | `(send\|publish) (redis\|pubsub) (message\|msg) %text% to [channel] %text%`, `(send\|publish) custom (redis\|pubsub) (message\|msg) %text% to [channel] %text%`, `on redis message`, `on custom redis message`, `redis message`, `redis channel`, `redis message date` |
+
+Redis messages use SkRedis's format, so a server on NeoSkript and one still on Skript with SkRedis hear each other. `on network message` hears SkRedis's messages too.
+
+### Differences
+
+- **Answers:** SkProxy's and Skelocity's expressions answer at once, from what the proxy said last, and ask again behind it, so they work anywhere (a server list ping's motd, just before `cancel event`). NeoSkript Proxy does the same for their syntax: the first read gives `0`, `Offline`, nothing or `Unknown`, as theirs do, and a read can be a moment stale. Unlike theirs, it asks again at most once a second for each question (`plugin-messaging.refresh`), so a scoreboard reading a count every tick doesn't send twenty plugin messages a second, and an answer that stops coming (a server the proxy dropped) is forgotten, so it reads `Offline` and `0` again rather than as it last was. Its own `network ...` expressions wait for the current answer instead.
+- **Nobody online:** SkProxy throws an error each time with nobody online; Skelocity answers `0` or nothing. For their syntax, NeoSkript Proxy answers from the last answer it has, without an error. Its own questions say so in a runtime error, and messages wait for the next player.
+- **Threads:** SkRedis runs `on redis message` triggers on Redis's thread, off the server's, where touching the world isn't safe; NeoSkript Proxy runs them on the server's thread. SkRedis also blocks the main thread on each read; NeoSkript Proxy never does.
+- **Not yet:** SkRedis's storage syntax (Redis strings, hashes and lists, `%text% exists`) and its `run async` section aren't there yet; nor are Skelocity's `fetch ... and store it in` effects, which are in its source but not in a release.
+
+## Safety and limits
+
+- **Forged messages:** plugin messages on the BungeeCord channel can be sent by anyone who reaches a server directly (Velocity drops the ones players send). Network messages over plugin messaging are signed with `secret` (HMAC-SHA256), with the server they're for, and dropped if they're unsigned, signed with another secret, for another server, replayed, or more than a minute old (each nonce is kept as long as its message could be let through; more than 100,000 messages a minute are refused, not forgotten). Without a secret, they're neither sent nor taken; `secret: insecure` sends and takes them unsigned. Answers from the proxy are only taken for a question that's waiting. Over Redis, messages are trusted: protect Redis with a password, and with `redis.ssl: true` the certificate is checked against the host's name.
+- **Several networks on one Redis:** Redis's database number doesn't keep pub/sub apart. Give each network a `redis.channel-prefix`, put in front of every channel (servers still on SkRedis don't add one).
+- **Bounds:** a message is at most `max-message-bytes` (16 KB; plugin messages can't be over 32 KB), sent or received over Redis. At most `plugin-messaging.max-queued` messages wait for a player and `redis.max-queued` for Redis (1,000 each), each for at most a minute; 1,000 questions wait for answers at once; 10,000 messages (16 MB) wait for the server to hand them to scripts; messages to named servers wait up to a minute for this server to learn its name, if `server-name` isn't set. Past each, new ones are dropped, and the console says so.
+- **Redis down:** messages wait (or are dropped, with `redis.on-outage: drop`) and both connections try again, every second at first and every 30 seconds at most. The console says when it goes down and comes back. Messages published while it was down are missed: that's pub/sub.
+- **Stopping:** questions still waiting fail, and messages waiting for a player are dropped. Messages to Redis from `on unload` triggers still go out: the Redis connection closes once NeoSkript has stopped, after a two-second grace.
+
+## config.yml
+
+| Setting | Default | |
+|---|---|---|
+| `server-name` | blank | This server's name on the proxy; blank asks the proxy |
+| `secret` | blank | What network messages over plugin messaging are signed with: the same on every server; blank sends and takes none, `insecure` sends them unsigned |
+| `plugin-messaging.enabled` | true | Plugin messaging through the proxy |
+| `plugin-messaging.timeout` | 5000 | How long a question waits for the proxy's answer, in milliseconds |
+| `plugin-messaging.refresh` | 1000 | How often SkProxy's and Skelocity's expressions ask again, at most, in milliseconds |
+| `plugin-messaging.queue-without-players` | true | Messages wait for a player when nobody's online |
+| `plugin-messaging.max-queued`, `queued-for` | 1000, 60 | The most messages waiting, and for how many seconds |
+| `redis.enabled` | false | Messages over Redis |
+| `redis.host`, `port`, `username`, `password`, `database`, `ssl` | localhost, 6379 | Where Redis is, and how to log in |
+| `redis.timeout` | 2000 | How long connecting and each reply may take, in milliseconds |
+| `redis.on-outage` | queue | While Redis is down, messages wait (`queue`) or are dropped (`drop`) |
+| `redis.max-queued`, `queued-for` | 1000, 60 | The most messages waiting for Redis, and for how many seconds |
+| `redis.channel-prefix` | blank | Put in front of every Redis channel, to keep networks sharing a Redis apart |
+| `max-message-bytes` | 16384 | The longest network message |
+
+<Aside type="note">
+Network-wide variables (`{network::...}`, kept the same on every server) are planned, built on Redis, once NeoSkript's variable storage can hand a prefix of variables to an addon. They're not in this version. Until then, Skript's own `databases:` section with MySQL storage shares variables between servers.
+</Aside>

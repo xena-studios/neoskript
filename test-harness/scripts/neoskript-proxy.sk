@@ -1,0 +1,32 @@
+# Harness check: the community addons' proxy syntax, the same on Skript 2.17.0 with SkProxy 2.4, Skelocity 1.1 and
+# SkRedis 2.3.5 (server a) and on NeoSkript with NeoSkriptProxy (server b), behind one Velocity, with one Redis.
+# Each line prints "[proxytest] <check>"; the harness compares them. The originals answer from what they heard
+# last, so each question is asked once first, printed as "[proxyfirst]" (not compared), then again after a wait.
+on redis message:
+	send "[proxytest] redis %redis message% on %redis channel%" to console
+
+on custom redis message:
+	send "[proxytest] custom %redis message% on %redis channel%" to console
+
+command /proxytest:
+	trigger:
+		set {_me} to a random element out of all players
+		send "[proxyfirst] %player count of "b"% %status of "b"% %proxy player count% %player count of server "b"% %proxy players on server "a"% %server of {_me}%" to console
+		wait 2 seconds
+		send "[proxytest] skproxy b %player count of "b"%, status %status of "b"%, total %proxy player count%" to console
+		send "[proxytest] status of nowhere %status of "nowhere"%" to console
+		send "[proxytest] skelocity b %player count of server "b"%, on a %proxy players on server "a"%" to console
+		send "[proxyside] %server of {_me}%" to console
+		send redis message "ping" to channel "net"
+		send custom redis message "{""kind"":""custom""}" to channel "net"
+		send "[proxytest] done" to console
+
+# An original's expression is an answer at once, so the event can still be cancelled after it.
+on command "proxyquick":
+	set {_count} to proxy player count
+	cancel event
+	send "[proxytest] quick %{_count}%" to console
+
+command /redissend <text>:
+	trigger:
+		send redis message arg-1 to channel "net"

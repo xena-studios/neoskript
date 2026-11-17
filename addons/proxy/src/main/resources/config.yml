@@ -1,0 +1,52 @@
+# NeoSkriptProxy: messages and proxy actions across a BungeeCord or Velocity network. Changes take effect when the
+# server restarts. A value that isn't valid is replaced by its default, and the console says which.
+
+# This server's name on the proxy, as in velocity.toml or BungeeCord's config.yml. Blank: asked of the proxy once
+# a player is online. Network messages sent to a server by name, and their sender, use it.
+server-name: ""
+
+# Shared by every server on the network, the same on each: network messages sent over plugin messaging are signed
+# with it, and ones that aren't, or are signed with another, are dropped. Any long random text. Without it, network
+# messages over plugin messaging are neither sent nor taken ("insecure" sends and takes them unsigned, which anyone
+# who can send plugin messages on the BungeeCord channel could forge). Questions to the proxy and Redis don't need it.
+secret: ""
+
+plugin-messaging:
+  # Proxy actions and network messages through the proxy's BungeeCord channel. On Velocity, turn on
+  # bungee-plugin-message-channel in velocity.toml.
+  enabled: true
+  # How long a question to the proxy (a player count, the servers) waits for its answer, in milliseconds.
+  timeout: 5000
+  # SkProxy's and Skelocity's expressions answer from the proxy's last answer and ask again behind it: at most once
+  # this often for each question, in milliseconds, however often scripts read them.
+  refresh: 1000
+  # Plugin messages travel through a player's connection, so with nobody online none can be sent. Messages wait
+  # for the next player (true), or are dropped (false). Questions to the proxy can't wait: they fail at once.
+  queue-without-players: true
+  # The most messages waiting for a player, and how long each waits, in seconds.
+  max-queued: 1000
+  queued-for: 60
+
+redis:
+  # Network messages over Redis pub/sub, with SkRedis's syntax and format. Works with nobody online.
+  enabled: false
+  host: "localhost"
+  port: 6379
+  # Leave blank if Redis has no username or password.
+  username: ""
+  password: ""
+  database: 0
+  ssl: false
+  # How long connecting and each reply may take, in milliseconds.
+  timeout: 2000
+  # While Redis is down, messages wait (queue) until it's back, or are dropped (drop).
+  on-outage: queue
+  max-queued: 1000
+  queued-for: 60
+  # Redis's database number doesn't keep pub/sub apart: every client of the Redis server hears every channel. To
+  # keep two networks on one Redis apart, give each a prefix, put in front of every channel. Servers still on
+  # SkRedis don't add one, so leave it blank to talk to them.
+  channel-prefix: ""
+
+# The longest network message, in bytes of UTF-8. Plugin messages can't be longer than about 32 KB.
+max-message-bytes: 16384

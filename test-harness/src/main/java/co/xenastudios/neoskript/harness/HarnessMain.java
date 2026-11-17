@@ -11,6 +11,7 @@ import co.xenastudios.neoskript.harness.scenario.NeoSkriptYamlScenario;
 import co.xenastudios.neoskript.harness.scenario.YamlDifferentialScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptCliScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptDbScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptProxyScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptEventsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptLanguageScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptLoadBenchmark;
@@ -105,7 +106,8 @@ public final class HarnessMain {
             new NeoSkriptYamlScenario(),
             new YamlDifferentialScenario(),
             new NeoSkriptWebScenario(),
-            new NeoSkriptDbScenario());
+            new NeoSkriptDbScenario(),
+            new NeoSkriptProxyScenario());
 
     record Result(String environment, String scenario, boolean passed, Duration duration, String message,
             Map<String, Object> summary) {}
