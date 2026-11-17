@@ -391,7 +391,9 @@ class DatabasesTest {
     void whatABackupCutOffByACrashLeftIsRemovedByItsExactName() throws Exception {
         Path backups = Files.createDirectories(dir.resolve("backups"));
         List<String> leftovers = List.of("variables_2026-11-17_01-02-03_scheduled.csv.copying.tmp",
-                "variables_2026-11-17_01-02-03-2.csv.copying.tmp", "variables_2026-11-17_01-02-03.csv1234567.tmp");
+                "variables_2026-11-17_01-02-03-2.csv.copying.tmp", "variables_2026-11-17_01-02-03.csv1234567.tmp",
+                // A scheduled backup's temporary file from before .copying.tmp, as the system named it.
+                "variables_2026-11-17_01-02-03_scheduled.csv1234567.tmp");
         List<String> kept = List.of("variables_2026-11-17_01-02-03_scheduled.csv", "variables_notes.csv.copying.tmp",
                 "other_2026-11-17_01-02-03_scheduled.csv.copying.tmp",
                 "variables_2026-11-17_01-02-03_scheduled.csv.copying.tmp.old",
