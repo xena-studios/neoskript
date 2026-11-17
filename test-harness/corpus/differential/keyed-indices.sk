@@ -1,0 +1,26 @@
+# Probe: the indices of keyed expressions besides list variables (issue #61), as Skript's
+# KeyProviderExpression gives them.
+
+function keyed_indices_list() :: objects:
+	set {_r::a} to 1
+	set {_r::b} to 2
+	return {_r::*}
+
+function probe_keyed_indices():
+	set {_a::x::y} to 1
+	set {_a::x::z} to 2
+	set {_a::w} to 3
+	set {_s::c} to 30
+	set {_s::a} to 10
+	set {_s::b} to 20
+	show("of a list", indices of {_a::*})
+	show("of recursive", indices of (recursive {_a::*}))
+	show("of keyed", indices of keyed {_s::*})
+	show("of keyed recursive", indices of keyed (recursive {_a::*}))
+	show("of a function", indices of keyed_indices_list())
+	show("of filtered", indices of ({_s::*} where [input > 10]))
+	show("of transformed", indices of ({_s::*} transformed using [input * 2]))
+	show("of first elements", indices of (first 2 elements of {_s::*}))
+	show("sorted of recursive", sorted indices of (recursive {_a::*}) in descending order)
+	show("sorted of a function", sorted indices of keyed_indices_list() in descending order)
+	show("possessive of recursive", (recursive {_a::*})'s indices)

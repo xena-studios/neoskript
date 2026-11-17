@@ -62,6 +62,52 @@ public record KeyedValues(Object[] values, String[] keys) implements co.xenastud
         return new KeyedValues(keyed.values().toArray(), keyed.keySet().toArray(String[]::new));
     }
 
+    /**
+     * The indices of {@code value}'s values, as Skript's {@code indices of} a keyed expression: with {@code sort}
+     * 1 (ascending) or -1 (descending) ordered by their values; else each index as far as its first part ({@code a}
+     * for {@code a::b}), each once, unless {@code paths}, as for {@code recursive}, keeps them whole.
+     */
+    public static String[] indices(Object value, boolean paths, int sort) {
+        KeyedValues keyed = of(value);
+        if (sort != 0) {
+            Integer[] order = new Integer[keyed.values.length];
+            for (int i = 0; i < order.length; i++) {
+                order[i] = i;
+            }
+            java.util.Arrays.sort(order, (x, y) -> {
+                Integer c = Comparison.order(keyed.values[x], keyed.values[y]);
+                return (c == null ? 0 : c) * sort;
+            });
+            String[] sorted = new String[order.length];
+            for (int i = 0; i < order.length; i++) {
+                sorted[i] = keyed.keys[order[i]];
+            }
+            return sorted;
+        }
+        if (paths) {
+            return keyed.keys.clone();
+        }
+        java.util.LinkedHashSet<String> first = new java.util.LinkedHashSet<>();
+        for (String key : keyed.keys) {
+            int separator = key.indexOf("::");
+            first.add(separator < 0 ? key : key.substring(0, separator));
+        }
+        return first.toArray(String[]::new);
+    }
+
+    /** Adds {@code value}'s values to {@code values}, each with {@code key}, for a keyed filter or transform. */
+    public static void add(List<Object> values, List<String> keys, Object value, String key) {
+        for (Object each : Values.list(new Object[] {value})) {
+            values.add(each);
+            keys.add(key);
+        }
+    }
+
+    /** The values and keys collected with {@link #add}. */
+    public static KeyedValues of(List<Object> values, List<String> keys) {
+        return new KeyedValues(values.toArray(), keys.toArray(String[]::new));
+    }
+
     /** Only the values that are instances of {@code type}, with their keys. */
     public KeyedValues only(Class<?> type) {
         List<Object> kept = new ArrayList<>(values.length);
