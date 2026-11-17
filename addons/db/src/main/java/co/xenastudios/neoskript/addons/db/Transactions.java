@@ -10,23 +10,32 @@ import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 /**
  * The transactions scripts have open ({@code transaction on {db}:}), by trigger and database, as skript-db keeps
- * them. A transaction its section left without finishing ({@code stop}, {@code return}) is rolled back once it
- * has been idle for {@code transaction-timeout}, and every one still open is rolled back when NeoSkriptDb stops.
+ * them. A transaction ends at the end of its section (committed), when a statement in it fails (rolled back, and the
+ * rest of the section skipped), or when its trigger leaves the section another way (rolled back at once:
+ * {@link co.xenastudios.neoskript.api.element.PausingSection#abandoned}). A trigger waiting inside its section keeps
+ * it open: unlike skript-db, there's no idle timeout that rolls back under a trigger that's still going, after which
+ * the rest of its statements would commit on their own. One rolled back from outside (as NeoSkriptDb stops) is kept
+ * as broken until its section ends, so the trigger's later statements fail with the reason.
  */
 final class Transactions {
 
     private final Map<Object, Map<Database, Transaction>> scopes = new IdentityHashMap<>();
-    private final long timeoutNanos;
+    private final long warnAfterNanos;
     private final Logger logger;
 
-    Transactions(long timeoutNanos, Logger logger) {
-        this.timeoutNanos = timeoutNanos;
+    /**
+     * @param warnAfterNanos how long a transaction may stay open before the console says so, once
+     * @param logger the console
+     */
+    Transactions(long warnAfterNanos, Logger logger) {
+        this.warnAfterNanos = warnAfterNanos;
         this.logger = logger;
     }
 
@@ -38,7 +47,9 @@ final class Transactions {
         private final Object owner;
         private final AtomicBoolean open = new AtomicBoolean(true);
         private final ReentrantLock busy = new ReentrantLock();
-        private volatile long lastUsed = System.nanoTime();
+        private final long opened = System.nanoTime();
+        private volatile String failure;
+        private volatile boolean warned;
 
         private Transaction(Database database, Database.Lease lease, Object owner) {
             this.database = database;
@@ -59,16 +70,23 @@ final class Transactions {
             return open.get();
         }
 
+        /** Why it was rolled back from outside its trigger, or {@code null}. */
+        String failure() {
+            return failure;
+        }
+
         /** Runs {@code work} on the transaction's connection, one statement at a time. */
         <T> T use(Work<T> work) throws SQLException {
             busy.lock();
             try {
+                if (failure != null) {
+                    throw new SQLException("The transaction was rolled back: " + failure);
+                }
                 if (!open.get()) {
                     throw new SQLException("The transaction is no longer open");
                 }
                 return work.run(lease.connection());
             } finally {
-                lastUsed = System.nanoTime();
                 busy.unlock();
             }
         }
@@ -76,6 +94,9 @@ final class Transactions {
         void commit() throws SQLException {
             busy.lock();
             try {
+                if (failure != null) {
+                    throw new SQLException("The transaction was rolled back: " + failure);
+                }
                 if (open.compareAndSet(true, false)) {
                     try {
                         lease.connection().commit();
@@ -88,27 +109,56 @@ final class Transactions {
             }
         }
 
-        /** Rolls back, if it's still open. Never throws. */
+        /** Rolls back, if it's still open. Never throws. Waits for a statement running in it. */
         void rollback() {
-            // A statement that's running is left to finish or time out first.
             busy.lock();
             try {
-                if (open.compareAndSet(true, false)) {
-                    try {
-                        lease.connection().rollback();
-                    } catch (SQLException | RuntimeException ignored) {
-                        // The connection is closed below, which rolls back too.
-                    } finally {
-                        release();
-                    }
-                }
+                rollbackHeld(null);
             } finally {
                 busy.unlock();
             }
         }
 
-        private boolean idleLongerThan(long nanos) {
-            return !busy.isLocked() && System.nanoTime() - lastUsed > nanos;
+        /**
+         * Rolls back from outside its trigger, waiting at most until {@code deadline} for a statement running in it;
+         * past that, the connection is dropped, which rolls back on the database's side. The trigger's later
+         * statements fail with {@code reason}.
+         */
+        void rollbackBy(long deadline, String reason) {
+            boolean held;
+            try {
+                held = busy.tryLock(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                held = false;
+            }
+            if (!held) {
+                failure = reason;
+                if (open.compareAndSet(true, false)) {
+                    lease.abort();
+                }
+                return;
+            }
+            try {
+                rollbackHeld(reason);
+            } finally {
+                busy.unlock();
+            }
+        }
+
+        private void rollbackHeld(String reason) {
+            if (reason != null) {
+                failure = reason;
+            }
+            if (open.compareAndSet(true, false)) {
+                try {
+                    lease.connection().rollback();
+                } catch (SQLException | RuntimeException ignored) {
+                    // The connection is closed below, which rolls back too.
+                } finally {
+                    release();
+                }
+            }
         }
 
         private void release() {
@@ -155,7 +205,7 @@ final class Transactions {
         Transaction transaction = new Transaction(database, lease, owner);
         synchronized (scopes) {
             Transaction existing = scopes.computeIfAbsent(scope, ignored -> new IdentityHashMap<>()).get(database);
-            if (existing != null && existing.isOpen()) {
+            if (existing != null) {
                 transaction.rollback();
                 throw new IllegalStateException("There is already an open transaction on " + database.shown());
             }
@@ -164,22 +214,21 @@ final class Transactions {
         return transaction;
     }
 
-    /** The trigger's open transaction on the database, or {@code null}. */
+    /** The trigger's transaction on the database, open or broken, or {@code null}. */
     Transaction find(Object scope, Database database) {
         synchronized (scopes) {
             Map<Database, Transaction> open = scopes.get(scope);
-            Transaction transaction = open == null ? null : open.get(database);
-            return transaction != null && transaction.isOpen() ? transaction : null;
+            return open == null ? null : open.get(database);
         }
     }
 
-    /** The trigger's open transaction that section {@code owner} opened, or {@code null}. */
+    /** The trigger's transaction that section {@code owner} opened, open or broken, or {@code null}. */
     Transaction findOwned(Object scope, Object owner) {
         synchronized (scopes) {
             Map<Database, Transaction> open = scopes.get(scope);
             if (open != null) {
                 for (Transaction transaction : open.values()) {
-                    if (transaction.isOpen() && transaction.owner() == owner) {
+                    if (transaction.owner() == owner) {
                         return transaction;
                     }
                 }
@@ -201,45 +250,46 @@ final class Transactions {
         }
     }
 
-    /** How many transactions are open. */
+    /** How many transactions are open or broken. */
     int open() {
         synchronized (scopes) {
             return scopes.values().stream().mapToInt(Map::size).sum();
         }
     }
 
-    /** Rolls back the transactions idle for longer than {@code transaction-timeout}. */
-    void rollBackAbandoned() {
-        List<Transaction> abandoned = new ArrayList<>();
+    /** Says in the console, once each, which transactions have been open a long time: a trigger waiting in one. */
+    void warnLongOpen() {
+        List<Transaction> old = new ArrayList<>();
         synchronized (scopes) {
             for (Map<Database, Transaction> open : scopes.values()) {
-                open.values().removeIf(transaction -> {
-                    if (!transaction.isOpen()) {
-                        return true;
+                for (Transaction transaction : open.values()) {
+                    if (transaction.isOpen() && !transaction.warned
+                            && System.nanoTime() - transaction.opened > warnAfterNanos) {
+                        transaction.warned = true;
+                        old.add(transaction);
                     }
-                    if (transaction.idleLongerThan(timeoutNanos)) {
-                        abandoned.add(transaction);
-                        return true;
-                    }
-                    return false;
-                });
+                }
             }
-            scopes.values().removeIf(Map::isEmpty);
         }
-        for (Transaction transaction : abandoned) {
-            transaction.rollback();
-            logger.warning("Rolled back an abandoned transaction on " + transaction.database().shown()
-                    + ". Don't leave a transaction section with stop, exit or return.");
+        for (Transaction transaction : old) {
+            logger.warning("A transaction on " + transaction.database().shown() + " has been open for over "
+                    + TimeUnit.NANOSECONDS.toSeconds(warnAfterNanos) + " seconds, holding a connection: its"
+                    + " trigger is still in its section, waiting.");
         }
     }
 
-    /** Rolls back every open transaction, as NeoSkriptDb stops. */
-    void close() {
+    /**
+     * Rolls back every open transaction, as NeoSkriptDb stops: each waits at most until {@code deadline} for a
+     * statement running in it (which should have been cancelled), then its connection is dropped.
+     */
+    void close(long deadline) {
         List<Transaction> open = new ArrayList<>();
         synchronized (scopes) {
             scopes.values().forEach(transactions -> open.addAll(transactions.values()));
             scopes.clear();
         }
-        open.forEach(Transaction::rollback);
+        for (Transaction transaction : open) {
+            transaction.rollbackBy(deadline, "NeoSkriptDb stopped");
+        }
     }
 }

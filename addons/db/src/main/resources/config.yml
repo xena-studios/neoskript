@@ -20,8 +20,9 @@ connection-timeout: 30000
 # connection-timeout, plus 5 seconds; with no limit, at most 10 minutes.
 query-timeout: 30
 
-# A transaction left without finishing (through 'stop' or 'return' inside its section) is rolled back once it has
-# been idle this many seconds.
+# skript-db rolls back a transaction idle this many seconds. NeoSkriptDb rolls one back the moment its trigger
+# leaves the section without finishing it (stop, return, an error), and keeps one open while its trigger waits
+# inside it; past this many seconds open, the console says so, once.
 transaction-timeout: 30
 
 # The JDBC driver for every database. "default" picks it from the URL: mariadb and postgresql use the drivers that
@@ -29,9 +30,10 @@ transaction-timeout: 30
 # the database "..." using driver "org.mariadb.jdbc.Driver"
 sql-driver-class-name: "default"
 
-# NeoSkriptDb: the most rows a statement may store in a list variable. A result with more fails, with a 'last sql
-# error' saying so, rather than running the server out of memory (skript-db reads every row). 0 for no limit.
-max-rows: 100000
+# NeoSkriptDb: the most values a statement may store in a list variable, rows times columns (a million is about
+# a hundred megabytes for short values). A result with more fails, with a 'last sql error' saying so, rather than
+# running the server out of memory (skript-db reads every row). 0 for no limit.
+max-cells: 1000000
 
 # NeoSkriptDb: a database nothing has used for this many seconds closes its connections, and opens them again
 # when it's next used. Databases a script stops using (say, after a reload changes the URL) don't hold

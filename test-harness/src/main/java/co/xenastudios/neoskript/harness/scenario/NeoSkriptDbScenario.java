@@ -28,9 +28,11 @@ import java.util.regex.Pattern;
  * the load warnings and errors of {@code neoskript-db-errors.sk}, and the tables afterwards must match, and match
  * {@code neoskript-db.expected}, which is also what Folia and Paper 1.21.4 (no Skript) are held to.
  *
- * <p>NeoSkript only: a statement in an {@code on unload} trigger is written as the server stops (skript-db's is
- * lost: it stops before Skript runs the trigger), {@code synchronously}, a console command's trigger, a slow
- * statement whose script is reloaded while it runs, and no password in the console.
+ * <p>Both write the statement in the {@code on unload} trigger as the server stops. NeoSkript only:
+ * {@code synchronously}, a console command's trigger, a transaction in a player's command (on Folia, on the player's
+ * region thread), a slow statement whose script is reloaded while it runs, no password in the console, and on Paper
+ * a {@code /reload}, whose {@code on unload} write must not be lost (NeoSkriptDb disables first, and keeps its
+ * connections until NeoSkript has run the trigger).
  */
 public final class NeoSkriptDbScenario implements Scenario {
 
@@ -45,7 +47,8 @@ public final class NeoSkriptDbScenario implements Scenario {
     private static final Pattern PREFIX = Pattern.compile("^\\[\\d\\d:\\d\\d:\\d\\d [A-Z]+]: (\\[(Neo)?Skript] )?");
 
     /** What one server printed and left in the database. */
-    private record Run(List<String> checks, List<String> loadMessages, List<String> tables, boolean unloadWritten) {}
+    private record Run(List<String> checks, List<String> loadMessages, List<String> tables, int unloadWrites,
+            List<String> log) {}
 
     @Override
     public String name() {
@@ -77,7 +80,7 @@ public final class NeoSkriptDbScenario implements Scenario {
         List<String> got = report(neoskript);
         if (skript != null) {
             List<String> original = report(skript);
-            context.summary("skript-db's unload write", skript.unloadWritten());
+            context.summary("skript-db's unload writes", skript.unloadWrites());
             if (!original.equals(got)) {
                 Files.write(runs.resolve("skript.txt"), original);
                 Files.write(runs.resolve("neoskript.txt"), got);
@@ -91,8 +94,16 @@ public final class NeoSkriptDbScenario implements Scenario {
             throw new HarnessFailure("NeoSkriptDb's results aren't those in scripts/neoskript-db.expected. Compare "
                     + runs.resolve("neoskript.txt") + " with it");
         }
-        if (!neoskript.unloadWritten()) {
-            throw new HarnessFailure("The on unload trigger's statement wasn't written as the server stopped");
+        // One as the server stopped, and on Paper one more for the /reload.
+        boolean reloads = context.environment().platform() != Environment.Platform.FOLIA;
+        int expectedUnloads = reloads ? 2 : 1;
+        if (neoskript.unloadWrites() != expectedUnloads) {
+            throw new HarnessFailure("The on unload trigger's statement was written " + neoskript.unloadWrites()
+                    + " times, not " + expectedUnloads + " (as the server stopped" + (reloads ? ", and at /reload" : "")
+                    + ")");
+        }
+        if (!neoskript.log().contains("Steve")) {
+            throw new HarnessFailure("The transaction in Steve's command wasn't committed: " + neoskript.log());
         }
         context.summary("checks", neoskript.checks().size());
     }
@@ -114,19 +125,26 @@ public final class NeoSkriptDbScenario implements Scenario {
                 .file("plugins/" + folder + "/scripts/neoskript-db.sk", context.script("neoskript-db.sk"))
                 .file("plugins/" + folder + "/scripts/neoskript-db-errors.sk", context.script("neoskript-db-errors.sk"));
         if (neo) {
-            builder.file("plugins/NeoSkript/scripts/neoskript-db-extra.sk", context.script("neoskript-db-extra.sk"));
+            builder.file("plugins/NeoSkript/scripts/neoskript-db-extra.sk", context.script("neoskript-db-extra.sk"))
+                    .plugin(context.botJar());
         }
+        Path database = runDir.resolve("plugins/dbtest/test.db");
         List<String> checks;
         List<String> loadMessages;
+        List<String> tables = new ArrayList<>();
         try (ServerProcess server = builder.start()) {
             server.await(line("[dbtest] done"), WAIT);
             server.await(ServerProcess.DONE, WAIT);
-            if (neo) {
-                extras(server);
-            }
             checks = server.linesMatching(CHECK).stream().map(CHECK::matcher).filter(Matcher::find)
                     .map(Matcher::group).toList();
             loadMessages = loadMessages(server.lines(0));
+            // The tables as the script left them, before anything else touches them.
+            try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database)) {
+                tables.addAll(dump(connection, "SELECT id, name, score, ratio FROM players ORDER BY id"));
+            }
+            if (neo) {
+                extras(server, context.environment().platform() != Environment.Platform.FOLIA);
+            }
             server.stop();
             List<String> leaked = server.linesMatching(Pattern.compile("hunter22"));
             if (neo && !leaked.isEmpty()) {
@@ -139,22 +157,20 @@ public final class NeoSkriptDbScenario implements Scenario {
                 }
             }
         }
-        Path database = runDir.resolve("plugins/dbtest/test.db");
-        if (!Files.exists(database)) {
-            throw new HarnessFailure(folder + " left no database at " + database);
-        }
-        List<String> tables = new ArrayList<>();
-        boolean unload;
+        List<String> log;
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + database)) {
-            tables.addAll(dump(connection, "SELECT id, name, score, ratio FROM players ORDER BY id"));
-            unload = !dump(connection, "SELECT what FROM log WHERE what = 'unload'").isEmpty();
+            log = dump(connection, "SELECT what FROM log");
         }
-        return new Run(checks, loadMessages, tables, unload);
+        return new Run(checks, loadMessages, tables, (int) log.stream().filter("unload"::equals).count(), log);
     }
 
     /** NeoSkript only: synchronously, a console command, a reload while a statement runs, a masked password. */
-    private static void extras(ServerProcess server) throws Exception {
+    private static void extras(ServerProcess server, boolean reload) throws Exception {
         int mark = server.mark();
+        server.command("bot join Steve");
+        server.await(line("[bot] Steve joined"), mark, WAIT);
+        server.command("bot command Steve dbextra tx");
+        server.await(line("[dbextra] tx by Steve <none>"), mark, WAIT);
         server.command("dbextra sync");
         server.await(line("[dbextra] sync 7"), mark, WAIT);
         server.command("dbextra shown");
@@ -164,6 +180,15 @@ public final class NeoSkriptDbScenario implements Scenario {
         // Reloaded while the statement runs: the trigger carries on with its old code.
         server.command("sk reload neoskript-db-extra.sk");
         server.await(line("[dbextra] slow done 3000000"), mark, WAIT);
+        server.command("bot quit Steve");
+        server.await(line("[bot] Steve left"), mark, WAIT);
+        if (reload) {
+            // Every plugin disables and enables again: NeoSkriptDb first, then NeoSkript, whose on unload trigger
+            // still writes. The scripts load again after it.
+            int reloaded = server.mark();
+            server.command("bukkit:reload confirm");
+            server.await(line("[dbtest] done"), reloaded, WAIT);
+        }
     }
 
     /** The warnings and errors loading neoskript-db-errors.sk gave: each one's line, message and code. */
