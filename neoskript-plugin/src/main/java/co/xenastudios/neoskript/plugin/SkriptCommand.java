@@ -4,12 +4,10 @@
  */
 package co.xenastudios.neoskript.plugin;
 
-import static co.xenastudios.neoskript.plugin.SkriptCommandMessages.PREFIX;
+import static co.xenastudios.neoskript.plugin.Messages.component;
+import static co.xenastudios.neoskript.plugin.Messages.send;
+import static co.xenastudios.neoskript.plugin.Messages.text;
 
-import co.xenastudios.neoskript.frontend.source.Diagnostic;
-import co.xenastudios.neoskript.frontend.source.Severity;
-import co.xenastudios.neoskript.frontend.source.SourceFile;
-import co.xenastudios.neoskript.paper.TextComponentParser;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,9 +18,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiConsumer;
+import java.util.TreeMap;
 import java.util.function.Predicate;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -31,93 +31,123 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 /**
- * {@code /skript} (also {@code /sk} and {@code /neoskript}), which NeoSkript takes over from Skript (D10):
- * Skript's subcommands (reload, enable, disable, list, info, update, restore and help) with its messages,
- * colours and tab completions, so existing habits and tools keep working.
+ * {@code /skript} (also {@code /sk}, {@code /neoskript} and {@code /ns}), which NeoSkript takes over from Skript
+ * (D10). It has Skript's subcommands and arguments (reload, enable, disable, list, info, update, restore, help,
+ * and gen-docs and test), so habits and console automation keep working, with NeoSkript's own messages in the
+ * theme of config.yml.
  *
- * <p>Where NeoSkript differs: a script with errors keeps running its last version when reloaded (D12),
- * so a reload never unloads first; {@code reload config} reloads {@code config.yml} (NeoSkript has no
- * {@code config.sk}), {@code reload aliases} has nothing to reload as NeoSkript's aliases are built in,
- * and {@code update} and {@code gen-docs} say NeoSkript can't do them yet.
+ * <p>Where NeoSkript differs: a script with errors keeps running its last version when reloaded (D12), so a
+ * reload never unloads first; {@code reload config} reloads {@code config.yml} (NeoSkript has no
+ * {@code config.sk}); {@code reload aliases} has nothing to reload, as NeoSkript's aliases are built in; and
+ * {@code gen-docs} points to the syntax reference on neoskript.dev.
  */
 final class SkriptCommand implements TabExecutor {
 
-    /** Skript's {@code skript.no scripts}. */
-    private static final String NO_SCRIPTS = "No scripts were found, maybe you should write some ;)";
-
-    /** A subcommand: its names (the first is its name in help) and the arguments its help lists. */
-    private record Sub(List<String> aliases, List<String> args) {
-        Sub(String... aliases) {
-            this(List.of(aliases), null);
+    /**
+     * A subcommand: its names (the first is its name in help), its arguments for help and their descriptions,
+     * and whether one must be given.
+     */
+    private record Sub(List<String> aliases, String description, Map<String, String> args, boolean required) {
+        Sub(String name, String description) {
+            this(List.of(name), description, Map.of(), false);
         }
 
         String name() {
             return aliases.getFirst();
         }
+
+        String usage() {
+            if (args.isEmpty()) {
+                return "";
+            }
+            String choices = String.join("|", args.keySet()).replace("<script>", "script");
+            return required ? " <" + choices + ">" : " [" + choices + "]";
+        }
     }
 
-    // In Skript's order of registration (its help lists them in a set's order, which varies).
+    private static Map<String, String> args(String... pairs) {
+        Map<String, String> args = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < pairs.length; i += 2) {
+            args.put(pairs[i], pairs[i + 1]);
+        }
+        return args;
+    }
+
+    private static final String SCRIPT_ARG = "A script, or a folder ending in /";
+
+    // In Skript's order.
     private static final List<Sub> SUBS = List.of(
-            new Sub("help"),
-            new Sub(List.of("reload"), List.of("all", "scripts", "config", "aliases", "last", "<script>")),
+            new Sub("help", "Shows this list"),
+            new Sub(List.of("reload"), "Reloads scripts, the config, or both", args(
+                    "all", "The config and every script",
+                    "scripts", "Every script",
+                    "config", "config.yml",
+                    "aliases", "Nothing: NeoSkript's aliases are built in",
+                    "last", "The script you reloaded last",
+                    "<script>", SCRIPT_ARG), true),
             // Skript fails with an internal error for these without an argument; NeoSkript shows their help.
-            new Sub(List.of("enable"), List.of("all", "<script>")),
-            new Sub(List.of("disable"), List.of("all", "<script>")),
-            new Sub("list", "show"),
-            new Sub("info"),
-            new Sub("update"),
-            new Sub("restore", "dump"));
+            new Sub(List.of("enable"), "Enables disabled scripts", args(
+                    "all", "Every disabled script",
+                    "<script>", SCRIPT_ARG), true),
+            new Sub(List.of("disable"), "Disables scripts, until they're enabled", args(
+                    "all", "Every script",
+                    "<script>", SCRIPT_ARG), true),
+            new Sub(List.of("list", "show"), "Lists the enabled and disabled scripts", Map.of(), false),
+            new Sub("info", "Shows the version, the server, addons and links"),
+            new Sub(List.of("update"), "Checks Modrinth for a newer NeoSkript", args(
+                    "check", "Checks for a newer version",
+                    "changes", "Links to what changed in each version"), false),
+            new Sub(List.of("restore", "dump"), "Writes the loaded scripts back to files, for scripts whose files were deleted",
+                    Map.of(), false));
 
-    /** Skript only has {@code gen-docs} with a docs template and {@code test} in development; neither is listed. */
-    private static final Sub GEN_DOCS = new Sub("gen-docs");
+    /** Skript has {@code gen-docs} and {@code test} too, but doesn't list them. */
+    private static final List<Sub> HIDDEN = List.of(
+            new Sub("gen-docs", "Points to the syntax reference"),
+            new Sub("test", "Says how to run tests"));
 
-    private final Plugin plugin;
+    private final NeoSkriptPlugin plugin;
     private final ScriptManager scripts;
-    private final Runnable reloadConfig;
     /** What {@code /skript reload last} reloads. */
     private String lastReloaded;
 
-    /**
-     * @param reloadConfig reloads {@code config.yml} and applies what can change while the server runs
-     */
-    SkriptCommand(Plugin plugin, ScriptManager scripts, Runnable reloadConfig) {
+    SkriptCommand(NeoSkriptPlugin plugin, ScriptManager scripts) {
         this.plugin = plugin;
         this.scripts = scripts;
-        this.reloadConfig = reloadConfig;
     }
 
     private static Sub find(String alias) {
-        for (Sub sub : SUBS) {
-            for (String name : sub.aliases()) {
-                if (name.equalsIgnoreCase(alias)) {
-                    return sub;
+        for (List<Sub> subs : List.of(SUBS, HIDDEN)) {
+            for (Sub sub : subs) {
+                for (String name : sub.aliases()) {
+                    if (name.equalsIgnoreCase(alias)) {
+                        return sub;
+                    }
                 }
             }
-        }
-        if (GEN_DOCS.name().equalsIgnoreCase(alias)) {
-            return GEN_DOCS;
         }
         return SUBS.getFirst();
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        // "/neoskript:sk" is "/sk" in what it suggests.
+        String name = label.substring(label.indexOf(':') + 1).toLowerCase(Locale.ROOT);
         Sub sub = find(args.length > 0 ? args[0] : "help");
-        // sub command requires args but none was given
-        if (args.length == 1 && sub.args() != null) {
-            sendHelp(sender, sub);
+        if (args.length == 1 && sub.required()) {
+            usage(sender, name, sub);
             return true;
         }
         switch (sub.name()) {
-            case "reload" -> onGlobalThread(() -> reload(sender, args));
-            case "enable" -> onGlobalThread(() -> enable(sender, args));
+            case "reload" -> onGlobalThread(() -> reload(sender, name, args));
+            case "enable" -> onGlobalThread(() -> enable(sender, name, args));
             case "disable" -> onGlobalThread(() -> disable(sender, args));
-            case "list" -> list(sender);
+            case "list" -> list(sender, name);
             case "info" -> info(sender);
-            case "update" -> info(sender, "update.unavailable");
+            case "update" -> update(sender, args.length > 1 ? args[1] : "check");
             case "restore" -> restore(sender);
-            case "gen-docs" -> Skriptlike.info(sender, SkriptCommandMessages.get("gen-docs.unavailable"));
-            default -> help(sender);
+            case "gen-docs" -> send(sender, Messages.GEN_DOCS, component("link", Messages.link(sender, "neoskript.dev/syntax", Messages.SYNTAX)));
+            case "test" -> send(sender, Messages.TEST);
+            default -> help(sender, name);
         }
         return true;
     }
@@ -136,23 +166,24 @@ final class SkriptCommand implements TabExecutor {
 
     // --- help ---
 
-    private static void help(CommandSender sender) {
-        TextComponentParser parser = TextComponentParser.instance();
-        sender.sendMessage(parser.parse(SkriptCommandMessages.get("usage") + " <gold>/skript <red>..."));
+    private void help(CommandSender sender, String label) {
+        send(sender, Messages.HELP_HEADER, text("version", plugin.getPluginMeta().getVersion()),
+                component("hint", Messages.chat(sender) ? Messages.HELP_HINT_CHAT.render() : Component.empty()));
         for (Sub sub : SUBS) {
-            String description = SkriptCommandMessages.has("help." + sub.name() + ".description")
-                    ? SkriptCommandMessages.get("help." + sub.name() + ".description")
-                    : SkriptCommandMessages.get("help." + sub.name());
-            sender.sendMessage(parser.parse("   <yellow>" + String.join("/", sub.aliases()) + " <dark_gray>- <white>" + description));
+            String typed = "/" + label + " " + sub.name();
+            Component command = Messages.command(typed, typed + " ")
+                    .append(Component.text(sub.usage() + (sub.aliases().size() > 1
+                            ? " (or " + String.join(", ", sub.aliases().subList(1, sub.aliases().size())) + ")" : "")));
+            send(sender, Messages.HELP_LINE, component("command", command), text("description", sub.description()));
         }
     }
 
-    private static void sendHelp(CommandSender sender, Sub sub) {
-        TextComponentParser parser = TextComponentParser.instance();
-        sender.sendMessage(parser.parseSafe(SkriptCommandMessages.get("usage") + " <gold>/skript <yellow>" + sub.name() + " <red>..."));
-        for (String arg : sub.args()) {
-            String description = SkriptCommandMessages.get("help." + sub.name() + "." + arg);
-            sender.sendMessage(parser.parseSafe("   <yellow>" + arg + " <gray>- <white>" + description));
+    /** A subcommand's arguments, when it needs one and none was given. */
+    private static void usage(CommandSender sender, String label, Sub sub) {
+        String typed = "/" + label + " " + sub.name();
+        send(sender, Messages.USAGE, component("command", Messages.command(typed + sub.usage(), typed + " ")));
+        for (Map.Entry<String, String> arg : sub.args().entrySet()) {
+            send(sender, Messages.USAGE_LINE, text("arg", arg.getKey()), text("description", arg.getValue()));
         }
     }
 
@@ -170,36 +201,43 @@ final class SkriptCommand implements TabExecutor {
         return List.copyOf(recipients);
     }
 
-    private void reload(CommandSender sender, String[] args) {
+    private void reload(CommandSender sender, String label, String[] args) {
         long start = System.nanoTime();
-        Reload reload = new Reload(sender, reloadRecipients(sender), start);
+        List<CommandSender> recipients = reloadRecipients(sender);
         switch (args[1].toLowerCase(Locale.ENGLISH)) {
             case "all" -> {
-                reload.reloading("config, aliases and scripts");
-                reloadConfig.run();
-                reload.scripts(null, true);
-                reload.reloaded("config, aliases and scripts");
+                reloading(sender, recipients, Component.text("the config and all scripts"));
+                boolean config = reloadConfig(recipients);
+                ScriptReport report = new ScriptReport(label);
+                ScriptManager.Outcome outcome = load(sender, recipients, null, report);
+                if (outcome != null) {
+                    Component what = Component.text(config ? "the config and " : "")
+                            .append(countOf(outcome.scripts(), "script"));
+                    report.send(recipients, "Reloaded", what, millis(start));
+                }
             }
             case "scripts" -> {
-                reload.reloading("scripts");
-                reload.scripts(null, true);
-                reload.reloaded("scripts");
+                reloading(sender, recipients, Component.text("all scripts"));
+                ScriptReport report = new ScriptReport(label);
+                ScriptManager.Outcome outcome = load(sender, recipients, null, report);
+                if (outcome != null) {
+                    report.send(recipients, "Reloaded", countOf(outcome.scripts(), "script"), millis(start));
+                }
             }
             case "config" -> {
-                reload.reloading("main config");
-                reloadConfig.run();
-                reload.reloaded("main config");
+                reloading(sender, recipients, Component.text("the config"));
+                if (reloadConfig(recipients)) {
+                    send(recipients, Messages.DONE, text("done", "Reloaded"), text("what", "the config"),
+                            text("ms", millis(start)));
+                }
             }
-            case "aliases" -> {
-                // NeoSkript's aliases are built in, so there's nothing to read again.
-                reload.reloading("aliases");
-                reload.reloaded("aliases");
-            }
+            // NeoSkript's aliases are built in, so there's nothing to read again.
+            case "aliases" -> send(sender, Messages.ALIASES);
             default -> {
                 String scriptName;
                 if (args[1].equalsIgnoreCase("last")) {
                     if (lastReloaded == null) {
-                        info(sender, "reload.no last file");
+                        send(sender, Messages.NO_LAST);
                         return;
                     }
                     scriptName = lastReloaded;
@@ -211,109 +249,102 @@ final class SkriptCommand implements TabExecutor {
                 if (file == null) {
                     return;
                 }
-                String fileName = file.getFileName().toString();
                 if (Files.isDirectory(file)) {
-                    reload.reloading("scripts in folder", fileName);
-                    ScriptManager.Outcome outcome = reload.scripts(inFolder(file), false);
+                    String folder = scripts.name(file) + "/";
+                    reloading(sender, recipients, Component.text("the scripts in ").append(Messages.highlight(folder)));
+                    ScriptReport report = new ScriptReport(label);
+                    ScriptManager.Outcome outcome = load(sender, recipients, inFolder(file), report);
                     if (outcome == null) {
                         return;
                     }
                     if (outcome.scripts() == 0) {
-                        info(sender, "reload.empty folder", fileName);
+                        send(sender, Messages.FOLDER_EMPTY, text("name", folder));
                         return;
                     }
-                    reload.reloaded(reload.errors == 0 ? "x scripts in folder success" : "x scripts in folder error",
-                            fileName, outcome.scripts());
+                    report.send(recipients, "Reloaded", countOf(outcome.scripts(), "script")
+                            .append(Component.text(" in ")).append(Messages.highlight(folder)), millis(start));
                 } else {
+                    String name = scripts.name(file);
                     if (ScriptFiles.disabled(file)) {
-                        info(sender, "reload.script disabled", fileName.substring(ScriptFiles.DISABLED_PREFIX.length()), join(args));
+                        String enable = "/" + label + " enable " + join(args);
+                        send(sender, Messages.RELOAD_DISABLED, text("name", enabledName(name)),
+                                component("command", Messages.command(enable)));
                         return;
                     }
-                    reload.reloading("script", fileName);
-                    String name = scripts.name(file);
-                    if (reload.scripts(name::equals, false) != null) {
-                        reload.reloaded("script", fileName);
+                    reloading(sender, recipients, Messages.highlight(name));
+                    ScriptReport report = new ScriptReport(label);
+                    if (load(sender, recipients, name::equals, report) != null) {
+                        report.send(recipients, "Reloaded", Messages.highlight(name), millis(start));
                     }
                 }
             }
         }
     }
 
-    /** A reload's messages, which go to its recipients as Skript's RedirectingLogHandler sends them. */
-    private final class Reload {
-        private final CommandSender sender;
-        private final List<CommandSender> recipients;
-        private final long start;
-        int errors;
-
-        Reload(CommandSender sender, List<CommandSender> recipients, long start) {
-            this.sender = sender;
-            this.recipients = recipients;
-            this.start = start;
-        }
-
-        void reloading(String what, Object... args) {
-            what = args.length == 0 ? SkriptCommandMessages.get("reload." + what) : format("reload." + what, false, args);
-            Skriptlike.info(sender, Skriptlike.fixCapitalization(String.format(SkriptCommandMessages.get("reload.reloading"), what)));
-            // Others hear who is reloading.
-            String text = String.format(SkriptCommandMessages.get("reload.player reload"), sender.getName(), what);
-            for (CommandSender recipient : recipients) {
-                if (recipient != sender) {
-                    AutoReload.send(List.of(recipient), text);
-                }
+    /** Tells whoever reloaded what's reloading, and the others who's reloading it. */
+    private static void reloading(CommandSender sender, List<CommandSender> recipients, Component what) {
+        send(sender, Messages.RELOADING, text("doing", "Reloading"), component("what", what));
+        for (CommandSender recipient : recipients) {
+            if (recipient != sender) {
+                send(recipient, Messages.OTHER_RELOADING, text("player", sender.getName()), component("what", what));
             }
         }
+    }
 
-        /** Reloads the scripts {@code scope} accepts (all if {@code null}), or returns {@code null} if they couldn't be read. */
-        ScriptManager.Outcome scripts(Predicate<String> scope, boolean warnIfNone) {
-            BiConsumer<Diagnostic, SourceFile> problems = (problem, file) -> {
-                if (problem.severity() == Severity.ERROR) {
-                    errors++;
-                }
-                AutoReload.send(recipients, AutoReload.describe(problem, file));
-            };
-            try {
-                ScriptManager.Outcome outcome = scripts.reload(scope, problems);
-                if (warnIfNone && outcome.scripts() == 0) {
-                    AutoReload.send(recipients, String.format(SkriptCommandMessages.get("reload.warning details"), NO_SCRIPTS));
-                }
-                return outcome;
-            } catch (IOException | RuntimeException e) {
-                plugin.getSLF4JLogger().error("Couldn't reload the scripts", e);
-                Skriptlike.error(sender, "Couldn't read the scripts: " + e.getMessage());
-                return null;
-            }
+    /** Reloads config.yml and tells the recipients what went wrong, if anything. Returns whether it was read. */
+    private boolean reloadConfig(List<CommandSender> recipients) {
+        NeoSkriptPlugin.SettingsReload result = plugin.reloadSettings();
+        if (result.failure() != null) {
+            send(recipients, Messages.CONFIG_FAILED, text("reason", result.failure()));
+            return false;
         }
+        if (result.warnings() > 0) {
+            send(recipients, Messages.CONFIG_WARNINGS, text("settings", Messages.count(result.warnings(), "setting")));
+        }
+        if (!result.restartOnly().isEmpty()) {
+            send(recipients, Messages.CONFIG_RESTART, text("settings", String.join(", ", result.restartOnly())),
+                    text("verb", result.restartOnly().size() == 1 ? "applies" : "apply"));
+        }
+        return true;
+    }
 
-        void reloaded(String what, Object... args) {
-            what = args.length == 0 ? SkriptCommandMessages.get("reload." + what) : format("reload." + what, true, args);
-            String time = String.valueOf((System.nanoTime() - start) / 1_000_000);
-            String message = errors == 0
-                    ? PREFIX + String.format(SkriptCommandMessages.get("reload.reloaded"), what, time)
-                    : PREFIX + String.format(SkriptCommandMessages.get("reload.error"), what, errors, time);
-            AutoReload.send(recipients, Skriptlike.fixCapitalization(AutoReload.pluralize(message)));
+    /** Loads the scripts {@code scope} accepts (all if {@code null}), or returns {@code null} if they couldn't be read. */
+    private ScriptManager.Outcome load(CommandSender sender, List<CommandSender> recipients, Predicate<String> scope,
+            ScriptReport report) {
+        try {
+            ScriptManager.Outcome outcome = scripts.reload(scope, report);
+            if (scope == null && outcome.scripts() == 0) {
+                send(recipients, Messages.NO_SCRIPTS);
+            }
+            return outcome;
+        } catch (IOException | RuntimeException e) {
+            plugin.getSLF4JLogger().error("Couldn't load the scripts", e);
+            send(sender, Messages.READ_FAILED, text("reason", String.valueOf(e.getMessage())));
+            return null;
         }
     }
 
     // --- enable and disable ---
 
-    private void enable(CommandSender sender, String[] args) {
-        Path folder = scripts.scriptsFolder();
-        Counter errors = new Counter(sender);
+    private void enable(CommandSender sender, String label, String[] args) {
+        long start = System.nanoTime();
+        List<CommandSender> self = List.of(sender);
         if (args[1].equalsIgnoreCase("all")) {
+            Set<Path> files;
             try {
-                info(sender, "enable.all.enabling");
-                Set<Path> files = ScriptFiles.toggleAll(folder, true);
-                if (load(sender, names(files)::contains, errors) == null) {
-                    return;
-                }
-                if (errors.count == 0) {
-                    info(sender, "enable.all.enabled");
-                } else {
-                    error(sender, "enable.all.error", errors.count);
-                }
+                files = ScriptFiles.toggleAll(scripts.scriptsFolder(), true);
             } catch (IOException e) {
-                error(sender, "enable.all.io error", e.toString());
+                send(sender, Messages.ENABLE_SOME_FAILED, text("reason", e.getMessage()));
+                return;
+            }
+            if (files.isEmpty()) {
+                send(sender, Messages.NOTHING_DISABLED);
+                return;
+            }
+            send(sender, Messages.RELOADING, text("doing", "Enabling"), text("what", "all disabled scripts"));
+            ScriptReport report = new ScriptReport(label);
+            if (load(sender, self, names(files)::contains, report) != null) {
+                report.send(self, "Enabled", countOf(files.size(), "script"), millis(start));
             }
             return;
         }
@@ -322,91 +353,54 @@ final class SkriptCommand implements TabExecutor {
             return;
         }
         if (Files.isDirectory(file)) {
+            String folder = scripts.name(file) + "/";
             Set<Path> files;
             try {
                 files = ScriptFiles.toggleAll(file, true);
             } catch (IOException e) {
-                error(sender, "enable.folder.io error", file.getFileName(), e.toString());
+                send(sender, Messages.ENABLE_SOME_FAILED, text("reason", e.getMessage()));
                 return;
             }
-            String fileName = file.getFileName().toString();
             if (files.isEmpty()) {
-                info(sender, "enable.folder.empty", fileName);
+                send(sender, Messages.FOLDER_NOTHING_DISABLED, text("name", folder));
                 return;
             }
-            info(sender, "enable.folder.enabling", fileName, files.size());
-            ScriptManager.Outcome outcome = load(sender, names(files)::contains, errors);
-            if (outcome == null) {
-                return;
-            }
-            if (errors.count == 0) {
-                info(sender, "enable.folder.enabled", fileName, outcome.scripts());
-            } else {
-                error(sender, "enable.folder.error", fileName, errors.count);
+            Component what = countOf(files.size(), "script").append(Component.text(" in ")).append(Messages.highlight(folder));
+            send(sender, Messages.RELOADING, text("doing", "Enabling"), component("what", what));
+            ScriptReport report = new ScriptReport(label);
+            if (load(sender, self, names(files)::contains, report) != null) {
+                report.send(self, "Enabled", what, millis(start));
             }
             return;
         }
         if (ScriptFiles.LOADED.accept(file.toFile())) {
-            info(sender, "enable.single.already enabled", file.getFileName(), join(args));
+            String reload = "/" + label + " reload " + join(args);
+            send(sender, Messages.ALREADY_ENABLED, text("name", scripts.name(file)), component("command", Messages.command(reload)));
             return;
         }
+        String name = enabledName(scripts.name(file));
         try {
             file = ScriptFiles.toggle(file, true);
         } catch (IOException e) {
-            error(sender, "enable.single.io error", file.getFileName().toString().substring(ScriptFiles.DISABLED_PREFIX.length()),
-                    e.toString());
+            send(sender, Messages.ENABLE_FAILED, text("name", name), text("reason", e.getMessage()));
             return;
         }
-        String fileName = file.getFileName().toString();
-        info(sender, "enable.single.enabling", fileName);
-        String name = scripts.name(file);
-        if (load(sender, name::equals, errors) == null) {
-            return;
-        }
-        if (errors.count == 0) {
-            info(sender, "enable.single.enabled", fileName);
-        } else {
-            error(sender, "enable.single.error", fileName, errors.count);
-        }
-    }
-
-    /** Counts the errors of loading scripts for enable, and sends their problems to whoever enabled them. */
-    private static final class Counter implements BiConsumer<Diagnostic, SourceFile> {
-        private final CommandSender sender;
-        int count;
-
-        Counter(CommandSender sender) {
-            this.sender = sender;
-        }
-
-        @Override
-        public void accept(Diagnostic problem, SourceFile file) {
-            if (problem.severity() == Severity.ERROR) {
-                count++;
-            }
-            AutoReload.send(List.of(sender), AutoReload.describe(problem, file));
-        }
-    }
-
-    private ScriptManager.Outcome load(CommandSender sender, Predicate<String> scope, Counter errors) {
-        try {
-            return scripts.reload(scope, errors);
-        } catch (IOException | RuntimeException e) {
-            plugin.getSLF4JLogger().error("Couldn't load the scripts", e);
-            Skriptlike.error(sender, "Couldn't read the scripts: " + e.getMessage());
-            return null;
+        send(sender, Messages.RELOADING, text("doing", "Enabling"), component("what", Messages.highlight(name)));
+        ScriptReport report = new ScriptReport(label);
+        String loaded = scripts.name(file);
+        if (load(sender, self, loaded::equals, report) != null) {
+            report.send(self, "Enabled", Messages.highlight(name), millis(start));
         }
     }
 
     private void disable(CommandSender sender, String[] args) {
-        Path folder = scripts.scriptsFolder();
         if (args[1].equalsIgnoreCase("all")) {
             scripts.unload(name -> true);
             try {
-                ScriptFiles.toggleAll(folder, false);
-                info(sender, "disable.all.disabled");
+                Set<Path> files = ScriptFiles.toggleAll(scripts.scriptsFolder(), false);
+                send(sender, Messages.DISABLED, component("what", countOf(files.size(), "script")));
             } catch (IOException e) {
-                error(sender, "disable.all.io error", e.toString());
+                send(sender, Messages.DISABLE_SOME_FAILED, text("reason", e.getMessage()));
             }
             // Skript then goes on to look for a script called 'all'; that's left out.
             return;
@@ -415,72 +409,185 @@ final class SkriptCommand implements TabExecutor {
         if (file == null) {
             return;
         }
-        String fileName = file.getFileName().toString();
         if (Files.isDirectory(file)) {
+            String folder = scripts.name(file) + "/";
             scripts.unload(inFolder(file));
             Set<Path> files;
             try {
                 files = ScriptFiles.toggleAll(file, false);
             } catch (IOException e) {
-                error(sender, "disable.folder.io error", fileName, e.toString());
+                send(sender, Messages.DISABLE_SOME_FAILED, text("reason", e.getMessage()));
                 return;
             }
             if (files.isEmpty()) {
-                info(sender, "disable.folder.empty", fileName);
+                send(sender, Messages.FOLDER_NOTHING_ENABLED, text("name", folder));
                 return;
             }
-            info(sender, "disable.folder.disabled", fileName, files.size());
-            return;
-        }
-        if (ScriptFiles.disabled(file)) {
-            info(sender, "disable.single.already disabled", fileName.substring(ScriptFiles.DISABLED_PREFIX.length()));
+            send(sender, Messages.DISABLED, component("what", countOf(files.size(), "script")
+                    .append(Component.text(" in ")).append(Messages.highlight(folder))));
             return;
         }
         String name = scripts.name(file);
+        if (ScriptFiles.disabled(file)) {
+            send(sender, Messages.ALREADY_DISABLED, text("name", enabledName(name)));
+            return;
+        }
         scripts.unload(name::equals);
         try {
             ScriptFiles.toggle(file, false);
         } catch (IOException e) {
-            error(sender, "disable.single.io error", fileName, e.toString());
+            send(sender, Messages.DISABLE_FAILED, text("name", name), text("reason", e.getMessage()));
             return;
         }
-        info(sender, "disable.single.disabled", fileName);
+        send(sender, Messages.DISABLED, component("what", Messages.highlight(name)));
     }
 
-    // --- list, info, restore ---
+    // --- list, info, update, restore ---
 
-    private void list(CommandSender sender) {
-        info(sender, "list.enabled.header");
-        for (String name : scripts.loadedScripts()) {
-            info(sender, "list.enabled.element", name);
+    private void list(CommandSender sender, String label) {
+        List<String> enabled = scripts.loadedScripts().stream().sorted().toList();
+        List<String> disabled = ScriptFiles.disabledScripts(scripts.scriptsFolder()).stream()
+                .map(path -> path.replace(java.io.File.separatorChar, '/')).toList();
+        if (enabled.isEmpty() && disabled.isEmpty()) {
+            send(sender, Messages.NO_SCRIPTS);
+            return;
         }
-        info(sender, "list.disabled.header");
-        for (String path : ScriptFiles.disabledScripts(scripts.scriptsFolder())) {
-            info(sender, "list.disabled.element", path);
+        send(sender, Messages.LIST_HEADER, text("enabled", enabled.size()),
+                text("scripts", Messages.plural(enabled.size(), "script")), text("disabled", disabled.size()));
+        group(sender, "Enabled", enabled, path -> "/" + label + " reload " + path);
+        group(sender, "Disabled", disabled, path -> "/" + label + " enable " + enabledName(path));
+    }
+
+    /** One group of {@code /sk list}: the scripts in the scripts folder on one line, then each folder's. */
+    private static void group(CommandSender sender, String label, List<String> paths,
+            java.util.function.Function<String, String> command) {
+        if (paths.isEmpty()) {
+            return;
         }
+        Map<String, List<Component>> folders = new TreeMap<>();
+        for (String path : paths) {
+            int slash = path.lastIndexOf('/');
+            String folder = slash < 0 ? "" : path.substring(0, slash + 1);
+            String file = path.substring(slash + 1);
+            folders.computeIfAbsent(folder, f -> new ArrayList<>()).add(Messages.chat(sender)
+                    ? Messages.command(file, command.apply(path))
+                    : Component.text(file));
+        }
+        List<Component> top = folders.remove("");
+        send(sender, Messages.LIST_GROUP, text("label", label), component("scripts",
+                top == null ? Component.text("(none here; see the folders below)") : Messages.joined(top)));
+        folders.forEach((folder, files) -> send(sender, Messages.LIST_FOLDER, text("folder", folder),
+                component("scripts", Messages.joined(files))));
     }
 
     private void info(CommandSender sender) {
-        info(sender, "info.aliases");
-        info(sender, "info.documentation");
-        info(sender, "info.tutorials");
-        info(sender, "info.server", serverVersion());
-        info(sender, "info.version", plugin.getPluginMeta().getVersion());
-        // NeoSkript has no addons yet.
-        info(sender, "info.addons", "None");
-        List<String> dependencies = new ArrayList<>();
+        send(sender, Messages.INFO_HEADER, text("version", plugin.getPluginMeta().getVersion()), text("server", serverVersion()));
+        int enabled = scripts.loadedScripts().size();
+        int disabled = ScriptFiles.disabledScripts(scripts.scriptsFolder()).size();
+        line(sender, "Scripts", Component.text(enabled + " enabled, " + disabled + " disabled"));
+        line(sender, "Addons", names(addons()));
+        List<String> hooks = new ArrayList<>();
         for (String name : plugin.getPluginMeta().getPluginSoftDependencies()) {
-            Plugin dependency = Bukkit.getPluginManager().getPlugin(name);
-            if (dependency != null) {
-                dependencies.add(" - " + dependency.getPluginMeta().getDisplayName());
+            Plugin hooked = Bukkit.getPluginManager().getPlugin(name);
+            if (hooked != null) {
+                hooks.add(hooked.getPluginMeta().getDisplayName());
             }
         }
-        if (dependencies.isEmpty()) {
-            info(sender, "info.dependencies", "None");
+        line(sender, "Hooks", names(hooks));
+        line(sender, "Updates", updateState(sender));
+        if (Messages.chat(sender)) {
+            line(sender, "Links", Messages.joined(List.of(
+                    Messages.link(sender, "Docs", Messages.DOCS),
+                    Messages.link(sender, "Syntax", Messages.SYNTAX),
+                    Messages.link(sender, "Download", Messages.DOWNLOAD),
+                    Messages.link(sender, "Issues", Messages.ISSUES))));
         } else {
-            info(sender, "info.dependencies", "");
-            dependencies.forEach(line -> sender.sendMessage(TextComponentParser.instance().parse(line)));
+            line(sender, "Docs", Component.text(Messages.DOCS));
+            line(sender, "Syntax", Component.text(Messages.SYNTAX));
+            line(sender, "Issues", Component.text(Messages.ISSUES));
         }
+    }
+
+    private static void line(CommandSender sender, String label, Component value) {
+        send(sender, Messages.INFO_LINE, text("label", label), component("value", value));
+    }
+
+    private static Component names(List<String> names) {
+        return Component.text(names.isEmpty() ? "none" : String.join(", ", names));
+    }
+
+    /** The plugins that depend on NeoSkript: its addons. */
+    private static List<String> addons() {
+        List<String> addons = new ArrayList<>();
+        for (Plugin other : Bukkit.getPluginManager().getPlugins()) {
+            var meta = other.getPluginMeta();
+            if (meta.getPluginDependencies().contains("NeoSkript") || meta.getPluginSoftDependencies().contains("NeoSkript")) {
+                addons.add(meta.getDisplayName());
+            }
+        }
+        return addons;
+    }
+
+    /** What the update checker knows, for {@code /sk info}. */
+    private Component updateState(CommandSender sender) {
+        String current = plugin.getPluginMeta().getVersion();
+        UpdateNotices updates = plugin.updates();
+        if (!UpdateChecker.checks(current)) {
+            return Component.text("a development build, which doesn't check");
+        }
+        if (updates == null) {
+            return Component.text("off on test servers");
+        }
+        if (!plugin.settings().updateChecker()) {
+            return Component.text("off in config.yml");
+        }
+        UpdateChecker.Update found = updates.found();
+        if (found != null) {
+            return Messages.highlight(found.version()).append(Component.text(" is out: "))
+                    .append(Messages.link(sender, "download it", found.url()));
+        }
+        return Component.text(updates.checked() ? "up to date" : "not checked yet");
+    }
+
+    private void update(CommandSender sender, String what) {
+        if (what.equalsIgnoreCase("changes")) {
+            send(sender, Messages.UPDATE_CHANGES, component("link", Messages.link(sender, "GitHub Releases", Messages.RELEASES)));
+            return;
+        }
+        String current = plugin.getPluginMeta().getVersion();
+        UpdateNotices updates = plugin.updates();
+        if (!UpdateChecker.checks(current)) {
+            send(sender, Messages.UPDATE_DEVELOPMENT, text("current", current),
+                    component("link", Messages.link(sender, "neoskript.dev/download", Messages.DOWNLOAD)));
+            return;
+        }
+        if (updates == null) {
+            send(sender, Messages.UPDATE_TESTING);
+            return;
+        }
+        if (!plugin.settings().updateChecker()) {
+            send(sender, Messages.UPDATE_OFF);
+            return;
+        }
+        send(sender, Messages.UPDATE_CHECKING);
+        Bukkit.getAsyncScheduler().runNow(plugin, task -> {
+            Optional<UpdateChecker.Update> found;
+            try {
+                found = updates.checkNow();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception e) {
+                send(sender, Messages.UPDATE_FAILED, text("reason", e.getMessage() == null ? e.toString() : e.getMessage()));
+                return;
+            }
+            if (found.isEmpty()) {
+                send(sender, Messages.UPDATE_NEWEST, text("current", current));
+            } else {
+                send(sender, Messages.UPDATE_OUT, text("latest", found.get().version()), text("current", current),
+                        component("link", Messages.link(sender, found.get().url(), found.get().url())));
+            }
+        });
     }
 
     /** As Skript shows it: the brand and Minecraft version, then the build number and commit if known. */
@@ -501,29 +608,33 @@ final class SkriptCommand implements TabExecutor {
      * their files were deleted, as Skript's RestoreCommand.
      */
     private void restore(CommandSender sender) {
-        // Create a unique folder for each dump, don't want to overwrite old dumps in a restore command
+        // A new folder for each dump, so a restore never overwrites an old one.
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMMM yyyy HH-mm-ss");
         Path target = plugin.getDataFolder().toPath().resolve("dump").resolve(LocalDateTime.now().format(formatter));
         Map<String, String> sources = scripts.loadedSources();
         Bukkit.getAsyncScheduler().runNow(plugin, task -> {
-            info(sender, "restore.restoring");
+            send(sender, Messages.RESTORING);
             try {
                 Files.createDirectories(target);
             } catch (IOException e) {
-                info(sender, "restore.io error", e.getMessage());
-                plugin.getSLF4JLogger().error("Error while restoring scripts.", e);
+                send(sender, Messages.RESTORE_FAILED, text("reason", e.getMessage()));
+                plugin.getSLF4JLogger().error("Couldn't restore the scripts", e);
+                return;
             }
+            int restored = 0;
             for (Map.Entry<String, String> script : sources.entrySet()) {
                 Path file = target.resolve(script.getKey());
                 try {
                     Files.createDirectories(file.getParent());
                     Files.writeString(file, script.getValue(), java.nio.file.StandardOpenOption.CREATE_NEW);
+                    restored++;
                 } catch (IOException e) {
-                    info(sender, "restore.io error", e.getMessage());
-                    plugin.getSLF4JLogger().error("Error while restoring scripts.", e);
+                    send(sender, Messages.RESTORE_FAILED, text("reason", e.getMessage()));
+                    plugin.getSLF4JLogger().error("Couldn't restore the scripts", e);
                 }
             }
-            info(sender, "restore.restored", target);
+            send(sender, Messages.RESTORED, text("count", restored), text("scripts", Messages.plural(restored, "script")),
+                    text("folder", plugin.getDataFolder().toPath().relativize(target).toString().replace('\\', '/') + "/"));
         });
     }
 
@@ -534,7 +645,7 @@ final class SkriptCommand implements TabExecutor {
         Path file = ScriptFiles.find(scripts.scriptsFolder(), name);
         if (file == null) {
             boolean folder = name.endsWith("/") || name.endsWith("\\") || name.endsWith(java.io.File.separator);
-            Skriptlike.error(sender, String.format(SkriptCommandMessages.get(folder ? "invalid folder" : "invalid script"), name));
+            send(sender, folder ? Messages.NO_FOLDER : Messages.NO_SCRIPT, text("name", name));
         }
         return file;
     }
@@ -551,56 +662,58 @@ final class SkriptCommand implements TabExecutor {
         return names;
     }
 
+    /** A script's name without the {@code -} that disables it: {@code sub/-c.sk} is {@code sub/c.sk}. */
+    static String enabledName(String name) {
+        int slash = name.lastIndexOf('/');
+        String file = name.substring(slash + 1);
+        return file.startsWith(ScriptFiles.DISABLED_PREFIX)
+                ? name.substring(0, slash + 1) + file.substring(ScriptFiles.DISABLED_PREFIX.length())
+                : name;
+    }
+
+    /** "4 scripts", with the number highlighted. */
+    private static Component countOf(int count, String noun) {
+        return Messages.highlight(String.valueOf(count)).append(Component.text(" " + Messages.plural(count, noun)));
+    }
+
+    private static long millis(long start) {
+        return (System.nanoTime() - start) / 1_000_000;
+    }
+
     /** The arguments after the subcommand, as one name: script names can have spaces. */
     private static String join(String[] args) {
         return String.join(" ", List.of(args).subList(1, args.length));
-    }
-
-    /** Skript's Language.format, then PluralizingArgsMessage.format if {@code pluralize}. */
-    private static String format(String key, boolean pluralize, Object... args) {
-        String formatted = String.format(SkriptCommandMessages.get(key), args);
-        return pluralize ? AutoReload.pluralize(formatted) : formatted;
-    }
-
-    /** Skript's SkriptCommand.info: the message, with its arguments, capitalised, after Skript's prefix. */
-    private static void info(CommandSender sender, String key, Object... args) {
-        String what = args.length == 0 ? SkriptCommandMessages.get(key) : format(key, true, args);
-        Skriptlike.info(sender, Skriptlike.fixCapitalization(what));
-    }
-
-    /** Skript's SkriptCommand.error: as {@link #info}, in dark red. */
-    private static void error(CommandSender sender, String key, Object... args) {
-        String what = args.length == 0 ? SkriptCommandMessages.get(key) : format(key, true, args);
-        Skriptlike.error(sender, Skriptlike.fixCapitalization(what));
-    }
-
-    /** Skript's Skript.info and Skript.error. */
-    private static final class Skriptlike {
-        static void info(CommandSender sender, String message) {
-            sender.sendMessage(TextComponentParser.instance().parseSafe(PREFIX + message));
-        }
-
-        static void error(CommandSender sender, String message) {
-            sender.sendMessage(TextComponentParser.instance().parseSafe(PREFIX + "<dark_red>" + message));
-        }
-
-        static String fixCapitalization(String s) {
-            return AutoReload.fixCapitalization(s);
-        }
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) {
         List<String> aliases = new ArrayList<>();
         SUBS.forEach(sub -> aliases.addAll(sub.aliases()));
-        if (args.length == 0 || args[0].isEmpty()) {
-            return aliases;
+        if (args.length <= 1) {
+            String typed = args.length == 0 ? "" : args[0].toLowerCase(Locale.ROOT);
+            return aliases.stream().filter(alias -> alias.startsWith(typed)).toList();
         }
-        if (args.length == 1) {
-            return aliases.stream().filter(alias -> alias.startsWith(args[0])).toList();
-        }
-        return switch (find(args[0]).name()) {
-            case "reload", "enable", "disable" -> ScriptFiles.completions(scripts.scriptsFolder(), args);
+        Sub sub = find(args[0]);
+        String typed = args[args.length - 1].toLowerCase(Locale.ROOT);
+        return switch (sub.name()) {
+            case "reload", "enable", "disable" -> {
+                List<String> options = new ArrayList<>();
+                Set<String> keywords = new LinkedHashSet<>(sub.args().keySet());
+                keywords.remove("<script>");
+                for (String option : ScriptFiles.completions(scripts.scriptsFolder(), args)) {
+                    // The words are offered only while they match what's typed; scripts as Skript offers them.
+                    if (!keywords.contains(option) || args.length == 2 && option.startsWith(typed)) {
+                        options.add(option);
+                    }
+                }
+                if (sub.name().equals("reload") && args.length == 2 && "last".startsWith(typed) && lastReloaded != null) {
+                    options.add("last");
+                }
+                yield options;
+            }
+            case "update" -> args.length == 2
+                    ? sub.args().keySet().stream().filter(arg -> arg.startsWith(typed)).toList()
+                    : List.of();
             default -> List.of();
         };
     }

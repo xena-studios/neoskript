@@ -55,7 +55,7 @@ export default defineConfig({
       // Custom pages (src/pages) can't be validated; the rest of the site is.
       plugins: [starlightLinksValidator({ exclude: ["/", "/download/", "/syntax/", "/syntax/**", "/parser/", "/llms.txt"] })],
       sidebar: [
-        { label: "Start here", items: ["docs", "docs/install", "docs/moving-from-skript", "docs/ai"] },
+        { label: "Start here", items: ["docs", "docs/install", "docs/commands", "docs/configuration", "docs/moving-from-skript", "docs/ai"] },
         { label: "Tools", items: ["docs/editors", "docs/parser", "docs/parser-checks"] },
       ],
     }),

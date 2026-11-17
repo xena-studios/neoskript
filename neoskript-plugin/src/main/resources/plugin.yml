@@ -10,9 +10,9 @@ website: https://xenastudios.co
 authors: [Xena Studios]
 commands:
   skript:
-    description: Skript's main command. Type '/skript help' for more information.
-    usage: /skript help
-    aliases: [sk, neoskript]
+    description: NeoSkript's main command, as Skript's /skript. Type '/sk help' for more information.
+    usage: /sk help
+    aliases: [sk, neoskript, ns]
     permission: skript.admin
 # Skript's permissions.
 permissions:

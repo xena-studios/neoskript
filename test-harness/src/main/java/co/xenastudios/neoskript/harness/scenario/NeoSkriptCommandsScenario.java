@@ -87,7 +87,7 @@ public final class NeoSkriptCommandsScenario implements Scenario {
                     \t\tsend "[harness] commands product %arg-1 * arg-2%"
                     """);
             server.command("sk reload commands.sk");
-            server.await(Pattern.compile("Successfully reloaded .*commands\\.sk"), mark, WAIT);
+            server.await(Pattern.compile("\\[NeoSkript] Reloaded commands\\.sk in \\d+ ms"), mark, WAIT);
             expect(server, mark, "nsk-add 3 4", "[harness] commands product 12");
             int unknown = server.mark();
             server.command("nsk-say still here");

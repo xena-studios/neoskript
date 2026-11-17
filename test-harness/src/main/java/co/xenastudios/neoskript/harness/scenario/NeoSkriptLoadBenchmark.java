@@ -28,7 +28,7 @@ public final class NeoSkriptLoadBenchmark implements Scenario {
     private static final Pattern LOADED =
             Pattern.compile("Loaded (\\d+) scripts? with (\\d+) triggers? in (\\d+) ms(?: \\((\\d+) errors?\\))?$");
     private static final Pattern RELOAD_DONE =
-            Pattern.compile("(Successfully reloaded all scripts|Encountered (\\d+) errors?).*\\((\\d+)ms\\)");
+            Pattern.compile("\\[NeoSkript] Reloaded \\d+ scripts?( with (\\d+) errors?)?.* in (\\d+) ms[.,]");
 
     @Override
     public String name() {
