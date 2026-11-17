@@ -116,6 +116,8 @@ public final class CheckMode {
             script.put("name", report.name());
             script.put("loads", report.loads());
             script.put("findings", findings);
+            // The language extensions it asks for: a script with any won't run on Skript.
+            script.put("extensions", List.copyOf(report.extensions()));
             scripts.add(script);
         }
         Map<String, Object> json = new LinkedHashMap<>();
