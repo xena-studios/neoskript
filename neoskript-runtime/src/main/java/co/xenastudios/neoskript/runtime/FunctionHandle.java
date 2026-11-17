@@ -64,7 +64,7 @@ public final class FunctionHandle {
             RuntimeErrors.logError("Couldn't resolve call for '" + name + "'.");
             return null;
         }
-        Object owner = caller instanceof SimpleTriggerContext simple ? simple.owner() : null;
-        return function.call(owner == null ? CONTEXT : new SimpleTriggerContext(null, owner), arguments);
+        // Straight through: the function's prologue makes its one context from it (SimpleTriggerContext.call).
+        return function.call(caller == null ? CONTEXT : caller, arguments);
     }
 }

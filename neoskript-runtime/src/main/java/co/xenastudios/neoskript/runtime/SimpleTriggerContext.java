@@ -17,7 +17,7 @@ public record SimpleTriggerContext(Object event, Object owner) implements Trigge
     }
 
     /**
-     * A context for one run of a trigger or one call of a function, made as it starts: a new object with the same
+     * A context for one run of a trigger, made as it starts: a new object with the same
      * event and owner, so what keeps state by run (pausing sections, an addon's transactions) can tell runs apart
      * by identity, though an event's triggers, and calls from nowhere, share the context they're given. A wait or
      * a pause carries on with the same one.
@@ -30,6 +30,18 @@ public record SimpleTriggerContext(Object event, Object owner) implements Trigge
             return new SimpleTriggerContext(simple.event(), simple.owner());
         }
         return new SimpleTriggerContext(given == null ? null : given.event());
+    }
+
+    /**
+     * A context for one call of a function, made as it starts: no event, as Skript's functions have none of the
+     * caller's, but the caller's owner, so a wait in it carries on where the caller runs (its region, on Folia).
+     * The only context a call makes: the caller hands its own straight through.
+     *
+     * @param caller the context the function was called from, or {@code null}
+     * @return a context of its own
+     */
+    public static TriggerContext call(TriggerContext caller) {
+        return new SimpleTriggerContext(null, caller instanceof SimpleTriggerContext simple ? simple.owner() : null);
     }
 
     // A run's context is itself, not its contents: two runs of the same event are two runs.
