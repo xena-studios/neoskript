@@ -67,6 +67,12 @@ Descriptions and examples come from the addon's `syntax-docs.json`, written as `
 }
 ```
 
+## The addons
+
+| Folder | Plugin | Replaces | Docs |
+|---|---|---|---|
+| `yaml/` | NeoSkriptYaml | skript-yaml 1.7.2 | [neoskript.dev/docs/addons/yaml](https://neoskript.dev/docs/addons/yaml/) |
+
 ## Releasing
 
 An addon is released with NeoSkript, at the same version, from the same tag: its jar from `./gradlew :addons:<name>:build` goes on the GitHub release next to NeoSkript's.
@@ -76,3 +82,14 @@ Each addon gets its own Modrinth project, which only the owner can create. For e
 - the project: name (`NeoSkript DB`), slug (`neoskript-db`), summary, description (what it replaces, that scripts run unchanged, that it needs NeoSkript), icon, licence GPL-3.0-only, the source link to this repository, Paper and Folia as loaders, the Minecraft versions NeoSkript supports;
 - a **required dependency** on the NeoSkript project (`FuVeJ2X5`), and an **incompatible** one on the community addon's project, if it's on Modrinth;
 - the project id added to the release steps, so each release uploads the addon's jar to it with the same version and changelog as NeoSkript's.
+
+### What each project needs
+
+**NeoSkriptYaml** (`addons/yaml`):
+
+- name `NeoSkript YAML`, slug `neoskript-yaml`;
+- summary: "YAML files from scripts, with skript-yaml's syntax: scripts written for skript-yaml run unchanged on NeoSkript.";
+- description: what it replaces (skript-yaml), that scripts and files carry over unchanged, that saves are written off the server's threads and never half written, that it runs on Folia, that it needs NeoSkript at the same version, and a link to [the docs](https://neoskript.dev/docs/addons/yaml/) with the list of differences;
+- icon, licence GPL-3.0-only, source link to this repository (`addons/yaml`), loaders Paper and Folia, NeoSkript's Minecraft versions;
+- a required dependency on NeoSkript (`FuVeJ2X5`); skript-yaml isn't on Modrinth (it's on GitHub and SpigotMC), so there's no incompatible dependency to add;
+- the jar to upload is `addons/yaml/build/libs/NeoSkriptYaml-<version>.jar`, and the project id goes into the release steps next to NeoSkript's.

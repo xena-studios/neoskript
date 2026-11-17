@@ -6,6 +6,7 @@ public interface co.xenastudios.neoskript.api.NeoSkript
   public abstract boolean isReady()
   public abstract co.xenastudios.neoskript.api.Scripts scripts()
   public abstract co.xenastudios.neoskript.api.Threads threads()
+  public abstract co.xenastudios.neoskript.api.Values values()
   public abstract co.xenastudios.neoskript.api.Variables variables()
   public abstract java.lang.String version()
   public abstract void whenReady(java.lang.Runnable)
@@ -27,6 +28,24 @@ public interface co.xenastudios.neoskript.api.Threads
   public abstract void runGlobalLater(long, java.lang.Runnable)
   public abstract java.lang.Runnable runGlobalRepeating(long, long, java.lang.Runnable)
   public abstract void runLater(java.lang.Object, long, java.lang.Runnable)
+
+public interface co.xenastudios.neoskript.api.Values
+  public abstract java.lang.Object convert(java.lang.Object, java.lang.Class) signature (Ljava/lang/Object;Ljava/lang/Class<*>;)Ljava/lang/Object;
+  public abstract java.lang.Object fromJava(java.lang.Object)
+  public abstract java.lang.Object load(java.lang.String, byte[])
+  public abstract java.lang.Object parse(java.lang.String, java.lang.String)
+  public abstract co.xenastudios.neoskript.api.Values$Saved save(java.lang.Object)
+  public abstract java.lang.String text(java.lang.Object)
+  public abstract java.lang.Object toJava(java.lang.Object)
+  public abstract java.lang.String type(java.lang.Object)
+
+public final record co.xenastudios.neoskript.api.Values$Saved
+  public Saved(java.lang.String, byte[])
+  public byte[] data()
+  public final boolean equals(java.lang.Object)
+  public final int hashCode()
+  public final java.lang.String toString()
+  public java.lang.String type()
 
 public interface co.xenastudios.neoskript.api.Variables
   public abstract void deleteList(java.lang.String)
@@ -116,6 +135,9 @@ public interface co.xenastudios.neoskript.api.element.Function
 public interface co.xenastudios.neoskript.api.element.KeyAware @Experimental
   public boolean implicitKeys()
   public boolean keysRecommended()
+
+public interface co.xenastudios.neoskript.api.element.LoopValue
+  public abstract java.lang.Object get(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[], java.lang.Object)
 
 public interface co.xenastudios.neoskript.api.element.PausingEffect
   public abstract java.util.concurrent.CompletionStage start(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[]) signature (Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;)Ljava/util/concurrent/CompletionStage<*>;
@@ -211,6 +233,7 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public abstract void kindClass(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/Object;Ljava/lang/Class<*>;>;)V @Experimental
   public abstract void literalError(java.util.function.Function) signature (Ljava/util/function/Function<Ljava/lang/String;Ljava/lang/String;>;)V @Experimental
   public abstract void literalParser(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/String;*>;)V
+  public abstract void loopValue(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/LoopValue;>;)V
   public abstract void namedType(java.lang.String, java.lang.String, java.lang.Class, java.util.Map) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/Map<Ljava/lang/String;+TT;>;)V
   public abstract void parser(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/String;*>;)V
   public abstract void pausingEffect(java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/PausingEffect;>;[Ljava/lang/String;)V

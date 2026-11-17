@@ -1,0 +1,299 @@
+# The same script on Skript 2.17 with skript-yaml 1.7.2 and on NeoSkript with NeoSkriptYaml: the yaml-differential
+# scenario compares each "[yaml] label: value" line and the files it leaves in plugins/YamlTest. The harness writes
+# plugins/YamlTest/given.yml and plugins/YamlTest/folder/*.yml first, then runs each /yamltest-<part> command from the
+# console, and /yamlping after each, so a part that fails on one of them doesn't stop the others.
+
+function out(label: text, value: objects):
+	send "[yaml] %{_label}%: %{_value::*}%" to console
+
+command /yamlping <text>:
+	trigger:
+		send "[yaml] ping %arg-1%" to console
+
+command /yamltest-values:
+	trigger:
+		# ---- a new file: texts, numbers, booleans, lists and nodes
+		out("loaded before", whether yaml "values" is loaded)
+		load yaml "plugins/YamlTest/values.yml"
+		out("loaded after", whether yaml "values" is loaded)
+		out("file exists", whether yaml file "plugins/YamlTest/values.yml" exists)
+		out("empty at first", whether yaml "values" is empty)
+		set yaml value "text.plain" of "values" to "hello world"
+		set yaml value "text.number" of "values" to "5"
+		set yaml value "text.decimal" of "values" to "2.5"
+		set yaml value "text.yes" of "values" to "yes"
+		set yaml value "text.kept" of "values" without string checks to "5"
+		set yaml value "text.quote" of "values" to "it's ""quoted"": yes"
+		set yaml value "numbers.whole" of "values" to 42
+		set yaml value "numbers.decimal" of "values" to 1.25
+		set yaml value "numbers.negative" of "values" to -7
+		set yaml value "flag" of "values" to true
+		set yaml list "list" of "values" to "a", "b" and 3
+		add "c" to yaml list "list" of "values"
+		remove "a" from yaml list "list" of "values"
+		set index 1 of yaml list "list" of "values" to "B"
+		out("empty after", whether yaml "values" is empty)
+		out("modified", whether yaml "values" is modified)
+		set {_v} to yaml value "text.plain" of "values"
+		out("plain", {_v})
+		set {_v} to yaml value "text.number" of "values"
+		out("number from text", {_v} + 1)
+		set {_v} to yaml value "text.yes" of "values"
+		out("boolean from text", {_v})
+		set {_v} to yaml value "numbers.decimal" of "values"
+		out("decimal", {_v} * 2)
+		out("list", yaml list "list" of "values")
+		set {_v} to index 2 of yaml list "list" of "values"
+		out("index 2", {_v})
+		out("node keys", yaml node keys "text" of "values")
+		out("root keys", yaml node keys "" of "values")
+		out("nodes", yaml node list "numbers" of "values")
+		out("has value", whether yaml path "flag" of "values" has value)
+		out("no value", whether yaml path "nothing" of "values" has value)
+		out("has list", whether yaml path "list" of "values" has list)
+		out("no list", whether yaml path "flag" of "values" has list)
+		out("exists", whether yaml path "text.plain" of "values" exists)
+		out("doesn't exist", whether yaml path "text.nothing" of "values" exists)
+		out("is list", whether yaml node "list" of "values" is a list)
+		out("is node", whether yaml node "text" of "values" is a node)
+		out("is value", whether yaml node "flag" of "values" is a value)
+		out("isn't value", whether yaml node "text" of "values" is not a value)
+		loop yaml node keys "text" of "values":
+			out("loop key", loop-key)
+			out("loop node", loop-node)
+			out("loop val", loop-val)
+			out("loop id", loop-id)
+		loop yaml list "list" of "values":
+			out("loop list val", loop-val)
+		set the comments of yaml node "flag" of "values" to "The flag" and "two lines"
+		set the header of "values" to "Values file" and "made by the test"
+		out("comments", comments of yaml node "flag" of "values")
+		out("header", header of "values")
+		save yaml "values"
+		out("modified after save", whether yaml "values" is modified)
+		save yaml "values" to "plugins/YamlTest/values-compact.yml" with an indentation of 2 without extra lines between nodes
+
+# Values of Skript's types: timespan, saved, then read back from the file.
+command /yamltest-type-timespan:
+	trigger:
+		load yaml "plugins/YamlTest/types/timespan.yml" as "timespan"
+		set yaml value "v" of "timespan" to 5 minutes
+		save yaml "timespan"
+		set {_v} to yaml value "v" of "timespan"
+		out("type timespan set", {_v})
+		unload yaml "timespan"
+		load yaml "plugins/YamlTest/types/timespan.yml" as "timespan"
+		set {_v} to yaml value "v" of "timespan"
+		out("type timespan read", {_v})
+
+# Values of Skript's types: entitytype, saved, then read back from the file.
+command /yamltest-type-entitytype:
+	trigger:
+		load yaml "plugins/YamlTest/types/entitytype.yml" as "entitytype"
+		set yaml value "v" of "entitytype" to pig
+		save yaml "entitytype"
+		set {_v} to yaml value "v" of "entitytype"
+		out("type entitytype set", {_v})
+		unload yaml "entitytype"
+		load yaml "plugins/YamlTest/types/entitytype.yml" as "entitytype"
+		set {_v} to yaml value "v" of "entitytype"
+		out("type entitytype read", {_v})
+
+# Values of Skript's types: colour, saved, then read back from the file.
+command /yamltest-type-colour:
+	trigger:
+		load yaml "plugins/YamlTest/types/colour.yml" as "colour"
+		set yaml value "v" of "colour" to red
+		save yaml "colour"
+		set {_v} to yaml value "v" of "colour"
+		out("type colour set", {_v})
+		unload yaml "colour"
+		load yaml "plugins/YamlTest/types/colour.yml" as "colour"
+		set {_v} to yaml value "v" of "colour"
+		out("type colour read", {_v})
+
+# Values of Skript's types: item, saved, then read back from the file.
+command /yamltest-type-item:
+	trigger:
+		load yaml "plugins/YamlTest/types/item.yml" as "item"
+		set yaml value "v" of "item" to diamond sword
+		save yaml "item"
+		set {_v} to yaml value "v" of "item"
+		out("type item set", {_v})
+		unload yaml "item"
+		load yaml "plugins/YamlTest/types/item.yml" as "item"
+		set {_v} to yaml value "v" of "item"
+		out("type item read", {_v})
+
+# Values of Skript's types: location, saved, then read back from the file.
+command /yamltest-type-location:
+	trigger:
+		load yaml "plugins/YamlTest/types/location.yml" as "location"
+		set yaml value "v" of "location" to location(1.5, 64, -3, world "world")
+		save yaml "location"
+		set {_v} to yaml value "v" of "location"
+		out("type location set", {_v})
+		unload yaml "location"
+		load yaml "plugins/YamlTest/types/location.yml" as "location"
+		set {_v} to yaml value "v" of "location"
+		out("type location read", {_v})
+
+# Values of Skript's types: vector, saved, then read back from the file.
+command /yamltest-type-vector:
+	trigger:
+		load yaml "plugins/YamlTest/types/vector.yml" as "vector"
+		set yaml value "v" of "vector" to vector(1, 2.5, -3)
+		save yaml "vector"
+		set {_v} to yaml value "v" of "vector"
+		out("type vector set", {_v})
+		unload yaml "vector"
+		load yaml "plugins/YamlTest/types/vector.yml" as "vector"
+		set {_v} to yaml value "v" of "vector"
+		out("type vector read", {_v})
+
+# Values of Skript's types: date, saved, then read back from the file.
+command /yamltest-type-date:
+	trigger:
+		load yaml "plugins/YamlTest/types/date.yml" as "date"
+		set yaml value "v" of "date" to unix date of 1700000000
+		save yaml "date"
+		set {_v} to yaml value "v" of "date"
+		out("type date set", {_v})
+		unload yaml "date"
+		load yaml "plugins/YamlTest/types/date.yml" as "date"
+		set {_v} to yaml value "v" of "date"
+		out("type date read", {_v})
+
+# Values of Skript's types: uuid, saved, then read back from the file.
+command /yamltest-type-uuid:
+	trigger:
+		load yaml "plugins/YamlTest/types/uuid.yml" as "uuid"
+		set yaml value "v" of "uuid" to "069a79f4-44e9-4726-a5be-fca90e38aaf5"
+		save yaml "uuid"
+		set {_v} to yaml value "v" of "uuid"
+		out("type uuid set", {_v})
+		unload yaml "uuid"
+		load yaml "plugins/YamlTest/types/uuid.yml" as "uuid"
+		set {_v} to yaml value "v" of "uuid"
+		out("type uuid read", {_v})
+
+# Values of Skript's types: weather, saved, then read back from the file.
+command /yamltest-type-weather:
+	trigger:
+		load yaml "plugins/YamlTest/types/weather.yml" as "weather"
+		set yaml value "v" of "weather" to rain
+		save yaml "weather"
+		set {_v} to yaml value "v" of "weather"
+		out("type weather set", {_v})
+		unload yaml "weather"
+		load yaml "plugins/YamlTest/types/weather.yml" as "weather"
+		set {_v} to yaml value "v" of "weather"
+		out("type weather read", {_v})
+
+# Values of Skript's types: text with colour, saved, then read back from the file.
+command /yamltest-type-text-with-colour:
+	trigger:
+		load yaml "plugins/YamlTest/types/text-with-colour.yml" as "text-with-colour"
+		set yaml value "v" of "text-with-colour" to "&cred"
+		save yaml "text-with-colour"
+		set {_v} to yaml value "v" of "text-with-colour"
+		out("type text with colour set", {_v})
+		unload yaml "text-with-colour"
+		load yaml "plugins/YamlTest/types/text-with-colour.yml" as "text-with-colour"
+		set {_v} to yaml value "v" of "text-with-colour"
+		out("type text with colour read", {_v})
+
+command /yamltest-given:
+	trigger:
+		# ---- a file written by hand: header, comments, nested nodes, lists
+		load yaml "plugins/YamlTest/given.yml"
+		out("given header", header of "given")
+		out("given comment", comments of yaml node "settings" of "given")
+		out("given nodes", all yaml nodes of "given")
+		out("given name", yaml value "settings.name" of "given")
+		out("given ratio", yaml value "settings.ratio" of "given")
+		out("given big", yaml value "settings.big" of "given")
+		out("given id", yaml value "owner" of "given")
+		out("given numbers", yaml list "numbers" of "given")
+		loop yaml node keys "homes" of "given":
+			out("home", loop-key)
+			out("home node", loop-node)
+			out("home keys", loop-subnodekeys)
+		loop yaml node list "homes" of "given":
+			out("home path", loop-value)
+		remove "b" from yaml node keys "homes" of "given"
+		delete yaml value "settings.ratio" of "given"
+		out("ratio deleted", whether yaml path "settings.ratio" of "given" exists)
+		save yaml "given" to "plugins/YamlTest/given-saved.yml"
+		out("given still its own file", whether yaml file "plugins/YamlTest/given-saved.yml" exists)
+
+# Text with colour codes: skript-yaml quotes it when it saves.
+command /yamltest-colour:
+	trigger:
+		load yaml "plugins/YamlTest/colour-text.yml" as "colour text"
+		set yaml value "text" of "colour text" to "&ahello"
+		set {_v} to yaml value "text" of "colour text"
+		out("colour", {_v})
+		set {_v} to yaml value "text" of "colour text" without string checks
+		out("colour unchecked", {_v})
+		load yaml "plugins/YamlTest/motd.yml"
+		out("motd", yaml value "motd" of "motd")
+		save yaml "colour text"
+
+# Several node keys at once.
+command /yamltest-node-keys:
+	trigger:
+		load yaml "plugins/YamlTest/node-keys.yml" as "node keys"
+		add "x" and "y" to yaml node keys "keys" of "node keys"
+		out("node keys added", yaml node keys "keys" of "node keys")
+		save yaml "node keys"
+
+# A number read from a file and the same number from a script.
+command /yamltest-numbers:
+	trigger:
+		load yaml "plugins/YamlTest/numbers.yml"
+		remove 2 from yaml list "numbers" of "numbers"
+		out("numbers after remove", yaml list "numbers" of "numbers")
+		save yaml "numbers"
+
+command /yamltest-folders:
+	trigger:
+		# ---- folders, ids, deleting
+		load all yaml from directory "plugins/YamlTest/folder"
+		out("folder loaded", sorted loaded yaml from directory "plugins/YamlTest/folder")
+		unload yaml directory "plugins/YamlTest/folder"
+		out("folder unloaded", whether yaml "plugins/YamlTest/folder/one.yml" is loaded)
+		load all yaml from directory "plugins/YamlTest/folder" using the filename as the id
+		out("folder by name", whether yamls "one" and "two" are loaded)
+		out("unloaded in folder", sorted unloaded yaml files from directory "plugins/YamlTest/folder")
+		change yaml id from "one" to "uno"
+		out("renamed", whether yamls "uno" is loaded)
+		out("old name", whether yaml "one" is loaded)
+		set yaml value "renamed" of "uno" to true
+		save yaml "uno"
+		change yaml "two" file path to "plugins/YamlTest/moved/two.yml"
+		save yaml "two"
+		load yaml "plugins/YamlTest/doomed.yml"
+		set yaml value "a" of "doomed" to 1
+		save yaml "doomed"
+		delete yaml "doomed" and keep loaded in memory
+		out("doomed kept", whether yaml "doomed" is loaded)
+		out("doomed file", whether yaml file "plugins/YamlTest/doomed.yml" exists)
+		save yaml "doomed"
+		save yaml "doomed" to "plugins/YamlTest/rescued.yml"
+		delete yaml "uno"
+		out("uno gone", whether yaml "uno" is loaded)
+		out("loadYaml", loadYaml("fn", "plugins/YamlTest/fn.yml"))
+		set yaml value "via function" of "fn" without string checks to "yes"
+		save yaml "fn" without extra lines between nodes
+		out("loaded", sorted loaded yaml)
+
+# Deleting a folder's loaded files: skript-yaml's trigger waits for it.
+command /yamltest-delete-folder:
+	trigger:
+		load all yaml from directory "plugins/YamlTest/doomed-folder"
+		out("before", whether yaml "plugins/YamlTest/doomed-folder/a.yml" is loaded)
+		delete all yaml from directory "plugins/YamlTest/doomed-folder"
+		out("after", whether yaml "plugins/YamlTest/doomed-folder/a.yml" is loaded)
+		out("file after", whether yaml file "plugins/YamlTest/doomed-folder/a.yml" exists)
+		out("kept", whether yaml file "plugins/YamlTest/doomed-folder/notes.txt" exists)

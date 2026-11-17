@@ -78,7 +78,7 @@ The [script checker](/docs/cli/) runs its server without these plugins, and [the
 
 ## Skript addons
 
-Skript addons like SkBee, skript-yaml, SkQuery and skript-reflect <Badge text="not yet" variant="caution" /> don't load on NeoSkript: they're built against Skript's own code (`ch.njol.skript`), which NeoSkript doesn't have. A compatibility layer for them is planned after 1.0, in that order, SkBee first. skript-reflect reaches deepest into Skript and may never work fully.
+Skript addons like SkBee, SkQuery and skript-reflect <Badge text="not yet" variant="caution" /> don't load on NeoSkript: they're built against Skript's own code (`ch.njol.skript`), which NeoSkript doesn't have. A compatibility layer for them is planned after 1.0, in that order, SkBee first. skript-reflect reaches deepest into Skript and may never work fully.
 
 Until then, the [script checker](/docs/cli/) lists every line of your scripts that uses an addon's syntax, so you know what a switch would leave out.
 
@@ -86,6 +86,8 @@ Until then, the [script checker](/docs/cli/) lists every line of your scripts th
 
 NeoSkript's standard library is built on its own addon API, `neoskript-api`, and other plugins can use it too: an addon registers its own types, events, effects, expressions, conditions, sections and functions, and reaches scripts and their variables. The [Addon API](/docs/addon-api/) guide shows how to write one.
 
-Official addons, made and maintained by Xena Studios and released with each NeoSkript version, will be listed on the addons page.
+Official addons are made and maintained by Xena Studios and released with each NeoSkript version. Each takes the syntax of the community addon it replaces, so scripts written for it run unchanged:
+
+- [YAML files](/docs/addons/yaml/): NeoSkriptYaml, in place of skript-yaml.
 
 <LinkCard title="Addons" description="Official addons, the plugins NeoSkript works with, and where Skript addons stand." href="/addons/" />

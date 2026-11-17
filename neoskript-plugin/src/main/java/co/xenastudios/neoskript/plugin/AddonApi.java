@@ -40,12 +40,15 @@ final class AddonApi implements NeoSkript {
     private final ScriptsView scripts = new ScriptsView();
     private final VariablesView variables;
     private final ThreadsView threads = new ThreadsView();
+    private final ValuesView values;
     /** Whether NeoSkript is ready, and what waits for it until then. */
     private boolean ready;
     private final List<Runnable> waiting = new ArrayList<>();
 
-    AddonApi(Plugin plugin, Addons addons, VariableStore globals, Logger logger) {
+    AddonApi(Plugin plugin, Addons addons, VariableStore globals, co.xenastudios.neoskript.compiler.Library library,
+            Logger logger) {
         this.plugin = plugin;
+        this.values = new ValuesView(library);
         this.addons = addons;
         this.logger = logger;
         this.variables = new VariablesView(globals);
@@ -120,6 +123,105 @@ final class AddonApi implements NeoSkript {
     @Override
     public Threads threads() {
         return threads;
+    }
+
+    @Override
+    public co.xenastudios.neoskript.api.Values values() {
+        return values;
+    }
+
+    /** Values' types, text, parsers and codecs, from the library scripts are compiled against. */
+    private static final class ValuesView implements co.xenastudios.neoskript.api.Values {
+
+        private final co.xenastudios.neoskript.compiler.Library library;
+
+        ValuesView(co.xenastudios.neoskript.compiler.Library library) {
+            this.library = library;
+        }
+
+        @Override
+        public String type(Object value) {
+            return value == null ? null : library.typeOf(value.getClass());
+        }
+
+        @Override
+        public String text(Object value) {
+            return co.xenastudios.neoskript.runtime.Values.text(value);
+        }
+
+        @Override
+        public Object parse(String text, String typeId) {
+            if (text == null || typeId == null) {
+                return null;
+            }
+            try {
+                return library.parse(text, typeId);
+            } catch (RuntimeException unreadable) {
+                return null;
+            }
+        }
+
+        @Override
+        public Object convert(Object value, Class<?> to) {
+            if (value == null || to == null) {
+                return null;
+            }
+            try {
+                Object converted = co.xenastudios.neoskript.runtime.Values.convert(value, to);
+                return to.isInstance(converted) ? converted : null;
+            } catch (RuntimeException unconvertible) {
+                return null;
+            }
+        }
+
+        @Override
+        public Object toJava(Object value) {
+            return switch (value) {
+                case co.xenastudios.neoskript.runtime.Date date -> java.time.Instant.ofEpochMilli(date.millis());
+                case co.xenastudios.neoskript.runtime.Timespan span -> java.time.Duration.ofMillis(span.millis());
+                case null, default -> value;
+            };
+        }
+
+        @Override
+        public Object fromJava(Object value) {
+            return switch (value) {
+                case java.time.Instant instant -> new co.xenastudios.neoskript.runtime.Date(instant.toEpochMilli());
+                case java.util.Date date -> new co.xenastudios.neoskript.runtime.Date(date.getTime());
+                case java.time.Duration duration -> new co.xenastudios.neoskript.runtime.Timespan(duration.toMillis());
+                case Integer number -> number.longValue();
+                case Short number -> number.longValue();
+                case Byte number -> number.longValue();
+                case Float number -> number.doubleValue();
+                case java.math.BigInteger number when number.bitLength() < 64 -> number.longValue();
+                case java.math.BigInteger number -> number.doubleValue();
+                case java.math.BigDecimal number -> number.doubleValue();
+                case null, default -> value;
+            };
+        }
+
+        @Override
+        public Saved save(Object value) {
+            if (value == null) {
+                return null;
+            }
+            try {
+                co.xenastudios.neoskript.runtime.variables.storage.VariableCodecs.Encoded encoded =
+                        library.codecs().encode(value);
+                return encoded == null ? null : new Saved(encoded.type(), encoded.bytes());
+            } catch (RuntimeException | LinkageError unsavable) {
+                return null;
+            }
+        }
+
+        @Override
+        public Object load(String type, byte[] data) {
+            if (type == null || data == null) {
+                return null;
+            }
+            Object value = library.codecs().decode(type, data.clone());
+            return value instanceof co.xenastudios.neoskript.runtime.variables.storage.RawValue ? null : value;
+        }
     }
 
     /**

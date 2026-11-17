@@ -54,6 +54,8 @@ public final class SyntaxRegistry {
     private final Set<String> ending;
     private final Set<String> suppressing;
     private final Set<String> sectionOnly;
+    /** The names of addons' {@code loop-<name>} values, as {@code node}. */
+    private final Set<String> loopValueNames;
     private final Map<String, ParseCheck> checks;
     /** The experiments syntax elements need, by element id. */
     private final Map<String, Experimental> experimental;
@@ -117,6 +119,7 @@ public final class SyntaxRegistry {
         this.ending = Frozen.set(builder.ending);
         this.suppressing = Frozen.set(builder.suppressing);
         this.sectionOnly = Frozen.set(builder.sectionOnly);
+        this.loopValueNames = Frozen.set(builder.loopValueNames);
         this.checks = Frozen.map(builder.checks);
         this.experimental = Frozen.map(builder.experimental);
         this.experimentNames = builder.experimentNames;
@@ -162,6 +165,11 @@ public final class SyntaxRegistry {
     /** Whether the expression can only be used with a section under it, as Skript's section-only expressions. */
     public boolean sectionOnly(SyntaxInfo syntax) {
         return sectionOnly.contains(syntax.id());
+    }
+
+    /** Whether an addon gives loops over one of its expressions a {@code loop-<name>} of this name. */
+    public boolean isLoopValueName(String name) {
+        return loopValueNames.contains(name);
     }
 
     private final Set<String> timed;
@@ -572,6 +580,7 @@ public final class SyntaxRegistry {
         private final Set<String> ending = new HashSet<>();
         private final Set<String> suppressing = new HashSet<>();
         private final Set<String> sectionOnly = new HashSet<>();
+        private final Set<String> loopValueNames = new HashSet<>();
         private final Map<String, ParseCheck> checks = new HashMap<>();
         private final Map<String, Experimental> experimental = new HashMap<>();
         private java.util.function.UnaryOperator<String> experimentNames =
@@ -697,6 +706,12 @@ public final class SyntaxRegistry {
         }
 
         /** Marks an expression as only usable with a section under it. */
+        /** Lets {@code loop-<name>} parse, for an addon's loop value of that name. */
+        public Builder loopValueName(String name) {
+            loopValueNames.add(name);
+            return this;
+        }
+
         public Builder sectionOnly(String id) {
             sectionOnly.add(id);
             return this;

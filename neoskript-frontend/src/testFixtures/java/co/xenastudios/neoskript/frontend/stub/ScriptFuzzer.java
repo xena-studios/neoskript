@@ -138,7 +138,9 @@ public final class ScriptFuzzer {
                 case 8 -> out.set(at, line + " " + lines.get(random.nextInt(lines.size())).strip());
                 case 9 -> out.set(at, line.replaceFirst("\\S+", tokens.get(random.nextInt(tokens.size()))
                         .replace("\\", "\\\\").replace("$", "\\$")));
-                case 10 -> out.set(at, line + " " + line.strip().repeat(1 + random.nextInt(60)));
+                // Very long, but not without end: repeated again in the same case, a line would grow 61-fold each time.
+                case 10 -> out.set(at, line + " " + line.strip().repeat(1 + random.nextInt(
+                        Math.max(1, Math.min(60, 20_000 / Math.max(1, line.length()))))));
                 case 11 -> out.set(at, insert(line, deepNesting(random).strip(), random));
                 case 12 -> out.set(at, new StringBuilder(line).reverse().toString());
                 default -> out.set(at, insert(line, Character.toString(random.nextInt(0x20, 0x2FFF)), random));

@@ -236,6 +236,21 @@ public interface Registrar {
     default void sectionEvent(String expressionId, String eventName) {}
 
     /**
+     * A {@code loop-<name>} for loops over expression {@code expressionId}, as skript-yaml's {@code loop-node} in
+     * {@code loop yaml node keys "x" from "config"}. Like {@code loop-value}, it can be written {@code loop-node-2} for
+     * the second such loop out. Only loops over that expression have it: elsewhere the line has Skript's error,
+     * "There's no loop that matches 'loop-node'". In a loop over that expression it comes before a type of the same
+     * name, as Skript ends up with skript-yaml's {@code loop-node} though Skript has a {@code node} type. Names Skript
+     * gives every loop ({@code value}, {@code index}, {@code counter}, {@code iteration}) can't be used.
+     * @param expressionId the expression's id, one of the addon's own
+     * @param name the name after {@code loop-}, in lower case, as {@code node}
+     * @param factory makes the value for each place it's used, from how the looped expression was matched there;
+     *     it throws {@link co.xenastudios.neoskript.api.element.SyntaxError} where that loop has no such value
+     */
+    void loopValue(String expressionId, String name,
+            ElementFactory<co.xenastudios.neoskript.api.element.LoopValue> factory);
+
+    /**
      * Marks expression {@code expressionId} as an event value, as Skript's {@code EventValueExpression}s are
      * ({@code the created damage source}): as an argument, it counts as a default one
      * ({@link co.xenastudios.neoskript.api.element.ElementInfo#isDefault(int)}).

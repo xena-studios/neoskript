@@ -134,6 +134,13 @@ public interface NeoSkript {
     Variables variables();
 
     /**
+     * Values as scripts have them: their types, their text, and how Skript saves them. For an addon that writes
+     * values to a file or a database the way Skript would.
+     * @return the values
+     */
+    Values values();
+
+    /**
      * Where code runs: the main thread on Paper, and on Folia, each region's own thread or the global one.
      *
      * @return the threads

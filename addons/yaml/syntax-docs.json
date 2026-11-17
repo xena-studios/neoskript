@@ -1,0 +1,273 @@
+{
+  "elements": {
+    "NeoSkriptYamlEffLoad": {
+      "name": "Load YAML",
+      "description": [
+        "Loads a YAML file into memory, under an id other YAML syntax uses. Without <code>as</code>, the id is the file's name without its extension: <code>plugins/MyScript/config.yml</code> is <code>config</code>. With <code>using the file path as the id</code>, it's the path as written.",
+        "Paths are from the server's folder and stay inside it; with <code>non-relative</code> they're from the file system's root. A file that doesn't exist is made, with its folders. A file that isn't valid YAML isn't loaded, and is left as it is; an id that was loaded keeps what it had."
+      ],
+      "examples": [
+        "load yaml \"plugins/MyScript/config.yml\"",
+        "load yaml \"plugins/MyScript/config.yml\" as \"config\"",
+        "load yaml \"plugins/MyScript/config.yml\" using the file path as the id"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlEffLoadDirectory": {
+      "name": "Load YAML Directory",
+      "description": [
+        "Loads every <code>.yml</code> and <code>.yaml</code> file in a folder. Each file's id is the folder and file name as written (<code>plugins/MyScript/data/</code> then the file's name), or with <code>using the filename as the id</code>, the file's name without its extension."
+      ],
+      "examples": [
+        "load all yaml from directory \"plugins/MyScript/data\"",
+        "load all yaml from directory \"plugins/MyScript/data\" using the filename as the id"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlEffUnload": {
+      "name": "Unload YAML",
+      "description": [
+        "Unloads YAML files from memory, without saving them, by id, or every file loaded from a folder."
+      ],
+      "examples": [
+        "unload yaml \"config\"",
+        "unload yaml directory \"plugins/MyScript/data\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlEffSave": {
+      "name": "Save YAML",
+      "description": [
+        "Saves a loaded YAML file. The file is written off the server's threads, to a temporary file that then replaces it, so it's never half written. Scripts see the save at once: loading the file again, or checking that it exists, waits for it.",
+        "<code>with an indentation of</code> sets the indent (1 to 10) for this and later saves. <code>without extra lines between nodes</code> leaves out the blank line between root keys. <code>to</code> saves to another file and keeps the id's own file, unless it was deleted."
+      ],
+      "examples": [
+        "save yaml \"config\"",
+        "save yaml \"config\" with an indentation of 2 without extra lines between nodes",
+        "save yaml \"config\" to \"plugins/MyScript/backup.yml\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlEffDelete": {
+      "name": "Delete YAML",
+      "description": [
+        "Deletes a loaded YAML file from disk, and unloads it, or with <code>and keep loaded in memory</code>, keeps it loaded until it's saved somewhere else."
+      ],
+      "examples": [
+        "delete yaml \"config\"",
+        "delete yaml \"config\" and keep loaded in memory"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlEffDeleteDirectory": {
+      "name": "Delete YAML Directory",
+      "description": [
+        "Deletes the loaded YAML files of a folder from disk, and unloads them. Files in the folder that aren't loaded are left alone."
+      ],
+      "examples": [
+        "delete all yaml from directory \"plugins/MyScript/data\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlEffChangeId": {
+      "name": "Change YAML ID or Path",
+      "description": [
+        "Gives a loaded file another id, or points it at another file, which later saves write."
+      ],
+      "examples": [
+        "change yaml id from \"config\" to \"settings\"",
+        "change yaml \"config\" file path to \"plugins/MyScript/settings.yml\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlExprYaml": {
+      "name": "YAML",
+      "description": [
+        "A value, a list, the keys of a node, or the full paths of a node's keys, in a loaded file, by its path with dots between keys. It can be set, added to, removed from and deleted; changes are saved by <code>save yaml</code>.",
+        "Text set without <code>without string checks</code> is stored as what it reads as: <code>\"true\"</code> as a boolean, <code>\"5\"</code> as a number. Text read has its <code>&amp;</code> colour codes turned into colours.",
+        "Looping its node keys, nodes or list gives <code>loop-node</code> (the full path), <code>loop-key</code>, <code>loop-val</code> (the value there), <code>loop-list</code>, <code>loop-subnodekeys</code> and <code>loop-id</code>."
+      ],
+      "examples": [
+        "set yaml value \"spawn.world\" of \"config\" to \"world\"",
+        "add \"Steve\" to yaml list \"admins\" of \"config\"",
+        "loop yaml node keys \"homes\" of \"config\":\n\tsend \"%loop-key%: %loop-val%\" to player",
+        "delete yaml value \"old\" of \"config\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlExprListValue": {
+      "name": "YAML List Value",
+      "description": [
+        "One item of a list in a loaded file, by its index from 1. It can be set and deleted."
+      ],
+      "examples": [
+        "set {_first} to index 1 of yaml list \"admins\" of \"config\"",
+        "set index 2 of yaml list \"admins\" of \"config\" to \"Alex\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlExprComments": {
+      "name": "YAML Comments and Header",
+      "description": [
+        "The comment above a root key, or the header at the top of a file, a line each. It can be set and deleted. A comment's lines get <code># </code>, and the header's <code>## </code>; <code>with an extra line</code> puts a blank line under it."
+      ],
+      "examples": [
+        "set the comments of yaml node \"spawn\" of \"config\" to \"Where players start\"",
+        "set the header of \"config\" to \"My script's settings\" and \"Changes need a reload\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlExprAllNodes": {
+      "name": "All YAML Nodes",
+      "description": [
+        "Every path in a loaded file, nested ones too, each once."
+      ],
+      "examples": [
+        "set {_paths::*} to all yaml nodes of \"config\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlExprAllLoaded": {
+      "name": "Loaded YAML",
+      "description": [
+        "The ids of the loaded files, of those loaded from some folders, the YAML files in folders that aren't loaded, or the folders loaded files are in."
+      ],
+      "examples": [
+        "loop the loaded yaml:\n\tsend loop-value",
+        "set {_new::*} to the unloaded yaml files from directory \"plugins/MyScript/data\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlCondHasList": {
+      "name": "YAML Has List",
+      "description": [
+        "Whether there's a list at a path in a loaded file."
+      ],
+      "examples": [
+        "if yaml path \"admins\" of \"config\" has list:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlCondHasValue": {
+      "name": "YAML Has Value",
+      "description": [
+        "Whether there's a value at each of the paths in a loaded file."
+      ],
+      "examples": [
+        "if yaml path \"spawn\" of \"config\" has value:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlCondFileExists": {
+      "name": "YAML File Exists",
+      "description": [
+        "Whether a file exists, counting saves still being written."
+      ],
+      "examples": [
+        "if yaml file \"plugins/MyScript/config.yml\" doesn't exist:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlCondIsEmpty": {
+      "name": "YAML Is Empty",
+      "description": [
+        "Whether a loaded file has no paths."
+      ],
+      "examples": [
+        "if yaml \"config\" is empty:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlCondIsLoaded": {
+      "name": "YAML Is Loaded",
+      "description": [
+        "Whether files are loaded under these ids."
+      ],
+      "examples": [
+        "if yaml \"config\" is not loaded:\n\tload yaml \"plugins/MyScript/config.yml\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlCondIsModified": {
+      "name": "YAML Is Modified",
+      "description": [
+        "Whether a loaded file has changed since it was loaded or last saved."
+      ],
+      "examples": [
+        "if yaml \"config\" is modified:\n\tsave yaml \"config\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlCondNodeIsType": {
+      "name": "YAML Node Is Type",
+      "description": [
+        "Whether a path in a loaded file is a list, a node (with keys under it) or a value."
+      ],
+      "examples": [
+        "if yaml node \"homes\" of \"config\" is a node:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptYamlCondPathExists": {
+      "name": "YAML Path Exists",
+      "description": [
+        "Whether each of the paths exists in a loaded file, set to nothing or not."
+      ],
+      "examples": [
+        "if yaml path \"spawn\" and \"lobby\" of \"config\" exists:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    }
+  },
+  "types": {},
+  "functions": {
+    "loadYaml": {
+      "description": [
+        "Loads a YAML file under an id, as <code>load yaml ... as ...</code> does, and returns whether it loaded. The third argument says the path is from the file system's root (<code>non-relative</code>)."
+      ],
+      "examples": [
+        "if loadYaml(\"config\", \"plugins/MyScript/config.yml\") is false:\n\tsend \"Couldn't load the config\" to console"
+      ]
+    }
+  }
+}
