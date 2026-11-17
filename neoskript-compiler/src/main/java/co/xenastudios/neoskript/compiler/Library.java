@@ -111,6 +111,52 @@ public final class Library implements Registrar {
         return false;
     }
 
+    /** The syntax whose arguments are being compiled on this thread, innermost last. */
+    private static final ThreadLocal<java.util.ArrayDeque<String>> enclosing = new ThreadLocal<>();
+
+    void enterSyntax(String id) {
+        java.util.ArrayDeque<String> stack = enclosing.get();
+        if (stack == null) {
+            stack = new java.util.ArrayDeque<>();
+            enclosing.set(stack);
+        }
+        stack.addLast(id);
+    }
+
+    void leaveSyntax() {
+        java.util.ArrayDeque<String> stack = enclosing.get();
+        if (stack != null) {
+            stack.pollLast();
+            if (stack.isEmpty()) {
+                enclosing.remove();
+            }
+        }
+    }
+
+    /**
+     * The ids of the syntax around the element being set up on this thread, outermost first: for NeoSkriptCompat,
+     * which gives an addon Skript's parsing stack.
+     */
+    public List<String> enclosingSyntax() {
+        java.util.ArrayDeque<String> stack = enclosing.get();
+        return stack == null ? List.of() : List.copyOf(stack);
+    }
+
+    private final Set<String> wordsAsLiterals = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Gives syntax {@code id}'s arguments that are words a type's literal parser read ({@code int list tag}) as
+     * literals ({@code ElementInfo.argumentLiteral}), as Skript gives an addon them: for NeoSkriptCompat. NeoSkript's
+     * own syntax doesn't get them.
+     */
+    public void wordsAsLiterals(String id) {
+        wordsAsLiterals.add(id);
+    }
+
+    boolean hasWordsAsLiterals(String id) {
+        return wordsAsLiterals.contains(id);
+    }
+
     /** Whether a type has this id: for NeoSkriptCompat. */
     public boolean hasType(String id) {
         return javaClasses.containsKey(id);
@@ -1324,6 +1370,14 @@ public final class Library implements Registrar {
     @Override
     public <T> void storage(String name, Class<T> type, VariableCodec<T> codec) {
         codecs.register(name, type, codec);
+    }
+
+    /**
+     * Whether a codec, or a class one saves, is {@code loader}'s: a plugin that isn't an addon but whose classes an
+     * addon's codec saves (a Skript addon's types, through NeoSkriptCompat).
+     */
+    public boolean hasCodecsFrom(ClassLoader loader) {
+        return codecs.owns(loader);
     }
 
     /** Whether values of exactly {@code type} already have a codec. */
