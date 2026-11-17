@@ -103,6 +103,21 @@ public record KeyedValues(Object[] values, String[] keys) implements co.xenastud
         }
     }
 
+    /** {@code value}'s values as {@code type}, as {@code values within} gives them, each keeping its index. */
+    public static KeyedValues cast(Object value, Class<?> type) {
+        KeyedValues keyed = of(value);
+        List<Object> kept = new ArrayList<>(keyed.values.length);
+        List<String> keys = new ArrayList<>(keyed.values.length);
+        for (int i = 0; i < keyed.values.length; i++) {
+            Object[] cast = Values.cast(keyed.values[i], type);
+            if (cast.length == 1) {
+                kept.add(cast[0]);
+                keys.add(keyed.keys[i]);
+            }
+        }
+        return of(kept, keys);
+    }
+
     /** The values and keys collected with {@link #add}. */
     public static KeyedValues of(List<Object> values, List<String> keys) {
         return new KeyedValues(values.toArray(), keys.toArray(String[]::new));
