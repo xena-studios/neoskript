@@ -60,7 +60,7 @@ public final class NeoSkriptMigrationScenario implements Scenario {
             String config = Files.readString(builder.runDir().resolve("plugins/NeoSkript/config.yml"));
             // The token in either quotes: a current file is changed through Bukkit, which keeps its comments.
             for (String setting : new String[] {"^  enabled: true$", "^  token: [\"']\\?[\"']$",
-                    "^  player-uuids-in-names: false$", "^config-version: 2$"}) {
+                    "^  player-uuids-in-names: false$", "^config-version: 3$"}) {
                 if (!Pattern.compile(setting, Pattern.MULTILINE).matcher(config).find()) {
                     throw new HarnessFailure("config.yml doesn't have " + setting + " from Skript's config.sk:\n" + config);
                 }

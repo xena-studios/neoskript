@@ -47,13 +47,25 @@ public final class VariableStorage implements VariableBackend {
     private static final DateTimeFormatter BACKUP_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
     private final VariableStore store;
+    private final VariableStore loadInto;
+    private final java.util.function.Predicate<String> owns;
     private final VariableCodecs codecs;
     private final Path file;
     private volatile boolean loaded;
     private long savedAt = -1;
 
     public VariableStorage(VariableStore store, VariableCodecs codecs, Path file) {
+        this(store, codecs, file, Routing.ALL);
+    }
+
+    /**
+     * One of several databases: only the variables {@code routing} gives it are saved, and loading puts the
+     * variables into {@link Routing#loadInto}, or into {@code store} if that's {@code null}.
+     */
+    public VariableStorage(VariableStore store, VariableCodecs codecs, Path file, Routing routing) {
         this.store = store;
+        this.loadInto = routing.loadInto() != null ? routing.loadInto() : store;
+        this.owns = routing.owns();
         this.codecs = codecs;
         this.file = file;
     }
@@ -106,7 +118,7 @@ public final class VariableStorage implements VariableBackend {
         }
         Path backup = skipped.isEmpty() ? null : backup(file);
         for (Map.Entry<String, Object> value : values) {
-            store.set(value.getKey(), value.getValue());
+            loadInto.set(value.getKey(), value.getValue());
         }
         savedAt = store.modifications();
         loaded = true;
@@ -134,6 +146,45 @@ public final class VariableStorage implements VariableBackend {
                 // Two backups in the same second: number the next.
             }
         }
+    }
+
+    @Override
+    public synchronized Path backupNow() throws IOException {
+        return Files.exists(file) ? backup(file) : null;
+    }
+
+    /**
+     * Removes all but the newest {@code keep} backups of {@code file} in {@code backups/}, as Skript's {@code backups to
+     * keep}. Unlike Skript, only this file's backups ({@code <name>_<time>.<extension>}) are counted and removed: other
+     * databases' backups and the native storage's snapshots are left alone. Returns how many were removed.
+     */
+    public static int purgeBackups(Path file, int keep) throws IOException {
+        Path dir = file.toAbsolutePath().getParent().resolve("backups");
+        if (keep < 0 || !Files.isDirectory(dir)) {
+            return 0;
+        }
+        String name = file.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        String base = dot < 0 ? name : name.substring(0, dot);
+        String extension = dot < 0 ? "" : name.substring(dot);
+        java.util.regex.Pattern shape = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(base)
+                + "_\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}(-\\d+)?" + java.util.regex.Pattern.quote(extension));
+        List<Path> backups = new ArrayList<>();
+        try (DirectoryStream<Path> found = Files.newDirectoryStream(dir,
+                path -> shape.matcher(path.getFileName().toString()).matches() && Files.isRegularFile(path))) {
+            found.forEach(backups::add);
+        }
+        // Oldest first: the time in the name, then the number of a second backup in the same second.
+        backups.sort(java.util.Comparator.comparing((Path p) -> {
+            String n = p.getFileName().toString();
+            return n.substring(base.length() + 1, base.length() + 20);
+        }).thenComparing(p -> p.getFileName().toString().length()).thenComparing(p -> p.getFileName().toString()));
+        int removed = 0;
+        for (int i = 0; i < backups.size() - keep; i++) {
+            Durable.delete(backups.get(i));
+            removed++;
+        }
+        return removed;
     }
 
     /**
@@ -252,6 +303,11 @@ public final class VariableStorage implements VariableBackend {
      */
     public record Detached(List<String> kept, List<String> notSaved) {}
 
+    @Override
+    public VariableFile.Entry previous(String name) {
+        return previousEntries().get(name.toLowerCase(Locale.ROOT));
+    }
+
     /** The entries the file has now, or none if it can't be read. */
     private Map<String, VariableFile.Entry> previousEntries() {
         try {
@@ -273,7 +329,7 @@ public final class VariableStorage implements VariableBackend {
         int[] counts = new int[2];
         List<String> broken = new ArrayList<>();
         store.forEach((name, value) -> {
-            if (name.startsWith("-")) {
+            if (name.startsWith("-") || !owns.test(name)) {
                 return;
             }
             VariableCodecs.Encoded encoded;

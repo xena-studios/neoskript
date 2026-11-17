@@ -89,4 +89,65 @@ class SkriptMigrationTest {
         assertEquals(java.util.Map.of("effect-commands.enabled", true, "effect-commands.token", "#!",
                 "effect-commands.allow-ops", false), SkriptMigration.settings(config));
     }
+
+    @Test
+    void copiesTheDatabasesSectionAndTheFilesItNames() throws Exception {
+        // As on a server: paths in config.sk are relative to the server's folder.
+        Path skript = plugins.resolve("plugins/Skript");
+        Files.createDirectories(skript.resolve("scripts"));
+        Files.writeString(skript.resolve("scripts/a.sk"), "on load:\n\tbroadcast \"a\"\n");
+        Files.writeString(skript.resolve("variables.csv"), "# variables\n");
+        Files.writeString(skript.resolve("variables.db"), "sqlite");
+        Files.writeString(skript.resolve("variables.db-journal"), "journal");
+        Files.writeString(skript.resolve("config.sk"), String.join("\n",
+                "language: english",
+                "databases:",
+                "\t# Skript's example.",
+                "\tdatabase 1:",
+                "\t\ttype: SQLite",
+                "\t\tpattern: db_.*",
+                "\t\tmonitor changes: false",
+                "\t\tmonitor interval: 20 seconds",
+                "\t\tfile: ./plugins/Skript/variables",
+                "\t\tbackup interval: 0",
+                "\tshared:",
+                "\t\ttype: CSV",
+                "\t\tpattern: shared_.*",
+                "\t\tfile: /srv/shared/variables.csv",
+                "\tsynced:",
+                "\t\ttype: MySQL",
+                "\t\tpattern: synced_.*",
+                "\t\thost: localhost",
+                "\t\tport: 3306",
+                "\t\tuser: root",
+                "\t\tpassword: pass ## with a hash",
+                "\t\tdatabase: skript",
+                "\tdefault:",
+                "\t\ttype: CSV",
+                "\t\tpattern: .*",
+                "\t\tfile: ./plugins/Skript/variables.csv",
+                "\t\tbackup interval: 2 hours",
+                "\t\tbackups to keep: -1",
+                "",
+                "version: 2.17.0",
+                ""));
+        Path neoskript = plugins.resolve("plugins/NeoSkript");
+        SkriptMigration.Result result = SkriptMigration.migrate(skript, neoskript);
+        assertEquals(List.of("scripts", "variables.db", "variables.csv"), result.copied());
+        assertEquals("sqlite", Files.readString(neoskript.resolve("variables.db")));
+        assertEquals("journal", Files.readString(neoskript.resolve("variables.db-journal")));
+        assertTrue(Files.exists(neoskript.resolve("variables.csv")));
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, java.util.Map<String, Object>> databases =
+                (java.util.Map<String, java.util.Map<String, Object>>) result.settings().get("databases");
+        assertEquals(List.of("database 1", "shared", "synced", "default"), List.copyOf(databases.keySet()));
+        assertEquals("variables.db", databases.get("database 1").get("file"));
+        assertEquals("20 seconds", databases.get("database 1").get("monitor-interval"));
+        assertEquals(Path.of("/srv/shared/variables.csv").toAbsolutePath().toString(), databases.get("shared").get("file"),
+                "a file outside Skript's folder is shared, so it's used where it is");
+        assertEquals("pass # with a hash", databases.get("synced").get("password"));
+        assertEquals("variables.csv", databases.get("default").get("file"));
+        assertEquals("-1", databases.get("default").get("backups-to-keep"));
+        assertTrue(Files.exists(skript.resolve("variables.db")), "Skript's files stay where they were");
+    }
 }

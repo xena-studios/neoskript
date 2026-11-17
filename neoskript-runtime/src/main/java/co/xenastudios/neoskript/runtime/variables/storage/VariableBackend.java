@@ -8,13 +8,20 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 /**
- * Where global variables are saved: Skript's {@code variables.csv} ({@link VariableStorage}, the default) or
- * NeoSkript's own file ({@link NativeVariableStorage}). Saving is safe from any thread, one save at a time.
+ * Where global variables are saved: Skript's {@code variables.csv} ({@link VariableStorage}, the default),
+ * NeoSkript's own file ({@link NativeVariableStorage}), an SQL database ({@link SqlVariableStorage}), or several of
+ * them by pattern ({@link Databases}). Saving is safe from any thread, one save at a time.
  */
 public interface VariableBackend extends AutoCloseable {
 
-    /** The file variables are saved in. */
+    /** The file variables are saved in, or {@code null} if they aren't in a file (MySQL). */
     Path file();
+
+    /** Where variables are saved, for the console. */
+    default String describe() {
+        Path file = file();
+        return file == null ? "the database" : file.getFileName().toString();
+    }
 
     /** Loads the saved variables into the store. Nothing is saved until this has succeeded. */
     VariableStorage.Result load() throws IOException;
@@ -33,6 +40,19 @@ public interface VariableBackend extends AutoCloseable {
      * being disabled, so later saves never run its code. See {@link VariableStorage#detach}.
      */
     VariableStorage.Detached detach(ClassLoader loader);
+
+    /** What was last loaded or saved for {@code name} (in lower case), or {@code null} if nothing. */
+    default VariableFile.Entry previous(String name) {
+        return null;
+    }
+
+    /**
+     * Copies what's saved to {@code backups/} beside the file, as Skript's {@code backup interval} does, and returns the
+     * copy, or {@code null} if there's nothing to copy yet. Storage that isn't a file (MySQL) can't.
+     */
+    default Path backupNow() throws IOException {
+        throw new IOException(describe() + " isn't a file, so it can't be backed up this way");
+    }
 
     /** What the last load or saves did that the console should hear about; each is given once. */
     default java.util.List<String> notes() {

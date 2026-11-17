@@ -66,6 +66,8 @@ public final class NativeVariableStorage implements VariableBackend {
     }
 
     private final VariableStore store;
+    private final VariableStore loadInto;
+    private final java.util.function.Predicate<String> owns;
     private final VariableCodecs codecs;
     private final Path file;
     private final Map<String, Saved> saved = new HashMap<>();
@@ -89,7 +91,14 @@ public final class NativeVariableStorage implements VariableBackend {
     private int compactions;
 
     public NativeVariableStorage(VariableStore store, VariableCodecs codecs, Path file) {
+        this(store, codecs, file, Routing.ALL);
+    }
+
+    /** One of several databases: see {@link VariableStorage#VariableStorage(VariableStore, VariableCodecs, Path, Routing)}. */
+    public NativeVariableStorage(VariableStore store, VariableCodecs codecs, Path file, Routing routing) {
         this.store = store;
+        this.loadInto = routing.loadInto() != null ? routing.loadInto() : store;
+        this.owns = routing.owns();
         this.codecs = codecs;
         this.file = file;
     }
@@ -344,7 +353,7 @@ public final class NativeVariableStorage implements VariableBackend {
             }
         }
         // A compacted file is in Skript's order, which the store takes in one pass.
-        store.load(names, values);
+        loadInto.load(names, values);
         fileBytes = contents.validEnd();
         sequence = contents.sequence();
         slot = contents.slot();
@@ -379,7 +388,7 @@ public final class NativeVariableStorage implements VariableBackend {
         List<String> kept = new ArrayList<>();
         List<String> notSaved = new ArrayList<>();
         store.forEach((variable, value) -> {
-            if (variable.startsWith("-")) {
+            if (variable.startsWith("-") || !owns.test(variable)) {
                 return;
             }
             String name = variable.toLowerCase(Locale.ROOT);
@@ -506,6 +515,17 @@ public final class NativeVariableStorage implements VariableBackend {
         }
         codecs.forget(loader);
         return new VariableStorage.Detached(List.copyOf(kept), List.copyOf(notSaved));
+    }
+
+    @Override
+    public synchronized Path backupNow() throws IOException {
+        return Files.exists(file) ? VariableStorage.backup(file) : null;
+    }
+
+    @Override
+    public synchronized VariableFile.Entry previous(String name) {
+        Saved before = saved.get(name.toLowerCase(Locale.ROOT));
+        return before == null ? null : new VariableFile.Entry(name.toLowerCase(Locale.ROOT), before.type, before.bytes);
     }
 
     /** Values that can't change in place, so the same object means the same saved bytes. */

@@ -45,6 +45,9 @@ final class SkriptMigration {
         }
     }
 
+    /** Skript's {@code databases:} section, read from config.sk: each database's options as Skript wrote them. */
+    record SkriptDatabase(String name, Map<String, String> options) {}
+
     /** Skript's config.sk options that NeoSkript's config.yml has too, by Skript's name, with NeoSkript's path. */
     static final Map<String, String> SETTINGS = Map.of(
             "enable effect commands", "effect-commands.enabled",
@@ -62,21 +65,132 @@ final class SkriptMigration {
         Files.createDirectories(neoskriptDir);
         List<String> copied = new ArrayList<>();
         int[] scripts = {0};
+        List<SkriptDatabase> databases = databases(skriptDir.resolve("config.sk"));
         for (String name : COPIED) {
             Path source = skriptDir.resolve(name);
-            if (!Files.exists(source)) {
+            if (!Files.exists(source) || (name.equals("variables.csv") && !databases.isEmpty())) {
                 continue;
             }
             copy(source, neoskriptDir.resolve(name), scripts);
             copied.add(name);
         }
-        // Before NeoSkript first loads or saves them, the variables Skript saved are backed up as they were.
-        Path variables = neoskriptDir.resolve("variables.csv");
-        Path backup = copied.contains("variables.csv") ? VariableStorage.backup(variables) : null;
+        Map<String, Object> settings = settings(skriptDir.resolve("config.sk"));
+        Path backup = null;
+        if (databases.isEmpty()) {
+            // Before NeoSkript first loads or saves them, the variables Skript saved are backed up as they were.
+            Path variables = neoskriptDir.resolve("variables.csv");
+            backup = copied.contains("variables.csv") ? VariableStorage.backup(variables) : null;
+        } else {
+            Map<String, Object> section = new java.util.LinkedHashMap<>();
+            for (SkriptDatabase database : databases) {
+                Map<String, Object> options = new java.util.LinkedHashMap<>();
+                database.options().forEach((key, value) -> options.put(key.replace(' ', '-'), value));
+                Object file = options.get("file");
+                if (file != null) {
+                    String type = String.valueOf(options.getOrDefault("type", "")).strip().toLowerCase(java.util.Locale.ROOT);
+                    Moved moved = moveFile(skriptDir, neoskriptDir, String.valueOf(file), type, copied);
+                    options.put("file", moved.file());
+                    if (moved.backup() != null && backup == null) {
+                        backup = moved.backup();
+                    }
+                }
+                section.put(database.name(), options);
+            }
+            settings.put("databases", section);
+        }
         Files.writeString(neoskriptDir.resolve(MARKER),
                 "Copied " + copied + " from " + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n");
-        return new Result(copied, scripts[0], playerUuids(skriptDir.resolve("config.sk")),
-                settings(skriptDir.resolve("config.sk")), backup);
+        return new Result(copied, scripts[0], playerUuids(skriptDir.resolve("config.sk")), settings, backup);
+    }
+
+    /** Where a database's file is for NeoSkript, and the backup of what was copied. */
+    private record Moved(String file, Path backup) {}
+
+    /**
+     * A database file config.sk names. One in Skript's folder is copied into NeoSkript's (CSV and SQLite files, with
+     * SQLite's journal, once each, a backup made first), and the database then names the copy, relative to
+     * NeoSkript's folder. One anywhere else, which servers may share, is left where it is and named by its full path.
+     * A disabled database's file isn't copied.
+     */
+    private static Moved moveFile(Path skriptDir, Path neoskriptDir, String file, String type, List<String> copied)
+            throws IOException {
+        boolean sqlite = type.equals("sqlite");
+        // As Skript: an SQLite file always ends in .db.
+        String name = sqlite && !file.endsWith(".db") ? file + ".db" : file;
+        Path server = skriptDir.toAbsolutePath().getParent().getParent();
+        Path source = Path.of(name);
+        source = (source.isAbsolute() ? source : server.resolve(source)).normalize();
+        Path skript = skriptDir.toAbsolutePath().normalize();
+        if (!source.startsWith(skript)) {
+            return new Moved(source.toString(), null);
+        }
+        String relative = skript.relativize(source).toString().replace('\\', '/');
+        Path target = neoskriptDir.resolve(relative);
+        boolean csv = type.equals("csv") || type.equals("file") || type.equals("flatfile");
+        if (!(csv || sqlite) || !Files.isRegularFile(source) || copied.contains(relative)) {
+            return new Moved(relative, null);
+        }
+        Files.createDirectories(target.toAbsolutePath().getParent());
+        Files.copy(source, target, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
+        if (sqlite) {
+            for (String suffix : List.of("-journal", "-wal", "-shm")) {
+                Path extra = source.resolveSibling(source.getFileName() + suffix);
+                if (Files.isRegularFile(extra)) {
+                    Files.copy(extra, target.resolveSibling(target.getFileName() + suffix),
+                            StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+        copied.add(relative);
+        // Before NeoSkript first loads or saves it, the copy is backed up as Skript left it.
+        return new Moved(relative, VariableStorage.backup(target));
+    }
+
+    /**
+     * The {@code databases:} section of Skript's config.sk, in order, each database's options by Skript's names
+     * ({@code monitor changes}). Empty if there's no config.sk or no such section.
+     */
+    static List<SkriptDatabase> databases(Path config) throws IOException {
+        List<SkriptDatabase> databases = new ArrayList<>();
+        if (!Files.isRegularFile(config)) {
+            return databases;
+        }
+        boolean inside = false;
+        String sectionIndent = null;
+        String name = null;
+        Map<String, String> options = null;
+        for (String line : Files.readAllLines(config)) {
+            String content = value(line);
+            if (content.isEmpty()) {
+                continue;
+            }
+            String indent = line.substring(0, line.length() - line.stripLeading().length());
+            if (!inside) {
+                inside = indent.isEmpty() && content.equals("databases:");
+                continue;
+            }
+            if (indent.isEmpty()) {
+                break;
+            }
+            if (sectionIndent == null || indent.equals(sectionIndent)) {
+                sectionIndent = indent;
+                if (name != null) {
+                    databases.add(new SkriptDatabase(name, options));
+                }
+                name = content.endsWith(":") ? content.substring(0, content.length() - 1).strip() : null;
+                options = new java.util.LinkedHashMap<>();
+                continue;
+            }
+            int colon = content.indexOf(':');
+            if (name != null && colon > 0) {
+                options.put(content.substring(0, colon).strip().toLowerCase(java.util.Locale.ROOT),
+                        content.substring(colon + 1).strip());
+            }
+        }
+        if (name != null) {
+            databases.add(new SkriptDatabase(name, options));
+        }
+        return databases;
     }
 
     /**

@@ -87,6 +87,12 @@ public final class VariableBackends {
      */
     public static Opened open(Kind kind, VariableStore store, VariableCodecs codecs, Path csv, boolean recover)
             throws IOException {
+        return open(kind, store, codecs, csv, recover, Routing.ALL);
+    }
+
+    /** As {@link #open(Kind, VariableStore, VariableCodecs, Path, boolean)}, for one of several databases. */
+    public static Opened open(Kind kind, VariableStore store, VariableCodecs codecs, Path csv, boolean recover,
+            Routing routing) throws IOException {
         Path nsv = nativeFile(csv);
         List<String> log = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
@@ -101,9 +107,9 @@ public final class VariableBackends {
             warnings.add("Variables are saved in " + nsv.getFileName() + " (variables.storage: native), which older "
                     + "NeoSkript versions and Skript don't read. Before downgrading NeoSkript or going back to Skript, "
                     + "set variables.storage to csv and restart once, so " + csv.getFileName() + " is written.");
-            return new Opened(new NativeVariableStorage(store, codecs, nsv), List.copyOf(log), List.copyOf(warnings));
+            return new Opened(new NativeVariableStorage(store, codecs, nsv, routing), List.copyOf(log), List.copyOf(warnings));
         }
-        return new Opened(new VariableStorage(store, codecs, csv), List.copyOf(log), List.copyOf(warnings));
+        return new Opened(new VariableStorage(store, codecs, csv, routing), List.copyOf(log), List.copyOf(warnings));
     }
 
     /**

@@ -27,7 +27,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class NeoSkriptPlugin extends JavaPlugin {
 
-    private VariableBackend storage;
+    private co.xenastudios.neoskript.runtime.variables.storage.Databases storage;
     /** Whether the saved variables couldn't be opened or loaded, so scripts run without them and nothing is saved. */
     private boolean variablesUnavailable;
     /** Whether {@code variables.recover} was on for this start. */
@@ -350,6 +350,11 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (copied.keySet().stream().anyMatch(path -> path.startsWith("effect-commands."))) {
             getSLF4JLogger().info("Effect commands are set up as in Skript's config.sk.");
         }
+        if (copied.containsKey("databases")) {
+            getSLF4JLogger().info("Variables are saved in the databases Skript's config.sk has: {}.",
+                    settings.databases().all().stream().map(DatabaseSettings.Database::toString)
+                            .collect(java.util.stream.Collectors.joining(", ")));
+        }
     }
 
     /** The settings from config.yml. */
@@ -431,43 +436,93 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     }
 
     /**
-     * Where variables are saved, from {@code variables.storage}: {@code csv} (Skript's variables.csv, the default)
-     * or {@code native} (NeoSkript's own file). Switching moves the variables over, after a backup. If that fails,
-     * {@code null}: the variables stay where they are and aren't loaded or saved.
+     * Where variables are saved, from the {@code databases} section: each database, in order, with Skript's routing by
+     * pattern. A database that can't be opened (a switch between csv and native that can't be finished, a setting
+     * that's wrong) keeps its pattern, so its variables aren't saved anywhere else, and the console hears why.
      */
-    private VariableBackend openVariables(co.xenastudios.neoskript.runtime.variables.VariableStore globals,
+    private co.xenastudios.neoskript.runtime.variables.storage.Databases openVariables(
+            co.xenastudios.neoskript.runtime.variables.VariableStore globals,
             co.xenastudios.neoskript.runtime.variables.storage.VariableCodecs codecs) {
-        java.nio.file.Path csv = getDataPath().resolve(settings.variables().file());
-        String setting = settings.variables().storage();
-        VariableBackends.Kind kind = VariableBackends.Kind.parse(setting);
-        if (kind == null) {
-            // Keep using the file that's in use, rather than moving the variables because of a typo.
-            kind = java.nio.file.Files.exists(VariableBackends.nativeFile(csv)) ? VariableBackends.Kind.NATIVE
-                    : VariableBackends.Kind.CSV;
-            getSLF4JLogger().warn("Unknown variables.storage '{}' in config.yml (csv or native); using {}", setting,
-                    kind.name().toLowerCase(java.util.Locale.ROOT));
-        }
         // variables.recover: a one-shot recovery of a damaged native file. It's turned off in config.yml before it's
         // used, so it can never stay on and recover later damage nobody chose to; if it can't be, it isn't used.
         recoverVariables = settings.variables().recover() && turnOffRecover();
-        try {
-            VariableBackends.Opened opened = VariableBackends.open(kind, globals, codecs, csv, recoverVariables);
-            opened.log().forEach(line -> getSLF4JLogger().info(line));
-            opened.warnings().forEach(line -> getSLF4JLogger().warn(line));
-            if (opened.backend() instanceof NativeVariableStorage nsv) {
-                nsv.recover(recoverVariables);
-            }
-            return opened.backend();
-        } catch (VariableBackends.Conflict e) {
-            getSLF4JLogger().error(e.getMessage());
-            variablesUnavailable();
-            return null;
-        } catch (IOException | RuntimeException e) {
-            getSLF4JLogger().error("Couldn't read the saved variables ({} storage). The variable files are left as "
-                    + "they were.", kind.name().toLowerCase(java.util.Locale.ROOT), e);
-            variablesUnavailable();
-            return null;
+        co.xenastudios.neoskript.runtime.variables.storage.Console console = console();
+        java.util.List<co.xenastudios.neoskript.runtime.variables.storage.Databases.Definition> definitions =
+                new java.util.ArrayList<>();
+        for (DatabaseSettings.Database database : settings.databases().enabled()) {
+            definitions.add(new co.xenastudios.neoskript.runtime.variables.storage.Databases.Definition(
+                    database.name(), database.typeText(), database.pattern(),
+                    routing -> openDatabase(database, globals, codecs, routing, console)));
         }
+        return co.xenastudios.neoskript.runtime.variables.storage.Databases.open(globals, codecs, definitions, console);
+    }
+
+    /** One database's storage. */
+    private VariableBackend openDatabase(DatabaseSettings.Database database,
+            co.xenastudios.neoskript.runtime.variables.VariableStore globals,
+            co.xenastudios.neoskript.runtime.variables.storage.VariableCodecs codecs,
+            co.xenastudios.neoskript.runtime.variables.storage.Routing routing,
+            co.xenastudios.neoskript.runtime.variables.storage.Console console) throws IOException {
+        if (database.problem() != null) {
+            throw new IOException(database.problem());
+        }
+        java.nio.file.Path data = getDataPath();
+        switch (database.type()) {
+            case CSV, NATIVE -> {
+                VariableBackends.Kind kind = database.type() == DatabaseSettings.Type.NATIVE
+                        ? VariableBackends.Kind.NATIVE : VariableBackends.Kind.CSV;
+                VariableBackends.Opened opened = VariableBackends.open(kind, globals, codecs,
+                        data.resolve(database.file()), recoverVariables, routing);
+                opened.log().forEach(line -> getSLF4JLogger().info(line));
+                opened.warnings().forEach(line -> getSLF4JLogger().warn(line));
+                if (opened.backend() instanceof NativeVariableStorage nsv) {
+                    nsv.recover(recoverVariables);
+                }
+                return opened.backend();
+            }
+            case SQLITE, MYSQL -> {
+                co.xenastudios.neoskript.runtime.variables.storage.SqlVariableStorage.Settings sql =
+                        database.type() == DatabaseSettings.Type.SQLITE
+                                ? co.xenastudios.neoskript.runtime.variables.storage.SqlVariableStorage.Settings.sqlite(
+                                        database.name(), data.resolve(database.file()), database.table(),
+                                        database.monitorChanges(), database.monitorInterval().millis())
+                                : co.xenastudios.neoskript.runtime.variables.storage.SqlVariableStorage.Settings.mysql(
+                                        database.name(), database.host(), database.port(), database.database(),
+                                        database.user(), database.password(), database.table(),
+                                        database.monitorChanges(), database.monitorInterval().millis());
+                java.nio.file.Path pending = data.resolve("pending").resolve(
+                        database.name().replaceAll("[^A-Za-z0-9_-]", "_") + ".pending.csv");
+                return new co.xenastudios.neoskript.runtime.variables.storage.SqlVariableStorage(globals, codecs, sql,
+                        routing, pending, console);
+            }
+            default -> throw new IOException("type " + database.typeText() + " can't hold variables");
+        }
+    }
+
+    /** Where background storage tells the console what happened. */
+    private co.xenastudios.neoskript.runtime.variables.storage.Console console() {
+        org.slf4j.Logger logger = getSLF4JLogger();
+        return new co.xenastudios.neoskript.runtime.variables.storage.Console() {
+            @Override
+            public void info(String message) {
+                logger.info(message);
+            }
+
+            @Override
+            public void warn(String message) {
+                logger.warn(message);
+            }
+
+            @Override
+            public void error(String message) {
+                logger.error(message);
+            }
+        };
+    }
+
+    /** The databases variables are saved in, for {@code /sk info}; empty if they couldn't be opened. */
+    java.util.List<co.xenastudios.neoskript.runtime.variables.storage.Databases.Database> databases() {
+        return storage == null ? java.util.List.of() : storage.databases();
     }
 
     /** Sets variables.recover back to false in config.yml, once a recovery has run. */
@@ -526,20 +581,22 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                         .map(co.xenastudios.neoskript.runtime.variables.storage.VariableFile.Problem::name)
                         .collect(java.util.stream.Collectors.joining(", ")));
                 if (loaded.backup() != null) {
-                    getSLF4JLogger().info("Created a backup of {} as {}", storage.file().getFileName(),
+                    getSLF4JLogger().info("Created a backup of {} as {}", loaded.backup().getFileName(),
                             getDataPath().toAbsolutePath().relativize(loaded.backup().toAbsolutePath()));
                 } else {
                     getSLF4JLogger().info("{} is backed up before the first save writes it again",
-                            storage.file().getFileName());
+                            storage.describe());
                 }
                 getSLF4JLogger().warn("Skipped {} {} of {} that couldn't be read; the other variables loaded. "
                         + "The next save leaves those lines out, and the backup keeps them.", count,
-                        count == 1 ? "line" : "lines", storage.file().getFileName());
+                        count == 1 ? "line" : "lines", storage.describe());
             }
-            if (storage instanceof NativeVariableStorage nsv && nsv.recoveredBytes() > 0) {
-                getSLF4JLogger().warn("The last {} bytes of {} were a save cut off by a crash; every save before it "
-                        + "loaded. The first save drops them, after backing the file up.", nsv.recoveredBytes(),
-                        storage.file().getFileName());
+            for (var database : storage.databases()) {
+                if (database.backend() instanceof NativeVariableStorage nsv && nsv.recoveredBytes() > 0) {
+                    getSLF4JLogger().warn("The last {} bytes of {} were a save cut off by a crash; every save before "
+                            + "it loaded. The first save drops them, after backing the file up.", nsv.recoveredBytes(),
+                            nsv.file().getFileName());
+                }
             }
             storage.notes().forEach(line -> getSLF4JLogger().warn(line));
             getSLF4JLogger().info("Loaded {} {} in {} ms{}", loaded.variables(), loaded.variables() == 1 ? "variable" : "variables",
@@ -549,7 +606,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             // Don't run with an empty set of variables that would then overwrite the file. The storage never saves
             // until it has loaded, so nothing writes over the file, not even when the server stops.
             getSLF4JLogger().error("Couldn't load variables from {}. Variables won't be saved until it's fixed.",
-                    storage.file(), e);
+                    storage.describe(), e);
             storage.notes().forEach(line -> getSLF4JLogger().warn(line));
             try {
                 storage.close();
@@ -561,6 +618,58 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             return;
         }
         scheduleSaves();
+        scheduleBackups();
+    }
+
+    /**
+     * Backs up each file database every {@code backup-interval}, keeping the newest {@code backups-to-keep}, as Skript
+     * does. With {@code backups-to-keep: 0}, as in Skript, there are no backups, and that file's old ones are removed.
+     */
+    private void scheduleBackups() {
+        java.util.Map<String, co.xenastudios.neoskript.runtime.variables.storage.Databases.Database> open =
+                new java.util.HashMap<>();
+        for (var database : storage.databases()) {
+            open.put(database.name(), database);
+        }
+        for (DatabaseSettings.Database settings : this.settings.databases().enabled()) {
+            var database = open.get(settings.name());
+            if (!settings.type().file() || database == null || database.backend() == null
+                    || database.failure() != null || settings.backupInterval() == null) {
+                continue;
+            }
+            VariableBackend backend = database.backend();
+            if (settings.backupsToKeep() == 0) {
+                purgeBackups(backend, 0);
+                continue;
+            }
+            long seconds = Math.max(settings.backupInterval().millis() / 1000, 60);
+            getServer().getAsyncScheduler().runAtFixedRate(this, task -> {
+                try {
+                    java.nio.file.Path backup = backend.backupNow();
+                    if (backup != null) {
+                        getSLF4JLogger().info("Backed up {} as {}", backend.describe(),
+                                getDataPath().toAbsolutePath().relativize(backup.toAbsolutePath()));
+                    }
+                } catch (IOException | RuntimeException e) {
+                    // Skript's message.
+                    getSLF4JLogger().error("Automatic variables backup failed: {}", e.getMessage());
+                    return;
+                }
+                purgeBackups(backend, settings.backupsToKeep());
+            }, seconds, seconds, TimeUnit.SECONDS);
+        }
+    }
+
+    private void purgeBackups(VariableBackend backend, int keep) {
+        if (keep < 0 || backend.file() == null) {
+            return;
+        }
+        try {
+            VariableStorage.purgeBackups(backend.file(), keep);
+        } catch (IOException | RuntimeException e) {
+            // Skript's message.
+            getSLF4JLogger().error("Automatic variables backup purge failed: {}", e.getMessage());
+        }
     }
 
     /** Saves changed variables every {@code variables.save-interval}, at least every 10 seconds. */
@@ -590,7 +699,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                         String.join(", ", saved.notSaved()));
             }
         } catch (IOException | RuntimeException | LinkageError e) {
-            getSLF4JLogger().error("Couldn't save variables to {}: {}", current.file(), e.getMessage(), e);
+            getSLF4JLogger().error("Couldn't save variables to {}: {}", current.describe(), e.getMessage(), e);
         }
         current.notes().forEach(line -> getSLF4JLogger().warn(line));
     }
@@ -633,7 +742,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             try {
                 storage.close();
             } catch (IOException e) {
-                getSLF4JLogger().warn("Couldn't close {}", storage.file(), e);
+                getSLF4JLogger().warn("Couldn't close {}", storage.describe(), e);
             }
         }
         // Last, once nothing scheduled can run any more: a task cancelled after this could have opened a log again.

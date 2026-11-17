@@ -16,6 +16,10 @@ vault-api = "1.7.1"
 worldguard = "7.0.12"
 worldedit = "7.3.0"
 griefprevention = "16.18.4"
+# JDBC drivers Paper and Folia ship (the versions in Paper 26.3), so NeoSkript uses them without bundling any.
+# Only the tests depend on them.
+sqlite-jdbc = "3.49.1.0"
+mysql-connector-j = "9.2.0"
 
 [libraries]
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
@@ -32,6 +36,8 @@ worldguard-core = { module = "com.sk89q.worldguard:worldguard-core", version.ref
 worldedit-core = { module = "com.sk89q.worldedit:worldedit-core", version.ref = "worldedit" }
 worldedit-bukkit = { module = "com.sk89q.worldedit:worldedit-bukkit", version.ref = "worldedit" }
 griefprevention = { module = "com.github.TechFortress:GriefPrevention", version.ref = "griefprevention" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+mysql-connector-j = { module = "com.mysql:mysql-connector-j", version.ref = "mysql-connector-j" }
 spotless-gradle = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
 
 [plugins]

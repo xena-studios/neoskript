@@ -1,0 +1,4 @@
+# Harness: the reference Skript reads what NeoSkript changed in the database.
+on load:
+	send "[harness] skript sql read: %{db_text}% | %{db_number}% | %{db_unchanged}% | %{db_deleted} ? "deleted"% | %{plain}%" to console
+	send "[harness] skript sql items: %item amount of {db_new item}% | %name of {db_new item}% | %name of {db_item}% | %x coordinate of {db_loc}%" to console

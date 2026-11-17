@@ -20,7 +20,8 @@ import java.util.TreeMap;
  * forward. As the config of Xena Studios' other plugins, written again here so NeoSkript releases on its own.
  *
  * <p>Settings can be {@code boolean}, {@code int}, {@code long}, {@code double}, {@code String}, enums, nested
- * records, {@code List}s of those scalars, and any type with a {@linkplain Builder#codec codec}.
+ * records, {@code List}s of those scalars, any type with a {@linkplain Builder#codec codec}, and sections with the
+ * owner's own keys ({@linkplain Builder#section section codecs}).
  *
  * @param <C> the config's record type
  */
@@ -34,6 +35,7 @@ public final class ConfigSpec<C extends Record> {
     final List<String> header;
     final TreeMap<Integer, Migration> migrations;
     final Map<Class<?>, Codec<?>> codecs;
+    final Map<Class<?>, SectionCodec<?>> sections;
 
     private ConfigSpec(Builder<C> builder) {
         this.type = builder.type;
@@ -44,6 +46,7 @@ public final class ConfigSpec<C extends Record> {
         this.header = List.copyOf(builder.header);
         this.migrations = new TreeMap<>(builder.migrations);
         this.codecs = Map.copyOf(builder.codecs);
+        this.sections = Map.copyOf(builder.sections);
         check(type, type.getSimpleName());
         for (int from = 1; from < version; from++) {
             if (!migrations.containsKey(from)) {
@@ -69,8 +72,16 @@ public final class ConfigSpec<C extends Record> {
         return (Codec<T>) codecs.get(type);
     }
 
+    @SuppressWarnings("unchecked")
+    <T> SectionCodec<T> sectionCodec(Class<T> type) {
+        return (SectionCodec<T>) sections.get(type);
+    }
+
     // Fails at startup (and in unit tests) on a setting type the config can't read.
     private void check(Type type, String path) {
+        if (type instanceof Class<?> c && sections.containsKey(c)) {
+            return;
+        }
         if (type instanceof Class<?> c) {
             if (c.isRecord() && !codecs.containsKey(c)) {
                 for (RecordComponent component : c.getRecordComponents()) {
@@ -109,6 +120,7 @@ public final class ConfigSpec<C extends Record> {
         private final List<String> header = new ArrayList<>();
         private final Map<Integer, Migration> migrations = new HashMap<>();
         private final Map<Class<?>, Codec<?>> codecs = new HashMap<>();
+        private final Map<Class<?>, SectionCodec<?>> sections = new HashMap<>();
 
         private Builder(Class<C> type, C defaults) {
             this.type = Objects.requireNonNull(type);
@@ -154,6 +166,12 @@ public final class ConfigSpec<C extends Record> {
 
         public <T> Builder<C> codec(Class<T> type, Codec<T> codec) {
             codecs.put(type, codec);
+            return this;
+        }
+
+        /** Settings of {@code type} are a section with the owner's own keys, read whole by {@code codec}. */
+        public <T> Builder<C> section(Class<T> type, SectionCodec<T> codec) {
+            sections.put(type, codec);
             return this;
         }
 

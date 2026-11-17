@@ -62,6 +62,11 @@ public final class ConfigLoader {
      */
     public record Change(boolean written, List<String> warnings, List<String> notices) {}
 
+    /** Whether a raw value read from the file stands for a key left empty, for migrations. */
+    public static boolean isBlank(Object raw) {
+        return raw == null || Reader.BLANK.equals(raw);
+    }
+
     /** The default config file, as written on first start. */
     public static String defaultText(ConfigSpec<?> spec) {
         return Emitter.render(spec);

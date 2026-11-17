@@ -61,6 +61,12 @@ final class Reader {
             String key = Names.key(component);
             Object defaultValue = get(component, fallback);
             boolean empty = BLANK.equals(section.get(key));
+            if (empty && spec.sectionCodec(component.getType()) != null) {
+                // "databases:" with nothing under it.
+                values[i] = defaultValue;
+                warnings.add(join(path, key) + " has nothing in it; using the default.");
+                continue;
+            }
             if (empty && spec.isSection(component.getType())) {
                 // "variables:" with nothing under it: the section's settings get their defaults.
                 section.set(key, null);
@@ -112,6 +118,23 @@ final class Reader {
             warn(path, null, "is empty");
             return fallback;
         }
+        if (type instanceof Class<?> c && spec.sectionCodec(c) != null) {
+            Map<String, Object> plain;
+            if (raw instanceof ConfigurationSection section) {
+                plain = plain(section);
+            } else if (raw instanceof Map<?, ?> map) {
+                plain = plain(map);
+            } else {
+                warn(path, raw, "should be a section of settings");
+                return fallback;
+            }
+            try {
+                return spec.sectionCodec(c).decode(plain, path, warnings);
+            } catch (IllegalArgumentException e) {
+                warnings.add("%s %s; using the default.".formatted(path, e.getMessage()));
+                return fallback;
+            }
+        }
         if (type instanceof Class<?> c && spec.isSection(c)) {
             return readRecord((Class) c, raw, (Record) fallback, path);
         }
@@ -136,6 +159,37 @@ final class Reader {
             warn(path, raw, e.getMessage());
             return fallback;
         }
+    }
+
+    /** A section as plain maps, in order, with keys left empty as {@code null}. */
+    static Map<String, Object> plain(ConfigurationSection section) {
+        Map<String, Object> map = new java.util.LinkedHashMap<>();
+        for (String key : section.getKeys(false)) {
+            Object value = section.get(key);
+            if (value instanceof ConfigurationSection nested) {
+                value = plain(nested);
+            } else if (BLANK.equals(value)) {
+                value = null;
+            }
+            map.put(key, value);
+        }
+        return map;
+    }
+
+    private static Map<String, Object> plain(Map<?, ?> raw) {
+        Map<String, Object> map = new java.util.LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : raw.entrySet()) {
+            Object value = entry.getValue();
+            if (value instanceof ConfigurationSection nested) {
+                value = plain(nested);
+            } else if (value instanceof Map<?, ?> nested) {
+                value = plain(nested);
+            } else if (BLANK.equals(value)) {
+                value = null;
+            }
+            map.put(String.valueOf(entry.getKey()), value);
+        }
+        return map;
     }
 
     private Object readList(Class<?> element, Object raw, String path) {
