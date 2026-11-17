@@ -333,6 +333,21 @@ public interface Registrar {
     default void priority(String id, SyntaxPriority priority) {}
 
     /**
+     * Says expression {@code id} is several values when a plural argument of it is several values, as Skript's
+     * property expressions are: {@code names of {_players::*}} is several names. Without it, syntax Skript doesn't
+     * have is taken as one value when the script loads, so where only one value goes, a list in its argument isn't
+     * refused. Skript's parser splits a list differently by this: {@code (status of {_r} and body of {_r})}, where
+     * {@code status of} takes one response, is two values, as {@code last response of {_r} and body of {_r}} is
+     * several. Use it on an addon's property expressions that are a Skript addon's.
+     *
+     * @param id the expression's id: one this addon registered, without {@code -}
+     * @throws IllegalArgumentException if the id isn't one of this addon's elements, or is also the id of one of
+     *     NeoSkript's elements or another addon's
+     */
+    @Experimental
+    default void pluralAsArguments(String id) {}
+
+    /**
      * Has effect {@code effectId} tried before effect {@code otherId}, as Skript tries its effects in its own order:
      * {@code clear drops} is its cancel drops effect, which comes before its change effect.
      *

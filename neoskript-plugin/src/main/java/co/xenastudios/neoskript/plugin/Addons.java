@@ -162,6 +162,8 @@ final class Addons {
                     } else if (method.getName().equals("priority") && args.length == 2
                             && args[1] instanceof co.xenastudios.neoskript.api.registration.SyntaxPriority) {
                         checkOwn(addon, "priority", (String) args[0], own, taken);
+                    } else if (method.getName().equals("pluralAsArguments") && args.length == 1) {
+                        checkOwn(addon, "plurality", (String) args[0], own, taken);
                     } else if (method.getName().equals("timeout") && args.length == 2
                             && args[1] instanceof java.time.Duration) {
                         checkOwn(addon, "timeout", (String) args[0], own, taken);

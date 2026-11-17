@@ -1,0 +1,22 @@
+# Probe: how a list in brackets is split when a reading of it as one expression fails to set up, as Skript's
+# parser backs off (issues #33 and #44).
+
+function probe_splits():
+	set {_n::*} to "a" and "b"
+	set {_a::*} to 1 and 2
+	set {_b::*} to 3 and 4
+	set {_t} to "abc"
+	set {_o::*} to "x" and "y"
+	# 'indices of' wants something with indices; Skript tries the next way to split when it isn't.
+	show("indices then size", (indices of {_n::*}, size of {_n::*}))
+	show("size then indices", (size of {_n::*}, indices of {_n::*}))
+	show("indices and list", (indices of {_a::*} and {_b::*}))
+	show("indices and value", (indices of {_a::*} and 5))
+	show("indices of two lists", indices of {_a::*} and {_b::*})
+	# A property of an expression that can return anything, next to another value.
+	show("length and element", (length of {_t} and first element of {_o::*}))
+	show("size and element", (size of {_a::*} and last element of {_b::*}))
+	show("element and length", (first element of {_o::*} and length of {_t}))
+	show("lengths of a list", (length of {_t} and "de"))
+	show("recursive size then size", (recursive size of {_a::*}, size of {_b::*}))
+	show("sorted then size", (sorted {_a::*}, size of {_b::*}))

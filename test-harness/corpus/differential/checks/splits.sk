@@ -1,0 +1,14 @@
+# Checks: 'indices of' and 'recursive size of' something that isn't a list variable, where no other reading of the
+# line works, keep their errors (issue #33).
+
+on join:
+	send indices of {_x}
+	set {_i::*} to indices of {_x}
+	set {_n} to recursive size of {_x}
+	show("indices of a value", indices of player)
+	set {_j::*} to indices of {_a::*} and {_b::*}
+	set {_k::*} to (indices of {_a::*}, size of {_b::*})
+	set {_l::*} to (1, 2)
+	set {_m::*} to (size of {_a::*}, size of {_b::*})
+	set {_p::*} to size of {_a::*}, size of {_b::*}
+	show("indices or list", (indices of {_a::*} or {_b::*}))
