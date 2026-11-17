@@ -35,6 +35,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     private UpdateNotices updates;
     private Scheduler scheduler;
     private io.papermc.paper.threadedregions.scheduler.ScheduledTask saveTask;
+    private SettingsReloader settingsReloader;
 
     /** https://bstats.org/plugin/bukkit/NeoSkript/34868 */
     private static final int BSTATS_PLUGIN_ID = 34868;
@@ -171,6 +172,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             updates = UpdateNotices.start(this, getSLF4JLogger(), settings.updateChecker());
         }
         // D10: NeoSkript takes over /skript and /sk, with /neoskript and /ns as aliases.
+        // What /sk reload config compares with: the settings the server started with.
+        settingsReloader = new SettingsReloader(configFile(), settings, reloadEffects());
         getCommand("skript").setExecutor(new SkriptCommand(this, scripts));
     }
 
@@ -241,7 +244,14 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             return;
         }
         try {
-            ConfigLoader.set(NeoSkriptConfig.SPEC, configFile(), copied);
+            ConfigLoader.Change change = ConfigLoader.set(NeoSkriptConfig.SPEC, configFile(), copied);
+            change.notices().forEach(notice -> getSLF4JLogger().info(notice));
+            change.warnings().forEach(warning -> getSLF4JLogger().warn("config.yml: {}", warning));
+            if (!change.written()) {
+                getSLF4JLogger().warn("Skript's settings weren't copied to config.yml: {}. Set them there by hand.",
+                        String.join(", ", copied.keySet()));
+                return;
+            }
             accept(ConfigLoader.load(NeoSkriptConfig.SPEC, configFile()));
         } catch (ConfigException e) {
             getSLF4JLogger().error("Couldn't copy Skript's settings to config.yml: {}", e.getMessage());
@@ -266,55 +276,67 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         return updates;
     }
 
-    /**
-     * What {@code /sk reload config} found: why config.yml couldn't be read ({@code null} if it was), how many
-     * settings fell back to their defaults, and the changed settings that only apply when the server restarts.
-     */
-    record SettingsReload(String failure, int warnings, java.util.List<String> restartOnly) {}
+    /** {@code /sk reload config}. */
+    SettingsReloader.Outcome reloadSettings() {
+        return settingsReloader.reload();
+    }
 
-    /**
-     * {@code /skript reload config}: reads config.yml again and applies what can change while the server runs:
-     * the theme, the update checker, how players are named in variables, how often variables are saved, the
-     * runtime error limits and effect commands. If the file can't be read, the running settings stay.
-     */
-    SettingsReload reloadSettings() {
-        NeoSkriptConfig before = settings;
-        ConfigLoader.Result<NeoSkriptConfig> result;
-        try {
-            result = ConfigLoader.load(NeoSkriptConfig.SPEC, configFile());
-        } catch (ConfigException e) {
-            getSLF4JLogger().error("{} The running settings are kept.", e.getMessage());
-            return new SettingsReload(e.getMessage(), 0, java.util.List.of());
-        }
-        accept(result);
-        NeoSkriptConfig now = settings;
-        StandardLibrary.usePlayerUuidsInVariableNames(now.variables().playerUuidsInNames());
-        if (effectCommands != null) {
-            effectCommands.settings(EffectCommands.Settings.of(now.effectCommands()));
-        }
-        if (runtimeErrorFrames != null && !now.runtimeErrors().equals(before.runtimeErrors())) {
-            runtimeErrorFrames.run();
-            runtimeErrorFrames = RuntimeErrorConsole.start(now.runtimeErrors(), scheduler);
-        }
-        if (saveTask != null && !now.variables().saveInterval().equals(before.variables().saveInterval())) {
-            saveTask.cancel();
-            scheduleSaves();
-        }
-        if (updates != null) {
-            updates.enabled(now.updateChecker());
-            if (now.updateChecker() && !before.updateChecker()) {
-                getServer().getAsyncScheduler().runNow(this, task -> {
-                    try {
-                        updates.checkNow();
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    } catch (Exception e) {
-                        getSLF4JLogger().debug("Couldn't check Modrinth for a newer NeoSkript: {}", e.toString());
-                    }
-                });
+    /** What applying settings on {@code /sk reload config} does to the running server. */
+    private SettingsReloader.Effects reloadEffects() {
+        return new SettingsReloader.Effects() {
+            @Override
+            public void accept(ConfigLoader.Result<NeoSkriptConfig> result) {
+                NeoSkriptPlugin.this.accept(result);
             }
-        }
-        return new SettingsReload(null, result.warnings().size(), now.restartOnlyChanges(before));
+
+            @Override
+            public void playerUuids(boolean uuids) {
+                StandardLibrary.usePlayerUuidsInVariableNames(uuids);
+            }
+
+            @Override
+            public void effectCommands(EffectCommands.Settings settings) {
+                effectCommands.settings(settings);
+            }
+
+            @Override
+            public void runtimeErrors(NeoSkriptConfig.RuntimeErrors limits) {
+                runtimeErrorFrames.run();
+                runtimeErrorFrames = RuntimeErrorConsole.start(limits, scheduler);
+            }
+
+            @Override
+            public void saveInterval(NeoSkriptConfig.Interval interval) {
+                if (saveTask != null) {
+                    saveTask.cancel();
+                    scheduleSaves();
+                }
+            }
+
+            @Override
+            public void updateChecker(boolean enabled, boolean turnedOn) {
+                if (updates == null) {
+                    return;
+                }
+                updates.enabled(enabled);
+                if (turnedOn) {
+                    getServer().getAsyncScheduler().runNow(NeoSkriptPlugin.this, task -> {
+                        try {
+                            updates.checkNow();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        } catch (Exception e) {
+                            getSLF4JLogger().debug("Couldn't check Modrinth for a newer NeoSkript: {}", e.toString());
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void failed(String message) {
+                getSLF4JLogger().error("{} The running settings are kept.", message);
+            }
+        };
     }
 
     /** The priority triggers listen to events at, {@code high} by default as in Skript. */

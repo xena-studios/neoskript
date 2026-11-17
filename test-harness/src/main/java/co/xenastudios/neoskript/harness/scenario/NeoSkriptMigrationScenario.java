@@ -58,11 +58,11 @@ public final class NeoSkriptMigrationScenario implements Scenario {
                 throw new HarnessFailure("NeoSkript logged errors. See " + server.logFile());
             }
             String config = Files.readString(builder.runDir().resolve("plugins/NeoSkript/config.yml"));
-            for (String setting : new String[] {"\n  enabled: true\n", "\n  token: \"?\"\n",
-                    "\n  player-uuids-in-names: false\n", "\nconfig-version: "}) {
-                if (!config.contains(setting)) {
-                    throw new HarnessFailure("config.yml doesn't have" + setting.stripTrailing() + " from Skript's config.sk:\n"
-                            + config);
+            // The token in either quotes: a current file is changed through Bukkit, which keeps its comments.
+            for (String setting : new String[] {"^  enabled: true$", "^  token: [\"']\\?[\"']$",
+                    "^  player-uuids-in-names: false$", "^config-version: 2$"}) {
+                if (!Pattern.compile(setting, Pattern.MULTILINE).matcher(config).find()) {
+                    throw new HarnessFailure("config.yml doesn't have " + setting + " from Skript's config.sk:\n" + config);
                 }
             }
             if (!Files.exists(builder.runDir().resolve("plugins/Skript/scripts/hello.sk"))) {

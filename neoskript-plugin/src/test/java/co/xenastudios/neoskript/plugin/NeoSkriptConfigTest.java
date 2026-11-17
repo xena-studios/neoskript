@@ -10,7 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import co.xenastudios.neoskript.plugin.config.ConfigException;
+import co.xenastudios.neoskript.plugin.config.AllowBlank;
 import co.xenastudios.neoskript.plugin.config.ConfigLoader;
+import co.xenastudios.neoskript.plugin.config.ConfigSpec;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -197,13 +199,235 @@ class NeoSkriptConfigTest {
     }
 
     @Test
-    void setsCopiedSettingsInTheCurrentLayout() throws Exception {
+    void setsCopiedSettings() throws Exception {
         load();
         ConfigLoader.set(NeoSkriptConfig.SPEC, file(), Map.of("effect-commands.enabled", true, "effect-commands.token", "?"));
         ConfigLoader.Result<NeoSkriptConfig> result = load();
         assertEquals(new NeoSkriptConfig.EffectCommands(true, "?", false, false), result.config().effectCommands());
         assertEquals(List.of(), result.notices());
-        assertTrue(Files.readString(file()).contains("  token: \"?\"\n"));
+        assertEquals(List.of(), result.warnings());
+    }
+
+    // --- Files that can't be written: their settings are used as read ---
+
+    /** Runs {@code body} with the folder read-only, as a read-only mount is. */
+    private void readOnly(ThrowingRunnable body) throws Exception {
+        assertTrue(folder.toFile().setWritable(false));
+        try {
+            body.run();
+        } finally {
+            folder.toFile().setWritable(true);
+        }
+    }
+
+    @FunctionalInterface
+    private interface ThrowingRunnable {
+        void run() throws Exception;
+    }
+
+    @Test
+    void aVersion1FileThatCannotBeWrittenKeepsItsSettings() throws Exception {
+        String old = version1()
+                .replace("player-uuids-in-names: true", "player-uuids-in-names: false")
+                .replace("file: variables.csv", "file: data/vars.csv")
+                .replace("enabled: false", "enabled: true");
+        Files.writeString(file(), old);
+        readOnly(() -> {
+            ConfigLoader.Result<NeoSkriptConfig> result = load();
+            assertFalse(result.config().variables().playerUuidsInNames());
+            assertEquals("data/vars.csv", result.config().variables().file());
+            assertTrue(result.config().effectCommands().enabled());
+            assertEquals(1, result.warnings().size(), result.warnings().toString());
+            assertTrue(result.warnings().getFirst().startsWith("Couldn't update config.yml: "), result.warnings().toString());
+            assertTrue(result.warnings().getFirst().endsWith("; using its settings as read."), result.warnings().toString());
+        });
+        assertEquals(old, Files.readString(file()));
+        assertFalse(Files.exists(folder.resolve("config.yml.bak-v1")));
+    }
+
+    @Test
+    void aCurrentFileMissingASettingThatCannotBeWrittenKeepsItsSettings() throws Exception {
+        load();
+        String text = Files.readString(file()).replace("metrics: true", "metrics: false")
+                .replaceAll("(?s)\neffect-commands:.*", "\n");
+        Files.writeString(file(), text);
+        readOnly(() -> {
+            ConfigLoader.Result<NeoSkriptConfig> result = load();
+            assertFalse(result.config().metrics());
+            assertEquals(NeoSkriptConfig.DEFAULTS.effectCommands(), result.config().effectCommands());
+            assertEquals(List.of(), result.notices());
+            assertTrue(result.warnings().getFirst().startsWith("Couldn't update config.yml: "));
+        });
+        assertEquals(text, Files.readString(file()));
+    }
+
+    @Test
+    void noFileAndNoWayToWriteOneRunsOnTheDefaults() throws Exception {
+        readOnly(() -> {
+            ConfigLoader.Result<NeoSkriptConfig> result = load();
+            assertEquals(NeoSkriptConfig.DEFAULTS, result.config());
+            assertTrue(result.warnings().getFirst().startsWith("Couldn't write the default config.yml: "));
+        });
+        assertFalse(Files.exists(file()));
+    }
+
+    // --- Versions ---
+
+    @Test
+    void aFileFromANewerNeoSkriptIsNeverWritten() throws Exception {
+        String newer = "# Mine.\nconfig-version: 3\nmetrics: false\nsomething-new: 4\n";
+        Files.writeString(file(), newer);
+        ConfigLoader.Result<NeoSkriptConfig> result = load();
+        assertFalse(result.config().metrics());
+        assertTrue(result.warnings().getFirst().startsWith("config.yml is from a newer NeoSkript (config version 3;"));
+        assertEquals(newer, Files.readString(file()));
+
+        ConfigLoader.Change change = ConfigLoader.set(NeoSkriptConfig.SPEC, file(), Map.of("effect-commands.enabled", true));
+        assertFalse(change.written());
+        assertTrue(change.warnings().getFirst().contains("so it's left as it is, without effect-commands.enabled."));
+        assertEquals(newer, Files.readString(file()));
+        assertEquals(List.of("config.yml"), names());
+    }
+
+    private List<String> names() throws IOException {
+        try (var files = Files.list(folder)) {
+            return files.map(path -> path.getFileName().toString()).sorted().toList();
+        }
+    }
+
+    @Test
+    void aCurrentFileWithoutConfigVersionIsNotCarriedForward() throws Exception {
+        load();
+        String text = Files.readString(file())
+                .replaceFirst("# Managed by NeoSkript.*\nconfig-version: 2\n", "")
+                .replace("metrics: true\n", "# Mine.\nmetrics: false\nmine: 1\n");
+        Files.writeString(file(), text);
+        ConfigLoader.Result<NeoSkriptConfig> result = load();
+        assertEquals(0, result.carriedFrom());
+        assertFalse(result.config().metrics());
+        assertEquals(List.of("config.yml"), names());
+        String after = Files.readString(file());
+        assertTrue(after.contains("config-version: 2\n"), after);
+        assertTrue(after.contains("# Mine.\nmetrics: false\nmine: 1\n"), after);
+    }
+
+    // --- Keys that aren't settings ---
+
+    @Test
+    void carryingForwardKeepsKeysThatAreNotSettings() throws Exception {
+        String old = version1()
+                .replace("  file: variables.csv\n", "  file: variables.csv\n  # A newer NeoSkript's.\n  storage: native\n")
+                + "\n# Mine.\ncustom: [a, b]\nnested:\n  deeper:\n    value: 1\nlists:\n- [1, 2]\n- {x: y}\n";
+        Files.writeString(file(), old);
+        ConfigLoader.Result<NeoSkriptConfig> result = load();
+        assertEquals("Kept variables.storage, custom, nested, lists, which aren't NeoSkript's, as they were. Comments on"
+                + " NeoSkript's settings are its own now; yours are in config.yml.bak-v1.", result.notices().getLast());
+        String text = Files.readString(file());
+        assertTrue(text.contains("  player-uuids-in-names: true\n  # A newer NeoSkript's.\n  storage: \"native\"\n"), text);
+        assertTrue(text.contains("# Mine.\ncustom: [\"a\", \"b\"]\n"), text);
+        assertTrue(text.contains("nested:\n  deeper:\n    value: 1\n"), text);
+
+        // Read back, the keys are all there, and nothing changes.
+        org.bukkit.configuration.file.YamlConfiguration yaml =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file().toFile());
+        assertEquals("native", yaml.getString("variables.storage"));
+        assertEquals(List.of("a", "b"), yaml.getStringList("custom"));
+        assertEquals(1, yaml.getInt("nested.deeper.value"));
+        assertEquals(List.of(List.of(1, 2), Map.of("x", "y")), yaml.getList("lists"));
+        ConfigLoader.Result<NeoSkriptConfig> again = load();
+        assertEquals(List.of(), again.notices());
+        assertEquals(text, Files.readString(file()));
+    }
+
+    // --- Empty settings ---
+
+    @Test
+    void onlyThePrefixMayBeLeftEmpty() throws Exception {
+        load();
+        Files.writeString(file(), Files.readString(file())
+                .replace("  file: \"variables.csv\"", "  file:")
+                .replace("  token: \"!\"", "  token: \"\"")
+                .replace("  base: \"<gray>\"", "  base:"));
+        ConfigLoader.Result<NeoSkriptConfig> result = load();
+        assertEquals("variables.csv", result.config().variables().file());
+        assertEquals("!", result.config().effectCommands().token());
+        assertEquals(NeoSkriptConfig.DEFAULTS.theme().base(), result.config().theme().base());
+        assertEquals(List.of(
+                "theme.base is empty; quote values that start with #; using the default.",
+                "variables.file is empty; quote values that start with #; using the default.",
+                "effect-commands.token (\"\") is empty; using the default."), result.warnings());
+    }
+
+    @Test
+    void anEmptyFileIsNotCarriedForward() throws Exception {
+        Files.writeString(file(), version1().replace("  file: variables.csv", "  file:"));
+        ConfigLoader.Result<NeoSkriptConfig> result = load();
+        assertEquals("variables.csv", result.config().variables().file());
+        assertTrue(Files.readString(file()).contains("  file: \"variables.csv\"\n"));
+    }
+
+    @Test
+    void anEmptySettingIsFoundAfterAMigrationMovesIt() throws Exception {
+        // Version 1 called the setting "name"; version 2 calls it "title", which may be empty.
+        ConfigSpec<Renamed> spec = ConfigSpec.builder(Renamed.class, new Renamed("Untitled", 1))
+                .version(2)
+                .unversioned(1)
+                .migrate(1, root -> {
+                    if (root.contains("name")) {
+                        root.set("title", root.get("name"));
+                        root.set("name", null);
+                    }
+                })
+                .build();
+        Files.writeString(file(), "name:\ncount: 3\n");
+        ConfigLoader.Result<Renamed> result = ConfigLoader.load(spec, file());
+        assertEquals(new Renamed("", 3), result.config());
+        assertEquals(List.of(), result.warnings());
+        assertTrue(Files.readString(file()).contains("title: \"\"\n"), Files.readString(file()));
+    }
+
+    public record Renamed(@AllowBlank String title, int count) {}
+
+    // --- Setting values copied from Skript ---
+
+    @Test
+    void settingValuesInACurrentFileKeepsItsCommentsAndOtherKeys() throws Exception {
+        load();
+        Files.writeString(file(), Files.readString(file()).replace("metrics: true\n", "# Mine.\nmetrics: true\nmine: 1\n"));
+        ConfigLoader.Change change = ConfigLoader.set(NeoSkriptConfig.SPEC, file(), Map.of("effect-commands.enabled", true));
+        assertTrue(change.written());
+        String text = Files.readString(file());
+        assertTrue(text.contains("# Mine.\nmetrics: true\nmine: 1\n"), text);
+        assertTrue(load().config().effectCommands().enabled());
+        assertEquals(List.of("config.yml"), names());
+    }
+
+    @Test
+    void settingValuesInAnOldFileBacksItUpFirst() throws Exception {
+        Files.writeString(file(), version1() + "mine: 1\n");
+        ConfigLoader.Change change = ConfigLoader.set(NeoSkriptConfig.SPEC, file(), Map.of("effect-commands.token", "?"));
+        assertTrue(change.written());
+        assertTrue(Files.exists(folder.resolve("config.yml.bak-v1")));
+        assertEquals("?", load().config().effectCommands().token());
+        assertTrue(Files.readString(file()).contains("\nmine: 1\n"));
+    }
+
+    // --- What changed meaning, on purpose ---
+
+    @Test
+    void aQuotedFalseTurnsMetricsOff() throws Exception {
+        // Bukkit's getBoolean read "false" in quotes as not a boolean, so as the default: on.
+        Files.writeString(file(), version1().replace("metrics: true", "metrics: \"false\""));
+        assertFalse(load().config().metrics());
+    }
+
+    @Test
+    void negativeErrorLimitsFallBackToTheDefaults() throws Exception {
+        Files.writeString(file(), version1().replace("error-timeout-length: 10", "error-timeout-length: -5"));
+        ConfigLoader.Result<NeoSkriptConfig> result = load();
+        assertEquals(10, result.config().runtimeErrors().errorTimeoutLength());
+        assertEquals(List.of("runtime-errors.error-timeout-length (\"-5\") must be at least 0; using the default."),
+                result.warnings());
     }
 
     @Test

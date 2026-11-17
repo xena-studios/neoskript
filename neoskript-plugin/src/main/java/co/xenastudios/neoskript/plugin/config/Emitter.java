@@ -16,7 +16,9 @@ import org.bukkit.configuration.ConfigurationSection;
  * its own line.)
  *
  * <p>Given an existing file, it writes that file's values in the current layout: what the owner set is kept,
- * even a value that isn't valid (it's warned about when read), and what's missing gets its default.
+ * even a value that isn't valid (it's warned about when read), and what's missing gets its default. Keys that
+ * aren't settings, such as one a newer NeoSkript added, are kept as they were, with their comments, at the end
+ * of the section they were in.
  */
 final class Emitter {
 
@@ -83,6 +85,74 @@ final class Emitter {
             String text = raw == null ? (blanks.contains(at) ? "\"\"" : null) : raw(raw);
             indent(depth).append(key(key)).append(": ").append(text != null ? text : scalarOrList(child)).append('\n');
         }
+        if (existing == null) {
+            return;
+        }
+        java.util.Set<String> known = new java.util.HashSet<>();
+        for (RecordComponent component : value.getClass().getRecordComponents()) {
+            known.add(Names.key(component));
+        }
+        for (String key : existing.getKeys(false)) {
+            if (!known.contains(key) && !(depth == 0 && key.equals(Writer.VERSION_KEY))) {
+                if (depth == 0) {
+                    out.append('\n');
+                }
+                unknown(existing, key, depth);
+            }
+        }
+    }
+
+    /** A key that isn't a setting, with its comments, as it was. */
+    private void unknown(ConfigurationSection parent, String key, int depth) {
+        for (String line : parent.getComments(key)) {
+            if (line == null) {
+                out.append('\n');
+            } else {
+                comment(depth, line.strip());
+            }
+        }
+        Object value = parent.get(key);
+        if (value instanceof ConfigurationSection section) {
+            indent(depth).append(key(key)).append(":\n");
+            for (String child : section.getKeys(false)) {
+                unknown(section, child, depth + 1);
+            }
+            return;
+        }
+        String text = value == null ? null : raw(value);
+        if (text != null) {
+            indent(depth).append(key(key)).append(": ").append(text).append('\n');
+            return;
+        }
+        // A list of lists or of maps: as YAML writes it, under the key.
+        org.yaml.snakeyaml.DumperOptions options = new org.yaml.snakeyaml.DumperOptions();
+        options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
+        options.setIndent(2);
+        String dumped = new org.yaml.snakeyaml.Yaml(options).dump(plain(value));
+        indent(depth).append(key(key)).append(":\n");
+        for (String line : dumped.split("\n")) {
+            indent(depth + 1).append(line).append('\n');
+        }
+    }
+
+    /** {@code value} with Bukkit's sections as plain maps, for SnakeYAML. */
+    private static Object plain(Object value) {
+        if (value instanceof ConfigurationSection section) {
+            java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
+            for (String key : section.getKeys(false)) {
+                map.put(key, plain(section.get(key)));
+            }
+            return map;
+        }
+        if (value instanceof java.util.Map<?, ?> map) {
+            java.util.Map<Object, Object> copy = new java.util.LinkedHashMap<>();
+            map.forEach((k, v) -> copy.put(k, plain(v)));
+            return copy;
+        }
+        if (value instanceof List<?> list) {
+            return list.stream().map(Emitter::plain).toList();
+        }
+        return value;
     }
 
     /** An owner's value as written, or {@code null} if it isn't one value or a list of them. */

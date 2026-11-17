@@ -30,6 +30,7 @@ public final class ConfigSpec<C extends Record> {
     final C defaults;
     final int version;
     final int unversioned;
+    final List<String> currentKeys;
     final List<String> header;
     final TreeMap<Integer, Migration> migrations;
     final Map<Class<?>, Codec<?>> codecs;
@@ -39,6 +40,7 @@ public final class ConfigSpec<C extends Record> {
         this.defaults = builder.defaults;
         this.version = builder.version;
         this.unversioned = builder.unversioned;
+        this.currentKeys = List.copyOf(builder.currentKeys);
         this.header = List.copyOf(builder.header);
         this.migrations = new TreeMap<>(builder.migrations);
         this.codecs = Map.copyOf(builder.codecs);
@@ -103,6 +105,7 @@ public final class ConfigSpec<C extends Record> {
         private final C defaults;
         private int version = 1;
         private int unversioned;
+        private final List<String> currentKeys = new ArrayList<>();
         private final List<String> header = new ArrayList<>();
         private final Map<Integer, Migration> migrations = new HashMap<>();
         private final Map<Class<?>, Codec<?>> codecs = new HashMap<>();
@@ -130,6 +133,16 @@ public final class ConfigSpec<C extends Record> {
          */
         public Builder<C> unversioned(int version) {
             this.unversioned = version;
+            return this;
+        }
+
+        /**
+         * Keys only the current version has, such as a new section. A file without {@code config-version} that has
+         * one is taken as current, not as the {@linkplain #unversioned unversioned} version, so it isn't carried
+         * forward again.
+         */
+        public Builder<C> currentWith(String... keys) {
+            currentKeys.addAll(List.of(keys));
             return this;
         }
 

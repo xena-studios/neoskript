@@ -25,18 +25,25 @@ final class Reader {
     /** A setting the file doesn't have, to add with its default. */
     record Missing(ConfigurationSection parent, String key, RecordComponent component, Object value) {}
 
+    /**
+     * What stands for a key with nothing after it in {@link #blankTree}. Bukkit drops such keys, so this is how
+     * "prefix:" (meaning blank) is told apart from a setting that isn't there.
+     */
+    static final String BLANK = "\u0000blank";
+
     private final ConfigSpec<?> spec;
-    // The file as SnakeYAML read it. Bukkit drops keys with no value, so this is how "prefix:" (meaning
-    // blank) is told apart from a setting that isn't there.
-    private final Object rawRoot;
+    // The file with BLANK for keys with no value, migrated as the file is.
+    private final ConfigurationSection blankTree;
     final List<String> warnings = new ArrayList<>();
     final List<Missing> missing = new ArrayList<>();
-    /** The paths of text settings left empty. */
+    /** The paths of text settings left empty that may be. */
     final Set<String> blanks = new LinkedHashSet<>();
+    /** The paths of keys that aren't settings, in the order they're found. */
+    final List<String> unknown = new ArrayList<>();
 
-    Reader(ConfigSpec<?> spec, Object rawRoot) {
+    Reader(ConfigSpec<?> spec, ConfigurationSection blankTree) {
         this.spec = spec;
-        this.rawRoot = rawRoot;
+        this.blankTree = blankTree;
     }
 
     <R extends Record> R readRoot(Class<R> type, ConfigurationSection root, R defaults) {
@@ -58,7 +65,7 @@ final class Reader {
             Object defaultValue = get(component, fallback);
             if (!section.contains(key)) {
                 boolean empty = isBlank(join(path, key));
-                if (empty && component.getType() == String.class) {
+                if (empty && component.getType() == String.class && component.isAnnotationPresent(AllowBlank.class)) {
                     values[i] = "";
                     blanks.add(join(path, key));
                     continue;
@@ -66,13 +73,22 @@ final class Reader {
                 values[i] = defaultValue;
                 if (empty) {
                     // Often a colour like "highlight: #FF4D9D", which YAML reads as a comment.
-                    warn(join(path, key), null, "is empty; write \"\" for none, and quote values that start with #");
+                    warn(join(path, key), null, "is empty; quote values that start with #");
                     continue;
                 }
                 missing.add(new Missing(section, key, component, defaultValue));
                 continue;
             }
             values[i] = read(component.getGenericType(), component, section.get(key), defaultValue, join(path, key));
+        }
+        Set<String> known = new java.util.HashSet<>();
+        for (RecordComponent component : components) {
+            known.add(Names.key(component));
+        }
+        for (String key : section.getKeys(false)) {
+            if (!known.contains(key) && !(path.isEmpty() && key.equals(Writer.VERSION_KEY))) {
+                unknown.add(join(path, key));
+            }
         }
         try {
             return type.getDeclaredConstructor(types).newInstance(values);
@@ -102,6 +118,10 @@ final class Reader {
         }
         try {
             Object value = scalar((Class<?>) type, raw);
+            if (value instanceof String text && text.isEmpty() && (component == null
+                    || !component.isAnnotationPresent(AllowBlank.class))) {
+                throw new IllegalArgumentException("is empty");
+            }
             Range range = component == null ? null : component.getAnnotation(Range.class);
             if (range != null && value instanceof Number number) {
                 double d = number.doubleValue();
@@ -216,18 +236,7 @@ final class Reader {
 
     /** Whether the file has this key with nothing after it. */
     private boolean isBlank(String path) {
-        Object node = rawRoot;
-        String[] keys = path.split("\\.");
-        for (int i = 0; i < keys.length; i++) {
-            if (!(node instanceof Map<?, ?> map) || !map.containsKey(keys[i])) {
-                return false;
-            }
-            node = map.get(keys[i]);
-            if (i == keys.length - 1) {
-                return node == null;
-            }
-        }
-        return false;
+        return blankTree != null && BLANK.equals(blankTree.get(path));
     }
 
     private static Object get(RecordComponent component, Record from) {

@@ -60,6 +60,8 @@ public record NeoSkriptConfig(
                     "restart. A bad value falls back to its default, with a warning in the console.")
             .version(VERSION)
             .unversioned(1)
+            // A file with a theme is current even without config-version, such as one an owner wrote by hand.
+            .currentWith("theme")
             // Version 1 had the same settings, without the theme, which loading adds with its defaults.
             .migrate(1, root -> {})
             .codec(TextStyle.class, TextStyle.CODEC)
@@ -184,8 +186,12 @@ public record NeoSkriptConfig(
         }
     }
 
-    /** The settings that changed from {@code before} to this config that only apply when the server restarts. */
-    List<String> restartOnlyChanges(NeoSkriptConfig before) {
+    /**
+     * The settings that only apply when the server restarts and that differ from {@code running}, the settings the
+     * server started with.
+     */
+    List<String> restartOnlyChanges(NeoSkriptConfig running) {
+        NeoSkriptConfig before = running;
         List<String> changed = new ArrayList<>();
         if (metrics != before.metrics) {
             changed.add("metrics");

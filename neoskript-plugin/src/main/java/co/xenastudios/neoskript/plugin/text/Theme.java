@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.plugin.text;
 
+import co.xenastudios.neoskript.plugin.config.AllowBlank;
 import co.xenastudios.neoskript.plugin.config.Comment;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.Style;
@@ -20,7 +21,7 @@ public record Theme(
         @Comment({
             "<prefix> starts NeoSkript's messages, such as \"<dark_gray>[<#FF4D9D>MyServer</#FF4D9D>]</dark_gray> \",",
             "or blank for none."})
-        String prefix,
+        @AllowBlank String prefix,
         @Comment("The colour of message text that has no tag of its own.") TextStyle base,
         @Comment("<highlight>: names and values, such as a script or a number.") TextStyle highlight,
         @Comment("<success>: something done, such as a script reloaded.") TextStyle success,

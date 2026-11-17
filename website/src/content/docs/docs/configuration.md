@@ -3,7 +3,7 @@ title: Configuration
 description: Every setting in NeoSkript's config.yml, and how to make its messages look like your server.
 ---
 
-The config is `plugins/NeoSkript/config.yml`, written on the first start with a comment on every setting. Apply changes with `/sk reload config`. A setting that isn't valid falls back to its default, and the console says which and why. A file that isn't valid YAML is never overwritten: on a reload the running settings stay, and at startup NeoSkript runs on the defaults until it's fixed.
+The config is `plugins/NeoSkript/config.yml`, written on the first start with a comment on every setting. Apply changes with `/sk reload config`. A setting that isn't valid falls back to its default, and the console says which and why. A file that isn't valid YAML is never overwritten: on a reload the running settings stay, and at startup NeoSkript runs on the defaults until it's fixed. A file NeoSkript can read but not write, such as a read-only mount, is used as it is; the console says what it couldn't add.
 
 ## Make it look like your server
 
@@ -18,7 +18,7 @@ theme:
   error: "<#FF6B6B>"        # something went wrong
 ```
 
-Styles are [MiniMessage](https://docs.advntr.dev/minimessage/format) tags, such as `<gray>`, `<#FF4D9D>` or `<gold><bold>`. Quote a colour that starts with `#`. The prefix can be anything, gradients too, or `""` for none.
+Styles are [MiniMessage](https://docs.advntr.dev/minimessage/format) tags, such as `<gray>`, `<#FF4D9D>` or `<gold><bold>`. Quote a colour that starts with `#`. The prefix can be anything, gradients too, or `""` for none. It's the only setting that may be empty; any other left empty falls back to its default.
 
 Script problems at startup and runtime errors keep Skript's look, since tools and guides read them.
 
@@ -36,7 +36,7 @@ The first start copies Skript's settings for effect commands and `use player UUI
 
 ## Updating NeoSkript
 
-When a new version adds settings, NeoSkript adds them with their defaults and says so in the console. When the layout changes, `config-version` goes up: the old file is backed up as `config.yml.bak-v<version>`, and the new one keeps every value you set. Files from before NeoSkript had a theme are version 1.
+When a new version adds settings, NeoSkript adds them with their defaults and says so in the console. When the layout changes, `config-version` goes up: the old file is backed up as `config.yml.bak-v<version>`, and the new one keeps every value you set, and any keys that aren't NeoSkript's settings. Your comments on NeoSkript's settings are replaced by its own; the backup has them. Files without `config-version` or a `theme` are version 1. A file from a newer NeoSkript is never written.
 
 ## The full default config
 

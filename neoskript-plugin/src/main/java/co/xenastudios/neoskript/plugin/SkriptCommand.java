@@ -293,7 +293,7 @@ final class SkriptCommand implements TabExecutor {
 
     /** Reloads config.yml and tells the recipients what went wrong, if anything. Returns whether it was read. */
     private boolean reloadConfig(List<CommandSender> recipients) {
-        NeoSkriptPlugin.SettingsReload result = plugin.reloadSettings();
+        SettingsReloader.Outcome result = plugin.reloadSettings();
         if (result.failure() != null) {
             send(recipients, Messages.CONFIG_FAILED, text("reason", result.failure()));
             return false;
