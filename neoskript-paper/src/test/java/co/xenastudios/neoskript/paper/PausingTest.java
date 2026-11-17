@@ -615,6 +615,11 @@ class PausingTest {
                 ends.add("end");
                 return stage();
             }
+
+            @Override
+            public void abandoned(co.xenastudios.neoskript.api.element.TriggerContext context) {
+                ends.add("abandoned");
+            }
         }, "tx %text%");
         library.timeout("TestSecTx", Duration.ofSeconds(5));
     }
@@ -726,5 +731,78 @@ class PausingTest {
                 \tbatch {_rows::*}
                 """);
         assertEquals(List.of("1::1,1::2,2::1,2::2,3 = Steve, 100, Alex, 250 and lone"), said);
+    }
+
+    @Test
+    void aPausingSectionLeftAnotherWayIsToldAtOnce() {
+        sections();
+        library.effect("TestEffBoom", info -> (context, args) -> {
+            throw new IllegalStateException("boom");
+        }, "boom");
+        run("""
+                on load:
+                \ttx "stop":
+                \t\tsay "in"
+                \t\tstop
+                """);
+        stages.get(0).complete(null);
+        tick();
+        assertEquals(List.of("in"), said);
+        assertEquals(List.of("abandoned"), ends, "stop skips the end and tells the section");
+        assertEquals(0, co.xenastudios.neoskript.runtime.PausingSections.open());
+    }
+
+    @Test
+    void exitSectionEndsAPausingSectionAsItsEndDoes() {
+        sections();
+        run("""
+                on load:
+                \ttx "a":
+                \t\texit section
+                \t\tsay "never"
+                \tsay "after"
+                \tloop 2 times:
+                \t\ttx "b":
+                \t\t\tcontinue
+                \tsay "done"
+                """);
+        stages.get(0).complete(null);
+        tick();
+        assertEquals(List.of("end"), ends);
+        stages.get(1).complete(null);
+        tick();
+        assertEquals(List.of("after"), said);
+        stages.get(2).complete(null);
+        tick();
+        stages.get(3).complete(null);
+        tick();
+        assertEquals(List.of("end", "abandoned", "abandoned"), ends, "continue past it abandons it");
+        assertEquals(List.of("after", "done"), said);
+        assertEquals(0, co.xenastudios.neoskript.runtime.PausingSections.open());
+        assertEquals(0, Pauses.pending());
+    }
+
+    @Test
+    void aPausingSectionIsntAConditional() {
+        sections();
+        CompiledScripts compiled = compile("""
+                on load:
+                \ttx "a":
+                \t\texit 1 conditional
+                """);
+        assertEquals(List.of("Can't stop any conditionals as there are no conditionals present"),
+                errors(compiled.diagnostics()));
+    }
+
+    @Test
+    void aPausingExpressionNeverGivesASentinel() {
+        library.pausingExpression("TestExprSentinel", "object", info -> (context, args) ->
+                CompletableFuture.completedFuture(PausingEffect.UNCHANGED), "sentinel");
+        run("""
+                on load:
+                \tset {_v} to sentinel
+                \tsay "v is %{_v}%"
+                """);
+        assertEquals(List.of("v is <none>"), said);
     }
 }
