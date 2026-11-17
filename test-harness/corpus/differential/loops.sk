@@ -37,3 +37,22 @@ function probe_loops():
 		show("nested list", loop-index)
 	loop indices of {_l::*}:
 		show("indices", loop-value)
+	set {_t} to 3
+	loop {_t} times:
+		set {_t} to 10
+		show("times read once", loop-value)
+	loop 2.5 times:
+		show("fractional times", loop-number)
+	loop (10 - 1.05 / 0.15) times:
+		show("epsilon times", loop-counter)
+	set {_neg} to -2
+	loop {_neg} times:
+		show("negative times", "never")
+	loop 3 times:
+		show("peek times", "%loop-value% %next loop-value ? -1% %previous loop-value ? -1%")
+	loop 1000000000 times:
+		if loop-value is 2:
+			exit loop
+		show("huge times", loop-value)
+	loop thrice:
+		show("thrice", loop-iteration)

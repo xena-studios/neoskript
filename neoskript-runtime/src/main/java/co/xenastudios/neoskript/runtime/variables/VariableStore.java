@@ -183,17 +183,63 @@ public final class VariableStore {
             return byIndex.isEmpty();
         }
 
+        /**
+         * Skript's next open index ({@code IndexTrackingTreeMap.nextOpenIndex}): the smallest positive integer that
+         * isn't an index here, where {@code add} puts a value. 0 until it's first needed. With the owner's lock held.
+         */
+        private int nextOpen;
+
         /** Adds {@code node} at {@code key}, which it doesn't have yet. With the owner's lock held. */
         void addChild(String key, Node node) {
             super.put(key, node);
             byIndex.put(fold(key), node);
+            if (nextOpen != 0 && positiveIndex(key) == nextOpen) {
+                do {
+                    nextOpen++;
+                } while (byIndex.containsKey(Integer.toString(nextOpen)));
+            }
         }
 
         /** Takes {@code node} out, if it's the one at {@code key}. With the owner's lock held. */
         void removeChild(String key, Node node) {
             if (byIndex.remove(fold(key), node)) {
                 super.remove(key, node);
+                int index = positiveIndex(key);
+                if (nextOpen != 0 && index > 0 && index < nextOpen) {
+                    nextOpen = index;
+                }
             }
+        }
+
+        /** The index {@code add} puts its next value at. With the owner's lock held. */
+        int nextOpen() {
+            if (nextOpen == 0) {
+                int index = 1;
+                while (byIndex.containsKey(Integer.toString(index))) {
+                    index++;
+                }
+                nextOpen = index;
+            }
+            return nextOpen;
+        }
+
+        /**
+         * {@code key} as a positive integer, as Skript counts one: digits only, no leading zero, and no more than
+         * {@link Integer#MAX_VALUE}. Else -1.
+         */
+        static int positiveIndex(String key) {
+            if (key.isEmpty() || key.charAt(0) == '0' || key.length() > 10) {
+                return -1;
+            }
+            long value = 0;
+            for (int i = 0; i < key.length(); i++) {
+                char c = key.charAt(i);
+                if (c < '0' || c > '9') {
+                    return -1;
+                }
+                value = value * 10 + (c - '0');
+            }
+            return value > Integer.MAX_VALUE ? -1 : (int) value;
         }
 
         /** With the owner's lock held. */
@@ -201,6 +247,7 @@ public final class VariableStore {
         public void clear() {
             super.clear();
             byIndex.clear();
+            nextOpen = 1;
         }
 
         @Override
@@ -853,7 +900,10 @@ public final class VariableStore {
         return new KeyedValues(values.toArray(), keys.toArray(String[]::new));
     }
 
-    /** Adds {@code values} to {@code {prefix::*}}, each at the lowest free index from the list's size + 1. */
+    /**
+     * Adds {@code values} to {@code {prefix::*}}, each at the smallest positive integer index the list doesn't have,
+     * as Skript 2.17 adds (its {@code IndexTrackingTreeMap}): after deleting {@code {x::1}}, the next is added there.
+     */
     public void addToList(String prefix, Object[] values) {
         changed();
         if (!hasValue(values)) {
@@ -865,23 +915,13 @@ public final class VariableStore {
                 if (node.dead()) {
                     continue;
                 }
-                Children children = node.children;
-                int index = children == null ? 1 : children.size() + 1;
                 for (Object value : values) {
                     if (value == null) {
                         continue;
                     }
-                    String key = Integer.toString(index);
-                    Node slot = children == null ? null : children.get(key);
-                    while (slot != null && slot.value.get() != null) {
-                        key = Integer.toString(++index);
-                        slot = children.get(key);
-                    }
-                    if (slot == null) {
-                        slot = node.lockedChild(key);
-                        children = node.children;
-                    }
-                    slot.value.set(Values.copy(value));
+                    Children children = node.children;
+                    int index = children == null ? 1 : children.nextOpen();
+                    node.lockedChild(Integer.toString(index)).value.set(Values.copy(value));
                 }
                 return;
             }

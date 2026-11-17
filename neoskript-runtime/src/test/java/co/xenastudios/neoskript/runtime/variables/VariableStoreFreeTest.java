@@ -106,8 +106,11 @@ class VariableStoreFreeTest {
         // As Skript's next open index: 3 is free again.
         assertArrayEquals(new String[] {"1", "2", "3"}, store.indices("l"));
         store.set("l::1", null);
-        store.addToList("l", new Object[] {"e"});
-        assertArrayEquals(new Object[] {"b", "d", "e"}, store.list("l"));
+        store.addToList("l", new Object[] {"e", "f"});
+        // The lowest free index first, then the next free one.
+        assertArrayEquals(new Object[] {"e", "b", "d", "f"}, store.list("l"));
+        assertArrayEquals(new String[] {"1", "2", "3", "4"}, store.indices("l"));
+        store.set("l::4", null);
         store.removeFromList("l", new Object[] {"b", "d", "e"}, true);
         assertEquals(0, store.nodes());
         store.setList("l", new Object[] {"x", new Object[] {null}, "y"});
@@ -126,21 +129,19 @@ class VariableStoreFreeTest {
     }
 
     @Test
-    void loopingASnapshotWhileDeletingSeesWhatWasThere() {
+    void loopingWhileDeletingSeesWhatWasThere() {
         VariableStore store = new VariableStore();
         store.setList("l", new Object[] {"a", "b", "c"});
+        // As Skript 2.17's loop (Variable.keyedIterator): the values are taken when the loop starts, so what's
+        // deleted inside it is still looped.
         KeyedValues looped = store.keyedList("l");
         List<Object> seen = new ArrayList<>();
         for (int i = 0; i < looped.keys().length; i++) {
-            seen.add(store.get("l::" + looped.keys()[i]));
+            seen.add(looped.values()[i]);
             store.set("l::" + looped.keys()[i], null);
-            store.set("l::2", null);
+            store.set("l::3", null);
         }
-        // As Skript: indices are taken first and each value read as the loop gets there, so a deleted one is none.
-        List<Object> expected = new ArrayList<>(List.of("a"));
-        expected.add(null);
-        expected.add("c");
-        assertEquals(expected, seen);
+        assertEquals(List.of("a", "b", "c"), seen);
         assertEquals(0, store.nodes());
     }
 

@@ -54,3 +54,26 @@ function probe_lists():
 	show("key values", {_k::*})
 	set {_x::*} to "one" and "two"
 	show("loop count", size of all integers between 1 and 100)
+	# Deleting, then adding and reading what's left.
+	set {_d::*} to "a", "b" and "c"
+	delete {_d::3}
+	add "d" to {_d::*}
+	show("add after delete", indices of {_d::*})
+	delete {_d::1}
+	add "e" to {_d::*}
+	show("add after first deleted", ({_d::*}, indices of {_d::*}))
+	set {_e::x::y} to 1
+	set {_e::z} to 2
+	delete {_e::x::y}
+	show("emptied list", (size of {_e::*}, indices of {_e::*}))
+	set {_g::*} to "a", "b" and "c"
+	loop {_g::*}:
+		delete {_g::3}
+		show("delete in loop", loop-value)
+	show("after delete in loop", size of {_g::*})
+	set {difftmp::x::y} to 1
+	set {difftmp::x::z} to 2
+	delete {difftmp::x::y}
+	delete {difftmp::x::*}
+	show("global emptied", (size of {difftmp::*}, {difftmp::x::z}))
+	set {difftmp::kept} to "kept"
