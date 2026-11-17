@@ -1,0 +1,37 @@
+# Harness check: {network::...} variables on two NeoSkript servers (b and c) that share one MariaDB, and tell each
+# other about their writes over Redis or plugin messaging. Lines print "[nv] ...".
+command /nvset <text> <text>:
+	trigger:
+		set {network::%arg-1%} to arg-2
+		send "[nv] set %arg-1%" to console
+
+command /nvget <text>:
+	trigger:
+		send "[nv] %arg-1% = %{network::%arg-1%}%" to console
+
+# Spread over a few seconds, so the two servers' writes cross.
+command /nvadd <text> <integer> <integer>:
+	trigger:
+		loop arg-3 times:
+			add arg-2 to {network::%arg-1%}
+			if mod(loop-number, 5) = 0:
+				wait 1 tick
+		send "[nv] added %arg-1%" to console
+
+command /nvappend <text> <text> <integer>:
+	trigger:
+		loop arg-3 times:
+			add "%arg-2%-%loop-number%" to {network::%arg-1%::*}
+			wait 1 tick
+		send "[nv] appended %arg-1%" to console
+
+command /nvsize <text>:
+	trigger:
+		send "[nv] size %arg-1% = %size of {network::%arg-1%::*}%" to console
+
+command /nvstate:
+	trigger:
+		if network variables are available:
+			send "[nv] available" to console
+		else:
+			send "[nv] not available" to console
