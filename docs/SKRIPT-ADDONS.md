@@ -243,8 +243,22 @@ the addon's name and the element's class (`SkBee:ExprWorldHeight`).
   names and signatures only, no code) is generated, so an addon's classes link and reflect as on Skript. A generated
   method throws, saying NeoSkriptCompat doesn't have it yet.
 - **Types** an addon registers become NeoSkript's types, with their parser, text and values. One NeoSkript has
-  already (by code name or class) stays NeoSkript's: SkBee checks first and leaves those alone. Their values can't
-  be saved in variables yet.
+  already (by code name or class) stays NeoSkript's: SkBee checks first and leaves those alone.
+- **Saving** an addon's types in variables uses the addon's own serializer, in Skript's format (its `Fields` by
+  name, as Skript's `variables.csv` has them): fields of text, numbers, booleans and nothing, which is all SkBee's
+  serializers write. Field names are lowercased and written in a hash map's order, as Skript's `Fields` are, so
+  what either saved reads and writes back byte for byte (a unit test checks bytes Skript 2.17 + SkBee 3.26 wrote).
+  A value the serializer refuses isn't saved, as on Skript. Enums aren't saved yet. Paper closes an addon's class
+  loader when it's disabled, before NeoSkriptCompat, so NeoSkript turns values into their saved bytes as the plugin
+  whose code their codec runs is disabled (the addon's serializer's class loader, `CodecLoader`), not only when the
+  codec's plugin is.
+- **Literals:** words a type's literal parser reads (SkBee's `int list tag`) are literals for an addon, as Skript
+  gives them (`Library.wordsAsLiterals`, for NeoSkriptCompat's syntax only). Numbers an addon's changer takes are
+  any number to NeoSkript, made the class it asks for (`Integer`) when the change runs.
+- **Parsing stack:** `ParserInstance.getParsingStack()` has the syntax around the element being set up, from what
+  NeoSkript's compiler is compiling around it (`Library.enclosingSyntax`): an addon's syntax with its info, and
+  NeoSkript's own as an element of no addon's, so the top is the element's parent, as on Skript. SkBee reads it to
+  tell `nbt compound` inside its `has nbt tag` condition, where it doesn't create the item's custom data.
 - **Runtime errors** name the addon: what an element throws while it runs becomes "SkBee's ExprStoredEnchant threw in
   SkBee's code: ..." ("in SkBee's code" when the addon's own code threw, not NeoSkriptCompat's), and the trigger goes
   on as with NeoSkript's other runtime errors.
@@ -266,8 +280,8 @@ the addon's name and the element's class (`SkBee:ExprWorldHeight`).
   Skript's code names for types that NeoSkript has under another id are mapped (`entitydata` is NeoSkript's
   `entitytype`).
 - **Not yet:** sections and structures an addon registers (SkBee's 60 sections and 2 structures are left out, and
-  the console says so), event values of types NeoSkript has none of, type properties, saving addon types' values,
-  and reading an addon's language files.
+  the console says so), event values of types NeoSkript has none of, type properties, saving addon types that are
+  enums, and reading an addon's language files.
 
 SkBee 3.26.0 enables with all its modules, and NeoSkriptCompat registers its 78 types, 258 expressions, 77 effects,
 31 conditions, 69 events, 162 event values and 17 functions on NeoSkript. Not every one of those works yet: an element that reaches a part of

@@ -619,6 +619,51 @@ final class LineParser {
                 return false;
             }
         }
+        return wordsFitOperation(parsed);
+    }
+
+    /**
+     * Whether words against an operand of a known type can be read as a type an operation with it takes, as Skript's
+     * arithmetic converts its unparsed literal to those types and fails to set up when it can't: with SkBee, 'custom
+     * model data -1' isn't a data component type take away 1.
+     */
+    private boolean wordsFitOperation(ParsedSyntax parsed) {
+        List<Object> values = parsed.match().values();
+        if (parsed.pattern() >= SKRIPT_OPERATIONS.length || values.size() != 2) {
+            return true;
+        }
+        for (int side = 0; side < 2; side++) {
+            if (!(values.get(side) instanceof Expr.Unresolved words) || !words.verified()) {
+                continue;
+            }
+            Object other = values.get(1 - side);
+            String known = other instanceof Expr expr && !(expr instanceof Expr.Unresolved) && !(expr instanceof Expr.Variable)
+                    ? expr.type() : null;
+            if (known == null || known.equals(SyntaxRegistry.OBJECT) || registry.type(known) == null) {
+                continue;
+            }
+            List<String> wanted = new ArrayList<>();
+            for (String[] operation : SKRIPT_OPERATIONS[parsed.pattern()]) {
+                if (isOperand(known, operation[1 - side])) {
+                    wanted.add(operation[side]);
+                }
+            }
+            if (wanted.isEmpty()) {
+                continue;
+            }
+            String normalized = Literals.normalize(words.text());
+            boolean fits = false;
+            for (TypeInfo type : registry.types()) {
+                boolean reads = type.openLiterals() ? registry.isLiteral(type, words.text()) : type.literals().contains(normalized);
+                if (reads && wanted.stream().anyMatch(operand -> isOperand(type.id(), operand))) {
+                    fits = true;
+                    break;
+                }
+            }
+            if (!fits) {
+                return false;
+            }
+        }
         return true;
     }
 

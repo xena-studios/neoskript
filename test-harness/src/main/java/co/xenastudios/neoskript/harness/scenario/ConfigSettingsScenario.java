@@ -28,16 +28,18 @@ import java.util.zip.ZipFile;
 
 /**
  * Skript's config.sk settings on NeoSkript: Skript's default config.sk, then the same with settings changed, each
- * given to the reference Skript and to NeoSkript moving over from it. NeoSkript must copy the changed settings to
- * its config.yml, and {@code scripts/config-settings.sk} must write the same {@code logs/cfg.log} on both (the
- * timestamps in the date format too) and show the harness bot's player the same things.
+ * given to the reference Skript and to NeoSkript moving over from it, with Vault and EssentialsX for Vault's hook.
+ * NeoSkript must copy the changed settings to its config.yml, {@code scripts/config-settings.sk} must write the same
+ * {@code logs/cfg.log} on both (the timestamps in the date format too) and show the harness bot's player the same
+ * things, and {@code scripts/config-warnings.sk} must get the same warnings and errors when it loads. Lines the
+ * verbosity logs must be in both consoles, and lines it hides in neither.
  *
  * <p>Skript's results are cached by their inputs in {@code .harness-cache/config-settings}.
  */
 public final class ConfigSettingsScenario implements Scenario {
 
     /** Bump when the way results are gathered changes, so cached results of the reference Skript go stale. */
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private static final Duration WAIT = Duration.ofMinutes(3);
     private static final Pattern LOG_LINE = Pattern.compile("^\\[(.+?)] (.*)$");
     private static final Pattern BOT_LINE = Pattern.compile("(\\[bot:Alice] .*)$");
@@ -48,14 +50,22 @@ public final class ConfigSettingsScenario implements Scenario {
      * in, and the lines where NeoSkript doesn't follow Skript on purpose, with what each gives.
      */
     private record Variant(String name, Map<String, String> changes, List<String> configYml, Pattern timestamp,
-            Map<String, List<String>> differences) {}
+            Map<String, List<String>> differences, List<Pattern> logged, List<Pattern> hidden) {
+
+        Variant(String name, Map<String, String> changes, List<String> configYml, Pattern timestamp,
+                Map<String, List<String>> differences) {
+            this(name, changes, configYml, timestamp, differences, List.of(), List.of());
+        }
+    }
+
+    /** The log's timestamps with Skript's default date format, in the harness's locale. */
+    private static final Pattern DEFAULT_TIMESTAMP = Pattern.compile("\\d{1,2}/\\d{1,2}/\\d{2}, \\d{1,2}:\\d\\d.[AP]M");
+    /** Skript has its 'case sensitive' option the wrong way round in 'positions of': off, it finds text with case. */
+    private static final Map<String, List<String>> POSITIONS = Map.of("positions", List.of("positions: 4", "positions: 1 and 4"));
 
     private static final List<Variant> VARIANTS = List.of(
             new Variant("default", Map.of(), List.of("^language: [\"']?english[\"']?$", "^  number-accuracy: 2$",
-                    "^  player-variable-fix: true$", "^  priority: [\"']?high[\"']?$"),
-                    Pattern.compile("\\d{1,2}/\\d{1,2}/\\d{2}, \\d{1,2}:\\d\\d.[AP]M"),
-                    // Skript has its 'case sensitive' option the wrong way round here: off, it finds text with case.
-                    Map.of("positions", List.of("positions: 4", "positions: 1 and 4"))),
+                    "^  player-variable-fix: true$", "^  priority: [\"']?high[\"']?$"), DEFAULT_TIMESTAMP, POSITIONS),
             new Variant("text", ordered(
                     "language", "turkish",
                     "date format", "yyyy-MM-dd HH:mm 'Uhr'",
@@ -81,10 +91,39 @@ public final class ConfigSettingsScenario implements Scenario {
                             "^  total-errors-per-frame: 3$"),
                     Pattern.compile("\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d Uhr"),
                     // Skript has its 'case sensitive' option the wrong way round here: on, it finds text without case.
-                    Map.of("positions", List.of("positions: 1 and 4", "positions: 4"))));
+                    Map.of("positions", List.of("positions: 1 and 4", "positions: 4"))),
+            new Variant("warnings", ordered(
+                    "verbosity", "low",
+                    "disable variable will not be saved warnings", "true",
+                    "disable variable missing and/or warnings", "true",
+                    "disable starting a variable's name with an expression warnings", "true",
+                    "disable single colon in variable name warnings", "true",
+                    "disable unreachable code warnings", "true",
+                    "enable legacy tab completion event compatibility", "false",
+                    "hooks.vault", "true"),
+                    List.of("^verbosity: [\"']?low[\"']?$", "^  variable-not-saved: false$", "^  missing-and-or: false$",
+                            "^  variable-starting-with-expression: false$",
+                            "^  single-colon-in-variable-name: false$", "^  unreachable-code: false$",
+                            "^  legacy-tab-completion: false$", "^  vault: false$"),
+                    DEFAULT_TIMESTAMP, POSITIONS, List.of(),
+                    // What Skript only says from normal on: how many scripts and variables loaded.
+                    List.of(Pattern.compile("Loaded \\d+ (scripts?|variables?)"))),
+            new Variant("verbose", ordered("verbosity", "very high"), List.of("^verbosity: [\"']?very-high[\"']?$"),
+                    DEFAULT_TIMESTAMP, POSITIONS,
+                    List.of(Pattern.compile("loading trigger 'on join'$"),
+                            Pattern.compile("loaded 3 structures from 'config-settings\\.sk'$"),
+                            Pattern.compile("Successfully hooked into Vault$"),
+                            Pattern.compile("== org\\.bukkit\\.event\\.player\\.PlayerJoinEvent with priority HIGH ==$")),
+                    List.of()));
 
-    /** What one plugin did: its log lines without their timestamps, and what the player was shown. */
-    record Results(List<String> log, List<String> player) {}
+    /**
+     * What one plugin did: its log lines without their timestamps, what the player was shown, what
+     * {@code config-warnings.sk} got when it loaded, and the variant's logged and hidden lines its console had.
+     */
+    record Results(List<String> log, List<String> player, List<String> problems, List<String> console) {}
+
+    private static final Pattern PREFIX = Pattern.compile("^\\[\\d\\d:\\d\\d:\\d\\d \\w+]: (?:\\[[\\w ]+] )?");
+    private static final Pattern PROBLEM = Pattern.compile("^Line (\\d+): \\(config-warnings\\.sk\\)$");
 
     @Override
     public String name() {
@@ -158,6 +197,18 @@ public final class ConfigSettingsScenario implements Scenario {
                 failures.add(variant.name() + ": Skript logged '" + line.getValue() + "', NeoSkript '" + neo + "'");
             }
         }
+        if (!skript.problems().equals(neoskript.problems())) {
+            failures.add(variant.name() + ": config-warnings.sk got " + skript.problems() + " on Skript and "
+                    + neoskript.problems() + " on NeoSkript");
+        }
+        List<String> expected = new ArrayList<>();
+        variant.logged().forEach(pattern -> expected.add("logged " + pattern));
+        for (Results results : List.of(skript, neoskript)) {
+            if (!results.console().equals(expected)) {
+                failures.add(variant.name() + ": " + (results == skript ? "Skript" : "NeoSkript") + "'s console had "
+                        + results.console() + ", not " + expected);
+            }
+        }
         if (!skript.player().equals(neoskript.player())) {
             failures.add(variant.name() + ": the player was shown " + skript.player() + " by Skript and "
                     + neoskript.player() + " by NeoSkript");
@@ -178,12 +229,19 @@ public final class ConfigSettingsScenario implements Scenario {
     private static Results play(ScenarioContext context, Path runDir, Path plugin, String folder, String configSk,
             String script, Variant variant) throws Exception {
         // NeoSkript gets them where Skript keeps them, and copies them over on its first start.
-        try (ServerProcess server = context.server(runDir)
+        var builder = context.server(runDir)
                 .plugin(plugin)
                 .plugin(context.botJar())
                 .file("plugins/Skript/config.sk", configSk)
                 .file("plugins/Skript/scripts/config-settings.sk", script)
-                .start()) {
+                .file("plugins/Skript/scripts/config-warnings.sk", context.script("config-warnings.sk"));
+        // Vault with an economy, for Vault's hook.
+        for (NeoSkriptHooksScenario.PinnedPlugin pinned : NeoSkriptHooksScenario.PLUGINS) {
+            if (pinned.fileName().startsWith("Vault") || pinned.fileName().startsWith("EssentialsX")) {
+                builder.plugin(context.download(pinned.url(), pinned.sha256(), pinned.fileName()));
+            }
+        }
+        try (ServerProcess server = builder.start()) {
             server.await(line("[harness] cfg loaded"), WAIT);
             server.await(ServerProcess.DONE, WAIT);
             server.command("difficulty peaceful");
@@ -207,6 +265,27 @@ public final class ConfigSettingsScenario implements Scenario {
             server.await(line("[bot] Alice left"), quit, WAIT);
             server.stop();
 
+            List<String> problems = new ArrayList<>();
+            List<String> all = server.lines(0);
+            for (int i = 0; i + 1 < all.size(); i++) {
+                Matcher prefix = PREFIX.matcher(all.get(i));
+                Matcher problem = PROBLEM.matcher(prefix.find() ? all.get(i).substring(prefix.end()) : all.get(i));
+                if (problem.matches()) {
+                    Matcher next = PREFIX.matcher(all.get(i + 1));
+                    problems.add(problem.group(1) + ": "
+                            + (next.find() ? all.get(i + 1).substring(next.end()) : all.get(i + 1)).strip());
+                }
+            }
+            List<String> console = new ArrayList<>();
+            for (Pattern logged : variant.logged()) {
+                if (all.stream().anyMatch(text -> logged.matcher(text).find())) {
+                    console.add("logged " + logged);
+                }
+            }
+            for (Pattern hidden : variant.hidden()) {
+                all.stream().filter(text -> hidden.matcher(text).find()).findFirst()
+                        .ifPresent(text -> console.add("not hidden: " + text));
+            }
             List<String> player = new ArrayList<>();
             for (String text : server.lines(mark)) {
                 Matcher matcher = BOT_LINE.matcher(text);
@@ -223,7 +302,7 @@ public final class ConfigSettingsScenario implements Scenario {
                 }
                 log.add(matcher.group(2));
             }
-            return new Results(log, player);
+            return new Results(log, player, problems, console);
         }
     }
 
@@ -263,7 +342,7 @@ public final class ConfigSettingsScenario implements Scenario {
     private static String key(ScenarioContext context, String configSk, String script) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         for (String part : List.of(String.valueOf(VERSION), context.referenceSkript().version(),
-                context.environment().name(), configSk, script)) {
+                context.environment().name(), configSk, script, context.script("config-warnings.sk"))) {
             digest.update(part.getBytes(StandardCharsets.UTF_8));
             digest.update((byte) 0);
         }

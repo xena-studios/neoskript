@@ -153,10 +153,37 @@ final class ScriptManager {
         }
     }
 
+    /**
+     * As Skript at config.yml's {@code verbosity: high}, how many structures each script has, and at {@code very high}
+     * each structure as it loads.
+     */
+    private void logStructures(List<ParsedScript> parsed, Predicate<String> scope) {
+        if (!Logging.logs(NeoSkriptConfig.Verbosity.HIGH)) {
+            return;
+        }
+        for (ParsedScript script : parsed) {
+            String name = script.file().name();
+            if (scope != null && !scope.test(name)) {
+                continue;
+            }
+            if (Logging.logs(NeoSkriptConfig.Verbosity.VERY_HIGH)) {
+                for (ParsedStructure structure : script.structures()) {
+                    logger.info("loading trigger '{}'", structure.structure().node().line().key().strip());
+                }
+            }
+            int count = script.structures().size();
+            logger.info("loaded {} structure{} from '{}'", count, count == 1 ? "" : "s", name);
+        }
+    }
+
     /** Loads every script when the server starts. */
     synchronized void loadAll() throws IOException {
         Outcome outcome = load(null, problem -> {}, false, ScriptManager::toConsole);
         int triggers = loaded.values().stream().mapToInt(List::size).sum();
+        // Skript doesn't say at config.yml's 'verbosity: low'.
+        if (!Logging.logs(NeoSkriptConfig.Verbosity.NORMAL)) {
+            return;
+        }
         logger.info("Loaded {} {} with {} {} in {} ms{}", outcome.scripts(), outcome.scripts() == 1 ? "script" : "scripts",
                 triggers, triggers == 1 ? "trigger" : "triggers", outcome.millis(),
                 outcome.errors() == 0 ? "" : " (" + outcome.errors() + (outcome.errors() == 1 ? " error" : " errors") + ")");
@@ -271,6 +298,7 @@ final class ScriptManager {
         ScriptCompiler compiler = new ScriptCompiler(library, globals, functions);
         try {
             parsed = new ScriptLoader(library.registry()).load(files);
+            logStructures(parsed, scope);
             // Which item names each script looks up, so /sk reload aliases reloads the scripts a change affects.
             co.xenastudios.neoskript.paper.GlobalAliases.recordUses();
             try {

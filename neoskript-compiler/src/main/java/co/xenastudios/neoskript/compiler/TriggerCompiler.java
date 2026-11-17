@@ -1577,13 +1577,18 @@ final class TriggerCompiler {
         if (syntax == null) {
             return;
         }
-        syntax.match().values().forEach(value -> setupErrors(value, errors));
-        for (Object value : syntax.match().regexValues()) {
-            if (value instanceof ParsedSyntax inner) {
-                setupErrors(inner, errors);
-            } else {
-                setupErrors(value, errors);
+        library.enterSyntax(syntax.syntax().id());
+        try {
+            syntax.match().values().forEach(value -> setupErrors(value, errors));
+            for (Object value : syntax.match().regexValues()) {
+                if (value instanceof ParsedSyntax inner) {
+                    setupErrors(inner, errors);
+                } else {
+                    setupErrors(value, errors);
+                }
             }
+        } finally {
+            library.leaveSyntax();
         }
         if (library.binding(syntax.syntax()) instanceof ElementFactory<?> factory) {
             try {
@@ -4833,6 +4838,12 @@ final class TriggerCompiler {
                     literal = written.text();
                     one = true;
                 }
+                // Words a type's literal parser read, as an addon element through NeoSkriptCompat gets them: as
+                // Skript gives them, a literal (SkBee's 'int list tag'). NeoSkript's own elements don't get these.
+                case Expr.Unresolved words when words.verified() && library.hasWordsAsLiterals(syntax.syntax().id()) -> {
+                    literal = words.text();
+                    one = true;
+                }
                 case Expr.Text text -> {
                     one = true;
                     if (text.embedded().isEmpty() && text.end() <= source.length()) {
@@ -5272,9 +5283,12 @@ final class TriggerCompiler {
         // Only this element's own list variables are recursive, not those of the elements in its arguments.
         boolean recursive = recursiveListArguments;
         recursiveListArguments = false;
+        // The element is around its arguments while they're set up, as Skript's parsing stack has it.
+        library.enterSyntax(syntax.syntax().id());
         try {
             argumentsIn(syntax, keyed, implicit, recursive);
         } finally {
+            library.leaveSyntax();
             recursiveListArguments = recursive;
         }
     }

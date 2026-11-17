@@ -109,6 +109,52 @@ class SkriptSettingsTest {
     }
 
     @Test
+    void copiesTheWarningLoggingAndHookSettings() throws Exception {
+        Map<String, Object> copied = read("""
+                verbosity: Very High
+                disable variable will not be saved warnings: true
+                disable variable missing and/or warnings: false
+                disable starting a variable's name with an expression warnings: yes
+                disable single colon in variable name warnings: on
+                disable unreachable code warnings: true
+                long parse time warning threshold: 500 milliseconds
+                enable legacy tab completion event compatibility: false
+                disable hooks:
+                	vault: true
+                	regions:
+                		grief prevention: false
+                		worldguard: true
+                """);
+        assertEquals("very-high", copied.get("verbosity"));
+        assertEquals(false, copied.get("warnings.variable-not-saved"));
+        assertEquals(true, copied.get("warnings.missing-and-or"));
+        assertEquals(false, copied.get("warnings.variable-starting-with-expression"));
+        assertEquals(false, copied.get("warnings.single-colon-in-variable-name"));
+        assertEquals(false, copied.get("warnings.unreachable-code"));
+        assertEquals("500 milliseconds", copied.get("warnings.long-parse-time"));
+        assertEquals(false, copied.get("syntax.legacy-tab-completion"));
+        assertEquals(false, copied.get("hooks.vault"));
+        assertEquals(true, copied.get("hooks.grief-prevention"));
+        assertEquals(false, copied.get("hooks.worldguard"));
+        // As Skript: an unreadable verbosity is normal, and an unreadable threshold none.
+        copied = read("verbosity: loud\nlong parse time warning threshold: a while\n");
+        assertEquals("normal", copied.get("verbosity"));
+        assertEquals("0 seconds", copied.get("warnings.long-parse-time"));
+    }
+
+    @Test
+    void saysWhichSettingsArentCopiedAndWhy() throws Exception {
+        Path file = folder.resolve("config.sk");
+        Files.writeString(file, stockConfig());
+        assertEquals(List.of(), SkriptSettings.notCopied(file));
+        Files.writeString(file, stockConfig().replace("use type properties: true", "use type properties: false")
+                .replace("enable timings: false", "enable timings: true"));
+        List<String> notes = SkriptSettings.notCopied(file);
+        assertEquals(2, notes.size(), notes.toString());
+        assertTrue(notes.getFirst().startsWith("Skript's 'use type properties: false' isn't copied"), notes.toString());
+    }
+
+    @Test
     void valuesSkriptCantReadAreCopiedAsWhatSkriptRunsWith() throws Exception {
         Map<String, Object> copied = read("""
                 language: klingon

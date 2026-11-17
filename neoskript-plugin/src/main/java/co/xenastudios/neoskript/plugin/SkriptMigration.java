@@ -56,10 +56,11 @@ final class SkriptMigration {
      * the CSV file, {@code caseClashFile}.
      */
     record Result(List<String> copied, int scriptCount, Map<String, Object> settings, Path variablesBackup,
-            String settingsProblem, List<List<String>> caseClashes, Path caseClashFile, List<String> notes, boolean aliasesDone) {
+            String settingsProblem, List<List<String>> caseClashes, Path caseClashFile, List<String> notes,
+            boolean aliasesDone, List<String> notCopied) {
 
         Result(List<String> copied, int scriptCount) {
-            this(copied, scriptCount, Map.of(), null, null, null, null, List.of(), true);
+            this(copied, scriptCount, Map.of(), null, null, null, null, List.of(), true, List.of());
         }
     }
 
@@ -149,8 +150,10 @@ final class SkriptMigration {
         List<String> notes = new ArrayList<>();
         AliasCopy aliases = copyAliases(skriptDir, neoskriptDir, notes);
         copied.addAll(aliases.copied());
+        List<String> notCopied = List.of();
         List<List<String>> clashes = null;
         try {
+            notCopied = SkriptSettings.notCopied(skriptDir.resolve("config.sk"));
             if (SkriptSettings.caseSensitiveVariables(skriptDir.resolve("config.sk"))) {
                 clashes = csv != null && Files.isRegularFile(csv) ? caseClashes(csv) : List.of();
             }
@@ -159,7 +162,7 @@ final class SkriptMigration {
         }
         // The marker is written by finish(), once config.yml has the settings.
         return new Result(copied, scripts[0], settings, backup, problem, clashes, csv, List.copyOf(notes),
-                aliases.complete());
+                aliases.complete(), notCopied);
     }
 
     /**
@@ -302,7 +305,8 @@ final class SkriptMigration {
         Files.writeString(marker, recorded + (copied.isEmpty() ? "" : "Copied " + copied + " from "
                 + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n") + (aliases.complete() ? ALIASES_DONE + "\n" : ""));
         if (copied.isEmpty()) {
-            return new Result(List.of(), 0, Map.of(), null, null, null, null, List.copyOf(notes), aliases.complete());
+            return new Result(List.of(), 0, Map.of(), null, null, null, null, List.copyOf(notes), aliases.complete(),
+                    List.of());
         }
         Map<String, Object> settings = new java.util.LinkedHashMap<>();
         String problem = null;
@@ -312,7 +316,8 @@ final class SkriptMigration {
             problem = String.valueOf(e.getMessage() == null ? e : e.getMessage());
         }
         settings.keySet().retainAll(List.of("aliases.load-defaults"));
-        return new Result(copied, 0, settings, null, problem, null, null, List.copyOf(notes), aliases.complete());
+        return new Result(copied, 0, settings, null, problem, null, null, List.copyOf(notes), aliases.complete(),
+                List.of());
     }
 
     /** Where a database's file is for NeoSkript, and the backup of what was copied. */

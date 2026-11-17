@@ -45,14 +45,20 @@ class EventDispatcher implements Listener {
         this.listenToCancelled = listenToCancelled;
     }
 
+    /** The triggers' names, for {@link #fireLogged}, by the array {@link #update} registers them in. */
+    private final Map<Trigger[], String[]> triggerNames = new java.util.IdentityHashMap<>();
+
     /** Listens for the events of {@code triggers}, and only those, replacing what it listened for before. */
     void update(Collection<CompiledScripts.CompiledTrigger> triggers) {
         Map<Class<? extends Event>, List<Trigger>> byClass = new LinkedHashMap<>();
         Map<Class<? extends Event>, java.util.Set<String>> scripts = new LinkedHashMap<>();
+        // For config.yml's 'verbosity: very high', which logs each trigger an event runs.
+        Map<Trigger, String> names = new java.util.IdentityHashMap<>();
         for (CompiledScripts.CompiledTrigger trigger : triggers) {
             if (trigger.eventClasses() == null) {
                 continue;
             }
+            names.put(trigger.trigger(), trigger.script() + ", line " + trigger.line());
             for (Class<?> eventClass : trigger.eventClasses()) {
                 Class<? extends Event> type = eventClass.asSubclass(Event.class);
                 byClass.computeIfAbsent(type, k -> new ArrayList<>()).add(trigger.trigger());
@@ -60,9 +66,11 @@ class EventDispatcher implements Listener {
             }
         }
         HandlerList.unregisterAll(this);
+        triggerNames.clear();
         for (Map.Entry<Class<? extends Event>, List<Trigger>> entry : byClass.entrySet()) {
             Class<? extends Event> eventClass = entry.getKey();
             Trigger[] listeners = entry.getValue().toArray(Trigger[]::new);
+            triggerNames.put(listeners, entry.getValue().stream().map(names::get).toArray(String[]::new));
             try {
                 register(eventClass, listeners);
             } catch (RuntimeException | LinkageError e) {
@@ -75,12 +83,40 @@ class EventDispatcher implements Listener {
 
     /** Listens for {@code eventClass}, running {@code listeners}. */
     void register(Class<? extends Event> eventClass, Trigger[] listeners) {
+        String[] names = triggerNames.getOrDefault(listeners, new String[listeners.length]);
         plugin.getServer().getPluginManager().registerEvent(eventClass, this, priority, (listener, event) -> {
             // Bukkit also passes subclasses that share the handler list.
             if (eventClass.isInstance(event)) {
-                fire(listeners, event);
+                if (Logging.events()) {
+                    fireLogged(listeners, names, event);
+                } else {
+                    fire(listeners, event);
+                }
             }
         }, plugin, !listenToCancelled);
+    }
+
+    /**
+     * As Skript logs events at config.yml's {@code verbosity: very high}: the event, then each trigger it runs and how
+     * long it took, then how long the event took.
+     */
+    private void fireLogged(Trigger[] triggers, String[] names, Event event) {
+        long start = System.nanoTime();
+        logger.info("");
+        logger.info("== {} with priority {}{} ==", event.getClass().getName(), priority,
+                event instanceof org.bukkit.event.Cancellable cancellable && cancellable.isCancelled() ? " (cancelled)" : "");
+        SimpleTriggerContext context = new SimpleTriggerContext(event, owner(event));
+        for (int i = 0; i < triggers.length; i++) {
+            long started = System.nanoTime();
+            logger.info("# {}", names[i]);
+            try {
+                triggers[i].execute(context);
+            } catch (Throwable e) {
+                TriggerErrors.report(logger, e);
+            }
+            logger.info("# {} took {} milliseconds", names[i], (System.nanoTime() - started) / 1_000_000.0);
+        }
+        logger.info("== took {} milliseconds ==", (System.nanoTime() - start) / 1_000_000.0);
     }
 
     void fire(Trigger[] triggers, Event event) {
