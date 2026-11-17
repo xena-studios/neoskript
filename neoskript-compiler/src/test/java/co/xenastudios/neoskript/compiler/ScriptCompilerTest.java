@@ -186,4 +186,36 @@ class ScriptCompilerTest {
         assertEquals(List.of("There's no loop that matches 'loop-path'"),
                 other.diagnostics().stream().map(d -> d.message()).toList());
     }
+
+    @Test
+    void codeTooBigForAMethodIsAnErrorNotACrash() throws Throwable {
+        // 2,000 nested calls parse where the stack is deep enough (a warm parser's is), but their bytecode doesn't
+        // fit in one method: ASM threw where a script error is due, and the rest of the script still loads.
+        String deep = "function f(x: object) :: object:\n\treturn {_x}\n\non load:\n\tsay "
+                + "f(".repeat(2000) + "1" + ")".repeat(2000) + "\n\tsay \"after\"\n";
+        Throwable[] failed = {null};
+        Thread thread = new Thread(null, () -> {
+            try {
+                List<ParsedScript> parsed = new ScriptLoader(library.registry())
+                        .load(List.of(new SourceFile("deep.sk", deep)));
+                assertEquals(List.of(), parsed.getFirst().diagnostics());
+                CompiledScripts compiled = new ScriptCompiler(library,
+                        new co.xenastudios.neoskript.runtime.variables.VariableStore()).compile(parsed);
+                assertEquals(List.of("5: " + ScriptCompiler.TOO_BIG),
+                        compiled.diagnostics().stream().map(d -> d.line() + ": " + d.message()).toList());
+                compiled.linkFunctions();
+                for (CompiledScripts.CompiledTrigger trigger : compiled.triggers()) {
+                    trigger.trigger().execute(new SimpleTriggerContext(null));
+                }
+            } catch (Throwable e) {
+                failed[0] = e;
+            }
+        }, "deep", 512L * 1024 * 1024);
+        thread.start();
+        thread.join();
+        if (failed[0] != null) {
+            throw failed[0];
+        }
+        assertEquals(List.of("[after]"), said);
+    }
 }
