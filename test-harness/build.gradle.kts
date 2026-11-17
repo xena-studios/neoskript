@@ -150,6 +150,8 @@ tasks.register<JavaExec>("harness") {
     val echo = providers.gradleProperty("harness.echo").orElse("false")
     // -Pharness.differential.skriptRuns=N runs the reference Skript N times for the differential (each run cached).
     val skriptRuns = providers.gradleProperty("harness.differential.skriptRuns").orElse("3")
+    // -Pharness.soak.reloads=N sets how many reloads neoskript-reload-soak measures (300 by default).
+    val soakReloads = providers.gradleProperty("harness.soak.reloads").orElse("300")
     val projectDir = layout.projectDirectory
     val buildDir = layout.buildDirectory
     val cacheDir = layout.settingsDirectory.dir(".harness-cache")
@@ -174,6 +176,7 @@ tasks.register<JavaExec>("harness") {
             "-Dharness.cache=" + cacheDir.asFile.absolutePath,
             "-Dharness.echo=" + echo.get(),
             "-Dharness.differential.skriptRuns=" + skriptRuns.get(),
+            "-Dharness.soak.reloads=" + soakReloads.get(),
         )
     })
 

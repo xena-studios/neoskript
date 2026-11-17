@@ -205,7 +205,8 @@ final class Potions {
     }
 
     /** The potion effect last made on this thread, for 'the created effect' in its section. */
-    private static final ThreadLocal<Effect> CREATED = new ThreadLocal<>();
+    private static final co.xenastudios.neoskript.runtime.PerThread<Effect> CREATED =
+            new co.xenastudios.neoskript.runtime.PerThread<>();
 
     private static void registerCreation(Registrar registrar) {
         registrar.expression("ExprSecPotionEffect", "skriptpotioneffect", info -> {

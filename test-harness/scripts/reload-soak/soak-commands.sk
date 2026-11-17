@@ -1,0 +1,30 @@
+# The reload soak's commands, a GUI and a command that waits.
+command /soak <text> [<number=1>]:
+	aliases: soakalias, soak-alias
+	usage: /soak <text> [number]
+	cooldown: 1 second
+	trigger:
+		set {soak::%arg-1%} to arg-2
+		send "[harness] soak %arg-1% %soakAdd(arg-2, 1)% VERSION" to console
+
+command /soakgui:
+	executable by: players
+	trigger:
+		set {_inv} to chest inventory with 3 rows named "Soak VERSION"
+		set slot 0 of {_inv} to diamond named "soak"
+		open {_inv} to player
+
+command /soakdelay:
+	trigger:
+		wait 3 seconds
+		send "[harness] soak delayed VERSION" to console
+
+command /soakrate:
+	trigger:
+		set {_from} to {-soak::ticks}
+		wait 2 seconds
+		send "[harness] soak rate %{-soak::ticks} - {_from}%" to console
+
+command /soakstate:
+	trigger:
+		send "[harness] soak state %{-soak::version}% %size of {soak::list::*}% %{-soak::depth}% %{-soak::sum}% %{-soak::ref}%" to console

@@ -45,6 +45,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     private SettingsReloader settingsReloader;
     /** The addons registered through the API. */
     private Addons addons;
+    /** bStats, whose thread must stop with the plugin. */
+    private Metrics metrics;
 
     /** https://bstats.org/plugin/bukkit/NeoSkript/34868 */
     private static final int BSTATS_PLUGIN_ID = 34868;
@@ -64,7 +66,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         Platform platform = Platform.detect();
         // D15: bStats, opt-out with `metrics: false` (or globally in plugins/bStats/config.yml).
         if (settings.metrics()) {
-            Metrics metrics = new Metrics(this, BSTATS_PLUGIN_ID);
+            metrics = new Metrics(this, BSTATS_PLUGIN_ID);
             metrics.addCustomChart(new SimplePie("platform", platform::displayName));
         }
 
@@ -599,6 +601,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         co.xenastudios.neoskript.api.Installed.install(null);
+        if (metrics != null) {
+            // bStats' thread would otherwise outlive the plugin, and keep it in memory, through /reload.
+            metrics.shutdown();
+        }
         if (runtimeErrorFrames != null) {
             runtimeErrorFrames.run();
         }
@@ -613,6 +619,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         // wait, and the pauses' timer stops.
         co.xenastudios.neoskript.runtime.Pauses.close(PAUSE_GRACE);
         getServer().getAsyncScheduler().cancelTasks(this);
+        getServer().getGlobalRegionScheduler().cancelTasks(this);
         co.xenastudios.neoskript.runtime.region.Regions.uninstall();
         if (commands != null) {
             commands.unregister(getServer().getCommandMap());
@@ -629,5 +636,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 getSLF4JLogger().warn("Couldn't close {}", storage.file(), e);
             }
         }
+        // Last, once nothing scheduled can run any more: a task cancelled after this could have opened a log again.
+        StandardLibrary.close();
     }
 }

@@ -1,0 +1,31 @@
+# The reload soak's events, timers and waits. VERSION changes on every reload.
+options:
+	version: VERSION
+
+on load:
+	set {-soak::version} to "{@version}"
+	add 1 to {-soak::loads}
+
+on unload:
+	add 1 to {-soak::unloads}
+
+every 1 tick:
+	add 1 to {-soak::ticks}
+
+every 5 ticks:
+	# Still waiting when the next reload comes.
+	wait 2 seconds
+	add 1 to {-soak::waited}
+
+on join:
+	set {soak::joined::%player's uuid%} to now
+
+on chat:
+	add 1 to {-soak::chats}
+
+on sneak toggle:
+	add 1 to {-soak::sneaks}
+
+on inventory click:
+	if name of event-inventory is "Soak {@version}":
+		cancel event
