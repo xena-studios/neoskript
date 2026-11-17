@@ -1,0 +1,62 @@
+# Harness: skript-reflect's custom syntax, the same script on Skript 2.17.0 with skript-reflect 2.6.3 and on
+# NeoSkript with NeoSkriptReflect. Each line it prints is compared. reflect-check.sk loads first.
+import:
+	java.util.ArrayList
+
+effect shout %string%:
+	trigger:
+		send "[reflect] custom shout: %expression-1%" to console
+
+condition %number% is big:
+	check:
+		if expression-1 > 10:
+			continue
+
+expression doubled %number%:
+	get:
+		return expression-1 * 2
+
+effect:
+	patterns:
+		greet %string%
+		wave at %string%
+	trigger:
+		send "[reflect] custom pattern %matched pattern%: %expr-1%" to console
+
+numbers property twice:
+	get:
+		return expression-1 * 2
+
+numbers property condition even:
+	check:
+		if mod(expression-1, 2) is 0:
+			continue
+
+expression size of java list %object%:
+	get:
+		return expression-1.size()
+
+local effect whisper %string%:
+	trigger:
+		send "[reflect] custom whisper: %expression-1%" to console
+
+on load:
+	shout "hi"
+	if 20 is big:
+		send "[reflect] custom big: yes" to console
+	if 5 is big:
+		send "[reflect] custom big: WRONG" to console
+	send "[reflect] custom doubled: %doubled 4%" to console
+	greet "a"
+	wave at "b"
+	send "[reflect] custom twice: %twice of 3%" to console
+	send "[reflect] custom twices: %(1 and 2)'s twice%" to console
+	if 4 is even:
+		send "[reflect] custom even: yes" to console
+	if 3 is not even:
+		send "[reflect] custom not even: yes" to console
+	set {_l} to new ArrayList()
+	{_l}.add("x")
+	send "[reflect] custom java: %size of java list {_l}%" to console
+	whisper "psst"
+	send "[reflect] custom done" to console

@@ -630,13 +630,28 @@ final class TriggerCompiler {
     }
 
     CompiledFunction compileFunction(String scriptName, ParsedStructure.Function parsed) throws CompileException {
+        declaredSyntax = parsed.declaredSyntax();
         function = parsed.signature();
         headerLine = parsed.structure().node().line();
-        byte[] bytes = generate(scriptName, () -> {
-                    parameters(parsed);
-                    statements(parsed.body());
-                });
-        return (CompiledFunction) define(bytes);
+        Boolean outer = DECLARED_SYNTAX_CODE.get();
+        DECLARED_SYNTAX_CODE.set(declaredSyntax);
+        try {
+            byte[] bytes = generate(scriptName, () -> {
+                        parameters(parsed);
+                        statements(parsed.body());
+                    });
+            return (CompiledFunction) define(bytes);
+        } finally {
+            DECLARED_SYNTAX_CODE.set(outer);
+        }
+    }
+
+    /** Whether declared syntax's code is being compiled on this thread: see {@code NeoSkript.inDeclaredSyntaxCode}. */
+    private static final ThreadLocal<Boolean> DECLARED_SYNTAX_CODE = new ThreadLocal<>();
+
+    /** Whether the code being compiled on this thread is the code of syntax a script declared. */
+    static boolean compilingDeclaredSyntax() {
+        return Boolean.TRUE.equals(DECLARED_SYNTAX_CODE.get());
     }
 
     @FunctionalInterface
@@ -3127,6 +3142,16 @@ final class TriggerCompiler {
         switch (core.id()) {
             case CoreSyntax.EXIT -> exit(effect);
             case CoreSyntax.CONTINUE -> {
+                if (declaredSyntax && effect.pattern() == 0 && effect.match().values().isEmpty() && !inLoop()) {
+                    // skript-reflect's 'continue' in declared syntax's code: the condition passes, or an effect
+                    // that waited lets its trigger carry on, and the code ends.
+                    method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+                    method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(
+                            co.xenastudios.neoskript.runtime.ScriptSyntaxContext.class), "proceed",
+                            "(" + CONTEXT + ")V", false);
+                    exitTrigger();
+                    return;
+                }
                 Block loop = effect.pattern() == 0 ? innermostLoop() : loopNumber(regexNumber(effect));
                 leaving(loop);
                 method.visitJumpInsn(GOTO, loop.next());
@@ -3439,6 +3464,14 @@ final class TriggerCompiler {
 
     private static int regexNumber(ParsedSyntax syntax) {
         return Integer.parseInt(((java.util.regex.MatchResult) syntax.match().regexValues().getFirst()).group());
+    }
+
+    /** Whether this is the code of syntax a script declared, where {@code continue} outside a loop proceeds. */
+    private boolean declaredSyntax;
+
+    /** Whether there's a loop around the line being compiled. */
+    private boolean inLoop() {
+        return !loops().isEmpty();
     }
 
     /**

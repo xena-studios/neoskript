@@ -87,15 +87,19 @@ public final class Plurality {
 
     /**
      * What's known of element {@code id}: Skript's own answer, or for an addon's element that said so, as its arguments
-     * ({@link SyntaxRegistry#isPluralAsArguments}).
+     * ({@link SyntaxRegistry#isPluralAsArguments}), or what a script declared for its own syntax
+     * ({@link SyntaxRegistry#scriptPlurality}).
      */
     private static Character known(String id, SyntaxRegistry registry) {
         int dash = id.indexOf('-');
         Character known = KNOWN.get(dash < 0 ? id : id.substring(0, dash));
-        if (known == null && registry.isPluralAsArguments(id)) {
+        if (known != null || registry == null) {
+            return known;
+        }
+        if (registry.isPluralAsArguments(id)) {
             return 'A';
         }
-        return known;
+        return registry.scriptPlurality(id);
     }
 
     /** For each placeholder of a pattern, whether it takes several values. */

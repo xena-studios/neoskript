@@ -164,6 +164,11 @@ final class AddonApi implements NeoSkript {
     }
 
     @Override
+    public boolean inDeclaredSyntaxCode() {
+        return co.xenastudios.neoskript.compiler.ScriptCompiler.compilingDeclaredSyntax();
+    }
+
+    @Override
     public String scriptBeingLoaded() {
         return co.xenastudios.neoskript.frontend.parse.LoadingScript.current();
     }

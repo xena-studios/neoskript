@@ -33,6 +33,7 @@ import co.xenastudios.neoskript.harness.scenario.NeoSkriptGuiScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptPlaceholdersScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptWebScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptRegionsScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptLoadOrderScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptReloadScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptReloadSoakScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptAutoReloadScenario;
@@ -74,6 +75,7 @@ public final class HarnessMain {
             new NeoSkriptLanguageScenario(),
             new NeoSkriptSkriptTestsScenario(),
             new NeoSkriptReloadScenario(),
+            new NeoSkriptLoadOrderScenario(),
             new NeoSkriptReloadSoakScenario(),
             new NeoSkriptAutoReloadScenario(),
             new NeoSkriptRuntimeErrorsScenario(),

@@ -16,6 +16,8 @@ public final class FunctionHandle {
     private final String name;
     private volatile CompiledFunction target;
     private volatile String script;
+    /** For declared syntax's code: the scripts whose loaded code uses it, to name them if it goes. */
+    private final java.util.Set<String> users = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public FunctionHandle(String name) {
         this.name = name;
@@ -37,6 +39,11 @@ public final class FunctionHandle {
     /** Whether it's loaded, so it can be called. */
     public boolean loaded() {
         return target != null;
+    }
+
+    /** The scripts whose loaded code uses this handle's declared syntax. */
+    public java.util.Set<String> users() {
+        return users;
     }
 
     public void target(CompiledFunction target) {

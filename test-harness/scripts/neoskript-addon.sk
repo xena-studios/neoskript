@@ -3,6 +3,12 @@
 options:
 	prefix: [harness] addon
 
+# Above the 'on load' that draws the lottery: as in Skript, an event an 'on load' fires reaches only the triggers
+# before it in the load order.
+on lottery draw:
+	set {lottery::last} to event-ticket
+	send "{@prefix} event: %event-ticket% won" to console
+
 on load:
 	set {_steve} to a new ticket for "Steve"
 	set {_alex} to a new ticket for "Alex"
@@ -13,10 +19,6 @@ on load:
 		send "{@prefix} negated condition: %{_steve}% doesn't" to console
 	send "{@prefix} function: %lotteryPrize(3)%" to console
 	draw the lottery with {_steve} and {_alex}
-
-on lottery draw:
-	set {lottery::last} to event-ticket
-	send "{@prefix} event: %event-ticket% won" to console
 
 # Set while the server stops, after the addon has disabled: it's saved with the ticket.
 on unload:
