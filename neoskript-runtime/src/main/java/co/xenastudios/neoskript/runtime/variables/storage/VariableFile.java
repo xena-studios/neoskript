@@ -4,8 +4,10 @@
  */
 package co.xenastudios.neoskript.runtime.variables.storage;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -50,46 +52,56 @@ public final class VariableFile {
 
     /**
      * Reads the file as Skript does: a line that can't be read is skipped and the rest are kept. A skipped line
-     * changes nothing, so an earlier line for the same variable still counts.
+     * changes nothing, so an earlier line for the same variable still counts. The file is read a line at a time,
+     * never held in memory whole, so a file of hundreds of MB needs no more heap than its variables do.
      */
     public static Contents load(Path file) throws IOException {
         Map<String, Entry> entries = new LinkedHashMap<>();
         List<Problem> problems = new ArrayList<>();
-        // Bytes that aren't UTF-8 (a line cut off mid-character) become U+FFFD instead of failing the read,
-        // as with Skript's reader.
-        String text = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
         HexFormat hex = HexFormat.of();
         int number = 0;
-        for (String line : (Iterable<String>) text.lines()::iterator) {
-            number++;
-            if (line.isBlank() || line.startsWith("#")) {
-                continue;
+        // Bytes that aren't UTF-8 (a line cut off mid-character) become U+FFFD instead of failing the read,
+        // as with Skript's reader. Lines end at \n, \r or \r\n, as String.lines() ends them.
+        try (BufferedReader in = new BufferedReader(
+                new InputStreamReader(Files.newInputStream(file), StandardCharsets.UTF_8), 1 << 16)) {
+            String line;
+            while ((line = in.readLine()) != null) {
+                number++;
+                read(line, number, hex, entries, problems);
             }
-            List<String> fields = split(line);
-            String name = fields.getFirst();
-            String shown = name.isEmpty() ? "<unknown>" : name;
-            if (fields.size() != 3) {
-                // Skript's message.
-                problems.add(new Problem(number, line, shown,
-                        "invalid amount of commas in line " + number + " ('" + line + "')"));
-                continue;
-            }
-            if (fields.get(1).isEmpty()) {
-                entries.remove(name);
-                continue;
-            }
-            byte[] bytes;
-            try {
-                bytes = hex.parseHex(fields.get(2));
-            } catch (IllegalArgumentException e) {
-                problems.add(new Problem(number, line, shown,
-                        "invalid value in line " + number + " ('" + line + "'): " + e.getMessage()));
-                continue;
-            }
-            entries.remove(name);
-            entries.put(name, new Entry(name, fields.get(1), bytes));
         }
         return new Contents(entries, problems);
+    }
+
+    /** One line of the file, line {@code number}: into {@code entries}, or {@code problems} if it can't be read. */
+    private static void read(String line, int number, HexFormat hex, Map<String, Entry> entries,
+            List<Problem> problems) {
+        if (line.isBlank() || line.startsWith("#")) {
+            return;
+        }
+        List<String> fields = split(line);
+        String name = fields.getFirst();
+        String shown = name.isEmpty() ? "<unknown>" : name;
+        if (fields.size() != 3) {
+            // Skript's message.
+            problems.add(new Problem(number, line, shown,
+                    "invalid amount of commas in line " + number + " ('" + line + "')"));
+            return;
+        }
+        if (fields.get(1).isEmpty()) {
+            entries.remove(name);
+            return;
+        }
+        byte[] bytes;
+        try {
+            bytes = hex.parseHex(fields.get(2));
+        } catch (IllegalArgumentException e) {
+            problems.add(new Problem(number, line, shown,
+                    "invalid value in line " + number + " ('" + line + "'): " + e.getMessage()));
+            return;
+        }
+        entries.remove(name);
+        entries.put(name, new Entry(name, fields.get(1), bytes));
     }
 
     /**

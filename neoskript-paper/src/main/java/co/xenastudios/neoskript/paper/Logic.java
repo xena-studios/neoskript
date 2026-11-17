@@ -275,14 +275,11 @@ final class Logic {
         registrar.expression("ExprTimes", "integer", info -> {
             timesChecks(info);
             return (context, args) -> {
-                // Rounded, so floating point error doesn't lose one: 10 - 1.05 / 0.15 times is 3 times.
-                long count = info.hasTag("once") ? 1 : info.hasTag("twice") ? 2 : info.hasTag("thrice") ? 3
-                        : args[0] instanceof Number n ? Math.max(0, Math.round(n.doubleValue())) : 0;
-                Object[] numbers = new Object[(int) Math.min(count, Integer.MAX_VALUE)];
-                for (int i = 0; i < numbers.length; i++) {
-                    numbers[i] = (long) i + 1;
-                }
-                return numbers;
+                // Outside a loop, all of them, as Skript's get(), up to a limit (Values.TIMES_LIST_LIMIT). 'loop N
+                // times' and 'for' count them one by one instead (TriggerCompiler), so they never hold N numbers.
+                int count = info.hasTag("once") ? 1 : info.hasTag("twice") ? 2 : info.hasTag("thrice") ? 3
+                        : Values.timesCount(args[0]);
+                return Values.timesList(count);
             };
         }, "%number% time[s]", "(once:once|twice:twice|thrice:thrice)");
         registrar.expression("ExprPi", "number", info -> (context, args) -> Math.PI, "(pi|\u03c0)");

@@ -93,6 +93,56 @@ public final class Values {
         return value instanceof KeyedValues keyed ? keyed.only(type) : filter(value, type);
     }
 
+    /**
+     * How many times {@code N times} counts, as Skript's ExprTimes: {@code N} plus Skript's epsilon ({@code 1e-10}),
+     * rounded down, so floating point error doesn't lose one ({@code 10 - 1.05 / 0.15 times} is 3 times) and
+     * {@code 2.5 times} is 2. Not a number, zero, negative or NaN counts nothing. Skript counts with
+     * {@code LongStream.range(1, N + 1)}, which is empty when {@code N} is {@link Long#MAX_VALUE} (any number from
+     * 2^63 up, and infinity), so those count nothing too. Above {@link Integer#MAX_VALUE} it's capped there: a loop
+     * can't get that far in Skript either without the server's watchdog stopping it.
+     */
+    public static int timesCount(Object amount) {
+        if (!(amount instanceof Number number)) {
+            return 0;
+        }
+        long fixed = (long) (number.doubleValue() + 1e-10);
+        if (fixed <= 0 || fixed == Long.MAX_VALUE) {
+            return 0;
+        }
+        return (int) Math.min(fixed, Integer.MAX_VALUE);
+    }
+
+    /**
+     * The most numbers {@code N times} makes when it isn't looped: a list of them all at once, as Skript's
+     * {@code get()} makes, which for a billion runs out of memory in Skript. Past this it's a runtime error and nothing,
+     * a deliberate difference. {@code loop N times} and {@code for} count as they go and have no such limit.
+     */
+    public static final int TIMES_LIST_LIMIT = 1_000_000;
+
+    /** The numbers 1 to {@code count} for {@code N times} outside a loop, or none, with a runtime error, past the limit. */
+    public static Object[] timesList(int count) {
+        if (count > TIMES_LIST_LIMIT) {
+            RuntimeErrors.report("'" + count + " times' would make a list of " + count
+                    + " numbers, more than the " + TIMES_LIST_LIMIT + " allowed. Loop it ('loop " + count
+                    + " times:') to count that far");
+            return new Object[0];
+        }
+        Object[] numbers = new Object[count];
+        for (int i = 0; i < count; i++) {
+            numbers[i] = (long) i + 1;
+        }
+        return numbers;
+    }
+
+    /**
+     * The value of a {@code loop N times} at {@code index + offset}, worked out instead of kept in an array: that
+     * number plus one, or {@code null} outside the loop's {@code count}, as {@link #element}.
+     */
+    public static Object timesElement(int index, int offset, int count) {
+        long i = (long) index + offset;
+        return i >= 0 && i < count ? Long.valueOf(i + 1) : null;
+    }
+
     /** What a loop goes through: the values, or a queue's elements, which looping takes out of it. */
     public static Object[] loopValues(Object[] values) {
         return loopedQueue(values) != null ? new Object[0] : values;

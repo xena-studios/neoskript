@@ -411,6 +411,126 @@ class LanguageTest {
     }
 
     @Test
+    void timesLoopsCountAsTheyGoAsSkriptsIteratorDoes() {
+        // A billion times would need gigabytes as an array: counted as it goes, 'exit loop' stops it at once.
+        assertEquals(List.of("3", "2", "0", "0", "0", "0", "0", "1:1 2", "2:2 3", "3:3 none", "3", "x1", "x2",
+                "1=1", "2=2", "1000000"), run("""
+                on load:
+                \tloop 1000000000 times:
+                \t\tif loop-value is 3:
+                \t\t\tsay loop-number
+                \t\t\texit loop
+                \tset {_n} to 0
+                \tloop 2.9 times:
+                \t\tadd 1 to {_n}
+                \tsay {_n}
+                \tset {_n} to 0
+                \tset {_m} to -4
+                \tloop {_m} times:
+                \t\tadd 1 to {_n}
+                \tsay {_n}
+                \tloop {_nothing} times:
+                \t\tadd 1 to {_n}
+                \tsay {_n}
+                \t# From 2^63 up Skript's range is empty.
+                \tloop 1e30 times:
+                \t\tadd 1 to {_n}
+                \tsay {_n}
+                \tloop (0 / 0) times:
+                \t\tadd 1 to {_n}
+                \tsay {_n}
+                \tloop (1 / 0) times:
+                \t\tadd 1 to {_n}
+                \tsay {_n}
+                \tset {_k} to 3
+                \tloop {_k} times:
+                \t\tset {_k} to 100
+                \t\tsay "%loop-counter%:%loop-value% %next loop-value ? "none"%"
+                \tsay {_n} + 3
+                \tloop twice:
+                \t\tsay "x%loop-iteration%"
+                \tfor {_i}, {_v} in 2 times:
+                \t\tsay "%{_i}%=%{_v}%"
+                \tset {_c} to 0
+                \tloop 1000000 times:
+                \t\tset {_c} to loop-value
+                \tsay {_c}
+                """));
+    }
+
+    @Test
+    void timesOutsideALoopHasALimitInsteadOfRunningOutOfMemory() {
+        List<String> errors = new ArrayList<>();
+        co.xenastudios.neoskript.runtime.RuntimeErrors.install(new co.xenastudios.neoskript.runtime.RuntimeErrors.Consumer() {
+            @Override
+            public void printError(co.xenastudios.neoskript.runtime.errors.RuntimeError error) {
+                errors.add(error.source().lineNumber() + ": " + error.error());
+            }
+
+            @Override
+            public void printFrameOutput(co.xenastudios.neoskript.runtime.errors.ErrorFrame.Output output,
+                    co.xenastudios.neoskript.runtime.errors.RuntimeError.Level level) {}
+
+            @Override
+            public void logError(String message) {
+                errors.add(message);
+            }
+        }, co.xenastudios.neoskript.runtime.errors.ErrorFrame.Limits.DEFAULT,
+                co.xenastudios.neoskript.runtime.errors.ErrorFrame.Limits.DEFAULT);
+        try {
+            assertEquals(List.of("0", "3", "1000000"), run("""
+                    on load:
+                    \tset {_x::*} to 1000000000 times
+                    \tsay size of {_x::*}
+                    \tset {_y::*} to 3 times
+                    \tsay size of {_y::*}
+                    \tset {_z::*} to 1000000 times
+                    \tsay size of {_z::*}
+                    """));
+            assertEquals(List.of("2: '1000000000 times' would make a list of 1000000000 numbers, more than the 1000000"
+                    + " allowed. Loop it ('loop 1000000000 times:') to count that far"), errors);
+        } finally {
+            co.xenastudios.neoskript.runtime.RuntimeErrors.install(null,
+                    co.xenastudios.neoskript.runtime.errors.ErrorFrame.Limits.DEFAULT,
+                    co.xenastudios.neoskript.runtime.errors.ErrorFrame.Limits.DEFAULT);
+        }
+    }
+
+    @Test
+    void timesLoopsCarryOnAfterAWait() {
+        java.util.ArrayDeque<Runnable> later = new java.util.ArrayDeque<>();
+        co.xenastudios.neoskript.runtime.Waits.install(new co.xenastudios.neoskript.runtime.scheduler.Scheduler() {
+            @Override
+            public void runGlobal(Runnable task) {
+                later.add(task);
+            }
+
+            @Override
+            public void runGlobalLater(long ticks, Runnable task) {
+                later.add(task);
+            }
+
+            @Override
+            public Runnable runGlobalRepeating(long ticks, Runnable task) {
+                throw new UnsupportedOperationException();
+            }
+        }, e -> {
+            throw e;
+        });
+        run("""
+                on load:
+                \tloop 3 times:
+                \t\tsay "%loop-value% %previous loop-value ? 0%"
+                \t\twait 1 tick
+                \tsay "done"
+                """);
+        while (!later.isEmpty()) {
+            later.poll().run();
+        }
+        assertEquals(List.of("1 0", "2 1", "3 2", "done"), said);
+    }
+
+    @Test
     void delayStateFollowsSkriptsRules() {
         Library library = new Library();
         library.enableTesting();
