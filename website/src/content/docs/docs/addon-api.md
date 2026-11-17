@@ -266,6 +266,12 @@ registrar.pausingEffect("MyAddonEffQuery", info -> PausingEffect.storing(1, (con
 
 The value is stored as `set` would. A `Map` sets a list's indices, and a map or list in it makes a list under its index: `{"name": ["Steve", "Alex"]}` gives `{_rows::name::1}` and `{_rows::name::2}`. A `Collection` or an array is several values, numbered from 1.
 
+A stage's `java.time.Instant` is stored as a date and a `Duration` as a timespan, since an addon can't make Skript's own date and timespan values.
+
+When the work goes wrong in a way your addon reports itself, as skript-db keeps its error for `the last sql error`, complete the stage with `PausingEffect.UNCHANGED`: nothing is stored, the target keeps its value, and there's no runtime error.
+
+A pausing effect may implement `KeyAware` to get list variables with their indices. With `recursiveKeys()`, it gets every value under the list, each at its path (`{_rows::1::2}` at `1::2`), as skript-db's batch arguments, a list of lists, need.
+
 **What scripts see.** A pausing element is a delay for Skript's rules, as `wait` is, from the start of its line: the line runs once the value is there, so on that line and after it the event has passed. `return` can't be used there, nor `cancel event` and the like. A stage that fails is a runtime error on the line, with its exception's message, and the trigger carries on: the expression has no value, the variable isn't changed. If the stage takes longer than its timeout, the same happens, and NeoSkript tries to cancel it. The timeout is a minute unless you set one; an addon whose work has its own time limit (a database query, a web request) should set the element's to match it, so scripts see the addon's error rather than NeoSkript's:
 
 ```java
@@ -275,6 +281,62 @@ registrar.timeout("MyAddonEffQuery", Duration.ofSeconds(30));
 At most 10,000 triggers wait at once; past that, a pausing element fails at once with a runtime error. `/sk info` shows how many are waiting.
 
 **Reloads and stopping.** A trigger whose script is reloaded or unloaded while it waits carries on with the code it started with, as after a `wait`. When the server stops, `on unload` triggers run first, and what they pause for (a last write to a database) gets up to 3 seconds to finish before the server exits. Then triggers still waiting are dropped without carrying on, as after a `wait`. Their stages aren't cancelled: the work may still be running, and finishing or stopping it is up to your addon's own `onDisable`. A stage that completes after a timeout or a stop is ignored, and NeoSkript keeps nothing of the trigger or its event once its pause is over, so holding on to a stage doesn't hold on to old scripts or players.
+
+### Sections that pause
+
+A pausing section pauses before its code and again after it, as a database transaction opens, runs its statements, then commits:
+
+```java
+registrar.pausingSection("MyAddonSecBatch", info -> new PausingSection() {
+    public CompletionStage<?> start(TriggerContext context, Object[] args) {
+        return CompletableFuture.supplyAsync(() -> open(context.event(), args[0]), executor);
+    }
+
+    public CompletionStage<?> end(TriggerContext context) {
+        return CompletableFuture.runAsync(() -> close(context.event()), executor);
+    }
+}, "batch on %text%");
+```
+
+```
+batch on "orders":
+    ...
+```
+
+Each pause is a pausing effect's, with its timeout and failures. The code runs once after `start`, unless its stage fails, times out or completes with `false`; `end` runs whenever the trigger reaches the end of the section, whether or not the code ran. Code that leaves the section another way (`stop`, `return`) skips `end`, so clean up what such a section left open yourself, after a while. The element is shared by every run of the trigger: keep what a run opened by its event, not in the element.
+
+A pausing effect inside the section leaves it by completing its stage with `PausingSection.LEAVE`: the rest of the code is skipped and `end` runs, as a failed statement leaves skript-db's transaction.
+
+### The expressions in a text
+
+An element can take a text written in quotes with the expressions in it kept apart, rather than joined into one string. skript-db does this to send each one to the database as a parameter, so a value can't change the query. Implement `TemplateAware` on the element and say which arguments:
+
+```java
+final class Query implements PausingEffect, TemplateAware {
+    public boolean template(int index) {
+        return index == 0;
+    }
+
+    public CompletionStage<?> start(TriggerContext context, Object[] args) {
+        if (args[0] instanceof TextTemplate text) {
+            // text.pieces(): the text around the expressions, one more than the holes.
+            // text.holes(): each expression's element id, how it's written, its values, and each value as text.
+        }
+        ...
+    }
+}
+```
+
+The argument is a `TextTemplate` only where the script writes a text in quotes; anything else, like a variable, arrives as usual. While the script loads, the factory sees the same shape, without values, in `info.argumentText(index)`, and the id of the element an argument is in `info.argumentElement(index)`, to check how it's written:
+
+```java
+registrar.pausingEffect("MyAddonEffQuery", info -> {
+    if (info.argumentText(0) == null) {
+        throw new SyntaxError("Write the query as text in quotes");
+    }
+    return new Query();
+}, "query %text%");
+```
 
 ## Loop values
 
