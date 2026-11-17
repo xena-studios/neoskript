@@ -364,12 +364,13 @@ public final class DatabaseSettings {
     private static NeoSkriptConfig.Interval interval(Object raw, String fallback, String at, List<String> warnings,
             boolean zeroIsOff) {
         String text = raw == null ? fallback : String.valueOf(raw).strip();
+        // Only the text 0 is off, as Skript checks before anything else (VariablesStorage): "0 seconds" is an
+        // interval, which with backups-to-keep 0 still removes the backups, as in Skript.
         if (zeroIsOff && (text.equals("0") || text.isEmpty())) {
             return null;
         }
         try {
-            NeoSkriptConfig.Interval interval = NeoSkriptConfig.Interval.parse(text);
-            return zeroIsOff && interval.millis() == 0 ? null : interval;
+            return NeoSkriptConfig.Interval.parse(text);
         } catch (IllegalArgumentException e) {
             warnings.add(at + " (\"" + raw + "\") " + e.getMessage() + "; using " + fallback + ".");
             return zeroIsOff && fallback.equals("0") ? null : NeoSkriptConfig.Interval.parse(fallback);

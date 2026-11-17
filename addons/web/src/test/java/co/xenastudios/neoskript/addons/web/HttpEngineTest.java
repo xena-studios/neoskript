@@ -227,10 +227,19 @@ class HttpEngineTest {
         HttpEngine engine = engine(config(5, 8192, 8, 100, false, 2048));
         String message = failure(engine.send(get(base + "/big")));
         assertTrue(message.contains("max-response-memory-megabytes"), message);
-        assertEquals(0, engine.bufferedBytes(), "what it held is released");
+        assertReleased(engine, "what it held is released");
         HttpEngine roomy = engine(config(5, 8192, 8, 100, false, 1024 * 1024));
         assertEquals(4096, roomy.send(get(base + "/big")).join().length());
-        assertEquals(0, roomy.bufferedBytes(), "what it held is released once it's handed over");
+        assertReleased(roomy, "what it held is released once it's handed over");
+    }
+
+    /** The budget is given back as the request finishes, which can be a moment after its result is handed over. */
+    private static void assertReleased(HttpEngine engine, String message) {
+        long until = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while (engine.bufferedBytes() != 0 && System.nanoTime() < until) {
+            Thread.onSpinWait();
+        }
+        assertEquals(0, engine.bufferedBytes(), message);
     }
 
     @Test

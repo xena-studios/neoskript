@@ -373,6 +373,16 @@ public final class SqlVariableStorage implements VariableBackend {
         if (loaded) {
             throw new IllegalStateException(describe() + " is already loaded");
         }
+        if (settings.dialect() == Dialect.SQLITE) {
+            try {
+                // What backups cut off by a crash left: the file's own, so it's never needed.
+                VariableStorage.removeBackupLeftovers(settings.file());
+            } catch (IOException | RuntimeException e) {
+                synchronized (this) {
+                    notes.add("Couldn't remove unfinished backups of " + describe() + ": " + e.getMessage());
+                }
+            }
+        }
         VariableStorage.Result result;
         // On the database's thread, so a database that doesn't answer can't hold the server's thread past the bound.
         Future<VariableStorage.Result> first = thread.submit(() -> connectAndLoad(loadInto, false));
@@ -1307,36 +1317,26 @@ public final class SqlVariableStorage implements VariableBackend {
 
     /**
      * Copies SQLite's file to {@code backups/} with {@code VACUUM INTO}, on the database's thread, so the copy is a
-     * whole, consistent database even while it's written to.
+     * whole, consistent database even while it's written to. It's written as the backup's name with {@code .tmp} after
+     * and renamed once whole, so a crash never leaves a part of one that looks like a backup (the next start removes
+     * it), and {@link #cancelBackup} interrupts it, so the server's stop doesn't wait behind a backup of a big file.
      */
     @Override
     public Path backupNow() throws IOException {
         if (settings.dialect() != Dialect.SQLITE) {
             return VariableBackend.super.backupNow();
         }
+        if (backupCancelled) {
+            return null;
+        }
         Future<Path> done = thread.submit(() -> {
             if (connection == null) {
                 throw new IOException(describe() + " is down (" + problem + ")");
             }
-            Path dir = settings.file().toAbsolutePath().getParent().resolve("backups");
-            Files.createDirectories(dir);
-            String name = settings.file().getFileName().toString();
-            String base = name.substring(0, name.length() - 3);
-            String time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern(
-                    "yyyy-MM-dd_HH-mm-ss"));
-            Path target = dir.resolve(base + "_" + time + VariableStorage.SCHEDULED + ".db");
-            for (int n = 2; Files.exists(target); n++) {
-                target = dir.resolve(base + "_" + time + "-" + n + VariableStorage.SCHEDULED + ".db");
+            if (backupCancelled) {
+                return null;
             }
-            boolean autoCommit = connection.getAutoCommit();
-            connection.setAutoCommit(true);
-            try (PreparedStatement vacuum = connection.prepareStatement("VACUUM INTO ?")) {
-                vacuum.setString(1, target.toString());
-                vacuum.execute();
-            } finally {
-                connection.setAutoCommit(autoCommit);
-            }
-            return target;
+            return VariableStorage.backup(settings.file(), VariableStorage.SCHEDULED, this::vacuumInto);
         });
         try {
             return done.get(closeTimeoutMillis * 4, TimeUnit.MILLISECONDS);
@@ -1347,6 +1347,74 @@ public final class SqlVariableStorage implements VariableBackend {
             throw new IOException("Couldn't back up " + describe() + ": " + message(e), e);
         }
     }
+
+    /** {@code VACUUM INTO} {@code target}'s temporary name, then renamed to it: on the database's thread. */
+    private Path vacuumInto(Path target) throws IOException {
+        if (Files.exists(target)) {
+            throw new java.nio.file.FileAlreadyExistsException(target.toString());
+        }
+        Path temp = Durable.temporary(target);
+        Files.deleteIfExists(temp);
+        try {
+            boolean autoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(true);
+            try (PreparedStatement vacuum = connection.prepareStatement("VACUUM INTO ?")) {
+                vacuum.setString(1, temp.toString());
+                synchronized (backupLock) {
+                    if (backupCancelled) {
+                        throw new IOException("The backup of " + describe() + " was cut off");
+                    }
+                    backupStatement = vacuum;
+                }
+                try {
+                    vacuum.execute();
+                } finally {
+                    synchronized (backupLock) {
+                        backupStatement = null;
+                    }
+                }
+            } finally {
+                connection.setAutoCommit(autoCommit);
+            }
+            if (backupCancelled) {
+                throw new IOException("The backup of " + describe() + " was cut off");
+            }
+            Durable.force(temp);
+            // Not REPLACE_EXISTING: a backup is never written over.
+            Files.move(temp, target);
+            Durable.syncDirectory(target.toAbsolutePath().getParent());
+            return target;
+        } catch (SQLException e) {
+            Files.deleteIfExists(temp);
+            throw new IOException(backupCancelled ? "The backup of " + describe() + " was cut off" : e.getMessage(), e);
+        } catch (IOException | RuntimeException e) {
+            Files.deleteIfExists(temp);
+            throw e;
+        }
+    }
+
+    /**
+     * Interrupts a {@code VACUUM INTO} that's running and stops later ones. Only while one runs, under
+     * {@link #backupLock}: SQLite's interrupt is the whole connection's, and must not reach the write after it.
+     */
+    @Override
+    public void cancelBackup() {
+        synchronized (backupLock) {
+            backupCancelled = true;
+            if (backupStatement != null) {
+                try {
+                    backupStatement.cancel();
+                } catch (SQLException e) {
+                    // Already done: there's nothing to cut off.
+                }
+            }
+        }
+    }
+
+    private final Object backupLock = new Object();
+    private volatile boolean backupCancelled;
+    // Package-private and volatile for tests, which wait for a backup to be running.
+    volatile PreparedStatement backupStatement;
 
     @Override
     public VariableStorage.Detached detach(ClassLoader loader) {
@@ -1368,6 +1436,8 @@ public final class SqlVariableStorage implements VariableBackend {
         if (closed) {
             return;
         }
+        // A backup running on the database's thread would hold up the last write behind it.
+        cancelBackup();
         // A load still running (a late one, or one abandoned at startup) is cut off and never applied: what's in
         // memory is what's kept below.
         synchronized (this) {

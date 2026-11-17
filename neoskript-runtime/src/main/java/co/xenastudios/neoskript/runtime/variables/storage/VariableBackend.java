@@ -55,6 +55,12 @@ public interface VariableBackend extends AutoCloseable {
     }
 
     /**
+     * Cuts off a {@link #backupNow} that's running, leaving no part of its copy behind, and stops later ones: for the
+     * server's stop, so its last save and {@link #close} don't wait for a backup of a big file.
+     */
+    default void cancelBackup() {}
+
+    /**
      * {@link #previous} for many names in a row, as when an addon is disabled: storage that would read a file for each
      * reads it once.
      */
