@@ -106,8 +106,12 @@ public class ClassInfo<T> implements ch.njol.skript.lang.Debuggable {
         return this;
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public ClassInfo<T> serializer(final Serializer<? super T> serializer) {
         this.serializer = serializer;
+        if (serializer != null && serializer.info == null) {
+            ((Serializer) serializer).info = this;
+        }
         return this;
     }
 

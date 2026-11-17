@@ -32,6 +32,24 @@ final class CompatValuesBridge {
         return NeoSkript.get().values().fromJava(CompatAdapters.toNeoSkript(value));
     }
 
+    /** A number as {@code type}, if it's one of Java's number classes; else null. */
+    private static Object number(Number number, Class<?> type) {
+        if (type == Integer.class) {
+            return number.intValue();
+        } else if (type == Long.class) {
+            return number.longValue();
+        } else if (type == Double.class) {
+            return number.doubleValue();
+        } else if (type == Float.class) {
+            return number.floatValue();
+        } else if (type == Short.class) {
+            return number.shortValue();
+        } else if (type == Byte.class) {
+            return number.byteValue();
+        }
+        return null;
+    }
+
     /** {@code type}, boxed if it's primitive. */
     static Class<?> boxed(Class<?> type) {
         return MethodType.methodType(type).wrap().returnType();
@@ -46,6 +64,13 @@ final class CompatValuesBridge {
         Object adapted = CompatAdapters.toSkript(value, boxed);
         if (boxed.isInstance(adapted)) {
             return adapted;
+        }
+        if (value instanceof Number number) {
+            // Numbers as the class asked for, as Skript converts them: NeoSkript's whole numbers are longs.
+            Object converted = number(number, boxed);
+            if (converted != null) {
+                return converted;
+            }
         }
         Class<?> neoskript = CompatAdapters.neoskriptClass(boxed);
         if (neoskript != boxed) {
