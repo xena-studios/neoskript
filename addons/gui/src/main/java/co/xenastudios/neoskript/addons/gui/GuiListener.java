@@ -38,7 +38,12 @@ import org.bukkit.inventory.ItemStack;
 final class GuiListener implements Listener {
 
     private final Guis guis;
-    /** Close events whose closing a script cancelled ({@code cancel the gui closing}), until they're handled. */
+    /**
+     * Close events being handled now, while their code runs: only those can have their closing cancelled. A close
+     * section that waits and then cancels is too late, and isn't kept, nor its event and player.
+     */
+    private final Set<Event> closing = ConcurrentHashMap.newKeySet();
+    /** Of those, the ones whose closing a script cancelled ({@code cancel the gui closing}). */
     private final Set<Event> closeCancelled = ConcurrentHashMap.newKeySet();
 
     GuiListener(Guis guis) {
@@ -46,6 +51,9 @@ final class GuiListener implements Listener {
     }
 
     void cancelClose(Event event, boolean cancel) {
+        if (!closing.contains(event)) {
+            return;
+        }
         if (cancel) {
             closeCancelled.add(event);
         } else {
@@ -83,9 +91,18 @@ final class GuiListener implements Listener {
             click.setCancelled(true);
             return;
         }
+        if (stale(gui)) {
+            click.setCancelled(true);
+            return;
+        }
         List<InventoryClickEvent> changes = new ArrayList<>();
         if (clicked.equals(click.getView().getBottomInventory())) {
             // The player's own inventory, which they may use, except for what would reach the GUI.
+            if ((click.getClick().isShiftClick() || click.getClick() == ClickType.DOUBLE_CLICK)
+                    && click.getWhoClicked() instanceof Player clicker && sharedAcrossRegions(gui, clicker)) {
+                click.setCancelled(true);
+                return;
+            }
             synchronized (gui) {
                 switch (click.getClick()) {
                     case SHIFT_LEFT, SHIFT_RIGHT -> {
@@ -108,6 +125,11 @@ final class GuiListener implements Listener {
             for (InventoryClickEvent change : changes) {
                 change(gui, change);
             }
+            return;
+        }
+        if (click.getClick() == ClickType.DOUBLE_CLICK && click.getWhoClicked() instanceof Player clicker
+                && sharedAcrossRegions(gui, clicker)) {
+            click.setCancelled(true);
             return;
         }
         synchronized (gui) {
@@ -134,10 +156,10 @@ final class GuiListener implements Listener {
         synchronized (gui) {
             Gui.SlotData data = gui.slot(gui.convert(click.getSlot()));
             if (data == null) {
-                click.setCancelled(!gui.changeable());
+                click.setCancelled(!gui.changeable() || sharedAcrossRegions(gui, player));
                 return;
             }
-            click.setCancelled(!gui.changeable(data));
+            click.setCancelled(!gui.changeable(data) || sharedAcrossRegions(gui, player));
             ItemStack current = click.getCurrentItem();
             changes = !click.isCancelled() && (current == null || !click.getCursor().isSimilar(current)
                     || current.getAmount() < current.getMaxStackSize());
@@ -161,10 +183,10 @@ final class GuiListener implements Listener {
         synchronized (gui) {
             Gui.SlotData data = gui.slot(gui.convert(click.getSlot()));
             if (data == null) {
-                click.setCancelled(!gui.changeable());
+                click.setCancelled(!gui.changeable() || sharedAcrossRegions(gui, player));
                 return;
             }
-            click.setCancelled(!gui.changeable(data));
+            click.setCancelled(!gui.changeable(data) || sharedAcrossRegions(gui, player));
             onChange = click.isCancelled() ? null : data.onChange;
         }
         if (onChange != null) {
@@ -182,6 +204,11 @@ final class GuiListener implements Listener {
             return false;
         }
         Inventory inventory = gui.inventory();
+        if (!GENERIC.contains(inventory.getType()) && gui.anyLocked()) {
+            // A furnace, brewing stand and the like put items in slots of their own, not the first empty one: with
+            // any slot locked, a shift-click in is refused rather than guessed at.
+            return false;
+        }
         int left = moved.getAmount();
         for (int slot = 0; slot < inventory.getSize() && left > 0; slot++) {
             ItemStack item = inventory.getItem(slot);
@@ -215,8 +242,10 @@ final class GuiListener implements Listener {
         if (cursor.getType().isAir()) {
             return true;
         }
+        // Vanilla gathers in two passes, full stacks last, and backwards for the right button, so which slots it takes
+        // from can't be told from the count: any locked slot with the item refuses it. (skript-gui stopped counting
+        // once the cursor would be full, and a gather past full stacks of a removable slot took a locked one.)
         Inventory inventory = gui.inventory();
-        int total = cursor.getAmount();
         for (int slot = 0; slot < inventory.getSize(); slot++) {
             ItemStack item = inventory.getItem(slot);
             if (item == null || !item.isSimilar(cursor)) {
@@ -226,13 +255,16 @@ final class GuiListener implements Listener {
                 return false;
             }
             changes.add(withSlot(click, slot));
-            total += item.getAmount();
-            if (total >= cursor.getMaxStackSize()) {
-                break;
-            }
         }
         return true;
     }
+
+    /** Inventories whose slots a shift-click fills in order, as a chest's. */
+    private static final Set<org.bukkit.event.inventory.InventoryType> GENERIC = java.util.EnumSet.of(
+            org.bukkit.event.inventory.InventoryType.CHEST, org.bukkit.event.inventory.InventoryType.BARREL,
+            org.bukkit.event.inventory.InventoryType.ENDER_CHEST, org.bukkit.event.inventory.InventoryType.SHULKER_BOX,
+            org.bukkit.event.inventory.InventoryType.DISPENSER, org.bukkit.event.inventory.InventoryType.DROPPER,
+            org.bukkit.event.inventory.InventoryType.HOPPER);
 
     private static InventoryClickEvent withSlot(InventoryClickEvent click, int slot) {
         return new InventoryClickEvent(click.getView(), click.getSlotType(), slot, click.getClick(), click.getAction());
@@ -262,6 +294,10 @@ final class GuiListener implements Listener {
             return;
         }
         List<InventoryClickEvent> changes = new ArrayList<>();
+        if (sharedAcrossRegions(gui, player) || stale(gui)) {
+            drag.setCancelled(true);
+            return;
+        }
         synchronized (gui) {
             for (int slot : drag.getRawSlots()) {
                 if (slot < end && !gui.changeable(gui.convert(slot))) {
@@ -291,6 +327,10 @@ final class GuiListener implements Listener {
         if (gui == null || !(open.getPlayer() instanceof Player player) || guis.paused(player)) {
             return;
         }
+        if (stale(gui)) {
+            open.setCancelled(true);
+            return;
+        }
         SectionCode code = gui.onOpen();
         if (code != null) {
             run(gui, open, code, player);
@@ -304,14 +344,20 @@ final class GuiListener implements Listener {
             return;
         }
         SectionCode code = gui.onClose();
+        closing.add(close);
         try {
             if (code != null) {
                 run(gui, close, code, player);
             }
         } finally {
+            closing.remove(close);
             boolean reopen = closeCancelled.remove(close);
-            if (reopen && player.isOnline() && close.getReason() != InventoryCloseEvent.Reason.DISCONNECT) {
-                // Opened again on the player's own thread (skript-gui used the global one, which Folia refuses).
+            InventoryCloseEvent.Reason reason = close.getReason();
+            boolean gone = reason == InventoryCloseEvent.Reason.DISCONNECT || reason == InventoryCloseEvent.Reason.DEATH
+                    || !player.isOnline();
+            if (reopen && !gone) {
+                // Opened again on the player's own thread, on the next tick (skript-gui used the global thread,
+                // which Folia refuses).
                 guis.later(player, () -> {
                     if (player.isOnline() && guis.of(gui.inventory()) == gui) {
                         guis.pause(player);
@@ -322,21 +368,48 @@ final class GuiListener implements Listener {
                         }
                     }
                 });
-            } else if (gui.id() == null && gui.inventory().getViewers().size() <= 1) {
-                // Nobody else has it open, and it isn't global: it goes.
+            } else if (gui.id() == null && gui.viewers().stream().allMatch(viewer -> viewer == player)) {
+                // Nobody else has it open, and it isn't global: it goes now, here, as the player may be leaving or
+                // dead, when their thread's tasks don't run.
+                guis.unregister(gui, player);
+            }
+            if (!gone) {
+                // As skript-gui (its issue 60): the player's inventory is sent again, so nothing they were shown
+                // sticks.
                 guis.later(player, () -> {
-                    if (gui.id() == null && gui.inventory().getViewers().isEmpty()) {
-                        guis.unregister(gui);
+                    if (player.isOnline()) {
+                        player.updateInventory();
                     }
                 });
             }
-            // As skript-gui (its issue 60): the player's inventory is sent again, so nothing they were shown sticks.
-            guis.later(player, () -> {
-                if (player.isOnline()) {
-                    player.updateInventory();
-                }
-            });
         }
+    }
+
+    /**
+     * Whether another player with the GUI open is on another region's thread (Folia): items a click allows would
+     * then move on two threads at once, so nothing moves.
+     */
+    private boolean sharedAcrossRegions(Gui gui, Player player) {
+        for (HumanEntity viewer : gui.viewers()) {
+            if (viewer != player && !guis.owns(viewer)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a GUI has code from an old version of its script (reloaded or unloaded since, even if the GUI was made
+     * afterwards by a trigger of the old version that waited): it goes, rather than run that code.
+     */
+    private boolean stale(Gui gui) {
+        for (SectionCode code : gui.code()) {
+            if (!code.loaded()) {
+                guis.unregister(gui);
+                return true;
+            }
+        }
+        return false;
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)

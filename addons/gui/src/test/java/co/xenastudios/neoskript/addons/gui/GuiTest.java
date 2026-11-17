@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Test;
 class GuiTest {
 
     private final Guis guis = new Guis(() -> null, Logger.getLogger("test"));
+    /** Scripts whose code isn't the loaded version any more. */
+    private static final java.util.Set<String> stale = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     /** A chest inventory of {@code size} slots, without a server: what slots hold, by index. */
     private static Inventory inventory(int size) {
@@ -55,6 +57,25 @@ class GuiTest {
         return null;
     }
 
+    @Test
+    void codeOfTheLoadedVersionStaysThoughItsScriptReloaded() {
+        // Made by the new version before addons heard of the reload: its code is loaded, and it stays.
+        Gui gui = gui(9, null);
+        gui.setItem(0L, item(), false, code("menus/new.sk"));
+        guis.scriptsUnloaded(Set.of("menus/new.sk"));
+        assertSame(gui, guis.of(gui.inventory()));
+    }
+
+    @Test
+    void aShiftClickIntoAGuiWithALockedSlotIsKnownToHaveOne() {
+        Gui gui = gui(9, null);
+        assertTrue(gui.anyLocked());
+        gui.setChangeable(true);
+        assertFalse(gui.anyLocked());
+        gui.setItem(3L, item(), false, code("a.sk"));
+        assertTrue(gui.anyLocked());
+    }
+
     private static SectionCode code(String script) {
         return new SectionCode() {
             @Override
@@ -63,6 +84,11 @@ class GuiTest {
             @Override
             public String script() {
                 return script;
+            }
+
+            @Override
+            public boolean loaded() {
+                return !stale.contains(script);
             }
         };
     }
@@ -148,7 +174,9 @@ class GuiTest {
         Gui fromB = gui(9, null);
         fromB.onClose(code("menus/b.sk"));
         Gui plain = gui(9, null);
+        stale.add("menus/a.sk");
         guis.scriptsUnloaded(Set.of("menus/a.sk"));
+        stale.remove("menus/a.sk");
         assertNull(guis.of(fromA.inventory()));
         assertTrue(guis.retired(fromA.inventory()));
         assertSame(fromB, guis.of(fromB.inventory()));

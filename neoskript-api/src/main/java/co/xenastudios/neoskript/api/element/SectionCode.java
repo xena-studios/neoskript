@@ -25,10 +25,17 @@ public interface SectionCode {
     void run(Object event, Object owner);
 
     /**
-     * The script the code is in: when that script reloads or unloads ({@code Registrar#scriptsUnloaded}), this code
-     * is its old version.
+     * The script the code is in.
      *
      * @return the script's name, as {@code menus/shop.sk}
      */
     String script();
+
+    /**
+     * Whether the code is the loaded version of its script: not once the script has reloaded or unloaded, even for
+     * code made after that by its old version (a trigger that waited across the reload).
+     *
+     * @return whether it's the loaded version
+     */
+    boolean loaded();
 }

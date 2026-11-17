@@ -174,6 +174,7 @@ public interface co.xenastudios.neoskript.api.element.Section
   public abstract java.lang.Object run(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[])
 
 public interface co.xenastudios.neoskript.api.element.SectionCode
+  public abstract boolean loaded()
   public abstract void run(java.lang.Object, java.lang.Object)
   public abstract java.lang.String script()
 

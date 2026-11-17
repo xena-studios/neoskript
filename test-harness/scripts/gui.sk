@@ -62,6 +62,26 @@ function layout(p: player):
 	guilog("name", name of gui "layout")
 	open gui "layout" to {_p}
 
+# NeoSkript only: a double-click gathering diamonds onto the cursor, past a full stack of removable ones, mustn't take
+# the locked one (skript-gui's gather took it).
+function gather(p: player):
+	create a gui with virtual chest inventory with 3 rows named "Gather":
+		make gui slot 0 with removable 64 diamonds
+		make gui slot 1 with diamond
+	open the last gui to {_p}
+
+# NeoSkript only: a GUI without an id goes when its player quits or dies with it open.
+function kept(p: player):
+	create a gui with virtual chest inventory with 3 rows named "Kept":
+		make gui slot 0 with diamond
+	set {gui::kept::%{_p}%} to the last gui
+	open the last gui to {_p}
+
+command /nsk-gui-released <text>:
+	trigger:
+		guilog("released %arg-1%", amount of diamond in {gui::kept::%arg-1%})
+		delete {gui::kept::%arg-1%}
+
 command /nsk-gui <player> <text>:
 	trigger:
 		if arg-2 is "shop":
@@ -71,6 +91,10 @@ command /nsk-gui <player> <text>:
 			sticky(arg-1)
 		else if arg-2 is "layout":
 			layout(arg-1)
+		else if arg-2 is "gather":
+			gather(arg-1)
+		else if arg-2 is "kept":
+			kept(arg-1)
 		else if arg-2 is "pages":
 			set {_items::*} to 1, 2, 3, 4, 5, 6 and 7
 			guilog("page 2", page 2 of {_items::*} with 3 values)

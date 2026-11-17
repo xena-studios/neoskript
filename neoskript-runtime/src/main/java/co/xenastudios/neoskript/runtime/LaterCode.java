@@ -15,11 +15,18 @@ final class LaterCode implements SectionCode {
     private final Resumable code;
     private final Frame frame;
     private final String script;
+    private final Object version;
 
-    LaterCode(Resumable code, Frame frame, String script) {
+    LaterCode(Resumable code, Frame frame, String script, Object version) {
         this.code = code;
         this.frame = frame;
         this.script = script;
+        this.version = version;
+    }
+
+    @Override
+    public boolean loaded() {
+        return version == null || ScriptVersions.loaded(script, version);
     }
 
     @Override

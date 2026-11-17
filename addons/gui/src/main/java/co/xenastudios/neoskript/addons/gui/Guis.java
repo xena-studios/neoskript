@@ -57,11 +57,22 @@ final class Guis {
 
     /** Takes a GUI away: its viewers' screens close, and it's cleared. */
     void unregister(Gui gui) {
+        unregister(gui, null);
+    }
+
+    /**
+     * Takes a GUI away, as {@link #unregister(Gui)}, but {@code closing}'s screen is left alone: it's closing already
+     * (the GUI's close event is being handled).
+     */
+    void unregister(Gui gui, HumanEntity closing) {
         Inventory inventory = gui.inventory();
         retired.add(inventory);
         byInventory.remove(inventory, gui);
         last.removeValue(gui);
         for (HumanEntity viewer : gui.viewers()) {
+            if (viewer == closing) {
+                continue;
+            }
             onThreadOf(viewer, () -> {
                 if (viewer.getOpenInventory().getTopInventory().equals(inventory)) {
                     viewer.closeInventory();
@@ -160,6 +171,12 @@ final class Guis {
         }
     }
 
+    /** Whether this thread owns {@code entity}: always on Paper; on Folia, its region's thread. */
+    boolean owns(HumanEntity entity) {
+        Threads threads = this.threads.get();
+        return threads == null || threads.owns(entity);
+    }
+
     /** Runs {@code task} on the thread that owns {@code entity}: now if it's this one. */
     void onThreadOf(HumanEntity entity, Runnable task) {
         Threads threads = this.threads.get();
@@ -171,13 +188,14 @@ final class Guis {
     }
 
     /**
-     * Scripts reloaded or unloaded: the GUIs with code from them close, as that code is the old version. Those
-     * scripts' loads make them again.
+     * Scripts reloaded or unloaded: the GUIs with code that isn't its script's loaded version any more close. Those
+     * scripts' loads make them again. By the code's version, not the scripts' names: a GUI the new version made
+     * before this runs stays.
      */
     void scriptsUnloaded(Set<String> scripts) {
         for (Gui gui : List.copyOf(byInventory.values())) {
             for (SectionCode code : gui.code()) {
-                if (scripts.contains(code.script())) {
+                if (!code.loaded()) {
                     unregister(gui);
                     break;
                 }

@@ -319,6 +319,17 @@ final class TriggerCompiler {
     private java.util.function.BiConsumer<Integer, String> warnings = (line, message) -> {};
 
     /** Sends the warnings this compiler finds to {@code sink}. */
+    /**
+     * What this compile of the script is, for the code of sections that run later to know whether it's still the
+     * script's loaded version ({@code SectionCode.loaded}). {@code null} for code that isn't a script's.
+     */
+    private Object scriptVersion;
+
+    TriggerCompiler version(Object version) {
+        this.scriptVersion = version;
+        return this;
+    }
+
     TriggerCompiler warnings(java.util.function.BiConsumer<Integer, String> sink) {
         this.warnings = sink;
         return this;
@@ -2522,28 +2533,38 @@ final class TriggerCompiler {
         Library.Later later = library.later(header.syntax().id());
         int codeSlot = nextSlot++;
         Label after = new Label();
-        method.visitVarInsn(ALOAD, 0);
-        WaitPoint start = saveFrame();
-        method.visitLdcInsn(constantsScript == null ? "" : constantsScript);
-        method.visitMethodInsn(INVOKESTATIC, VALUES, "laterSection",
-                "(" + Type.getDescriptor(Resumable.class) + FRAME_DESC + STRING_DESC + ")" + OBJECT_DESC, false);
-        method.visitVarInsn(ASTORE, codeSlot);
-        method.visitJumpInsn(GOTO, after);
-        method.visitLabel(start.resume());
         List<Class<?>> outerClasses = eventClasses;
         String outerLabel = eventLabel;
         List<Block> outerBlocks = new ArrayList<>(blocks);
         List<RunOn> outerRunOns = new ArrayList<>(runOns);
-        eventClasses = later.eventClasses();
-        eventLabel = later.eventName();
+        // The code is apart from the loops and 'run on' sections around it: its frame doesn't keep their values (the
+        // players a loop went through), for as long as the code is kept.
         blocks.clear();
         runOns.clear();
         try {
+            method.visitVarInsn(ALOAD, 0);
+            WaitPoint start = saveFrame();
+            method.visitLdcInsn(constantsScript == null ? "" : constantsScript);
+            if (scriptVersion == null) {
+                method.visitInsn(ACONST_NULL);
+            } else {
+                constant(scriptVersion, Object.class);
+            }
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "laterSection",
+                    "(" + Type.getDescriptor(Resumable.class) + FRAME_DESC + STRING_DESC + OBJECT_DESC + ")" + OBJECT_DESC,
+                    false);
+            method.visitVarInsn(ASTORE, codeSlot);
+            method.visitJumpInsn(GOTO, after);
+            method.visitLabel(start.resume());
+            eventClasses = later.eventClasses();
+            eventLabel = later.eventName();
             statements(section.body());
             exitTrigger();
         } finally {
             eventClasses = outerClasses;
             eventLabel = outerLabel;
+            blocks.clear();
+            runOns.clear();
             blocks.addAll(outerBlocks);
             runOns.addAll(outerRunOns);
         }

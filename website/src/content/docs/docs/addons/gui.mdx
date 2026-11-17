@@ -81,16 +81,18 @@ In a slot's code: `gui slot`, `gui raw slot`, `gui hotbar slot`, `gui inventory`
 
 ## Taking items
 
-A GUI is locked unless it's made with `removable items`: nothing can be taken from it or put in it. A slot made `removable` can always change; in an unlocked GUI, so can slots without code. Every way of moving items is checked before any code runs: clicks, shift-clicks from either side, number keys, the offhand key, dropping, double-clicks that gather items, and dragging. A script error in a slot's code can't undo that.
+A GUI is locked unless it's made with `removable items`: nothing can be taken from it or put in it. A slot made `removable` can always change; in an unlocked GUI, so can slots without code. Every way of moving items is checked before any code runs: clicks, shift-clicks from either side, number keys, the offhand key, dropping, a creative player's middle click, double-clicks that gather items, and dragging. A script error in a slot's code can't undo that.
 
 ## Differences from skript-gui
 
 Scripts written for skript-gui 1.4.0 work the same, with these differences:
 
-- **Folia:** a GUI can be open for players in several regions at once. Each click runs on the clicking player's thread, and what decides whether it may change the GUI holds the GUI's lock, briefly, so clicks from two regions can't race. Reopening a GUI whose closing was cancelled happens on the player's thread; skript-gui used the global thread, which Folia refuses.
-- **Reloading:** when a script reloads or unloads, GUIs with code from it close, as that code is the old version. skript-gui left them open, running the old code.
+- **Double-clicks:** a double-click gathering an item onto the cursor is refused if any locked slot of the GUI holds that item. skript-gui stopped counting once the cursor would be full, but the server gathers in two passes, full stacks last, so with a full stack in a removable slot it took the locked item.
+- **Folia:** each click runs on the clicking player's thread. While a GUI is open for players in more than one region, nothing can be moved in or out of it, removable slots included: the server moves items on each player's own thread, so two regions could otherwise take the same item. Clicks still run their code. Reopening a GUI whose closing was cancelled happens on the player's thread; skript-gui used the global thread, which Folia refuses.
+- **Shift-clicks into a furnace, brewing stand or other GUI with slots of its own:** refused if any of its slots is locked, as the server puts items in particular slots there, not the first empty one.
+- **Reloading:** when a script reloads or unloads, GUIs with code from its old version close, and one made later by the old version (a trigger that waited across the reload) goes when it's opened or clicked. skript-gui left them open, running the old code.
 - **GUIs that went away:** a player who still has a GUI open after it's deleted or replaced (on Folia, until their region closes it) can't take anything from it.
-- **Nothing kept:** a GUI goes once nobody has it open and it has no id; nothing is kept for players who left. When the addon disables, every GUI closes.
+- **Nothing kept:** a GUI goes once nobody has it open and it has no id, including when its player quits or dies with it open; nothing is kept for players who left. When the addon disables, every GUI closes.
 - **Nested sections:** after `create a gui` or `edit gui` inside another GUI's section, `the gui` stays the inner one. skript-gui switched back to the outer one.
 - **Menu GUIs:** skript-gui's experimental `menu guis` (`%inventory type% menu bound to %player%`, `using menu guis`) aren't supported yet.
 - **`size of gui`** can't be set yet. Its name can.

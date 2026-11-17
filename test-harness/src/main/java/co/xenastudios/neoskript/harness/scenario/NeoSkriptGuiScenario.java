@@ -171,6 +171,7 @@ public final class NeoSkriptGuiScenario implements Scenario {
             // What's compared ends here: the rest is NeoSkript's own.
             int compared = server.mark();
             if (neoskript) {
+                fixes(server, steps, mark);
                 // Reloading the script with its GUI open closes it: its code is the old version.
                 server.command("nsk-gui Alice shop");
                 server.await(line("[bot:Alice] [screen] Shop"), mark, WAIT);
@@ -204,6 +205,64 @@ public final class NeoSkriptGuiScenario implements Scenario {
             }
             transcript.addAll(NeoSkriptPlaceholdersScenario.errors(server.lines(0), ERROR_AT, "[harness] gui error "));
             return transcript;
+        }
+    }
+
+    /**
+     * NeoSkript only, where it does better than skript-gui: a double-click gathering onto the cursor past a full stack
+     * of removable items doesn't take a locked one, a creative player's middle click doesn't copy a locked item, and
+     * a GUI without an id goes when its player quits or dies with it open.
+     */
+    private static void fixes(ServerProcess server, Steps steps, int mark) throws Exception {
+        server.command("clear Alice");
+        server.command("give Alice diamond 1");
+        steps.sync();
+        server.command("nsk-gui Alice gather");
+        server.await(line("[bot:Alice] [screen] Gather"), mark, WAIT);
+        steps.sync();
+        // The diamond from the hotbar (raw slot 54) onto the cursor, then a double-click on an empty slot gathers.
+        steps.click(54, "left");
+        steps.click(55, "double");
+        steps.click(55, "double");
+        int gathered = server.mark();
+        steps.state();
+        expect(server, gathered, "[harness] gui gui diamonds: 65", "a gather took the locked diamond");
+        steps.click(54, "left");
+        server.command("gamemode creative Alice");
+        steps.sync();
+        steps.click(1, "middle");
+        int cloned = server.mark();
+        steps.state();
+        expect(server, cloned, "[harness] gui cursor: 0 airs", "a creative middle click copied the locked diamond");
+        server.command("gamemode survival Alice");
+        steps.close();
+
+        for (String[] leaving : List.of(new String[] {"Bob", "bot quit Bob"}, new String[] {"Carl", "kill Carl"})) {
+            String name = leaving[0];
+            int at = server.mark();
+            server.command("bot join " + name);
+            server.await(line("[bot] " + name + " joined"), at, WAIT);
+            server.command("nsk-gui " + name + " kept");
+            server.await(line("[bot:" + name + "] [screen] Kept"), at, WAIT);
+            server.command(leaving[1]);
+            if (leaving[1].startsWith("bot quit")) {
+                server.await(line("[bot] " + name + " left"), at, WAIT);
+            } else {
+                server.await(Pattern.compile("Killed " + name + "|" + name + " (died|was killed|fell)"), at, WAIT);
+            }
+            steps.sync();
+            int released = server.mark();
+            server.command("nsk-gui-released " + name);
+            server.await(Pattern.compile(Pattern.quote("[harness] gui released " + name + ": ") + "\\d+$"), released, WAIT);
+            expect(server, released, "[harness] gui released " + name + ": 0",
+                    "the GUI of a player who " + (name.equals("Bob") ? "quit" : "died") + " with it open was kept");
+        }
+        server.command("bot quit Carl");
+    }
+
+    private static void expect(ServerProcess server, int from, String text, String failure) throws Exception {
+        if (server.lines(from).stream().noneMatch(l -> l.endsWith(text))) {
+            throw new HarnessFailure(failure + ": no '" + text + "'. See " + server.logFile());
         }
     }
 

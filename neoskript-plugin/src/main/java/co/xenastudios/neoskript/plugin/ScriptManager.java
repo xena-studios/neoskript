@@ -268,12 +268,13 @@ final class ScriptManager {
         List<SourceFile> files = read();
         List<ParsedScript> parsed;
         CompiledScripts compiled;
+        ScriptCompiler compiler = new ScriptCompiler(library, globals, functions);
         try {
             parsed = new ScriptLoader(library.registry()).load(files);
             // Which item names each script looks up, so /sk reload aliases reloads the scripts a change affects.
             co.xenastudios.neoskript.paper.GlobalAliases.recordUses();
             try {
-                compiled = new ScriptCompiler(library, globals, functions).compile(parsed);
+                compiled = compiler.compile(parsed);
             } finally {
                 Map<String, Set<String>> uses = co.xenastudios.neoskript.paper.GlobalAliases.recordedUses();
                 itemNames.clear();
@@ -400,6 +401,15 @@ final class ScriptManager {
             if (loaded.containsKey(name)) {
                 stopped.add(name);
             }
+        }
+        for (String name : stopped) {
+            if (!switching.contains(name)) {
+                co.xenastudios.neoskript.runtime.ScriptVersions.unloaded(name);
+            }
+        }
+        for (String name : switching) {
+            // This compile is now the script's loaded version: code from the one before knows it isn't.
+            co.xenastudios.neoskript.runtime.ScriptVersions.load(name, compiler.version(name));
         }
         for (String name : switching) {
             // The previous version of a script unloads before the new one loads.
@@ -716,6 +726,7 @@ final class ScriptManager {
         }
         updateListenersAndCommands();
         if (old != null) {
+            co.xenastudios.neoskript.runtime.ScriptVersions.unloaded(name);
             tellUnloaded(Set.of(name));
         }
     }

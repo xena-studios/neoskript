@@ -241,6 +241,16 @@ final class Gui implements Nameable {
         this.changeable = changeable;
     }
 
+    /** Whether any slot of the inventory can't be changed by a player. */
+    synchronized boolean anyLocked() {
+        for (int i = 0; i < inventory.getSize() && i < layout.length(); i++) {
+            if (!changeable(layout.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Whether the slots of {@code ch} can have their item changed by a player. */
     synchronized boolean changeable(char ch) {
         SlotData data = slots.get(ch);

@@ -136,8 +136,8 @@ public interface Registrar {
 
     /**
      * Tells the addon which scripts' code stopped, each time scripts reload or unload: those reloaded, unloaded
-     * or removed. Code from them it still holds, as {@link co.xenastudios.neoskript.api.element.SectionCode}, is
-     * the old version. It's called on the thread that loaded them, the global thread on Folia; an exception from it
+     * or removed. Code it still holds, as {@link co.xenastudios.neoskript.api.element.SectionCode}, says itself
+     * whether it's the loaded version ({@link co.xenastudios.neoskript.api.element.SectionCode#loaded}). It's called on the thread that loaded them, the global thread on Folia; an exception from it
      * is logged.
      *
      * @param scripts what gets the scripts' names, as {@code menus/shop.sk}

@@ -443,7 +443,6 @@ public final class Library implements Registrar {
         }, patterns);
     }
 
-    /** The type of the values a library section's code runs for, or {@code null} if {@code id} isn't one. */
     /** A section whose code runs later, for events of its own: what they're called and their classes. */
     public record Later(String eventName, List<Class<?>> eventClasses) {}
 
@@ -485,6 +484,7 @@ public final class Library implements Registrar {
         return java.util.Collections.unmodifiableList(unloadWatchers);
     }
 
+    /** The type of the values a library section's code runs for, or {@code null} if {@code id} isn't one. */
     String sectionType(String id) {
         return sectionTypes.get(id);
     }
