@@ -107,6 +107,25 @@ final class LineParser {
         return input;
     }
 
+    private int steps;
+
+    /** Checks now and then that the line hasn't run out of time: see {@link ParserContext#startLine}. */
+    private void spend() {
+        if ((++steps & 255) == 0) {
+            context.checkTime();
+        }
+    }
+
+    /** Thrown when a line takes longer to read than {@link ParserContext#LINE_TIME_LIMIT_NANOS}. */
+    static final class TooComplex extends RuntimeException {
+        TooComplex() {
+            super(TOO_COMPLEX, null, false, false);
+        }
+    }
+
+    /** The error for a line that took too long to read. */
+    static final String TOO_COMPLEX = "This line is too complex to be understood. Split it into shorter lines";
+
     // ---------------------------------------------------------------- statements and other syntax
 
     ParsedSyntax effect(int start, int end) {
@@ -979,7 +998,13 @@ final class LineParser {
             boolean[] leaned) {
         return new PlaceholderResolver() {
             @Override
+            public void step() {
+                spend();
+            }
+
+            @Override
             public Object resolve(String text, int start, int end, PlaceholderSpec spec) {
+                spend();
                 if (!splitTokens && splitsToken(start)) {
                     tokenSplits++;
                     return null;
@@ -2061,7 +2086,51 @@ final class LineParser {
         }
         Expected item = context.intern(expected.single());
         int n = separators.size();
-        // reach[k]: the items that cover [start, separator k's start), or null if none parse. k == n is the end.
+        List<Expr> split = splitAtEverySeparator(start, end, separators, item, expected);
+        List<List<Expr>> reach = null;
+        if (split == null) {
+            reach = reachable(start, end, separators, item, expected);
+        }
+        List<Expr> items = split != null ? split : reach.get(n);
+        if (items == null) {
+            return null;
+        }
+        if (and[0] && items.size() > 1 && items.stream().anyMatch(each -> !expected.acceptsMany(each.type(), registry))) {
+            return null;
+        }
+        String type = items.stream().map(Expr::type).distinct().count() == 1 ? items.getFirst().type() : SyntaxRegistry.OBJECT;
+        return new Expr.ListOf(start, end, items, and[0], type);
+    }
+
+    /**
+     * The list split at every separator, if each item parses without leaning on unresolved words, else {@code null}.
+     * That's what {@link #reachable} would choose (no item leans on words, and no choice has more items), found
+     * without parsing every run of items as one: that made a list of a few hundred texts take minutes.
+     */
+    private List<Expr> splitAtEverySeparator(int start, int end, List<int[]> separators, Expected item,
+            Expected expected) {
+        List<Expr> items = new ArrayList<>(separators.size() + 1);
+        int from = start;
+        for (int k = 0; k <= separators.size(); k++) {
+            int itemEnd = k == separators.size() ? end : separators.get(k)[0];
+            Expr next = listItem(from, itemEnd, item, expected);
+            if (next == null || next instanceof Expr.Syntax && hasUnresolved(next)) {
+                return null;
+            }
+            items.add(next);
+            if (k < separators.size()) {
+                from = separators.get(k)[1];
+            }
+        }
+        return items;
+    }
+
+    /**
+     * For each separator k, the best items that cover {@code [start, separator k's start)}, or null if none parse;
+     * k == the number of separators is the end. Best is fewest items leaning on unresolved words, then most items.
+     */
+    private List<List<Expr>> reachable(int start, int end, List<int[]> separators, Expected item, Expected expected) {
+        int n = separators.size();
         List<List<Expr>> reach = new ArrayList<>(java.util.Collections.nCopies(n + 1, (List<Expr>) null));
         for (int k = 0; k <= n; k++) {
             int itemEnd = k == n ? end : separators.get(k)[0];
@@ -2087,15 +2156,7 @@ final class LineParser {
                 }
             }
         }
-        List<Expr> items = reach.get(n);
-        if (items == null) {
-            return null;
-        }
-        if (and[0] && items.size() > 1 && items.stream().anyMatch(each -> !expected.acceptsMany(each.type(), registry))) {
-            return null;
-        }
-        String type = items.stream().map(Expr::type).distinct().count() == 1 ? items.getFirst().type() : SyntaxRegistry.OBJECT;
-        return new Expr.ListOf(start, end, items, and[0], type);
+        return reach;
     }
 
     /** How many items are syntax leaning on unresolved words; words alone may still be a literal. */
@@ -2204,6 +2265,7 @@ final class LineParser {
             return cached == IN_PROGRESS || cached == FAILED ? null : cached;
         }
         memo.put(key, IN_PROGRESS);
+        spend();
         Object result = compute.get();
         memo.put(key, result == null ? FAILED : result);
         return result;

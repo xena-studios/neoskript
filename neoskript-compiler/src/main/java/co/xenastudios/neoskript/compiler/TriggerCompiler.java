@@ -7,6 +7,7 @@ package co.xenastudios.neoskript.compiler;
 import static org.objectweb.asm.Opcodes.AALOAD;
 import static org.objectweb.asm.Opcodes.AASTORE;
 import static org.objectweb.asm.Opcodes.IADD;
+import static org.objectweb.asm.Opcodes.IAND;
 import static org.objectweb.asm.Opcodes.IFNULL;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
@@ -85,6 +86,7 @@ import co.xenastudios.neoskript.runtime.region.RegionAccess;
 import co.xenastudios.neoskript.runtime.region.RegionalElements;
 import co.xenastudios.neoskript.runtime.region.Regions;
 import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
+import co.xenastudios.neoskript.runtime.LongLoops;
 import co.xenastudios.neoskript.runtime.Trigger;
 import co.xenastudios.neoskript.runtime.Values;
 import co.xenastudios.neoskript.runtime.command.CommandEvent;
@@ -717,25 +719,29 @@ final class TriggerCompiler {
         }
         exitTrigger();
         method.visitLabel(end);
-        // catch (Throwable t) { throw t instanceof ScriptRuntimeException ? t : new ScriptRuntimeException(...); }
+        // catch (Throwable t) { throw ScriptRuntimeException.at(t, script, line); }
         // Errors from a function called here already say where they happened, so they pass through as is.
         method.visitLabel(handler);
         method.visitVarInsn(ASTORE, EXCEPTION_SLOT);
         String exception = Type.getInternalName(ScriptRuntimeException.class);
-        Label wrap = new Label();
         method.visitVarInsn(ALOAD, EXCEPTION_SLOT);
-        method.visitTypeInsn(INSTANCEOF, exception);
-        method.visitJumpInsn(IFEQ, wrap);
-        method.visitVarInsn(ALOAD, EXCEPTION_SLOT);
-        method.visitInsn(ATHROW);
-        method.visitLabel(wrap);
-        method.visitTypeInsn(NEW, exception);
-        method.visitInsn(DUP);
         method.visitLdcInsn(scriptName);
         method.visitVarInsn(ILOAD, LINE_SLOT);
-        method.visitVarInsn(ALOAD, EXCEPTION_SLOT);
-        method.visitMethodInsn(INVOKESPECIAL, exception, "<init>", "(Ljava/lang/String;ILjava/lang/Throwable;)V", false);
-        method.visitInsn(ATHROW);
+        method.visitMethodInsn(INVOKESTATIC, exception, trigger ? "at" : "inFunction",
+                "(Ljava/lang/Throwable;Ljava/lang/String;I)L" + exception + ";", false);
+        if (!trigger) {
+            // A function whose call ran out of stack returns nothing, as Skript's: the caller carries on.
+            Label stopped = new Label();
+            method.visitInsn(DUP);
+            method.visitJumpInsn(IFNULL, stopped);
+            method.visitInsn(ATHROW);
+            method.visitLabel(stopped);
+            method.visitInsn(POP);
+            method.visitInsn(ACONST_NULL);
+            method.visitInsn(ARETURN);
+        } else {
+            method.visitInsn(ATHROW);
+        }
         method.visitLabel(dispatch);
         if (!trigger) {
             method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
@@ -1856,8 +1862,29 @@ final class TriggerCompiler {
         blocks.pop();
         method.visitLabel(next);
         method.visitIincInsn(indexSlot, 1);
+        checkLongLoop(indexSlot, section.line().number());
         method.visitJumpInsn(GOTO, top);
         method.visitLabel(end);
+    }
+
+    /**
+     * Every {@link LongLoops#EVERY} times round a loop, whose count is in {@code counterSlot}, tells
+     * {@link LongLoops#check} where it is, so a loop that runs for seconds without waiting can be named.
+     */
+    private void checkLongLoop(int counterSlot, int loopLine) {
+        Label skip = new Label();
+        method.visitVarInsn(ILOAD, counterSlot);
+        method.visitJumpInsn(IFEQ, skip);
+        method.visitVarInsn(ILOAD, counterSlot);
+        pushInt(LongLoops.EVERY - 1);
+        method.visitInsn(IAND);
+        method.visitJumpInsn(IFNE, skip);
+        method.visitLdcInsn(constantsScript);
+        pushInt(loopLine);
+        method.visitVarInsn(ILOAD, counterSlot);
+        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(LongLoops.class), "check",
+                "(" + STRING_DESC + "II)V", false);
+        method.visitLabel(skip);
     }
 
     /**
@@ -2223,6 +2250,7 @@ final class TriggerCompiler {
         }
         method.visitLabel(top);
         method.visitIincInsn(counterSlot, 1);
+        checkLongLoop(counterSlot, section.line().number());
         blocks.push(new Block(BlockKind.WHILE, end, next, -1, -1, counterSlot));
         statements(section.body());
         blocks.pop();

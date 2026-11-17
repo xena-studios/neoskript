@@ -266,15 +266,23 @@ class LanguageTest {
     }
 
     @Test
-    void runawayRecursionFailsAtTheScriptLine() {
-        ScriptRuntimeException e = assertThrows(ScriptRuntimeException.class, () -> run("""
-                function forever(n: number) :: number:
-                \treturn forever({_n} + 1)
-                on load:
-                \tsay forever(1)
-                """));
-        assertEquals(2, e.line());
-        assertInstanceOf(StackOverflowError.class, e.getCause());
+    void runawayRecursionStopsTheInnermostCallAsInSkript() {
+        // As Skript's TriggerItem.walk: admins are told once, the call with room to spare returns nothing, and the
+        // trigger carries on.
+        List<String> reported = new ArrayList<>();
+        co.xenastudios.neoskript.runtime.Overflows.install(reported::add);
+        try {
+            assertEquals(List.of("after"), run("""
+                    function forever(n: number) :: number:
+                    \treturn forever({_n} + 1)
+                    on load:
+                    \tset {_x} to forever(1)
+                    \tsay "after"
+                    """));
+        } finally {
+            co.xenastudios.neoskript.runtime.Overflows.install(null);
+        }
+        assertEquals(List.of("test.sk"), reported);
     }
 
     @Test

@@ -24,6 +24,76 @@ import java.util.concurrent.ConcurrentHashMap;
 final class ParserContext {
 
     private final SyntaxRegistry registry;
+
+    /**
+     * How long reading one statement or structure header may take. Real lines, even lists of a thousand values, take
+     * well under a second; past this the parser's search grows much faster than the line (thousands of statements
+     * run together, with quotes that pair up any number of ways), and the line is an error rather than minutes of
+     * work on the thread that loads scripts.
+     */
+    static final long LINE_TIME_LIMIT_NANOS =
+            Long.getLong("neoskript.parse.lineTimeLimitMillis", 10_000L) * 1_000_000L;
+
+    /**
+     * How long reading one script's lines may take in all, for each of its lines: a script of thousands of lines takes
+     * well under a second, so this only stops a script made of many lines that each take nearly
+     * {@link #LINE_TIME_LIMIT_NANOS}. It's never less than three lines' limit, and a bigger script gets more.
+     */
+    static final long SCRIPT_TIME_PER_LINE_NANOS = 20_000_000L;
+
+    /** How many lines the script being read has. */
+    private int scriptLines;
+
+    /** How many lines are being read, one inside the other: a section's header and a line in it. */
+    private int lineDepth;
+
+    /** When the line being read runs out of time, in {@link System#nanoTime} terms. */
+    private long deadline;
+
+    /** When this script runs out of time, from when its first line started, once it has. */
+    private long scriptDeadline;
+    private boolean scriptStarted;
+
+    /** The number of lines in the script, which gives it its time in all. */
+    void scriptLines(int lines) {
+        scriptLines = lines;
+    }
+
+    /** Starts the time for reading one line, returning what to give {@link #endLine} after it. */
+    long startLine() {
+        long outer = lineDepth;
+        lineDepth++;
+        deadline = lineDeadline();
+        return outer;
+    }
+
+    /**
+     * Ends a line {@link #startLine} started. The line around it, a section's header, gets its time again, as what's
+     * in the section isn't its own.
+     */
+    void endLine(long outer) {
+        lineDepth = (int) outer;
+        if (lineDepth > 0) {
+            deadline = lineDeadline();
+        }
+    }
+
+    private long lineDeadline() {
+        long now = System.nanoTime();
+        if (!scriptStarted) {
+            scriptStarted = true;
+            scriptDeadline = now + Math.max(3 * LINE_TIME_LIMIT_NANOS, scriptLines * SCRIPT_TIME_PER_LINE_NANOS);
+        }
+        long line = now + LINE_TIME_LIMIT_NANOS;
+        return line - scriptDeadline < 0 ? line : scriptDeadline;
+    }
+
+    /** Throws {@link LineParser.TooComplex} if the line being read has run out of time. */
+    void checkTime() {
+        if (lineDepth > 0 && System.nanoTime() - deadline > 0) {
+            throw new LineParser.TooComplex();
+        }
+    }
     private final Map<String, List<FunctionInfo>> scriptFunctions;
     /** The current script's local functions, which take precedence over global ones with the same name. */
     private final Map<String, List<FunctionInfo>> localFunctions;

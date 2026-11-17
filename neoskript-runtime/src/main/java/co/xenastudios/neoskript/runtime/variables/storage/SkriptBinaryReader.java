@@ -191,7 +191,13 @@ public final class SkriptBinaryReader implements BinaryReader {
 
     private int length() {
         int first = in.get(in.position()) & 0xFF;
-        return (first & 0x80) != 0 ? in.getShort() & 0x7FFF : in.getInt();
+        int length = (first & 0x80) != 0 ? in.getShort() & 0x7FFF : in.getInt();
+        // A length or count is never more than the bytes left. A damaged value's could be anything, and making an
+        // array that big ran the server out of memory instead of skipping the value.
+        if (length < 0 || length > in.remaining()) {
+            throw new IllegalStateException("Bad length " + length + " with " + in.remaining() + " bytes left");
+        }
+        return length;
     }
 
     private void field(String name, int tag) {

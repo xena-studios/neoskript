@@ -16,6 +16,8 @@ dependencies {
     compileOnly(libs.griefprevention) { isTransitive = false }
     // Language tests run the real standard library through the compiler, without a server.
     testImplementation(project(":neoskript-compiler"))
+    // The fuzz test's scripts.
+    testImplementation(testFixtures(project(":neoskript-frontend")))
     testImplementation(libs.paper.api)
     testImplementation(libs.vault.api) { isTransitive = false }
 }

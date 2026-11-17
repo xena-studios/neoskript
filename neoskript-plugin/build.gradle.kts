@@ -12,7 +12,8 @@ dependencies {
     // Paper ships Gson; the update checker reads Modrinth's answers with it.
     compileOnly(libs.gson)
     testImplementation(libs.gson)
-    // The config and message tests read YAML and MiniMessage as the server does.
+    // The config and message tests read YAML and MiniMessage as the server does, and the trigger tests run
+    // Bukkit's events without a server.
     testImplementation(libs.paper.api)
 }
 

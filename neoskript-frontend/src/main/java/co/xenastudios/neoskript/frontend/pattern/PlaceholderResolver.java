@@ -41,4 +41,10 @@ public interface PlaceholderResolver {
     default Object resolveRegex(String input, int start, int end, int index, java.util.regex.MatchResult match) {
         return match;
     }
+
+    /**
+     * Called as the matcher works through a pattern, so a parser can stop work on a line that takes too long by
+     * throwing. Does nothing by default.
+     */
+    default void step() {}
 }
