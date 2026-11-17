@@ -499,6 +499,13 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public void scriptSyntax(String id, co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler handler,
+            String... patterns) {
+        add(SyntaxKind.STRUCTURE, id, null, handler, patterns);
+        builder.scriptSyntaxHandler(id, handler);
+    }
+
+    @Override
     public void condition(String id, ElementFactory<Condition> factory, String... patterns) {
         add(SyntaxKind.CONDITION, id, null, factory, patterns);
     }
@@ -1952,8 +1959,16 @@ public final class Library implements Registrar {
      * {@link ServerEvent}.
      */
     Object binding(SyntaxInfo syntax) {
+        if (syntax.script() != null) {
+            // Syntax a script declared: what it's bound to is only known while its load compiles.
+            java.util.function.Function<SyntaxInfo, Object> declared = SCRIPT_SYNTAX.get();
+            return declared == null ? null : declared.apply(syntax);
+        }
         return bindings.get(new Key(syntax.kind(), syntax.id()));
     }
+
+    /** What syntax scripts declared is bound to, while a load compiles on this thread: see {@link ScriptCompiler}. */
+    static final ThreadLocal<java.util.function.Function<SyntaxInfo, Object>> SCRIPT_SYNTAX = new ThreadLocal<>();
 
     /**
      * Whether an element of any kind is registered as {@code id}, or as a variant of it ({@code id-2}): what an

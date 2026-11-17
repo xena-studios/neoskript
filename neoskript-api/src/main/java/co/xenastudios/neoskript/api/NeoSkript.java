@@ -190,4 +190,16 @@ public interface NeoSkript {
      */
     @co.xenastudios.neoskript.api.annotation.Experimental
     default void runtimeError(String message) {}
+
+    /**
+     * While an element is set up (its factory runs): whether it's in the code of syntax a script declared
+     * ({@link co.xenastudios.neoskript.api.registration.Registrar#scriptSyntax}), for syntax only that code can use,
+     * as skript-reflect's {@code expression-1}.
+     *
+     * @return whether it is
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default boolean inDeclaredSyntaxCode() {
+        return false;
+    }
 }
