@@ -17,7 +17,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerRegisterChannelEvent;
-import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -79,7 +78,6 @@ public final class NeoSkriptProxy extends JavaPlugin implements Listener {
         NeoSkript.get().addon(getName(), getPluginMeta().getVersion(),
                 registrar -> ProxySyntax.register(registrar, network, messaging, getLogger(),
                         settings.proxyTimeoutMillis()));
-        closeAfterNeoSkript();
     }
 
     /** Sends a plugin message through an online player whose connection has BungeeCord's channel. */
@@ -132,25 +130,6 @@ public final class NeoSkriptProxy extends JavaPlugin implements Listener {
         });
     }
 
-    /**
-     * NeoSkript disables after this (it depends on it), and its on unload triggers may still publish to Redis: the
-     * connections close once NeoSkript has disabled, or 30 seconds after this one if NeoSkript keeps running.
-     */
-    private void closeAfterNeoSkript() {
-        Plugin neoskript = getServer().getPluginManager().getPlugin("NeoSkript");
-        if (neoskript == null) {
-            return;
-        }
-        getServer().getPluginManager().registerEvents(new Listener() {
-            @EventHandler
-            public void onDisable(PluginDisableEvent event) {
-                if (event.getPlugin() == neoskript) {
-                    shutDown();
-                }
-            }
-        }, neoskript);
-    }
-
     @Override
     public void onDisable() {
         if (messaging == null) {
@@ -160,18 +139,28 @@ public final class NeoSkriptProxy extends JavaPlugin implements Listener {
         // stops now, and so do messages to scripts. Only Redis can still publish, for on unload triggers.
         messaging.close();
         network.stopDelivering();
-        Plugin neoskript = getServer().getPluginManager().getPlugin("NeoSkript");
-        if (neoskript == null || !neoskript.isEnabled()) {
+        // NeoSkript disables after this (it depends on it) and runs its on unload triggers then, which may still
+        // publish to Redis: the connection closes once NeoSkript has stopped running scripts.
+        Runnable cancel;
+        try {
+            cancel = NeoSkript.get().whenStopped(this::shutDown);
+        } catch (RuntimeException | LinkageError gone) {
             shutDown();
             return;
         }
+        // Disabled alone, with NeoSkript still running (a plugin manager): closes 30 seconds later, and NeoSkript
+        // lets go of the task, and with it this plugin's classes.
         Thread closer = new Thread(() -> {
             try {
                 Thread.sleep(30_000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            shutDown();
+            Plugin neoskript = Bukkit.getPluginManager().getPlugin("NeoSkript");
+            if (neoskript != null && neoskript.isEnabled()) {
+                shutDown();
+                cancel.run();
+            }
         }, "NeoSkriptProxy-shutdown");
         closer.setDaemon(true);
         closer.start();

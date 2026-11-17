@@ -212,9 +212,12 @@ public final class NeoSkriptProxyScenario implements Scenario {
                         throw new HarnessFailure("NeoSkript logged errors: " + errors + ". See " + server.logFile());
                     }
                 }
+                // b stops: its on unload trigger's Redis message still goes out, and SkRedis on a hears it.
+                markA = serverA.mark();
+                serverB.stop();
+                serverA.await(line("[proxytest] redis bye on net"), markA, WAIT);
                 proxy.command("shutdown");
                 proxy.awaitExit(Duration.ofSeconds(60));
-                serverB.stop();
                 serverC.stop();
                 serverA.stop();
                 context.summary("checks", original.size() + own.size());
