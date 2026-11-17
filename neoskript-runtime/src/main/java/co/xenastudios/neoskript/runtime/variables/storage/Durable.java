@@ -72,28 +72,59 @@ final class Durable {
      * Windows, which needs write access for that.
      */
     static Path copy(Path from, Path to) throws IOException {
+        try (FileChannel in = FileChannel.open(from, StandardOpenOption.READ)) {
+            return copy(in, null, in.size(), to, () -> false, Files.getLastModifiedTime(from));
+        }
+    }
+
+    /**
+     * What a copy to {@code to} is written as until it's whole: always this name, so one a crash left is found by it
+     * exactly, and never one an owner would give a copy of their own ({@code variables.csv.tmp}).
+     */
+    static Path temporary(Path to) {
+        return to.resolveSibling(to.getFileName() + TEMPORARY);
+    }
+
+    /** What {@link #temporary} adds to a copy's name. */
+    static final String TEMPORARY = ".copying.tmp";
+
+    /**
+     * Copies the first {@code size} bytes of {@code in} to a new file {@code to}, as {@link #copy(Path, Path)}, with
+     * {@code head}, if given, in place of the bytes at its start: what they were when {@code in} was opened, for a file
+     * whose header changes while it's copied. The copy is written to {@link #temporary} and renamed once whole, and
+     * {@code cancelled} is checked every few megabytes: once it's true, the copy stops, is removed and throws.
+     */
+    static Path copy(FileChannel in, byte[] head, long size, Path to, java.util.function.BooleanSupplier cancelled,
+            java.nio.file.attribute.FileTime modified) throws IOException {
         if (Files.exists(to)) {
             throw new FileAlreadyExistsException(to.toString());
         }
         // Copied to a temporary name and renamed once whole, so a failed copy never looks like a backup. Through a
         // channel opened here, not Files.copy, which gives the copy the source's permissions.
         Path parent = to.toAbsolutePath().getParent();
-        Path temp = Files.createTempFile(parent, to.getFileName().toString(), ".tmp");
+        Path temp = temporary(to);
+        // The backup it was for was never made, so this is what a crash left of it.
+        Files.deleteIfExists(temp);
         try {
-            try (FileChannel in = FileChannel.open(from, StandardOpenOption.READ);
-                    FileChannel out = FileChannel.open(temp, StandardOpenOption.WRITE)) {
-                long size = in.size();
+            try (FileChannel out = FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
                 long done = 0;
+                if (head != null) {
+                    writeFully(out, head);
+                    done = head.length;
+                }
                 while (done < size) {
-                    long copied = out.transferFrom(in, done, size - done);
+                    if (cancelled.getAsBoolean()) {
+                        throw new IOException("The copy to " + to.getFileName() + " was cut off");
+                    }
+                    long copied = out.transferFrom(in.position(done), done, Math.min(size - done, CHUNK));
                     if (copied <= 0) {
-                        throw new IOException(from + " got shorter while it was copied");
+                        throw new IOException(to.getFileName() + "'s source got shorter while it was copied");
                     }
                     done += copied;
                 }
                 out.force(true);
             }
-            Files.setLastModifiedTime(temp, Files.getLastModifiedTime(from));
+            Files.setLastModifiedTime(temp, modified);
             // Not REPLACE_EXISTING: a backup is never written over.
             Files.move(temp, to);
         } catch (IOException | RuntimeException | Error e) {
@@ -103,6 +134,9 @@ final class Durable {
         syncDirectory(parent);
         return to;
     }
+
+    /** How much is copied between checks that the copy hasn't been cut off. */
+    private static final long CHUNK = 8L << 20;
 
     /** Deletes {@code file} and syncs its directory, so the delete can't be undone by a power cut. */
     static void delete(Path file) throws IOException {

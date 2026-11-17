@@ -71,6 +71,64 @@ class DatabaseSettingsTest {
     }
 
     @Test
+    void backupsFollowSkriptsRulesWithNothingRaised() throws Exception {
+        ConfigLoader.Result<NeoSkriptConfig> result = load("""
+                  never:
+                    type: csv
+                    pattern: a_.*
+                    file: a.csv
+                    backup interval: 0
+                    backups to keep: 0
+                  zero:
+                    type: csv
+                    pattern: b_.*
+                    file: b.csv
+                    backup interval: 0 seconds
+                    backups to keep: 0
+                  zerokept:
+                    type: csv
+                    pattern: c_.*
+                    file: c.csv
+                    backup interval: 0 seconds
+                    backups to keep: 3
+                  short:
+                    type: sqlite
+                    pattern: d_.*
+                    file: d
+                    backup interval: 10 seconds
+                    backups to keep: 2
+                  tiny:
+                    type: csv
+                    pattern: e_.*
+                    file: e.csv
+                    backup interval: 0.01 seconds
+                    backups to keep: 2
+                  default:
+                    type: csv
+                    pattern: .*
+                    file: variables.csv
+                """);
+        assertEquals(List.of(), result.warnings());
+        java.util.Map<String, NeoSkriptPlugin.BackupPlan> plans = new java.util.LinkedHashMap<>();
+        for (DatabaseSettings.Database database : result.config().databases().enabled()) {
+            plans.put(database.name(), NeoSkriptPlugin.BackupPlan.of(database.backupInterval(), database.backupsToKeep()));
+        }
+        // 'backup interval: 0' is off, as Skript checks before anything else: with backups-to-keep 0 too, nothing
+        // is removed, at startup or on a reload.
+        assertEquals(new NeoSkriptPlugin.BackupPlan(false, 0), plans.get("never"));
+        // Any other interval with backups-to-keep 0 removes them, as Skript's backupPurge(file, 0) does.
+        assertEquals(new NeoSkriptPlugin.BackupPlan(true, 0), plans.get("zero"));
+        // Under a tick, Skript's task doesn't start, and nothing is removed.
+        assertEquals(new NeoSkriptPlugin.BackupPlan(false, 0), plans.get("zerokept"));
+        assertEquals(new NeoSkriptPlugin.BackupPlan(false, 0), plans.get("tiny"));
+        // Not raised to a minute: every 10 seconds, as written.
+        assertEquals(new NeoSkriptPlugin.BackupPlan(false, 10_000), plans.get("short"));
+        assertEquals(new NeoSkriptPlugin.BackupPlan(false, 0), plans.get("default"), "left out, there are none");
+        String written = Files.readString(folder.resolve("config.yml"));
+        assertTrue(written.contains("10 seconds"), written);
+    }
+
+    @Test
     void aDatabaseThatCantBeUsedIsKeptWithWhy() throws Exception {
         ConfigLoader.Result<NeoSkriptConfig> result = load("""
                   typo:
@@ -114,7 +172,7 @@ class DatabaseSettingsTest {
     @Test
     void noDatabasesIsSkriptsErrorAndTheDefault() throws Exception {
         ConfigLoader.Result<NeoSkriptConfig> result = load("""
-                  off:
+                  never:
                     type: disabled
                 """);
         assertEquals(DatabaseSettings.DEFAULTS, result.config().databases());

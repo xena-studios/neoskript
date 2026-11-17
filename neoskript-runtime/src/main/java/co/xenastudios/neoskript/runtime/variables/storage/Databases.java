@@ -573,6 +573,15 @@ public final class Databases implements VariableBackend {
         notes.add(line);
     }
 
+    @Override
+    public void cancelBackup() {
+        for (Database database : databases) {
+            if (database.backend != null) {
+                database.backend.cancelBackup();
+            }
+        }
+    }
+
     /**
      * Closes every database at once, the SQL ones writing what's left first, and waits for them all together, at most
      * a little longer than one SQL database may take. One still going then is named in the console; it keeps what it

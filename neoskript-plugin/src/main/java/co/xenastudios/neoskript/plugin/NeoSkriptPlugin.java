@@ -679,7 +679,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     /**
      * Backs up each file database every {@code backup-interval}, keeping the newest {@code backups-to-keep}, as Skript
-     * does. With {@code backups-to-keep: 0}, as in Skript, there are no backups, and that file's old ones are removed.
+     * does (VariablesStorage): an interval of {@code 0} is no backups, and nothing is removed; with
+     * {@code backups-to-keep: 0} there are no backups and that file's scheduled ones are removed; an interval shorter
+     * than a tick makes none. Intervals are used as they're written, however short, as Skript's are.
      */
     private void scheduleBackups() {
         java.util.Map<String, co.xenastudios.neoskript.runtime.variables.storage.Databases.Database> open =
@@ -690,15 +692,18 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         for (DatabaseSettings.Database settings : this.settings.databases().enabled()) {
             var database = open.get(settings.name());
             if (!settings.type().file() || database == null || database.backend() == null
-                    || database.failure() != null || settings.backupInterval() == null) {
+                    || database.failure() != null) {
                 continue;
             }
             VariableBackend backend = database.backend();
-            if (settings.backupsToKeep() == 0) {
+            BackupPlan plan = BackupPlan.of(settings.backupInterval(), settings.backupsToKeep());
+            if (plan.purgeAll()) {
                 purgeBackups(backend, 0);
+            }
+            if (plan.periodMillis() <= 0) {
                 continue;
             }
-            long seconds = Math.max(settings.backupInterval().millis() / 1000, 60);
+            long period = plan.periodMillis();
             getServer().getAsyncScheduler().runAtFixedRate(this, task -> {
                 try {
                     java.nio.file.Path backup = backend.backupNow();
@@ -712,7 +717,27 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                     return;
                 }
                 purgeBackups(backend, settings.backupsToKeep());
-            }, seconds, seconds, TimeUnit.SECONDS);
+            }, period, period, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    /**
+     * What a database's backup settings do, as Skript's {@code VariablesStorage} decides: {@code purgeAll} removes the
+     * scheduled backups once, and a backup is made every {@code periodMillis} if it's above 0.
+     */
+    record BackupPlan(boolean purgeAll, long periodMillis) {
+
+        static BackupPlan of(NeoSkriptConfig.Interval interval, int keep) {
+            if (interval == null) {
+                // 'backup interval: 0': Skript does nothing at all, and removes nothing.
+                return new BackupPlan(false, 0);
+            }
+            if (keep == 0) {
+                return new BackupPlan(true, 0);
+            }
+            // Skript's task runs every so many ticks: under one, it doesn't start. Otherwise exactly as written.
+            long ticks = interval.millis() / 50;
+            return new BackupPlan(false, ticks * 50);
         }
     }
 
@@ -784,6 +809,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         // wait, and the pauses' timer stops.
         co.xenastudios.neoskript.runtime.Pauses.close(PAUSE_GRACE);
         getServer().getAsyncScheduler().cancelTasks(this);
+        if (storage != null) {
+            // A backup still copying a big file is cut off, so the last save and the close don't wait for it.
+            storage.cancelBackup();
+        }
         getServer().getGlobalRegionScheduler().cancelTasks(this);
         co.xenastudios.neoskript.runtime.region.Regions.uninstall();
         if (commands != null) {
