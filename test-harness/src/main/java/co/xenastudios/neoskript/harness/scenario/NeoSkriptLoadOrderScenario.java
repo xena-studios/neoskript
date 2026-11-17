@@ -39,35 +39,47 @@ public final class NeoSkriptLoadOrderScenario implements Scenario {
         return true;
     }
 
+    // The event is a weather change, which on Folia belongs to the global thread 'on load' runs on, so the scenario
+    // runs there too. Only the changes made while {load-on} is set count, whatever the weather was.
     private static final String ONE = """
-            on spawn of armadillo:
-            \tadd "1: spawn" to {load::*}
+            on weather change:
+            \t{load-on} is set
+            \tadd "1: weather" to {load::*}
             """;
 
     private static final String TWO = """
-            on spawn of armadillo:
-            \tadd "2: spawn, above the on load" to {load::*}
+            on weather change:
+            \t{load-on} is set
+            \tadd "2: weather, above the on load" to {load::*}
 
             on load:
             \tadd "2: load" to {load::*}
-            \tspawn an armadillo at location(0.5, 300, 0.5, world "world")
-            \tadd "2: load, after the spawn" to {load::*}
+            \tset weather in world "world" to clear
+            \tset {load-on} to true
+            \tset weather in world "world" to rain
+            \tdelete {load-on}
+            \tadd "2: load, after the weather" to {load::*}
 
-            on spawn of armadillo:
-            \tadd "2: spawn, below the on load" to {load::*}
+            on weather change:
+            \t{load-on} is set
+            \tadd "2: weather, below the on load" to {load::*}
             """;
 
     private static final String THREE = """
-            on spawn of armadillo:
-            \tadd "3: spawn, above the on load" to {load::*}
+            on weather change:
+            \t{load-on} is set
+            \tadd "3: weather, above the on load" to {load::*}
 
             on load:
             \tadd "3: load" to {load::*}
-            \tspawn an armadillo at location(0.5, 300, 0.5, world "world")
+            \tset {load-on} to true
+            \tset weather in world "world" to clear
+            \tdelete {load-on}
             \tsend "[harness] load order: loaded" to console
 
-            on spawn of armadillo:
-            \tadd "3: spawn, below the on load" to {load::*}
+            on weather change:
+            \t{load-on} is set
+            \tadd "3: weather, below the on load" to {load::*}
             """;
 
     private static final String SHOW = """
@@ -79,12 +91,13 @@ public final class NeoSkriptLoadOrderScenario implements Scenario {
             """;
 
     /** What Skript printed after loading every script: at startup, and reloading them all. */
-    private static final String ALL = "2: load, 1: spawn, 2: spawn, above the on load, 2: load, after the spawn, 3: load,"
-            + " 1: spawn, 2: spawn, above the on load, 2: spawn, below the on load and 3: spawn, above the on load";
+    private static final String ALL = "2: load, 1: weather, 2: weather, above the on load, 2: load, after the weather,"
+            + " 3: load, 1: weather, 2: weather, above the on load, 2: weather, below the on load and 3: weather, above the"
+            + " on load";
 
     /** What Skript printed after reloading load-fire-2.sk on its own. */
-    private static final String TWO_ALONE = "2: load, 1: spawn, 3: spawn, above the on load, 3: spawn, below the on load,"
-            + " 2: spawn, above the on load and 2: load, after the spawn";
+    private static final String TWO_ALONE = "2: load, 1: weather, 3: weather, above the on load, 3: weather, below the"
+            + " on load, 2: weather, above the on load and 2: load, after the weather";
 
     @Override
     public void run(ScenarioContext context) throws Exception {

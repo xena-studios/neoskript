@@ -283,6 +283,9 @@ final class ScriptManager {
         return load(scope, problems, now, null);
     }
 
+    /** The scripts being loaded whose triggers don't all listen yet, or {@code null}: see {@link LoadWalk}. */
+    private volatile LoadWalk walk;
+
     /**
      * With {@code redirect}, every problem (warnings too) goes there instead of the log and
      * {@code problems}: for {@code auto reload}, which sends them to its recipients.
@@ -576,7 +579,8 @@ final class ScriptManager {
                 Messages.component("what", what));
         ScriptReport report = new ScriptReport("sk");
         try {
-            load(name::equals, problem -> {}, false, report);
+            // On the global region's thread, so load events run straight away, as for /sk reload.
+            load(name::equals, problem -> {}, true, report);
             report.send(audience, "Automatically reloaded", what, (System.nanoTime() - start) / 1_000_000);
         } catch (IOException | RuntimeException e) {
             logger.error("Exception occurred while automatically reloading a script ({})", name, e);
@@ -803,18 +807,24 @@ final class ScriptManager {
     }
 
     /**
-     * Listens for the loaded scripts' events and registers their commands. Each goes ahead even if the other
-     * fails, so a server that refuses one doesn't leave the scripts half switched over.
-     */
-    /**
      * When each loaded trigger was registered, by identity: as in Skript, an event's triggers run in that order, so
      * those of a script reloaded on its own run after the others'.
      */
     private final Map<co.xenastudios.neoskript.runtime.Trigger, Long> registeredAt = new java.util.IdentityHashMap<>();
     private long registrations;
 
+    /** The loaded triggers, by identity, as last listened for: one not among them has unloaded or reloaded. */
+    private volatile Set<CompiledScripts.CompiledTrigger> current = Set.of();
+
+    /**
+     * Listens for the loaded scripts' events and registers their commands. Each goes ahead even if the other
+     * fails, so a server that refuses one doesn't leave the scripts half switched over.
+     */
     private void updateListenersAndCommands() {
         List<CompiledScripts.CompiledTrigger> all = new ArrayList<>(loaded.values().stream().flatMap(List::stream).toList());
+        Set<CompiledScripts.CompiledTrigger> now = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        now.addAll(all);
+        current = now;
         Set<co.xenastudios.neoskript.runtime.Trigger> listening = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         all.forEach(trigger -> listening.add(trigger.trigger()));
         registeredAt.keySet().retainAll(listening);
@@ -895,22 +905,13 @@ final class ScriptManager {
         }
     }
 
-    /** The scripts being loaded whose triggers don't all listen yet, or {@code null}: see {@link LoadWalk}. */
-    private volatile LoadWalk walk;
-
     /**
      * Goes through the triggers of the scripts loaded, in Skript's load order: each {@code on load} runs when it's
      * reached, and each other trigger listens from then on.
      */
     private void walk(List<CompiledScripts.CompiledTrigger> order, LoadWalk loadWalk) {
         try {
-            for (int i = 0; i < order.size(); i++) {
-                CompiledScripts.CompiledTrigger trigger = order.get(i);
-                if (trigger.event() == ScriptEvent.LOAD) {
-                    run(trigger);
-                }
-                loadWalk.reach(i);
-            }
+            walk(order, loadWalk, trigger -> current.contains(trigger), this::run);
         } finally {
             loadWalk.finish();
             synchronized (this) {
@@ -919,6 +920,22 @@ final class ScriptManager {
                     events.walk(null);
                 }
             }
+        }
+    }
+
+    /**
+     * {@link #walk(List, LoadWalk)}'s steps: each {@code on load} that's still {@code loaded} runs when it's reached,
+     * and each trigger listens from then on. One whose script has unloaded or reloaded since, as an {@code on load}
+     * before it may have had done, doesn't run.
+     */
+    static void walk(List<CompiledScripts.CompiledTrigger> order, LoadWalk loadWalk,
+            Predicate<CompiledScripts.CompiledTrigger> loaded, Consumer<CompiledScripts.CompiledTrigger> run) {
+        for (int i = 0; i < order.size(); i++) {
+            CompiledScripts.CompiledTrigger trigger = order.get(i);
+            if (trigger.event() == ScriptEvent.LOAD && loaded.test(trigger)) {
+                run.accept(trigger);
+            }
+            loadWalk.reach(i);
         }
     }
 

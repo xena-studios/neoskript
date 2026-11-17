@@ -1,15 +1,19 @@
 # Probe: see load-fire-1. By this script's 'on load', every trigger before it listens: load-fire-1's, both of
 # load-fire-2's, and the one above it here.
 
-on spawn of armadillo:
-	add "3: spawn, above the on load" to {diff::load-fire::*}
+on weather change:
+	{diff::load-fire-on} is set
+	add "3: weather, above the on load" to {diff::load-fire::*}
 
 on load:
 	add "3: load" to {diff::load-fire::*}
-	spawn an armadillo at location(0.5, 300, 0.5, world "world")
+	set {diff::load-fire-on} to true
+	set weather in world "world" to clear
+	delete {diff::load-fire-on}
 
-on spawn of armadillo:
-	add "3: spawn, below the on load" to {diff::load-fire::*}
+on weather change:
+	{diff::load-fire-on} is set
+	add "3: weather, below the on load" to {diff::load-fire::*}
 
 function probe_load_fire_3():
 	show("load fire", {diff::load-fire::*})
