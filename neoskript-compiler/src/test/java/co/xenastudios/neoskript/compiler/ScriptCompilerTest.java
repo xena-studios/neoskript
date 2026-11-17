@@ -104,4 +104,23 @@ class ScriptCompilerTest {
         CompiledScripts compiled = compile("on load:\n\tloop 1, 2 and 3:\n\t\tsay \"%11 - loop-number%\"\n\t\twait 1 second\n");
         assertEquals(List.of(), compiled.diagnostics());
     }
+
+    @Test
+    void addonsGiveLoopsOverTheirExpressionsLoopValuesOfTheirOwn() {
+        // 'keys of "x"' gives "a" and "b"; in a loop over it, loop-path is "x.a" from the looped expression's argument.
+        library.expression("Keys", "string", info -> (context, args) -> new Object[] {"a", "b"}, "keys of %string%");
+        library.loopValue("Keys", "path", info -> {
+            if (info.mark() != 0) {
+                throw new co.xenastudios.neoskript.api.element.SyntaxError("not here");
+            }
+            return (context, args, current) -> args[0] + "." + current;
+        });
+        run("on load:\n\tloop keys of \"x\":\n\t\tsay loop-path and loop-value\n\tloop 1 and 2:\n\t\tloop keys of \"y\":"
+                + "\n\t\t\tsay loop-path-1\n");
+        assertEquals(List.of("[x.a, a]", "[x.b, b]", "[y.a]", "[y.b]", "[y.a]", "[y.b]"), said);
+        // Only loops over that expression have it.
+        CompiledScripts other = compile("on load:\n\tloop 1 and 2:\n\t\tsay loop-path\n");
+        assertEquals(List.of("There's no loop that matches 'loop-path'"),
+                other.diagnostics().stream().map(d -> d.message()).toList());
+    }
 }

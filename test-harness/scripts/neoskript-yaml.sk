@@ -1,0 +1,94 @@
+# NeoSkriptYaml on its own, on Paper and Folia (the neoskript-yaml scenario): what it does differently from
+# skript-yaml on purpose, files it must not load or touch, and one file changed and saved from two regions' threads at
+# once. The harness writes the files in plugins/YamlCheck first, and runs each command from the console.
+
+function ycheck(label: text, ok: boolean):
+	if {_ok} is true:
+		send "[yamlcheck] ok %{_label}%" to console
+	else:
+		send "[yamlcheck] FAIL %{_label}%" to console
+
+on load:
+	send "[yamlcheck] loaded" to console
+
+command /yamlcheck-basics:
+	trigger:
+		load yaml "plugins/YamlCheck/basics.yml" as "basics"
+		set yaml value "a.b.c" of "basics" to 1
+		set yaml value "a.b.d" of "basics" to "two"
+		add "r1" and "r2" to yaml node keys "" of "basics"
+		ycheck("root node keys", whether yaml paths "r1" and "r2" of "basics" exists)
+		ycheck("paths once each", whether size of all yaml nodes of "basics" is 6)
+		ycheck("list of paths", whether yaml paths "a.b.c" and "a.b.d" of "basics" has values)
+		loop yaml node list "a.b" of "basics":
+			ycheck("loop-key of nodes", whether loop-key is "c" or "d")
+		save yaml "basics" to "plugins/YamlCheck/both-marks.yml" with an indentation of 2 without extra lines between nodes
+		save yaml "basics"
+		load yaml "plugins/YamlCheck/numbers.yml"
+		remove 2 from yaml list "numbers" of "numbers"
+		ycheck("number from a file removed", whether size of yaml list "numbers" of "numbers" is 2)
+		load yaml "plugins/YamlCheck/commented.yml"
+		ycheck("comment under the header", whether comments of yaml node "a" of "commented" is "# kept")
+		save yaml "commented"
+		load yaml "plugins/YamlCheck/kept.yml"
+		ycheck("location in no world reads as nothing", whether yaml value "home" of "kept" is not set)
+		set yaml value "other" of "kept" to "x"
+		save yaml "kept"
+		send "[yamlcheck] basics done" to console
+
+command /yamlcheck-refused:
+	trigger:
+		load yaml "plugins/YamlCheck/broken.yml"
+		ycheck("broken file not loaded", whether yaml "broken" is not loaded)
+		load yaml "plugins/YamlCheck/list.yml"
+		ycheck("list at the top not loaded", whether yaml "list" is not loaded)
+		load yaml "plugins/YamlCheck/bomb.yml"
+		ycheck("alias bomb not loaded", whether yaml "bomb" is not loaded)
+		load yaml "../yaml-escape.yml"
+		ycheck("outside the server not loaded", whether yaml "yaml-escape" is not loaded)
+		load yaml "plugins/../../yaml-escape.yml" as "escape"
+		ycheck("outside the server through plugins not loaded", whether yaml "escape" is not loaded)
+		save yaml "nothing loaded"
+		set yaml value "x" of "nothing loaded" to 1
+		send "[yamlcheck] refused done" to console
+
+command /yamlcheck-big:
+	trigger:
+		load yaml "plugins/YamlCheck/big.yml" as "big"
+		ycheck("big file loaded", whether yaml value "k99999" of "big" is 99999)
+		set yaml value "k100000" of "big" to 100000
+		save yaml "big"
+		load yaml "plugins/YamlCheck/big.yml" as "big again"
+		ycheck("big file saved", whether yaml value "k100000" of "big again" is 100000)
+		send "[yamlcheck] big done" to console
+
+# Two triggers changing and saving one file at once: on Folia, each on its own region's thread.
+command /yamlcheck-stress <text>:
+	trigger:
+		if arg-1 is "near":
+			set {_place} to location(8, 80, 8, world "world")
+		else:
+			set {_place} to location(4104, 80, 4104, world "world")
+		if yaml "stress" is not loaded:
+			load yaml "plugins/YamlCheck/stress.yml" as "stress"
+		run on {_place}:
+			loop 100 times:
+				set yaml value "%arg-1%.n%mod(loop-number, 10)%" of "stress" to loop-number
+				add loop-number to yaml list "%arg-1%-list" of "stress"
+				save yaml "stress"
+				if mod(loop-number, 10) is 0:
+					wait 1 tick
+		send "[yamlcheck] stress %arg-1% done" to console
+
+command /yamlcheck-stress-result:
+	trigger:
+		load yaml "plugins/YamlCheck/stress.yml" as "stress result"
+		ycheck("near saves", whether size of yaml list "near-list" of "stress result" is 100)
+		ycheck("far saves", whether size of yaml list "far-list" of "stress result" is 100)
+		ycheck("still loaded", whether yaml "stress" is loaded)
+		send "[yamlcheck] stress result done" to console
+
+command /yamlcheck-after-reload:
+	trigger:
+		ycheck("loaded after reload", whether yaml "basics" is loaded)
+		send "[yamlcheck] after reload done" to console

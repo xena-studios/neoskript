@@ -134,20 +134,16 @@ public interface NeoSkript {
     Variables variables();
 
     /**
+     * Values as scripts have them: their types, their text, and how Skript saves them. For an addon that writes
+     * values to a file or a database the way Skript would.
+     * @return the values
+     */
+    Values values();
+
+    /**
      * Where code runs: the main thread on Paper, and on Folia, each region's own thread or the global one.
      *
      * @return the threads
      */
     Threads threads();
-
-    /**
-     * A value as it reads in text, as when a script puts it in a text with {@code %...%}: {@code 5} for the number
-     * 5, a player's name for a player, {@code <none>} for nothing.
-     *
-     * @param value the value, as scripts have it, or an {@code Object[]} of several
-     * @return the text
-     */
-    default String text(Object value) {
-        return String.valueOf(value);
-    }
 }

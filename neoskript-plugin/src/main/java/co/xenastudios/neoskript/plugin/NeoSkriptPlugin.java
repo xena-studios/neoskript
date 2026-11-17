@@ -186,7 +186,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (!deferSyntax) {
             loadVariables();
         }
-        AddonApi api = new AddonApi(this, addons, scripts.globals(), getSLF4JLogger());
+        AddonApi api = new AddonApi(this, addons, scripts.globals(), library, getSLF4JLogger());
         co.xenastudios.neoskript.api.Installed.install(api);
         // An addon disables before NeoSkript when the server stops, and its classes go with it. Its values in
         // variables become their saved bytes now, so later saves, after unload events, never need its code.

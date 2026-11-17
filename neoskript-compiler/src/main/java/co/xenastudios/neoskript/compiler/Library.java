@@ -69,6 +69,21 @@ public final class Library implements Registrar {
             .experimentNames(co.xenastudios.neoskript.runtime.ScriptFeatures::codeName);
     private final Map<Key, Object> bindings = new HashMap<>();
     private final Map<String, Class<?>> javaClasses = new HashMap<>();
+    /**
+     * The id of the most specific type values of {@code javaClass} have, or {@code null} for none: for addons
+     * ({@link co.xenastudios.neoskript.api.Values#type}).
+     */
+    public String typeOf(Class<?> javaClass) {
+        String type = superType(javaClass);
+        return SyntaxRegistry.OBJECT.equals(type) ? null : type;
+    }
+
+    /** Text as a value of type {@code typeId}, as a command argument, or {@code null}: for addons. */
+    public Object parse(String text, String typeId) {
+        java.util.function.Function<String, ?> parser = parsers.get(typeId);
+        return parser == null ? null : parser.apply(text);
+    }
+
     /** Every type, in the order registered. */
     private final List<String> javaClassOrder = new ArrayList<>();
     /** The converters, as Skript looks them up to get event values. */
@@ -241,6 +256,32 @@ public final class Library implements Registrar {
     public void effectBefore(String effectId, String otherId) {
         checkOpen();
         builder.before(SyntaxKind.EFFECT, effectId, otherId);
+    }
+
+    /** Addons' {@code loop-<name>} values, by the looped expression's id and then the name. */
+    private final Map<String, Map<String, ElementFactory<co.xenastudios.neoskript.api.element.LoopValue>>> loopValues =
+            new HashMap<>();
+
+    @Override
+    public void loopValue(String expressionId, String name,
+            ElementFactory<co.xenastudios.neoskript.api.element.LoopValue> factory) {
+        checkOpen();
+        java.util.Objects.requireNonNull(factory, "factory");
+        String word = name == null ? "" : name.strip().toLowerCase(java.util.Locale.ROOT);
+        if (!word.matches("[a-z][a-z_]*")) {
+            throw new IllegalArgumentException("A loop value's name is a word of letters, as 'node', not '" + name + "'");
+        }
+        if (Set.of("value", "index", "counter", "iteration").contains(word)) {
+            throw new IllegalArgumentException("loop-" + word + " is Skript's own, so it can't be an addon's loop value");
+        }
+        loopValues.computeIfAbsent(expressionId, id -> new HashMap<>()).put(word, factory);
+        builder.loopValueName(word);
+    }
+
+    /** The factory of the {@code loop-<name>} of loops over expression {@code expressionId}, or {@code null}. */
+    ElementFactory<co.xenastudios.neoskript.api.element.LoopValue> loopValue(String expressionId, String name) {
+        Map<String, ElementFactory<co.xenastudios.neoskript.api.element.LoopValue>> names = loopValues.get(expressionId);
+        return names == null ? null : names.get(name);
     }
 
     @Override

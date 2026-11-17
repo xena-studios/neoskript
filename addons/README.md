@@ -67,6 +67,12 @@ Descriptions and examples come from the addon's `syntax-docs.json`, written as `
 }
 ```
 
+## The addons
+
+| Folder | Plugin | Replaces | Docs |
+|---|---|---|---|
+| `yaml/` | NeoSkriptYaml | skript-yaml 1.7.2 | [neoskript.dev/docs/addons/yaml](https://neoskript.dev/docs/addons/yaml/) |
+
 ## Releasing
 
 An addon is released with NeoSkript, at the same version, from the same tag: its jar from `./gradlew :addons:<name>:build` goes on the GitHub release next to NeoSkript's.
@@ -84,3 +90,12 @@ Each addon gets its own Modrinth project, which only the owner can create. For e
 - Description: it replaces skript-placeholders, scripts written for it load unchanged, it needs NeoSkript and PlaceholderAPI, and it links to [the docs](https://neoskript.dev/docs/addons/placeholders/), which list the differences.
 - Dependencies: **required** NeoSkript (`FuVeJ2X5`) and **required** PlaceholderAPI (`lKEzGugV`). skript-placeholders itself isn't on Modrinth; a fork by someone else is (`skript-placeholders-fork`), which can be marked **incompatible**.
 - Once it exists, an entry in `website/src/data/addons.json` lists it on neoskript.dev/addons with its Modrinth link.
+
+### NeoSkript YAML (`addons/yaml`)
+
+- name `NeoSkript YAML`, slug `neoskript-yaml`;
+- summary: "YAML files from scripts, with skript-yaml's syntax: scripts written for skript-yaml run unchanged on NeoSkript.";
+- description: what it replaces (skript-yaml), that scripts and files carry over unchanged, that saves are written off the server's threads and never half written, that it runs on Folia, that it needs NeoSkript at the same version, and a link to [the docs](https://neoskript.dev/docs/addons/yaml/) with the list of differences;
+- icon, licence GPL-3.0-only, source link to this repository (`addons/yaml`), loaders Paper and Folia, NeoSkript's Minecraft versions;
+- a required dependency on NeoSkript (`FuVeJ2X5`); skript-yaml isn't on Modrinth (it's on GitHub and SpigotMC), so there's no incompatible dependency to add;
+- the jar to upload is `addons/yaml/build/libs/NeoSkriptYaml-<version>.jar`, and the project id goes into the release steps next to NeoSkript's.
