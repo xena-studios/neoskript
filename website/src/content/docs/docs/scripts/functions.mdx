@@ -1,0 +1,94 @@
+---
+title: Functions
+description: Declaring functions with parameters, defaults and return types, calling them from any script, and local functions.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+A function is code with a name, called from any trigger, in any script. It takes values (parameters) and can give one back.
+
+```skript
+function coins(p: offline player) :: number:
+	return {coins::%{_p}'s uuid%} ? 0
+
+function giveCoins(p: offline player, amount: number = 1):
+	add {_amount} to {coins::%{_p}'s uuid%}
+
+command /balance:
+	executable by: players
+	trigger:
+		send "<gold>You have %coins(player)% coins." to player
+
+on death of a player:
+	attacker is a player
+	giveCoins(attacker, 10)
+```
+
+## Parameters
+
+Each parameter is `name: type`, and inside the function it's the local variable `{_name}`.
+
+- A default, `amount: number = 1`, is used when the call leaves the argument out: `giveCoins(player)`.
+- A plural type takes a list: `function total(values: numbers)`. Inside, it's a list variable, `{_values::*}`.
+- Calls can name their arguments: `giveCoins(p: player, amount: 5)`.
+
+```skript
+function total(values: numbers) :: number:
+	loop {_values::*}:
+		add loop-value to {_sum}
+	return {_sum} ? 0
+
+command /total:
+	trigger:
+		send "%total(1, 2 and 3)%" to sender
+```
+
+A call with the wrong kind of value doesn't load: `total("x")` gives *Can't understand this expression*.
+
+## Returning a value
+
+`:: type` after the parameters says what the function gives back, and `return` gives it. A function with no return type just runs. `return` in it, with no value, stops it.
+
+```skript
+function isRich(p: offline player) :: boolean:
+	return true if coins({_p}) > 1000, else false
+
+function coins(p: offline player) :: number:
+	return {coins::%{_p}'s uuid%} ? 0
+
+command /rich:
+	executable by: players
+	trigger:
+		if isRich(player) is true:
+			send "You're rich." to player
+```
+
+## Where functions live
+
+Functions are global: one script can call a function another script declares, and the order the scripts load in doesn't matter. Two functions with the same name and the same parameters clash, so give yours distinct names.
+
+`local function` makes a function only that script can call, so two scripts can each have their own with the same name:
+
+```skript
+local function double(n: number) :: number:
+	return {_n} * 2
+
+command /double <number>:
+	trigger:
+		send "%double(arg-1)%" to sender
+```
+
+## Built-in functions
+
+NeoSkript has Skript's built-in functions: maths (`round`, `floor`, `ceil`, `abs`, `sqrt`, `min`, `max`, `clamp`), `location`, `vector`, `world`, `player`, `offlineplayer`, `date`, `rgb`, `formatNumber` and others. See the [functions reference](/syntax/functions/).
+
+```skript
+command /maths:
+	trigger:
+		send "%round(2.567)% %floor(2.5)% %max(1, 5 and 3)%" to sender
+		send "%formatNumber(1234567)%" to sender
+```
+
+<Aside type="note">
+Functions can `wait`. As in Skript, the trigger that called one doesn't wait with it: it carries on as soon as the function starts waiting, and the rest of the function runs later, on the caller's thread. So a function that waits can't give a value back to its caller.
+</Aside>

@@ -1,0 +1,51 @@
+---
+title: Performance
+description: NeoSkript's benchmarks against Skript 2.17, why compiled triggers are faster, and how to keep scripts cheap.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+The same scripts, on the same Paper 26.3 server, on an Apple M1 Pro laptop, measured by NeoSkript's [test harness](https://github.com/xena-studios/neoskript/tree/main/test-harness) on 2026-11-12 against Skript 2.17.0:
+
+| What | Skript 2.17.0 | NeoSkript |
+|---|---|---|
+| Loading 40 scripts (5,960 lines) at startup | 1.97 s | 0.87 s |
+| `/sk reload scripts` on the same scripts | 1,412 ms | 228 ms |
+| The scripts' part of each tick, 20 players online | 2.36 ms | 0.95 ms |
+| A trigger with one condition, per event | 1.0 µs | 0.04 µs |
+| A trigger with global variables and text, per event | 7.03 µs | 0.88 µs |
+| A trigger with a loop, arithmetic and a local list, per event | 8.98 µs | 3.55 µs |
+| Loading 140,000 saved variables | 500 ms | 438 ms |
+
+## How they're measured
+
+- **Loading** is the time each plugin logs for its own startup load. **Reload** is the median wall time of 5 runs of `/sk reload scripts`.
+- **Per event:** a bot joins, and a toggle event (flight, sneak, sprint) is fired 20,000 times in a row on the player's thread. There are 12 rounds; the first 4 warm up, and the result is the median of the other 8.
+- **Tick time:** 20 bots online with a script doing a busy server's per-player work every tick, every 5 ticks and every second. The harness reads the server's mean milliseconds per tick 8 times and takes the median, and the scripts' part is the difference from the same server with no scripts (3.54 ms).
+- **Variables:** Skript makes 140,000 variables of the kinds servers keep and saves them, then each plugin loads that `variables.csv` 3 times at startup; the median.
+
+The benchmark scripts are in the repository: `event-benchmark.sk`, `tick-benchmark.sk` and `variables-benchmark.sk` under `test-harness/scripts`.
+
+## Why it's faster
+
+Skript reads a script into a tree of syntax objects and, each time a trigger runs, walks the tree, one element at a time, passing values around as arrays of objects. NeoSkript compiles each trigger and function to JVM bytecode when it loads, as a class of its own. Each call into a syntax element has one known target, so the JVM's JIT can inline across the whole trigger and optimise it like hand-written Java.
+
+Loading is faster because the parser was written for it: patterns are compiled and indexed once, matching is memoised, and each line only tries the patterns whose words it contains.
+
+Waits compile into resumable state machines, so a trigger that waits keeps its local variables and loops without extra cost.
+
+## Keeping scripts cheap
+
+Compiled code is cheap, but what a script asks the server to do still costs the same. The usual advice holds on both Skript and NeoSkript:
+
+- Prefer events to timers. A short `every` timer that loops over all players or entities runs that loop many times a second.
+- Avoid `all entities`. Entities in a radius, or of one type, are much cheaper.
+- Don't loop a huge global list on every event. Key data so you can read one entry directly: `{coins::%player's uuid%}`.
+- Use local variables for values you only need in the trigger, and `{-memory-only}` variables for values that change often but don't need saving.
+- A `while` loop that waits a tick to check something runs 20 times a second. Use the event for the change instead.
+
+[`neoskript-cli`](/docs/cli/) reports `performance` hints for the first, second and last of these.
+
+<Aside type="tip">
+Variable lists keep a hash index alongside Skript's ordering, so reading one entry of a long list, such as one keyed by UUIDs, doesn't get slower as the list grows.
+</Aside>

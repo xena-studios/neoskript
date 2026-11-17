@@ -1,0 +1,23 @@
+---
+title: Updates and bStats
+description: How NeoSkript tells you about new versions, what it sends to bStats, and how to turn both off.
+---
+
+## The update checker
+
+When the server starts, and once a day after that, NeoSkript asks [Modrinth](https://modrinth.com/plugin/neoskript) for its versions.
+
+- **Who hears:** the console gets a line for a newer version, and players with `skript.admin` get a clickable line when they join.
+- **Which versions count:** a release only hears of newer releases. A beta also hears of newer betas. Alphas never count.
+- **Development builds** don't check: they're replaced by the next development build.
+- **When Modrinth can't be reached**, a debug line is logged and nothing else happens.
+
+Turn it off with `update-checker: false` in `config.yml`, then restart the server.
+
+NeoSkript doesn't download or install anything itself. Download new versions from [Modrinth](https://modrinth.com/plugin/neoskript), [GitHub Releases](https://github.com/xena-studios/neoskript/releases) or [the download page](/download/), and swap the jar.
+
+## bStats
+
+NeoSkript sends anonymous usage statistics to [bStats](https://bstats.org/plugin/bukkit/NeoSkript/34868), as many plugins do: bStats' standard charts, such as how many servers and players use it and their Minecraft and Java versions, and one of NeoSkript's own, whether the server runs Paper or Folia. The numbers are public on that page.
+
+Turn it off with `metrics: false` in `config.yml`, then restart the server, or for every plugin at once in `plugins/bStats/config.yml`.

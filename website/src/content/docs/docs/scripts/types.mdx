@@ -1,0 +1,89 @@
+---
+title: Expressions and types
+description: Values in Skript, the types they have, converting between them, arithmetic, and lists.
+---
+
+An expression is a value in a line: `player`, `5`, `"hello"`, `{coins}`, `the player's health`, `random integer between 1 and 6`. Each one has a type: a player, a number, a text, an item. The [expressions reference](/syntax/expressions/) has every expression, and the [types reference](/syntax/types/) every type.
+
+## Common types
+
+| Type | Examples |
+|---|---|
+| text | `"hello"`, `name of player` |
+| number, integer | `5`, `2.5`, `health of player` |
+| boolean | `true`, `false`, `whether player is op` |
+| timespan | `5 seconds`, `1 minute and 30 seconds`, `2h` |
+| date | `now`, `5 minutes ago` |
+| player, offline player | `player`, `offlineplayer("Notch")` |
+| entity | `attacker`, `last spawned entity` |
+| item type, item | `diamond`, `3 iron ingots`, `player's tool` |
+| block | `event-block`, `block at player` |
+| location | `location of player`, `spawn of world "world"` |
+| world | `world "world"`, `player's world` |
+| inventory, slot | `player's inventory`, `slot 0 of player's inventory` |
+
+A command argument or function parameter names its type the same way: `<player>`, `amount: number`.
+
+## Properties
+
+Most properties can be written two ways: `name of player` or `player's name`, `health of victim` or `victim's health`. Many can be changed with `set`, `add`, `remove` and `delete`:
+
+```skript
+command /tank:
+	executable by: players
+	trigger:
+		set max health of player to 40
+		heal player
+		set player's display name to "<red>Tank"
+		add 5 to player's level
+```
+
+## Arithmetic
+
+`+`, `-`, `*`, `/` and `^`, with brackets, in the usual order. A value that isn't set counts as 0.
+
+```skript
+command /area <number> <number>:
+	trigger:
+		set {_area} to arg-1 * arg-2
+		send "%arg-1% by %arg-2% is %{_area}%, and its half is %{_area} / 2%." to sender
+```
+
+Timespans and dates work too: `now + 1 hour`, `2 minutes * 3`.
+
+## Converting
+
+Text becomes another type with `parsed as`. If it doesn't read as that type, the result isn't set.
+
+```skript
+command /double <text>:
+	trigger:
+		set {_n} to arg-1 parsed as integer
+		if {_n} is not set:
+			send "<red>That's not a whole number." to sender
+			stop
+		send "%{_n} * 2%" to sender
+```
+
+Values also convert where one type is expected and another is given, as in Skript: an entity where a location goes is its location, so `teleport player to victim` works.
+
+## Lists of values
+
+Write several values with commas and `and` or `or`: `1, 2 and 3`, `"red" or "blue"`. Expressions can be plural too: `all players`, `{homes::*}`, `blocks in radius 3 around player`.
+
+```skript
+command /lists:
+	trigger:
+		set {_nums::*} to 5, 3, 8 and 1
+		send "Sorted: %sorted {_nums::*}%" to sender
+		send "Above 4: %{_nums::*} where [input > 4]%" to sender
+		send "Doubled: %{_nums::*} transformed using [input * 2]%" to sender
+		send "Count: %size of {_nums::*}%" to sender
+		send "A random one: %random element out of {_nums::*}%" to sender
+```
+
+`where [...]` keeps the values that pass a condition, and `transformed using [...]` changes each one; `input` is the value being looked at.
+
+## Literals
+
+Some values are written as words: `diamond sword`, `zombie`, `creative`, `speed`. These are item types, entity types, game modes and potion effect types, read from the server's registries. When a word could be two things, the place it's used decides: `ender pearl` is an item where an item goes and an entity type where an entity type goes. Add the type in brackets to be sure: `black (color)`.

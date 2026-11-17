@@ -1,0 +1,133 @@
+---
+title: Commands
+description: Script commands with arguments, permissions, cooldowns, aliases and subcommand-style choices.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+`command /<name>:` adds a command to the server. Its code goes under `trigger:`, and the other entries above it set who can use it and how.
+
+```skript
+command /spawn:
+	description: Takes you to spawn.
+	executable by: players
+	trigger:
+		teleport player to spawn of world "world"
+		send "<green>Whoosh." to player
+```
+
+Script commands are registered in the server's command map under the `skript:` namespace (so `/skript:spawn` works too), with tab completion from their arguments. Reloading a script replaces its commands, and players get the new command list straight away.
+
+## Arguments
+
+Arguments go after the name, in `<>`, by type. Read them as `arg-1`, `arg-2` and so on, in the order they're written.
+
+```skript
+command /pay <player> <number>:
+	executable by: players
+	trigger:
+		if arg-2 <= 0:
+			send "<red>Pay more than nothing." to player
+			stop
+		send "You paid %arg-1% %arg-2%." to player
+		send "%player% paid you %arg-2%." to arg-1
+```
+
+- `[<player>]` in square brackets is optional. When it isn't given, `arg-1` isn't set.
+- `<text = home>` has a default: what's used when the argument is left out. `<player = %player%>` defaults to whoever ran the command.
+- A name before the type, `<amount: integer>`, makes the argument a local variable, `{_amount}`, as well as `arg-N`.
+- The last text argument takes the rest of the line, spaces and all.
+- Words and choices work in the pattern too: `/eco (give|take) <player> <number>`.
+
+```skript
+command /home [<text = home>]:
+	executable by: players
+	trigger:
+		send "Going to your home called %arg-1%." to player
+
+command /givecoins <target: player> <amount: integer = 1>:
+	permission: server.coins
+	trigger:
+		add {_amount} to {coins::%{_target}'s uuid%}
+		send "Gave %{_amount}% coins to %{_target}%." to sender
+```
+
+An argument type that doesn't exist is an error when the script loads: `'playr' is not a known type.` The types are in the [types reference](/syntax/types/).
+
+## Who ran it
+
+`sender` is whoever ran the command: a player or the console. `player` is only there when a player ran it. `executable by: players` stops the console from running a command that needs a player; `executable by: console` does the opposite.
+
+```skript
+command /heal [<player>]:
+	permission: server.heal
+	trigger:
+		if arg-1 is set:
+			heal arg-1
+			send "<green>Healed %arg-1%." to sender
+		else if sender is a player:
+			heal player
+			send "<green>Healed." to player
+		else:
+			send "Give a player's name when you use this from the console." to sender
+```
+
+## Entries
+
+| Entry | What it does |
+|---|---|
+| `trigger:` | The code that runs. Required. |
+| `description:` | A line about the command, for help lists. |
+| `usage:` | What's shown when the arguments typed don't fit. |
+| `aliases:` | Other names for it: `aliases: /h, /hp`. |
+| `permission:` | The permission a player needs to use it. Players without it don't see the command. |
+| `executable by:` | `players`, `console`, or `players and console`. |
+| `cooldown:` | How long a player waits between uses: `cooldown: 30 seconds`. |
+| `cooldown message:` | What a player is told while they wait. `%remaining time%` is how long is left. |
+| `cooldown bypass:` | A permission that skips the cooldown. |
+| `cooldown storage:` | A variable that keeps the cooldown, so it lasts through restarts. |
+| `suggestions:` | Code that sets what tab completion suggests for each argument. |
+
+```skript
+command /daily:
+	description: Your daily reward.
+	executable by: players
+	cooldown: 1 day
+	cooldown message: <red>Come back in %remaining time%.
+	cooldown storage: {daily::%player's uuid%}
+	trigger:
+		give player 1 diamond
+		send "<aqua>Here's today's diamond." to player
+```
+
+<Aside type="note">
+Skript 2.17 deprecates the `permission message:` entry, and NeoSkript gives the same warning: players without the permission don't get the command sent to their client, so they never see the message.
+</Aside>
+
+## Tab completion
+
+Each argument suggests values of its type: online players for `<player>`, and so on. `suggestions:` sets your own, for each argument, in code:
+
+```skript
+command /warp <text> [<player>]:
+	suggestions:
+		set the suggestions for arg-1 to "spawn", "shop" and "arena"
+	trigger:
+		send "Warping to %arg-1%." to sender
+```
+
+What the player has typed so far filters the suggestions. Arguments without their own suggestions keep their type's.
+
+## Running other commands
+
+`execute console command "..."` runs a command as the console, and `make player execute command "..."` as the player. Leave out the `/`.
+
+```skript
+command /reward <player>:
+	permission: server.reward
+	trigger:
+		execute console command "give %arg-1% diamond 1"
+		send "Rewarded %arg-1%." to sender
+```
+
+The command patterns are under [structures](/syntax/structures/); `arg-N` and its other forms are the [argument expression](/syntax/expressions/#argument).

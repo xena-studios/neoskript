@@ -1,0 +1,101 @@
+---
+title: Loops
+description: Looping a number of times, over players, entities and lists, while loops, and leaving a loop early.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+A loop runs its code once for each value it goes through. Inside it, `loop-value` is the current value, or it's named by its type: `loop-player`, `loop-entity`, `loop-number`.
+
+## A number of times
+
+```skript
+command /countdown:
+	trigger:
+		loop 5 times:
+			broadcast "<yellow>Starting in %6 - loop-number%..."
+			wait 1 second
+		broadcast "<green>Go!"
+```
+
+`loop-number` counts from 1.
+
+## Players, entities and blocks
+
+```skript
+command /healall:
+	permission: server.healall
+	trigger:
+		loop all players:
+			heal loop-player
+			send "<green>You were healed." to loop-player
+
+command /clearzombies:
+	executable by: players
+	trigger:
+		loop all entities in radius 20 around player:
+			if loop-entity is a zombie:
+				kill loop-entity
+```
+
+## Lists
+
+Looping a list variable gives each value, with `loop-index` as its index.
+
+```skript
+command /homes:
+	executable by: players
+	trigger:
+		loop {homes::%player's uuid%::*}:
+			send "%loop-index%: %loop-value%" to player
+```
+
+`for each` names the value, and the index too if you want it:
+
+```skript
+command /scores:
+	trigger:
+		for each {_name}, {_score} in {scores::*}:
+			send "%{_name}% has %{_score}%" to sender
+		for each {_score} in {scores::*}:
+			add {_score} to {_total}
+		send "Total: %{_total}%" to sender
+```
+
+## while
+
+`while` runs its code again as long as its condition is true. `do while` checks after running, so the code runs at least once.
+
+```skript
+command /roll:
+	trigger:
+		set {_roll} to 0
+		set {_tries} to 0
+		while {_roll} is not 6:
+			set {_roll} to random integer between 1 and 6
+			add 1 to {_tries}
+		send "Rolled a 6 after %{_tries}% tries." to sender
+```
+
+<Aside type="caution">
+A `while` loop with no `wait` in it runs to the end before anything else on its thread can happen, so a condition that never turns false hangs the server. A `while` that waits a tick each time is safe, but checks its condition 20 times a second: an event that fires when the thing changes is cheaper, and [`neoskript-cli`](/docs/cli/) points these loops out.
+</Aside>
+
+## Leaving early
+
+- `continue` skips to the next value.
+- `exit loop` leaves the loop and carries on after it. `exit 2 loops` leaves two nested loops, and `exit all loops` every loop around it.
+- `stop` ends the whole trigger.
+
+```skript
+command /findop:
+	trigger:
+		loop all players:
+			if loop-player is not op:
+				continue
+			send "%loop-player% is an op." to sender
+			exit loop
+		send "Done looking." to sender
+```
+
+The patterns are in the sections reference: [loop](/syntax/sections/#loop), [while](/syntax/sections/#while) and [for each](/syntax/sections/#for).
