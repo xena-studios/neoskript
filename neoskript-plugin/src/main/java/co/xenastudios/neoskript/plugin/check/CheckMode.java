@@ -64,7 +64,13 @@ public final class CheckMode {
         co.xenastudios.neoskript.paper.GlobalAliases.install(loaded);
         List<ScriptCheck.ScriptReport> reports = new ScriptCheck(library).check(read(scripts));
         Map<String, Object> json = json(reports);
-        json.put("aliases", Map.of("files", loaded.files(), "problems", aliasProblems));
+        Map<String, Object> aliasReport = new LinkedHashMap<>();
+        aliasReport.put("files", loaded.files());
+        aliasReport.put("problems", aliasProblems);
+        // Past the problems listed, how many more there were, so the counts are right.
+        aliasReport.put("unlistedErrors", loaded.unlistedErrors());
+        aliasReport.put("unlistedWarnings", loaded.unlistedWarnings());
+        json.put("aliases", aliasReport);
         Files.writeString(report, new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()
                 .toJson(json) + "\n");
     }

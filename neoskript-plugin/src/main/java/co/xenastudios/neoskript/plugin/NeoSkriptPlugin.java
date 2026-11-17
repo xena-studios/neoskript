@@ -104,7 +104,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             java.nio.file.Path skriptDir = getDataPath().resolveSibling("Skript");
             if (copySkriptSettings(migration)) {
                 // Only now: if config.yml couldn't take Skript's settings, the next start copies them again.
-                SkriptMigration.finish(getDataPath(), skriptDir, migration.copied());
+                SkriptMigration.finish(getDataPath(), skriptDir, migration.copied(), migration.aliasesDone());
             }
             String notice = SkriptMigration.databasesNotice(skriptDir, getDataPath(), settings.databases().all()
                     .stream().anyMatch(d -> d.type() == DatabaseSettings.Type.SQLITE

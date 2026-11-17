@@ -79,6 +79,21 @@ final class ScriptReport implements BiConsumer<Diagnostic, SourceFile> {
         };
     }
 
+    /**
+     * Counts problems that aren't listed, as the alias files' past their limit: {@code note} (if not {@code null}) is
+     * shown after the others, on a line of its own.
+     */
+    void unlisted(int moreErrors, int moreWarnings, String note) {
+        errors += moreErrors;
+        warnings += moreWarnings;
+        if (note != null) {
+            notes.add(note);
+        }
+    }
+
+    /** Lines said after the problems, such as how many weren't listed. */
+    private final List<String> notes = new ArrayList<>();
+
     int errors() {
         return errors;
     }
@@ -138,6 +153,9 @@ final class ScriptReport implements BiConsumer<Diagnostic, SourceFile> {
                 }
             }
         }
+        for (String note : notes) {
+            lines.add(NOTE.chat(text("text", note)));
+        }
         return lines;
     }
 
@@ -150,4 +168,5 @@ final class ScriptReport implements BiConsumer<Diagnostic, SourceFile> {
     }
 
     private static final Message ERROR = Message.of("<error><text>");
+    private static final Message NOTE = Message.of("   <text>");
 }

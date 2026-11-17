@@ -92,8 +92,9 @@ final class AliasLoader {
     private final Server server;
     private final int[] version;
     private final List<Problem> problems = new ArrayList<>();
-    /** Problems past {@link #MAX_PROBLEMS}, which are counted but not kept. */
+    /** Problems past {@link #MAX_PROBLEMS}, which are counted but not kept, and how many of them are errors. */
     private int moreProblems;
+    private int moreErrors;
 
     /** The most problems kept; the rest are counted, so a file of bad lines can't fill the heap or the chat. */
     static final int MAX_PROBLEMS = 1000;
@@ -148,6 +149,11 @@ final class AliasLoader {
         return moreProblems;
     }
 
+    /** How many of {@link #moreProblems} are errors; the rest are warnings. */
+    int moreErrors() {
+        return moreErrors;
+    }
+
     /** A problem with a whole file, such as one that can't be read. */
     void fileProblem(String name, boolean error, String message) {
         report(new Problem(name, 0, error, message, ""));
@@ -163,6 +169,9 @@ final class AliasLoader {
             problems.add(problem);
         } else {
             moreProblems++;
+            if (problem.error()) {
+                moreErrors++;
+            }
         }
     }
 

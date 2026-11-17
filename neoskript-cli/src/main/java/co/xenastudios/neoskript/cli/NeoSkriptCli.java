@@ -418,6 +418,7 @@ public final class NeoSkriptCli {
             for (JsonElement problem : aliasProblems) {
                 errors += problem.getAsJsonObject().get("kind").getAsString().equals("error") ? 1 : 0;
             }
+            errors += aliases.has("unlistedErrors") ? aliases.get("unlistedErrors").getAsInt() : 0;
             out.printf("Alias files: %d read, %d with problems (%d error%s)%n", aliases.get("files").getAsInt(),
                     countFiles(aliasProblems), errors, errors == 1 ? "" : "s");
         }
@@ -436,6 +437,12 @@ public final class NeoSkriptCli {
                 int line = problem.get("line").getAsInt();
                 out.printf(Locale.ROOT, "  %-11s %s%s%n", problem.get("kind").getAsString(),
                         line > 0 ? "line " + line + ": " : "", problem.get("message").getAsString());
+            }
+            int unlisted = (aliases.has("unlistedErrors") ? aliases.get("unlistedErrors").getAsInt() : 0)
+                    + (aliases.has("unlistedWarnings") ? aliases.get("unlistedWarnings").getAsInt() : 0);
+            if (unlisted > 0) {
+                out.printf(Locale.ROOT, "  ... and %d more %s in the alias files, not listed%n", unlisted,
+                        unlisted == 1 ? "problem" : "problems");
             }
         }
         for (JsonElement element : scripts) {

@@ -10,7 +10,6 @@ import co.xenastudios.neoskript.paper.GlobalAliases;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
-import java.util.function.BiConsumer;
 import org.bukkit.Bukkit;
 import org.slf4j.Logger;
 
@@ -45,6 +44,10 @@ final class AliasManager {
             long start = System.nanoTime();
             GlobalAliases.Loaded loaded = GlobalAliases.load(folder(), dataFolder, defaults);
             loaded.problems(AliasManager::toConsole);
+            if (loaded.unlistedNote() != null) {
+                toConsole(new Diagnostic(loaded.unlistedErrors() > 0 ? Severity.ERROR : Severity.WARNING, "aliases", 0,
+                        0, 0, loaded.unlistedNote()), "");
+            }
             GlobalAliases.install(loaded);
             if (loaded.failed()) {
                 logger.error("Couldn't load the alias files, so only Skript's default aliases are used");
@@ -59,14 +62,16 @@ final class AliasManager {
     }
 
     /**
-     * Reads the aliases again and uses them, with their problems going to {@code problems} with their lines of code.
+     * Reads the aliases again and uses them, with their problems going to {@code report} with their lines of code.
      * Returns the names whose meaning changed, for the scripts that use them to be reloaded, or {@code null} if so
      * many changed that every script should be. If loading fails, the aliases in use stay and nothing changed.
      */
-    Set<String> reload(boolean defaults, BiConsumer<Diagnostic, String> problems) {
+    Set<String> reload(boolean defaults, ScriptReport report) {
         GlobalAliases.Loaded before = GlobalAliases.inUse();
         GlobalAliases.Loaded loaded = GlobalAliases.load(folder(), dataFolder, defaults);
-        loaded.problems(problems);
+        loaded.problems(report.aliases());
+        // Those past the limit count as what they are, with one line saying so, not as one error on 'line 0'.
+        report.unlisted(loaded.unlistedErrors(), loaded.unlistedWarnings(), loaded.unlistedNote());
         Set<String> changed = GlobalAliases.changes(before, loaded, CHANGE_LIMIT);
         GlobalAliases.install(loaded);
         return changed;
