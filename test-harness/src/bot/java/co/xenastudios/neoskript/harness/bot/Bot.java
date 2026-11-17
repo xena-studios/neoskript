@@ -42,6 +42,10 @@ import net.minecraft.network.protocol.configuration.ServerboundFinishConfigurati
 import net.minecraft.network.protocol.configuration.ServerboundSelectKnownPacks;
 import net.minecraft.network.protocol.game.ClientboundBundlePacket;
 import net.minecraft.network.protocol.game.ClientboundChunkBatchFinishedPacket;
+import net.minecraft.network.protocol.game.ClientboundContainerClosePacket;
+import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
+import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
+import net.minecraft.network.protocol.game.ClientboundOpenScreenPacket;
 import net.minecraft.network.protocol.game.ClientboundDisguisedChatPacket;
 import net.minecraft.network.protocol.game.ClientboundLoginPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerChatPacket;
@@ -56,6 +60,8 @@ import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
 import net.minecraft.network.protocol.game.ServerboundChatPacket;
 import net.minecraft.network.protocol.game.ServerboundChunkBatchReceivedPacket;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
+import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.network.protocol.game.ServerboundConfigurationAcknowledgedPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerLoadedPacket;
@@ -125,6 +131,9 @@ final class Bot extends SimpleChannelInboundHandler<Packet<?>> {
     private PositionMoveRotation position = new PositionMoveRotation(Vec3.ZERO, Vec3.ZERO, 0, 0);
     private boolean loaded;
     private int sequence;
+    /** The screen open, 0 for the player's own inventory, and the server's state id for it. */
+    private volatile int containerId;
+    private volatile int stateId;
 
     Bot(String name, int port, Consumer<Bot> onClose) {
         this(name, "localhost", port, new Wire() {}, onClose);
@@ -244,6 +253,25 @@ final class Bot extends SimpleChannelInboundHandler<Packet<?>> {
                 }, 100, TimeUnit.MILLISECONDS);
             }
             case ClientboundChunkBatchFinishedPacket ignored -> send(new ServerboundChunkBatchReceivedPacket(64));
+            // Screens: which is open, and its state id, which clicks send back
+            case ClientboundOpenScreenPacket open -> {
+                containerId = open.getContainerId();
+                LOG.info("[bot:" + name + "] [screen] " + ChatFormatting.stripFormatting(open.getTitle().getString()));
+            }
+            case ClientboundContainerSetContentPacket content -> {
+                if (content.containerId() == containerId) {
+                    stateId = content.stateId();
+                }
+            }
+            case ClientboundContainerSetSlotPacket slot -> {
+                if (slot.getContainerId() == containerId) {
+                    stateId = slot.getStateId();
+                }
+            }
+            case ClientboundContainerClosePacket closed -> {
+                containerId = 0;
+                LOG.info("[bot:" + name + "] [screen closed]");
+            }
             // What the player is shown
             case ClientboundSystemChatPacket chat -> show(chat.overlay() ? "[action bar] " : "", chat.content());
             case ClientboundPlayerChatPacket chat -> show("", chat.chatType().decorate(
@@ -331,6 +359,51 @@ final class Bot extends SimpleChannelInboundHandler<Packet<?>> {
 
     void selectSlot(int slot) {
         play(new ServerboundSetCarriedItemPacket(slot));
+    }
+
+    /**
+     * Clicks a slot of the open screen (or of the player's own inventory if none is open), as a client does:
+     * {@code left}, {@code right}, {@code shift}, {@code double}, {@code middle}, {@code drop}, {@code offhand} (the
+     * swap-with-offhand key), or a number key {@code 1}-{@code 9}. The client's guess at the result is left out, so
+     * the server works it out and sends back what really happened.
+     */
+    void click(int slot, String how) {
+        net.minecraft.world.inventory.ContainerInput input;
+        int button;
+        switch (how) {
+            case "left" -> { input = net.minecraft.world.inventory.ContainerInput.PICKUP; button = 0; }
+            case "right" -> { input = net.minecraft.world.inventory.ContainerInput.PICKUP; button = 1; }
+            case "shift" -> { input = net.minecraft.world.inventory.ContainerInput.QUICK_MOVE; button = 0; }
+            case "double" -> { input = net.minecraft.world.inventory.ContainerInput.PICKUP_ALL; button = 0; }
+            case "middle" -> { input = net.minecraft.world.inventory.ContainerInput.CLONE; button = 2; }
+            case "drop" -> { input = net.minecraft.world.inventory.ContainerInput.THROW; button = 0; }
+            case "offhand" -> { input = net.minecraft.world.inventory.ContainerInput.SWAP; button = 40; }
+            default -> { input = net.minecraft.world.inventory.ContainerInput.SWAP; button = Integer.parseInt(how) - 1; }
+        }
+        containerClick(slot, button, input);
+    }
+
+    /** Drags the item on the cursor over {@code slots}, spreading it as a left-button drag does. */
+    void drag(int... slots) {
+        net.minecraft.world.inventory.ContainerInput craft = net.minecraft.world.inventory.ContainerInput.QUICK_CRAFT;
+        containerClick(-999, 0, craft);
+        for (int slot : slots) {
+            containerClick(slot, 1, craft);
+        }
+        containerClick(-999, 2, craft);
+    }
+
+    private void containerClick(int slot, int button, net.minecraft.world.inventory.ContainerInput input) {
+        Channel channel = this.channel;
+        channel.eventLoop().execute(() -> play(new ServerboundContainerClickPacket(containerId, stateId, (short) slot,
+                (byte) button, input, new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<>(),
+                net.minecraft.network.HashedStack.EMPTY)));
+    }
+
+    /** Closes the open screen, as pressing escape does. */
+    void closeScreen() {
+        Channel channel = this.channel;
+        channel.eventLoop().execute(() -> play(new ServerboundContainerClosePacket(containerId)));
     }
 
     void quit() {
