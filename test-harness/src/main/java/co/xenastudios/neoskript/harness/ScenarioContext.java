@@ -68,6 +68,15 @@ public final class ScenarioContext {
                 .filter(jar -> !jar.isBlank()).map(Path::of).toList();
     }
 
+    /** NeoSkriptCompat's jar ({@code neoskript-compat}), which stands in for Skript so Skript addons load. */
+    public Path compatJar() {
+        String jar = System.getProperty("harness.compatJar", "");
+        if (jar.isBlank()) {
+            throw new co.xenastudios.neoskript.harness.HarnessFailure("NeoSkriptCompat's jar wasn't given to the harness");
+        }
+        return Path.of(jar);
+    }
+
     /** The example addon ({@code examples/example-addon}), which registers syntax through NeoSkript's API. */
     public Path exampleAddonJar() {
         return config.exampleAddonJar();
