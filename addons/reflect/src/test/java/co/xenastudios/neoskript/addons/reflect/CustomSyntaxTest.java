@@ -138,6 +138,27 @@ class CustomSyntaxTest {
                 "Couldn't resolve call for 'custom syntax: effect shout %string% (defs.sk)'")), harness.warnings.toString());
     }
 
+    /** The event of {@code apart values:}'s code, as a spawn section's code is in a spawn event. */
+    record ApartEvent(Object value) {}
+
+    @Test
+    void continueInASectionLoadedApartIsSkriptsNotTheDeclaredSyntaxs() {
+        // A section whose code is in an event of its own, as Skript loads a spawn section's (one needs a server's
+        // registries here), so 'continue' there isn't skript-reflect's: with no loop in that code, it's Skript's error.
+        harness.library.section("TestSecApart", "string", info -> (context, args) -> new Object[] {"v"}, "apart values");
+        harness.library.sectionEvent("TestSecApart", "apart", ApartEvent.class, ApartEvent::new);
+        List<String> problems = harness.load("defs.sk", """
+                effect frob:
+                \ttrigger:
+                \t\tapart values:
+                \t\t\tcontinue
+
+                on load:
+                \tfrob
+                """);
+        assertEquals(List.of("ERROR 4: The 'continue' effect may only be used in loops"), problems);
+    }
+
     @Test
     void aDeclarationWithoutItsCodeDeclaresNothing() {
         List<String> problems = harness.load("defs.sk", """

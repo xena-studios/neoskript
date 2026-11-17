@@ -328,7 +328,9 @@ final class StatementParser {
         if (context.eventScope() == null || header != null && values != null && values.keepsEventValues(header.syntax())) {
             return body.get();
         }
-        EventValues.Scope scope = context.eventScope(null);
+        // A section whose code is in an event of its own (a spawn section's) can use that event's values only.
+        EventValues.Scope own = header != null && values != null ? values.section(header.syntax()) : null;
+        EventValues.Scope scope = context.eventScope(own);
         try {
             return body.get();
         } finally {

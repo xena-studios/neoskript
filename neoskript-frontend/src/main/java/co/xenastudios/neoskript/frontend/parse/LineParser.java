@@ -316,11 +316,17 @@ final class LineParser {
                     && !mayHaveTimeState(timed)) {
                 // Skript's init first refuses any time state after a wait; else it names the expression as it writes it.
                 boolean future = candidate.pattern() >= 2;
-                problem(() -> context.delay() == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED
-                        ? "Cannot use time states after the event has already passed"
-                        : (timed instanceof Expr.Syntax inner ? described(inner.syntax(),
-                                input.substring(timed.start(), timed.end())) : input.substring(timed.start(), timed.end()).strip())
-                                + " does not have a " + (future ? "future" : "past") + " state", SEMANTIC_ERROR);
+                problem(() -> {
+                    if (context.delay() == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED) {
+                        return "Cannot use time states after the event has already passed";
+                    }
+                    String message = (timed instanceof Expr.Syntax inner ? described(inner.syntax(),
+                            input.substring(timed.start(), timed.end())) : input.substring(timed.start(), timed.end()).strip())
+                            + " does not have a " + (future ? "future" : "past") + " state";
+                    // Skript sets the expression up first: if it can't be used here, that's the error.
+                    causes.put(message, timed);
+                    return message;
+                }, SEMANTIC_ERROR);
                 continue;
             }
             // A direction after a direction word is another one written out, as Skript's init refuses anything else:
@@ -1359,7 +1365,7 @@ final class LineParser {
         // expression gave an error: Skript keeps that error ('player' where there's no player in the event).
         if (expr instanceof Expr.Unresolved words && (!words.verified() || anyValueOnly(words, expected))
                 && frame[0] != null && expected.anything()) {
-            return new Expr.Unresolved(words.start(), words.end(), words.text(), false, frame[0]);
+            return new Expr.Unresolved(words.start(), words.end(), words.text(), false, frame[0], causes.get(frame[0]));
         }
         return expr;
     }
@@ -2314,6 +2320,9 @@ final class LineParser {
 
     /** The quality of {@link #problem}. */
     private int problemQuality;
+
+    /** The expressions problems are about, by problem: see {@link Expr.Unresolved#cause}. */
+    private final java.util.Map<String, Expr> causes = new java.util.HashMap<>();
 
     /** {@link #problem(String, int)}, worked out only if it's kept. */
     private void problem(java.util.function.Supplier<String> found, int quality) {

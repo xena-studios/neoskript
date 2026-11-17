@@ -294,6 +294,22 @@ public interface Registrar {
             ElementFactory<co.xenastudios.neoskript.api.element.LoopValue> factory);
 
     /**
+     * The code in library section {@code sectionId}'s section is in an event of its own, of {@code eventClass} and
+     * called {@code eventName} in errors, as Skript loads a spawn section's code: it runs once for each value the
+     * section gives, in the event {@code event} makes of that value, and only that event's values can be used there
+     * ({@code There's no world in a spawn event.}), as {@link #eventValue} gives them for {@code eventClass}.
+     *
+     * @param <E> the event's class
+     * @param sectionId the section's id
+     * @param eventName the event's name in errors
+     * @param eventClass the event's class, whose event values the code can use
+     * @param event the event for one of the values the section gives
+     */
+    @Experimental
+    default <E> void sectionEvent(String sectionId, String eventName, Class<E> eventClass,
+            java.util.function.Function<Object, ? extends E> event) {}
+
+    /**
      * Marks expression {@code expressionId} as an event value, as Skript's {@code EventValueExpression}s are
      * ({@code the created damage source}): as an argument, it counts as a default one
      * ({@link co.xenastudios.neoskript.api.element.ElementInfo#isDefault(int)}).
