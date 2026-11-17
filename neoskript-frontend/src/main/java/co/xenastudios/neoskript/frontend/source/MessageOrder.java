@@ -53,6 +53,21 @@ public final class MessageOrder {
     }
 
     /**
+     * {@code diagnostics} grouped by script, the scripts in the order of {@code scripts} (their load order) and
+     * others last, each script's problems kept in the order given: as a report that lists each script's
+     * problems together shows them.
+     */
+    public static List<Diagnostic> byScript(List<Diagnostic> diagnostics, List<SourceFile> scripts) {
+        java.util.Map<String, Integer> order = new java.util.HashMap<>();
+        for (SourceFile script : scripts) {
+            order.putIfAbsent(script.name(), order.size());
+        }
+        List<Diagnostic> grouped = new ArrayList<>(diagnostics);
+        grouped.sort(java.util.Comparator.comparingInt(d -> order.getOrDefault(d.file(), Integer.MAX_VALUE)));
+        return grouped;
+    }
+
+    /**
      * Sorts the problems of scripts loaded together as Skript gives them: Skript reads every script's file first (their
      * layout problems, in the scripts' order), then every script's structure headers, then sorts all their structures
      * together by priority and runs each stage across all of them, so one script's problems come between another's

@@ -342,7 +342,10 @@ final class ScriptManager {
         diagnostics.addAll(ordered);
         Set<String> failed = new HashSet<>();
         int errors = 0;
-        for (Diagnostic diagnostic : diagnostics) {
+        // A report lists each script's problems together, the scripts in the order they're loaded.
+        List<Diagnostic> listed = redirect == null ? diagnostics
+                : co.xenastudios.neoskript.frontend.source.MessageOrder.byScript(diagnostics, files);
+        for (Diagnostic diagnostic : listed) {
             if (scope != null && !scope.test(diagnostic.file())) {
                 continue;
             }

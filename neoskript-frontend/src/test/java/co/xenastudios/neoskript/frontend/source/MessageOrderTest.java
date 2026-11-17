@@ -144,4 +144,18 @@ class MessageOrderTest {
         assertEquals(List.of("b.sk:3", "a.sk:2"), MessageOrder.sortAll(found, List.of(a, b),
                 d -> d.message().startsWith("Empty")).stream().map(d -> d.file() + ":" + d.line()).toList());
     }
+
+    @Test
+    void aReportGroupsTheScriptsInTheirLoadOrder() {
+        // '/sk reload' lists each script's problems together: by load order, not by which has the first problem.
+        SourceFile a = new SourceFile("a.sk", "on load:\n\tfrob\n");
+        SourceFile b = new SourceFile("b.sk", "on load:\n\tfrob\n");
+        List<Diagnostic> found = List.of(new Diagnostic(Severity.ERROR, "b.sk", 2, 0, 0, "b1"),
+                new Diagnostic(Severity.ERROR, "a.sk", 2, 0, 0, "a1"),
+                new Diagnostic(Severity.ERROR, "b.sk", 3, 0, 0, "b2"),
+                new Diagnostic(Severity.ERROR, "c.sk", 1, 0, 0, "c1"),
+                new Diagnostic(Severity.ERROR, "a.sk", 1, 0, 0, "a2"));
+        assertEquals(List.of("a1", "a2", "b1", "b2", "c1"), MessageOrder.byScript(found, List.of(a, b)).stream()
+                .map(Diagnostic::message).toList());
+    }
 }
