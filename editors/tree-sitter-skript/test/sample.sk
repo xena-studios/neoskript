@@ -1,0 +1,18 @@
+# A sample for the query check.
+options:
+	greeting: Hello
+
+command /hi [<text>]:
+	permission: hi.use
+	trigger:
+		send "{@greeting} %player%! <green>&aHi" to player
+		set {hi::%uuid of player%} to now
+		loop 3 times:
+			broadcast "%loop-value%"
+
+function add(a: number, b: number) :: number:
+	return {_a} + 1.5
+
+on join:
+	if add(1, 2) is 3:
+		send "yes" to event-player
