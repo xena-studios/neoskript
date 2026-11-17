@@ -5502,6 +5502,30 @@
       }
     },
     {
+      "kind": "event",
+      "id": "NeoSkriptPlaceholdersEvtPlaceholder",
+      "patterns": [
+        "(placeholder[ ]api|papi) [:relational] placeholder (with|for) [the] prefix %*string%",
+        "(mvdw[ ]placeholder[ ]api|mvdw) placeholder [with [the] name|named] %*string%",
+        "(placeholder[ ]api|papi) [placeholder] request (for|with) [the] prefix[es] %*strings%",
+        "(mvdw[ ]placeholder[ ]api|mvdw) [placeholder] request (for|with) [the] placeholder[s] %*strings%"
+      ],
+      "eventValues": [
+        {
+          "type": "player",
+          "time": 0
+        },
+        {
+          "type": "offlineplayer",
+          "time": 0
+        }
+      ],
+      "parser": {
+        "scope": 178
+      },
+      "addon": "NeoSkriptPlaceholders"
+    },
+    {
       "kind": "section",
       "id": "SecCatchErrors",
       "patterns": [
@@ -12900,6 +12924,46 @@
       ],
       "returnType": "string",
       "addon": "NeoSkriptDb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptPlaceholdersExprPlaceholder",
+      "patterns": [
+        "[the] placeholder",
+        "[the] [placeholder] (1:prefix|2:identifier)"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptPlaceholders"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptPlaceholdersExprResult",
+      "patterns": [
+        "[the] [placeholder] result"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptPlaceholders"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptPlaceholdersExprRelationalPlayers",
+      "patterns": [
+        "[the] first player",
+        "[the] second player"
+      ],
+      "returnType": "player",
+      "addon": "NeoSkriptPlaceholders"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptPlaceholdersExprValue",
+      "patterns": [
+        "[the] [value[s] of [the]] [:relational] placeholder[s] [in] %strings% [(for|from|of) %-players/offlineplayers%]",
+        "[:relational] placeholder[s] %strings%'[s] value[s] [(for|from|of) %-players/offlineplayers%]",
+        "parse placeholder[s] %strings% [(for|as) %-players/offlineplayers%]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptPlaceholders"
     },
     {
       "kind": "expression",
@@ -24979,6 +25043,39 @@
       },
       {
         "values": [
+          "audience",
+          "commandsender",
+          "offlineplayer",
+          "player",
+          "entity",
+          "location",
+          "entitytype",
+          "pluralentitytype",
+          "inventory",
+          "inventoryholder",
+          "countedentitytype",
+          "livingentity",
+          "block",
+          "display",
+          "metadataholder"
+        ],
+        "plurals": [],
+        "defaults": [
+          "audience",
+          "commandsender",
+          "offlineplayer",
+          "player",
+          "entity",
+          "location",
+          "inventory",
+          "inventoryholder",
+          "livingentity",
+          "block",
+          "display"
+        ]
+      },
+      {
+        "values": [
           "object",
           "commandsender",
           "offlineplayer",
@@ -25034,7 +25131,7 @@
         "defaults": []
       }
     ],
-    "commandScope": 178,
-    "functionScope": 179
+    "commandScope": 179,
+    "functionScope": 180
   }
 }
