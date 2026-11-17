@@ -153,6 +153,37 @@ public final class Library implements Registrar {
         wordsAsLiterals.add(id);
     }
 
+    private final Set<String> writesBackArguments = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Writes what effect {@code id} sets its variable arguments to back to them once it's run
+     * ({@link co.xenastudios.neoskript.runtime.ArgumentChanges}), as a Skript addon changes its arguments: for
+     * NeoSkriptCompat. NeoSkript's own syntax doesn't.
+     */
+    public void writesBackArguments(String id) {
+        writesBackArguments.add(id);
+    }
+
+    boolean hasWriteBack(String id) {
+        return writesBackArguments.contains(id);
+    }
+
+    /** Which of the element being set up's arguments are a variable, and which a list variable: bits by index. */
+    private static final ThreadLocal<long[]> variableArguments = new ThreadLocal<>();
+
+    void settingUpVariables(long single, long list) {
+        variableArguments.set(new long[] {single, list});
+    }
+
+    /**
+     * Which of the arguments of the element being set up on this thread are a variable ({@code [0]}) and which a list
+     * variable ({@code [1]}), by bit, for syntax that {@link #writesBackArguments writes back}: for NeoSkriptCompat.
+     */
+    public long[] variableArguments() {
+        long[] masks = variableArguments.get();
+        return masks == null ? new long[2] : masks.clone();
+    }
+
     boolean hasWordsAsLiterals(String id) {
         return wordsAsLiterals.contains(id);
     }

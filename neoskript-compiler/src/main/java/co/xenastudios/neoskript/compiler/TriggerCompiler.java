@@ -9,6 +9,7 @@ import static org.objectweb.asm.Opcodes.AASTORE;
 import static org.objectweb.asm.Opcodes.IADD;
 import static org.objectweb.asm.Opcodes.IAND;
 import static org.objectweb.asm.Opcodes.IFNULL;
+import static org.objectweb.asm.Opcodes.IF_ACMPEQ;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
@@ -3011,6 +3012,9 @@ final class TriggerCompiler {
             callThrough(effect, Effect.class);
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Effect.class), "execute",
                     "(" + CONTEXT + OBJECTS + ")V", true);
+            if (library.hasWriteBack(effect.syntax().id())) {
+                writeBackArguments(effect);
+            }
             return;
         }
         switch (core.id()) {
@@ -4714,6 +4718,19 @@ final class TriggerCompiler {
             if (one && i < 64) {
                 single |= 1L << i;
             }
+        }
+        if (library.hasWriteBack(syntax.syntax().id())) {
+            long variables = 0;
+            long listVariables = 0;
+            for (int i = 0; i < values.size() && i < 64; i++) {
+                if (values.get(i) instanceof Expr.Variable variable) {
+                    variables |= 1L << i;
+                    if (variable.list()) {
+                        listVariables |= 1L << i;
+                    }
+                }
+            }
+            library.settingUpVariables(variables, listVariables);
         }
         long defaults = 0;
         for (int i = 0; i < values.size() && i < 64; i++) {
@@ -6837,6 +6854,49 @@ final class TriggerCompiler {
     }
 
     // ---------------------------------------------------------------- variables
+
+    /**
+     * Writes what an addon's effect set its variable arguments to back to them, as Skript's addons change their
+     * arguments: each variable argument's change ({@link co.xenastudios.neoskript.runtime.ArgumentChanges}), if it
+     * has one, set (or deleted, for null).
+     */
+    private void writeBackArguments(ParsedSyntax effect) throws CompileException {
+        String changes = "co/xenastudios/neoskript/runtime/ArgumentChanges";
+        List<Object> values = effect.match().values();
+        for (int i = 0; i < values.size(); i++) {
+            if (!(values.get(i) instanceof Expr.Variable variable)) {
+                continue;
+            }
+            int slot = nextSlot++;
+            pushInt(i);
+            method.visitMethodInsn(INVOKESTATIC, changes, "take", "(I)" + OBJECT_DESC, false);
+            method.visitVarInsn(ASTORE, slot);
+            Label unchanged = new Label();
+            method.visitVarInsn(ALOAD, slot);
+            method.visitFieldInsn(GETSTATIC, changes, "NONE", OBJECT_DESC);
+            method.visitJumpInsn(IF_ACMPEQ, unchanged);
+            variableStore(variable);
+            variableName(variable);
+            if (variable.list()) {
+                Label delete = new Label();
+                Label done = new Label();
+                method.visitVarInsn(ALOAD, slot);
+                method.visitJumpInsn(IFNULL, delete);
+                method.visitVarInsn(ALOAD, slot);
+                method.visitTypeInsn(CHECKCAST, "[" + OBJECT_DESC);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "setList", "(" + STRING_DESC + OBJECTS + ")V", false);
+                method.visitJumpInsn(GOTO, done);
+                method.visitLabel(delete);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "deleteList", "(" + STRING_DESC + ")V", false);
+                method.visitLabel(done);
+            } else {
+                method.visitVarInsn(ALOAD, slot);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "set", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
+            }
+            method.visitLabel(unchanged);
+        }
+        method.visitMethodInsn(INVOKESTATIC, changes, "end", "()V", false);
+    }
 
     private void variableStore(Expr.Variable variable) {
         if (variable.local()) {
