@@ -43,6 +43,7 @@ class ScriptCompilerTest {
             throw new IllegalStateException("a bug");
         }, "crash");
         library.condition("Truth", info -> (context, args) -> info.hasTag("yes"), "(yes:always|never)");
+        library.condition("Given", info -> (context, args) -> args[0] != null, "%object% is given");
         library.expression("Double", "number", info -> (context, args) -> ((Number) args[0]).doubleValue() * 2,
                 "double %number%");
         library.expression("Mark", "integer", info -> (context, args) -> (long) info.mark(), "(1¦one|2¦two)");
@@ -185,5 +186,102 @@ class ScriptCompilerTest {
         CompiledScripts other = compile("on load:\n\tloop 1 and 2:\n\t\tsay loop-path\n");
         assertEquals(List.of("There's no loop that matches 'loop-path'"),
                 other.diagnostics().stream().map(d -> d.message()).toList());
+    }
+
+    @Test
+    void codeTooBigForAMethodIsAnErrorNotACrash() throws Throwable {
+        // 2,000 nested calls parse where the stack is deep enough (a warm parser's is), but their bytecode doesn't
+        // fit in one method: ASM threw where a script error is due, and the rest of the script still loads.
+        String deep = "function f(x: object) :: object:\n\treturn {_x}\n\non load:\n\tsay "
+                + "f(".repeat(2000) + "1" + ")".repeat(2000) + "\n\tsay \"after\"\n";
+        Throwable[] failed = {null};
+        Thread thread = new Thread(null, () -> {
+            try {
+                List<ParsedScript> parsed = new ScriptLoader(library.registry())
+                        .load(List.of(new SourceFile("deep.sk", deep)));
+                assertEquals(List.of(), parsed.getFirst().diagnostics());
+                CompiledScripts compiled = new ScriptCompiler(library,
+                        new co.xenastudios.neoskript.runtime.variables.VariableStore()).compile(parsed);
+                assertEquals(List.of("5: " + ScriptCompiler.TOO_BIG),
+                        compiled.diagnostics().stream().map(d -> d.line() + ": " + d.message()).toList());
+                compiled.linkFunctions();
+                for (CompiledScripts.CompiledTrigger trigger : compiled.triggers()) {
+                    trigger.trigger().execute(new SimpleTriggerContext(null));
+                }
+            } catch (Throwable e) {
+                failed[0] = e;
+            }
+        }, "deep", 512L * 1024 * 1024);
+        thread.start();
+        thread.join();
+        if (failed[0] != null) {
+            throw failed[0];
+        }
+        assertEquals(List.of("[after]"), said);
+    }
+
+    /** Parses and compiles {@code text} on a thread with a deep stack, as a warm parser can go that deep. */
+    private CompiledScripts compileDeep(String text) throws Throwable {
+        Object[] result = {null};
+        Thread thread = new Thread(null, () -> {
+            try {
+                List<ParsedScript> parsed = new ScriptLoader(library.registry())
+                        .load(List.of(new SourceFile("deep.sk", text)));
+                assertEquals(List.of(), parsed.getFirst().diagnostics());
+                result[0] = new ScriptCompiler(library,
+                        new co.xenastudios.neoskript.runtime.variables.VariableStore()).compile(parsed);
+            } catch (Throwable e) {
+                result[0] = e;
+            }
+        }, "deep", 512L * 1024 * 1024);
+        thread.start();
+        thread.join();
+        if (result[0] instanceof Throwable e) {
+            throw e;
+        }
+        return (CompiledScripts) result[0];
+    }
+
+    private static String nestedCalls(int depth) {
+        return "f(".repeat(depth) + "1" + ")".repeat(depth);
+    }
+
+    private static final String IDENTITY = "function f(x: object) :: object:\n\treturn {_x}\n\n";
+
+    private void runAll(CompiledScripts compiled) {
+        compiled.linkFunctions();
+        for (CompiledScripts.CompiledTrigger trigger : compiled.triggers()) {
+            trigger.trigger().execute(new SimpleTriggerContext(null));
+        }
+    }
+
+    @Test
+    void nestingUpToTheLimitCompiles() throws Throwable {
+        CompiledScripts compiled = compileDeep(IDENTITY + "on load:\n\tsay " + nestedCalls(TriggerCompiler.MAX_NESTING)
+                + "\n");
+        assertEquals(List.of(), compiled.diagnostics());
+        runAll(compiled);
+        assertEquals(List.of("[1]"), said);
+    }
+
+    @Test
+    void nestingPastTheLimitIsAnErrorOnItsLine() throws Throwable {
+        CompiledScripts compiled = compileDeep(IDENTITY + "on load:\n\tsay " + nestedCalls(TriggerCompiler.MAX_NESTING + 1)
+                + "\n\tsay \"after\"\n");
+        assertEquals(List.of("5: " + ScriptCompiler.TOO_BIG),
+                compiled.diagnostics().stream().map(d -> d.line() + ": " + d.message()).toList());
+        runAll(compiled);
+        assertEquals(List.of("[after]"), said);
+    }
+
+    @Test
+    void aDeepElseIfIsLeftOutNotTheTrigger() throws Throwable {
+        CompiledScripts compiled = compileDeep(IDENTITY + "on load:\n\tif never:\n\t\tsay \"if\"\n"
+                + "\telse if " + nestedCalls(2000) + " is given:\n\t\tsay \"deep\"\n"
+                + "\telse:\n\t\tsay \"else\"\n\tsay \"after\"\n");
+        assertEquals(List.of("7: " + ScriptCompiler.TOO_BIG),
+                compiled.diagnostics().stream().map(d -> d.line() + ": " + d.message()).toList());
+        runAll(compiled);
+        assertEquals(List.of("[else]", "[after]"), said);
     }
 }

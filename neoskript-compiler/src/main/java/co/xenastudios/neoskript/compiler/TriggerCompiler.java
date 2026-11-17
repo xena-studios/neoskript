@@ -1207,6 +1207,9 @@ final class TriggerCompiler {
                 Statement culprit = statement;
                 int open = blocks.size();
                 try {
+                    if (nesting(statement) > MAX_NESTING) {
+                        throw new CompileException(statement.line().number(), ScriptCompiler.TOO_BIG);
+                    }
                     if (onGlobal && !globalSafe(statement)) {
                         leaveGlobal();
                     }
@@ -1244,6 +1247,69 @@ final class TriggerCompiler {
     }
 
     /**
+     * How deeply a line's expressions may be nested, one in another's arguments, to be compiled. Each level's code
+     * goes in the trigger's method, which can only be so big: 2,000 nested calls parse where the stack is deep
+     * enough, but don't fit. Real scripts don't come close.
+     */
+    static final int MAX_NESTING = 300;
+
+    /** How deeply the expressions of a statement's own line are nested (not its section's body). */
+    private static int nesting(Statement statement) {
+        return switch (statement) {
+            case Statement.Effect effect -> nesting(effect.effect());
+            case Statement.Condition condition -> nesting(condition.condition());
+            case Statement.Call call -> nesting(call.call());
+            case Statement.Section section -> Math.max(nesting(section.header()), nesting(section.call()));
+            case Statement.Conditions conditions -> Math.max(nesting(conditions.header()),
+                    nesting(conditions.conditions()));
+            default -> 0;
+        };
+    }
+
+    private static int nesting(Object value) {
+        int inner = 0;
+        switch (value) {
+            case ParsedSyntax syntax -> {
+                for (Object each : syntax.match().values()) {
+                    inner = Math.max(inner, nesting(each));
+                }
+                for (Object each : syntax.match().regexValues()) {
+                    inner = Math.max(inner, nesting(each));
+                }
+                return inner;
+            }
+            case Expr.Syntax syntax -> {
+                return 1 + nesting(syntax.syntax());
+            }
+            case Expr.ListOf list -> inner = nesting(list.items());
+            case Expr.FunctionCall call -> inner = nesting(call.arguments());
+            case Expr.Text text -> {
+                if (text.embedded().isEmpty()) {
+                    return 0;
+                }
+                inner = nesting(text.embedded());
+            }
+            case Expr.Variable variable -> {
+                if (variable.embedded().isEmpty()) {
+                    return 0;
+                }
+                inner = nesting(variable.embedded());
+            }
+            case List<?> list -> {
+                for (Object each : list) {
+                    inner = Math.max(inner, nesting(each));
+                }
+                return inner;
+            }
+            case null, default -> {
+                // A literal, a variable without parts, words: nothing nested in it.
+                return 0;
+            }
+        }
+        return 1 + inner;
+    }
+
+    /**
      * Notes that {@code culprit} failed with {@code thrown}: in an 'if' chain starting with {@code statement}, the
      * branch that did. As in Skript, it's left out and the rest is still compiled, so every error is found.
      */
@@ -1266,7 +1332,9 @@ final class TriggerCompiler {
             if (culprit instanceof Statement.Section section && section.body() != null
                     && e.line() == section.line().number()) {
                 unparsed(section.body());
+                // Too deep to compile isn't the line's meaning, which Skript's statement error would be about.
                 if (script.statementError(section.line()) != null && !e.alreadyReported()
+                        && !ScriptCompiler.TOO_BIG.equals(e.getMessage())
                         && !(culprit != statement && neoskriptOnly(e.getMessage()))) {
                     // Skript then reads the line as a statement, whose error it keeps if it has one.
                     e = new CompileException(e.line(), script.statementError(section.line()));
@@ -2039,6 +2107,10 @@ final class TriggerCompiler {
             Label next = new Label();
             int open = blocks.size();
             try {
+            if (branch && nesting(statement) > MAX_NESTING) {
+                // An 'else if' too deep to compile is left out like any failed branch, not the whole trigger.
+                throw new CompileException(statement.line().number(), ScriptCompiler.TOO_BIG);
+            }
             if (statement instanceof Statement.Conditions conditions) {
                 lineOf(statement, statement.line().key());
                 Label then = new Label();
