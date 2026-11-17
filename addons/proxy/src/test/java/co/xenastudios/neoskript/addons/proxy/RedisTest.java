@@ -170,6 +170,24 @@ class RedisTest {
         assertTrue(condition.getAsBoolean(), "timed out");
     }
 
+    /**
+     * A fake Redis on a port another one just left. The link keeps reconnecting meanwhile, and on Linux one of those
+     * attempts can briefly hold the port itself (a TCP self-connect), so binding is retried for a few seconds.
+     */
+    private static FakeRedis rebind(int port) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (true) {
+            try {
+                return new FakeRedis(port);
+            } catch (java.net.BindException taken) {
+                if (System.nanoTime() > deadline) {
+                    throw taken;
+                }
+                Thread.sleep(50);
+            }
+        }
+    }
+
     @Test
     void messagesGoRoundAndWaitThroughAnOutage() throws Exception {
         FakeRedis redis = new FakeRedis(0);
@@ -186,7 +204,7 @@ class RedisTest {
         redis.close();
         await(() -> !link.up());
         link.publish("events", "two");
-        FakeRedis back = new FakeRedis(port);
+        FakeRedis back = rebind(port);
         closing.add(back);
         await(link::up);
         await(() -> back.published.contains("events two"));
