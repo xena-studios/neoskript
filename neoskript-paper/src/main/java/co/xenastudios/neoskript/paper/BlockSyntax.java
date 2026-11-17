@@ -115,8 +115,7 @@ final class BlockSyntax {
                     case ItemType item -> baseType(item);
                     case BlockData data -> data.getMaterial().createBlockData();
                     // A block's type is its item, or its block data if it has no item, like water.
-                    case org.bukkit.block.Block block -> block.getType().isItem()
-                            ? new ItemType(new org.bukkit.inventory.ItemStack(block.getType()), false)
+                    case org.bukkit.block.Block block -> block.getType().isItem() ? ItemType.ofBlock(block)
                             : block.getType().createBlockData();
                     case EntityKind kind -> kind.type() == null ? kind : EntityKind.of(kind.type());
                     case Entity entity -> EntityKind.of(entity.getType());

@@ -22,11 +22,19 @@ import java.util.stream.Stream;
  * The server NeoSkript's CLI starts to check a scripts folder: with {@code -Dneoskript.check=<scripts>} and
  * {@code -Dneoskript.check.report=<report.json>}, NeoSkript checks the scripts with the standard library the server
  * registered, writes the report, and stops the server. Nothing runs and no variables are read or written.
+ *
+ * <p>With {@code -Dneoskript.check.aliases=<folder>}, the alias files there are read first, as the plugin reads
+ * {@code plugins/NeoSkript/aliases}, and with {@code -Dneoskript.check.defaultAliases=false} Skript's default aliases
+ * aren't, as Skript's {@code load default aliases: false}. With {@code -Dneoskript.check.dataFolder=<folder>}, an
+ * {@code aliases-english.zip} there replaces the default aliases, as in the plugin's folder. Their problems go in the report's {@code aliases}.
  */
 public final class CheckMode {
 
     private static final String SCRIPTS = "neoskript.check";
     private static final String REPORT = "neoskript.check.report";
+    private static final String ALIASES = "neoskript.check.aliases";
+    private static final String DEFAULT_ALIASES = "neoskript.check.defaultAliases";
+    private static final String DATA_FOLDER = "neoskript.check.dataFolder";
 
     private CheckMode() {}
 
@@ -39,9 +47,26 @@ public final class CheckMode {
     public static void run(Library library) throws IOException {
         Path scripts = Path.of(System.getProperty(SCRIPTS));
         Path report = Path.of(System.getProperty(REPORT));
+        List<Map<String, Object>> aliasProblems = new ArrayList<>();
+        String aliases = System.getProperty(ALIASES);
+        co.xenastudios.neoskript.paper.GlobalAliases.Loaded loaded = co.xenastudios.neoskript.paper.GlobalAliases.load(
+                aliases == null || aliases.isBlank() ? null : Path.of(aliases),
+                System.getProperty(DATA_FOLDER) == null ? null : Path.of(System.getProperty(DATA_FOLDER)),
+                !"false".equalsIgnoreCase(System.getProperty(DEFAULT_ALIASES)));
+        loaded.problems((problem, file) -> {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("file", problem.file());
+            entry.put("kind", problem.severity().name().toLowerCase(Locale.ROOT));
+            entry.put("line", problem.line());
+            entry.put("message", problem.message());
+            aliasProblems.add(entry);
+        });
+        co.xenastudios.neoskript.paper.GlobalAliases.install(loaded);
         List<ScriptCheck.ScriptReport> reports = new ScriptCheck(library).check(read(scripts));
+        Map<String, Object> json = json(reports);
+        json.put("aliases", Map.of("files", loaded.files(), "problems", aliasProblems));
         Files.writeString(report, new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()
-                .toJson(json(reports)) + "\n");
+                .toJson(json) + "\n");
     }
 
     /**

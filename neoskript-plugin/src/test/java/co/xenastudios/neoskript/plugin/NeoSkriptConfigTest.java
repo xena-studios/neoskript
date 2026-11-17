@@ -90,7 +90,7 @@ class NeoSkriptConfigTest {
         assertEquals(List.of(), result.warnings());
         assertEquals(List.of(
                 "Carried config.yml forward from config version 1 to 2, keeping your settings. The old file is config.yml.bak-v1.",
-                "Added 3 new settings with their defaults: theme, variables.storage, variables.recover."), result.notices());
+                "Added 4 new settings with their defaults: theme, aliases, variables.storage, variables.recover."), result.notices());
         assertEquals(old, Files.readString(folder.resolve("config.yml.bak-v1")));
 
         NeoSkriptConfig config = result.config();

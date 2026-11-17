@@ -57,11 +57,24 @@ Item, block and entity names come from the server's registries, which only a run
 | `--hints-only` | Only shows Folia and performance hints. |
 | `--quiet` | Only prints the summary line. |
 | `--minecraft <26.3\|1.21.4>` | The server version to check against. By default, the newest your Java runs. |
+| `--aliases <folder>` | The [alias files](/docs/scripts/items/#custom-aliases) to read. By default, the `aliases` folder beside the `scripts` folder the checked script or folder is in, as `plugins/Skript/aliases` is beside `plugins/Skript/scripts`, if there is one. An `aliases-english.zip` beside it replaces Skript's defaults, as on a server. |
 | `--cache <folder>` | Where the server is downloaded to, instead of `~/.neoskript/cache`. |
 | `--verbose` | Shows the check server's console. |
 | `--version` | Prints the CLI's version. |
 
 Files and folders whose names start with `-` or `.` are skipped, as Skript skips them.
+
+## Alias files
+
+A script that uses a server's own aliases, like `ruby = minecraft:red_dye`, only loads with them. The checker reads the alias files beside the scripts folder, with Skript's default aliases unless the `config.sk` beside them says `load default aliases: false`, and lists their problems under `aliases/<file>` before the scripts'. Problems in alias files don't change the exit code, as Skript loads the rest of the aliases.
+
+```text
+NeoSkript check of plugins/Skript/scripts: 12 scripts, 12 load cleanly, 0 with errors, 0 hints
+Alias files: 2 read, 1 with problems (1 error)
+
+aliases/gems.sk
+  error       line 4: Minecraft id minecraft:rubyy is not valid
+```
 
 ## Exit codes
 

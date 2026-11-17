@@ -225,7 +225,7 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
             return false;
         }
         for (ItemType each : item.alternatives()) {
-            String name = AliasFiles.relatedEntity(each.material().getKey().getKey());
+            String name = GlobalAliases.relatedEntity(each.material().getKey().getKey());
             EntityKind related = name == null ? null : parse(name);
             if (related != null && related.baseClass().isAssignableFrom(c)) {
                 return true;

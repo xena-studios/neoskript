@@ -1,0 +1,17 @@
+outside = minecraft:stone
+broken:
+	bad id = minecraft:not_a_real_item
+	{nope} thing = minecraft:stone
+	open [bracket = minecraft:stone
+	close] bracket = minecraft:stone
+	loopy = loopy2
+	just text line
+	ok after bad = minecraft:flint
+	{notvars}x:
+		a = minecraft:stone
+	{usel}:
+		a = -
+	[big] (pebble|grit) dup = minecraft:nope
+	bad state = minecraft:anvil[facing=up]
+	trailing = minecraft:flint,
+	weird@zz = minecraft:iron_nugget

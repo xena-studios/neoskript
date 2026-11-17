@@ -978,12 +978,14 @@ final class PlayerSyntax {
         registrar.expression("ExprHotbarButton", "integer", info -> (context, args) ->
                 context.event() instanceof org.bukkit.event.inventory.InventoryClickEvent click ? (long) click.getHotbarButton() : null,
                 "[the] hotbar button");
-        // The raw names of items: their Minecraft ids.
+        // The raw names of items: their Minecraft ids, each of an alias's, as its alias file wrote them.
         registrar.expression("ExprRawName", "string", info -> (context, args) -> {
             List<Object> names = new ArrayList<>();
             for (Object item : owners(args[0])) {
                 if (item instanceof ItemType type) {
-                    names.add(type.material().getKey().toString());
+                    for (ItemType each : type.alternatives()) {
+                        names.add(each.rawName());
+                    }
                 }
             }
             return names.size() == 1 ? names.getFirst() : names.toArray();

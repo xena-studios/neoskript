@@ -16,7 +16,7 @@ What's on this page is what's left: the deliberate differences, what NeoSkript a
 - **Its own folder.** Scripts and variables live in `plugins/NeoSkript`, copied from `plugins/Skript` on the first start.
 - **`config.yml`, not `config.sk`,** with the settings NeoSkript has. See [configuration](/docs/server/configuration/).
 - **Folia.** Skript doesn't run on Folia; NeoSkript runs on its region threads. See [Folia](/docs/server/folia/).
-- **`/sk reload aliases`** has nothing to read: item names come from the server's registries.
+- **`/sk reload aliases`** also reloads the scripts that use the aliases that changed, and those that had errors. Skript only reads the alias files again, so scripts keep the items they loaded with until they're reloaded.
 - **`/sk update`** uses NeoSkript's [update checker](/docs/server/updates-and-metrics/), and **`/sk gen-docs`** points to the [syntax reference](/syntax/) instead of writing docs files.
 - **`/sk`'s messages are NeoSkript's own**, in the [theme](/docs/server/configuration/#make-it-look-like-your-server) from `config.yml`, with reload reports per script. Problems at startup and runtime errors keep Skript's look.
 
@@ -27,6 +27,8 @@ Where Skript 2.17 has a bug, NeoSkript does what Skript meant rather than copy i
 - **Script folders in `/sk`:** Skript 2.17 never finds folders given to `/sk reload`, `enable` or `disable`, because of a bug. NeoSkript finds them; a name ending in `/` is a folder.
 - **Warning frames:** Skript 2.17's runtime warning frames never reset. NeoSkript resets them as intended.
 - **Comparisons of words:** `projectile is an arrow` was false because of how words were read. NeoSkript reads words in comparisons as Skript's `CondCompare` means to, so it's true.
+- **Alias files that stop Skript loading aliases:** in Skript 2.17, an alias starting with `{`, a block state without `=` (`[facing]`), components the server can't read, a `minecraft version` that isn't a version, or a lone `}` in a name stop it loading any aliases, and can disable it. NeoSkript reports an error for the line and loads the rest.
+- **Alias names with capitals:** Skript keeps `Ruby = minecraft:red_dye` as written but looks names up in lower case, so it never finds it. NeoSkript finds it, and writes the item as `Ruby`.
 
 ## What NeoSkript adds
 
@@ -37,7 +39,6 @@ Where Skript 2.17 has a bug, NeoSkript does what Skript meant rather than copy i
 
 - **Skript addons** (SkBee, skript-yaml, SkQuery, skript-reflect and others) don't load. A compatibility layer is planned after 1.0. See [addons](/docs/addons/).
 - **Databases for variables**: Skript's SQLite and MySQL storage. Skript 2.17 only supports CSV out of the box. Planned after 1.0.
-- **Skript's alias files** for groups like `any sword`: item names come from the server's registries. A saved `any sword` stays in `variables.csv` as Skript saved it.
 
 ## Known differences
 

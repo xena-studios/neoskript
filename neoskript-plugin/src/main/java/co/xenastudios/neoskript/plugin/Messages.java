@@ -62,7 +62,6 @@ final class Messages {
     static final Message NO_LAST = Message.of("<prefix><error>No script has been reloaded yet, so there's no last one to reload.");
     static final Message RELOAD_DISABLED = Message.of("<prefix><highlight><name></highlight> is disabled. <command> enables it.");
     static final Message FOLDER_EMPTY = Message.of("<prefix><highlight><name></highlight> has no enabled scripts.");
-    static final Message ALIASES = Message.of("<prefix>NeoSkript's aliases are built in, so there's nothing to reload.");
     static final Message CONFIG_FAILED = Message.of("<prefix><error><reason></error> The running settings are kept.");
     static final Message CONFIG_WARNINGS = Message.of(
             "<prefix><error><settings> fell back to the default.</error> The console says which.");

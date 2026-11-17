@@ -1,6 +1,6 @@
 ---
 title: Moving from Skript
-description: Swap the jar. NeoSkript copies your scripts and variables on its first start, and leaves Skript's folder as it was.
+description: Swap the jar. NeoSkript copies your scripts, variables and alias files on its first start, and leaves Skript's folder as it was.
 ---
 
 import { Aside, FileTree, Steps } from "@astrojs/starlight/components";
@@ -15,7 +15,7 @@ The script checker, `neoskript-cli`, tells you before you switch what NeoSkript 
 java -jar neoskript-cli-0.1.0.jar check plugins/Skript/scripts
 ```
 
-It starts a throwaway headless Paper server (downloaded once into `~/.neoskript/cache` and checked against its SHA-256), loads the scripts there without running them, and lists each line NeoSkript won't load, Skript's warnings, and hints on what may behave differently on Folia or cost a lot of server time. Options: `--json <file>`, `--hints-only`, `--quiet`, `--minecraft 26.3|1.21.4`, `--verbose`. It exits with 0 when every script loads, 1 when some don't, and 2 when the check couldn't run. See [the CLI](/docs/cli/) for more.
+It reads the alias files in `plugins/Skript/aliases`, as Skript does. It starts a throwaway headless Paper server (downloaded once into `~/.neoskript/cache` and checked against its SHA-256), loads the scripts there without running them, and lists each line NeoSkript won't load, Skript's warnings, and hints on what may behave differently on Folia or cost a lot of server time. Options: `--json <file>`, `--hints-only`, `--quiet`, `--minecraft 26.3|1.21.4`, `--aliases <folder>`, `--verbose`. It exits with 0 when every script loads, 1 when some don't, and 2 when the check couldn't run. See [the CLI](/docs/cli/) for more.
 
 The lines it reports are usually syntax from a Skript addon, which NeoSkript doesn't load yet. See [addons](/docs/addons/).
 
@@ -33,26 +33,28 @@ The lines it reports are usually syntax from a Skript addon, which NeoSkript doe
 
 </Steps>
 
-On its first start, NeoSkript copies `scripts/` and `variables.csv` from `plugins/Skript` into `plugins/NeoSkript`, then leaves a marker so it never copies again. It **copies** rather than moves, so Skript's folder stays exactly as it was, and switching back means putting `Skript.jar` back. If you turned on [native variable storage](/docs/server/variables/#native-storage), set `variables.storage` back to `csv` and restart once first, so NeoSkript writes `variables.csv` for Skript, and copy that file to `plugins/Skript`.
+On its first start, NeoSkript copies `scripts/`, `variables.csv` and `aliases/` (with `aliases-english.zip`, if you have one) from `plugins/Skript` into `plugins/NeoSkript`, then leaves a marker so it never copies again. It **copies** rather than moves, so Skript's folder stays exactly as it was, and switching back means putting `Skript.jar` back. If you turned on [native variable storage](/docs/server/variables/#native-storage), set `variables.storage` back to `csv` and restart once first, so NeoSkript writes `variables.csv` for Skript, and copy that file to `plugins/Skript`.
 
 <FileTree>
 - plugins/
   - Skript/ left as it was
     - config.sk
+    - aliases/
     - scripts/
     - variables.csv
   - NeoSkript/
     - .migrated-from-skript the marker
     - config.yml
+    - aliases/ copied from Skript
     - scripts/ copied from Skript
     - variables.csv copied from Skript
     - backups/
       - variables_2026-11-12_16-03-07.csv the copy, backed up before its first load
 </FileTree>
 
-Nothing is copied if `plugins/NeoSkript/scripts` already exists, for example after a start before you moved your scripts. Then copy them yourself.
+Nothing is copied if `plugins/NeoSkript/scripts` already exists, for example after a start before you moved your scripts. Then copy them yourself. Alias files are copied last: one `plugins/NeoSkript/aliases` already has is kept, and the console says so. A server that moved over before NeoSkript read alias files gets `aliases/` copied once on its next start, unless `plugins/NeoSkript/aliases` exists by then.
 
-A few of Skript's `config.sk` settings carry over to NeoSkript's `config.yml` in that first start: whether players are saved by UUID in variable names, and the effect command settings. The rest of `config.sk` isn't copied; NeoSkript's defaults match Skript's.
+A few of Skript's `config.sk` settings carry over to NeoSkript's `config.yml` in that first start: whether players are saved by UUID in variable names, `load default aliases`, and the effect command settings. The rest of `config.sk` isn't copied; NeoSkript's defaults match Skript's.
 
 `/skript` and `/sk` keep Skript's subcommands and arguments, so what you type and any console automation still work. Their messages are NeoSkript's own: see [commands](/docs/server/commands/).
 

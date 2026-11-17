@@ -38,8 +38,8 @@ import org.bukkit.plugin.Plugin;
  *
  * <p>Where NeoSkript differs: a script with errors keeps running its last version when reloaded (D12), so a
  * reload never unloads first; {@code reload config} reloads {@code config.yml} (NeoSkript has no
- * {@code config.sk}); {@code reload aliases} has nothing to reload, as NeoSkript's aliases are built in; and
- * {@code gen-docs} points to the syntax reference on neoskript.dev.
+ * {@code config.sk}); {@code reload aliases} also reloads the scripts the changed aliases may change, which keep
+ * their last version if they now have errors; and {@code gen-docs} points to the syntax reference on neoskript.dev.
  */
 final class SkriptCommand implements TabExecutor {
 
@@ -79,10 +79,10 @@ final class SkriptCommand implements TabExecutor {
     private static final List<Sub> SUBS = List.of(
             new Sub("help", "Shows this list"),
             new Sub(List.of("reload"), "Reloads scripts, the config, or both", args(
-                    "all", "The config and every script",
+                    "all", "The config, the aliases and every script",
                     "scripts", "Every script",
                     "config", "config.yml",
-                    "aliases", "Nothing: NeoSkript's aliases are built in",
+                    "aliases", "The alias files, and the scripts that use them",
                     "last", "The script you reloaded last",
                     "<script>", SCRIPT_ARG), true),
             // Skript fails with an internal error for these without an argument; NeoSkript shows their help.
@@ -206,12 +206,14 @@ final class SkriptCommand implements TabExecutor {
         List<CommandSender> recipients = reloadRecipients(sender);
         switch (args[1].toLowerCase(Locale.ENGLISH)) {
             case "all" -> {
-                reloading(sender, recipients, Component.text("the config and all scripts"));
+                reloading(sender, recipients, Component.text("the config, aliases and all scripts"));
                 boolean config = reloadConfig(recipients);
                 ScriptReport report = new ScriptReport(label);
+                boolean aliases = reloadAliases(report);
                 ScriptManager.Outcome outcome = load(sender, recipients, null, report);
                 if (outcome != null) {
-                    Component what = Component.text(config ? "the config and " : "")
+                    Component what = Component.text(config && aliases ? "the config, aliases and "
+                                    : config ? "the config and " : aliases ? "the aliases and " : "")
                             .append(countOf(outcome.scripts(), "script"));
                     report.send(recipients, "Reloaded", what, millis(start));
                 }
@@ -231,8 +233,30 @@ final class SkriptCommand implements TabExecutor {
                             text("ms", millis(start)));
                 }
             }
-            // NeoSkript's aliases are built in, so there's nothing to read again.
-            case "aliases" -> send(sender, Messages.ALIASES);
+            case "aliases" -> {
+                reloading(sender, recipients, Component.text("the aliases"));
+                ScriptReport report = new ScriptReport(label);
+                Set<String> changed;
+                try {
+                    // aliases.load-defaults as config.yml has it now, without needing /sk reload config first.
+                    changed = plugin.aliases().reload(plugin.loadDefaultAliases(), report.aliases());
+                } catch (RuntimeException | StackOverflowError | OutOfMemoryError | LinkageError e) {
+                    plugin.getSLF4JLogger().error("Couldn't reload the aliases", e);
+                    send(sender, Messages.READ_FAILED, text("reason", String.valueOf(e.getMessage())));
+                    return;
+                }
+                // Then the scripts that use the aliases that changed, or that had errors the new aliases may fix.
+                // A script that now has errors keeps running its last version (D12).
+                Predicate<String> affected = scripts.affectedBy(changed);
+                ScriptManager.Outcome outcome = load(sender, recipients, affected, report);
+                if (outcome != null) {
+                    Component what = Component.text("the aliases");
+                    if (outcome.scripts() > 0) {
+                        what = what.append(Component.text(" and ")).append(countOf(outcome.scripts(), "script"));
+                    }
+                    report.send(recipients, "Reloaded", what, millis(start));
+                }
+            }
             default -> {
                 String scriptName;
                 if (args[1].equalsIgnoreCase("last")) {
@@ -306,6 +330,17 @@ final class SkriptCommand implements TabExecutor {
                     text("verb", result.restartOnly().size() == 1 ? "applies" : "apply"));
         }
         return true;
+    }
+
+    /** Reloads the aliases for {@code /sk reload all}, with their problems in {@code report}. Returns whether it could. */
+    private boolean reloadAliases(ScriptReport report) {
+        try {
+            plugin.aliases().reload(plugin.loadDefaultAliases(), report.aliases());
+            return true;
+        } catch (RuntimeException | StackOverflowError | OutOfMemoryError | LinkageError e) {
+            plugin.getSLF4JLogger().error("Couldn't reload the aliases", e);
+            return false;
+        }
     }
 
     /** Loads the scripts {@code scope} accepts (all if {@code null}), or returns {@code null} if they couldn't be read. */

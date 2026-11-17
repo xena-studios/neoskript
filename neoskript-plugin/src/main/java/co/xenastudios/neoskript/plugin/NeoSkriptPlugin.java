@@ -47,6 +47,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     private Addons addons;
     /** bStats, whose thread must stop with the plugin. */
     private Metrics metrics;
+    private AliasManager aliases;
 
     /** https://bstats.org/plugin/bukkit/NeoSkript/34868 */
     private static final int BSTATS_PLUGIN_ID = 34868;
@@ -81,10 +82,17 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             SkriptMigration.Result migration = SkriptMigration.migrate(
                     getDataPath().resolveSibling("Skript"), getDataPath());
             if (!migration.copied().isEmpty()) {
-                getSLF4JLogger().info("Copied {} from plugins/Skript ({} {}). Skript's folder was left as it was.",
-                        String.join(" and ", migration.copied()), migration.scriptCount(),
-                        migration.scriptCount() == 1 ? "script" : "scripts");
+                java.util.List<String> copied = migration.copied();
+                String what = copied.size() == 1 ? copied.getFirst()
+                        : String.join(", ", copied.subList(0, copied.size() - 1)) + " and " + copied.getLast();
+                if (copied.contains("scripts")) {
+                    getSLF4JLogger().info("Copied {} from plugins/Skript ({} {}). Skript's folder was left as it was.",
+                            what, migration.scriptCount(), migration.scriptCount() == 1 ? "script" : "scripts");
+                } else {
+                    getSLF4JLogger().info("Copied {} from plugins/Skript. Skript's folder was left as it was.", what);
+                }
             }
+            migration.notes().forEach(note -> getSLF4JLogger().warn(note));
             if (migration.variablesBackup() != null) {
                 getSLF4JLogger().info("Backed up Skript's variables as {} before loading them",
                         getDataPath().toAbsolutePath().relativize(migration.variablesBackup().toAbsolutePath()));
@@ -121,6 +129,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (!deferSyntax) {
             registerSyntax.run();
         }
+        aliases = new AliasManager(getDataPath(), getSLF4JLogger());
         if (co.xenastudios.neoskript.plugin.check.CheckMode.requested()) {
             // Started by NeoSkript's CLI to check scripts: check them, write the report, and stop.
             try {
@@ -145,6 +154,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 getSLF4JLogger().warn("Couldn't keep the test chunks loaded: {}", notHere.toString());
             }
         }
+        // Skript's default aliases and the alias files, before any script is compiled.
+        aliases.load(settings.aliases().loadDefaults());
         scheduler = platform == Platform.FOLIA ? new FoliaScheduler(this) : new PaperScheduler(this);
         // Runtime errors go to the console as Skript prints them, limited per frame by config.yml.
         runtimeErrorFrames = RuntimeErrorConsole.start(settings.runtimeErrors(), scheduler);
@@ -347,6 +358,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             getSLF4JLogger().info("Players are their {} in variable names, as in Skript's config.sk.",
                     settings.variables().playerUuidsInNames() ? "UUIDs" : "names");
         }
+        if (copied.containsKey("aliases.load-defaults")) {
+            getSLF4JLogger().info("Skript's default aliases are {}, as in Skript's config.sk.",
+                    settings.aliases().loadDefaults() ? "loaded" : "not loaded");
+        }
         if (copied.keySet().stream().anyMatch(path -> path.startsWith("effect-commands."))) {
             getSLF4JLogger().info("Effect commands are set up as in Skript's config.sk.");
         }
@@ -355,6 +370,33 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     /** The settings from config.yml. */
     NeoSkriptConfig settings() {
         return settings;
+    }
+
+    /**
+     * {@code aliases.load-defaults} as config.yml has it now, for {@code /sk reload aliases}, which reads it again
+     * as Skript reads its setting. If the file can't be read or the value isn't true or false, the running setting.
+     */
+    boolean loadDefaultAliases() {
+        boolean running = settings.aliases().loadDefaults();
+        try {
+            org.bukkit.configuration.file.YamlConfiguration config = new org.bukkit.configuration.file.YamlConfiguration();
+            config.load(configFile().toFile());
+            if (config.isBoolean("aliases.load-defaults")) {
+                return config.getBoolean("aliases.load-defaults");
+            }
+            if (config.contains("aliases.load-defaults")) {
+                getSLF4JLogger().warn("config.yml: aliases.load-defaults isn't true or false, so it stays {}", running);
+            }
+        } catch (IOException | org.bukkit.configuration.InvalidConfigurationException | RuntimeException e) {
+            getSLF4JLogger().warn("Couldn't read aliases.load-defaults from config.yml, so it stays {}: {}", running,
+                    e.getMessage());
+        }
+        return running;
+    }
+
+    /** The alias files, for {@code /sk reload aliases}. */
+    AliasManager aliases() {
+        return aliases;
     }
 
     /** The update checker, or {@code null} on test servers and development builds, which never check. */
