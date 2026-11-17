@@ -1169,10 +1169,18 @@ final class LineParser {
         } finally {
             frames.pop();
         }
-        if (expr instanceof Expr.Unresolved words && !words.verified() && frame[0] != null && expected.anything()) {
+        // Words read as a value only because a type's parser takes them ('stone') aren't, where reading them as an
+        // expression gave an error: Skript keeps that error ('player' where there's no player in the event).
+        if (expr instanceof Expr.Unresolved words && (!words.verified() || anyValueOnly(words, expected))
+                && frame[0] != null && expected.anything()) {
             return new Expr.Unresolved(words.start(), words.end(), words.text(), false, frame[0]);
         }
         return expr;
+    }
+
+    /** Whether words are verified only because some type's parser takes them where any value goes. */
+    private boolean anyValueOnly(Expr.Unresolved words, Expected expected) {
+        return words.verified() && expected.anything() && !context.isItemAlias(words.text());
     }
 
     /** The problems found so far, to drop those found after: see {@link #restore}. */
@@ -2291,9 +2299,11 @@ final class LineParser {
         if (!open) {
             return null;
         }
+        // Where any value goes, Skript reads the words with every type's parser (Classes.parse(words, Object.class)),
+        // so words one of them takes, like 'stone', are a value, not words leaning on nothing: '"%name of stone%"'.
+        // Words only an addon's strict type takes (an imported class) are known there too.
         boolean verified = expected.types().stream().anyMatch(type -> type.openLiterals() && registry.isLiteral(type, text))
-                // Where any value goes, words only an addon's strict type takes (an imported class) are known too.
-                || expected.anything() && registry.isAddonStrictLiteral(text);
+                || expected.anything() && (anyLiteral(text) || registry.isAddonStrictLiteral(text));
         return new Expr.Unresolved(start, end, text, verified);
     }
 
