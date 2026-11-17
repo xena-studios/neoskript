@@ -33,10 +33,25 @@ final class SkriptOrder {
 
     /** {@code syntaxes}, in the order they were registered, in the order Skript tries them. */
     static List<SyntaxInfo> sort(SyntaxKind kind, List<SyntaxInfo> syntaxes) {
+        return sort(kind, syntaxes, id -> null);
+    }
+
+    /**
+     * {@code syntaxes} in the order Skript tries them, with addon syntax whose priority level {@code declared} gives
+     * after Skript's own syntax of that level, as Skript orders an addon's.
+     */
+    static List<SyntaxInfo> sort(SyntaxKind kind, List<SyntaxInfo> syntaxes,
+            java.util.function.Function<String, Integer> declared) {
         String prefix = kind.name().toLowerCase(Locale.ROOT) + "\t";
         List<Map.Entry<SyntaxInfo, Rank>> ranked = new ArrayList<>(syntaxes.size());
         Rank previous = null;
         for (SyntaxInfo syntax : syntaxes) {
+            Integer level = declared.apply(syntax.id());
+            if (level != null) {
+                // Not 'previous': syntax after it that Skript doesn't have goes with the built-in syntax before it.
+                ranked.add(Map.entry(syntax, new Rank(level, Integer.MAX_VALUE, false)));
+                continue;
+            }
             Rank rank = rank(prefix, syntax.id());
             if (rank == null) {
                 rank = previous;
