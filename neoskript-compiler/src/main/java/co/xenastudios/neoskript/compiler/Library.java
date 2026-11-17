@@ -62,8 +62,18 @@ public final class Library implements Registrar {
      * {@code valueClass} makes it the value of only a narrower kind, like the projectile of a damage event, which
      * {@code event-projectile} gets; plain {@code event-entity} doesn't.
      */
+    /** An event value, and the addon that registered it, or {@code null} for NeoSkript's own. */
     private record EventValue(Class<?> eventClass, String type, int time, Class<?> valueClass,
-            java.util.function.Function<Object, ?> getter, String excluded) {}
+            java.util.function.Function<Object, ?> getter, String excluded, String addon) {
+
+        EventValue(Class<?> eventClass, String type, int time, Class<?> valueClass,
+                java.util.function.Function<Object, ?> getter, String excluded) {
+            this(eventClass, type, time, valueClass, getter, excluded, Library.currentAddon.get());
+        }
+    }
+
+    /** The addon registering now, as {@link #registeringAddon} says: what its event values are credited to. */
+    private static final ThreadLocal<String> currentAddon = new ThreadLocal<>();
 
     private final SyntaxRegistry.Builder builder = SyntaxRegistry.builder()
             .experimentNames(co.xenastudios.neoskript.runtime.ScriptFeatures::codeName);
@@ -81,6 +91,24 @@ public final class Library implements Registrar {
     /** The id of the type whose values are exactly {@code javaClass}, or {@code null}: for NeoSkriptCompat. */
     public String exactTypeOf(Class<?> javaClass) {
         return exactType(javaClass);
+    }
+
+    /**
+     * Whether events of {@code eventClass} already have one of NeoSkript's own values of type {@code typeId}, of
+     * exactly {@code valueClass} (an array class for a list), at {@code time}, registered for that class or a
+     * superclass of it: for NeoSkriptCompat, which adds an addon's event values only where NeoSkript has none. An
+     * addon's earlier values don't count, as on Skript, where each is kept and the closest event class used.
+     */
+    public synchronized boolean hasEventValue(Class<?> eventClass, String typeId, Class<?> valueClass, int time) {
+        for (EventValue value : eventValues) {
+            Class<?> given = value.valueClass() != null ? value.valueClass() : javaClasses.get(value.type());
+            if (value.addon() == null && value.excluded() == null && value.time() == time
+                    && value.type().equals(typeId) && valueClass.equals(given)
+                    && value.eventClass().isAssignableFrom(eventClass)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether a type has this id: for NeoSkriptCompat. */
@@ -1463,6 +1491,11 @@ public final class Library implements Registrar {
      */
     public void registeringAddon(String name) {
         registering = name;
+        if (name == null) {
+            currentAddon.remove();
+        } else {
+            currentAddon.set(name);
+        }
     }
 
     /**

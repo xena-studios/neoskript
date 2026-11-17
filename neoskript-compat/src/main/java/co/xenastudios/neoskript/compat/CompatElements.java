@@ -67,6 +67,11 @@ final class CompatElements {
     }
 
     static void effect(Compat compat, Registrar registrar, String addon, SyntaxInfo<?> info) {
+        if (walks(info.type())) {
+            // It runs the rest of the trigger itself, as an effect that waits does: not supported yet, and running
+            // only its execute would silently do nothing.
+            throw new UnsupportedEffect();
+        }
         List<List<Placeholder>> placeholders = placeholders(compat, info);
         String id = id(addon, info);
         registrar.effect(id, element -> {
@@ -75,6 +80,95 @@ final class CompatElements {
                     () -> effect.run(CompatEvent.of(context.event())));
         }, patterns(info));
         priority(registrar, id, info);
+    }
+
+    /**
+     * An addon's event: NeoSkript listens to its event classes, and the event's {@code check} filters each one that
+     * fires, with the literals written in the trigger's header ({@code on wave of zombies}).
+     */
+    static void event(Compat compat, Registrar registrar, String addon, SyntaxInfo<?> info) {
+        List<Class<?>> classes = info instanceof org.skriptlang.skript.bukkit.registration.BukkitSyntaxInfos.Event<?> event
+                ? List.copyOf(event.events()) : List.of();
+        if (classes.isEmpty()) {
+            throw new IllegalArgumentException("it has no event classes");
+        }
+        List<List<Placeholder>> placeholders = placeholders(compat, info);
+        String id = id(addon, info);
+        registrar.event(id, classes, element -> {
+            // Set up once when the script loads, so a header it won't take is an error then, as on Skript.
+            setup(compat, addon, info, placeholders, element, "event");
+            return new EventCheck(compat, addon, info, placeholders, element);
+        }, patterns(info));
+    }
+
+    /**
+     * A trigger's filter for an addon's event. The event is set up (again) the first time the filter runs, with the
+     * header's values, which are constants: a list of them (`on tab complete of "/a" and "/b"`) has no one written
+     * value, so it has its values only then, and an event that copies them in {@code init} gets them all. An event
+     * whose check throws is logged at most once a minute for the trigger.
+     */
+    private static final class EventCheck implements Condition {
+
+        private static final long LOG_EVERY = java.util.concurrent.TimeUnit.MINUTES.toNanos(1);
+
+        private final Compat compat;
+        private final String addon;
+        private final SyntaxInfo<?> info;
+        private final List<List<Placeholder>> placeholders;
+        private final ElementInfo element;
+        private volatile ch.njol.skript.lang.SkriptEvent event;
+        private boolean failed;
+        private long logged = System.nanoTime() - LOG_EVERY;
+
+        EventCheck(Compat compat, String addon, SyntaxInfo<?> info, List<List<Placeholder>> placeholders,
+                ElementInfo element) {
+            this.compat = compat;
+            this.addon = addon;
+            this.info = info;
+            this.placeholders = placeholders;
+            this.element = element;
+        }
+
+        @Override
+        public boolean check(TriggerContext context, Object[] arguments) {
+            if (!(context.event() instanceof Event fired)) {
+                return false;
+            }
+            ch.njol.skript.lang.SkriptEvent ready = event != null ? event : setUp(arguments);
+            if (ready == null) {
+                return false;
+            }
+            try {
+                return run(addon, ready, arguments, () -> ready.check(fired));
+            } catch (AddonError e) {
+                problem(e);
+                return false;
+            }
+        }
+
+        private synchronized ch.njol.skript.lang.SkriptEvent setUp(Object[] arguments) {
+            if (event == null && !failed) {
+                try {
+                    event = CompatArgument.with(arguments,
+                            () -> setup(compat, addon, info, placeholders, element, "event", true));
+                } catch (VirtualMachineError e) {
+                    throw e;
+                } catch (Throwable e) {
+                    failed = true;
+                    problem(e);
+                }
+            }
+            return event;
+        }
+
+        private synchronized void problem(Throwable e) {
+            long now = System.nanoTime();
+            if (now - logged >= LOG_EVERY) {
+                logged = now;
+                compat.logger().log(Level.WARNING, e.getMessage() + " (in '" + element.textOr("") + "'; more of"
+                        + " these in the next minute aren't logged)", e);
+            }
+        }
     }
 
     static void condition(Compat compat, Registrar registrar, String addon, SyntaxInfo<?> info) {
@@ -138,6 +232,27 @@ final class CompatElements {
             }
             return false;
         }
+    }
+
+    /** An effect NeoSkriptCompat leaves out: one that runs the rest of the trigger itself. */
+    static final class UnsupportedEffect extends RuntimeException {
+        UnsupportedEffect() {
+            super(null, null, false, false);
+        }
+    }
+
+    /** Whether an effect overrides {@code walk}, so it runs the rest of the trigger itself rather than its execute. */
+    static boolean walks(Class<?> type) {
+        for (Class<?> c = type; c != null && c != ch.njol.skript.lang.Effect.class && c != Object.class;
+                c = c.getSuperclass()) {
+            try {
+                c.getDeclaredMethod("walk", Event.class);
+                return true;
+            } catch (NoSuchMethodException notHere) {
+                // Look further up.
+            }
+        }
+        return false;
     }
 
     /** The element's id: the addon's name and the element's class, as {@code SkBee:ExprWorldHeight}. */
@@ -204,7 +319,8 @@ final class CompatElements {
                 javaClass = javaClass == null ? null : CompatAdapters.skriptClass(javaClass);
                 type = javaClass == null ? Object.class : javaClass;
             }
-            arguments[i] = argument(i, type, element);
+            // An event's arguments are all literals, as Skript gives them.
+            arguments[i] = argument(i, type, element, instance instanceof ch.njol.skript.lang.SkriptEvent);
         }
         ParseResult result = new ParseResult(text, arguments);
         result.mark = mark(element);
@@ -216,8 +332,9 @@ final class CompatElements {
         boolean[] ok = {false};
         String error;
         try {
-            error = Compat.withSetupErrors(() -> ok[0] = instance.preInit()
-                    && instance.init(arguments, element.pattern(), Kleenean.FALSE, result));
+            error = Compat.withSetupErrors(() -> ok[0] = instance instanceof ch.njol.skript.lang.SkriptEvent event
+                    ? event.init(literals(arguments), element.pattern(), result)
+                    : instance.preInit() && instance.init(arguments, element.pattern(), Kleenean.FALSE, result));
         } catch (VirtualMachineError e) {
             throw e;
         } catch (Throwable e) {
@@ -256,9 +373,17 @@ final class CompatElements {
         return element.isDefault(index) && element.argumentType(index) == null && element.argumentLiteral(index) == null;
     }
 
-    private static <T> CompatArgument<T> argument(int index, Class<T> type, ElementInfo element) {
+    private static ch.njol.skript.lang.Literal<?>[] literals(ch.njol.skript.lang.Expression<?>[] arguments) {
+        ch.njol.skript.lang.Literal<?>[] literals = new ch.njol.skript.lang.Literal<?>[arguments.length];
+        for (int i = 0; i < arguments.length; i++) {
+            literals[i] = (ch.njol.skript.lang.Literal<?>) arguments[i];
+        }
+        return literals;
+    }
+
+    private static <T> CompatArgument<T> argument(int index, Class<T> type, ElementInfo element, boolean literal) {
         String written = element.argumentLiteral(index);
-        if (written != null) {
+        if (written != null || literal) {
             return new CompatArgument.Written<>(index, type, element.isSingle(index), element.and(index),
                     element.isDefault(index), written);
         }

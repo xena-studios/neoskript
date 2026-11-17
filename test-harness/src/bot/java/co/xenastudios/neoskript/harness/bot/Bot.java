@@ -299,6 +299,12 @@ final class Bot extends SimpleChannelInboundHandler<Packet<?>> {
         play(new ServerboundChatCommandPacket(command.startsWith("/") ? command.substring(1) : command));
     }
 
+    /** Asks for completions of {@code text} ({@code /some command}), as pressing tab in chat does. */
+    void tabComplete(String text) {
+        play(new net.minecraft.network.protocol.game.ServerboundCommandSuggestionPacket(
+                ThreadLocalRandom.current().nextInt(1, Integer.MAX_VALUE), text));
+    }
+
     void respawn() {
         play(new ServerboundClientCommandPacket(ServerboundClientCommandPacket.Action.PERFORM_RESPAWN));
     }

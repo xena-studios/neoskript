@@ -68,12 +68,19 @@ public final class CompatTypes {
         return new ArrayList<>(registered);
     }
 
+    /** Skript's code names for its types that NeoSkript has under another id. */
+    private static final Map<String, String> SKRIPT_NAMES = Map.of("entitydata", "entitytype");
+
     public ClassInfo<?> byCodeName(String codeName) {
         ClassInfo<?> info = byCodeName.get(codeName);
         if (info != null) {
             return info;
         }
-        return library.hasType(codeName) ? neoskript(codeName) : null;
+        if (library.hasType(codeName)) {
+            return neoskript(codeName);
+        }
+        String id = SKRIPT_NAMES.get(codeName);
+        return id != null && library.hasType(id) ? neoskript(id) : null;
     }
 
     @SuppressWarnings("unchecked")

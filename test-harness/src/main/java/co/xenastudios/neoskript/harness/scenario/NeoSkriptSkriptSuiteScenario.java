@@ -48,9 +48,10 @@ public final class NeoSkriptSkriptSuiteScenario implements Scenario {
         return withSkBee ? "neoskript-skript-suite-skbee" : "neoskript-skript-suite";
     }
 
+    /** The plain suite is a baseline; with SkBee, a smoke guard, so CI runs it on every pull request. */
     @Override
     public Group group() {
-        return Group.BASELINE;
+        return withSkBee ? Group.SMOKE : Group.BASELINE;
     }
 
     @Override
