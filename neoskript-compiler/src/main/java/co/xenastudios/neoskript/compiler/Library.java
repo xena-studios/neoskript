@@ -345,6 +345,28 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public void strictType(String typeId) {
+        checkOpen();
+        if (!javaClasses.containsKey(typeId)) {
+            throw new IllegalArgumentException("Unknown type '" + typeId + "'");
+        }
+        builder.addonStrict(typeId);
+    }
+
+    @Override
+    public void argumentsLikeFunctions(String id) {
+        checkOpen();
+        builder.quietLists(id);
+    }
+
+    @Override
+    public void structure(String id, co.xenastudios.neoskript.api.registration.StructureHandler handler,
+            String... patterns) {
+        add(SyntaxKind.STRUCTURE, id, null, handler, patterns);
+        builder.structureHandler(id, handler);
+    }
+
+    @Override
     public void condition(String id, ElementFactory<Condition> factory, String... patterns) {
         add(SyntaxKind.CONDITION, id, null, factory, patterns);
     }

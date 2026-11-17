@@ -4,6 +4,9 @@ public interface co.xenastudios.neoskript.api.NeoSkript
   public static co.xenastudios.neoskript.api.NeoSkript get()
   public static boolean isEnabled()
   public abstract boolean isReady()
+  public void runtimeError(java.lang.String) @Experimental
+  public void runtimeWarning(java.lang.String) @Experimental
+  public java.lang.String scriptBeingLoaded() @Experimental
   public abstract co.xenastudios.neoskript.api.Scripts scripts()
   public abstract co.xenastudios.neoskript.api.Threads threads()
   public abstract co.xenastudios.neoskript.api.Values values()
@@ -248,6 +251,7 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public void affinity(java.lang.String, co.xenastudios.neoskript.api.registration.ThreadAffinity)
   public abstract void alias(java.lang.String, java.lang.String, java.lang.String)
   public abstract void allValues(java.lang.String, java.util.function.Supplier) signature (Ljava/lang/String;Ljava/util/function/Supplier<+Ljava/lang/Iterable<*>;>;)V
+  public void argumentsLikeFunctions(java.lang.String) @Experimental
   public abstract void arithmetic(char, java.lang.Class, java.lang.Class, java.util.function.BiFunction) signature <A:Ljava/lang/Object;B:Ljava/lang/Object;>(CLjava/lang/Class<TA;>;Ljava/lang/Class<TB;>;Ljava/util/function/BiFunction<-TA;-TB;*>;)V
   public abstract void arithmeticDefault(java.lang.Class, java.util.function.Supplier) signature <T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;Ljava/util/function/Supplier<+TT;>;)V
   public abstract void changer(java.lang.Class, co.xenastudios.neoskript.api.element.Changeable$Mode, java.util.function.BiConsumer) signature <T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;Lco/xenastudios/neoskript/api/element/Changeable$Mode;Ljava/util/function/BiConsumer<-TT;[Ljava/lang/Object;>;)V
@@ -294,6 +298,8 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public void sectionEvent(java.lang.String, java.lang.String) @Experimental
   public abstract void sectionExpression(java.lang.String, java.lang.String)
   public abstract void storage(java.lang.String, java.lang.Class, co.xenastudios.neoskript.api.storage.VariableCodec) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/Class<TT;>;Lco/xenastudios/neoskript/api/storage/VariableCodec<TT;>;)V
+  public void strictType(java.lang.String) @Experimental
+  public void structure(java.lang.String, co.xenastudios.neoskript.api.registration.StructureHandler, java.lang.String[]) @Experimental
   public abstract void subtype(java.lang.String, java.lang.String)
   public abstract void text(java.lang.Class, java.util.function.Function) signature <T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;Ljava/util/function/Function<-TT;Ljava/lang/String;>;)V
   public void timeStates(java.lang.String, int, java.lang.Class[]) signature (Ljava/lang/String;I[Ljava/lang/Class<*>;)V
@@ -314,6 +320,26 @@ public enum co.xenastudios.neoskript.api.registration.ScriptEvent signature Ljav
   public static final co.xenastudios.neoskript.api.registration.ScriptEvent UNLOAD
   public static co.xenastudios.neoskript.api.registration.ScriptEvent valueOf(java.lang.String)
   public static co.xenastudios.neoskript.api.registration.ScriptEvent[] values()
+
+public interface co.xenastudios.neoskript.api.registration.ScriptStructure @Experimental
+  public abstract java.util.List entries() signature ()Ljava/util/List<Lco/xenastudios/neoskript/api/registration/ScriptStructure$Entry;>;
+  public abstract void error(int, java.lang.String)
+  public abstract java.lang.String header()
+  public abstract int pattern()
+  public abstract java.lang.String script()
+  public abstract void warning(int, java.lang.String)
+
+public final record co.xenastudios.neoskript.api.registration.ScriptStructure$Entry
+  public Entry(int, java.lang.String)
+  public final boolean equals(java.lang.Object)
+  public final int hashCode()
+  public int line()
+  public java.lang.String text()
+  public final java.lang.String toString()
+
+public interface co.xenastudios.neoskript.api.registration.StructureHandler @Experimental
+  public abstract void load(co.xenastudios.neoskript.api.registration.ScriptStructure)
+  public abstract void reset()
 
 public enum co.xenastudios.neoskript.api.registration.SyntaxPriority signature Ljava/lang/Enum<Lco/xenastudios/neoskript/api/registration/SyntaxPriority;>; @Experimental
   public static final co.xenastudios.neoskript.api.registration.SyntaxPriority COMBINED
