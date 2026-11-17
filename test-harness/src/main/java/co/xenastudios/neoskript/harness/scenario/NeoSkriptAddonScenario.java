@@ -79,7 +79,8 @@ public final class NeoSkriptAddonScenario implements Scenario {
                 server.await(Pattern.compile(Pattern.quote(expected) + "$"), Duration.ofMinutes(1));
             }
             server.command("sk info");
-            server.await(Pattern.compile("Addons.*NeoSkriptExampleAddon"), Duration.ofMinutes(1));
+            // Listed as an API addon, "name version", not as the plugin "name vversion".
+            server.await(Pattern.compile("Addons.*NeoSkriptExampleAddon [0-9]"), Duration.ofMinutes(1));
             server.stop();
             noErrors(server);
             variables = first.runDir().resolve("plugins/NeoSkript/variables.csv");
