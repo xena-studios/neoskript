@@ -102,7 +102,9 @@ public final class NeoSkriptDbScenario implements Scenario {
                     + " times, not " + expectedUnloads + " (as the server stopped" + (reloads ? ", and at /reload" : "")
                     + ")");
         }
-        if (!neoskript.log().contains("Steve")) {
+        // The harness bot speaks 26.x's protocol only.
+        boolean players = !context.environment().minecraftVersion().startsWith("1.");
+        if (players && !neoskript.log().contains("Steve")) {
             throw new HarnessFailure("The transaction in Steve's command wasn't committed: " + neoskript.log());
         }
         context.summary("checks", neoskript.checks().size());
@@ -143,7 +145,8 @@ public final class NeoSkriptDbScenario implements Scenario {
                 tables.addAll(dump(connection, "SELECT id, name, score, ratio FROM players ORDER BY id"));
             }
             if (neo) {
-                extras(server, context.environment().platform() != Environment.Platform.FOLIA);
+                extras(server, context.environment().platform() != Environment.Platform.FOLIA,
+                        !context.environment().minecraftVersion().startsWith("1."));
             }
             server.stop();
             List<String> leaked = server.linesMatching(Pattern.compile("hunter22"));
@@ -165,12 +168,14 @@ public final class NeoSkriptDbScenario implements Scenario {
     }
 
     /** NeoSkript only: synchronously, a console command, a reload while a statement runs, a masked password. */
-    private static void extras(ServerProcess server, boolean reload) throws Exception {
+    private static void extras(ServerProcess server, boolean reload, boolean players) throws Exception {
         int mark = server.mark();
-        server.command("bot join Steve");
-        server.await(line("[bot] Steve joined"), mark, WAIT);
-        server.command("bot command Steve dbextra tx");
-        server.await(line("[dbextra] tx by Steve <none>"), mark, WAIT);
+        if (players) {
+            server.command("bot join Steve");
+            server.await(line("[bot] Steve joined"), mark, WAIT);
+            server.command("bot command Steve dbextra tx");
+            server.await(line("[dbextra] tx by Steve <none>"), mark, WAIT);
+        }
         server.command("dbextra sync");
         server.await(line("[dbextra] sync 7"), mark, WAIT);
         server.command("dbextra shown");
@@ -180,8 +185,10 @@ public final class NeoSkriptDbScenario implements Scenario {
         // Reloaded while the statement runs: the trigger carries on with its old code.
         server.command("sk reload neoskript-db-extra.sk");
         server.await(line("[dbextra] slow done 3000000"), mark, WAIT);
-        server.command("bot quit Steve");
-        server.await(line("[bot] Steve left"), mark, WAIT);
+        if (players) {
+            server.command("bot quit Steve");
+            server.await(line("[bot] Steve left"), mark, WAIT);
+        }
         if (reload) {
             // Every plugin disables and enables again: NeoSkriptDb first, then NeoSkript, whose on unload trigger
             // still writes. The scripts load again after it.
