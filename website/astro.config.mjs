@@ -138,7 +138,7 @@ export default defineConfig({
           ],
         },
         { label: "Tools", items: ["docs/cli", "docs/editors", "docs/parser", "docs/parser-checks"] },
-        { label: "Addons", items: ["docs/addons", "docs/addons/placeholders", "docs/addons/yaml", "docs/addons/web", "docs/addons/db", "docs/addons/proxy", "docs/addon-api"] },
+        { label: "Addons", items: ["docs/addons", "docs/addons/placeholders", "docs/addons/yaml", "docs/addons/web", "docs/addons/db", "docs/addons/proxy", "docs/addons/reflect", "docs/addon-api"] },
         {
           label: "Reference",
           items: [
