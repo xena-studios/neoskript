@@ -67,7 +67,8 @@ public final class WebSyntax {
                 "NeoSkriptWebExprSkJsonFormatted", "NeoSkriptWebExprSkJsonPretty", "NeoSkriptWebExprSkJsonSize",
                 "NeoSkriptWebExprSkJsonKeys", "NeoSkriptWebExprSkJsonValues", "NeoSkriptWebCondSkJsonType",
                 "NeoSkriptWebCondSkJsonEmpty", "NeoSkriptWebCondSkJsonHas", "NeoSkriptWebExprBody",
-                "NeoSkriptWebExprStatusCode", "NeoSkriptWebExprHeaders", "NeoSkriptWebExprStatus",
+                "NeoSkriptWebExprStatusCode", "NeoSkriptWebExprReqnStatusCodes", "NeoSkriptWebExprHeaders",
+                "NeoSkriptWebExprStatus", "NeoSkriptWebExprReqnStatuses",
                 "NeoSkriptWebExprReqnHeaderKeys", "NeoSkriptWebExprReqnHeaderValues", "NeoSkriptWebExprReqnMessage",
                 "NeoSkriptWebExprReqnHeader")) {
             registrar.affinity(id, ThreadAffinity.ANY);
@@ -101,7 +102,8 @@ public final class WebSyntax {
         levels.put("NeoSkriptWebCondSkJsonHas", SyntaxPriority.COMBINED);
         for (String property : List.of("NeoSkriptWebExprSkJsonLastResponse", "NeoSkriptWebExprSkJsonQueryParams",
                 "NeoSkriptWebExprSkJsonFormatted", "NeoSkriptWebExprSkJsonSize", "NeoSkriptWebExprBody",
-                "NeoSkriptWebExprStatusCode", "NeoSkriptWebExprHeaders", "NeoSkriptWebExprStatus",
+                "NeoSkriptWebExprStatusCode", "NeoSkriptWebExprReqnStatusCodes", "NeoSkriptWebExprHeaders",
+                "NeoSkriptWebExprStatus", "NeoSkriptWebExprReqnStatuses",
                 "NeoSkriptWebExprReqnHeaderKeys", "NeoSkriptWebExprReqnHeaderValues", "NeoSkriptWebExprReqnMessage",
                 "NeoSkriptWebExprReqnHeader")) {
             levels.put(property, SyntaxPriority.PROPERTY);
@@ -148,24 +150,35 @@ public final class WebSyntax {
     }
 
     /**
-     * The properties Reqn's and skJson's responses share, for whichever they're given. {@code status} and
-     * {@code status code} are of one response, as skJson's are (Reqn's took several): so '(status of {_r} and body of
-     * {_r})' is two values, as on Skript, where a list can't be one response and the parser splits it (issue #44).
+     * The properties Reqn's and skJson's responses share, for whichever they're given. skJson's {@code status} and
+     * {@code status code} are of one response, so '(status of {_r} and body of {_r})' is two values, as on Skript, where
+     * a list can't be one response and the parser splits it (issue #44). Reqn's are of several, as Reqn registers them
+     * ({@code status codes of {_responses::*}}): its other spellings ({@code status codes}, {@code response code},
+     * {@code status line}) take several here. Only the singular spelling of a list of Reqn's is refused, where Reqn took it.
      */
     private static void shared(Registrar registrar) {
         registrar.expression("NeoSkriptWebExprBody", "object", info -> new Body(),
                 Patterns.property("[response] bod(y|ies)", "httpresponses/requests/responses"));
-        registrar.expression("NeoSkriptWebExprStatusCode", "integer", info -> (context, args) -> each(args[0], owner ->
-                        owner instanceof ReqnResponse r ? (Object) (long) r.code()
-                                : owner instanceof SkResponse s && s.statusCode() != null ? (Object) (long) s.statusCode()
-                                : null),
-                Patterns.property("[response] [status] code[s]", "httpresponse/response"));
+        // Of a Reqn response, text, as Reqn's body is: so '(response code of last response and body of last response)'
+        // is two values, as on Skript, where text can't be a response and the parser splits the list.
+        registrar.returnType("NeoSkriptWebExprBody", info -> "httpresponse".equals(info.argumentType(0)) ? "string" : null);
+        Expression code = (context, args) -> each(args[0], owner ->
+                owner instanceof ReqnResponse r ? (Object) (long) r.code()
+                        : owner instanceof SkResponse s && s.statusCode() != null ? (Object) (long) s.statusCode()
+                        : null);
+        registrar.expression("NeoSkriptWebExprStatusCode", "integer", info -> code,
+                Patterns.property("status code", "httpresponse/response"));
+        registrar.expression("NeoSkriptWebExprReqnStatusCodes", "integer", info -> code,
+                Patterns.property("(response [status] code[s]|status codes|code[s])", "httpresponses/responses"));
         registrar.expression("NeoSkriptWebExprHeaders", "object", info -> new Headers(),
                 Patterns.property("[response] header[s]", "httpresponses/requests/responses"));
-        registrar.expression("NeoSkriptWebExprStatus", "string", info -> (context, args) -> each(args[0], owner ->
-                        owner instanceof ReqnResponse r ? r.statusLine()
-                                : owner instanceof SkResponse s ? s.status().toString() : null),
-                Patterns.property("[response] status[(es| line[s])]", "httpresponse/response"));
+        Expression status = (context, args) -> each(args[0], owner ->
+                owner instanceof ReqnResponse r ? r.statusLine()
+                        : owner instanceof SkResponse s ? s.status().toString() : null);
+        registrar.expression("NeoSkriptWebExprStatus", "string", info -> status,
+                Patterns.property("status", "httpresponse/response"));
+        registrar.expression("NeoSkriptWebExprReqnStatuses", "string", info -> status,
+                Patterns.property("(response status[(es| line[s])]|status(es| line[s]))", "httpresponses/responses"));
     }
 
     private static void reqnProperties(Registrar registrar) {
