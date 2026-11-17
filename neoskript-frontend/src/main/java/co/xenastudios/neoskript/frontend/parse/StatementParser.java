@@ -196,11 +196,27 @@ final class StatementParser {
     }
 
     private Statement parse(Node node, Statement previous) {
-        return switch (node) {
-            case Node.Simple simple -> simple(simple.line());
-            case Node.Section section -> section(section, previous);
-        };
+        long outer = context.startLine();
+        try {
+            return switch (node) {
+                case Node.Simple simple -> simple(simple.line());
+                case Node.Section section -> section(section, previous);
+            };
+        } catch (StackOverflowError tooDeep) {
+            // Brackets or calls nested hundreds deep run the parser out of stack: an error in the script, not a
+            // crash of the reload.
+            error(node.line(), TOO_DEEP);
+            return new Statement.Invalid(node.line());
+        } catch (LineParser.TooComplex tooComplex) {
+            error(node.line(), LineParser.TOO_COMPLEX);
+            return new Statement.Invalid(node.line());
+        } finally {
+            context.endLine(outer);
+        }
     }
+
+    /** The error for a line nested too deeply to parse. */
+    static final String TOO_DEEP = "This line is nested too deeply to be understood";
 
     /**
      * A section's code, parsed by {@code body}. Unless {@code header} only keeps the event values of the code

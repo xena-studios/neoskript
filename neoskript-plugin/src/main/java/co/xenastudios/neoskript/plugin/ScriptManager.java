@@ -18,7 +18,6 @@ import co.xenastudios.neoskript.frontend.source.Severity;
 import co.xenastudios.neoskript.frontend.source.SourceFile;
 import co.xenastudios.neoskript.runtime.FunctionHandle;
 import co.xenastudios.neoskript.runtime.PeriodicalEvent;
-import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
 import co.xenastudios.neoskript.runtime.SimpleTriggerContext;
 import co.xenastudios.neoskript.runtime.scheduler.Scheduler;
 import co.xenastudios.neoskript.runtime.variables.VariableStore;
@@ -232,8 +231,15 @@ final class ScriptManager {
         Files.createDirectories(scriptsDir);
         // Everything is parsed and compiled, even for one script, so calls between scripts resolve.
         List<SourceFile> files = read();
-        List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(files);
-        CompiledScripts compiled = new ScriptCompiler(library, globals, functions).compile(parsed);
+        List<ParsedScript> parsed;
+        CompiledScripts compiled;
+        try {
+            parsed = new ScriptLoader(library.registry()).load(files);
+            compiled = new ScriptCompiler(library, globals, functions).compile(parsed);
+        } catch (StackOverflowError | LinkageError e) {
+            // Nothing has changed yet, so every script keeps running the version it had (D12).
+            throw new IllegalStateException("Couldn't compile the scripts: " + e, e);
+        }
 
         Map<String, SourceFile> byName = new HashMap<>();
         files.forEach(file -> byName.put(file.name(), file));
@@ -326,8 +332,7 @@ final class ScriptManager {
             sources.put(name, byName.get(name).text());
             loadedCommands.put(name, scriptCommands.getOrDefault(name, List.of()));
         }
-        events.update(loaded.values().stream().flatMap(List::stream).toList());
-        commands.update(loadedCommands.values().stream().flatMap(List::stream).toList());
+        updateListenersAndCommands();
         long millis = (System.nanoTime() - start) / 1_000_000;
 
         for (String name : switching) {
@@ -607,8 +612,24 @@ final class ScriptManager {
         if (autoReload != null) {
             autoReload.stop();
         }
-        events.update(loaded.values().stream().flatMap(List::stream).toList());
-        commands.update(loadedCommands.values().stream().flatMap(List::stream).toList());
+        updateListenersAndCommands();
+    }
+
+    /**
+     * Listens for the loaded scripts' events and registers their commands. Each goes ahead even if the other
+     * fails, so a server that refuses one doesn't leave the scripts half switched over.
+     */
+    private void updateListenersAndCommands() {
+        try {
+            events.update(loaded.values().stream().flatMap(List::stream).toList());
+        } catch (RuntimeException e) {
+            logger.error("Couldn't listen for the scripts' events", e);
+        }
+        try {
+            commands.update(loadedCommands.values().stream().flatMap(List::stream).toList());
+        } catch (RuntimeException e) {
+            logger.error("Couldn't register the scripts' commands", e);
+        }
     }
 
     /**
@@ -660,8 +681,8 @@ final class ScriptManager {
     private void run(CompiledScripts.CompiledTrigger trigger, Object event) {
         try {
             trigger.trigger().execute(new SimpleTriggerContext(event));
-        } catch (ScriptRuntimeException e) {
-            logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
+        } catch (Throwable e) {
+            TriggerErrors.report(logger, e);
         }
     }
 

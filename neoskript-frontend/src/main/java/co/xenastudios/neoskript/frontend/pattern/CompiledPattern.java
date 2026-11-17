@@ -197,6 +197,7 @@ public final class CompiledPattern {
         }
 
         State match(PatternElement element, int pos, State state, Continuation next) {
+            resolver.step();
             return switch (element) {
                 case PatternElement.Literal literal -> {
                     String text = literal.text();
@@ -237,6 +238,7 @@ public final class CompiledPattern {
                             ? new int[] {end}
                             : regex.matchesCode() ? reversed(Spans.candidateEnds(input, pos, end)) : allEnds(pos);
                     for (int to : ends) {
+                        resolver.step();
                         if (followedBy != null && !followedAt(to, followedBy)) {
                             continue;
                         }

@@ -156,7 +156,14 @@ public final class ScriptCompiler {
                         default -> throw new CompileException(header.number(),
                                 "NeoSkript can't run this yet: '" + header.key() + "'");
                     }
-                } catch (RuntimeException e) {
+                } catch (StackOverflowError tooDeep) {
+                    // Code nested so deeply the compiler runs out of stack: an error in the script, as the parser
+                    // gives for lines it can't follow that deep.
+                    diagnostics.add(new Diagnostic(Severity.ERROR, name, header.number(), 0, 0, TOO_DEEP));
+                    if (testName != null) {
+                        unrunnableTests.put(testName, "line " + header.number() + ": " + TOO_DEEP);
+                    }
+                } catch (RuntimeException | LinkageError e) {
                     // A bug in NeoSkript, not the script: this structure is left out and the rest still load.
                     String message = "NeoSkript couldn't compile this (" + e + "). Please report it.";
                     diagnostics.add(new Diagnostic(Severity.ERROR, name, header.number(), 0, 0, message));
@@ -226,10 +233,15 @@ public final class ScriptCompiler {
                     .compileLine(name, parsed.statement(), List.of(eventClass), eventName), List.of());
         } catch (CompileException e) {
             return new CompiledLine(null, e.alreadyReported() ? List.of() : List.of(e.getMessage()));
-        } catch (RuntimeException e) {
+        } catch (StackOverflowError tooDeep) {
+            return new CompiledLine(null, List.of(TOO_DEEP));
+        } catch (RuntimeException | LinkageError e) {
             return new CompiledLine(null, List.of("NeoSkript couldn't compile this (" + e + "). Please report it."));
         }
     }
+
+    /** The error for code nested too deeply to compile. */
+    static final String TOO_DEEP = "This code is nested too deeply to be compiled";
 
     /** A compiler for code in {@code script}, whose warnings are reported with the other problems. */
     private TriggerCompiler compiler(Map<FunctionInfo, FunctionHandle> functions, ParsedScript script) {
@@ -314,7 +326,13 @@ public final class ScriptCompiler {
                             "The variation " + variation.group() + " has not been defined before"));
                 }
             }
-            String problem = co.xenastudios.neoskript.runtime.ScriptAliases.check(definition);
+            String problem;
+            try {
+                problem = co.xenastudios.neoskript.runtime.ScriptAliases.check(definition);
+            } catch (RuntimeException | LinkageError | StackOverflowError e) {
+                // A bug in an item type's parser stops this alias, not every script's load.
+                problem = "NeoSkript couldn't compile this (" + e + "). Please report it.";
+            }
             if (problem != null) {
                 problems.add(new AliasProblem(child.line().number(), problem));
                 continue;
