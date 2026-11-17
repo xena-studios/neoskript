@@ -55,8 +55,11 @@ final class ServerSyntax {
 
     /** Open log files, by their name in the logs folder. */
     private static final Map<String, PrintWriter> LOGS = new ConcurrentHashMap<>();
+    /** Whether the plugin closed the log files as it was disabled, after which none is opened. */
+    private static volatile boolean logsClosed;
 
     static void register(Registrar registrar) {
+        allowLogs();
         registrar.type("cachedservericon", "server icon", CachedServerIcon.class);
         registerPlayers(registrar);
         registerServer(registrar);
@@ -161,6 +164,7 @@ final class ServerSyntax {
 
     /** Closes the log files scripts wrote to, as the plugin is disabled, so none stays open after. */
     static void closeLogs() {
+        logsClosed = true;
         for (String file : java.util.List.copyOf(LOGS.keySet())) {
             PrintWriter writer = LOGS.remove(file);
             if (writer != null) {
@@ -173,6 +177,10 @@ final class ServerSyntax {
 
     /** The open writer for {@code file} in {@code logs}, opening it to append if it isn't. */
     static PrintWriter writer(String file, File logs) throws IOException {
+        if (logsClosed) {
+            // Something still running as the plugin is disabled: a writer opened now would never be closed.
+            throw new IOException("NeoSkript is disabled");
+        }
         PrintWriter writer = LOGS.get(file);
         if (writer != null) {
             return writer;
@@ -186,6 +194,11 @@ final class ServerSyntax {
             return existing;
         }
         return writer;
+    }
+
+    /** Lets log files be opened again, as the plugin is enabled. */
+    static void allowLogs() {
+        logsClosed = false;
     }
 
     /** How many log files are open, for tests. */

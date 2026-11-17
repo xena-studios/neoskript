@@ -186,6 +186,13 @@ public final class EventBridges {
                 }
             }, plugin, true);
         }
+        // A player who leaves isn't kept for their last click.
+        Bukkit.getPluginManager().registerEvent(org.bukkit.event.player.PlayerQuitEvent.class, LISTENER,
+                EventPriority.MONITOR, (listener, event) -> {
+                    if (event instanceof org.bukkit.event.player.PlayerQuitEvent quit) {
+                        PlayerEvents.forget(quit.getPlayer().getUniqueId());
+                    }
+                }, plugin);
         Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> checkTimes(), 1, CHECK_PERIOD);
         Bukkit.getAsyncScheduler().runAtFixedRate(plugin, task -> checkRealTime(plugin), 1, 1, TimeUnit.SECONDS);
         // Skript starts its start event once the server is running.

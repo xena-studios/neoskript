@@ -613,7 +613,6 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (scripts != null) {
             co.xenastudios.neoskript.paper.EventBridges.stop();
             scripts.unloadAll();
-            StandardLibrary.close();
         }
         // After the unload triggers, which may have started work an addon pauses for (a last database write): it
         // gets a moment to finish before the server exits. Then triggers still waiting are dropped, as after a
@@ -637,5 +636,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 getSLF4JLogger().warn("Couldn't close {}", storage.file(), e);
             }
         }
+        // Last, once nothing scheduled can run any more: a task cancelled after this could have opened a log again.
+        StandardLibrary.close();
     }
 }

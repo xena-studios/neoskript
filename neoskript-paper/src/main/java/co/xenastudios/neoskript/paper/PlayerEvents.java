@@ -113,6 +113,11 @@ final class PlayerEvents {
         return true;
     }
 
+    /** Forgets a player who left. */
+    static void forget(UUID id) {
+        FIRST_CLICKS.remove(id);
+    }
+
     /** How many players' clicks are kept, for tests. */
     static int clicksKept() {
         return FIRST_CLICKS.size();

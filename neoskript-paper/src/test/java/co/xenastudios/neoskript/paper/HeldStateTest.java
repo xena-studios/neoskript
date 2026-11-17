@@ -51,6 +51,7 @@ class HeldStateTest {
 
     @Test
     void logFilesCloseWithThePlugin(@TempDir Path logs) throws Exception {
+        ServerSyntax.allowLogs();
         PrintWriter writer = ServerSyntax.writer("soak.log", logs.toFile());
         assertSame(writer, ServerSyntax.writer("soak.log", logs.toFile()));
         assertEquals(1, ServerSyntax.openLogs());
@@ -58,5 +59,19 @@ class HeldStateTest {
         assertEquals(0, ServerSyntax.openLogs());
         writer.println("after");
         assertTrue(writer.checkError(), "the writer is closed");
+        // A task still running as the plugin is disabled can't open one that would never be closed.
+        org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
+                () -> ServerSyntax.writer("late.log", logs.toFile()));
+        assertEquals(0, ServerSyntax.openLogs());
+        ServerSyntax.allowLogs();
+    }
+
+    @Test
+    void aPlayerWhoLeavesIsForgotten() {
+        UUID player = UUID.randomUUID();
+        PlayerEvents.firstClick(player, new Click(), 7);
+        int kept = PlayerEvents.clicksKept();
+        PlayerEvents.forget(player);
+        assertEquals(kept - 1, PlayerEvents.clicksKept());
     }
 }
