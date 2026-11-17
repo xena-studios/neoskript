@@ -149,3 +149,12 @@ Each addon gets its own Modrinth project, which only the owner can create. For e
 - icon, licence GPL-3.0-only, source link to this repository (`addons/reflect`), loaders Paper and Folia, NeoSkript's Minecraft versions;
 - a required dependency on NeoSkript (`FuVeJ2X5`); skript-reflect isn't on Modrinth (it's on GitHub and SpigotMC), so there's no incompatible dependency to add;
 - the jar to upload is `addons/reflect/build/libs/NeoSkriptReflect-<version>.jar`, and the project id goes into the release steps next to NeoSkript's.
+
+### NeoSkript GUI (`addons/gui`)
+
+- Name **NeoSkript GUI**, slug `neoskript-gui`, licence GPL-3.0-only, source this repository, loaders Paper and Folia.
+- Summary: "Inventory menus from scripts, with skript-gui's syntax, for NeoSkript."
+- Description: it replaces skript-gui, scripts written for it load unchanged, it needs NeoSkript, and it links to [the docs](https://neoskript.dev/docs/addons/gui/), which list the differences.
+- Dependencies: **required** NeoSkript (`FuVeJ2X5`). skript-gui isn't on Modrinth (it's on GitHub and SpigotMC), so there's no incompatible one to add.
+- Once it exists, an entry in `website/src/data/addons.json` lists it on neoskript.dev/addons with its Modrinth link.
+

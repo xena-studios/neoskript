@@ -239,19 +239,25 @@ public final class NeoSkriptPlaceholdersScenario implements Scenario {
 
     /** The errors in the errors script: each as {@code [harness] ph error <line>: <message>}. */
     static List<String> errors(List<String> log) {
+        return errors(log, ERROR_AT, "[harness] ph error ");
+    }
+
+    /** The errors in a script, each as {@code <prefix><line>: <message>}, by line. */
+    static List<String> errors(List<String> log, Pattern errorAt, String prefix) {
         List<String> errors = new ArrayList<>();
         for (int i = 0; i + 1 < log.size(); i++) {
-            Matcher at = ERROR_AT.matcher(log.get(i));
+            Matcher at = errorAt.matcher(log.get(i));
             if (at.find()) {
                 String message = log.get(i + 1);
                 int text = message.indexOf("]: ");
                 message = (text >= 0 ? message.substring(text + 3) : message).replaceAll("\u001B\\[[0-9;]*m", "")
                         .replaceFirst("^\\[(Skript|NeoSkript)] ?", "").strip();
-                errors.add("[harness] ph error " + at.group(1) + ": " + message);
+                errors.add(prefix + at.group(1) + ": " + message);
             }
         }
         // Skript reports a structure's errors before the code's in other structures; only what they are is compared.
-        errors.sort(java.util.Comparator.comparingInt(error -> Integer.parseInt(error.split("[ :]")[3])));
+        errors.sort(java.util.Comparator.comparingInt(
+                error -> Integer.parseInt(error.substring(prefix.length(), error.indexOf(':', prefix.length())))));
         return errors;
     }
 
