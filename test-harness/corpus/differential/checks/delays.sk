@@ -235,6 +235,10 @@ on chat:
 
 on chat:
 	wait 1 tick
+	set message to "x"
+
+on chat:
+	wait 1 tick
 	set chat format to "x"
 
 on chat:
