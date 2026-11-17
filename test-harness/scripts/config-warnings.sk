@@ -1,0 +1,11 @@
+# For the config-settings scenario: a line for each warning Skript's config.sk can turn off, and Vault's syntax,
+# which its 'disable hooks' takes away. It's only loaded: the scenario compares what each line gets.
+
+on load:
+	set {cfgw::inventory} to chest inventory with 1 row
+	set {%now%::x} to 1
+	set {cfgw:x} to 1
+	set {_list::*} to 1, 2, 3
+	set {_money} to balance of {_nobody}
+	stop
+	set {_x} to 1

@@ -85,7 +85,45 @@ final class SkriptSettings {
             count("runtime errors.total warnings per frame", "runtime-errors.total-warnings-per-frame", 8),
             count("runtime errors.warnings from one line per frame", "runtime-errors.warnings-from-one-line-per-frame", 2),
             count("runtime errors.warning spam timeout limit", "runtime-errors.warning-spam-timeout-limit", 4),
-            count("runtime errors.warning timeout length", "runtime-errors.warning-timeout-length", 10));
+            count("runtime errors.warning timeout length", "runtime-errors.warning-timeout-length", 10),
+            new Option("verbosity", "verbosity", value -> {
+                String name = value.strip().toLowerCase(Locale.ENGLISH).replace('_', ' ');
+                return List.of("low", "normal", "high", "very high", "debug").contains(name) ? name.replace(' ', '-')
+                        : null;
+            }, "normal"),
+            shown("disable variable will not be saved warnings", "warnings.variable-not-saved"),
+            shown("disable variable missing and/or warnings", "warnings.missing-and-or"),
+            shown("disable starting a variable's name with an expression warnings",
+                    "warnings.variable-starting-with-expression"),
+            shown("disable single colon in variable name warnings", "warnings.single-colon-in-variable-name"),
+            shown("disable unreachable code warnings", "warnings.unreachable-code"),
+            new Option("long parse time warning threshold", "warnings.long-parse-time", value -> {
+                try {
+                    return NeoSkriptConfig.Interval.parse(value).toString();
+                } catch (IllegalArgumentException e) {
+                    return null;
+                }
+            }, "0 seconds"),
+            shown("disable hooks.vault", "hooks.vault"),
+            shown("disable hooks.regions.worldguard", "hooks.worldguard"),
+            shown("disable hooks.regions.grief prevention", "hooks.grief-prevention"),
+            bool("enable legacy tab completion event compatibility", "syntax.legacy-tab-completion", true));
+
+    /**
+     * Options that change nothing on NeoSkript when set away from Skript's default config, and why, for the log:
+     * by name in config.sk, with the value that matters.
+     */
+    private static final List<String[]> NOT_COPIED = List.of(
+            new String[] {"use type properties", "false", "NeoSkript only has Skript's type property syntax (name of,"
+                    + " amount of and the others), so scripts are read as with it on"},
+            new String[] {"enable timings", "true", "Paper has had no Timings since 1.19.4, where Skript only warns."
+                    + " Use spark, built into Paper, to see what scripts cost"},
+            new String[] {"soft api exceptions", "true", "it turns two failures Skript stops on into errors: aliases"
+                    + " without an item Skript's own code needs ('type ... not found'), and addons' mistakes registering"
+                    + " types. NeoSkript names every Minecraft item after its id whatever the alias files have, and"
+                    + " doesn't load Skript addons"},
+            new String[] {"disable hooks.regions.precious stones", "true", "NeoSkript doesn't hook into PreciousStones"},
+            new String[] {"disable hooks.regions.residence", "true", "NeoSkript doesn't hook into Residence"});
 
     private SkriptSettings() {}
 
@@ -132,6 +170,34 @@ final class SkriptSettings {
         String value = SkriptConfigFile.read(SkriptConfigFile.text(config))
                 .get("case-insensitive variables");
         return value != null && Boolean.FALSE.equals(SkriptConfigFile.bool(value));
+    }
+
+    /**
+     * Skript's settings in config.sk that NeoSkript leaves as they are, as lines for the log: those set away from
+     * Skript's default config that change nothing here, with why.
+     */
+    static List<String> notCopied(Path config) throws IOException {
+        if (!Files.isRegularFile(config)) {
+            return List.of();
+        }
+        Map<String, String> entries = SkriptConfigFile.read(SkriptConfigFile.text(config));
+        List<String> notes = new java.util.ArrayList<>();
+        for (String[] option : NOT_COPIED) {
+            String value = entries.get(option[0]);
+            Boolean set = value == null ? null : SkriptConfigFile.bool(value);
+            if (set != null && set.toString().equals(option[1])) {
+                notes.add("Skript's '" + option[0] + ": " + value + "' isn't copied: " + option[2] + ".");
+            }
+        }
+        return notes;
+    }
+
+    /** A {@code disable ...} option, which config.yml turns round: off there is on in config.sk. */
+    private static Option shown(String skript, String path) {
+        return new Option(skript, path, value -> {
+            Boolean disabled = SkriptConfigFile.bool(value);
+            return disabled == null ? null : !disabled;
+        }, true);
     }
 
     private static Option bool(String skript, String path, boolean fallback) {

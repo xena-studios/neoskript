@@ -113,12 +113,39 @@ class ScriptSettingsTest {
                 new Case("target-block-distance: 100", "target-block-distance: 5000"),
                 new Case("player-name-pattern: \"[a-zA-Z0-9_]{1,16}\"", "player-name-pattern: \"[a-z\""),
                 new Case("player-variable-fix: true", "player-variable-fix: 7"),
-                new Case("language: \"english\"", "language: [a, b]"))) {
+                new Case("language: \"english\"", "language: [a, b]"),
+                new Case("verbosity: \"normal\"", "verbosity: shouty"),
+                new Case("long-parse-time: \"2 seconds\"", "long-parse-time: forever"),
+                new Case("unreachable-code: true", "unreachable-code: sometimes"),
+                new Case("vault: true", "vault: 3"),
+                new Case("legacy-tab-completion: true", "legacy-tab-completion: []"))) {
             ConfigLoader.Result<NeoSkriptConfig> result = load(bad.from(), bad.to());
             assertEquals(1, result.warnings().size(), bad + ": " + result.warnings());
             assertEquals(NeoSkriptConfig.DEFAULTS, result.config(), bad.toString());
             assertEquals(List.of(), ScriptSettings.apply(result.config(), folder), bad.toString());
         }
+    }
+
+    @Test
+    void appliesTheWarningsAndVerbosity() throws Exception {
+        NeoSkriptConfig config = load("unreachable-code: true", "unreachable-code: false").config();
+        ScriptSettings.apply(config, folder);
+        assertTrue(co.xenastudios.neoskript.frontend.parse.WarningSettings.disabled("unreachable"));
+        assertTrue(!co.xenastudios.neoskript.frontend.parse.WarningSettings.disabled("colon"));
+        config = load("verbosity: \"normal\"", "verbosity: very high").config();
+        assertEquals(NeoSkriptConfig.Verbosity.VERY_HIGH, config.verbosity());
+        ScriptSettings.apply(config, folder);
+        assertTrue(Logging.events());
+        assertTrue(!co.xenastudios.neoskript.frontend.parse.WarningSettings.disabled("unreachable"));
+        ScriptSettings.apply(load("verbosity: \"normal\"", "verbosity: low").config(), folder);
+        assertTrue(!Logging.logs(NeoSkriptConfig.Verbosity.NORMAL));
+        assertTrue(!Logging.events());
+    }
+
+    @Test
+    void zeroSecondsTurnsTheLongParseTimeWarningOff() throws Exception {
+        NeoSkriptConfig config = load("long-parse-time: \"2 seconds\"", "long-parse-time: 0 seconds").config();
+        assertEquals(0, config.warnings().longParseTime().millis());
     }
 
     @Test
