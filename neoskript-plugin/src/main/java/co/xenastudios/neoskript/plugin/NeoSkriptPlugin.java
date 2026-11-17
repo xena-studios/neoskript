@@ -14,6 +14,9 @@ import co.xenastudios.neoskript.runtime.platform.Platform;
 import co.xenastudios.neoskript.runtime.scheduler.FoliaScheduler;
 import co.xenastudios.neoskript.runtime.scheduler.PaperScheduler;
 import co.xenastudios.neoskript.runtime.scheduler.Scheduler;
+import co.xenastudios.neoskript.runtime.variables.storage.NativeVariableStorage;
+import co.xenastudios.neoskript.runtime.variables.storage.VariableBackend;
+import co.xenastudios.neoskript.runtime.variables.storage.VariableBackends;
 import co.xenastudios.neoskript.runtime.variables.storage.VariableStorage;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -24,7 +27,11 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class NeoSkriptPlugin extends JavaPlugin {
 
-    private VariableStorage storage;
+    private VariableBackend storage;
+    /** Whether the saved variables couldn't be opened or loaded, so scripts run without them and nothing is saved. */
+    private boolean variablesUnavailable;
+    /** Whether {@code variables.recover} was on for this start. */
+    private boolean recoverVariables;
     private ScriptCommands commands;
     private ScriptManager scripts;
     /** What stops the runtime error frames. */
@@ -142,9 +149,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         effectCommands = new EffectCommands(scripts, scheduler, getSLF4JLogger(), TestRunner.enabled(),
                 EffectCommands.Settings.of(settings.effectCommands()));
         getServer().getPluginManager().registerEvents(effectCommands, this);
-        storage = new VariableStorage(scripts.globals(), library.codecs(),
-                getDataPath().resolve(settings.variables().file()));
-        loadVariables();
+        storage = openVariables(scripts.globals(), library.codecs());
+        if (storage != null) {
+            loadVariables();
+        }
         Runnable start = () -> {
             if (hooks) {
                 co.xenastudios.neoskript.paper.Hooks.hookServices(getSLF4JLogger());
@@ -353,6 +361,70 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         return settings.events().priority().bukkit();
     }
 
+    /**
+     * Where variables are saved, from {@code variables.storage}: {@code csv} (Skript's variables.csv, the default)
+     * or {@code native} (NeoSkript's own file). Switching moves the variables over, after a backup. If that fails,
+     * {@code null}: the variables stay where they are and aren't loaded or saved.
+     */
+    private VariableBackend openVariables(co.xenastudios.neoskript.runtime.variables.VariableStore globals,
+            co.xenastudios.neoskript.runtime.variables.storage.VariableCodecs codecs) {
+        java.nio.file.Path csv = getDataPath().resolve(settings.variables().file());
+        String setting = settings.variables().storage();
+        VariableBackends.Kind kind = VariableBackends.Kind.parse(setting);
+        if (kind == null) {
+            // Keep using the file that's in use, rather than moving the variables because of a typo.
+            kind = java.nio.file.Files.exists(VariableBackends.nativeFile(csv)) ? VariableBackends.Kind.NATIVE
+                    : VariableBackends.Kind.CSV;
+            getSLF4JLogger().warn("Unknown variables.storage '{}' in config.yml (csv or native); using {}", setting,
+                    kind.name().toLowerCase(java.util.Locale.ROOT));
+        }
+        try {
+            VariableBackends.Opened opened = VariableBackends.open(kind, globals, codecs, csv);
+            opened.log().forEach(line -> getSLF4JLogger().info(line));
+            opened.warnings().forEach(line -> getSLF4JLogger().warn(line));
+            // variables.recover: a one-shot repair of a damaged native file, turned off again once it's run.
+            recoverVariables = settings.variables().recover();
+            if (opened.backend() instanceof NativeVariableStorage nsv) {
+                nsv.recover(recoverVariables);
+            }
+            return opened.backend();
+        } catch (VariableBackends.Conflict e) {
+            getSLF4JLogger().error(e.getMessage());
+            variablesUnavailable();
+            return null;
+        } catch (IOException | RuntimeException e) {
+            getSLF4JLogger().error("Couldn't read the saved variables ({} storage). The variable files are left as "
+                    + "they were.", kind.name().toLowerCase(java.util.Locale.ROOT), e);
+            variablesUnavailable();
+            return null;
+        }
+    }
+
+    /** Sets variables.recover back to false in config.yml, once a recovery has run. */
+    private void turnOffRecover() {
+        try {
+            ConfigLoader.Change change = ConfigLoader.set(NeoSkriptConfig.SPEC, configFile(),
+                    java.util.Map.of("variables.recover", false));
+            change.warnings().forEach(warning -> getSLF4JLogger().warn("config.yml: {}", warning));
+            if (change.written()) {
+                getSLF4JLogger().info("Turned variables.recover off again in config.yml");
+            } else {
+                getSLF4JLogger().warn("Couldn't turn variables.recover off in config.yml; set it to false by hand, or "
+                        + "the next start recovers again.");
+            }
+        } catch (ConfigException | RuntimeException e) {
+            getSLF4JLogger().warn("Couldn't turn variables.recover off in config.yml; set it to false by hand, or the "
+                    + "next start recovers again: {}", e.getMessage());
+        }
+    }
+
+    /** Says plainly that scripts run without their saved variables, and that nothing is saved. */
+    private void variablesUnavailable() {
+        variablesUnavailable = true;
+        getSLF4JLogger().error("Saved variables weren't loaded. Scripts run without them, and nothing they set is "
+                + "saved, until this is fixed and the server restarts.");
+    }
+
     /** Loads saved variables, then saves changed ones every {@code variables.save-interval}. */
     private void loadVariables() {
         try {
@@ -372,11 +444,25 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 getSLF4JLogger().error("Affected variables: {}", loaded.skipped().stream()
                         .map(co.xenastudios.neoskript.runtime.variables.storage.VariableFile.Problem::name)
                         .collect(java.util.stream.Collectors.joining(", ")));
-                getSLF4JLogger().info("Created a backup of {} as {}", storage.file().getFileName(),
-                        getDataPath().toAbsolutePath().relativize(loaded.backup().toAbsolutePath()));
+                if (loaded.backup() != null) {
+                    getSLF4JLogger().info("Created a backup of {} as {}", storage.file().getFileName(),
+                            getDataPath().toAbsolutePath().relativize(loaded.backup().toAbsolutePath()));
+                } else {
+                    getSLF4JLogger().info("{} is backed up before the first save writes it again",
+                            storage.file().getFileName());
+                }
                 getSLF4JLogger().warn("Skipped {} {} of {} that couldn't be read; the other variables loaded. "
                         + "The next save leaves those lines out, and the backup keeps them.", count,
                         count == 1 ? "line" : "lines", storage.file().getFileName());
+            }
+            if (storage instanceof NativeVariableStorage nsv && nsv.recoveredBytes() > 0) {
+                getSLF4JLogger().warn("The last {} bytes of {} were a save cut off by a crash; every save before it "
+                        + "loaded. The first save drops them, after backing the file up.", nsv.recoveredBytes(),
+                        storage.file().getFileName());
+            }
+            storage.notes().forEach(line -> getSLF4JLogger().warn(line));
+            if (recoverVariables) {
+                turnOffRecover();
             }
             getSLF4JLogger().info("Loaded {} {} in {} ms{}", loaded.variables(), loaded.variables() == 1 ? "variable" : "variables",
                     (System.nanoTime() - start) / 1_000_000,
@@ -386,7 +472,14 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             // until it has loaded, so nothing writes over the file, not even when the server stops.
             getSLF4JLogger().error("Couldn't load variables from {}. Variables won't be saved until it's fixed.",
                     storage.file(), e);
+            storage.notes().forEach(line -> getSLF4JLogger().warn(line));
+            try {
+                storage.close();
+            } catch (IOException closing) {
+                e.addSuppressed(closing);
+            }
             storage = null;
+            variablesUnavailable();
             return;
         }
         scheduleSaves();
@@ -400,7 +493,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     }
 
     private void saveVariables(boolean always) {
-        VariableStorage current = storage;
+        VariableBackend current = storage;
         if (current == null || !current.loaded() || (!always && !current.changed())) {
             return;
         }
@@ -412,6 +505,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         } catch (IOException | RuntimeException e) {
             getSLF4JLogger().error("Couldn't save variables to {}", current.file(), e);
         }
+        current.notes().forEach(line -> getSLF4JLogger().warn(line));
     }
 
     @Override
@@ -429,5 +523,16 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             commands.unregister(getServer().getCommandMap());
         }
         saveVariables(false);
+        if (variablesUnavailable) {
+            getSLF4JLogger().error("Variables weren't saved: they couldn't be loaded when the server started (see the "
+                    + "error then), so the variable files are as they were and changes since are lost.");
+        }
+        if (storage != null) {
+            try {
+                storage.close();
+            } catch (IOException e) {
+                getSLF4JLogger().warn("Couldn't close {}", storage.file(), e);
+            }
+        }
     }
 }
