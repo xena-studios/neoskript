@@ -431,6 +431,21 @@ class AliasLoaderTest {
     }
 
     @Test
+    void aFileOfBadLinesLoadsQuickly() {
+        // Each problem used to split the whole file again, so 30,000 bad lines took minutes on the server thread.
+        StringBuilder bad = new StringBuilder("bad:\n");
+        for (int i = 0; i < 30_000; i++) {
+            bad.append("\tline ").append(i).append(" = minecraft:nope\n");
+        }
+        AliasLoader loader = new AliasLoader(server);
+        assertTimeoutPreemptively(java.time.Duration.ofSeconds(20), () -> {
+            loader.read(new AliasLoader.Input("bad.sk", bad.toString()));
+            assertNotNull(loader.finish());
+        });
+        assertEquals(30_000 - AliasLoader.MAX_PROBLEMS, loader.moreProblems());
+    }
+
+    @Test
     void problemsStopAtALimitAndAreCounted() {
         StringBuilder bad = new StringBuilder("bad:\n");
         for (int i = 0; i < 5000; i++) {

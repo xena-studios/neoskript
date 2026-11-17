@@ -153,8 +153,13 @@ final class AliasLoader {
         report(new Problem(name, 0, error, message, ""));
     }
 
+    /** Whether another problem would be listed rather than only counted. */
+    private boolean listing() {
+        return problems.size() < MAX_PROBLEMS;
+    }
+
     private void report(Problem problem) {
-        if (problems.size() < MAX_PROBLEMS) {
+        if (listing()) {
             problems.add(problem);
         } else {
             moreProblems++;
@@ -166,6 +171,7 @@ final class AliasLoader {
     /** Reads one file into what's loaded. Its text isn't kept. */
     void read(Input input) {
         file = new SourceFile(input.name(), input.text());
+        fileLines = null;
         line = 0;
         lineProblems.clear();
         if (input.text().isEmpty()) {
@@ -187,7 +193,7 @@ final class AliasLoader {
             }
             report(new Problem(file.name(), diagnostic.line(),
                     diagnostic.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR, diagnostic.message(),
-                    code(diagnostic.line())));
+                    listing() ? code(diagnostic.line()) : ""));
         }
         notEntries(nodes);
         for (Node node : nodes) {
@@ -962,6 +968,7 @@ final class AliasLoader {
      */
     AliasTable finish() {
         file = null;
+        fileLines = null;
         Set<String> generated = new HashSet<>();
         Set<String> merged = new HashSet<>();
         for (String material : server.materials()) {
@@ -1021,15 +1028,24 @@ final class AliasLoader {
 
     private void problem(boolean error, String message) {
         if (lineProblems.merge((error ? "E" : "W") + message, 1, Integer::sum) <= MAX_REPEATS) {
-            report(new Problem(file == null ? "" : file.name(), line, error, message, code(line)));
+            report(new Problem(file == null ? "" : file.name(), line, error, message, listing() ? code(line) : ""));
         }
     }
 
+    /** The current file's lines, split once per file: splitting for every problem made bad files quadratic. */
+    private List<String> fileLines;
+
     /** The code on line {@code number} of the current file, or "" for none. */
     private String code(int number) {
-        if (file == null || number < 1 || number > file.lines().size()) {
+        if (file == null) {
             return "";
         }
-        return file.lines().get(number - 1).strip();
+        if (fileLines == null) {
+            fileLines = file.lines();
+        }
+        if (number < 1 || number > fileLines.size()) {
+            return "";
+        }
+        return fileLines.get(number - 1).strip();
     }
 }
