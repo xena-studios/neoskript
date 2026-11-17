@@ -87,7 +87,10 @@ public final class VariableStorage implements VariableBackend {
         List<VariableFile.Problem> skipped = new ArrayList<>(contents.problems());
         List<Map.Entry<String, Object>> values = new ArrayList<>(contents.entries().size());
         int raw = 0;
-        for (VariableFile.Entry entry : contents.entries().values()) {
+        // Each entry's bytes are let go once decoded, so a big file never needs its bytes and its values in full.
+        for (java.util.Iterator<VariableFile.Entry> each = contents.entries().values().iterator(); each.hasNext(); ) {
+            VariableFile.Entry entry = each.next();
+            each.remove();
             Object value;
             try {
                 value = codecs.decode(entry.type(), entry.bytes());
