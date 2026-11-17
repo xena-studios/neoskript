@@ -1,0 +1,159 @@
+skript-yaml-1.7.2.jar: 54 of 407 classes use 49 of Skript's classes
+   34  ch.njol.skript.lang.Expression  [call, cast, class literal, implements, signature]
+         21  toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+         14  getSingle(Lorg/bukkit/event/Event;)Ljava/lang/Object;
+         10  getAll(Lorg/bukkit/event/Event;)[Ljava/lang/Object;
+          7  getClass()Ljava/lang/Class;
+          5  isSingle()Z
+          1  isDefault()Z
+   29  ch.njol.util.Kleenean  [cast, field, signature]
+          1  TRUE:Lch/njol/util/Kleenean;
+   27  ch.njol.skript.Skript  [call]
+          8  registerCondition(Ljava/lang/Class;[Ljava/lang/String;)V
+          7  registerEffect(Ljava/lang/Class;[Ljava/lang/String;)V
+          6  registerExpression(Ljava/lang/Class;Ljava/lang/Class;Lch/njol/skript/lang/ExpressionType;[Ljava/lang/String;)V
+          2  getInstance()Lch/njol/skript/Skript;
+          2  getVersion()Lch/njol/skript/util/Version;
+          1  error(Ljava/lang/String;)V
+          1  exception(Ljava/lang/Throwable;[Ljava/lang/String;)Lch/njol/skript/util/EmptyStacktraceException;
+          1  fieldExists(Ljava/lang/Class;Ljava/lang/String;)Z
+          1  getMinecraftVersion()Lch/njol/skript/util/Version;
+          1  isAcceptRegistrations()Z
+          1  registerAddon(Lorg/bukkit/plugin/java/JavaPlugin;)Lch/njol/skript/SkriptAddon;
+   23  ch.njol.skript.lang.SkriptParser$ParseResult  [field, signature]
+         11  mark:I
+          4  expr:Ljava/lang/String;
+   21  ch.njol.skript.doc.Description  [annotation]
+   21  ch.njol.skript.doc.Examples  [annotation]
+   21  ch.njol.skript.doc.Name  [annotation]
+   21  ch.njol.skript.doc.Since  [annotation]
+   11  ch.njol.skript.log.SkriptLogger  [call]
+         11  getNode()Lch/njol/skript/config/Node;
+    9  ch.njol.skript.util.Date  [call, cast, class literal, new, signature]
+          1  <init>(J)V
+          1  getTime()J
+    8  ch.njol.skript.effects.Delay  [call, class literal, extends]
+          2  <init>()V
+          2  overrides walk(Lorg/bukkit/event/Event;)Lch/njol/skript/lang/TriggerItem;
+          1  overrides lambda$walk$0(Lorg/bukkit/event/Event;Ljava/lang/Void;Ljava/lang/Throwable;)V
+    8  ch.njol.skript.lang.Condition  [call, extends]
+          8  <init>()V
+          8  overrides check(Lorg/bukkit/event/Event;)Z
+          8  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+          8  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+    8  ch.njol.skript.lang.util.ConvertedExpression  [call, cast, class literal, signature]
+          1  newInstance(Lch/njol/skript/lang/Expression;[Ljava/lang/Class;)Lch/njol/skript/lang/util/ConvertedExpression;
+    6  ch.njol.skript.classes.Changer$ChangeMode  [field, signature]
+          3  DELETE:Lch/njol/skript/classes/Changer$ChangeMode;
+          3  RESET:Lch/njol/skript/classes/Changer$ChangeMode;
+          3  SET:Lch/njol/skript/classes/Changer$ChangeMode;
+          1  ADD:Lch/njol/skript/classes/Changer$ChangeMode;
+          1  REMOVE:Lch/njol/skript/classes/Changer$ChangeMode;
+    6  ch.njol.skript.lang.Effect  [call, extends]
+          6  <init>()V
+          6  overrides execute(Lorg/bukkit/event/Event;)V
+          6  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+          6  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          1  overrides load(Ljava/lang/String;Lorg/bukkit/event/Event;)V
+    6  ch.njol.skript.lang.ExpressionType  [field]
+          6  SIMPLE:Lch/njol/skript/lang/ExpressionType;
+    5  ch.njol.skript.registrations.Classes  [call]
+          2  deserialize(Ljava/lang/String;[B)Ljava/lang/Object;
+          2  serialize(Ljava/lang/Object;)Lch/njol/skript/variables/SerializedVariable$Value;
+          1  getDebugMessage(Ljava/lang/Object;)Ljava/lang/String;
+          1  getExactClassInfo(Ljava/lang/Class;)Lch/njol/skript/classes/ClassInfo;
+          1  getSuperClassInfo(Ljava/lang/Class;)Lch/njol/skript/classes/ClassInfo;
+    4  ch.njol.skript.lang.parser.ParserInstance  [call, signature]
+          3  get()Lch/njol/skript/lang/parser/ParserInstance;
+          3  getCurrentSections(Ljava/lang/Class;)Ljava/util/List;
+          3  getHasDelayBefore()Lch/njol/util/Kleenean;
+          3  isCurrentEvent(Ljava/lang/Class;)Z
+    4  ch.njol.skript.lang.util.SimpleExpression  [call, extends, signature]
+          3  <init>()V
+          3  overrides acceptChange(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class;
+          3  overrides change(Lorg/bukkit/event/Event;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;)V
+          3  overrides get(Lorg/bukkit/event/Event;)[Ljava/lang/Object;
+          3  overrides getReturnType()Ljava/lang/Class;
+          3  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+          3  overrides isSingle()Z
+          3  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          2  overrides get(Lorg/bukkit/event/Event;)[Ljava/lang/String;
+          1  overrides filterDirectories([Ljava/lang/String;)Ljava/util/List;
+          1  overrides getAllDirectories()[Ljava/lang/String;
+          1  overrides getUnloadedYamlFromDirectories([Ljava/lang/String;)[Ljava/lang/String;
+          1  overrides getYamlFromDirectories([Ljava/lang/String;)[Ljava/lang/String;
+          1  overrides toStringArray([Ljava/lang/Object;[Ljava/lang/String;)[Ljava/lang/String;
+    4  ch.njol.skript.sections.SecLoop  [call, cast, class literal, signature]
+          4  getLoopedExpression()Lch/njol/skript/lang/Expression;
+          1  getCurrent(Lorg/bukkit/event/Event;)Ljava/lang/Object;
+    4  ch.njol.skript.util.SkriptColor  [call, cast, class literal, signature]
+          4  fromName(Ljava/lang/String;)Lch/njol/skript/util/SkriptColor;
+          4  getName()Ljava/lang/String;
+    4  ch.njol.skript.util.Utils  [call]
+          3  getSuperType([Ljava/lang/Class;)Ljava/lang/Class;
+          1  random(II)I
+    4  ch.njol.util.coll.CollectionUtils  [call]
+          3  array([Ljava/lang/Object;)[Ljava/lang/Object;
+          1  containsSuperclass([Ljava/lang/Class;Ljava/lang/Class;)Z
+    3  ch.njol.skript.lang.TriggerItem  [call, signature]
+          2  walk(Lch/njol/skript/lang/TriggerItem;Lorg/bukkit/event/Event;)Z
+    3  ch.njol.skript.util.Time  [call, cast, class literal]
+          1  parse(Ljava/lang/String;)Lch/njol/skript/util/Time;
+          1  toString()Ljava/lang/String;
+    3  ch.njol.skript.util.Timespan  [call, cast, class literal]
+          1  parse(Ljava/lang/String;)Lch/njol/skript/util/Timespan;
+          1  toString()Ljava/lang/String;
+    3  ch.njol.skript.util.WeatherType  [call, cast, class literal]
+          1  parse(Ljava/lang/String;)Lch/njol/skript/util/WeatherType;
+          1  toString()Ljava/lang/String;
+    2  ch.njol.skript.ScriptLoader  [class literal]
+    2  ch.njol.skript.aliases.ItemType  [call, cast, class literal]
+          1  addTo(Lorg/bukkit/inventory/ItemStack;)Lorg/bukkit/inventory/ItemStack;
+    2  ch.njol.skript.config.Config  [call]
+          2  getFileName()Ljava/lang/String;
+    2  ch.njol.skript.config.Node  [call, signature]
+          2  getConfig()Lch/njol/skript/config/Config;
+          2  getLine()I
+          1  save()Ljava/lang/String;
+    2  ch.njol.skript.util.Version  [call]
+          2  getMajor()I
+          2  getMinor()I
+    2  ch.njol.skript.util.slot.Slot  [call, cast, class literal]
+          1  getItem()Lorg/bukkit/inventory/ItemStack;
+    2  ch.njol.skript.variables.SerializedVariable$Value  [field]
+          2  data:[B
+          2  type:Ljava/lang/String;
+    2  ch.njol.util.coll.iterator.ArrayIterator  [call, class literal, new]
+          1  <init>([Ljava/lang/Object;)V
+    1  ch.njol.skript.SkriptAPIException  [call, new]
+          1  <init>(Ljava/lang/String;)V
+    1  ch.njol.skript.SkriptAddon  [call]
+          1  loadClasses(Ljava/lang/String;[Ljava/lang/String;)Lch/njol/skript/SkriptAddon;
+    1  ch.njol.skript.classes.Changer  [call]
+          1  acceptChange(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class;
+          1  change([Ljava/lang/Object;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;)V
+    1  ch.njol.skript.classes.ClassInfo  [call, signature]
+          1  getChanger()Lch/njol/skript/classes/Changer;
+    1  ch.njol.skript.events.bukkit.ScriptEvent  [class literal]
+    1  ch.njol.skript.events.bukkit.SkriptStopEvent  [class literal]
+    1  ch.njol.skript.lang.Literal  [call, cast]
+          1  getSingle()Ljava/lang/Object;
+    1  ch.njol.skript.lang.SyntaxElement  [signature]
+    1  ch.njol.skript.lang.function.FunctionEvent  [signature]
+    1  ch.njol.skript.lang.function.Functions  [call]
+          1  registerFunction(Lch/njol/skript/lang/function/JavaFunction;)Lch/njol/skript/lang/function/JavaFunction;
+    1  ch.njol.skript.lang.function.JavaFunction  [call, extends, signature]
+          1  <init>(Ljava/lang/String;[Lch/njol/skript/lang/function/Parameter;Lch/njol/skript/classes/ClassInfo;Z)V
+          1  description([Ljava/lang/String;)Lch/njol/skript/lang/function/JavaFunction;
+          1  examples([Ljava/lang/String;)Lch/njol/skript/lang/function/JavaFunction;
+          1  overrides execute(Lch/njol/skript/lang/function/FunctionEvent;[[Ljava/lang/Object;)[Ljava/lang/Boolean;
+          1  overrides execute(Lch/njol/skript/lang/function/FunctionEvent;[[Ljava/lang/Object;)[Ljava/lang/Object;
+          1  overrides toString()Ljava/lang/String;
+          1  since(Ljava/lang/String;)Lch/njol/skript/lang/function/JavaFunction;
+          1  toString()Ljava/lang/String;
+    1  ch.njol.skript.lang.function.Parameter  [call, cast, new]
+          1  <init>(Ljava/lang/String;Lch/njol/skript/classes/ClassInfo;ZLch/njol/skript/lang/Expression;)V
+    1  ch.njol.skript.lang.util.SimpleLiteral  [call, new]
+          1  <init>(Ljava/lang/Object;Z)V
+    1  ch.njol.skript.util.Color  [call, cast, class literal, signature]
+          1  toString()Ljava/lang/String;

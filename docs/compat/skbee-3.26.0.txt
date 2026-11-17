@@ -1,0 +1,952 @@
+SkBee-3.26.0.jar: 677 of 1029 classes use 156 of Skript's classes
+  420  ch.njol.skript.lang.Expression  [call, cast, signature]
+        251  toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+        210  getArray(Lorg/bukkit/event/Event;)[Ljava/lang/Object;
+        205  getSingle(Lorg/bukkit/event/Event;)Ljava/lang/Object;
+         40  isSingle()Z
+         17  check(Lorg/bukkit/event/Event;Ljava/util/function/Predicate;Z)Z
+         14  getOptionalSingle(Lorg/bukkit/event/Event;)Ljava/util/Optional;
+         12  getAll(Lorg/bukkit/event/Event;)[Ljava/lang/Object;
+          6  check(Lorg/bukkit/event/Event;Ljava/util/function/Predicate;)Z
+          4  getReturnType()Ljava/lang/Class;
+          3  change(Lorg/bukkit/event/Event;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;)V
+          3  isDefault()Z
+          2  getAnd()Z
+          1  acceptChange(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class;
+          1  changeInPlace(Lorg/bukkit/event/Event;Ljava/util/function/Function;)V
+          1  getAcceptedChangeModes()Ljava/util/Map;
+          1  stream(Lorg/bukkit/event/Event;)Ljava/util/stream/Stream;
+  398  ch.njol.skript.lang.SkriptParser$ParseResult  [call, field, signature]
+         79  hasTag(Ljava/lang/String;)Z
+         37  mark:I
+         20  expr:Ljava/lang/String;
+          2  regexes:Ljava/util/List;
+  384  ch.njol.util.Kleenean  [call, field, signature]
+          5  TRUE:Lch/njol/util/Kleenean;
+          5  isFalse()Z
+          4  ordinal()I
+          3  FALSE:Lch/njol/util/Kleenean;
+          2  get(I)Lch/njol/util/Kleenean;
+          2  values()[Lch/njol/util/Kleenean;
+          1  UNKNOWN:Lch/njol/util/Kleenean;
+  199  ch.njol.skript.classes.Changer$ChangeMode  [call, cast, field, signature]
+        152  SET:Lch/njol/skript/classes/Changer$ChangeMode;
+         84  ordinal()I
+         71  DELETE:Lch/njol/skript/classes/Changer$ChangeMode;
+         61  RESET:Lch/njol/skript/classes/Changer$ChangeMode;
+         56  ADD:Lch/njol/skript/classes/Changer$ChangeMode;
+         49  REMOVE:Lch/njol/skript/classes/Changer$ChangeMode;
+         44  values()[Lch/njol/skript/classes/Changer$ChangeMode;
+          6  REMOVE_ALL:Lch/njol/skript/classes/Changer$ChangeMode;
+          1  name()Ljava/lang/String;
+  142  ch.njol.skript.Skript  [call]
+         86  error(Ljava/lang/String;)V
+         35  methodExists(Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Class;)Z
+         12  warning(Ljava/lang/String;)V
+         11  classExists(Ljava/lang/String;)Z
+          7  error(Ljava/lang/String;Lch/njol/skript/log/ErrorQuality;)V
+          4  exception(Ljava/lang/Throwable;[Ljava/lang/String;)Lch/njol/skript/util/EmptyStacktraceException;
+          3  getMinecraftVersion()Lch/njol/skript/util/Version;
+          3  getVersion()Lch/njol/skript/util/Version;
+          1  fieldExists(Ljava/lang/Class;Ljava/lang/String;)Z
+          1  getAddons()Ljava/util/Collection;
+          1  getInstance()Lch/njol/skript/Skript;
+          1  getServerPlatform()Lch/njol/skript/ServerPlatform;
+          1  getUpdater()Lch/njol/skript/SkriptUpdater;
+          1  instance()Lorg/skriptlang/skript/Skript;
+          1  isAcceptRegistrations()Z
+          1  isRunningMinecraft(II)Z
+          1  isRunningMinecraft(III)Z
+  133  ch.njol.util.coll.CollectionUtils  [call]
+        133  array([Ljava/lang/Object;)[Ljava/lang/Object;
+  109  ch.njol.skript.lang.util.SimpleExpression  [call, extends, signature]
+        108  <init>()V
+        107  overrides get(Lorg/bukkit/event/Event;)[Ljava/lang/Object;
+        107  overrides getReturnType()Ljava/lang/Class;
+        107  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+        107  overrides isSingle()Z
+        107  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+         31  overrides acceptChange(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class;
+         31  overrides change(Lorg/bukkit/event/Event;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;)V
+         10  overrides get(Lorg/bukkit/event/Event;)[Ljava/lang/Number;
+          9  overrides get(Lorg/bukkit/event/Event;)[Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;
+          9  overrides get(Lorg/bukkit/event/Event;)[Ljava/lang/String;
+          8  overrides get(Lorg/bukkit/event/Event;)[Lch/njol/skript/aliases/ItemType;
+          4  overrides get(Lorg/bukkit/event/Event;)[Ljava/lang/Boolean;
+          4  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/boss/BossBar;
+          4  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/entity/Entity;
+          3  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/block/Block;
+          2  overrides get(Lorg/bukkit/event/Event;)[Lcom/shanebeestudios/skbee/api/bound/Bound;
+          2  overrides get(Lorg/bukkit/event/Event;)[Lcom/shanebeestudios/skbee/api/virtualfurnace/api/machine/Machine;
+          2  overrides get(Lorg/bukkit/event/Event;)[Lcom/shanebeestudios/skbee/api/virtualfurnace/api/property/Properties;
+          2  overrides get(Lorg/bukkit/event/Event;)[Lio/papermc/paper/registry/tag/TagKey;
+          2  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/block/data/BlockData;
+          2  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/inventory/MerchantRecipe;
+          2  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/util/Vector;
+          2  overrides iterator(Lorg/bukkit/event/Event;)Ljava/util/Iterator;
+          2  overrides supportedEvents()[Ljava/lang/Class;
+          1  check([Ljava/lang/Object;Ljava/util/function/Predicate;ZZ)Z
+          1  overrides get(Lorg/bukkit/event/Event;)[Lch/njol/skript/util/EnchantmentType;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lch/njol/skript/util/Experience;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lch/njol/skript/util/Timespan;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lch/njol/skript/util/slot/Slot;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lcom/shanebeestudios/skbee/api/recipe/RecipeType;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lcom/shanebeestudios/skbee/api/structure/StructureWrapper;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lcom/shanebeestudios/skbee/api/virtualfurnace/api/machine/Furnace;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lcom/shanebeestudios/skbee/api/worldgen/BeeWorldCreator;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lnet/kyori/adventure/chat/SignedMessage;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lnet/kyori/adventure/text/event/ClickEvent;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lnet/kyori/adventure/text/event/HoverEvent;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/OfflinePlayer;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/World;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/advancement/Advancement;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/advancement/AdvancementProgress;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/attribute/AttributeModifier;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/block/BlockState;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/command/CommandSender;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/damage/DamageSource;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/entity/LivingEntity;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/event/player/PlayerFishEvent$State;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/inventory/Inventory;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/inventory/Merchant;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/inventory/RecipeChoice$MaterialChoice;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/inventory/meta/trim/ArmorTrim;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/scoreboard/Criteria;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/scoreboard/Team$OptionStatus;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/util/RayTraceResult;
+          1  overrides getAllRecipes()[Ljava/lang/String;
+          1  overrides getAnd()Z
+          1  overrides getNode()Lch/njol/skript/config/Node;
+          1  overrides getRecipesForItems([Lch/njol/skript/aliases/ItemType;)[Ljava/lang/String;
+          1  overrides getStat(Lorg/bukkit/OfflinePlayer;Lorg/bukkit/Statistic;Ljava/lang/Object;)I
+          1  overrides isCustom(Lorg/bukkit/NamespacedKey;)Z
+          1  overrides isMinecraft(Lorg/bukkit/NamespacedKey;)Z
+          1  overrides lambda$get$0(Lorg/bukkit/entity/LivingEntity;)Z
+          1  overrides lambda$getAllRecipes$0(Ljava/util/List;Lorg/bukkit/inventory/Recipe;)V
+          1  overrides loopAllBounds(Ljava/util/List;Ljava/util/List;Ljava/util/Collection;)V
+          1  overrides setStat(Lorg/bukkit/OfflinePlayer;Lorg/bukkit/Statistic;ILjava/lang/Object;)V
+   84  ch.njol.skript.expressions.base.SimplePropertyExpression  [call, extends, signature]
+         83  <init>()V
+         82  overrides convert(Ljava/lang/Object;)Ljava/lang/Object;
+         82  overrides getPropertyName()Ljava/lang/String;
+         82  overrides getReturnType()Ljava/lang/Class;
+         53  overrides change(Lorg/bukkit/event/Event;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;)V
+         52  overrides acceptChange(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class;
+         34  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+         27  init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+          4  overrides convert(Ljava/lang/Object;)Ljava/lang/String;
+          4  overrides convert(Lorg/bukkit/block/Block;)Ljava/lang/Integer;
+          4  overrides convert(Lorg/bukkit/entity/Entity;)Ljava/lang/Boolean;
+          3  overrides convert(Ljava/lang/Object;)Ljava/lang/Boolean;
+          3  overrides convert(Ljava/lang/Object;)Ljava/lang/Number;
+          2  overrides convert(Lcom/shanebeestudios/skbee/api/virtualfurnace/api/machine/Machine;)Ljava/lang/String;
+          2  overrides convert(Lorg/bukkit/World;)Ljava/lang/Long;
+          2  overrides convert(Lorg/bukkit/entity/Player;)Lch/njol/skript/util/Timespan;
+          2  overrides convert(Lorg/bukkit/scoreboard/Team;)Ljava/lang/String;
+          1  getPatterns(Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;
+          1  overrides change(Ljava/lang/Object;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;)V
+          1  overrides convert(Lch/njol/skript/aliases/ItemType;)Lorg/bukkit/block/data/BlockData;
+          1  overrides convert(Lch/njol/skript/aliases/ItemType;)Lorg/bukkit/inventory/meta/trim/ArmorTrim;
+          1  overrides convert(Lch/njol/skript/util/EnchantmentType;)Ljava/lang/Number;
+          1  overrides convert(Lch/njol/skript/util/EnchantmentType;)Lorg/bukkit/enchantments/Enchantment;
+          1  overrides convert(Lcom/shanebeestudios/skbee/api/bound/Bound;)Ljava/lang/Boolean;
+          1  overrides convert(Lcom/shanebeestudios/skbee/api/bound/Bound;)Ljava/lang/String;
+          1  overrides convert(Lcom/shanebeestudios/skbee/api/bound/Bound;)Lorg/bukkit/Location;
+          1  overrides convert(Lcom/shanebeestudios/skbee/api/bound/Bound;)Lorg/bukkit/World;
+          1  overrides convert(Lcom/shanebeestudios/skbee/api/structure/StructureWrapper;)Lorg/bukkit/Location;
+          1  overrides convert(Lcom/shanebeestudios/skbee/api/virtualfurnace/api/machine/Machine;)Lorg/bukkit/inventory/Inventory;
+          1  overrides convert(Lcom/shanebeestudios/skbee/api/worldgen/BeeWorldCreator;)Ljava/lang/Object;
+          1  overrides convert(Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;)Ljava/lang/String;
+          1  overrides convert(Ljava/lang/Object;)Lch/njol/skript/aliases/ItemType;
+          1  overrides convert(Ljava/lang/Object;)Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;
+          1  overrides convert(Ljava/lang/Object;)Lorg/bukkit/NamespacedKey;
+          1  overrides convert(Ljava/lang/Object;)Lorg/bukkit/inventory/ItemStack;
+          1  overrides convert(Lorg/bukkit/Chunk;)Lorg/bukkit/Chunk$LoadLevel;
+          1  overrides convert(Lorg/bukkit/World;)Ljava/lang/Boolean;
+          1  overrides convert(Lorg/bukkit/World;)Ljava/lang/Number;
+          1  overrides convert(Lorg/bukkit/attribute/AttributeModifier;)Ljava/lang/Object;
+          1  overrides convert(Lorg/bukkit/block/Block;)Lch/njol/skript/aliases/ItemType;
+          1  overrides convert(Lorg/bukkit/block/Block;)Lch/njol/skript/util/Timespan;
+          1  overrides convert(Lorg/bukkit/block/Block;)Ljava/lang/Long;
+          1  overrides convert(Lorg/bukkit/block/Block;)Lorg/bukkit/Location;
+          1  overrides convert(Lorg/bukkit/block/Block;)Lorg/bukkit/block/BlockState;
+          1  overrides convert(Lorg/bukkit/block/BlockState;)Lch/njol/skript/aliases/ItemType;
+          1  overrides convert(Lorg/bukkit/block/BlockState;)Lorg/bukkit/block/Block;
+          1  overrides convert(Lorg/bukkit/block/BlockState;)Lorg/bukkit/block/data/BlockData;
+          1  overrides convert(Lorg/bukkit/damage/DamageSource;)Ljava/lang/Object;
+          1  overrides convert(Lorg/bukkit/entity/Display;)Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;
+          1  overrides convert(Lorg/bukkit/entity/Entity;)Lch/njol/skript/util/Timespan;
+          1  overrides convert(Lorg/bukkit/entity/Entity;)Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;
+          1  overrides convert(Lorg/bukkit/entity/Entity;)Ljava/lang/Integer;
+          1  overrides convert(Lorg/bukkit/entity/Entity;)Ljava/lang/Number;
+          1  overrides convert(Lorg/bukkit/entity/Entity;)Lorg/bukkit/Location;
+          1  overrides convert(Lorg/bukkit/entity/Entity;)Lorg/bukkit/entity/EntityType;
+          1  overrides convert(Lorg/bukkit/entity/Entity;)Lorg/bukkit/entity/FishHook$HookState;
+          1  overrides convert(Lorg/bukkit/entity/Entity;)Lorg/bukkit/entity/Pose;
+          1  overrides convert(Lorg/bukkit/entity/Entity;)Lorg/bukkit/entity/Spellcaster$Spell;
+          1  overrides convert(Lorg/bukkit/entity/FishHook;)Lorg/bukkit/entity/Entity;
+          1  overrides convert(Lorg/bukkit/entity/LivingEntity;)Ljava/lang/Object;
+          1  overrides convert(Lorg/bukkit/entity/Player;)Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;
+          1  overrides convert(Lorg/bukkit/entity/Player;)Ljava/lang/Number;
+          1  overrides convert(Lorg/bukkit/entity/Player;)Ljava/lang/Object;
+          1  overrides convert(Lorg/bukkit/entity/Player;)Ljava/lang/String;
+          1  overrides convert(Lorg/bukkit/entity/Player;)Lorg/bukkit/entity/Entity;
+          1  overrides convert(Lorg/bukkit/inventory/Inventory;)Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;
+          1  overrides convert(Lorg/bukkit/inventory/meta/trim/ArmorTrim;)Ljava/lang/Object;
+          1  overrides convert(Lorg/bukkit/scoreboard/Team;)Lch/njol/skript/util/SkriptColor;
+          1  overrides convert(Lorg/bukkit/scoreboard/Team;)Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;
+          1  overrides convert(Lorg/bukkit/scoreboard/Team;)Ljava/lang/Boolean;
+          1  overrides convert(Lorg/bukkit/util/RayTraceResult;)Lorg/bukkit/Location;
+          1  overrides convert(Lorg/bukkit/util/RayTraceResult;)Lorg/bukkit/block/Block;
+          1  overrides convert(Lorg/bukkit/util/RayTraceResult;)Lorg/bukkit/block/BlockFace;
+          1  overrides convert(Lorg/bukkit/util/RayTraceResult;)Lorg/bukkit/entity/Entity;
+          1  overrides convert(Lorg/bukkit/util/RayTraceResult;)Lorg/bukkit/util/Vector;
+          1  overrides getDefault(Lorg/bukkit/block/Block;)I
+          1  overrides getNode()Lch/njol/skript/config/Node;
+          1  overrides getValue(Lch/njol/skript/classes/Changer$ChangeMode;Lorg/bukkit/entity/Player;I)I
+          1  overrides isSingle()Z
+          1  overrides lambda$change$0(Lnet/kyori/adventure/text/Component;Lorg/bukkit/inventory/ItemStack;)V
+          1  overrides lambda$convert$0(Lorg/bukkit/inventory/ItemStack;)Lnet/kyori/adventure/text/Component;
+   80  ch.njol.skript.aliases.ItemType  [call, cast, class literal, method reference, new, signature]
+         31  getMaterial()Lorg/bukkit/Material;
+         23  getRandom()Lorg/bukkit/inventory/ItemStack;
+         21  <init>(Lorg/bukkit/inventory/ItemStack;)V
+         13  getItemMeta()Lorg/bukkit/inventory/meta/ItemMeta;
+         13  setItemMeta(Lorg/bukkit/inventory/meta/ItemMeta;)V
+         11  <init>(Lorg/bukkit/Material;)V
+          2  getItem()Lch/njol/skript/aliases/ItemType;
+          1  <init>(Lorg/bukkit/block/data/BlockData;)V
+          1  addTo(Lorg/bukkit/inventory/Inventory;)Z
+          1  addTo([Lorg/bukkit/inventory/ItemStack;)Z
+          1  getAll()Ljava/lang/Iterable;
+          1  getAmount()I
+          1  isOfType(Lorg/bukkit/block/Block;)Z
+          1  isSupertypeOf(Lch/njol/skript/aliases/ItemType;)Z
+          1  removeFrom(Lorg/bukkit/inventory/Inventory;)Z
+          1  removeFrom([Ljava/util/List;)Z
+          1  setBlock(Lorg/bukkit/block/Block;Z)Z
+          1  toString()Ljava/lang/String;
+          1  toString(I)Ljava/lang/String;
+          1  toString(Lorg/bukkit/inventory/ItemStack;)Ljava/lang/String;
+   74  ch.njol.skript.lang.TriggerItem  [call, signature]
+         24  walk(Lch/njol/skript/lang/TriggerItem;Lorg/bukkit/event/Event;)Z
+          2  setNext(Lch/njol/skript/lang/TriggerItem;)Lch/njol/skript/lang/TriggerItem;
+   71  ch.njol.skript.lang.parser.ParserInstance  [call]
+         42  isCurrentEvent(Ljava/lang/Class;)Z
+         31  get()Lch/njol/skript/lang/parser/ParserInstance;
+          8  getNode()Lch/njol/skript/config/Node;
+          8  isCurrentEvent([Ljava/lang/Class;)Z
+          7  getHasDelayBefore()Lch/njol/util/Kleenean;
+          6  getCurrentEvents()[Ljava/lang/Class;
+          5  getCurrentEventName()Ljava/lang/String;
+          3  getCurrentStructure()Lorg/skriptlang/skript/lang/structure/Structure;
+          2  getCurrentScript()Lorg/skriptlang/skript/lang/script/Script;
+          2  setCurrentEvent(Ljava/lang/String;[Ljava/lang/Class;)V
+          2  setHasDelayBefore(Lch/njol/util/Kleenean;)V
+          1  deleteCurrentEvent()V
+          1  getCurrentSections(Ljava/lang/Class;)Ljava/util/List;
+          1  getParsingStack()Lch/njol/skript/lang/parser/ParsingStack;
+          1  isCurrentSection(Ljava/lang/Class;)Z
+   70  ch.njol.skript.config.SectionNode  [call, cast, class literal, new, signature]
+          3  iterator()Ljava/util/Iterator;
+          1  <init>(Ljava/lang/String;Ljava/lang/String;Lch/njol/skript/config/SectionNode;I)V
+          1  add(Lch/njol/skript/config/Node;)V
+          1  convertToEntries(ILjava/lang/String;)V
+   59  org.skriptlang.skript.lang.entry.EntryValidator  [call, signature]
+         52  validate(Lch/njol/skript/config/SectionNode;)Lorg/skriptlang/skript/lang/entry/EntryContainer;
+         16  builder()Lorg/skriptlang/skript/lang/entry/EntryValidator$EntryValidatorBuilder;
+          1  getEntryData()Ljava/util/List;
+   56  ch.njol.skript.registrations.Classes  [call]
+         29  getExactClassInfo(Ljava/lang/Class;)Lch/njol/skript/classes/ClassInfo;
+         26  toString(Ljava/lang/Object;)Ljava/lang/String;
+          5  getClassInfoNoError(Ljava/lang/String;)Lch/njol/skript/classes/ClassInfo;
+          3  getSuperClassInfo(Ljava/lang/Class;)Lch/njol/skript/classes/ClassInfo;
+          1  registerClass(Lch/njol/skript/classes/ClassInfo;)V
+          1  toString([Ljava/lang/Object;Z)Ljava/lang/String;
+   54  org.skriptlang.skript.lang.entry.EntryContainer  [call, signature]
+         52  getOptional(Ljava/lang/String;Z)Ljava/lang/Object;
+          9  getOptional(Ljava/lang/String;Ljava/lang/Class;Z)Ljava/lang/Object;
+          2  get(Ljava/lang/String;Ljava/lang/Class;Z)Ljava/lang/Object;
+          1  getSource()Lch/njol/skript/config/SectionNode;
+   53  org.skriptlang.skript.lang.converter.Converter  [call, implements, signature]
+          1  convert(Ljava/lang/Object;)Ljava/lang/Object;
+   52  ch.njol.skript.lang.Effect  [call, cast, extends, signature]
+         49  <init>()V
+         48  overrides execute(Lorg/bukkit/event/Event;)V
+         48  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+         48  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          2  overrides walk(Lorg/bukkit/event/Event;)Lch/njol/skript/lang/TriggerItem;
+          2  parse(Ljava/lang/String;Ljava/lang/String;)Lch/njol/skript/lang/Effect;
+          1  overrides cookingRecipe(Lorg/bukkit/inventory/ItemStack;Lorg/bukkit/inventory/RecipeChoice;Ljava/lang/String;Lorg/bukkit/NamespacedKey;FI)V
+          1  overrides getDefaultCookTime(I)I
+          1  overrides getNode()Lch/njol/skript/config/Node;
+          1  overrides lambda$execute$0(ZLjava/lang/Object;[Ljava/lang/String;Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;)Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;
+          1  overrides lambda$execute$0([Lio/papermc/paper/datacomponent/DataComponentType;Lorg/bukkit/inventory/ItemStack;)V
+          1  overrides registerShaped(Lch/njol/skript/aliases/ItemType;[Ljava/lang/Object;Lorg/bukkit/NamespacedKey;Ljava/lang/String;)V
+          1  overrides registerShapeless(Lch/njol/skript/aliases/ItemType;[Ljava/lang/Object;Lorg/bukkit/NamespacedKey;Ljava/lang/String;)V
+          1  overrides sleepVillager(Lorg/bukkit/entity/Villager;Lorg/bukkit/Location;)V
+          1  overrides unloadWorld(Lorg/bukkit/World;)Z
+          1  toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          1  walk(Lorg/bukkit/event/Event;)Lch/njol/skript/lang/TriggerItem;
+   35  ch.njol.skript.lang.Trigger  [call, new, signature]
+         14  walk(Lch/njol/skript/lang/TriggerItem;Lorg/bukkit/event/Event;)Z
+          4  execute(Lorg/bukkit/event/Event;)Z
+          1  <init>(Lorg/skriptlang/skript/lang/script/Script;Ljava/lang/String;Lch/njol/skript/lang/SkriptEvent;Ljava/util/List;)V
+   35  ch.njol.skript.util.Timespan  [call, cast, class literal, new, signature]
+         31  getAs(Lch/njol/skript/util/Timespan$TimePeriod;)J
+         13  <init>(Lch/njol/skript/util/Timespan$TimePeriod;J)V
+          3  <init>(J)V
+   34  ch.njol.skript.util.Timespan$TimePeriod  [call, cast, class literal, field]
+         25  TICK:Lch/njol/skript/util/Timespan$TimePeriod;
+          6  MILLISECOND:Lch/njol/skript/util/Timespan$TimePeriod;
+          3  SECOND:Lch/njol/skript/util/Timespan$TimePeriod;
+          1  getTime()J
+   33  ch.njol.skript.classes.Parser  [call, extends, signature]
+         29  <init>()V
+         29  overrides toString(Ljava/lang/Object;I)Ljava/lang/String;
+         29  overrides toVariableNameString(Ljava/lang/Object;)Ljava/lang/String;
+         23  overrides canParse(Lch/njol/skript/lang/ParseContext;)Z
+          8  overrides parse(Ljava/lang/String;Lch/njol/skript/lang/ParseContext;)Ljava/lang/Object;
+          1  overrides getVariableNamePattern()Ljava/lang/String;
+          1  overrides parse(Ljava/lang/String;Lch/njol/skript/lang/ParseContext;)Lcom/shanebeestudios/skbee/api/nbt/NBTCustomType;
+          1  overrides parse(Ljava/lang/String;Lch/njol/skript/lang/ParseContext;)Lcom/shanebeestudios/skbee/api/particle/ParticleWrapper;
+          1  overrides parse(Ljava/lang/String;Lch/njol/skript/lang/ParseContext;)Lcom/shanebeestudios/skbee/api/property/Property;
+          1  overrides parse(Ljava/lang/String;Lch/njol/skript/lang/ParseContext;)Lio/papermc/paper/registry/RegistryKey;
+          1  overrides parse(Ljava/lang/String;Lch/njol/skript/lang/ParseContext;)Ljava/lang/Enum;
+          1  overrides parse(Ljava/lang/String;Lch/njol/skript/lang/ParseContext;)Lorg/bukkit/Keyed;
+          1  overrides parse(Ljava/lang/String;Lch/njol/skript/lang/ParseContext;)Lorg/bukkit/advancement/Advancement;
+          1  overrides parse(Ljava/lang/String;Lch/njol/skript/lang/ParseContext;)Lorg/bukkit/inventory/EquipmentSlotGroup;
+          1  overrides toString(Lcom/shanebeestudios/skbee/api/bound/Bound;I)Ljava/lang/String;
+          1  overrides toString(Lcom/shanebeestudios/skbee/api/nbt/NBTCompound;I)Ljava/lang/String;
+          1  overrides toString(Lcom/shanebeestudios/skbee/api/nbt/NBTCustomType;I)Ljava/lang/String;
+          1  overrides toString(Lcom/shanebeestudios/skbee/api/particle/ParticleWrapper;I)Ljava/lang/String;
+          1  overrides toString(Lcom/shanebeestudios/skbee/api/property/Property;I)Ljava/lang/String;
+          1  overrides toString(Lcom/shanebeestudios/skbee/api/structure/StructureWrapper;I)Ljava/lang/String;
+          1  overrides toString(Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;I)Ljava/lang/String;
+          1  overrides toString(Lio/papermc/paper/datacomponent/item/consumable/ConsumeEffect;I)Ljava/lang/String;
+          1  overrides toString(Lio/papermc/paper/registry/RegistryKey;I)Ljava/lang/String;
+          1  overrides toString(Lio/papermc/paper/registry/TypedKey;I)Ljava/lang/String;
+          1  overrides toString(Lio/papermc/paper/registry/tag/TagKey;I)Ljava/lang/String;
+          1  overrides toString(Ljava/lang/Enum;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/Color;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/Keyed;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/Particle$DustOptions;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/advancement/Advancement;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/attribute/AttributeModifier;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/block/BlockState;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/boss/BossBar;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/inventory/EquipmentSlotGroup;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/inventory/Merchant;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/inventory/MerchantRecipe;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/inventory/RecipeChoice;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/inventory/meta/trim/ArmorTrim;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/scoreboard/Criteria;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/scoreboard/Objective;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/scoreboard/Scoreboard;I)Ljava/lang/String;
+          1  overrides toString(Lorg/bukkit/scoreboard/Team;I)Ljava/lang/String;
+          1  overrides toVariableNameString(Lcom/shanebeestudios/skbee/api/bound/Bound;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lcom/shanebeestudios/skbee/api/nbt/NBTCompound;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lcom/shanebeestudios/skbee/api/nbt/NBTCustomType;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lcom/shanebeestudios/skbee/api/particle/ParticleWrapper;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lcom/shanebeestudios/skbee/api/property/Property;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lcom/shanebeestudios/skbee/api/structure/StructureWrapper;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lio/papermc/paper/datacomponent/item/consumable/ConsumeEffect;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lio/papermc/paper/registry/RegistryKey;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lio/papermc/paper/registry/TypedKey;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lio/papermc/paper/registry/tag/TagKey;)Ljava/lang/String;
+          1  overrides toVariableNameString(Ljava/lang/Enum;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/Color;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/Keyed;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/Particle$DustOptions;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/advancement/Advancement;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/attribute/AttributeModifier;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/block/BlockState;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/boss/BossBar;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/inventory/EquipmentSlotGroup;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/inventory/Merchant;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/inventory/MerchantRecipe;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/inventory/RecipeChoice;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/inventory/meta/trim/ArmorTrim;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/scoreboard/Criteria;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/scoreboard/Objective;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/scoreboard/Scoreboard;)Ljava/lang/String;
+          1  overrides toVariableNameString(Lorg/bukkit/scoreboard/Team;)Ljava/lang/String;
+   31  ch.njol.skript.variables.Variables  [call]
+         19  setLocalVariables(Lorg/bukkit/event/Event;Ljava/lang/Object;)V
+         17  copyLocalVariables(Lorg/bukkit/event/Event;)Ljava/lang/Object;
+         16  removeLocals(Lorg/bukkit/event/Event;)Lch/njol/skript/variables/VariablesMap;
+         11  withLocalVariables(Lorg/bukkit/event/Event;Lorg/bukkit/event/Event;Ljava/lang/Runnable;)V
+          1  getStores()Ljava/util/List;
+   30  ch.njol.skript.lang.ParseContext  [field, signature]
+          3  DEFAULT:Lch/njol/skript/lang/ParseContext;
+   29  ch.njol.skript.lang.SyntaxStringBuilder  [call, new]
+         29  <init>(Lorg/bukkit/event/Event;Z)V
+         29  toString()Ljava/lang/String;
+         26  append([Ljava/lang/Object;)Lch/njol/skript/lang/SyntaxStringBuilder;
+         20  append(Ljava/lang/Object;)Lch/njol/skript/lang/SyntaxStringBuilder;
+   28  ch.njol.skript.lang.Literal  [call, cast, signature]
+         11  getSingle()Ljava/lang/Object;
+          8  toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          5  check(Lorg/bukkit/event/Event;Ljava/util/function/Predicate;)Z
+          4  getArray()[Ljava/lang/Object;
+          2  getAll()[Ljava/lang/Object;
+          2  toString()Ljava/lang/String;
+          1  getAnd()Z
+          1  getArray(Lorg/bukkit/event/Event;)[Ljava/lang/Object;
+   23  ch.njol.skript.lang.Condition  [call, cast, extends, signature]
+         18  <init>()V
+         17  overrides check(Lorg/bukkit/event/Event;)Z
+         17  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+         17  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          2  parse(Ljava/lang/String;Ljava/lang/String;)Lch/njol/skript/lang/Condition;
+          1  check(Lorg/bukkit/event/Event;)Z
+          1  overrides getNode()Lch/njol/skript/config/Node;
+          1  overrides isAWorld(Ljava/lang/String;)Z
+          1  overrides lambda$check$0(Lorg/bukkit/event/Event;Lcom/shanebeestudios/skbee/api/bound/Bound;)Z
+          1  overrides lambda$check$0(Lorg/bukkit/event/Event;Ljava/lang/Object;)Z
+          1  overrides lambda$check$0(Lorg/bukkit/event/Event;Lorg/bukkit/Chunk;)Z
+          1  overrides lambda$check$0(Lorg/bukkit/event/Event;Lorg/bukkit/entity/Player;)Z
+          1  overrides lambda$check$0([Lorg/bukkit/Location;ZLcom/shanebeestudios/skbee/api/bound/Bound;)Z
+          1  toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+   21  ch.njol.skript.entity.EntityData  [call, cast, class literal, signature]
+          4  isInstance(Lorg/bukkit/entity/Entity;)Z
+          2  getType()Ljava/lang/Class;
+          2  isSupertypeOf(Lch/njol/skript/entity/EntityData;)Z
+          1  fromEntity(Lorg/bukkit/entity/Entity;)Lch/njol/skript/entity/EntityData;
+          1  spawn(Lorg/bukkit/Location;Ljava/util/function/Consumer;)Lorg/bukkit/entity/Entity;
+          1  toString()Ljava/lang/String;
+          1  toString(Lorg/bukkit/entity/Entity;I)Ljava/lang/String;
+   17  ch.njol.skript.util.LiteralUtils  [call]
+         17  defendExpression(Lch/njol/skript/lang/Expression;)Lch/njol/skript/lang/Expression;
+         13  canInitSafely([Lch/njol/skript/lang/Expression;)Z
+          1  hasUnparsedLiteral(Lch/njol/skript/lang/Expression;)Z
+   16  ch.njol.skript.lang.SkriptEvent  [call, extends, signature]
+         14  <init>()V
+         14  overrides check(Lorg/bukkit/event/Event;)Z
+         14  overrides init([Lch/njol/skript/lang/Literal;ILch/njol/skript/lang/SkriptParser$ParseResult;)Z
+         14  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          1  overrides canExecuteAsynchronously()Z
+          1  overrides checkDamaged(Lorg/bukkit/entity/Entity;)Z
+          1  overrides checkDamager(Lorg/bukkit/block/Block;)Z
+          1  overrides execute(Lorg/bukkit/World;)V
+          1  overrides isEventPrioritySupported()Z
+          1  overrides lambda$postLoad$0()V
+          1  overrides lambda$postLoad$1(Lorg/bukkit/World;)V
+          1  overrides postLoad()Z
+          1  overrides unload()V
+   16  org.skriptlang.skript.lang.entry.EntryValidator$EntryValidatorBuilder  [call, signature]
+         16  addEntryData(Lorg/skriptlang/skript/lang/entry/EntryData;)Lorg/skriptlang/skript/lang/entry/EntryValidator$EntryValidatorBuilder;
+         16  build()Lorg/skriptlang/skript/lang/entry/EntryValidator;
+          2  addSection(Ljava/lang/String;Z)Lorg/skriptlang/skript/lang/entry/EntryValidator$EntryValidatorBuilder;
+   16  org.skriptlang.skript.lang.entry.util.ExpressionEntryData  [call, new]
+         16  <init>(Ljava/lang/String;Lch/njol/skript/lang/Expression;ZLjava/lang/Class;)V
+         15  <init>(Ljava/lang/String;Lch/njol/skript/lang/Expression;Z[Ljava/lang/Class;)V
+   14  ch.njol.skript.lang.Section  [call, cast, extends, signature]
+         12  <init>()V
+         11  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;Lch/njol/skript/config/SectionNode;Ljava/util/List;)Z
+         11  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+         11  overrides walk(Lorg/bukkit/event/Event;)Lch/njol/skript/lang/TriggerItem;
+         11  walk(Lorg/bukkit/event/Event;Z)Lch/njol/skript/lang/TriggerItem;
+          1  overrides getNode()Lch/njol/skript/config/Node;
+          1  overrides getSwitchedObjectExpression()Lch/njol/skript/lang/Expression;
+          1  overrides isSingleReturnValue()Z
+          1  overrides lambda$walk$0(Lio/papermc/paper/datacomponent/item/ItemAdventurePredicate;Lorg/bukkit/inventory/ItemStack;)V
+          1  overrides lambda$walk$0(Ljava/lang/Object;Lorg/bukkit/event/Event;Lnet/kyori/adventure/audience/Audience;)V
+          1  overrides returnValueType()Ljava/lang/Class;
+          1  overrides returnValues(Lorg/bukkit/event/Event;Lch/njol/skript/lang/Expression;)V
+   14  ch.njol.skript.util.Color  [call, cast, class literal, signature]
+          8  asBukkitColor()Lorg/bukkit/Color;
+          1  getAlpha()I
+          1  getBlue()I
+          1  getGreen()I
+          1  getRed()I
+   13  ch.njol.skript.classes.ClassInfo  [call, cast, extends, new, signature]
+          4  getDocName()Ljava/lang/String;
+          3  <init>(Ljava/lang/Class;Ljava/lang/String;)V
+          3  getCodeName()Ljava/lang/String;
+          3  usage([Ljava/lang/String;)Lch/njol/skript/classes/ClassInfo;
+          2  getC()Ljava/lang/Class;
+          2  getParser()Lch/njol/skript/classes/Parser;
+          2  getUsage()[Ljava/lang/String;
+          2  parser(Lch/njol/skript/classes/Parser;)Lch/njol/skript/classes/ClassInfo;
+          2  serializer(Lch/njol/skript/classes/Serializer;)Lch/njol/skript/classes/ClassInfo;
+          2  supplier(Ljava/util/function/Supplier;)Lch/njol/skript/classes/ClassInfo;
+          2  toString()Ljava/lang/String;
+          1  after([Ljava/lang/String;)Lch/njol/skript/classes/ClassInfo;
+          1  before([Ljava/lang/String;)Lch/njol/skript/classes/ClassInfo;
+          1  changer(Lch/njol/skript/classes/Changer;)Lch/njol/skript/classes/ClassInfo;
+          1  cloner(Lch/njol/skript/classes/Cloner;)Lch/njol/skript/classes/ClassInfo;
+          1  defaultExpression(Lch/njol/skript/lang/DefaultExpression;)Lch/njol/skript/classes/ClassInfo;
+          1  getAllProperties()Ljava/util/Collection;
+          1  getName()Lch/njol/skript/localization/Noun;
+          1  getPropertyDocumentation(Lorg/skriptlang/skript/lang/properties/Property;)Lch/njol/skript/classes/ClassInfo$PropertyDocs;
+          1  getSerializer()Lch/njol/skript/classes/Serializer;
+          1  getSupplier()Ljava/util/function/Supplier;
+          1  overrides getName(Lorg/bukkit/Keyed;)Ljava/lang/String;
+          1  overrides getNames()Ljava/lang/String;
+          1  overrides lambda$getNames$0(Ljava/util/List;Lorg/bukkit/Keyed;)V
+          1  overrides parse(Ljava/lang/String;)Lorg/bukkit/Keyed;
+          1  overrides toString(Lorg/bukkit/Keyed;)Ljava/lang/String;
+          1  property(Lorg/skriptlang/skript/lang/properties/Property;Ljava/lang/String;Lorg/skriptlang/skript/addon/SkriptAddon;Lorg/skriptlang/skript/lang/properties/handlers/base/PropertyHandler;)Lch/njol/skript/classes/ClassInfo;
+          1  user([Ljava/lang/String;)Lch/njol/skript/classes/ClassInfo;
+   13  ch.njol.skript.lang.util.SimpleEvent  [call, extends, new]
+         13  <init>()V
+          2  overrides canExecuteAsynchronously()Z
+   13  ch.njol.skript.lang.util.SimpleLiteral  [call, extends, new, signature]
+         13  <init>(Ljava/lang/Object;Z)V
+          1  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+          1  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+   13  ch.njol.skript.util.slot.Slot  [call, cast, class literal, extends, signature]
+         10  getItem()Lorg/bukkit/inventory/ItemStack;
+          3  <init>()V
+          3  overrides getAmount()I
+          3  overrides getItem()Lorg/bukkit/inventory/ItemStack;
+          3  overrides isSameSlot(Lch/njol/skript/util/slot/Slot;)Z
+          3  overrides setAmount(I)V
+          3  overrides setItem(Lorg/bukkit/inventory/ItemStack;)V
+          3  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          2  setItem(Lorg/bukkit/inventory/ItemStack;)V
+   12  ch.njol.skript.config.Node  [call, cast, signature]
+          2  getKey()Ljava/lang/String;
+          1  getLine()I
+          1  save()Ljava/lang/String;
+   12  ch.njol.skript.util.SkriptColor  [call, cast, class literal, field, signature]
+          3  DARK_BLUE:Lch/njol/skript/util/SkriptColor;
+          3  DARK_GREEN:Lch/njol/skript/util/SkriptColor;
+          3  DARK_RED:Lch/njol/skript/util/SkriptColor;
+          3  LIGHT_RED:Lch/njol/skript/util/SkriptColor;
+          3  WHITE:Lch/njol/skript/util/SkriptColor;
+          3  YELLOW:Lch/njol/skript/util/SkriptColor;
+          3  fromBukkitColor(Lorg/bukkit/Color;)Lch/njol/skript/util/SkriptColor;
+          2  DARK_CYAN:Lch/njol/skript/util/SkriptColor;
+          2  DARK_GREY:Lch/njol/skript/util/SkriptColor;
+          2  DARK_PURPLE:Lch/njol/skript/util/SkriptColor;
+          2  LIGHT_CYAN:Lch/njol/skript/util/SkriptColor;
+          2  LIGHT_GREEN:Lch/njol/skript/util/SkriptColor;
+          2  LIGHT_GREY:Lch/njol/skript/util/SkriptColor;
+          2  ORANGE:Lch/njol/skript/util/SkriptColor;
+          2  asChatColor()Lorg/bukkit/ChatColor;
+          2  asDyeColor()Lorg/bukkit/DyeColor;
+          2  ordinal()I
+          1  BLACK:Lch/njol/skript/util/SkriptColor;
+          1  BROWN:Lch/njol/skript/util/SkriptColor;
+          1  LIGHT_PURPLE:Lch/njol/skript/util/SkriptColor;
+          1  fromDyeColor(Lorg/bukkit/DyeColor;)Lch/njol/skript/util/SkriptColor;
+          1  toString()Ljava/lang/String;
+          1  values()[Lch/njol/skript/util/SkriptColor;
+   11  ch.njol.skript.bukkitutil.EntityUtils  [call]
+          7  toBukkitEntityType(Lch/njol/skript/entity/EntityData;)Lorg/bukkit/entity/EntityType;
+          4  toSkriptEntityData(Lorg/bukkit/entity/EntityType;)Lch/njol/skript/entity/EntityData;
+   11  ch.njol.skript.classes.Changer  [implements, signature]
+   11  ch.njol.skript.classes.Serializer  [call, extends, signature]
+         10  <init>()V
+         10  overrides canBeInstantiated()Z
+         10  overrides deserialize(Lch/njol/yggdrasil/Fields;)Ljava/lang/Object;
+         10  overrides mustSyncDeserialization()Z
+         10  overrides serialize(Ljava/lang/Object;)Lch/njol/yggdrasil/Fields;
+          9  overrides deserialize(Ljava/lang/Object;Lch/njol/yggdrasil/Fields;)V
+          1  overrides deserialize(Lch/njol/yggdrasil/Fields;)Lcom/shanebeestudios/skbee/api/bound/Bound;
+          1  overrides deserialize(Lch/njol/yggdrasil/Fields;)Lcom/shanebeestudios/skbee/api/nbt/NBTCompound;
+          1  overrides deserialize(Lch/njol/yggdrasil/Fields;)Lcom/shanebeestudios/skbee/api/virtualfurnace/api/machine/Machine;
+          1  overrides deserialize(Lch/njol/yggdrasil/Fields;)Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;
+          1  overrides deserialize(Lch/njol/yggdrasil/Fields;)Lorg/bukkit/Keyed;
+          1  overrides deserialize(Lch/njol/yggdrasil/Fields;)Lorg/bukkit/NamespacedKey;
+          1  overrides deserialize(Lch/njol/yggdrasil/Fields;)Lorg/bukkit/advancement/Advancement;
+          1  overrides deserialize(Lch/njol/yggdrasil/Fields;)Lorg/bukkit/boss/BossBar;
+          1  overrides deserialize(Lch/njol/yggdrasil/Fields;)Lorg/bukkit/inventory/meta/trim/ArmorTrim;
+          1  overrides deserialize(Lch/njol/yggdrasil/Fields;)Lorg/bukkit/scoreboard/Team;
+          1  overrides deserialize(Lcom/shanebeestudios/skbee/api/bound/Bound;Lch/njol/yggdrasil/Fields;)V
+          1  overrides deserialize(Lcom/shanebeestudios/skbee/api/nbt/NBTCompound;Lch/njol/yggdrasil/Fields;)V
+          1  overrides deserialize(Lcom/shanebeestudios/skbee/api/virtualfurnace/api/machine/Machine;Lch/njol/yggdrasil/Fields;)V
+          1  overrides deserialize(Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;Lch/njol/yggdrasil/Fields;)V
+          1  overrides deserialize(Lorg/bukkit/Keyed;Lch/njol/yggdrasil/Fields;)V
+          1  overrides deserialize(Lorg/bukkit/NamespacedKey;Lch/njol/yggdrasil/Fields;)V
+          1  overrides deserialize(Lorg/bukkit/advancement/Advancement;Lch/njol/yggdrasil/Fields;)V
+          1  overrides deserialize(Lorg/bukkit/boss/BossBar;Lch/njol/yggdrasil/Fields;)V
+          1  overrides deserialize(Lorg/bukkit/scoreboard/Team;Lch/njol/yggdrasil/Fields;)V
+          1  overrides serialize(Lcom/shanebeestudios/skbee/api/bound/Bound;)Lch/njol/yggdrasil/Fields;
+          1  overrides serialize(Lcom/shanebeestudios/skbee/api/nbt/NBTCompound;)Lch/njol/yggdrasil/Fields;
+          1  overrides serialize(Lcom/shanebeestudios/skbee/api/virtualfurnace/api/machine/Machine;)Lch/njol/yggdrasil/Fields;
+          1  overrides serialize(Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;)Lch/njol/yggdrasil/Fields;
+          1  overrides serialize(Lorg/bukkit/Keyed;)Lch/njol/yggdrasil/Fields;
+          1  overrides serialize(Lorg/bukkit/NamespacedKey;)Lch/njol/yggdrasil/Fields;
+          1  overrides serialize(Lorg/bukkit/advancement/Advancement;)Lch/njol/yggdrasil/Fields;
+          1  overrides serialize(Lorg/bukkit/boss/BossBar;)Lch/njol/yggdrasil/Fields;
+          1  overrides serialize(Lorg/bukkit/inventory/meta/trim/ArmorTrim;)Lch/njol/yggdrasil/Fields;
+          1  overrides serialize(Lorg/bukkit/scoreboard/Team;)Lch/njol/yggdrasil/Fields;
+   11  ch.njol.skript.expressions.base.PropertyExpression  [call, extends, signature]
+         11  <init>()V
+         10  overrides get(Lorg/bukkit/event/Event;[Ljava/lang/Object;)[Ljava/lang/Object;
+         10  overrides getReturnType()Ljava/lang/Class;
+         10  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+         10  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          8  overrides acceptChange(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class;
+          8  overrides change(Lorg/bukkit/event/Event;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;)V
+          1  acceptChange(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class;
+          1  overrides get(Lorg/bukkit/event/Event;[Lcom/shanebeestudios/skbee/api/bound/Bound;)[Ljava/lang/Object;
+          1  overrides get(Lorg/bukkit/event/Event;[Lcom/shanebeestudios/skbee/api/structure/StructureWrapper;)[Ljava/lang/Object;
+          1  overrides get(Lorg/bukkit/event/Event;[Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;)[Ljava/lang/Object;
+          1  overrides get(Lorg/bukkit/event/Event;[Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;)[Lnet/kyori/adventure/text/event/ClickEvent;
+          1  overrides get(Lorg/bukkit/event/Event;[Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;)[Lnet/kyori/adventure/text/event/HoverEvent;
+          1  overrides get(Lorg/bukkit/event/Event;[Lorg/bukkit/Chunk;)[Ljava/lang/Number;
+          1  overrides get(Lorg/bukkit/event/Event;[Lorg/bukkit/block/Block;)[Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;
+          1  overrides get(Lorg/bukkit/event/Event;[Lorg/bukkit/block/Block;)[Ljava/lang/Long;
+          1  overrides get(Lorg/bukkit/event/Event;[Lorg/bukkit/entity/Entity;)[Ljava/lang/Boolean;
+          1  overrides get(Lorg/bukkit/event/Event;[Lorg/bukkit/entity/Player;)[Ljava/lang/String;
+          1  overrides getNode()Lch/njol/skript/config/Node;
+          1  overrides lambda$get$0(ILorg/bukkit/block/Block;)Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;
+          1  overrides lambda$get$0(Lcom/shanebeestudios/skbee/api/bound/Bound;)Ljava/lang/Object;
+          1  overrides lambda$get$0(Lcom/shanebeestudios/skbee/api/structure/StructureWrapper;)Ljava/lang/Object;
+          1  overrides lambda$get$0(Lcom/shanebeestudios/skbee/api/wrapper/ComponentWrapper;)Ljava/lang/Object;
+          1  overrides lambda$get$0(Lorg/bukkit/Chunk;)Ljava/lang/Number;
+   11  ch.njol.util.StringUtils  [call]
+          9  join(Ljava/lang/Iterable;Ljava/lang/String;)Ljava/lang/String;
+          1  contains(Ljava/lang/String;Ljava/lang/String;Z)Z
+          1  hexStringToByteArray(Ljava/lang/String;)[B
+   10  ch.njol.skript.conditions.base.PropertyCondition  [call, extends, signature]
+          6  <init>()V
+          5  overrides check(Ljava/lang/Object;)Z
+          5  overrides getPropertyName()Ljava/lang/String;
+          3  toString(Lch/njol/skript/lang/Condition;Lch/njol/skript/conditions/base/PropertyCondition$PropertyType;Lorg/bukkit/event/Event;ZLch/njol/skript/lang/Expression;Ljava/lang/String;)Ljava/lang/String;
+          2  overrides check(Lorg/bukkit/block/Block;)Z
+          1  getPatterns(Lch/njol/skript/conditions/base/PropertyCondition$PropertyType;Ljava/lang/String;Ljava/lang/String;)[Ljava/lang/String;
+          1  init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+          1  overrides check(Lcom/shanebeestudios/skbee/api/bound/Bound;)Z
+          1  overrides check(Lorg/bukkit/damage/DamageSource;)Z
+          1  overrides check(Lorg/bukkit/entity/Entity;)Z
+          1  overrides getNode()Lch/njol/skript/config/Node;
+          1  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;)Z
+   10  ch.njol.yggdrasil.Fields  [call, new, signature]
+         10  <init>()V
+         10  getObject(Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/Object;
+         10  putObject(Ljava/lang/String;Ljava/lang/Object;)V
+          1  contains(Ljava/lang/String;)Z
+          1  hasField(Ljava/lang/String;)Z
+    9  ch.njol.skript.test.runner.TestMode  [field]
+          7  ENABLED:Z
+          2  DEV_MODE:Z
+    9  org.skriptlang.skript.bukkit.lang.eventvalue.EventValue$Changer  [signature]
+    8  ch.njol.skript.util.Direction  [call, cast, class literal, new, signature]
+          7  combine(Lch/njol/skript/lang/Expression;Lch/njol/skript/lang/Expression;)Lch/njol/skript/lang/Expression;
+          1  <init>(Lorg/bukkit/block/BlockFace;D)V
+    8  org.skriptlang.skript.common.function.DefaultFunction  [call, signature]
+          5  builder(Lorg/skriptlang/skript/addon/SkriptAddon;Ljava/lang/String;Ljava/lang/Class;)Lorg/skriptlang/skript/common/function/DefaultFunction$Builder;
+          1  name()Ljava/lang/String;
+          1  signature()Lorg/skriptlang/skript/common/function/Signature;
+    7  ch.njol.skript.log.ErrorQuality  [field]
+          7  SEMANTIC_ERROR:Lch/njol/skript/log/ErrorQuality;
+    7  org.skriptlang.skript.bukkit.lang.eventvalue.EventValue$Time  [call, field, signature]
+          5  PAST:Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Time;
+          3  FUTURE:Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Time;
+          2  NOW:Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Time;
+          2  ordinal()I
+          1  of(I)Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Time;
+          1  values()[Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Time;
+    7  org.skriptlang.skript.lang.comparator.Comparators  [call]
+          6  registerComparator(Ljava/lang/Class;Ljava/lang/Class;Lorg/skriptlang/skript/lang/comparator/Comparator;)V
+          3  exactComparatorExists(Ljava/lang/Class;Ljava/lang/Class;)Z
+          1  comparatorExists(Ljava/lang/Class;Ljava/lang/Class;)Z
+          1  compare(Ljava/lang/Object;Ljava/lang/Object;)Lorg/skriptlang/skript/lang/comparator/Relation;
+    7  org.skriptlang.skript.lang.comparator.Relation  [call, field, signature]
+          6  get(Z)Lorg/skriptlang/skript/lang/comparator/Relation;
+          1  EQUAL:Lorg/skriptlang/skript/lang/comparator/Relation;
+          1  NOT_EQUAL:Lorg/skriptlang/skript/lang/comparator/Relation;
+    7  org.skriptlang.skript.lang.entry.SectionEntryData  [call, class literal, new]
+          6  <init>(Ljava/lang/String;Lch/njol/skript/config/SectionNode;Z)V
+    6  ch.njol.skript.conditions.base.PropertyCondition$PropertyType  [field, signature]
+          3  BE:Lch/njol/skript/conditions/base/PropertyCondition$PropertyType;
+          2  HAVE:Lch/njol/skript/conditions/base/PropertyCondition$PropertyType;
+    6  ch.njol.skript.expressions.base.EventValueExpression  [call, extends, field, new, signature]
+          5  <init>(Ljava/lang/Class;)V
+          1  DEFAULT_PRIORITY:Lorg/skriptlang/skript/util/Priority;
+    6  ch.njol.skript.expressions.base.SectionExpression  [call, extends, signature]
+          6  <init>()V
+          6  overrides get(Lorg/bukkit/event/Event;)[Ljava/lang/Object;
+          6  overrides getReturnType()Ljava/lang/Class;
+          6  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;Lch/njol/skript/config/SectionNode;Ljava/util/List;)Z
+          6  overrides isSingle()Z
+          6  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          3  overrides isSectionOnly()Z
+          1  overrides get(Lorg/bukkit/event/Event;)[Lcom/shanebeestudios/skbee/api/nbt/NBTCompound;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lcom/shanebeestudios/skbee/api/worldgen/BeeWorldCreator;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/MusicInstrument;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/boss/BossBar;
+          1  overrides get(Lorg/bukkit/event/Event;)[Lorg/bukkit/scoreboard/Team;
+          1  overrides getSwitchedObjectExpression()Lch/njol/skript/lang/Expression;
+          1  overrides lambda$get$0(Lcom/shanebeestudios/skbee/elements/nbt/sections/SecModifyNBT$NBTEditEvent;)V
+          1  overrides lambda$get$0(Lorg/bukkit/event/Event;Lio/papermc/paper/registry/TypedKey;Lio/papermc/paper/registry/RegistryBuilderFactory;)V
+          1  overrides lambda$init$0(Ljava/util/concurrent/atomic/AtomicBoolean;)V
+          1  overrides setIsSingle(Z)V
+    6  org.skriptlang.skript.lang.comparator.Comparator  [signature]
+    5  ch.njol.skript.lang.EffectSection  [call, extends]
+          5  <init>()V
+          4  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;Lch/njol/skript/config/SectionNode;Ljava/util/List;)Z
+          4  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          4  overrides walk(Lorg/bukkit/event/Event;)Lch/njol/skript/lang/TriggerItem;
+          4  walk(Lorg/bukkit/event/Event;Z)Lch/njol/skript/lang/TriggerItem;
+          2  overrides lambda$init$0(Ljava/util/concurrent/atomic/AtomicBoolean;)V
+          1  overrides getNode()Lch/njol/skript/config/Node;
+    5  ch.njol.skript.util.Version  [call, cast, new, signature]
+          4  <init>(Ljava/lang/String;)V
+          4  toString()Ljava/lang/String;
+          1  <init>([I)V
+          1  compareTo(Lch/njol/skript/util/Version;)I
+          1  getMajor()I
+          1  getMinor()I
+          1  isSmallerThan(Lch/njol/skript/util/Version;)Z
+    5  org.skriptlang.skript.common.function.DefaultFunction$Builder  [call]
+          5  build(Ljava/util/function/Function;)Lorg/skriptlang/skript/common/function/DefaultFunction;
+          5  parameter(Ljava/lang/String;Ljava/lang/Class;[Lorg/skriptlang/skript/common/function/Parameter$Modifier;)Lorg/skriptlang/skript/common/function/DefaultFunction$Builder;
+    5  org.skriptlang.skript.common.function.FunctionArguments  [call, signature]
+          5  get(Ljava/lang/String;)Ljava/lang/Object;
+    5  org.skriptlang.skript.common.function.Parameter$Modifier  [cast, field]
+          1  OPTIONAL:Lorg/skriptlang/skript/common/function/Parameter$Modifier;
+    4  ch.njol.skript.SkriptConfig  [field]
+          3  maxTargetBlockDistance:Lch/njol/skript/config/Option;
+          1  caseSensitive:Lch/njol/skript/config/Option;
+    4  ch.njol.skript.config.Option  [call]
+          4  value()Ljava/lang/Object;
+    4  ch.njol.skript.util.EnchantmentType  [call, cast, class literal, new, signature]
+          3  getType()Lorg/bukkit/enchantments/Enchantment;
+          2  getLevel()I
+          1  <init>(Lorg/bukkit/enchantments/Enchantment;)V
+          1  <init>(Lorg/bukkit/enchantments/Enchantment;I)V
+    4  org.skriptlang.skript.lang.structure.Structure  [call, extends, signature]
+          2  <init>()V
+          2  overrides getPriority()Lorg/skriptlang/skript/lang/structure/Structure$Priority;
+          2  overrides init([Lch/njol/skript/lang/Literal;ILch/njol/skript/lang/SkriptParser$ParseResult;Lorg/skriptlang/skript/lang/entry/EntryContainer;)Z
+          2  overrides load()Z
+          2  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          1  overrides getAliasesParser(Z)Lch/njol/skript/aliases/AliasesParser;
+          1  overrides loadAlias(Lch/njol/skript/config/SectionNode;Lch/njol/skript/aliases/AliasesParser;Ljava/lang/String;Ljava/lang/String;I)Z
+          1  overrides preLoad()Z
+    3  ch.njol.skript.sections.EffSecSpawn  [field]
+          3  lastSpawned:Lorg/bukkit/entity/Entity;
+    3  ch.njol.skript.util.ColorRGB  [call]
+          2  fromBukkitColor(Lorg/bukkit/Color;)Lch/njol/skript/util/ColorRGB;
+          1  fromRGB(III)Lch/njol/skript/util/ColorRGB;
+    3  ch.njol.util.Math2  [call]
+          2  fit(III)I
+          1  fit(FFF)F
+    3  org.skriptlang.skript.addon.SkriptAddon  [call, signature]
+          2  registry(Ljava/lang/Class;)Lorg/skriptlang/skript/util/Registry;
+          1  loadModules([Lorg/skriptlang/skript/addon/AddonModule;)V
+          1  localizer()Lorg/skriptlang/skript/localization/Localizer;
+          1  name()Ljava/lang/String;
+          1  syntaxRegistry()Lorg/skriptlang/skript/registration/SyntaxRegistry;
+    3  org.skriptlang.skript.lang.converter.Converters  [call]
+          2  registerConverter(Ljava/lang/Class;Ljava/lang/Class;Lorg/skriptlang/skript/lang/converter/Converter;)V
+          1  convert(Ljava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object;
+          1  converterExists(Ljava/lang/Class;Ljava/lang/Class;)Z
+    3  org.skriptlang.skript.lang.properties.Property  [call, cast, field, signature]
+          1  AMOUNT:Lorg/skriptlang/skript/lang/properties/Property;
+          1  IS_EMPTY:Lorg/skriptlang/skript/lang/properties/Property;
+          1  NUMBER:Lorg/skriptlang/skript/lang/properties/Property;
+          1  SIZE:Lorg/skriptlang/skript/lang/properties/Property;
+          1  name()Ljava/lang/String;
+    2  ch.njol.skript.classes.Cloner  [signature]
+    2  ch.njol.skript.conditions.CondCompare  [call]
+          2  f(Lch/njol/skript/lang/Expression;)Ljava/lang/String;
+    2  ch.njol.skript.lang.EventRestrictedSyntax  [implements, signature]
+    2  ch.njol.skript.lang.ExpressionSection  [call, cast]
+          2  getAsExpression()Lch/njol/skript/expressions/base/SectionExpression;
+    2  ch.njol.skript.lang.LoopSection  [call, extends]
+          2  <init>()V
+          2  overrides exit(Lorg/bukkit/event/Event;)V
+          2  overrides getActualNext()Lch/njol/skript/lang/TriggerItem;
+          2  overrides init([Lch/njol/skript/lang/Expression;ILch/njol/util/Kleenean;Lch/njol/skript/lang/SkriptParser$ParseResult;Lch/njol/skript/config/SectionNode;Ljava/util/List;)Z
+          2  overrides toString(Lorg/bukkit/event/Event;Z)Ljava/lang/String;
+          2  overrides walk(Lorg/bukkit/event/Event;)Lch/njol/skript/lang/TriggerItem;
+          1  overrides lambda$walk$0(Lorg/bukkit/event/Event;Ljava/util/concurrent/atomic/AtomicReference;)V
+          1  overrides lambda$walk$0(Lorg/bukkit/event/Event;Ljava/util/concurrent/atomic/AtomicReference;Ljava/util/concurrent/atomic/AtomicReference;)V
+          1  overrides lambda$walk$1(Lorg/bukkit/event/Event;Ljava/util/concurrent/atomic/AtomicReference;)V
+          1  walk(Lorg/bukkit/event/Event;Z)Lch/njol/skript/lang/TriggerItem;
+    2  ch.njol.skript.lang.SectionSkriptEvent  [call, cast]
+          2  getSection()Lch/njol/skript/lang/Section;
+    2  ch.njol.skript.registrations.EventValues  [call]
+          2  getEventValue(Lorg/bukkit/event/Event;Ljava/lang/Class;I)Ljava/lang/Object;
+    2  ch.njol.skript.test.runner.TestTracker  [call]
+          1  getFailedTests()Ljava/util/Map;
+          1  testFailed(Ljava/lang/String;)V
+    2  ch.njol.skript.util.Experience  [call, cast, class literal, new, signature]
+          2  <init>(I)V
+          2  getXP()I
+    2  org.skriptlang.skript.addon.AddonModule  [cast, implements]
+    2  org.skriptlang.skript.bukkit.lang.eventvalue.EventValue  [call, cast, signature]
+          2  eventClass()Ljava/lang/Class;
+          1  builder(Ljava/lang/Class;Ljava/lang/Class;)Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Builder;
+          1  changer(Lch/njol/skript/classes/Changer$ChangeMode;)Ljava/util/Optional;
+          1  converter()Lorg/skriptlang/skript/lang/converter/Converter;
+          1  patterns()Ljava/util/SequencedCollection;
+          1  time()Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Time;
+          1  valueClass()Ljava/lang/Class;
+    2  org.skriptlang.skript.bukkit.lang.eventvalue.EventValueRegistry  [call, cast, class literal]
+          1  elements()Ljava/util/List;
+          1  isRegistered(Ljava/lang/Class;Ljava/lang/Class;Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Time;)Z
+          1  register(Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue;)V
+    2  org.skriptlang.skript.lang.structure.Structure$Priority  [call, new, signature]
+          2  <init>(I)V
+    2  org.skriptlang.skript.util.Priority  [signature]
+    1  ch.njol.skript.ScriptLoader  [call]
+          1  loadItems(Lch/njol/skript/config/SectionNode;)Ljava/util/ArrayList;
+    1  ch.njol.skript.ServerPlatform  [field]
+          1  name:Ljava/lang/String;
+    1  ch.njol.skript.SkriptAPIException  [call, new]
+          1  <init>(Ljava/lang/String;Ljava/lang/Throwable;)V
+    1  ch.njol.skript.SkriptAddon  [call, field, signature]
+          1  getName()Ljava/lang/String;
+          1  plugin:Lorg/bukkit/plugin/java/JavaPlugin;
+    1  ch.njol.skript.SkriptUpdater  [call]
+          1  getCurrentRelease()Lch/njol/skript/update/ReleaseManifest;
+    1  ch.njol.skript.aliases.Aliases  [call, class literal]
+          1  createScriptAliases(Lorg/skriptlang/skript/lang/script/Script;)Lch/njol/skript/aliases/ScriptAliases;
+          1  getScriptAliases(Lorg/skriptlang/skript/lang/script/Script;)Lch/njol/skript/aliases/ScriptAliases;
+    1  ch.njol.skript.aliases.AliasesParser  [call, cast, signature]
+          1  load(Lch/njol/skript/config/SectionNode;)V
+    1  ch.njol.skript.aliases.ScriptAliases  [field]
+          1  parser:Lch/njol/skript/aliases/AliasesParser;
+    1  ch.njol.skript.bukkitutil.BukkitUnsafe  [call]
+          1  getMaterialFromNamespacedId(Ljava/lang/String;)Lorg/bukkit/Material;
+    1  ch.njol.skript.bukkitutil.BukkitUtils  [call]
+          1  registryExists(Ljava/lang/String;)Z
+    1  ch.njol.skript.bukkitutil.SoundUtils  [call]
+          1  getKey(Ljava/lang/String;)Lorg/bukkit/NamespacedKey;
+    1  ch.njol.skript.classes.ClassInfo$PropertyDocs  [call]
+          1  description()Ljava/lang/String;
+    1  ch.njol.skript.classes.EnumSerializer  [call, new]
+          1  <init>(Ljava/lang/Class;)V
+    1  ch.njol.skript.command.EffectCommandEvent  [call, class literal, new]
+          1  <init>(Lorg/bukkit/command/CommandSender;Ljava/lang/String;)V
+    1  ch.njol.skript.config.EntryNode  [call, cast, new]
+          1  <init>(Ljava/lang/String;Ljava/lang/String;Lch/njol/skript/config/SectionNode;)V
+          1  getKey()Ljava/lang/String;
+          1  getValue()Ljava/lang/String;
+    1  ch.njol.skript.doc.NoDoc  [annotation]
+    1  ch.njol.skript.effects.Delay  [call]
+          1  addDelayedEvent(Lorg/bukkit/event/Event;)V
+    1  ch.njol.skript.entity.EntityType  [call, cast, field, signature]
+          1  data:Lch/njol/skript/entity/EntityData;
+          1  getAmount()I
+    1  ch.njol.skript.events.bukkit.ScheduledEvent  [call, new]
+          1  <init>(Lorg/bukkit/World;)V
+    1  ch.njol.skript.events.bukkit.ScheduledNoWorldEvent  [call, class literal, new]
+          1  <init>()V
+    1  ch.njol.skript.lang.DefaultExpression  [signature]
+    1  ch.njol.skript.lang.LiteralList  [call, cast]
+          1  invertAnd()V
+    1  ch.njol.skript.lang.ReturnHandler  [implements, signature]
+    1  ch.njol.skript.lang.ReturnableTrigger  [signature]
+    1  ch.njol.skript.lang.SkriptParser  [call, new]
+          1  <init>(Ljava/lang/String;ILch/njol/skript/lang/ParseContext;)V
+          1  parseExpression([Ljava/lang/Class;)Lch/njol/skript/lang/Expression;
+    1  ch.njol.skript.lang.VariableString  [call, cast]
+          1  toUnformattedString(Lorg/bukkit/event/Event;)Ljava/lang/String;
+    1  ch.njol.skript.lang.VerboseAssert  [implements]
+    1  ch.njol.skript.lang.function.Functions  [call]
+          1  register(Lorg/skriptlang/skript/common/function/DefaultFunction;)Lorg/skriptlang/skript/common/function/DefaultFunction;
+    1  ch.njol.skript.lang.parser.ParsingStack  [call]
+          1  isEmpty()Z
+          1  peek()Lch/njol/skript/lang/parser/ParsingStack$Element;
+    1  ch.njol.skript.lang.parser.ParsingStack$Element  [call]
+          1  getSyntaxElementClass()Ljava/lang/Class;
+    1  ch.njol.skript.localization.Noun  [call]
+          1  getPlural()Ljava/lang/String;
+          1  getSingular()Ljava/lang/String;
+    1  ch.njol.skript.log.LogEntry  [method reference]
+          1  getMessage()Ljava/lang/String;
+    1  ch.njol.skript.log.RetainingLogHandler  [call]
+          1  getLog()Ljava/util/Collection;
+          1  stop()V
+    1  ch.njol.skript.log.SkriptLogger  [call]
+          1  startRetainingLog()Lch/njol/skript/log/RetainingLogHandler;
+    1  ch.njol.skript.sections.EffSecSpawn$SpawnEvent  [call, class literal, new]
+          1  <init>(Lorg/bukkit/entity/Entity;)V
+    1  ch.njol.skript.test.runner.EvtTestCase  [call, cast]
+          1  getTestName()Ljava/lang/String;
+    1  ch.njol.skript.update.ReleaseManifest  [field]
+          1  flavor:Ljava/lang/String;
+    1  ch.njol.skript.util.GameruleValue  [call, class literal, new, signature]
+          1  <init>(Ljava/lang/Object;)V
+          1  toString()Ljava/lang/String;
+    1  ch.njol.skript.util.Time  [call, cast, class literal, new]
+          1  <init>(I)V
+          1  getTicks()I
+    1  ch.njol.skript.util.slot.InventorySlot  [cast]
+    1  ch.njol.skript.variables.FlatFileStorage  [cast]
+    1  ch.njol.skript.variables.VariablesStorage  [cast, class literal]
+    1  ch.njol.util.coll.iterator.IteratorIterable  [call, new]
+          1  <init>(Ljava/util/Iterator;)V
+          1  iterator()Ljava/util/Iterator;
+    1  org.skriptlang.skript.Skript  [call]
+          1  registerAddon(Ljava/lang/Class;Ljava/lang/String;)Lorg/skriptlang/skript/addon/SkriptAddon;
+    1  org.skriptlang.skript.bukkit.lang.eventvalue.EventValue$Builder  [call, method reference, signature]
+          1  build()Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue;
+          1  excludedErrorMessage(Ljava/lang/String;)Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Builder;
+          1  excludes([Ljava/lang/Class;)Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Builder;
+          1  getter(Lorg/skriptlang/skript/lang/converter/Converter;)Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Builder;
+          1  patterns([Ljava/lang/String;)Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Builder;
+          1  registerChanger(Lch/njol/skript/classes/Changer$ChangeMode;Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Changer;)Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Builder;
+          1  time(Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Time;)Lorg/skriptlang/skript/bukkit/lang/eventvalue/EventValue$Builder;
+    1  org.skriptlang.skript.bukkit.particles.particleeffects.ParticleEffect  [call, cast]
+          1  particle()Lorg/bukkit/Particle;
+    1  org.skriptlang.skript.bukkit.registration.BukkitSyntaxInfos$Event  [call, field]
+          1  KEY:Lorg/skriptlang/skript/registration/SyntaxRegistry$Key;
+          1  builder(Ljava/lang/Class;Ljava/lang/String;)Lorg/skriptlang/skript/bukkit/registration/BukkitSyntaxInfos$Event$Builder;
+    1  org.skriptlang.skript.bukkit.registration.BukkitSyntaxInfos$Event$Builder  [call]
+          1  addEvent(Ljava/lang/Class;)Lorg/skriptlang/skript/bukkit/registration/BukkitSyntaxInfos$Event$Builder;
+          1  addPatterns([Ljava/lang/String;)Lorg/skriptlang/skript/registration/SyntaxInfo$Builder;
+          1  build()Lorg/skriptlang/skript/bukkit/registration/BukkitSyntaxInfos$Event;
+    1  org.skriptlang.skript.bukkit.tags.TagModule  [field]
+          1  tagRegistry:Lorg/skriptlang/skript/bukkit/tags/TagRegistry;
+    1  org.skriptlang.skript.bukkit.tags.TagRegistry  [call]
+          1  getTag(Lorg/skriptlang/skript/bukkit/tags/sources/TagOrigin;Lorg/skriptlang/skript/bukkit/tags/TagType;Lorg/bukkit/NamespacedKey;)Lorg/bukkit/Tag;
+    1  org.skriptlang.skript.bukkit.tags.TagType  [call, field, signature]
+          1  BLOCKS:Lorg/skriptlang/skript/bukkit/tags/TagType;
+          1  ITEMS:Lorg/skriptlang/skript/bukkit/tags/TagType;
+          1  toString()Ljava/lang/String;
+    1  org.skriptlang.skript.bukkit.tags.sources.TagOrigin  [field]
+          1  ANY:Lorg/skriptlang/skript/bukkit/tags/sources/TagOrigin;
+    1  org.skriptlang.skript.common.function.Parameter  [call]
+          1  toFormattedString()Ljava/lang/String;
+    1  org.skriptlang.skript.common.function.Parameters  [call]
+          1  all()[Lorg/skriptlang/skript/common/function/Parameter;
+    1  org.skriptlang.skript.common.function.Signature  [call]
+          1  parameters()Lorg/skriptlang/skript/common/function/Parameters;
+          1  returnType()Ljava/lang/Class;
+    1  org.skriptlang.skript.lang.entry.EntryData  [call, cast]
+          1  getKey()Ljava/lang/String;
+          1  isOptional()Z
+    1  org.skriptlang.skript.lang.properties.handlers.base.ConditionPropertyHandler  [implements, signature]
+    1  org.skriptlang.skript.lang.properties.handlers.base.ExpressionPropertyHandler  [implements, signature]
+    1  org.skriptlang.skript.lang.properties.handlers.base.PropertyHandler  [signature]
+    1  org.skriptlang.skript.localization.Localizer  [call]
+          1  setSourceDirectories(Ljava/lang/String;Ljava/lang/String;)V
+    1  org.skriptlang.skript.log.runtime.SyntaxRuntimeErrorProducer  [call, implements]
+          1  error(Ljava/lang/String;Ljava/lang/String;)V
+          1  warning(Ljava/lang/String;Ljava/lang/String;)V
+    1  org.skriptlang.skript.registration.DefaultSyntaxInfos$Expression  [call, cast]
+          1  builder(Ljava/lang/Class;Ljava/lang/Class;)Lorg/skriptlang/skript/registration/DefaultSyntaxInfos$Expression$Builder;
+    1  org.skriptlang.skript.registration.DefaultSyntaxInfos$Expression$Builder  [call]
+          1  supplier(Ljava/util/function/Supplier;)Lorg/skriptlang/skript/registration/SyntaxInfo$Builder;
+    1  org.skriptlang.skript.registration.DefaultSyntaxInfos$Structure  [call]
+          1  builder(Ljava/lang/Class;)Lorg/skriptlang/skript/registration/DefaultSyntaxInfos$Structure$Builder;
+    1  org.skriptlang.skript.registration.DefaultSyntaxInfos$Structure$Builder  [call, cast]
+          1  addPatterns([Ljava/lang/String;)Lorg/skriptlang/skript/registration/SyntaxInfo$Builder;
+          1  build()Lorg/skriptlang/skript/registration/DefaultSyntaxInfos$Structure;
+          1  entryValidator(Lorg/skriptlang/skript/lang/entry/EntryValidator;)Lorg/skriptlang/skript/registration/DefaultSyntaxInfos$Structure$Builder;
+    1  org.skriptlang.skript.registration.SyntaxInfo  [call, field]
+          1  COMBINED:Lorg/skriptlang/skript/util/Priority;
+          1  SIMPLE:Lorg/skriptlang/skript/util/Priority;
+          1  builder(Ljava/lang/Class;)Lorg/skriptlang/skript/registration/SyntaxInfo$Builder;
+    1  org.skriptlang.skript.registration.SyntaxInfo$Builder  [call]
+          1  addPatterns([Ljava/lang/String;)Lorg/skriptlang/skript/registration/SyntaxInfo$Builder;
+          1  build()Lorg/skriptlang/skript/registration/SyntaxInfo;
+          1  supplier(Ljava/util/function/Supplier;)Lorg/skriptlang/skript/registration/SyntaxInfo$Builder;
+    1  org.skriptlang.skript.registration.SyntaxRegistry  [call, field]
+          1  CONDITION:Lorg/skriptlang/skript/registration/SyntaxRegistry$Key;
+          1  EFFECT:Lorg/skriptlang/skript/registration/SyntaxRegistry$Key;
+          1  EXPRESSION:Lorg/skriptlang/skript/registration/SyntaxRegistry$Key;
+          1  SECTION:Lorg/skriptlang/skript/registration/SyntaxRegistry$Key;
+          1  STRUCTURE:Lorg/skriptlang/skript/registration/SyntaxRegistry$Key;
+          1  register(Lorg/skriptlang/skript/registration/SyntaxRegistry$Key;Lorg/skriptlang/skript/registration/SyntaxInfo;)V
