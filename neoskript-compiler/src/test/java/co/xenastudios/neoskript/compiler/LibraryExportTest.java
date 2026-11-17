@@ -24,6 +24,10 @@ class LibraryExportTest {
         library.type("database", "database", Object.class);
         library.effect("NeoSkriptDbEffExecute", info -> (context, args) -> {}, "execute %string%");
         library.function("dbPing", List.of(Parameter.of("host", "string")), null, false, args -> null);
+        // Refused or already NeoSkript's: not credited to the addon.
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> library.effect("Say", info -> (context, args) -> {}, "say again %string%"));
+        library.type("string", "text", String.class);
         library.registeringAddon(null);
         library.effect("Shout", info -> (context, args) -> {}, "shout %string%");
 

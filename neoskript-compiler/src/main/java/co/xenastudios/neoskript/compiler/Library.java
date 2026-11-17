@@ -119,11 +119,10 @@ public final class Library implements Registrar {
     @Override
     public void type(String id, String name, Class<?> javaClass) {
         checkOpen();
-        if (registering != null) {
-            addonOf.putIfAbsent("type:" + id, registering);
-        }
+        boolean known = javaClasses.containsKey(id);
         builder.type(new TypeInfo(id, name, Set.of(), false));
         putJavaClass(id, javaClass);
+        credit("type:" + id, known);
         co.xenastudios.neoskript.runtime.TypeNames.register(javaClass, name);
         if (STRICT_TYPES.contains(id)) {
             builder.strict(id);
@@ -139,10 +138,9 @@ public final class Library implements Registrar {
     @Override
     public <T> void namedType(String id, String name, Class<T> javaClass, Map<String, ? extends T> values) {
         checkOpen();
-        if (registering != null) {
-            addonOf.putIfAbsent("type:" + id, registering);
-        }
+        boolean known = javaClasses.containsKey(id);
         builder.type(new TypeInfo(id, name, values.keySet(), false));
+        credit("type:" + id, known);
         if (STRICT_TYPES.contains(id)) {
             builder.strict(id);
         }
@@ -898,15 +896,14 @@ public final class Library implements Registrar {
     public void function(String name, List<Parameter> parameters, String returnType, boolean returnsPlural,
             Function function) {
         checkOpen();
-        if (registering != null) {
-            addonOf.putIfAbsent("function:" + name, registering);
-        }
+        boolean known = functionDefaults.keySet().stream().anyMatch(f -> f.name().equalsIgnoreCase(name));
         FunctionInfo info = new FunctionInfo(name, parameters.stream()
                 .map(p -> new FunctionInfo.Parameter(p.name(), p.type(), p.plural(), p.optional()))
                 .toList(), returnType, returnsPlural);
         functionDefaults.put(info, parameters.stream().map(Parameter::defaultValue).toList());
         builder.function(info);
         functions.put(info, function);
+        credit("function:" + name, known);
     }
 
     /** The types Skript can't save in variables, by id, with their names as its warning writes them. */
@@ -1142,6 +1139,17 @@ public final class Library implements Registrar {
         registering = name;
     }
 
+    /**
+     * Credits what's just been registered as {@code key} to the addon registering, unless it was there already
+     * ({@code known}): an addon registering NeoSkript's own type again doesn't make it the addon's.
+     */
+    private void credit(String key, boolean known) {
+        String addon = registering;
+        if (addon != null && !known) {
+            addonOf.putIfAbsent(key, addon);
+        }
+    }
+
     private void add(SyntaxKind kind, String id, String returnType, Object binding, String... patterns) {
         add(kind, id, returnType, binding, List.of(), patterns);
     }
@@ -1149,12 +1157,10 @@ public final class Library implements Registrar {
     private void add(SyntaxKind kind, String id, String returnType, Object binding, List<RegexRole> regexRoles,
             String... patterns) {
         checkOpen();
-        if (registering != null) {
-            addonOf.putIfAbsent(kind + ":" + id, registering);
-        }
         if (bindings.putIfAbsent(new Key(kind, id), binding) != null) {
             throw new IllegalArgumentException("Duplicate " + kind.name().toLowerCase() + " id: " + id);
         }
+        credit(kind + ":" + id, false);
         builder.syntax(new SyntaxInfo(kind, id, Arrays.stream(patterns).map(PatternCompiler::compile).toList(),
                 returnType, regexRoles));
     }

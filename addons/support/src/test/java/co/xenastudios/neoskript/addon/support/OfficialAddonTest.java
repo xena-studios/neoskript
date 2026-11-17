@@ -49,6 +49,12 @@ class OfficialAddonTest {
     }
 
     @Test
+    void findsAnOriginalUnderAnyOfItsNames() throws IOException {
+        Path mirror = jar("skript-mirror-2.0.jar", "plugin.yml", "name: skript-mirror\n");
+        assertEquals(Map.of("skript-mirror", mirror), Originals.find(plugins, List.of("skript-reflect", "skript-mirror")));
+    }
+
+    @Test
     void aMissingFolderOrNothingToLookForFindsNothing() {
         assertEquals(Map.of(), Originals.find(plugins.resolve("missing"), List.of("skript-db")));
         assertEquals(Map.of(), Originals.find(plugins, List.of()));
@@ -61,7 +67,7 @@ class OfficialAddonTest {
                 Map.of("skript-db", plugins.resolve("skript-db.jar")), "1.0.0", "1.0.0");
         assertFalse(check.load());
         assertEquals(1, check.warnings().size());
-        assertTrue(check.warnings().getFirst().startsWith("skript-db 1.4.0 is running, and NeoSkriptDb replaces it"),
+        assertTrue(check.warnings().getFirst().startsWith("skript-db 1.4.0 is installed and loaded, and NeoSkriptDb replaces it"),
                 check.warnings().toString());
     }
 
@@ -71,8 +77,8 @@ class OfficialAddonTest {
                 Map.of("skript-db", plugins.resolve("SkriptDB.jar")), "1.0.0", "1.0.0");
         assertTrue(check.load());
         assertEquals(List.of("plugins/SkriptDB.jar is skript-db, which needs Skript, so it doesn't load with"
-                + " NeoSkript. NeoSkriptDb replaces it, and scripts written for skript-db work as they are. Remove"
-                + " SkriptDB.jar."), check.warnings());
+                + " NeoSkript. NeoSkriptDb replaces it: scripts written for skript-db should work unchanged"
+                + " (NeoSkriptDb's docs list any differences). Remove SkriptDB.jar."), check.warnings());
     }
 
     @Test

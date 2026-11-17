@@ -28,9 +28,11 @@ import org.bukkit.plugin.java.JavaPlugin;
  * }
  * }</pre>
  *
- * <p><b>The community addon it replaces</b> (its build file's {@code replaces}, as {@code skript-db}):
+ * <p><b>The community addon it replaces</b> (its build file's {@code replaces}: {@code skript-db}, or every name
+ * it's gone by, as {@code skript-reflect} and {@code skript-mirror}), which the build also makes a soft
+ * dependency, so it loads first if it can load at all:
  * <ul>
- *   <li>if it's running, which it can only do through Skript's addon compatibility layer, this addon doesn't load,
+ *   <li>if it's loaded, which it can only be through Skript's addon compatibility layer, this addon doesn't load,
  *       so the two don't register the same syntax, and the console says to remove one;</li>
  *   <li>if only its jar is in {@code plugins/}, it can't load (it needs Skript, and NeoSkript doesn't run next to
  *       Skript), so this addon loads, and the console says to remove that jar.</li>
@@ -56,15 +58,17 @@ public final class OfficialAddon {
         try {
             Properties properties = properties(plugin.getClass().getClassLoader());
             List<String> replaces = list(properties.getProperty("replaces", ""));
+            // Loaded, whether or not it has enabled yet: load order mustn't decide.
             Map<String, String> running = new LinkedHashMap<>();
             for (String name : replaces) {
                 Plugin original = plugin.getServer().getPluginManager().getPlugin(name);
-                if (original != null && original != plugin && original.isEnabled()) {
+                if (original != null && original != plugin) {
                     running.put(name, original.getPluginMeta().getVersion());
                 }
             }
-            Path plugins = plugin.getDataFolder().toPath().toAbsolutePath().getParent();
-            Map<String, Path> jars = Originals.find(plugins, replaces);
+            // Only if none is loaded, the jars in plugins/ are read, for one that couldn't load.
+            Map<String, Path> jars = replaces.isEmpty() || !running.isEmpty() ? Map.of()
+                    : Originals.find(plugin.getDataFolder().toPath().toAbsolutePath().getParent(), replaces);
             String neoskript;
             try {
                 neoskript = NeoSkript.get().version();
@@ -99,7 +103,7 @@ public final class OfficialAddon {
      * Decides what addon {@code addon} does.
      *
      * @param addon the addon's name
-     * @param running the community addons it replaces that are running, with their versions
+     * @param running the community addons it replaces that are loaded, with their versions
      * @param jars the community addons it replaces whose jars are in {@code plugins/}, with the jars
      * @param builtFor the NeoSkript version it was built with, or {@code null}
      * @param neoskript the running NeoSkript's version, or {@code null} if unknown
@@ -109,14 +113,15 @@ public final class OfficialAddon {
             String neoskript) {
         List<String> warnings = new ArrayList<>();
         if (!running.isEmpty()) {
-            running.forEach((name, version) -> warnings.add(name + " " + version + " is running, and " + addon
+            running.forEach((name, version) -> warnings.add(name + " " + version + " is installed and loaded, and " + addon
                     + " replaces it, so " + addon + " won't load next to it: the two would register the same syntax."
                     + " Remove " + name + " to use " + addon + ", or remove " + addon + "."));
             return new Check(false, warnings);
         }
         jars.forEach((name, jar) -> warnings.add("plugins/" + jar.getFileName() + " is " + name + ", which needs"
-                + " Skript, so it doesn't load with NeoSkript. " + addon + " replaces it, and scripts written for "
-                + name + " work as they are. Remove " + jar.getFileName() + "."));
+                + " Skript, so it doesn't load with NeoSkript. " + addon + " replaces it: scripts written for " + name
+                + " should work unchanged (" + addon + "'s docs list any differences). Remove " + jar.getFileName()
+                + "."));
         if (builtFor != null && neoskript != null && older(neoskript, builtFor)) {
             warnings.add(addon + " was built for NeoSkript " + builtFor + ", and this is NeoSkript " + neoskript
                     + ": some of its syntax may not work. Update NeoSkript to " + builtFor + " or newer.");

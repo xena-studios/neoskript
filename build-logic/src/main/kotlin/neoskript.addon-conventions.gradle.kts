@@ -2,6 +2,7 @@
 // with NeoSkript. It ships one jar with its libraries shaded and relocated into its own package, and plugin.yml is
 // made from `neoskriptAddon { ... }`. See addons/README.md.
 
+import co.xenastudios.neoskript.gradle.CheckShadedPackages
 import co.xenastudios.neoskript.gradle.GenerateAddonResources
 import co.xenastudios.neoskript.gradle.OfficialAddonExtension
 
@@ -34,8 +35,15 @@ val generateAddonResources = tasks.register<GenerateAddonResources>("generateAdd
     pluginDescription = addon.description
     // The same version as NeoSkript: they're released together.
     pluginVersion = provider { project.version.toString() }
+    // NeoSkript's own oldest version, so the two never disagree.
+    apiVersion = providers.fileContents(rootProject.layout.projectDirectory.file("neoskript-plugin/src/main/resources/plugin.yml"))
+        .asText.map { yml ->
+            Regex("(?m)^api-version:\\s*['\"]?([^'\"\\s]+)").find(yml)?.groupValues?.get(1)
+                ?: error("NeoSkript's plugin.yml has no api-version")
+        }
     replaces = addon.replaces
-    softDepend = addon.softDepend
+    // A community addon it replaces loads first if it can load at all, so the check when this one starts sees it.
+    softDepend = addon.softDepend.zip(addon.replaces) { soft, replaced -> (soft + replaced).distinct() }
     syntaxExport = addon.syntaxExport
     output = generated
 }
@@ -44,8 +52,9 @@ the<SourceSetContainer>().named("main") {
     resources.srcDir(generateAddonResources)
 }
 
-// Each addon relocates what it ships into co.xenastudios.neoskript.addons.<name>.libs.
-val relocationBase = "co.xenastudios.neoskript.addons." + project.name.replace(Regex("[^A-Za-z0-9]"), "") + ".libs"
+// Each addon's classes are in co.xenastudios.neoskript.addons.<name>, and what it ships is relocated into .libs there.
+val addonPackage = "co.xenastudios.neoskript.addons." + project.name.replace(Regex("[^A-Za-z0-9]"), "")
+val relocationBase = "$addonPackage.libs"
 val licence = rootProject.layout.projectDirectory.file("LICENSE")
 
 tasks.named<Jar>("jar") {
@@ -80,4 +89,17 @@ afterEvaluate {
 
 tasks.named("assemble") {
     dependsOn("shadowJar")
+}
+
+// Nothing outside the addon's own package: a library shaded but not relocated fails the build.
+val checkShadedPackages = tasks.register<CheckShadedPackages>("checkShadedPackages") {
+    group = "verification"
+    description = "Checks that every class in the addon's jar is in its own package."
+    jar.set(project.tasks.named<Jar>("shadowJar").flatMap { it.archiveFile })
+    ownPackage = addonPackage.replace('.', '/') + "/"
+    marker = layout.buildDirectory.file("checkShadedPackages/ok")
+}
+
+tasks.named("check") {
+    dependsOn(checkShadedPackages)
 }

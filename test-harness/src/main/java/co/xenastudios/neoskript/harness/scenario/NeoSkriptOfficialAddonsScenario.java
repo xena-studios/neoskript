@@ -68,8 +68,9 @@ public final class NeoSkriptOfficialAddonsScenario implements Scenario {
                 """);
         try (ServerProcess server = builder.start()) {
             // Paper refuses the community addon first, as it needs Skript; what's checked comes after that.
-            Pattern refused = Pattern.compile(Pattern.quote("Could not load 'plugins/" + ORIGINAL + ".jar'") + "|"
-                    + Pattern.quote("Could not load plugin '" + ORIGINAL));
+            // On 1.21.4, Paper names the copy it remapped, in plugins/.paper-remapped.
+            Pattern refused = Pattern.compile("Could not load 'plugins/(\\.paper-remapped/)?" + Pattern.quote(ORIGINAL
+                    + ".jar'") + "|" + Pattern.quote("Could not load plugin '" + ORIGINAL));
             server.await(refused, WAIT);
             int after = server.lines(0).size();
             for (int i = 0; i < server.lines(0).size(); i++) {
@@ -79,7 +80,7 @@ public final class NeoSkriptOfficialAddonsScenario implements Scenario {
                 }
             }
             server.await(Pattern.compile(Pattern.quote("plugins/" + ORIGINAL + ".jar is " + ORIGINAL
-                    + ", which needs Skript, so it doesn't load with NeoSkript. NeoSkriptTemplate replaces it")), after,
+                    + ", which needs Skript, so it doesn't load with NeoSkript. NeoSkriptTemplate replaces it:")), after,
                     WAIT);
             for (Path jar : jars) {
                 String addon = properties(jar).getProperty("name");
