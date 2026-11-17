@@ -1,0 +1,60 @@
+---
+title: FAQ
+description: Short answers about NeoSkript, Skript, addons, Folia, variables and going back.
+---
+
+## Is NeoSkript a fork of Skript?
+
+No. It's a clean-room rewrite that treats Skript's behaviour as the spec. It shares Skript's licence, GPL-3.0, and reuses some of Skript's data under it, such as its test scripts, but the code is its own.
+
+## Do my scripts need changing?
+
+No, unless they use a Skript addon. NeoSkript runs Skript 2.17's syntax, with Skript's messages and errors. [`neoskript-cli`](/docs/cli/) checks your scripts before you switch and lists any line NeoSkript won't load.
+
+## Do Skript addons work?
+
+Not yet. Addons such as SkBee, skript-yaml, SkQuery and skript-reflect are built against Skript's own code, which NeoSkript doesn't have. A compatibility layer for them is planned after 1.0, SkBee first. The plugins Skript hooks into itself, Vault, WorldGuard and GriefPrevention, work now. See [addons](/docs/addons/).
+
+## Can I run NeoSkript and Skript together?
+
+No. They'd fight over the same scripts and the same `/skript` command, so NeoSkript disables itself when Skript is installed.
+
+## Can I go back to Skript?
+
+Yes. NeoSkript never changes `plugins/Skript`. Put `Skript.jar` back and take NeoSkript's out. NeoSkript's `variables.csv` is in Skript's format, so you can copy it over Skript's to keep what changed since the switch.
+
+## Does it work on Spigot?
+
+No. NeoSkript needs Paper or Folia, Minecraft 1.21.4 to 26.3, and Java 21 for 1.21.x or Java 25 for 26.x. See [supported versions](/docs/reference/versions/).
+
+## Does it work on Folia?
+
+Yes, the same jar runs on Paper and Folia. Skript doesn't run on Folia. Most scripts run unchanged; scripts that read players or blocks in other regions from a timer need `run on`. See [Folia](/docs/server/folia/).
+
+## How much faster is it?
+
+On the benchmark, startup loads in 0.87 s against Skript's 1.97 s, `/sk reload` takes 228 ms against 1,412 ms, and the scripts' share of each tick with 20 players online is 0.95 ms against 2.36 ms. See [performance](/docs/server/performance/).
+
+## Where do my scripts go?
+
+`plugins/NeoSkript/scripts/`. On its first start, NeoSkript copies them there from `plugins/Skript/scripts/`. See [moving from Skript](/docs/moving-from-skript/).
+
+## Can I use /skript and /sk?
+
+Yes, with Skript's subcommands and permissions. `/neoskript` and `/ns` work too. See [commands and permissions](/docs/server/commands/).
+
+## Is there a GUI or menu syntax?
+
+Yes, Skript's own: chest inventories made in a script, opened for a player, with `on inventory click`. See [menus](/docs/scripts/menus/).
+
+## Does it support MySQL or SQLite for variables?
+
+Not yet. Variables are saved to `variables.csv`, which is what Skript 2.17 supports out of the box. Database storage is planned after 1.0.
+
+## Is it stable?
+
+It's a public beta. Skript's whole test suite passes on it, but try it on a test server before your live one, and [report](https://github.com/xena-studios/neoskript/issues/new/choose) anything that behaves differently than on Skript.
+
+## Who makes it?
+
+[Xena Studios](https://xenastudios.co). The code is on [GitHub](https://github.com/xena-studios/neoskript).

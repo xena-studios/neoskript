@@ -1,0 +1,58 @@
+---
+title: Reloading scripts
+description: How /sk reload works, why a script with errors keeps its old version running, and auto reload.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+`/sk reload <script>` reads a script again and swaps the new version in, without restarting the server. `/sk reload scripts` does every script.
+
+## A failed reload keeps the old scripts
+
+NeoSkript reads and compiles everything first, then switches over together. If a script has errors, the errors are reported and **the version that's already running keeps running**, with its commands, events and functions as they were. Fix the errors and reload again.
+
+A script that wasn't loaded before, such as a new file, loads the lines that are fine, as on Skript, and reports the rest.
+
+<Aside type="note">
+This is a deliberate difference from Skript, which unloads a script before loading it again. A typo in a live server's script shouldn't take that script down.
+</Aside>
+
+Functions keep working across reloads too: a trigger that calls a function from another script calls its new version once that script reloads.
+
+## What happens on a reload
+
+- `on unload` triggers of the old version run, then `on load` triggers of the new one.
+- The script's commands are replaced, and players get the new command list straight away.
+- `every` timers start again.
+- Global variables aren't touched: they're not part of the script.
+
+The benchmark on the [performance](/docs/server/performance/) page reloads 40 scripts, 5,960 lines, in 228 ms, against 1,412 ms on Skript.
+
+## Who hears about it
+
+The player who reloads gets a report: what was reloaded, how many scripts, how long it took, and each script's problems with their line numbers. Players with `skript.reloadnotify` are told who's reloading what, and get the same report.
+
+```text
+[NeoSkript] Reloading shop.sk...
+ shop.sk - 1 error
+   Line 14: Can't understand this condition/effect: sned "hi" to player
+     sned "hi" to player
+[NeoSkript] Reloaded shop.sk with 1 error in 3 ms. Scripts with errors keep their last version.
+```
+
+In chat, hovering over a problem shows the line of code, and clicking copies it. The look comes from the [theme](/docs/server/configuration/#make-it-look-like-your-server) in `config.yml`. See [reload reports](/docs/server/commands/#reload-reports).
+
+## auto reload
+
+A script with an `auto reload` structure reloads itself when its file changes, checked every 2 seconds. A version with errors keeps the old one running, as with `/sk reload`.
+
+```skript
+auto reload:
+	recipients: "Notch" and "jeb_"
+	permission: skript.reloadnotify
+
+on join:
+	send "Hello!" to player
+```
+
+The console and the listed recipients get each reload's report. Without `recipients:`, players with the `permission:` hear, `skript.reloadnotify` by default. `auto reload` alone, with no entries, works too.

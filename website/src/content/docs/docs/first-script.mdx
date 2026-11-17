@@ -1,0 +1,87 @@
+---
+title: Your first script
+description: Write a script that greets players and adds a command, load it, and fix an error, in a few minutes.
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+A script is a text file of Skript code. This one greets players when they join and adds a `/hello` command. It takes a few minutes, and needs a server with NeoSkript [installed](/docs/install/) and a text editor.
+
+## Write it
+
+<Steps>
+
+1. In `plugins/NeoSkript/scripts/`, make a file called `hello.sk`.
+
+2. Put this in it:
+
+   ```skript title="hello.sk"
+   on join:
+   	send "<gold>Welcome to the server, %player%!" to player
+
+   command /hello:
+   	description: Says hello.
+   	trigger:
+   		send "<green>Hello, %sender%!" to sender
+   ```
+
+   The lines under `on join:` and `trigger:` are indented, with tabs or spaces. Indentation is how Skript knows which lines belong to what.
+
+3. Save it, and in the game or the console run:
+
+   ```text
+   /sk reload hello
+   ```
+
+   You'll see `Reloaded hello.sk in 3 ms.`, with however long it took. Join the server, or run `/hello`, and the script answers.
+
+</Steps>
+
+## What it does
+
+- `on join:` is an **event**. Its code runs each time a player joins.
+- `send "..." to player` is an **effect**: a line that does something. `player` is the player who joined.
+- `%player%` in the text is replaced by the player's name. Anything between `%` signs is a value.
+- `<gold>` and `<green>` are colours.
+- `command /hello:` adds a **command**. Its code goes under `trigger:`, and `sender` is whoever ran it.
+
+## Add a variable
+
+Variables keep values. One in curly brackets whose name doesn't start with `_` or `-` is saved, so it's still there after a restart. Change `hello.sk` to count joins:
+
+```skript title="hello.sk"
+on join:
+	add 1 to {joins::%player's uuid%}
+	send "<gold>Welcome, %player%! That's visit number %{joins::%player's uuid%}%." to player
+
+command /hello:
+	description: Says hello.
+	trigger:
+		send "<green>Hello, %sender%!" to sender
+```
+
+`{joins::%player's uuid%}` is a different variable for each player, named by their UUID. Run `/sk reload hello` again.
+
+## Fix an error
+
+Change `send` to `sned` on the third line, save, and reload. The new version doesn't load, and NeoSkript says why:
+
+```text
+[NeoSkript] Reloading hello.sk...
+ hello.sk - 1 error
+   Line 3: Can't understand this condition/effect: sned "<gold>Welcome, %player%! That's visit number %{joins::%player's uuid%}%." to player
+     sned "<gold>Welcome, %player%! That's visit number %{joins::%player's uuid%}%." to player
+[NeoSkript] Reloaded hello.sk with 1 error in 3 ms. Scripts with errors keep their last version.
+```
+
+The version that was running keeps running until the new one loads without errors. Change it back and reload.
+
+<Aside type="tip">
+You don't need a server to find errors: paste a script into [the parser](/parser/), or install the [editor extension](/docs/editors/), and errors show as you type.
+</Aside>
+
+## Next
+
+- [Script layout](/docs/scripts/structure/): structures, indentation and comments.
+- [Events](/docs/scripts/events/), [commands](/docs/scripts/commands/) and [variables](/docs/scripts/variables/).
+- The [syntax reference](/syntax/), for every event, effect and expression.

@@ -1,0 +1,75 @@
+---
+title: Menus
+description: Chest menus made from items, with Skript's own syntax and no addon.
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+A menu is an inventory you make in a script and open for a player. They click an item, and an `on inventory click` trigger decides what happens. This is plain Skript 2.17 syntax, so it needs no addon.
+
+```skript title="menu.sk"
+command /menu:
+	executable by: players
+	trigger:
+		set {_menu} to chest inventory with 3 rows named "Server menu"
+		set slot 11 of {_menu} to diamond named "<aqua>Shop" with lore "<gray>Buy and sell"
+		set slot 13 of {_menu} to compass named "<green>Spawn" with lore "<gray>Go to spawn"
+		set slot 15 of {_menu} to barrier named "<red>Close"
+		open {_menu} to player
+
+on inventory click:
+	event-inventory is not player's inventory
+	name of event-inventory is "Server menu"
+	cancel event
+	if index of event-slot is 11:
+		close player's inventory
+		send "The shop is opening soon." to player
+	else if index of event-slot is 13:
+		close player's inventory
+		teleport player to spawn of world "world"
+	else if index of event-slot is 15:
+		close player's inventory
+```
+
+## How it works
+
+<Steps>
+
+1. `chest inventory with 3 rows named "..."` makes an empty inventory of 27 slots, with a title. Rows go from 1 to 6.
+
+2. `set slot N of {_menu} to ...` puts an item in a slot. Slots count from 0, left to right and top to bottom: the top row is 0 to 8, the middle row of three is 9 to 17.
+
+3. `open {_menu} to player` shows it.
+
+4. In `on inventory click`, `event-inventory` is the inventory clicked in and `event-slot` the slot. `cancel event` stops the player taking the item out.
+
+</Steps>
+
+<Aside type="caution">
+Check which menu was clicked before cancelling, as the first lines of the click trigger do, so other inventories keep working. `event-inventory is not player's inventory` skips clicks in the player's own inventory below the menu, and checking the title works when the title is unique to the menu.
+</Aside>
+
+## Filling a menu from a list
+
+```skript
+command /warps:
+	executable by: players
+	trigger:
+		set {_menu} to chest inventory with 6 rows named "Warps"
+		set {_slot} to 0
+		loop {warps::*}:
+			set slot {_slot} of {_menu} to ender pearl named "<light purple>%loop-index%"
+			add 1 to {_slot}
+		open {_menu} to player
+
+on inventory click:
+	event-inventory is not player's inventory
+	name of event-inventory is "Warps"
+	cancel event
+	set {_warp} to uncolored name of event-slot
+	if {warps::%{_warp}%} is set:
+		close player's inventory
+		teleport player to {warps::%{_warp}%}
+```
+
+The inventory syntax is in the reference: [open inventory](/syntax/effects/#open-inventory), [named inventories](/syntax/expressions/#named) and the [inventory click event](/syntax/events/#inventory-click).

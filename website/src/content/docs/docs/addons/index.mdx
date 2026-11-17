@@ -1,0 +1,91 @@
+---
+title: Addons and other plugins
+description: What works with other plugins today (Vault, WorldGuard, GriefPrevention), where Skript addons stand, and NeoSkript's own addons.
+sidebar:
+  label: What works
+---
+
+import { Aside, Badge, LinkCard } from "@astrojs/starlight/components";
+
+## Built in: Skript's plugin hooks
+
+Like Skript, NeoSkript has syntax for a few plugins itself, with no addon. It's there when the plugin is installed, and nothing changes when it isn't. With any of them installed, NeoSkript loads scripts once the server has started, after those plugins, as Skript does.
+
+| Plugin | What scripts get |
+|---|---|
+| **Vault** | Players' money (balance, and adding or taking it), permission groups, and chat prefixes and suffixes, through whichever economy, permissions and chat plugins Vault finds. |
+| **WorldGuard** | Regions: which regions a place is in, their members and owners, whether a player can build somewhere, and events for entering and leaving a region. |
+| **GriefPrevention** | Claims, as regions, with the same syntax as WorldGuard's. |
+
+NeoSkript's test harness checks these against the real WorldGuard, and Vault with EssentialsX's economy and LuckPerms' permissions.
+
+### Money
+
+With Vault and an economy plugin, such as EssentialsX:
+
+```skript nocheck
+command /reward <offline player>:
+	permission: server.reward
+	trigger:
+		add 100 to balance of arg-1
+		send "%arg-1% now has %balance of arg-1%." to sender
+
+command /fine <offline player> <number>:
+	permission: server.fine
+	trigger:
+		remove arg-2 from balance of arg-1
+```
+
+Money is shown as the economy formats it, like `$105.50`, and can be written as money: `$5`, `5 dollars`. In a variable, money is saved as a number.
+
+### Groups
+
+With Vault and a permissions plugin, such as LuckPerms:
+
+```skript nocheck
+command /promote <offline player>:
+	permission: server.promote
+	trigger:
+		add "vip" to groups of arg-1
+		send "%arg-1% is now in %groups of arg-1%." to sender
+```
+
+### Regions
+
+With WorldGuard or GriefPrevention. A quoted region name, like `"spawn"` below, has to exist when the script loads, or the line is an error.
+
+```skript nocheck
+on region enter:
+	send "<gray>You entered a protected area." to player
+
+on place:
+	if location of event-block is in region "spawn":
+		player doesn't have permission "server.build.spawn"
+		cancel event
+		send "<red>You can't build at spawn." to player
+
+command /where:
+	executable by: players
+	trigger:
+		send "You're in: %regions at player%" to player
+```
+
+Skript 2.17 deprecates its region syntax, and NeoSkript gives the same warning when a script uses it: it still works, but Skript plans to remove it.
+
+<Aside type="note">
+The [script checker](/docs/cli/) runs its server without these plugins, and [the parser](/parser/)'s syntax list was made without them, so neither can check these lines. On a server with the plugins installed, they load.
+</Aside>
+
+## Skript addons
+
+Skript addons like SkBee, skript-yaml, SkQuery and skript-reflect <Badge text="not yet" variant="caution" /> don't load on NeoSkript: they're built against Skript's own code (`ch.njol.skript`), which NeoSkript doesn't have. A compatibility layer for them is planned after 1.0, in that order, SkBee first. skript-reflect reaches deepest into Skript and may never work fully.
+
+Until then, the [script checker](/docs/cli/) lists every line of your scripts that uses an addon's syntax, so you know what a switch would leave out.
+
+## NeoSkript's own addons
+
+NeoSkript's standard library is built on its own addon API, `neoskript-api`. Opening it to addons is in progress: other plugins can't register syntax yet.
+
+Official addons, made and maintained by Xena Studios and released with each NeoSkript version, will be listed on the addons page.
+
+<LinkCard title="Addons" description="Official addons, the plugins NeoSkript works with, and where Skript addons stand." href="/addons/" />

@@ -1,17 +1,49 @@
 # NeoSkript
 
-> NeoSkript is a drop-in replacement for Skript, the Minecraft server plugin whose scripts (.sk files) read like English. Existing scripts run unchanged on NeoSkript, compiled to JVM bytecode, on Paper and Folia (Minecraft 1.21.4+, Java 21+). It's in public beta: 0.1.0-beta.1 is on Modrinth (https://modrinth.com/plugin/neoskript) and GitHub Releases, and its script checker, neoskript-cli 0.1.0, is released. NeoSkript is GPL-3.0-only, by Xena Studios, and not affiliated with SkriptLang.
+> NeoSkript is a drop-in replacement for Skript, the Minecraft server plugin whose scripts (.sk files) read like English. Existing scripts run unchanged on NeoSkript, compiled to JVM bytecode, on Paper and Folia (Minecraft 1.21.4 to 26.3; Java 21 for 1.21.x, Java 25 for 26.x). It's in public beta: 0.1.0-beta.1 is on Modrinth (https://modrinth.com/plugin/neoskript) and GitHub Releases, and its script checker, neoskript-cli 0.1.0, is released. NeoSkript is GPL-3.0-only, by Xena Studios, and not affiliated with SkriptLang.
 
 Scripts written for Skript 2.17 with no addons run on both Skript and NeoSkript. When writing Skript, use only syntax listed in the syntax reference; Skript rejects any line that isn't one of its registered patterns.
 
 ## Docs
 
-- [What NeoSkript is](https://neoskript.dev/docs/): what it does, what's done and what isn't
+- [What NeoSkript is](https://neoskript.dev/docs/): what it does, how it's checked against Skript, and what it runs on
 - [Install](https://neoskript.dev/docs/install/): requirements, where scripts go, configuration
 - [Moving from Skript](https://neoskript.dev/docs/moving-from-skript/): checking your scripts with neoskript-cli, switching a server from Skript, and what's copied
+- [Your first script](https://neoskript.dev/docs/first-script/): writing, loading and fixing a first script
+- [FAQ](https://neoskript.dev/docs/faq/): short answers about addons, Folia, variables and going back to Skript
+- [Script layout](https://neoskript.dev/docs/scripts/structure/): script files, structures, indentation and comments
+- [Events](https://neoskript.dev/docs/scripts/events/): event triggers, event values, cancelling, and timers
+- [Commands](https://neoskript.dev/docs/scripts/commands/): script commands, arguments, permissions, cooldowns and tab completion
+- [Conditions](https://neoskript.dev/docs/scripts/conditions/): if, else, conditions on their own line, and lists with and/or
+- [Loops](https://neoskript.dev/docs/scripts/loops/): loop, for each and while, and leaving a loop
+- [Variables](https://neoskript.dev/docs/scripts/variables/): global, memory-only, local and list variables, and keying data by player
+- [Functions](https://neoskript.dev/docs/scripts/functions/): parameters, defaults, return types and local functions
+- [Options](https://neoskript.dev/docs/scripts/options/): reusable text as {@name}
+- [Expressions and types](https://neoskript.dev/docs/scripts/types/): values, types, arithmetic, converting and lists
+- [Text and formatting](https://neoskript.dev/docs/scripts/text/): messages, colours, clickable text, titles and action bars
+- [Waits and delays](https://neoskript.dev/docs/scripts/waits/): wait, and what changes after one
+- [Items and inventories](https://neoskript.dev/docs/scripts/items/): items, names, lore, enchantments, inventories and slots
+- [Entities and the world](https://neoskript.dev/docs/scripts/entities/): players, spawning, health, blocks, locations and worlds
+- [Menus](https://neoskript.dev/docs/scripts/menus/): chest menus with Skript's own syntax
+- [Reading errors](https://neoskript.dev/docs/scripts/errors/): what NeoSkript's error messages mean
+- [Writing scripts with AI](https://neoskript.dev/docs/ai/): the skill for Claude Code, Codex and other agents
+- [Configuration](https://neoskript.dev/docs/server/configuration/): every config.yml setting, the theme, and what applies on reload
+- [Commands and permissions](https://neoskript.dev/docs/server/commands/): /skript, /sk, /neoskript and /ns, reload reports, and Skript's permissions
+- [Effect commands](https://neoskript.dev/docs/server/effect-commands/): running one line of Skript from chat or the console
+- [Variables and storage](https://neoskript.dev/docs/server/variables/): variables.csv, saving, backups and player UUIDs
+- [Reloading scripts](https://neoskript.dev/docs/server/reloading/): /sk reload, failed reloads and auto reload
+- [Folia](https://neoskript.dev/docs/server/folia/): region threads, run on, and reads across regions
+- [Performance](https://neoskript.dev/docs/server/performance/): benchmarks against Skript 2.17 and why it's faster
+- [Updates and bStats](https://neoskript.dev/docs/server/updates-and-metrics/): the update checker and bStats
+- [Troubleshooting](https://neoskript.dev/docs/server/troubleshooting/): when NeoSkript, scripts or variables don't load
+- [The script checker](https://neoskript.dev/docs/cli/): neoskript-cli, its options, hints and exit codes
+- [Code editors](https://neoskript.dev/docs/editors/): the VS Code and Zed extensions and the language server
 - [Using the parser](https://neoskript.dev/docs/parser/): checking a script in the browser and sharing a link to the result
 - [What the parser checks](https://neoskript.dev/docs/parser-checks/): what it finds, what it can't know, and which syntax it checks against
-- [Writing scripts with AI](https://neoskript.dev/docs/ai/): the skill for Claude Code, Codex and other agents
+- [Addons and other plugins](https://neoskript.dev/docs/addons/): Vault, WorldGuard and GriefPrevention, and where Skript addons stand
+- [Differences from Skript](https://neoskript.dev/docs/reference/differences/): deliberate differences, fixed Skript bugs and known differences
+- [Supported versions](https://neoskript.dev/docs/reference/versions/): servers, Minecraft and Java versions
+- [Releases](https://neoskript.dev/docs/reference/releases/): releases and development builds
 
 ## Tools
 

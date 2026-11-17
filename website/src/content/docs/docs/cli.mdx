@@ -1,0 +1,88 @@
+---
+title: The script checker
+description: neoskript-cli checks a folder of scripts on a throwaway server and reports errors, warnings, and Folia and performance hints.
+sidebar:
+  label: Script checker (CLI)
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+`neoskript-cli` tells you what NeoSkript makes of a folder of scripts, before you install it or after you change them. It loads each script the way NeoSkript does, without running it, and lists every line that won't load, Skript's warnings, and hints on what may behave differently on Folia or cost a lot of server time.
+
+## Running it
+
+<Steps>
+
+1. Download `neoskript-cli-0.1.0.jar` from [its release](https://github.com/xena-studios/neoskript/releases/tag/cli-v0.1.0). It needs Java 21, or Java 25 to check against Minecraft 26.3.
+
+2. Point it at a scripts folder, or one `.sk` file:
+
+   ```sh
+   java -jar neoskript-cli-0.1.0.jar check plugins/Skript/scripts
+   ```
+
+</Steps>
+
+The first run downloads a Paper server into `~/.neoskript/cache` and checks it against its pinned SHA-256. Later runs use the cached one and take a few seconds.
+
+```text
+NeoSkript check of plugins/Skript/scripts: 12 scripts, 11 load cleanly, 1 with errors, 2 hints
+
+shop.sk
+  error       line 8: Can't understand this condition/effect: sned "Welcome to the shop" to player
+  folia       line 21: Reading and then setting a global variable isn't one step on Folia, where triggers run at the same time. 'add' and 'remove' change it in one step.
+  performance line 30: Runs every tick. Make sure what it does is cheap, or use a longer period or an event.
+```
+
+## Why it starts a server
+
+Item, block and entity names come from the server's registries, which only a running server has. So the CLI starts a throwaway headless Paper server in a temporary folder, with NeoSkript in a check mode: it loads the scripts with the real standard library, writes a report and stops. Nothing runs, nothing is saved, and your server isn't touched.
+
+## What it reports
+
+| Kind | What it means |
+|---|---|
+| `error` | A line NeoSkript won't load: Skript's error, or syntax NeoSkript doesn't have, such as an addon's. |
+| `warning` | Skript's warnings, as on load. |
+| `folia` | What may behave differently on Folia: global triggers that read players, entities or blocks (they need `run on`), global triggers that change entities (the change happens a moment later), and reading a global variable then setting it. |
+| `performance` | What's likely to cost a lot of server time: `every` timers under a second that go through players or entities, timers that run every tick, `all entities`, and `while` loops that wait a tick to check their condition. |
+
+[Folia](/docs/server/folia/) and [performance](/docs/server/performance/#keeping-scripts-cheap) explain the hints.
+
+## Options
+
+| Option | What it does |
+|---|---|
+| `--json <file>` | Also writes the report as JSON. |
+| `--hints-only` | Only shows Folia and performance hints. |
+| `--quiet` | Only prints the summary line. |
+| `--minecraft <26.3\|1.21.4>` | The server version to check against. By default, the newest your Java runs. |
+| `--cache <folder>` | Where the server is downloaded to, instead of `~/.neoskript/cache`. |
+| `--verbose` | Shows the check server's console. |
+| `--version` | Prints the CLI's version. |
+
+Files and folders whose names start with `-` or `.` are skipped, as Skript skips them.
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Every script loads. |
+| `1` | Some scripts don't. |
+| `2` | The check couldn't run. |
+
+That makes it usable in CI: check a repository of scripts on every pull request, and fail the build when a script stops loading.
+
+<Aside type="tip">
+For one script, without Java, paste it into [the parser](/parser/). It's the same parser, in your browser, though it can't check item and entity names as the CLI can.
+</Aside>
+
+## Building it
+
+From a copy of [the repository](https://github.com/xena-studios/neoskript), with JDK 21:
+
+```sh
+./gradlew :neoskript-cli:shadowJar
+```
+
+The jar is in `neoskript-cli/build/libs/`.

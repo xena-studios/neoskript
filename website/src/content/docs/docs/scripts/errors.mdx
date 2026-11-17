@@ -1,0 +1,113 @@
+---
+title: Reading errors
+description: What NeoSkript's error messages mean, where they appear, and how to fix the common ones.
+---
+
+NeoSkript reads each script when it loads, and reports every line it can't load, with Skript's own wording. A message you search for on a forum still applies.
+
+## Where errors appear
+
+- **When you reload**, `/sk reload <script>` sends them to you, and to players with `skript.reloadnotify`.
+- **When the server starts**, they go to the console, and the summary line counts them: `Loaded 12 scripts with 48 triggers in 310 ms (2 errors)`.
+- **Before you load**, [the parser](/parser/) and the [editor extensions](/docs/editors/) show them as you type, and [`neoskript-cli`](/docs/cli/) checks a whole folder.
+
+A reload lists each script's problems with their line numbers, then the line of code. In chat, hover over a problem to see the line, and click it to copy it:
+
+```text
+[NeoSkript] Reloading shop.sk...
+ shop.sk - 1 error
+   Line 2: Can't understand this condition/effect: sned "hi" to player
+     sned "hi" to player
+[NeoSkript] Reloaded shop.sk with 1 error in 3 ms. Scripts with errors keep their last version.
+```
+
+At startup, the console writes them as Skript does, so tools and guides that read Skript's log still work:
+
+```text
+Line 2: (shop.sk)
+    Can't understand this condition/effect: sned "hi" to player
+    Line: sned "hi" to player
+```
+
+A script with errors still loads the lines that are fine. When you reload one, a version with errors doesn't replace the one that's running: see [reloading](/docs/server/reloading/).
+
+## Common errors
+
+### Can't understand this condition/effect
+
+```text
+Can't understand this condition/effect: sned "hi" to player
+```
+
+The line doesn't match any syntax NeoSkript has. Usually a typo, or wording that's close to a pattern but isn't one. Look the effect up in the [syntax reference](/syntax/). If the line is from an addon, such as SkBee, NeoSkript doesn't have it: [addons](/docs/addons/) says why.
+
+### Can't understand this expression
+
+```text
+Can't understand this expression: nothere(2)
+```
+
+A value in the line isn't one NeoSkript knows: a misspelt expression, a function that doesn't exist, or a function given the wrong kind of value.
+
+### Can't understand this structure
+
+```text
+Can't understand this structure: on blorp
+```
+
+A line at the left edge that isn't an event, command, function or other structure. Often it's code that lost its indentation.
+
+### Indentation errors
+
+```text
+indentation error: expected 1 tab, but found '->__' [-> = tab, _ = space, ? = other whitespace]
+```
+
+The line is indented differently from the lines around it. The message shows what it found: `->` is a tab and `_` a space. Pick tabs or spaces and use them throughout. See [script layout](/docs/scripts/structure/#indentation).
+
+### Quotes
+
+```text
+Invalid use of quotes ("). If you want to use quotes in "quoted text", double them: "".
+```
+
+A text was never closed, or has a `"` in it. Close it, and write `""` for a quote inside text.
+
+### There's no X in this event
+
+```text
+'attacker' can only be used in the on vehicle destroy event, the on vehicle damage event, the on attempt attack event, the on death event or the on damage event
+```
+
+The event doesn't have that value. Check what the event gives in the [events reference](/syntax/events/).
+
+### Not a known type
+
+```text
+'playr' is not a known type.
+```
+
+A command argument or function parameter names a type that doesn't exist. The [types reference](/syntax/types/) lists them.
+
+### Undefined option
+
+```text
+undefined option {@nope}
+```
+
+The script uses `{@nope}` but its `options:` doesn't define it. See [options](/docs/scripts/options/).
+
+## Warnings
+
+Warnings don't stop a line loading, but point at something that may not do what you meant:
+
+- `List is missing 'and' or 'or', defaulting to 'and': 1, 2, 3`
+- `an entity cannot be saved. That is, the contents of the variable {lastmob} will be lost when the server stops.`
+- `Empty configuration section!`, for a line ending in `:` with nothing indented under it.
+- Deprecated syntax, such as the `permission message:` entry.
+
+## Errors while a script runs
+
+Some problems only show up when a line runs, such as a value that isn't set or, on Folia, an entity in another region. These are runtime errors, printed to the console as Skript prints them, with the script and line. Players with `skript.see_runtime_errors` (ops, by default) are told in chat that errors happened.
+
+So a broken line in a loop can't flood the console, runtime errors are limited per frame of time, a second by default, as in Skript. The limits are under [`runtime-errors`](/docs/server/configuration/#runtime-errors) in config.yml.

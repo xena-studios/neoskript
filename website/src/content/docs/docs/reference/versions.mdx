@@ -1,0 +1,33 @@
+---
+title: Supported versions
+description: The servers, Minecraft versions and Java versions NeoSkript runs on, and the Skript version it matches.
+---
+
+| | Supported |
+|---|---|
+| Server | Paper or Folia, the same jar for both |
+| Minecraft | 1.21.4 to 26.3 |
+| Java | 21 for 1.21.x, 25 for 26.x |
+| Skript it matches | 2.17.0 |
+
+NeoSkript needs Paper's API, so it doesn't run on Spigot or CraftBukkit.
+
+## What's tested
+
+Every change is tested on four pinned servers, each an exact build checked against its SHA-256: Paper 1.21.4, Paper 26.3, Folia 1.21.4 and Folia 26.3. Paper ships builds daily, and pinning them means a new build can't break the tests without anyone choosing to update.
+
+- **Skript's own test suite** runs on NeoSkript: 862 of 862 pass on Paper 26.3, and 860 on Folia 26.3. On Paper 1.21.4, the tests that need newer Minecraft versions are skipped, as Skript skips them.
+- **The differential harness** compares NeoSkript with a real Skript 2.17.0 server on Paper 26.3. Skript doesn't run on Folia, and Skript 2.17.0 needs Minecraft 1.21.5 or newer, so Skript itself is only run on Paper 26.3.
+
+## Minecraft versions in between
+
+The jar declares 1.21.4 as its oldest version and runs on the versions after it. Some of Skript's syntax depends on Minecraft: elements for features newer than 1.21.4, such as the pick item event (1.21.5 and newer), only work on servers that have them.
+
+## Skript versions
+
+NeoSkript follows stable Skript releases. Its reference is Skript 2.17.0, pinned so the target doesn't move, and it moves to new stable minor releases on purpose. Syntax added in later Skript versions isn't there until then.
+
+## The script checker and editors
+
+- [`neoskript-cli`](/docs/cli/) needs Java 21 to check against Minecraft 1.21.4, and Java 25 for 26.3, its default when your Java runs it.
+- The [editor extensions](/docs/editors/) work in VS Code 1.90 or newer, and the language server needs Node.js 18 or newer.

@@ -1,0 +1,54 @@
+---
+title: Differences from Skript
+description: Where NeoSkript behaves differently from Skript 2.17 on purpose, what it adds, what it doesn't have yet, and the known differences.
+---
+
+import { Aside, Badge } from "@astrojs/starlight/components";
+
+NeoSkript's spec is Skript 2.17.0's behaviour, messages included. Skript's whole test suite passes on it (862 of 862 on Paper), and every one of the differential harness's 1,613 units, each example in Skript's documentation and NeoSkript's own probes, prints the same messages and saves the same `variables.csv` as a real Skript server.
+
+What's on this page is what's left: the deliberate differences, what NeoSkript adds, and what it doesn't have yet.
+
+## Deliberate differences
+
+- **A reload with errors keeps the running version.** Skript unloads a script before loading it again; NeoSkript compiles first, and keeps the version that's running if the new one has errors. See [reloading](/docs/server/reloading/).
+- **It won't start next to Skript.** The two would fight over the same scripts and `/skript` command.
+- **Its own folder.** Scripts and variables live in `plugins/NeoSkript`, copied from `plugins/Skript` on the first start.
+- **`config.yml`, not `config.sk`,** with the settings NeoSkript has. See [configuration](/docs/server/configuration/).
+- **Folia.** Skript doesn't run on Folia; NeoSkript runs on its region threads. See [Folia](/docs/server/folia/).
+- **`/sk reload aliases`** has nothing to read: item names come from the server's registries.
+- **`/sk update`** uses NeoSkript's [update checker](/docs/server/updates-and-metrics/), and **`/sk gen-docs`** points to the [syntax reference](/syntax/) instead of writing docs files.
+- **`/sk`'s messages are NeoSkript's own**, in the [theme](/docs/server/configuration/#make-it-look-like-your-server) from `config.yml`, with reload reports per script. Problems at startup and runtime errors keep Skript's look.
+
+## Skript bugs NeoSkript fixes
+
+Where Skript 2.17 has a bug, NeoSkript does what Skript meant rather than copy it:
+
+- **Script folders in `/sk`:** Skript 2.17 never finds folders given to `/sk reload`, `enable` or `disable`, because of a bug. NeoSkript finds them; a name ending in `/` is a folder.
+- **Warning frames:** Skript 2.17's runtime warning frames never reset. NeoSkript resets them as intended.
+- **Comparisons of words:** `projectile is an arrow` was false because of how words were read. NeoSkript reads words in comparisons as Skript's `CondCompare` means to, so it's true.
+
+## What NeoSkript adds
+
+- <Badge text="NeoSkript only" variant="tip" /> `run on <entity or location>:` runs code on the thread that owns something, for Folia. On Paper it just runs. Scripts that use it don't load on Skript.
+- `neoskript-cli`, the [script checker](/docs/cli/), and NeoSkript's parser in [the browser](/parser/) and [code editors](/docs/editors/).
+
+## Not there yet
+
+- **Skript addons** (SkBee, skript-yaml, SkQuery, skript-reflect and others) don't load. A compatibility layer is planned after 1.0. See [addons](/docs/addons/).
+- **Databases for variables**: Skript's SQLite and MySQL storage. Skript 2.17 only supports CSV out of the box. Planned after 1.0.
+- **Skript's alias files** for groups like `any sword`: item names come from the server's registries. A saved `any sword` stays in `variables.csv` as Skript saved it.
+
+## Known differences
+
+These are the differences the test harness knows about, from `known-differences.txt` and the progress log:
+
+- **One unit varies in Skript itself.** `ExprLocationAt-1`'s error message depends on the order Skript sorts its syntax in, which changes from run to run. NeoSkript gives one of Skript's two results.
+- **Folia's global thread can't read the world.** The differential's `world` probe reads blocks from the console, which on Folia runs on the global thread, where reading regions isn't allowed.
+- **Skript's suite on Folia: 860 of 862.** The two left read a chest at the spawn of a random world from the test's region. Folia only allows that from the chest's own region.
+- **`permission message:`** is deprecated in Skript 2.17, and gives the same warning on NeoSkript.
+- **The `prefix:` command entry** is read, but commands are always registered under the `skript:` namespace.
+
+<Aside type="note">
+Found a difference that isn't here? [Open an issue](https://github.com/xena-studios/neoskript/issues/new/choose) with the script, and what Skript and NeoSkript each did.
+</Aside>

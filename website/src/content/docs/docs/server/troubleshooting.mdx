@@ -1,0 +1,58 @@
+---
+title: Troubleshooting
+description: What to do when NeoSkript doesn't start, scripts don't load, variables are missing, or a script behaves differently than on Skript.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+## NeoSkript doesn't start
+
+**"Skript is installed. NeoSkript replaces Skript, so they can't run together."** Take `Skript.jar` out of `plugins/`. NeoSkript disables itself when Skript is there, because the two would fight over the same scripts and the same `/skript` command. Leave the `plugins/Skript` folder where it is.
+
+**It doesn't load at all.** Check the server runs Paper or Folia, Minecraft 1.21.4 to 26.3, on Java 21 for 1.21.x or Java 25 for 26.x. NeoSkript doesn't run on Spigot or CraftBukkit. See [supported versions](/docs/reference/versions/).
+
+## My scripts aren't there
+
+NeoSkript loads scripts from `plugins/NeoSkript/scripts/`, not `plugins/Skript/scripts/`. On its first start it copies Skript's scripts and `variables.csv` over, then writes a marker, `.migrated-from-skript`, so it never copies again. It doesn't copy anything if `plugins/NeoSkript/scripts` already exists.
+
+If you started NeoSkript once before moving your scripts, copy them into `plugins/NeoSkript/scripts/` yourself and run `/sk reload scripts`.
+
+Files whose names start with `-` are disabled, and folders starting with `.` are skipped. `/sk list` shows what's enabled and what's disabled.
+
+## A script doesn't load
+
+Read the errors: `/sk reload <script>` sends them to you, and the console has them from startup. [Reading errors](/docs/scripts/errors/) explains the common ones.
+
+- **Lines from an addon,** such as SkBee or skript-reflect, give *Can't understand this condition/effect*: NeoSkript doesn't load Skript addons yet. See [addons](/docs/addons/).
+- **Check before you switch:** [`neoskript-cli`](/docs/cli/) lists every line NeoSkript won't load, on a throwaway server.
+- **One line at a time:** paste the script into [the parser](/parser/).
+
+## I reloaded and nothing changed
+
+If the new version has errors, the old one keeps running: fix the errors and reload again. See [reloading](/docs/server/reloading/).
+
+## Variables are missing
+
+- **After moving from Skript:** the copied `variables.csv` is in `plugins/NeoSkript/`. If Skript had `use player UUIDs in variable names` off, NeoSkript copies that setting; check `variables.player-uuids-in-names` in `config.yml` matches what Skript used.
+- **"Couldn't load variables from ..."** means the file couldn't be read. NeoSkript doesn't save variables until it's fixed, so the file isn't overwritten. The console says why.
+- **"... variables could not be loaded!"** means some lines were skipped. The file was backed up to `plugins/NeoSkript/backups/` first. See [variables and storage](/docs/server/variables/#backups).
+- **Memory-only and local variables** (`{-name}`, `{_name}`) are never saved.
+
+## A config.yml change didn't apply
+
+- **It needs a restart:** `metrics`, `variables.file` and the `events` settings apply when the server restarts. `/sk reload config` says so when one of them changed. See [what applies when](/docs/server/configuration/#what-applies-when).
+- **The value isn't valid:** it falls back to its default, and the console says which setting and why.
+- **The file isn't valid YAML:** NeoSkript never overwrites it. A reload keeps the running settings, and at startup the defaults run until it's fixed. The console says what the YAML parser found.
+- **After updating from 0.1.0-beta.1:** your old file was carried forward to the new layout, with every value you set, and backed up as `config.yml.bak-v1`. See [updating NeoSkript](/docs/server/configuration/#updating-neoskript).
+
+## Something behaves differently than on Skript
+
+NeoSkript aims to behave exactly as Skript 2.17 does. The [differences from Skript](/docs/reference/differences/) page lists the known differences and the deliberate ones. If yours isn't there, [open an issue](https://github.com/xena-studios/neoskript/issues/new/choose) with the script and what each plugin did.
+
+## Errors on Folia
+
+*"A pig is in another region, which only that region's thread can read on Folia"* means a trigger read something another region owns. Wrap that code in `run on`. See [Folia](/docs/server/folia/).
+
+<Aside type="tip">
+Going back to Skript is safe: NeoSkript never changes `plugins/Skript`. Put `Skript.jar` back and remove NeoSkript's jar. To keep variables saved since the switch, copy `plugins/NeoSkript/variables.csv` over Skript's: Skript reads NeoSkript's file.
+</Aside>

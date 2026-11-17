@@ -1,0 +1,120 @@
+---
+title: Conditions
+description: if, else if and else, conditions on their own line, and, or, any and all.
+---
+
+A condition checks something and is true or false: `player has permission "server.vip"`, `{coins} > 10`, `event-block is stone`. The [conditions reference](/syntax/conditions/) lists them all.
+
+## if, else if, else
+
+```skript
+command /rank:
+	executable by: players
+	trigger:
+		if player has permission "server.admin":
+			send "You're an admin." to player
+		else if player has permission "server.vip":
+			send "You're a VIP." to player
+		else:
+			send "You're a player." to player
+```
+
+## A condition on its own line
+
+A condition written as a line by itself, with no `if`, stops the trigger when it's false. It's a short way to say "only go on if".
+
+```skript
+on death of a player:
+	attacker is a player
+	add 1 to {kills::%attacker's uuid%}
+	send "That's %{kills::%attacker's uuid%}% kills." to attacker
+```
+
+When the victim wasn't killed by a player, nothing after the first line runs.
+
+## Comparing
+
+`is`, `is not` (or `isn't`), `is greater than` (`>`), `is less than` (`<`), `>=`, `<=`, and `is between X and Y`.
+
+```skript
+command /check <number>:
+	trigger:
+		if arg-1 is between 1 and 10:
+			send "Between 1 and 10." to sender
+		else if arg-1 > 10:
+			send "Bigger than 10." to sender
+		if arg-1 is not 5:
+			send "Not 5." to sender
+```
+
+Comparisons work across types where Skript's do: an entity type with an item (`projectile is an arrow`), a block with an item type (`event-block is stone`).
+
+## Several values: and, or
+
+A list of values takes `and` or `or`. With `or`, the condition is true if it's true for any of them; with `and`, for all of them.
+
+```skript
+on break:
+	if event-block is diamond ore or emerald ore:
+		send "Shiny." to player
+```
+
+`and` and `or` join values, not whole conditions. `if player is op or player has permission "x"` doesn't load: Skript reads `op or player has permission "x"` as the list of values to compare with, and says it can't compare them. For two conditions, put one inside the other, put them on lines of their own, or use `if any` and `if all`.
+
+```skript
+on break:
+	if event-block is diamond ore or emerald ore:
+		player's gamemode is survival
+		player doesn't have permission "server.bypass"
+		send "Ores are for the miners' guild." to player
+		cancel event
+```
+
+## if any, if all
+
+For several conditions on lines of their own, `if any:` is true when one of them is, and `if all:` when every one is. The code goes under `then:`.
+
+```skript
+command /lucky:
+	trigger:
+		set {_roll} to random integer between 1 and 100
+		if any:
+			{_roll} is 7
+			{_roll} is 77
+		then:
+			send "Lucky %{_roll}%!" to sender
+```
+
+## Conditions as values
+
+`whether <condition>` is a condition as a yes-or-no value, to keep or to show:
+
+```skript
+command /canfly:
+	executable by: players
+	trigger:
+		send "Can you fly? %whether player can fly%" to player
+```
+
+And a value can depend on a condition: `X if <condition>, else Y`.
+
+```skript
+command /size:
+	trigger:
+		set {_n} to random integer between 1 and 10
+		set {_word} to "big" if {_n} > 5, else "small"
+		send "%{_n}% is %{_word}%." to sender
+```
+
+## Is it set?
+
+`is set` checks that a variable or expression has a value. A variable that was never set is `<none>`. Comparing it with `is`, `>` or `<` is false, and with `is not` it's true. `X ? Y` gives `Y` when `X` isn't set:
+
+```skript
+command /coins:
+	executable by: players
+	trigger:
+		if {coins::%player's uuid%} is not set:
+			send "You've never had coins." to player
+		send "You have %{coins::%player's uuid%} ? 0% coins." to player
+```

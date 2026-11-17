@@ -1,0 +1,55 @@
+---
+title: Waits and delays
+description: Pausing a trigger with wait, what changes after a wait, and the thread it carries on on.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+`wait <timespan>` pauses the trigger and carries on later, without holding up the server. Other triggers, and the game, run in the meantime.
+
+```skript
+command /countdown:
+	trigger:
+		loop 3 times:
+			broadcast "%4 - loop-number%..."
+			wait 1 second
+		broadcast "<green>Go!"
+```
+
+Timespans: `1 tick` (a twentieth of a second), `5 seconds`, `2 minutes`, `1 hour`, and `1 minute and 30 seconds`. Short forms like `30s` and `2h` work only in a command argument a player types, not in a script.
+
+## After a wait
+
+The world moves on while a trigger waits, so check what you rely on.
+
+- **The player may have left.** Check `player is online` before using them.
+- **The event is over.** Skript won't load `cancel event`, or changes to event values such as `set damage to`, after a wait: "An event cannot be cancelled after it has already passed". Do them before waiting.
+- **Local variables are kept.** `{_x}` is still there, and so are the loops the wait is inside.
+
+```skript
+on join:
+	wait 5 seconds
+	if player is online:
+		send "Don't forget to read /rules." to player
+```
+
+## Where it carries on
+
+On Paper, a trigger carries on on the server's main thread. On Folia it carries on on the same thread it was on: a player's region thread follows the player if they move, and timers and console commands carry on on the global thread. See [Folia](/docs/server/folia/).
+
+<Aside type="tip">
+In a function, `wait` doesn't hold up the trigger that called it: the caller carries on, and the rest of the function runs later. See [functions](/docs/scripts/functions/).
+</Aside>
+
+## Instead of waiting in a loop
+
+A loop that waits a tick each time to check something runs 20 times a second for as long as it waits. When an event fires for the change you're waiting for, use the event.
+
+```skript
+# Instead of looping until the player sneaks, listen for it.
+on sneak toggle:
+	if player is sneaking:
+		send "You crouched." to player
+```
+
+The pattern is the [wait effect](/syntax/effects/#delay).

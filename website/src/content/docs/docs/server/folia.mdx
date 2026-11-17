@@ -1,0 +1,92 @@
+---
+title: Folia
+description: How NeoSkript runs scripts on Folia's region threads, reads across regions, run on, and what the script checker warns about.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+[Folia](https://papermc.io/software/folia) splits the world into regions, each ticked by its own thread, at the same time. Only a region's thread may touch the entities and blocks in it. Skript doesn't run on Folia. NeoSkript was built for it from the start, and the same jar runs on Paper and Folia.
+
+Most scripts run on Folia unchanged. What changes is what a trigger can reach from the thread it's on.
+
+## Where triggers run
+
+| Trigger | Paper | Folia |
+|---|---|---|
+| A player's or entity's event | Main thread | That entity's thread |
+| A block's or location's event | Main thread | That place's region thread |
+| `every`, `at`, `on load`, console commands | Main thread | The global region thread |
+| After a `wait` | Main thread | The same thread as before, following the entity if it moves |
+
+## Reading from another region
+
+A trigger reading an entity or block that another region owns, such as the health of a player far away, gets a runtime error that names the line, and the read gives nothing. The trigger carries on.
+
+```text
+A pig is in another region, which only that region's thread can read on Folia. Use 'run on' to run code there.
+```
+
+Reads of things any thread may read, such as names, UUIDs, permissions and worlds, aren't checked, and nor are lines that only send something, such as messages, titles and sounds.
+
+NeoSkript never waits for another region to answer a read: two regions waiting for each other would deadlock, and even from the global thread each read would wait for the other region's next tick. `loop all players` with 100 players would stall for seconds. `run on` does the same job without blocking.
+
+## run on
+
+`run on <entity or location>:` runs its code on the thread that owns the entity or place, then goes back. The trigger waits for it, as it would for a `wait`. It's NeoSkript's own syntax; on Paper the code just runs.
+
+```skript
+every 5 seconds:
+	loop all players:
+		run on loop-player:
+			if health of loop-player < 5:
+				send "You're low on health." to loop-player
+```
+
+A `wait` inside `run on` stays on that thread. With nothing to run on, the code doesn't run.
+
+<Aside type="caution">
+`run on` is NeoSkript only. A script that uses it doesn't load on Skript.
+</Aside>
+
+## Changes in another region
+
+Effects that change an entity or block in another region, such as `heal`, `teleport` or `set health of`, are sent to its thread and run there a moment later. The trigger doesn't wait for them. An effect on several entities is split by region.
+
+Sections given an entity or location, like `spawn a pig at X:`, run on the thread that owns X, so their code can use what they made.
+
+## Global changes
+
+World time, weather, gamerules, difficulty, PvP and console commands belong to Folia's global thread. From a region's thread they're sent there. In `every` timers, script commands, and after a wait, the trigger goes to the global thread for them, so the next line sees the change, as on Paper. In an event still being handled, they're sent off without waiting, because waiting would end the event and `cancel event` would stop working.
+
+## Global variables
+
+Triggers in different regions run at the same time. Each single change to a global variable happens in one step, so `add 1 to {count}` never loses a count. A read followed by a set is two steps, and another trigger can change the variable in between:
+
+```skript
+on join:
+	# One step: safe.
+	add 1 to {joins}
+	# Two steps: another region can change {visits} between the read and the set.
+	set {visits} to {visits} + 1
+```
+
+Use `add` and `remove` to change a number. [`neoskript-cli`](/docs/cli/) points out the read-then-set pattern.
+
+## Checking scripts for Folia
+
+[`neoskript-cli`](/docs/cli/) reports `folia` hints, alongside errors and warnings:
+
+- global events (timers, `on load`, `at`) that read players, entities or blocks, which need `run on`;
+- global events that change players or entities, which happen a moment later;
+- reading a global variable and then setting it.
+
+```text
+shop.sk
+  folia       line 14: Reads a player's, an entity's or a block's state in a trigger that runs on Folia's global region, where it can't be read. 'run on' runs code on its thread.
+```
+
+`--hints-only` shows just the hints.
+
+## How close it is
+
+Skript's own test suite passes 860 of 862 tests on NeoSkript on Folia. The other two read a block in another world from a test's region, which Folia doesn't allow without `run on`.

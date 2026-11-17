@@ -1,0 +1,36 @@
+---
+title: Options
+description: Reusable text for a script, written once under options and used as {@name}.
+---
+
+`options:` holds text a script uses in several places: a chat prefix, a permission, a number you might change later. Each entry is `name: value`, and `{@name}` anywhere in the script is replaced by its value.
+
+```skript
+options:
+	prefix: <gold>[Shop]<reset>
+	permission: server.shop
+	price: 50
+
+command /buy:
+	permission: {@permission}
+	executable by: players
+	trigger:
+		if {coins::%player's uuid%} ? 0 < {@price}:
+			send "{@prefix} <red>You need {@price} coins." to player
+			stop
+		remove {@price} from {coins::%player's uuid%}
+		give player 1 diamond
+		send "{@prefix} Bought a diamond for {@price} coins." to player
+```
+
+## Options are text
+
+An option's value is pasted into the line before it's read, as if you'd typed it there. That's why `{@price}` works as a number in `remove {@price} from ...` and as text inside quotes.
+
+It also means an option doesn't go inside `%...%`. `"%{@price}%"` becomes `"%50%"`, which doesn't load: `Can't understand this expression: 50`. Write `"{@price}"`.
+
+## Options belong to their script
+
+Each script's options are its own. Another script can't use them; give it its own `options:`. A `{@name}` the script doesn't define is an error when it loads: `undefined option {@nope}`.
+
+The [code editor extensions](/docs/editors/) complete `{@` with the script's options and go from an option to its entry.

@@ -18,6 +18,12 @@ const skript = {
 export default defineConfig({
   site: "https://neoskript.dev",
   trailingSlash: "always",
+  // The commands and configuration pages moved under /docs/server/. config.yml's header comment links the old
+  // configuration address, so both keep working.
+  redirects: {
+    "/docs/commands/": "/docs/server/commands/",
+    "/docs/configuration/": "/docs/server/configuration/",
+  },
   // Hashed build files go in /assets, not Astro's default /_astro. Stylesheets
   // stay files, never inline <style>. The CSP (public/_headers) still allows
   // 'unsafe-inline' styles only because Starlight writes style attributes.
@@ -90,10 +96,58 @@ export default defineConfig({
       editLink: { baseUrl: "https://github.com/xena-studios/neoskript/edit/main/website/" },
       lastUpdated: true,
       // Custom pages (src/pages) can't be validated; the rest of the site is.
-      plugins: [starlightLinksValidator({ exclude: ["/", "/download/", "/syntax/", "/syntax/**", "/parser/", "/llms.txt"] })],
+      plugins: [starlightLinksValidator({ exclude: ["/", "/download/", "/addons/", "/syntax/", "/syntax/**", "/parser/", "/llms.txt"] })],
       sidebar: [
-        { label: "Start here", items: ["docs", "docs/install", "docs/commands", "docs/configuration", "docs/moving-from-skript", "docs/ai"] },
-        { label: "Tools", items: ["docs/editors", "docs/parser", "docs/parser-checks"] },
+        {
+          label: "Start here",
+          items: ["docs", "docs/install", "docs/moving-from-skript", "docs/first-script", "docs/faq"],
+        },
+        {
+          label: "Writing scripts",
+          items: [
+            "docs/scripts/structure",
+            "docs/scripts/events",
+            "docs/scripts/commands",
+            "docs/scripts/conditions",
+            "docs/scripts/loops",
+            "docs/scripts/variables",
+            "docs/scripts/functions",
+            "docs/scripts/options",
+            "docs/scripts/types",
+            "docs/scripts/text",
+            "docs/scripts/waits",
+            "docs/scripts/items",
+            "docs/scripts/entities",
+            "docs/scripts/menus",
+            "docs/scripts/errors",
+            "docs/ai",
+          ],
+        },
+        {
+          label: "Running a server",
+          items: [
+            "docs/server/configuration",
+            "docs/server/commands",
+            "docs/server/effect-commands",
+            "docs/server/variables",
+            "docs/server/reloading",
+            "docs/server/folia",
+            "docs/server/performance",
+            "docs/server/updates-and-metrics",
+            "docs/server/troubleshooting",
+          ],
+        },
+        { label: "Tools", items: ["docs/cli", "docs/editors", "docs/parser", "docs/parser-checks"] },
+        { label: "Addons", items: ["docs/addons"] },
+        {
+          label: "Reference",
+          items: [
+            "docs/reference/differences",
+            "docs/reference/versions",
+            "docs/reference/releases",
+            { label: "Syntax reference", link: "/syntax/" },
+          ],
+        },
       ],
     }),
   ],

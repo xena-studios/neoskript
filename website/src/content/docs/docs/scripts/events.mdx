@@ -1,0 +1,106 @@
+---
+title: Events
+description: Running code when something happens on the server, event values, cancelling events, and timers.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+An event structure runs its code each time something happens: a player joins, a block breaks, an entity dies.
+
+```skript
+on join:
+	send "Welcome, %player%!" to player
+
+on quit:
+	broadcast "%player% left."
+```
+
+Every event, with its patterns and examples, is in the [events reference](/syntax/events/).
+
+## Narrowing an event
+
+Many events take what they're about in the header. Narrowing it there is clearer and cheaper than checking inside with an `if`, because the trigger doesn't run at all for the rest.
+
+```skript
+on break of diamond ore:
+	send "You found diamonds!" to player
+
+on right click on a chest:
+	send "A chest." to player
+
+on death of a player:
+	broadcast "%victim% died."
+```
+
+## Event values
+
+Inside an event, its values are there by name: `player` in a join event, `event-block` in a break event, `victim` and `attacker` in a damage or death event. Many can be left out, and the event's value is used: `send "hi"` sends to the event's player.
+
+```skript
+on damage of a player:
+	attacker is a player
+	send "You hit %victim% for %damage% damage." to attacker
+
+on place:
+	if event-block is tnt:
+		send "No TNT here." to player
+		cancel event
+```
+
+A value the event doesn't have is an error when the script loads, saying which events have it:
+
+```text
+'attacker' can only be used in the on vehicle destroy event, the on vehicle damage event, the on attempt attack event, the on death event or the on damage event
+```
+
+## Cancelling
+
+`cancel event` stops what the event is about, for events that can be cancelled: the block isn't broken, the damage isn't dealt, the chat message isn't sent.
+
+```skript
+on chat:
+	if message contains "badword":
+		cancel event
+		send "<red>Watch your language." to player
+```
+
+By default, triggers run at the `high` priority, after most other plugins have seen the event, and don't run for events another plugin cancelled. Both can be changed in [config.yml](/docs/server/configuration/#events).
+
+## Timers
+
+`every <timespan>:` runs its code again and again while the script is loaded. Reloading the script starts the timer again.
+
+```skript
+every 5 minutes:
+	broadcast "<gold>Remember to vote for the server!"
+```
+
+`at <time>:` runs at a time of day in the world. Add `in "<world>"` for one world.
+
+```skript
+at 6:00:
+	broadcast "Good morning!"
+
+at 18:00 in "world":
+	broadcast "The sun is setting."
+```
+
+<Aside type="caution">
+A timer that runs very often and goes through every player or entity each time costs server time on every tick. [`neoskript-cli`](/docs/cli/) points these out. An event is usually cheaper: `on join` instead of checking every second for new players.
+</Aside>
+
+## When a script loads
+
+`on load` runs when the script loads: when the server starts, and each time the script is reloaded. `on unload` runs when it's unloaded, and when it's reloaded.
+
+```skript
+on load:
+	set {-loaded-at} to now
+	send "The script loaded." to console
+```
+
+`on skript start` runs once, when NeoSkript has started. `on server start` works too, with a warning that recommends `on skript start`.
+
+## The thread an event runs on
+
+On Paper, every event runs on the server's main thread. On Folia, each region of the world has its own thread, and a player's events run on the thread of the region they're in. Timers, `on load` and console commands run on Folia's global thread. See [Folia](/docs/server/folia/) for what that changes.
