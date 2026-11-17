@@ -86,7 +86,7 @@ Moving over from Skript copies Skript's `use player UUIDs in variable names` set
 
 ## databases
 
-Where global variables are saved: Skript's `databases:` section from `config.sk`, with the same options. Each variable is saved in the first database, from the top, whose `pattern` matches its whole name. The default is one CSV database, `default`, for everything. Applies on restart. See [databases](/docs/server/variables/#databases) for examples, sharing variables between servers, and what happens when a database is down.
+Where global variables are saved: Skript's `databases:` section from `config.sk`, with the same options. Each variable is saved in the first database, from the top, whose `pattern` matches its whole name. The default is one CSV database, `default`, for everything, backed up every 2 hours with the newest 12 kept. A server that moved from Skript gets its `config.sk` section instead, copied as is, backups included: with Skript's default config that's every 2 hours, keeping every backup. Applies on restart. See [databases](/docs/server/variables/#databases) for examples, sharing variables between servers, and what happens when a database is down.
 
 ```yaml
 databases:
@@ -103,7 +103,7 @@ databases:
 | `type` | | `csv` (Skript's `variables.csv`), `native` (NeoSkript's own [native storage](/docs/server/variables/#native-storage), in `variables.nsv` beside `file`), `sqlite`, `mysql`, or `disabled`. Skript's `file` and `flatfile` mean `csv`, and `none` means `disabled`. |
 | `pattern` | | A [regular expression](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html) the variable's whole name must match, such as `db_.*`. `.*` matches everything. |
 | `file` | | `csv`, `native` and `sqlite`: the file, relative to `plugins/NeoSkript`, or a full path. An SQLite file always ends in `.db`, as in Skript. |
-| `backup-interval` | `0` | `csv`, `native` and `sqlite`: how often the file is copied to `backups/`. `0` for never. |
+| `backup-interval` | `0` | `csv`, `native` and `sqlite`: how often the file is copied to `backups/`. `0` for never. Left out, there are none, as when Skript's `config.sk` doesn't say. |
 | `backups-to-keep` | `-1` | How many of the file's backups to keep, the oldest removed first. `-1` keeps them all; `0` makes none and removes the file's old ones, as in Skript. |
 | `monitor-changes` | `false` | `sqlite` and `mysql`: read other servers' changes from the database every `monitor-interval`, for servers that share it. |
 | `monitor-interval` | `20 seconds` | How often, at least every second. |
@@ -162,7 +162,7 @@ When the layout changes, `config-version` goes up:
 - The new one keeps every value you set, and any keys that aren't NeoSkript's settings.
 - Your comments on NeoSkript's settings are replaced by its own; the backup has them.
 
-Files without `config-version` or a `theme` are version 1, from NeoSkript 0.1.0-beta.1, and are carried forward the same way, backed up as `config.yml.bak-v1`. Version 3 moved `variables.file` and `variables.storage` into the `databases` section, as the `default` database's `file` and `type`. Every setting keeps its meaning, with two on purpose: `metrics: "false"` in quotes now turns bStats off, and a negative runtime error limit falls back to its default.
+Files without `config-version` or a `theme` are version 1, from NeoSkript 0.1.0-beta.1, and are carried forward the same way, backed up as `config.yml.bak-v1`. Version 3 moved `variables.file` and `variables.storage` into the `databases` section, as the `default` database's `file` and `type`, backed up every 2 hours with the newest 12 kept. Every setting keeps its meaning, with two on purpose: `metrics: "false"` in quotes now turns bStats off, and a negative runtime error limit falls back to its default.
 
 A file from a newer NeoSkript is never written.
 

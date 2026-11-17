@@ -11,7 +11,7 @@ Global variables (`{name}`, not `{_name}` or `{-name}`) are saved to `plugins/Ne
 - plugins/NeoSkript/
   - variables.csv saved variables
   - backups/
-    - variables_2026-11-12_16-03-07.csv a backup, every 2 hours and when needed
+    - variables_2026-11-12_16-03-07.csv a backup, made on a schedule and when needed
   - .migrated-from-skript written by the first start after Skript
 </FileTree>
 
@@ -35,7 +35,7 @@ If the server crashes, only the changes since the last save are lost.
 
 NeoSkript backs up `variables.csv` to `backups/` beside it, named as Skript names its backups:
 
-- **Every `backup-interval`**, 2 hours by default, keeping the newest `backups-to-keep` (12, so a day's worth), as Skript's `backup interval` and `backups to keep`. Unlike Skript, which counts and removes every file in `backups/`, only that database's own backups are counted and removed. SQLite files are backed up the same way, as a whole, consistent copy even while they're written to. See [databases](/docs/server/configuration/#databases).
+- **Every `backup-interval`**, keeping the newest `backups-to-keep`, as Skript's `backup interval` and `backups to keep`. A server that moved from Skript has exactly what its `config.sk` says, copied as is: with Skript's default config, every 2 hours, keeping every backup (`-1`), and a database that names no backup interval makes none. A new install, or a NeoSkript config from before the `databases` section, gets every 2 hours, keeping 12 (a day's worth). Unlike Skript, which counts and removes every file in `backups/`, only that database's own backups are counted and removed. SQLite files are backed up the same way, as a whole, consistent copy even while they're written to. See [databases](/docs/server/configuration/#databases).
 - **The first start after moving from Skript** backs up the copied file before loading it.
 - **When some lines can't be read**, for example the last line cut short by a crash under Skript, the file is backed up first. The lines that can't be read are skipped and the rest load, as in Skript. The console lists them with Skript's summary (`1 variable could not be loaded!`, `Affected variables: ...`), and the next save leaves them out; the backup keeps them.
 

@@ -150,4 +150,44 @@ class SkriptMigrationTest {
         assertEquals("-1", databases.get("default").get("backups-to-keep"));
         assertTrue(Files.exists(skript.resolve("variables.db")), "Skript's files stay where they were");
     }
+
+    @Test
+    void backupsAreExactlyWhatConfigSkSays() throws Exception {
+        // Skript's own default config keeps every backup (backups to keep: -1). A server moving over keeps that, and a
+        // database that names no backups gets none: only configs that never had a config.sk get NeoSkript's default.
+        Path skript = plugins.resolve("plugins/Skript");
+        Files.createDirectories(skript.resolve("scripts"));
+        Files.writeString(skript.resolve("variables.csv"), "# variables\n");
+        Files.writeString(skript.resolve("config.sk"), String.join("\n",
+                "databases:",
+                "\tshop:",
+                "\t\ttype: CSV",
+                "\t\tpattern: shop_.*",
+                "\t\tfile: ./plugins/Skript/shop.csv",
+                "\tdefault:",
+                "\t\ttype: CSV",
+                "\t\tpattern: .*",
+                "\t\tfile: ./plugins/Skript/variables.csv",
+                "\t\tbackup interval: 2 hours",
+                "\t\tbackups to keep: -1",
+                ""));
+        Path neoskript = plugins.resolve("plugins/NeoSkript");
+        Files.createDirectories(neoskript);
+        Path config = neoskript.resolve("config.yml");
+        // As the plugin does: the default config first, then Skript's settings set in it.
+        co.xenastudios.neoskript.plugin.config.ConfigLoader.load(NeoSkriptConfig.SPEC, config);
+        SkriptMigration.Result result = SkriptMigration.migrate(skript, neoskript);
+        assertTrue(co.xenastudios.neoskript.plugin.config.ConfigLoader.set(NeoSkriptConfig.SPEC, config,
+                result.settings()).written());
+        List<DatabaseSettings.Database> databases = co.xenastudios.neoskript.plugin.config.ConfigLoader
+                .load(NeoSkriptConfig.SPEC, config).config().databases().enabled();
+        assertEquals(List.of("shop", "default"), databases.stream().map(DatabaseSettings.Database::name).toList());
+        assertEquals(null, databases.get(0).backupInterval(), "no backup interval in config.sk: no backups");
+        assertEquals(-1, databases.get(0).backupsToKeep());
+        assertEquals(2 * 60 * 60 * 1000L, databases.get(1).backupInterval().millis());
+        assertEquals(-1, databases.get(1).backupsToKeep(), "Skript's keep-everything is kept");
+        String text = Files.readString(config);
+        assertTrue(text.matches("(?s).*backups-to-keep: ['\"]?-1['\"]?\n.*"), text);
+        assertFalse(text.contains("backups-to-keep: 12"), text);
+    }
 }
