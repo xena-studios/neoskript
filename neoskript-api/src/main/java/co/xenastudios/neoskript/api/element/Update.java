@@ -10,6 +10,11 @@ import java.util.function.BiFunction;
  * An effect that works out new values for one of its placeholders, which is then set to them, as
  * {@code set} would: {@code replace "a" in {_x} with "b"} sets {@code {_x}}. The placeholder has to be
  * something that can be set, like a variable.
+ *
+ * <p>When the target is a list variable and the update gives a {@link java.util.Map}, the map's values go in at the
+ * indices it names, and the list's other indices are left as they are: each key is an index, and a value that's a
+ * map, a collection or an array makes a list under its index ({@code {"home": {"x": 10}}} sets
+ * {@code {_data::home::x}}).
  */
 public interface Update extends Effect {
 

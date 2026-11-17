@@ -117,6 +117,11 @@ public interface co.xenastudios.neoskript.api.element.Function
 public interface co.xenastudios.neoskript.api.element.KeyAware @Experimental
   public boolean implicitKeys()
   public boolean keysRecommended()
+  public boolean recursiveKeys()
+
+public interface co.xenastudios.neoskript.api.element.Keyed @Experimental
+  public abstract java.lang.String[] keys()
+  public abstract java.lang.Object[] values()
 
 public interface co.xenastudios.neoskript.api.element.PausingEffect
   public abstract java.util.concurrent.CompletionStage start(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[]) signature (Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;)Ljava/util/concurrent/CompletionStage<*>;
