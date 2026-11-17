@@ -8,6 +8,8 @@ import co.xenastudios.neoskript.api.NeoSkript;
 import co.xenastudios.neoskript.api.Scripts;
 import co.xenastudios.neoskript.api.Threads;
 import co.xenastudios.neoskript.api.Variables;
+import co.xenastudios.neoskript.runtime.variables.storage.Databases;
+import co.xenastudios.neoskript.runtime.variables.storage.SqlVariableStorage;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import co.xenastudios.neoskript.runtime.FunctionLookup;
 import co.xenastudios.neoskript.runtime.FunctionRef;
@@ -44,10 +46,12 @@ final class AddonApi implements NeoSkript {
     /** Whether NeoSkript is ready, and what waits for it until then. */
     private boolean ready;
     private final List<Runnable> waiting = new ArrayList<>();
+    private final java.util.function.Supplier<List<Databases.Database>> databaseList;
 
     AddonApi(Plugin plugin, Addons addons, VariableStore globals, co.xenastudios.neoskript.compiler.Library library,
-            Logger logger) {
+            Logger logger, java.util.function.Supplier<List<Databases.Database>> databaseList) {
         this.plugin = plugin;
+        this.databaseList = databaseList;
         this.values = new ValuesView(library);
         this.addons = addons;
         this.logger = logger;
@@ -400,6 +404,72 @@ final class AddonApi implements NeoSkript {
         public void deleteList(String name) {
             checkReady();
             globals.deleteList(name);
+        }
+
+        @Override
+        public List<co.xenastudios.neoskript.api.VariableDatabase> databases() {
+            List<co.xenastudios.neoskript.api.VariableDatabase> all = new ArrayList<>();
+            for (Databases.Database database : databaseList.get()) {
+                all.add(new DatabaseView(database));
+            }
+            return List.copyOf(all);
+        }
+    }
+
+    /** One database variables are saved in, as an addon sees it. */
+    private record DatabaseView(Databases.Database database) implements co.xenastudios.neoskript.api.VariableDatabase {
+
+        private SqlVariableStorage sql() {
+            return database.backend() instanceof SqlVariableStorage sql && database.failure() == null ? sql : null;
+        }
+
+        @Override
+        public String name() {
+            return database.name();
+        }
+
+        @Override
+        public String pattern() {
+            return database.pattern();
+        }
+
+        @Override
+        public boolean shared() {
+            SqlVariableStorage sql = sql();
+            return sql != null && sql.settings().monitor();
+        }
+
+        @Override
+        public boolean available() {
+            if (database.failure() != null || database.backend() == null || !database.backend().loaded()) {
+                return false;
+            }
+            SqlVariableStorage sql = sql();
+            return sql == null || sql.status().state() == SqlVariableStorage.State.CONNECTED;
+        }
+
+        @Override
+        public String state() {
+            return database.state();
+        }
+
+        @Override
+        public String id() {
+            return shared() ? sql().id() : null;
+        }
+
+        @Override
+        public Runnable whenWritten(Runnable listener) {
+            SqlVariableStorage sql = sql();
+            return sql == null ? () -> {} : sql.whenWritten(listener);
+        }
+
+        @Override
+        public void checkForChanges() {
+            SqlVariableStorage sql = sql();
+            if (sql != null) {
+                sql.checkForChanges();
+            }
         }
     }
 
