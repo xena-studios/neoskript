@@ -1,4 +1,16 @@
 {
   "_": "Official NeoSkript addons: made and maintained by Xena Studios, released and tested with NeoSkript. Shown on /addons/. Each entry: name, summary (one sentence), adds (what syntax it gives scripts), example (a few lines of script), version, status (beta or stable), and links (modrinth, source, docs; any can be left out).",
-  "official": []
+  "official": [
+    {
+      "name": "NeoSkript YAML",
+      "summary": "YAML files from scripts, with skript-yaml's syntax: scripts written for skript-yaml run unchanged.",
+      "adds": "Loading, reading, changing and saving YAML files, with their comments and headers. Saves are written off the server's threads and never half written, on Paper and Folia.",
+      "example": "load yaml \"plugins/MyScript/config.yml\" as \"config\"\nset yaml value \"spawn.world\" of \"config\" to \"world\"\nsave yaml \"config\"",
+      "status": "beta",
+      "links": {
+        "docs": "/docs/addons/yaml/",
+        "source": "https://github.com/xena-studios/neoskript/tree/main/addons/yaml"
+      }
+    }
+  ]
 }

@@ -804,7 +804,7 @@ final class LineParser {
         }
         String word = Text.lower(name.group(1));
         return word.equals("value") || word.equals("index") || word.equals("counter") || word.equals("iteration")
-                || registry.resolveType(word) != null;
+                || registry.resolveType(word) != null || registry.isLoopValueName(word);
     }
 
     /** Whether an event value the line can't use was turned down: only then could parsing with any differ. */

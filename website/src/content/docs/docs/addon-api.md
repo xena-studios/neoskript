@@ -276,6 +276,32 @@ At most 10,000 triggers wait at once; past that, a pausing element fails at once
 
 **Reloads and stopping.** A trigger whose script is reloaded or unloaded while it waits carries on with the code it started with, as after a `wait`. When the server stops, `on unload` triggers run first, and what they pause for (a last write to a database) gets up to 3 seconds to finish before the server exits. Then triggers still waiting are dropped without carrying on, as after a `wait`. Their stages aren't cancelled: the work may still be running, and finishing or stopping it is up to your addon's own `onDisable`. A stage that completes after a timeout or a stop is ignored, and NeoSkript keeps nothing of the trigger or its event once its pause is over, so holding on to a stage doesn't hold on to old scripts or players.
 
+## Loop values
+
+An expression scripts loop can give its loops a `loop-<name>` of its own, as NeoSkriptYaml's `loop yaml node keys "homes" of "data"` gives `loop-node`, the full path of each key. The value is worked out each time it's used, from the looped expression's arguments (evaluated again) and the loop's current value:
+
+```java
+registrar.loopValue("MyAddonExprKeys", "path", info -> (context, args, current) -> args[0] + "." + current);
+```
+
+Only loops over that expression have it; elsewhere `loop-path` is Skript's error, "There's no loop that matches 'loop-path'". It can be written `loop-path-2` for the second such loop out, and in those loops it comes before a type of the same name. The factory can throw `SyntaxError` where the loop, as matched, has no such value. `loopValue` is `@Experimental`.
+
+## Values
+
+`NeoSkript.get().values()` is for an addon that writes values somewhere else, as a file or a database, the way scripts and Skript have them:
+
+```java
+Values values = NeoSkript.get().values();
+values.type(value);                    // "timespan", "itemtype", "player"... or null
+values.text(value);                    // as "%value%" writes it; works before NeoSkript is ready too
+values.parse("5 minutes", "timespan"); // text as a command argument of that type is read
+values.convert(slot, ItemStack.class); // through the converters scripts use
+Values.Saved saved = values.save(value);         // as variables.csv saves it: Skript's type name and bytes
+Object back = values.load(saved.type(), saved.data());
+values.toJava(date);                   // a date as an Instant, a timespan as a Duration
+values.fromJava(Instant.now());        // and back; whole numbers as Longs, decimals as Doubles
+```
+
 ## Converters, comparisons and arithmetic
 
 ```java
@@ -302,7 +328,7 @@ Object prize = neoskript.scripts().call("lotteryPrize", 3L);         // a script
 neoskript.scripts().reload("quests/main.sk");
 ```
 
-`neoskript.text(value)` writes any value as a script's text would show it (`"%value%"`): `5` for the number 5, a player's name for a player. Unlike the rest, it works before NeoSkript is ready too.
+`neoskript.values().text(value)` writes any value as a script's text would show it (`"%value%"`): `5` for the number 5, a player's name for a player. Unlike the rest, it works before NeoSkript is ready too. The rest of `values()` is [below](#values).
 
 Use them once NeoSkript is ready (see `whenReady` above). A variable's name is written as in a script, without braces, with `%...%` already filled in. Players are their UUIDs in variable names, as in Skript's default config. Each variable call is atomic and works from any thread; a sequence of them isn't.
 

@@ -187,7 +187,7 @@ final class Syntax {
 
         private static String text(Object value) {
             try {
-                return NeoSkript.get().text(value);
+                return NeoSkript.get().values().text(value);
             } catch (RuntimeException | LinkageError none) {
                 return String.valueOf(value);
             }

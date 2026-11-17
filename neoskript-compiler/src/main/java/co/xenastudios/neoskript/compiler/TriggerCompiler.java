@@ -178,6 +178,8 @@ final class TriggerCompiler {
 
     /** What each loop loops, for which loop a {@code loop-<name>} is of. */
     private final Map<Block, Expr> looped = new java.util.IdentityHashMap<>();
+    /** The text of each loop's line, which its looped expression's positions are in. */
+    private final Map<Block, String> loopSources = new java.util.IdentityHashMap<>();
 
     /**
      * A block being compiled. A {@code loop N times} has its count in {@code countSlot} and works its values out
@@ -1879,6 +1881,7 @@ final class TriggerCompiler {
             unpeekable.put(block, "test loop peeking");
         }
         this.looped.put(block, looped);
+        loopSources.put(block, source);
         blocks.push(block);
         if (value != null) {
             variableStore(value);
@@ -3195,6 +3198,18 @@ final class TriggerCompiler {
                 && loop.syntax().match().regexValues().getFirst() instanceof java.util.regex.MatchResult named) {
             Matcher matcher = LOOP_VALUE.matcher(named.group().strip().toLowerCase(Locale.ROOT));
             TypeRef ref = matcher.matches() ? registry.resolveType(matcher.group(1)) : null;
+            if (ref != null && registry.isLoopValueName(matcher.group(1))) {
+                try {
+                    Block block = matchingLoop(matcher.group(1), matcher.group(2) == null ? -1
+                            : Integer.parseInt(matcher.group(2)));
+                    if (addonLoopValue(block, matcher.group(1)) != null) {
+                        // An addon's loop value of that name, not a value of the type.
+                        return expr.type();
+                    }
+                } catch (CompileException e) {
+                    // The error comes when it's compiled.
+                }
+            }
             if (ref != null) {
                 return ref.type().id();
             }
@@ -5937,6 +5952,26 @@ final class TriggerCompiler {
             throw new CompileException(line, "The expression '" + unpeekable.get(loop)
                     + "' does not allow the usage of 'next loop-" + text + "'.");
         }
+        if (addonLoopValue(loop, matcher.group(1)) != null) {
+            // An addon's: its value from the looped expression's arguments, evaluated again, and the current value.
+            Expr.Syntax over = (Expr.Syntax) looped.get(loop);
+            co.xenastudios.neoskript.api.element.LoopValue value =
+                    addonLoopValue(loop, matcher.group(1)).create(info(over.syntax()));
+            constant(value, co.xenastudios.neoskript.api.element.LoopValue.class);
+            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+            // The arguments are compiled again here, from the loop's line, whose text their positions are in.
+            String here = source;
+            source = loopSources.get(loop);
+            try {
+                arguments(over.syntax());
+            } finally {
+                source = here;
+            }
+            element(loop.valuesSlot(), loop.indexSlot(), offset);
+            method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(co.xenastudios.neoskript.api.element.LoopValue.class),
+                    "get", "(" + CONTEXT + OBJECTS + OBJECT_DESC + ")" + OBJECT_DESC, true);
+            return;
+        }
         switch (matcher.group(1)) {
             case "index" -> {
                 if (loop.indicesSlot() >= 0) {
@@ -6003,6 +6038,15 @@ final class TriggerCompiler {
         if (name.equals("value") || isLoopOf(expr, name)) {
             return LoopMatch.YES;
         }
+        if (addonLoopValue(block, name) != null) {
+            // An addon's loop-<name> for loops over its expression, before a type of that name, as Skript ends up
+            // with skript-yaml's loop-node though Skript has a node type: values of the loop aren't nodes.
+            return LoopMatch.YES;
+        }
+        if (registry.isLoopValueName(name) && registry.resolveType(name) == null) {
+            // Only loops over the addon's expression have it.
+            return LoopMatch.NO;
+        }
         if (name.equals("index")) {
             // Only loops with indices have a loop-index; values from a function are indexed 1, 2, 3...
             return block.indicesSlot() >= 0 || expr instanceof Expr.FunctionCall ? LoopMatch.YES : LoopMatch.NO;
@@ -6037,6 +6081,13 @@ final class TriggerCompiler {
             }
             case null, default -> false;
         };
+    }
+
+    /** The addon's {@code loop-<name>} of a loop over one of its expressions, or {@code null}. */
+    private co.xenastudios.neoskript.api.element.ElementFactory<co.xenastudios.neoskript.api.element.LoopValue>
+            addonLoopValue(Block block, String name) {
+        return looped.get(block) instanceof Expr.Syntax syntax ? library.loopValue(syntax.syntax().syntax().id(), name)
+                : null;
     }
 
     /** Skript's {@code isLoopOf}: whether {@code expr} says a loop over it is a {@code loop-<name>}. */
