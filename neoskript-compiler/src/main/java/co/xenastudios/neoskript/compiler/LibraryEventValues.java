@@ -204,6 +204,12 @@ final class LibraryEventValues implements EventValues {
         }
 
         @Override
+        public String unnamed(String words) {
+            return name == null ? null : "There's no " + words + " in " + TriggerCompiler.article(name) + " " + name
+                    + " event.";
+        }
+
+        @Override
         public boolean allowsSyntax(SyntaxInfo syntax, int pattern) {
             List<Class<?>> only = library.eventOnly(syntax.id(), pattern);
             if (only == null) {

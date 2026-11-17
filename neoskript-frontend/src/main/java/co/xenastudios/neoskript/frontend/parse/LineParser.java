@@ -48,6 +48,8 @@ final class LineParser {
     private final co.xenastudios.neoskript.frontend.registry.EventValues.Scope eventScope;
     private boolean refusedEventValues;
     private boolean refusedSkriptValues;
+    /** Whether an event value refused was written as words a value can be read from: not 'the' or 'event-' ones. */
+    private boolean refusedWords;
     private final String input;
     private final String lowerInput;
     private final Map<Key, Object> memo = new HashMap<>();
@@ -259,6 +261,8 @@ final class LineParser {
                 }
                 refusedEventValues = true;
                 refusedSkriptValues |= skriptEventValue(parsed, text);
+                String written = Text.lower(text.strip());
+                refusedWords |= !written.startsWith("the ") && !written.startsWith("event-");
                 continue;
             }
             if (eventScope != null && !leftOutAllowed(syntax, pattern, match)) {
@@ -914,6 +918,11 @@ final class LineParser {
         return refusedSkriptValues;
     }
 
+    /** Whether an event value the code can't have was turned down, written as words a value can be read from. */
+    boolean refusedWords() {
+        return refusedWords;
+    }
+
     private boolean skriptEventValue(ParsedSyntax parsed, String text) {
         if (text.strip().regionMatches(true, 0, "event-", 0, 6)) {
             return true;
@@ -1171,7 +1180,19 @@ final class LineParser {
                         yield effect != null ? strict(effect, strictCode) : call(start, end);
                     }
                     case EXPRESSION -> expression(start, end, Expected.OBJECTS);
-                    case TYPE -> typeName(start, end);
+                    case TYPE -> {
+                        TypeRef ref = typeName(start, end);
+                        if (ref == null && eventScope != null && start >= 6
+                                && input.regionMatches(true, start - 6, "event-", 0, 6)) {
+                            // Skript's 'event-<words>' asks for a value named so when they name no type, which
+                            // no event has: its error, if nothing else reads the line.
+                            String unnamed = eventScope.unnamed(input.substring(start, end).strip());
+                            if (unnamed != null) {
+                                problem(unnamed);
+                            }
+                        }
+                        yield ref;
+                    }
                     case TYPE_OR_ENTITY -> {
                         TypeRef ref = typeName(start, end);
                         TypeInfo entity = registry.type("entity");
