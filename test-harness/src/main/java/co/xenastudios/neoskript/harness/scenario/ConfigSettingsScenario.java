@@ -39,7 +39,7 @@ import java.util.zip.ZipFile;
 public final class ConfigSettingsScenario implements Scenario {
 
     /** Bump when the way results are gathered changes, so cached results of the reference Skript go stale. */
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
     private static final Duration WAIT = Duration.ofMinutes(3);
     private static final Pattern LOG_LINE = Pattern.compile("^\\[(.+?)] (.*)$");
     private static final Pattern BOT_LINE = Pattern.compile("(\\[bot:Alice] .*)$");
@@ -100,11 +100,12 @@ public final class ConfigSettingsScenario implements Scenario {
                     "disable single colon in variable name warnings", "true",
                     "disable unreachable code warnings", "true",
                     "enable legacy tab completion event compatibility", "false",
-                    "hooks.vault", "true"),
+                    "hooks.vault", "true",
+                    "compress backups", "false"),
                     List.of("^verbosity: [\"']?low[\"']?$", "^  variable-not-saved: false$", "^  missing-and-or: false$",
                             "^  variable-starting-with-expression: false$",
                             "^  single-colon-in-variable-name: false$", "^  unreachable-code: false$",
-                            "^  legacy-tab-completion: false$", "^  vault: false$"),
+                            "^  legacy-tab-completion: false$", "^  vault: false$", "^  compress-backups: false$"),
                     DEFAULT_TIMESTAMP, POSITIONS, List.of(),
                     // What Skript only says from normal on: how many scripts and variables loaded.
                     List.of(Pattern.compile("Loaded \\d+ (scripts?|variables?)"))),
