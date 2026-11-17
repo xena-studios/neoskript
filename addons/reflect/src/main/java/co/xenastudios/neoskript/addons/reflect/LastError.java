@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.addons.reflect;
 
+import co.xenastudios.neoskript.api.element.TriggerContext;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Map;
@@ -12,8 +13,9 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * skript-reflect's {@code [the] [last] [java] (throwable|exception|error)}: what the last Java call in this run of the
  * trigger threw, or {@code null} once one succeeds. skript-reflect keeps one for the whole server. Here each run has
- * its own, found by the run's context: on Folia, where regions run at once, one region's call can't hide another's
- * error, and a run that waits and carries on on another thread still reads its own.
+ * its own, found by the run's context ({@link TriggerContext#outermostRun}, so a function's error is its caller's, as on
+ * skript-reflect): on Folia, where regions run at once, one region's call can't hide another's error, and a run that
+ * waits and carries on on another thread still reads its own.
  *
  * <p>Held only as long as the run is: the context is held weakly, so when the trigger ends, its error, and the classes
  * it names, are let go, with no thread holding on to them.
@@ -25,21 +27,21 @@ final class LastError {
 
     private LastError() {}
 
-    static Throwable get(Object run) {
-        return run == null ? null : LAST.get(new Key(run, null));
+    static Throwable get(TriggerContext context) {
+        return context == null ? null : LAST.get(new Key(context.outermostRun(), null));
     }
 
-    static void set(Object run, Throwable error) {
-        if (run == null) {
+    static void set(TriggerContext context, Throwable error) {
+        if (context == null) {
             return;
         }
         expunge();
-        LAST.put(new Key(run, GONE), error);
+        LAST.put(new Key(context.outermostRun(), GONE), error);
     }
 
-    static void clear(Object run) {
-        if (run != null && !LAST.isEmpty()) {
-            LAST.remove(new Key(run, null));
+    static void clear(TriggerContext context) {
+        if (context != null && !LAST.isEmpty()) {
+            LAST.remove(new Key(context.outermostRun(), null));
         }
     }
 

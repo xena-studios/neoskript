@@ -44,7 +44,7 @@ final class CallSite {
     record Target(MethodHandle invoker, Class<?>[] parameters, boolean varargs, boolean setter) {}
 
     /** What was chosen for one combination of classes. */
-    private record Entry(Class<?> target, Descriptor descriptor, Class<?>[] arguments, Target chosen) {}
+    private record Entry(Class<?> target, Descriptor descriptor, Class<?>[] arguments, boolean setter, Target[] chosen) {}
 
     private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
     private static final int CACHE = 4;
@@ -61,28 +61,48 @@ final class CallSite {
         return kind;
     }
 
+    /** How many combinations of classes this call site keeps a choice for. For tests. */
+    int cached() {
+        return (int) java.util.Arrays.stream(cache).filter(java.util.Objects::nonNull).count();
+    }
+
     /**
      * The member to call for these classes, or {@code null} if none matches. {@code arguments} doesn't include the
      * target; {@code setter} asks for a field's setter.
      */
     Target find(Descriptor descriptor, Class<?> targetClass, boolean isStatic, Object[] arguments, boolean setter) {
         Entry[] entries = cache;
-        for (Entry entry : entries) {
+        Entry same = null;
+        int at = -1;
+        for (int i = 0; i < entries.length; i++) {
+            Entry entry = entries[i];
             if (entry != null && entry.target == targetClass && entry.descriptor.equals(descriptor)
-                    && entry.chosen.setter == setter && sameClasses(entry.arguments, arguments)) {
+                    && entry.setter == setter && sameClasses(entry.arguments, arguments)) {
                 // Checked against these values too: some conversions depend on the value, not only its class (a text
-                // is a char only if it's one letter), so the same classes can need another member, or none.
-                if (matches(entry.chosen, arguments)) {
-                    return entry.chosen;
+                // is a char only if it's one letter), so the same classes can need another member, or none. Each
+                // member chosen for these classes is kept, so a call that alternates between two picks neither again.
+                for (Target chosen : entry.chosen) {
+                    if (matches(chosen, arguments)) {
+                        return chosen;
+                    }
                 }
+                same = entry;
+                at = i;
                 break;
             }
         }
         Target chosen = choose(descriptor, isStatic, arguments, setter);
         if (chosen != null) {
             synchronized (this) {
-                cache[next] = new Entry(targetClass, descriptor, classes(arguments), chosen);
-                next = (next + 1) % CACHE;
+                if (same != null && cache[at] == same) {
+                    // One entry for these classes, with this member too.
+                    Target[] more = java.util.Arrays.copyOf(same.chosen, Math.min(same.chosen.length + 1, CACHE));
+                    more[more.length - 1] = chosen;
+                    cache[at] = new Entry(targetClass, descriptor, same.arguments, setter, more);
+                } else {
+                    cache[next] = new Entry(targetClass, descriptor, classes(arguments), setter, new Target[] {chosen});
+                    next = (next + 1) % CACHE;
+                }
             }
         }
         return chosen;
@@ -179,7 +199,9 @@ final class CallSite {
     }
 
     /** What {@link #candidates} looked up for a class: a kind of member, its name and parameter types, static or not. */
-    private record Lookup(Kind kind, String name, List<Class<?>> parameterTypes, boolean isStatic, boolean setter) {}
+    // The parameter types by name, not the classes: a descriptor naming another plugin's class
+    // ('{_list}.add[OtherType](...)') mustn't keep that plugin's classes for as long as the JDK's ArrayList is loaded.
+    private record Lookup(Kind kind, String name, List<String> parameterTypes, boolean isStatic, boolean setter) {}
 
     /**
      * Each class's members, looked up once, for every call site: a call site that sees many classes
@@ -217,12 +239,15 @@ final class CallSite {
      */
     List<Target> candidates(Descriptor descriptor, boolean isStatic, boolean setter) {
         Lookup key = new Lookup(kind, descriptor.name(), descriptor.parameterTypes() == null ? null
-                : List.of(descriptor.parameterTypes()), isStatic, setter);
+                : java.util.Arrays.stream(descriptor.parameterTypes()).map(Class::getName).toList(), isStatic, setter);
         Map<Lookup, List<Target>> known = MEMBERS.get(descriptor.javaClass());
         List<Target> found = known.get(key);
         if (found == null) {
             found = List.copyOf(lookUp(descriptor, isStatic, setter));
-            known.put(key, found);
+            if (!found.isEmpty()) {
+                // Only what's there is kept: a name with nothing (a typo) isn't, so misspellings don't pile up.
+                known.put(key, found);
+            }
         }
         return found;
     }

@@ -47,6 +47,9 @@ final class Syntax {
 
     static void elements(Registrar registrar, Imports imports) {
         registrar.structure("NeoSkriptReflectStructImport", imports, "import");
+        // skript-reflect turns Skript's 'disable variable missing and/or warnings' on as it enables, so a server with it
+        // gives no "List is missing 'and' or 'or'" warning at all, in any script.
+        registrar.noMissingAndOrWarnings();
 
         // Calls: as an expression, an effect, and a condition.
         registrar.expression("NeoSkriptReflectExprJavaCall", "object", info -> JavaCall.create(info, imports),
@@ -64,6 +67,9 @@ final class Syntax {
         for (String id : List.of("NeoSkriptReflectExprJavaCall", "NeoSkriptReflectEffJavaCall",
                 "NeoSkriptReflectCondJavaCall")) {
             registrar.argumentsLikeFunctions(id);
+            // Tried after all of Skript's own syntax, as skript-reflect's SHADOW_REALM priority puts them:
+            // '{_n} + {_l}.size()' is Skript's arithmetic around a call, not a call on '{_n} + {_l}'.
+            registrar.priority(id, co.xenastudios.neoskript.api.registration.SyntaxPriority.PATTERN_MATCHES_EVERYTHING);
         }
 
         registrar.expression("NeoSkriptReflectExprNull", "null", info -> (context, arguments) -> Null.NULL, "null");

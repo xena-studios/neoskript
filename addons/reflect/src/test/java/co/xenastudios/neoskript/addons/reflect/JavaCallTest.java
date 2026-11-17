@@ -359,4 +359,89 @@ class JavaCallTest {
         assertEquals("3", harness.said.get(0));
         assertTrue(harness.warnings.stream().noneMatch(w -> w.contains("could not be found")), harness.warnings.toString());
     }
+
+    @Test
+    void skriptsOwnArithmeticAndComparisonsComeFirst() {
+        // As skript-reflect's calls are tried after everything of Skript's: '{_n} + {_l}.size()' is {_n} plus a call.
+        List<String> said = harness.run("""
+                import:
+                \tjava.util.ArrayList
+
+                on load:
+                \tset {_l} to new ArrayList()
+                \t{_l}.add("a")
+                \tset {_n} to 1
+                \tsay {_n} + {_l}.size()
+                \tsay whether {_n} = {_l}.size()
+                \tsay whether {_n} is {_l}.size()
+                \tif {_n} = {_l}.size():
+                \t\tsay "if"
+                \tsay ({_n} + 1).toString()
+                """);
+        assertEquals(List.of("2", "true", "true", "if", "2"), said);
+    }
+
+    @Test
+    void aStaticMethodThatIsntThereIsAnErrorAtLoad() {
+        List<String> problems = harness.load("test.sk", """
+                import:
+                \tjava.lang.Math
+
+                on load:
+                \tset {_y} to Math.mux(1, 2)
+                \tset {_z} to Math.nope()
+                \tsay Math.max(1, 2)
+                """);
+        // skript-reflect's message, for the method as written.
+        assertEquals(List.of("ERROR 5: mux refers to a non-existent method",
+                "ERROR 6: nope refers to a non-existent method"), problems);
+        harness.run();
+        assertEquals(List.of("2"), harness.said, "the rest of the trigger loads");
+    }
+
+    @Test
+    void anErrorInAFunctionIsTheCallersLastError() {
+        // skript-reflect's one last error is the server's: a function's is seen by its caller. Here the run's, which
+        // a function called from it is part of.
+        List<String> said = harness.run("""
+                import:
+                \tjava.lang.Integer
+
+                function parseIt():
+                \ttry Integer.parseInt("zz")
+
+                on load:
+                \tparseIt()
+                \tsay last java error
+                """);
+        assertEquals(1, said.size(), said.toString());
+        assertTrue(said.get(0).startsWith("java.lang.NumberFormatException"), said.toString());
+    }
+
+    @Test
+    void oneEntryForTheSameClassesWhateverTheValues() {
+        CallSite site = new CallSite(CallSite.Kind.METHOD);
+        Descriptor isLetter = new Descriptor(Character.class, "isLetter", null);
+        for (String value : List.of("5", "ab", "c", "ab", "5")) {
+            site.find(isLetter, Character.class, true, new Object[] {value}, false);
+        }
+        assertEquals(1, site.cached(), "texts, whatever their length, are one combination of classes");
+        assertTrue(site.find(isLetter, Character.class, true, new Object[] {"ab"}, false) == null);
+        assertTrue(site.find(isLetter, Character.class, true, new Object[] {"x"}, false) != null);
+    }
+
+    @Test
+    void noMissingAndOrWarningsAsWithSkriptReflectInstalled() {
+        // skript-reflect turns Skript's 'disable variable missing and/or warnings' on: no list in any script is
+        // warned about for that. A list with both 'and' and 'or' still is.
+        List<String> problems = harness.load("test.sk", """
+                on load:
+                \tloop "5", "ab":
+                \t\tsay loop-value
+                \tset {_x::*} to "a", "b"
+                \tset {_y::*} to "a", "b" or "c" and "d"
+                """);
+        assertEquals(1, problems.size(), problems.toString());
+        assertTrue(problems.getFirst().contains("List has multiple 'and' or 'or'"), problems.toString());
+    }
 }

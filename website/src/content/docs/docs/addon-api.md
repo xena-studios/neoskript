@@ -248,6 +248,8 @@ Three more for syntax that reads like Java:
 
 - `argumentsLikeFunctions(id)`: the element's arguments are written as a function call's, `Math.max(3, 7)`, so a list joined by commas alone isn't warned about, as Skript doesn't for function calls.
 - `strictType(typeId)`: only values of your type itself, its subtypes and what converts to it are taken where it goes, as in Skript. Without it, a value of any other type is taken, and converted when the line runs: a `location` where a class goes would give none rather than the words being read as your type. Words your type's literal parser takes are also known words where any value goes, so they aren't read as something else.
+- `noMissingAndOrWarnings()`: Skript's "List is missing 'and' or 'or'" warning is off for every script, as when Skript's `disable variable missing and/or warnings` is on. skript-reflect turns it on when it's installed.
+- `TriggerContext.outermostRun()`: the run a context is part of: a trigger's own, and for a function the run that called it, however deep. Keep something for one run by its identity, and the functions the run calls share it.
 - `NeoSkript.get().runtimeWarning(message)` and `runtimeError(message)`: report something that went wrong while a trigger runs, as Skript's syntax does, with the script, line and element, and the trigger carries on.
 
 ## Functions

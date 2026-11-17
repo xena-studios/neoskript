@@ -87,8 +87,10 @@ final class JavaCall implements Expression, Changeable {
             if (descriptor == null) {
                 throw new SyntaxError(text + " is not a valid descriptor.");
             }
-            String target = info.argumentLiterals().isEmpty() ? null : info.argumentLiterals().getFirst();
-            JavaType imported = target == null ? null : imports.get(target.strip());
+            // What the call is made on, as written: an imported class's name makes it a static call, checked here as
+            // skript-reflect does. The words reach the factory unparsed, so they're read from the call's text.
+            String target = receiverText(info.text(), pattern == 3, quiet);
+            JavaType imported = target == null ? null : imports.get(target);
             if (descriptor.javaClass() == null && imported != null) {
                 descriptor = descriptor.orClass(imported.javaClass());
             }
@@ -117,6 +119,25 @@ final class JavaCall implements Expression, Changeable {
 
     /** The descriptor written in a call's text: what follows its last {@code .} outside brackets, quotes and calls. */
     static String descriptorText(String text, boolean method) {
+        String[] parts = split(text, method);
+        return parts == null ? null : parts[1];
+    }
+
+    /** What a call's text calls it on: the words before its last {@code .}, without {@code try}. */
+    static String receiverText(String text, boolean method, boolean quiet) {
+        String[] parts = split(text, method);
+        if (parts == null) {
+            return null;
+        }
+        String receiver = parts[0];
+        if (quiet && receiver.regionMatches(true, 0, "try ", 0, 4)) {
+            receiver = receiver.substring(4).strip();
+        }
+        return receiver;
+    }
+
+    /** A call's text as what it's called on and its descriptor, split at its last {@code .} outside brackets. */
+    private static String[] split(String text, boolean method) {
         if (text == null) {
             return null;
         }
@@ -141,7 +162,7 @@ final class JavaCall implements Expression, Changeable {
             } else if (c == '[' || c == '(' || c == '{') {
                 depth--;
             } else if (c == '.' && depth == 0) {
-                return call.substring(i + 1).strip();
+                return new String[] {call.substring(0, i).strip(), call.substring(i + 1).strip()};
             }
         }
         return null;

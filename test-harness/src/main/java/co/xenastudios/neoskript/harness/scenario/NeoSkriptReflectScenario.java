@@ -41,7 +41,8 @@ public final class NeoSkriptReflectScenario implements Scenario {
             "class of: java.util.ArrayList", "class named: java.lang.Thread", "dot class: class java.util.ArrayList",
             "world: world", "location x: 1", "field: 5", "nested: <none>",
             "fields: 6", "field names: x, y and serialVersionUID", "typed collect: [a, b]",
-            "contains size: true", "letter 5: false", "letter ab: <none>",
+            "contains size: true", "plus call: 3", "equals call: false", "is call: true", "letter 5: false",
+            "letter ab: <none>",
             "error: java.lang.IndexOutOfBoundsException: Index 9 out of bounds for length 2", "system: yes", "loaded",
             "event: reflect-event", "missing done");
 

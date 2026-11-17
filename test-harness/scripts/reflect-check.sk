@@ -73,6 +73,11 @@ on load:
 	# Java's Integer comes back as one, so a set of integers contains a list's size.
 	set {_ints} to IntStream.range(0, 3).boxed().collect(Collectors.toSet())
 	send "[reflect] contains size: %{_ints}.contains({_list}.size())%" to console
+	# Skript's arithmetic and comparisons come before a call: '{_one} + {_list}.size()' is 1 plus the size.
+	set {_one} to 1
+	send "[reflect] plus call: %{_one} + {_list}.size()%" to console
+	send "[reflect] equals call: %whether {_one} = {_list}.size()%" to console
+	send "[reflect] is call: %whether 2 is {_list}.size()%" to console
 	# A one-letter text is a char; "ab" isn't, though it's a text too.
 	loop "5" and "ab":
 		send "[reflect] letter %loop-value%: %Character.isLetter(loop-value)%" to console

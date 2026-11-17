@@ -97,9 +97,13 @@ The times vary from run to run and depend on the machine; what holds in every ru
 
 A call that can't be made never stops the trigger: a missing method, arguments no overload takes, a method that throws, and a class whose members can't be looked at (a plugin's class whose methods name a class from a plugin that isn't installed) each give no value and a warning for the line.
 
+Java calls are read after all of Skript's own syntax, as skript-reflect's are: `{_n} + {_list}.size()` is `{_n}` plus the list's size, and `{_n} = {_list}.size()` compares the two. Put brackets round what a call is made on when it's more than one value: `({_n} + 1).toString()`.
+
+As with skript-reflect installed, Skript's "List is missing 'and' or 'or'" warning is off for every script.
+
 ## Threads and Folia
 
-A Java call runs on the thread running the trigger: the main thread on Paper, and on Folia the thread of the region (or the global thread) the trigger runs on. `last java error` is each run of a trigger's own, so a region never sees another region's error, and a trigger that waits and carries on on another thread still sees its own. It's let go of when the trigger ends.
+A Java call runs on the thread running the trigger: the main thread on Paper, and on Folia the thread of the region (or the global thread) the trigger runs on. `last java error` is each run of a trigger's own, functions it calls included (an error in a function is its caller's, as on skript-reflect), so a region never sees another region's error, and a trigger that waits and carries on on another thread still sees its own. It's let go of when the trigger ends.
 
 :::caution[Folia's rules]
 On Folia, NeoSkript checks that a script's own syntax only touches what the current region owns, and stops a line that doesn't with a runtime error. It can't check Java code. A Java call that reads or changes an entity, block or chunk another region owns (`Bukkit.getWorlds().get(0).getEntities()` from a player's region, say) breaks Folia's rules: it can corrupt the world or throw from deep inside the server. Keep Java calls to what the trigger's own region owns, or to things that aren't in a world, and use Folia's schedulers (through Java) for the rest.
