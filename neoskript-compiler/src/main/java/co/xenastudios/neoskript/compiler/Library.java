@@ -237,6 +237,15 @@ public final class Library implements Registrar {
         builder.experimental(id, experiment, silent);
     }
 
+    /** The Skript priority level addon syntax said it has ({@link #priority}), by id. */
+    private final Map<String, Integer> priorities = new HashMap<>();
+
+    @Override
+    public void priority(String id, co.xenastudios.neoskript.api.registration.SyntaxPriority priority) {
+        checkOpen();
+        priorities.put(id, priority.ordinal());
+    }
+
     @Override
     public void effectBefore(String effectId, String otherId) {
         checkOpen();
@@ -1580,7 +1589,7 @@ public final class Library implements Registrar {
                 }
             }
             for (SyntaxKind kind : SyntaxKind.values()) {
-                builder.order(kind, syntaxes -> SkriptOrder.sort(kind, syntaxes));
+                builder.order(kind, syntaxes -> SkriptOrder.sort(kind, syntaxes, priorities::get));
             }
             registry = builder.eventValues(new LibraryEventValues(this)).build();
         }

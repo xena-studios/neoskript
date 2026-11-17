@@ -284,6 +284,19 @@ public interface Registrar {
     default void lateSyntax() {}
 
     /**
+     * Where Skript's parser tries syntax element {@code id}, one of this addon's: after Skript's own syntax of the same
+     * priority, and before syntax of a later one, as Skript orders an addon's syntax. Without it, an addon's syntax is
+     * tried after the built-in syntax registered before it. Use it where an addon's syntax is a Skript addon's, so a
+     * line that both it and a built-in element match is read as Skript reads it: skJson's {@code keys of %json%},
+     * {@link SyntaxPriority#SIMPLE}, is tried before Skript's {@code key of %minecraft tag%}, a property.
+     *
+     * @param id the element's id, of any kind
+     * @param priority its priority, as the Skript addon registers it
+     */
+    @Experimental
+    default void priority(String id, SyntaxPriority priority) {}
+
+    /**
      * Has effect {@code effectId} tried before effect {@code otherId}, as Skript tries its effects in its own order:
      * {@code clear drops} is its cancel drops effect, which comes before its change effect.
      *
