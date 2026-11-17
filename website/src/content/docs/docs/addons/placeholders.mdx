@@ -1,0 +1,110 @@
+---
+title: NeoSkript Placeholders
+description: "PlaceholderAPI from scripts, with skript-placeholders' syntax: register placeholders for scoreboards, tab lists and chat, and read any plugin's placeholders."
+sidebar:
+  label: Placeholders
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+NeoSkript Placeholders (`NeoSkriptPlaceholders`) connects scripts to [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi). Scripts register their own placeholders, which scoreboards, tab lists and chat plugins then show, and read any other plugin's placeholders for a player.
+
+It replaces [skript-placeholders](https://github.com/APickledWalrus/skript-placeholders) and takes its syntax (1.7.1), so scripts written for it load unchanged. NeoSkript's test harness runs the same scripts on Skript 2.17.0 with skript-placeholders 1.7.1 and on NeoSkript with this addon, both with PlaceholderAPI 2.12.3, and compares what they print, line for line.
+
+## Installing
+
+1. Install [PlaceholderAPI](https://modrinth.com/plugin/placeholderapi) (2.11 or newer; 2.12.3 is what it's tested with).
+2. Put `NeoSkriptPlaceholders-<version>.jar` in `plugins/`, next to NeoSkript. Use the version that matches NeoSkript's: they're released together.
+3. Remove `skript-placeholders.jar` if it's there. It needs Skript, so it can't run with NeoSkript anyway, and the console says so.
+4. Restart the server.
+
+`/sk info` lists the addon. It works on Paper and Folia.
+
+## Registering placeholders
+
+A placeholder structure answers every placeholder with its prefix. Set `the result` to give the placeholder's value:
+
+```skript nocheck
+placeholderapi placeholder with the prefix "myserver":
+	if the identifier is "coins":
+		# %myserver_coins%
+		set the result to {coins::%player's uuid%}
+	else if the identifier is "online":
+		# %myserver_online%
+		set the result to size of all players
+```
+
+The structure can be written `placeholderapi`, `placeholder api` or `papi`, and `with the prefix` or `for the prefix`.
+
+In it:
+
+| Syntax | What it is |
+|---|---|
+| `the placeholder` | The whole placeholder, without `%`: `myserver_coins` |
+| `the prefix`, `the placeholder prefix` | The part before the first `_`: `myserver` |
+| `the identifier`, `the placeholder identifier` | The part after it: `coins`. For `%myserver_top_1%` it's `top_1` |
+| `the result`, `the placeholder result` | The value. Set it to text or anything else (a number becomes `5`, a player their name), or delete or reset it for none |
+| `player` | The player it's asked for, if they're online |
+| `event-offlineplayer` | The player it's asked for, online or not |
+
+A placeholder with no result stays as it is, `%myserver_unknown%`, as PlaceholderAPI shows any placeholder nobody answers.
+
+Several structures can use the same prefix: they're asked in the order the scripts load, and the first to set a result answers.
+
+A prefix can't be blank or contain `%`, `{`, `}` or `_`, as PlaceholderAPI reads the first `_` as the end of the prefix. Prefixes don't care about case: `%MyServer_coins%` is the same placeholder.
+
+### Relational placeholders
+
+A relational placeholder is about two players, as a tab list showing each player whether the others are friends or enemies. PlaceholderAPI writes them `%rel_<prefix>_<identifier>%`:
+
+```skript nocheck
+placeholderapi relational placeholder with the prefix "teams":
+	if the identifier is "colour":
+		# %rel_teams_colour%
+		if {team::%the first player's uuid%} is {team::%the second player's uuid%}:
+			set the result to "&a"
+		else:
+			set the result to "&c"
+```
+
+`the first player` is the player the placeholder is shown to, and `the second player` the one it's about. In a relational placeholder, `player` is the first player.
+
+## Reading placeholders
+
+`the placeholder` with a text reads any plugin's placeholder for a player, or for nobody:
+
+```skript nocheck
+command /ping <player>:
+	trigger:
+		set {_ping} to the placeholder "player_ping" from arg-1
+		send "%arg-1%'s ping: %{_ping}%"
+
+on join:
+	set {_welcome} to placeholder "Welcome to %%server_name%%, one of %%server_online%% online!" for player
+	send {_welcome} to player
+```
+
+The `%` around a placeholder can be left out when it's the whole text. To write a `%` in a script's text, double it: `"%%server_online%%"`.
+
+| Syntax | |
+|---|---|
+| `[the] [value[s] of [the]] placeholder[s] [in] %texts% [(for/from/of) %players/offline players%]` | Each placeholder's value, for each player. A placeholder nothing answers gives nothing |
+| `placeholder[s] %texts%'[s] value[s] [(for/from/of) %players/offline players%]` | The same |
+| `relational placeholder[s] %texts% (for/from/of) %player% and %player%` | A relational placeholder's value for two online players |
+
+## Differences from skript-placeholders
+
+Scripts written for skript-placeholders 1.7.1 work the same, with these differences:
+
+- **Threads:** PlaceholderAPI can ask for a placeholder from any thread, including other plugins' async threads. The structure's code runs right there, as on Skript, and never waits for another thread. On Folia, it follows NeoSkript's region rules: reading a player whose region another thread owns is a runtime error naming the line, and gives nothing, rather than reading another region's player unsafely. The same goes for reading a placeholder for a player in another region. See [Folia](/docs/server/folia/).
+- **Reloading:** a prefix is registered with PlaceholderAPI while a loaded script uses it and unregistered when none does, on the global thread, whatever reloaded the scripts. Nothing is left registered after `/sk reload`, and a request never runs code from a script that's been unloaded.
+- **Order:** with several structures for one prefix, the first in load order with a result answers. skript-placeholders asked them in no fixed order.
+- **Safety:** a structure whose code throws is passed over, and the next for the prefix is asked. A placeholder that asks for itself stops after 16 levels with a warning, instead of running until the thread's stack overflows. A plugin's placeholder that throws when it's read gives nothing, instead of an error in the script. Warnings like these are written at most once a minute.
+- **Replacing another plugin's prefix:** a script that registers a prefix another plugin already has takes it over, as with skript-placeholders, and the console says so.
+- **Without PlaceholderAPI:** skript-placeholders disables itself, so scripts using its syntax fail to load with "can't understand" errors. This addon stays loaded: a placeholder structure is an error saying PlaceholderAPI isn't installed, and reading a placeholder gives nothing.
+- **MVdWPlaceholderAPI** isn't supported: it needs MVdW's plugins, which no longer run on current servers. `mvdw placeholder named "..."` is the error skript-placeholders gives when MVdWPlaceholderAPI isn't installed.
+- **Older syntax:** skript-placeholders 1.6's `placeholderapi request for the prefix "..."` and `parse placeholder "..." for player` work too, with one prefix per structure.
+
+<Aside type="note">
+The [script checker](/docs/cli/) and [the parser](/parser/) don't know this addon's syntax unless their syntax list includes it, so they may flag these lines. On a server with the addon installed, they load.
+</Aside>

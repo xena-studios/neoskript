@@ -76,3 +76,11 @@ Each addon gets its own Modrinth project, which only the owner can create. For e
 - the project: name (`NeoSkript DB`), slug (`neoskript-db`), summary, description (what it replaces, that scripts run unchanged, that it needs NeoSkript), icon, licence GPL-3.0-only, the source link to this repository, Paper and Folia as loaders, the Minecraft versions NeoSkript supports;
 - a **required dependency** on the NeoSkript project (`FuVeJ2X5`), and an **incompatible** one on the community addon's project, if it's on Modrinth;
 - the project id added to the release steps, so each release uploads the addon's jar to it with the same version and changelog as NeoSkript's.
+
+### NeoSkript Placeholders (`addons/placeholders`)
+
+- Name **NeoSkript Placeholders**, slug `neoskript-placeholders`, licence GPL-3.0-only, source this repository, loaders Paper and Folia.
+- Summary: "PlaceholderAPI from scripts, with skript-placeholders' syntax, for NeoSkript."
+- Description: it replaces skript-placeholders, scripts written for it load unchanged, it needs NeoSkript and PlaceholderAPI, and it links to [the docs](https://neoskript.dev/docs/addons/placeholders/), which list the differences.
+- Dependencies: **required** NeoSkript (`FuVeJ2X5`) and **required** PlaceholderAPI (`lKEzGugV`). skript-placeholders itself isn't on Modrinth; a fork by someone else is (`skript-placeholders-fork`), which can be marked **incompatible**.
+- Once it exists, an entry in `website/src/data/addons.json` lists it on neoskript.dev/addons with its Modrinth link.
