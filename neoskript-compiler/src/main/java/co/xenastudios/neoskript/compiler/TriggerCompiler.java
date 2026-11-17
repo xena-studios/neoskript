@@ -5969,6 +5969,39 @@ final class TriggerCompiler {
         listToArray(result);
     }
 
+    /**
+     * {@code filtered} or {@code transformed} values of something keyed, each keeping its index, as Skript's filter
+     * and transform give keys: {@code mapping} is the transform's expression, or {@code null} for the filter's
+     * {@code condition}.
+     */
+    private void keyedEach(Expr values, ParsedSyntax condition, Expr mapping) throws CompileException {
+        int[] list = listValues(values);
+        int kept = newList();
+        int keys = newList();
+        forEachInput(list, 0, -1, (frame, next) -> {
+            if (condition != null) {
+                condition(condition);
+                method.visitJumpInsn(IFEQ, next);
+            }
+            method.visitVarInsn(ALOAD, kept);
+            method.visitVarInsn(ALOAD, keys);
+            if (mapping != null) {
+                expression(mapping);
+            } else {
+                method.visitVarInsn(ALOAD, frame.valueSlot());
+            }
+            method.visitVarInsn(ALOAD, list[1]);
+            method.visitVarInsn(ILOAD, frame.indexSlot());
+            method.visitInsn(AALOAD);
+            method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "add",
+                    "(Ljava/util/List;Ljava/util/List;" + OBJECT_DESC + STRING_DESC + ")V", false);
+        });
+        method.visitVarInsn(ALOAD, kept);
+        method.visitVarInsn(ALOAD, keys);
+        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "of",
+                "(Ljava/util/List;Ljava/util/List;)" + Type.getDescriptor(KeyedValues.class), false);
+    }
+
     /** {@code %objects% transformed using [expression]}: every value the expression gives, for each value. */
     private void transform(Expr values, Expr mapping) throws CompileException {
         int[] list = listValues(values);
@@ -6142,6 +6175,15 @@ final class TriggerCompiler {
     private Expr recursiveIndices(ParsedSyntax syntax) {
         return isCore(syntax, CoreSyntax.RECURSIVE) && syntax.match().values().getFirst() instanceof Expr.Syntax inner
                 && isCore(inner.syntax(), CoreSyntax.INDICES) ? inner : null;
+    }
+
+    /** Whether the syntax works on a list variable, or {@code keyed} of one, as {@link #listVariable} reads it. */
+    private static boolean listVariableArgument(ParsedSyntax syntax) {
+        Object value = syntax.match().values().getFirst();
+        if (value instanceof Expr.Syntax keyed && keyed.syntax().syntax().id().equals(KEYED)) {
+            value = keyed.syntax().match().values().getFirst();
+        }
+        return value instanceof Expr.Variable variable && variable.list();
     }
 
     /** Whether {@code syntax} is {@code recursive} written around {@code keyed}: {@code recursive keyed {_x::*}}. */
@@ -6573,6 +6615,24 @@ final class TriggerCompiler {
                 method.visitLdcInsn(article(ref.type().name()) + " " + ref.type().name());
                 method.visitMethodInsn(INVOKESTATIC, VALUES, "parse",
                         "(Ljava/util/function/Function;" + OBJECT_DESC + STRING_DESC + ")" + OBJECT_DESC, false);
+            }
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.INDICES)
+                    && !listVariableArgument(syntax.syntax()) -> {
+                // Any other keyed expression's indices, as Skript's: a function's list, 'recursive', 'filtered'...
+                Expr source = (Expr) syntax.syntax().match().values().getFirst();
+                keyed(source, true);
+                // 'keyed' and 'value within' pass on whether their source gives nested indices, as Skript's
+                // returnsNestedStructures: the indices of 'recursive X' are whole paths.
+                Expr unwrapped = source;
+                while (unwrapped instanceof Expr.Syntax wrapper && (wrapper.syntax().syntax().id().equals(KEYED)
+                        || isCore(wrapper.syntax(), CoreSyntax.CAST))) {
+                    unwrapped = (Expr) wrapper.syntax().match().values().getFirst();
+                }
+                boolean paths = unwrapped instanceof Expr.Syntax inner && isCore(inner.syntax(), CoreSyntax.RECURSIVE);
+                method.visitInsn(paths ? ICONST_1 : ICONST_0);
+                pushInt(syntax.syntax().pattern() < 2 ? 0 : syntax.syntax().match().hasTag("descending") ? -1 : 1);
+                method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "indices",
+                        "(" + OBJECT_DESC + "ZI)[" + STRING_DESC, false);
             }
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.INDICES) -> {
                 Expr.Variable list = listVariable(syntax.syntax(), "Only list variables have indices");
@@ -7533,6 +7593,10 @@ final class TriggerCompiler {
         return switch (expr) {
             case Expr.Syntax syntax when syntax.syntax().syntax().id().equals(KEYED) -> true;
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RECURSIVE) -> implicit || recursiveOfKeyed(syntax.syntax());
+            // Filtered, one-to-one transformed and cast values of something keyed keep its indices, as in Skript.
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.FILTER)
+                    || isCore(syntax.syntax(), CoreSyntax.CAST) || oneToOneTransform(syntax) ->
+                    isKeyed((Expr) syntax.syntax().match().values().getFirst(), implicit);
             case Expr.Syntax syntax when keyAware(syntax) && keysRecommended(syntax) -> true;
             case Expr.Syntax syntax when keyAware(syntax) -> syntax.syntax().match().values().stream()
                     .anyMatch(value -> value instanceof Expr argument && isKeyed(argument, implicit));
@@ -7542,6 +7606,13 @@ final class TriggerCompiler {
                     && call.function().returnsPlural();
             default -> false;
         };
+    }
+
+    /** Whether {@code syntax} is {@code transformed} with one value for each, which keeps indices. */
+    private boolean oneToOneTransform(Expr.Syntax syntax) {
+        return isCore(syntax.syntax(), CoreSyntax.TRANSFORM)
+                && syntax.syntax().match().regexValues().getFirst() instanceof Expr mapping
+                && co.xenastudios.neoskript.frontend.parse.Plurality.single(mapping, registry);
     }
 
     /** The list variable in {@code keyed {_x::*}}, or {@code null} if {@code expr} isn't that. */
@@ -7598,6 +7669,22 @@ final class TriggerCompiler {
                 variableName(list);
                 method.visitMethodInsn(INVOKEVIRTUAL, STORE, "recursiveKeyedList",
                         "(" + STRING_DESC + ")" + Type.getDescriptor(KeyedValues.class), false);
+            }
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.FILTER)
+                    && syntax.syntax().match().regexValues().getFirst() instanceof ParsedSyntax condition
+                    && isKeyed((Expr) syntax.syntax().match().values().getFirst(), true) ->
+                    keyedEach((Expr) syntax.syntax().match().values().getFirst(), condition, null);
+            case Expr.Syntax syntax when oneToOneTransform(syntax)
+                    && isKeyed((Expr) syntax.syntax().match().values().getFirst(), true) ->
+                    keyedEach((Expr) syntax.syntax().match().values().getFirst(), null,
+                            (Expr) syntax.syntax().match().regexValues().getFirst());
+            case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.CAST)
+                    && isKeyed((Expr) syntax.syntax().match().values().getFirst(), true) -> {
+                // 'values within keyed X': X's values of the type, each with its index.
+                keyed((Expr) syntax.syntax().match().values().getFirst(), true);
+                constant(library.javaClass(syntax.type()), Class.class);
+                method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "cast",
+                        "(" + OBJECT_DESC + "Ljava/lang/Class;)" + Type.getDescriptor(KeyedValues.class), false);
             }
             case Expr.Syntax syntax when keyAware(syntax) -> {
                 callThrough(syntax.syntax(), Expression.class, true, implicit || implicitKeys(syntax));

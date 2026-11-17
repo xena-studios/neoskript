@@ -1277,7 +1277,7 @@ final class LineParser {
             return null;
         }
         Object value = parsed.match().values().isEmpty() ? null : parsed.match().values().getFirst();
-        if (value instanceof Expr argument && listVariable(argument)) {
+        if (value instanceof Expr argument && (indices ? keyedSource(argument) : listVariable(argument))) {
             return null;
         }
         // A recursive size of several list variables is all of theirs, as in Skript.
@@ -1304,6 +1304,32 @@ final class LineParser {
             }
         }
         return null;
+    }
+
+    /**
+     * Whether {@code expr} gives its values' indices, as Skript's {@code KeyProviderExpression.canReturnKeys}: a list
+     * variable, {@code keyed} anything, a function call, or {@code recursive}, {@code filtered}, an element of, a
+     * value within or (with one value for each) {@code transformed} something that does.
+     */
+    private boolean keyedSource(Expr expr) {
+        return switch (expr) {
+            case Expr.Variable variable -> variable.list();
+            case Expr.FunctionCall call -> true;
+            case Expr.Syntax syntax -> {
+                List<Object> values = syntax.syntax().match().values();
+                Expr inner = values.isEmpty() || !(values.getFirst() instanceof Expr first) ? null : first;
+                yield switch (syntax.syntax().syntax().id()) {
+                    case "ExprKeyed" -> true;
+                    case "ExprRecursive", "ExprFilter", "ExprCast" -> inner != null && keyedSource(inner);
+                    case "ExprElement" -> values.getLast() instanceof Expr last && keyedSource(last);
+                    case "ExprTransform" -> inner != null && keyedSource(inner)
+                            && syntax.syntax().match().regexValues().getFirst() instanceof Expr mapping
+                            && Plurality.single(mapping, registry);
+                    default -> false;
+                };
+            }
+            default -> false;
+        };
     }
 
     /** Whether {@code expr} is a list variable, or {@code keyed} of one. */
