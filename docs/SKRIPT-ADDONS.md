@@ -252,10 +252,17 @@ the addon's name and the element's class (`SkBee:ExprWorldHeight`).
 - **Conversions and comparisons** go to NeoSkript where they involve a class NeoSkript has no type for, so they
   don't change how NeoSkript's own types behave. **Event values** go where NeoSkript has no value of that type for
   the event (or a superclass of it): an addon's events get theirs, and NeoSkript's own event values stay as they
-  are. **Functions** an addon writes in Java become NeoSkript's.
+  are; only NeoSkript's own values count, compared by exact value class, so an addon's list value
+  (`event-entities`, `Entity[]`) goes in next to NeoSkript's single one. **Functions** an addon writes in Java become
+  NeoSkript's.
 - **Events:** NeoSkript listens to an addon event's classes, and runs the event's `check` as the trigger's filter,
   with the literals written in its header (`on zombie knockback by skeleton`). An event's arguments are all
-  literals, as on Skript; a list of them (`zombies or skeletons`) gets its values from the header when `check` runs.
+  literals, as on Skript. It's set up when the script loads (so a header it won't take is an error then), and again
+  the first time its trigger's filter runs, with the header's values, which are constants: a list (`on tab complete
+  of "/a" and "/b"`) has its values then, for an event that copies them in `init`. An event whose check throws is
+  logged at most once a minute per trigger.
+- **Effects that run the rest of the trigger themselves** (overriding `walk`, as SkBee's `load chunk`, which waits
+  for the load) aren't registered yet: running only their `execute` would do nothing. The console counts them.
   Skript's code names for types that NeoSkript has under another id are mapped (`entitydata` is NeoSkript's
   `entitytype`).
 - **Not yet:** sections and structures an addon registers (SkBee's 60 sections and 2 structures are left out, and

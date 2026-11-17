@@ -96,6 +96,24 @@ public final class SkBeeDifferentialScenario implements Scenario {
                 unexpected.add(label + ": Skript with SkBee " + x + ", NeoSkript with SkBee " + y);
             }
         }
+        // Every label the script prints must be printed on both sides: one missing on both isn't a match.
+        Matcher label = Pattern.compile("skbee\\(\"([^\"]+)\"").matcher(script);
+        java.util.Set<String> expected = new java.util.TreeSet<>();
+        while (label.find()) {
+            expected.add(label.group(1));
+        }
+        java.util.Set<String> printedHere = new java.util.HashSet<>();
+        java.util.Set<String> printedThere = new java.util.HashSet<>();
+        originalLines.keySet().forEach(key -> printedThere.add(key.substring(key.indexOf(" / ") + 3)));
+        ourLines.keySet().forEach(key -> printedHere.add(key.substring(key.indexOf(" / ") + 3)));
+        for (String wanted : expected) {
+            if (!printedThere.contains(wanted)) {
+                unexpected.add("'" + wanted + "' wasn't printed on Skript with SkBee");
+            }
+            if (!printedHere.contains(wanted)) {
+                unexpected.add("'" + wanted + "' wasn't printed on NeoSkript with SkBee");
+            }
+        }
         for (String unfinished : original.unfinished()) {
             unexpected.add("Skript with SkBee didn't finish /skbeetest-" + unfinished);
         }

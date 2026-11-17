@@ -29,7 +29,7 @@ What's compared with Skript 2.17.0 + SkBee 3.26.0, by NeoSkript's test harness o
 | Chunks: `chunk x/z of %chunk%`, `chunk key of %chunk%`, `chunk key at %location%`, `chunk key at %number%, %number%` | Same as on Skript |
 | Keys: `minecraft key of %objects%` (items, worlds, text), `translation key of %objects%` | Same as on Skript |
 | `server is paused` | Same as on Skript |
-| Events: `on entity removed from world`, `on server tick start`, `on async chat` (with `async chat message`), `on unknown command` (with `event-string`), `on player chunk send` | Same as on Skript |
+| Events: `on entity removed from world`, `on server tick start`, `on async chat` (with `async chat message`), `on unknown command` (with `event-string`), `on player chunk send`, `on tab complete of "/a" and "/b"`, `on damage of zombie by cactus or magma block` | Same as on Skript |
 
 The rest of SkBee's registered syntax may work, but isn't checked yet. Syntax that reaches a part of Skript NeoSkriptCompat doesn't have yet fails with an error that names what's missing: when the script loads if it reaches it while the line is set up, otherwise when the line runs.
 
@@ -38,6 +38,7 @@ The rest of SkBee's registered syntax may work, but isn't checked yet. Syntax th
 - An addon's **sections and structures** (for SkBee: text component and bound sections, its structures).
 - **Saving** an addon's own types in variables.
 - An addon's **type properties** (Skript 2.17's `name of`, `amount of` for an addon's types).
+- An addon's effects that **wait** and run the rest of the trigger themselves (SkBee's `load chunk`, `load world`).
 - An addon element that **changes its argument** (`set`, `add` on what it was given).
 - An element that turns down a line (its setup returns false) makes that line an error; on Skript, other syntax would be tried.
 - An element that needs a written value for an argument works only with one value there, not a list (`entities in range of beacon` with `zombies and skeletons`).

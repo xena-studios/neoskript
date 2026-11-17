@@ -172,6 +172,7 @@ final class Bots implements Listener {
                 case "quit" -> bot.quit();
                 case "chat" -> bot.chat(rest);
                 case "command" -> bot.command(rest);
+                case "tab" -> bot.tabComplete(rest);
                 case "respawn" -> bot.respawn();
                 case "swap" -> bot.swapHands();
                 case "drop" -> bot.drop(rest.equalsIgnoreCase("all"));

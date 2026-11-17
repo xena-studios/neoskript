@@ -238,12 +238,32 @@ final class CompatRegistration {
             skip("event values of types NeoSkript doesn't have");
             return;
         }
-        if (compat.library().hasEventValue(value.eventClass(), type, value.time().value())) {
+        // NeoSkript's class for the value: an array class for a list (event-entities), as the addon has it.
+        Class<?> valueClass = value.valueClass();
+        Class<?> component = CompatAdapters.neoskriptClass(valueClass.isArray() ? valueClass.getComponentType()
+                : valueClass);
+        Class<?> neoskriptClass = valueClass.isArray() ? component.arrayType() : component;
+        if (compat.library().hasEventValue(value.eventClass(), type, neoskriptClass, value.time().value())) {
             return;
         }
-        registrar.eventValue(value.eventClass(), type, value.time().value(),
-                event -> CompatValuesBridge.result(value.get(event)));
+        registrar.eventValue(value.eventClass(), type, neoskriptClass, value.time().value(),
+                event -> typed(CompatValuesBridge.result(value.get(event)), neoskriptClass));
         count("event values");
+    }
+
+    /** A list value as an array of its class ({@code Entity[]}), as NeoSkript looks event values up by class. */
+    private static Object typed(Object value, Class<?> valueClass) {
+        if (!(value instanceof Object[] values) || !valueClass.isArray() || valueClass.isInstance(value)) {
+            return value;
+        }
+        Object[] typed = (Object[]) java.lang.reflect.Array.newInstance(valueClass.getComponentType(), values.length);
+        int count = 0;
+        for (Object element : values) {
+            if (valueClass.getComponentType().isInstance(element)) {
+                typed[count++] = element;
+            }
+        }
+        return count == typed.length ? typed : java.util.Arrays.copyOf(typed, count);
     }
 
     // ------------------------------------------------------------ syntax
@@ -259,8 +279,14 @@ final class CompatRegistration {
             boolean registered = switch (kind) {
                 case "expression" -> attempt("expression", info.type().getName(),
                         () -> CompatElements.expression(compat, registrar, addon, info));
-                case "effect" -> attempt("effect", info.type().getName(),
-                        () -> CompatElements.effect(compat, registrar, addon, info));
+                case "effect" -> {
+                    if (CompatElements.walks(info.type())) {
+                        skip("effects that run the rest of the trigger themselves");
+                        yield false;
+                    }
+                    yield attempt("effect", info.type().getName(),
+                            () -> CompatElements.effect(compat, registrar, addon, info));
+                }
                 case "condition" -> attempt("condition", info.type().getName(),
                         () -> CompatElements.condition(compat, registrar, addon, info));
                 case "event" -> attempt("event", info.type().getName(),
