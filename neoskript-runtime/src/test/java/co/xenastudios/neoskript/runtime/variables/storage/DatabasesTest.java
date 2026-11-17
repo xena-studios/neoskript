@@ -399,7 +399,9 @@ class DatabasesTest {
                 "variables_2026-11-17_01-02-03_scheduled.csv.copying.tmp.old",
                 "myvariables_2026-11-17_01-02-03.csv.copying.tmp",
                 // An owner's own copy, as the native storage's test has it.
-                "variables_2026-11-17_01-02-03_scheduled.csv.tmp");
+                "variables_2026-11-17_01-02-03_scheduled.csv.tmp",
+                // Not a backup's extension: an owner's files, with digits before .tmp.
+                "variables_2026-11-17_01-02-03.bak2.tmp", "variables_2026-11-17_01-02-03_scheduled.txt12.tmp");
         for (String name : leftovers) {
             Files.writeString(backups.resolve(name), "part");
         }

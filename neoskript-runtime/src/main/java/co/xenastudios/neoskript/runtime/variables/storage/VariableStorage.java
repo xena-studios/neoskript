@@ -286,10 +286,13 @@ public final class VariableStorage implements VariableBackend {
         Path backups = file.toAbsolutePath().getParent().resolve("backups");
         String name = file.getFileName().toString();
         int dot = name.lastIndexOf('.');
+        // A backup's and a snapshot's name end in the file's own extension, exactly: an owner's 'variables_<time>.bak2.tmp'
+        // isn't one.
         java.util.regex.Pattern shape = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(
                 dot < 0 ? name : name.substring(0, dot))
                 + "_\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}(-\\d{3})?([-_]\\d+)?(" + java.util.regex.Pattern.quote(SCHEDULED)
-                + ")?(\\.[A-Za-z0-9]+)?(\\d+\\.tmp|" + java.util.regex.Pattern.quote(Durable.TEMPORARY) + ")");
+                + ")?" + java.util.regex.Pattern.quote(dot < 0 ? "" : name.substring(dot)) + "(\\d+\\.tmp|"
+                + java.util.regex.Pattern.quote(Durable.TEMPORARY) + ")");
         int removed = 0;
         for (Path dir : List.of(backups, backups.resolve("snapshots"))) {
             if (!Files.isDirectory(dir)) {
