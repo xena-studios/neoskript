@@ -169,6 +169,8 @@ Each server writes its own changes before it reads the others', and a change it 
 
 Unlike Skript, a variable deleted on one server is deleted on the others: with `monitor-changes` on, a deletion is written as a row without a value, which Skript ignores when it reads, and such rows are removed a while later, as Skript removes them. Skript servers on the same database see NeoSkript's changes, but not its deletions.
 
+Also unlike Skript, two servers changing one variable at once don't lose a change. With `monitor-changes` on, each write checks the rows it writes against what the server last saw of them (locking them, on MySQL, until it's done); where another server wrote one since, numbers that were only added to or taken from have this server's additions added to the other's value, so `add 1 to {x}` on two servers at once adds 2, and a value added to a list at an index the other server filled first moves to the next free one. Anything else is the last write's, as in Skript. This covers an outage too: additions made on every server while the database was down all count once it's back. [NeoSkript Proxy](/docs/addons/proxy/#network-variables) builds `{network::...}` variables on this, and tells the other servers about each write so they don't wait for `monitor-interval`.
+
 ### When a database is down
 
 NeoSkript never stalls the server waiting for a database, never writes to one it didn't load, and doesn't lose changes while the server runs:
