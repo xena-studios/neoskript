@@ -279,6 +279,10 @@ final class EventTypes {
             }
         }
         for (Map.Entry<String, E> constant : byConstant.entrySet()) {
+            if (texts.containsKey(constant.getValue())) {
+                // Skript reads a value by its names only: the click type 'creative action' isn't 'creative'.
+                continue;
+            }
             String fallback = constant.getKey().replace('_', ' ');
             values.putIfAbsent(fallback, constant.getValue());
             texts.putIfAbsent(constant.getValue(), fallback);
