@@ -71,7 +71,8 @@ public final class Comparison {
             return dx == dy || Math.abs(dx - dy) < EPSILON;
         }
         if (a instanceof String x && b instanceof String y) {
-            return x.equalsIgnoreCase(y);
+            // Skript's 'case sensitive' option; off by default.
+            return Settings.caseSensitive() ? x.equals(y) : x.equalsIgnoreCase(y);
         }
         return a.equals(b);
     }

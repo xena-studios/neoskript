@@ -73,6 +73,45 @@ public final class VariableFile {
         return new Contents(entries, problems);
     }
 
+    /**
+     * The names of the variables the file holds, as {@link #load} would read them, without their values: read a line
+     * at a time, so only the names are held.
+     */
+    public static java.util.Set<String> names(Path file) throws IOException {
+        java.util.Set<String> names = new java.util.LinkedHashSet<>();
+        try (BufferedReader in = new BufferedReader(
+                new InputStreamReader(Files.newInputStream(file), StandardCharsets.UTF_8), 1 << 16)) {
+            String line;
+            while ((line = in.readLine()) != null) {
+                if (line.isBlank() || line.startsWith("#")) {
+                    continue;
+                }
+                List<String> fields = split(line);
+                if (fields.size() != 3) {
+                    continue;
+                }
+                if (fields.get(1).isEmpty()) {
+                    names.remove(fields.getFirst());
+                } else if (isHex(fields.get(2))) {
+                    names.add(fields.getFirst());
+                }
+            }
+        }
+        return names;
+    }
+
+    private static boolean isHex(String text) {
+        if (text.length() % 2 != 0) {
+            return false;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            if (Character.digit(text.charAt(i), 16) < 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** One line of the file, line {@code number}: into {@code entries}, or {@code problems} if it can't be read. */
     private static void read(String line, int number, HexFormat hex, Map<String, Entry> entries,
             List<Problem> problems) {
