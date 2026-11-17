@@ -2559,7 +2559,8 @@ final class TriggerCompiler {
             eventClasses = later.eventClasses();
             eventLabel = later.eventName();
             statements(section.body());
-            exitTrigger();
+            // The code's own end: nothing around it was entered, so nothing is left.
+            suspendTrigger();
         } finally {
             eventClasses = outerClasses;
             eventLabel = outerLabel;
