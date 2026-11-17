@@ -601,12 +601,16 @@ class PausingTest {
 
     /** 'tx %text%:' pauses before and after its code, with the test completing each stage. */
     private final List<String> ends = Collections.synchronizedList(new ArrayList<>());
+    /** The runs 'tx' started for, and was told were abandoned. */
+    private final List<Object> startedRuns = Collections.synchronizedList(new ArrayList<>());
+    private final List<Object> abandonedRuns = Collections.synchronizedList(new ArrayList<>());
 
     private void sections() {
         library.pausingSection("TestSecTx", info -> new co.xenastudios.neoskript.api.element.PausingSection() {
             @Override
             public java.util.concurrent.CompletionStage<?> start(co.xenastudios.neoskript.api.element.TriggerContext context,
                     Object[] arguments) {
+                startedRuns.add(context);
                 return stage();
             }
 
@@ -619,6 +623,7 @@ class PausingTest {
             @Override
             public void abandoned(co.xenastudios.neoskript.api.element.TriggerContext context) {
                 ends.add("abandoned");
+                abandonedRuns.add(context);
             }
         }, "tx %text%");
         library.timeout("TestSecTx", Duration.ofSeconds(5));
@@ -804,5 +809,77 @@ class PausingTest {
                 \tsay "v is %{_v}%"
                 """);
         assertEquals(List.of("v is <none>"), said);
+    }
+
+    @Test
+    void eachRunHasAContextOfItsOwnThoughItsEventIsShared() {
+        sections();
+        library.effect("TestEffBoom", info -> (context, args) -> {
+            throw new IllegalStateException("boom");
+        }, "boom");
+        CompiledScripts compiled = compile("""
+                on load:
+                \ttx "a":
+                \t\tfetch "waits"
+                \t\tsay "a carried on"
+
+                on load:
+                \ttx "b":
+                \t\tboom
+                """);
+        assertEquals(List.of(), errors(compiled.diagnostics()));
+        // Both triggers are given the same context, as an event's triggers are.
+        SimpleTriggerContext shared = new SimpleTriggerContext(null);
+        for (var trigger : compiled.triggers()) {
+            try {
+                trigger.trigger().execute(shared);
+            } catch (RuntimeException expected) {
+                // b's boom, once its section has started.
+            }
+        }
+        // a's and b's sections started for runs of their own.
+        assertEquals(2, startedRuns.size());
+        assertTrue(startedRuns.get(0) != startedRuns.get(1) && startedRuns.get(0) != shared);
+        stages.get(0).complete(null); // a: into its code, where it waits
+        tick();
+        stages.get(1).complete(null); // b: into its code, where it throws
+        try {
+            tick();
+        } catch (RuntimeException expected) {
+            // b's boom.
+        }
+        // b throwing abandons b's section only: a still waits in its own.
+        assertEquals(List.of(startedRuns.get(1)), abandonedRuns);
+        stages.get(2).complete(null); // a's fetch
+        tick();
+        assertTrue(said.contains("a carried on"));
+        stages.get(3).complete(null); // a's end
+        tick();
+        assertEquals(List.of("abandoned", "end"), ends);
+        assertEquals(0, co.xenastudios.neoskript.runtime.PausingSections.open());
+    }
+
+    @Test
+    void functionsCalledFromNowhereEachHaveARunOfTheirOwn() {
+        sections();
+        run("""
+                function fa():
+                \ttx "fa":
+                \t\tsay "fa"
+
+                function fb():
+                \ttx "fb":
+                \t\tsay "fb"
+
+                on load:
+                \tfa()
+                \tfb()
+                """);
+        assertEquals(2, startedRuns.size());
+        assertTrue(startedRuns.get(0) != startedRuns.get(1));
+        stages.get(0).complete(null);
+        stages.get(1).complete(null);
+        tick();
+        assertEquals(List.of("fa", "fb"), said.stream().sorted().toList());
     }
 }

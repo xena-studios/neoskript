@@ -92,15 +92,20 @@ final class AddonApi implements NeoSkript {
     private boolean stopped;
 
     @Override
-    public void whenStopped(Runnable task) {
+    public Runnable whenStopped(Runnable task) {
         java.util.Objects.requireNonNull(task, "task");
         synchronized (this) {
             if (!stopped) {
                 stopping.add(task);
-                return;
+                return () -> {
+                    synchronized (this) {
+                        stopping.remove(task);
+                    }
+                };
             }
         }
         task.run();
+        return () -> {};
     }
 
     /** Marks NeoSkript stopped, after its unload triggers and their pauses, and runs what waited for that. */

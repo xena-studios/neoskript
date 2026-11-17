@@ -54,8 +54,9 @@ public final class NeoSkriptDb extends JavaPlugin {
         // NeoSkript disables after this (it's a dependency), and runs its 'on unload' triggers then, whose writes
         // still need the databases: on a server stop, /reload, or a plugin manager disabling both. They close once
         // NeoSkript has stopped running scripts.
+        Runnable cancel;
         try {
-            NeoSkript.get().whenStopped(() -> stopping.close(GRACE));
+            cancel = NeoSkript.get().whenStopped(() -> stopping.close(GRACE));
         } catch (RuntimeException | LinkageError gone) {
             stopping.close(GRACE);
             return;
@@ -71,6 +72,8 @@ public final class NeoSkriptDb extends JavaPlugin {
             Plugin neoskript = Bukkit.getPluginManager().getPlugin("NeoSkript");
             if (neoskript != null && neoskript.isEnabled()) {
                 stopping.close(GRACE);
+                // Closed: NeoSkript lets go of the task, and with it this plugin's classes.
+                cancel.run();
             }
         }, "NeoSkriptDb-shutdown");
         closer.setDaemon(true);

@@ -67,6 +67,12 @@ class PartsTest {
         assertEquals(new Secrets.Split("jdbc:mysql://localhost:3306/db?user=admin&useSSL=false", "admin", "s3cret!"),
                 Secrets.split("jdbc:mysql://admin:s3cret%21@localhost:3306/db?password=s3cret%21&user=admin&useSSL=false"));
         assertEquals(new Secrets.Split("jdbc:sqlite:x.db", null, null), Secrets.split("jdbc:sqlite:x.db"));
+        // A password with an @ or a / in it, not encoded: all of it, to the last @ before the host.
+        String awkward = "jdbc:mysql://root:p@ss/w@host/db?user=root";
+        assertEquals("jdbc:mysql://root:***@host/db?user=root", Secrets.mask(awkward));
+        assertEquals(new Secrets.Split("jdbc:mysql://host/db?user=root", "root", "p@ss/w"), Secrets.split(awkward));
+        assertFalse(Secrets.hide("Access denied (p@ss/w) for " + awkward, awkward).contains("ss/w"));
+        assertEquals("jdbc:mysql://host:3306/db", Secrets.mask("jdbc:mysql://host:3306/db"));
         // Short passwords too.
         String shortOne = "jdbc:mariadb://h/db?user=u&password=q7";
         assertFalse(Secrets.hide("bad password q7 for u", shortOne).contains("q7"));

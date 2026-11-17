@@ -104,6 +104,9 @@ public final class NeoSkriptDbScenario implements Scenario {
         }
         // The harness bot speaks 26.x's protocol only.
         boolean players = !context.environment().minecraftVersion().startsWith("1.");
+        if (!neoskript.log().contains("pair b") || neoskript.log().contains("pair a")) {
+            throw new HarnessFailure("Two scripts' transactions on one event weren't each their own: " + neoskript.log());
+        }
         if (players && !neoskript.log().contains("Steve")) {
             throw new HarnessFailure("The transaction in Steve's command wasn't committed: " + neoskript.log());
         }
@@ -128,6 +131,7 @@ public final class NeoSkriptDbScenario implements Scenario {
                 .file("plugins/" + folder + "/scripts/neoskript-db-errors.sk", context.script("neoskript-db-errors.sk"));
         if (neo) {
             builder.file("plugins/NeoSkript/scripts/neoskript-db-extra.sk", context.script("neoskript-db-extra.sk"))
+                    .file("plugins/NeoSkript/scripts/neoskript-db-pair.sk", context.script("neoskript-db-pair.sk"))
                     .plugin(context.botJar());
         }
         Path database = runDir.resolve("plugins/dbtest/test.db");
@@ -176,6 +180,10 @@ public final class NeoSkriptDbScenario implements Scenario {
             server.command("bot command Steve dbextra tx");
             server.await(line("[dbextra] tx by Steve <none>"), mark, WAIT);
         }
+        // Two scripts' transactions on one event: each its own.
+        server.command("dbpair");
+        server.await(line("[dbextra] pair a failed"), mark, WAIT);
+        server.await(line("[dbextra] pair b <none>"), mark, WAIT);
         server.command("dbextra sync");
         server.await(line("[dbextra] sync 7"), mark, WAIT);
         server.command("dbextra shown");

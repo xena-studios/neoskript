@@ -22,7 +22,8 @@ import java.util.concurrent.CompletionStage;
  * instead, so an addon can let go of what the section opened.
  *
  * <p>The element is shared by every run of the trigger, and by every trigger the section is in: keep what a run
- * opened by its {@link TriggerContext#event()}, not in the element.
+ * opened by its {@link TriggerContext}, by identity (each run has its own), not by its event (an event's triggers
+ * share it) and not in the element.
  *
  * <p>Experimental until a second addon uses it.
  */
