@@ -225,7 +225,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (!deferSyntax) {
             loadVariables();
         }
-        AddonApi api = new AddonApi(this, addons, scripts.globals(), library, getSLF4JLogger());
+        AddonApi api = new AddonApi(this, addons, scripts.globals(), library, getSLF4JLogger(), this::databases);
         addonApi = api;
         co.xenastudios.neoskript.api.Installed.install(api);
         // An addon disables before NeoSkript when the server stops, and its classes go with it. Its values in

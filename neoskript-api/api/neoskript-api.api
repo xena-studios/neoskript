@@ -52,7 +52,18 @@ public final record co.xenastudios.neoskript.api.Values$Saved
   public java.lang.String toString()
   public java.lang.String type()
 
+public interface co.xenastudios.neoskript.api.VariableDatabase @Experimental
+  public abstract boolean available()
+  public abstract void checkForChanges()
+  public abstract java.lang.String id()
+  public abstract java.lang.String name()
+  public abstract java.lang.String pattern()
+  public abstract boolean shared()
+  public abstract java.lang.String state()
+  public abstract java.lang.Runnable whenWritten(java.lang.Runnable)
+
 public interface co.xenastudios.neoskript.api.Variables
+  public java.util.List databases() signature ()Ljava/util/List<Lco/xenastudios/neoskript/api/VariableDatabase;>; @Experimental
   public abstract void deleteList(java.lang.String)
   public abstract java.lang.Object get(java.lang.String)
   public abstract java.util.Map list(java.lang.String) signature (Ljava/lang/String;)Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;
