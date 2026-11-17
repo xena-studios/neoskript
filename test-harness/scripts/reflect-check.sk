@@ -1,0 +1,146 @@
+# Harness: the same script on Skript 2.17.0 with skript-reflect 2.6.3 and on NeoSkript with NeoSkriptReflect.
+# Each line it prints is compared.
+import:
+	java.lang.Math
+	java.lang.System
+	java.lang.Integer
+	java.lang.String as JavaString
+	java.util.ArrayList
+	java.util.HashMap
+	java.util.List
+	java.awt.Point
+	org.bukkit.Bukkit
+	org.bukkit.Location
+	org.bukkit.entity.EnderDragon
+	org.bukkit.event.server.ServerCommandEvent
+	java.lang.Character
+	java.util.LinkedList
+	java.util.HashSet
+	java.util.TreeSet
+	java.util.ArrayDeque
+	java.util.LinkedHashSet
+	java.util.stream.IntStream
+	java.util.stream.Collectors
+
+on load:
+	send "[reflect] max int: %Math.max[int, int](3, 7)%" to console
+	send "[reflect] abs: %Math.abs(-2.5)%" to console
+	set {_format} to JavaString.format("%%s-%%s", "a", "b")
+	send "[reflect] format: %{_format}%" to console
+	set {_list} to new ArrayList()
+	{_list}.add("a")
+	{_list}.add("b")
+	send "[reflect] size: %{_list}.size()%" to console
+	send "[reflect] size plus one: %{_list}.size() + 1%" to console
+	send "[reflect] get: %{_list}.get(1)%" to console
+	send "[reflect] list: %{_list}%" to console
+	send "[reflect] spread: %...{_list}%" to console
+	set {_contains} to {_list}.contains("a")
+	send "[reflect] contains: %{_contains}%" to console
+	if {_list}.contains("a"):
+		send "[reflect] condition: yes" to console
+	if {_list}.isEmpty():
+		send "[reflect] condition: empty" to console
+	send "[reflect] max value: %Integer.MAX_VALUE%" to console
+	set {_map} to new HashMap()
+	{_map}.put("k", 5)
+	set {_value} to {_map}.get("k")
+	send "[reflect] map: %{_value}%" to console
+	if {_list} is an instance of List:
+		send "[reflect] instance of: yes" to console
+	set {_array} to new int[3]
+	set {_array}[1] to 7
+	send "[reflect] array: %{_array}%" to console
+	send "[reflect] array element: %{_array}[1]%" to console
+	send "[reflect] collect: %[1, 2, 3]%" to console
+	send "[reflect] null: %null%" to console
+	send "[reflect] class of: %{_list}'s class%" to console
+	set {_class} to class "java.lang.Thread"
+	send "[reflect] class named: %{_class}%" to console
+	send "[reflect] dot class: %ArrayList.class%" to console
+	send "[reflect] world: %Bukkit.getWorlds().get(0).getName()%" to console
+	set {_world} to Bukkit.getWorld("world")
+	set {_location} to new Location({_world}, 1, 2, 3)
+	send "[reflect] location x: %{_location}.getX()%" to console
+	set {_point} to new Point(1, 2)
+	set {_point}.x to 5
+	send "[reflect] field: %{_point}.x%" to console
+	send "[reflect] nested: %EnderDragon.Phase.LEAVE_PORTAL%" to console
+	send "[reflect] fields: %size of fields of ArrayList%" to console
+	send "[reflect] field names: %field names of {_point}%" to console
+	set {_texts} to ["a", "b" as JavaString]
+	send "[reflect] typed collect: %{_texts}%" to console
+	# Java's Integer comes back as one, so a set of integers contains a list's size.
+	set {_ints} to IntStream.range(0, 3).boxed().collect(Collectors.toSet())
+	send "[reflect] contains size: %{_ints}.contains({_list}.size())%" to console
+	# Skript's arithmetic and comparisons come before a call: '{_one} + {_list}.size()' is 1 plus the size.
+	set {_one} to 1
+	send "[reflect] plus call: %{_one} + {_list}.size()%" to console
+	send "[reflect] equals call: %whether {_one} = {_list}.size()%" to console
+	send "[reflect] is call: %whether 2 is {_list}.size()%" to console
+	# A one-letter text is a char; "ab" isn't, though it's a text too.
+	loop "5" and "ab":
+		send "[reflect] letter %loop-value%: %Character.isLetter(loop-value)%" to console
+	try {_list}.get(9)
+	send "[reflect] error: %last java error%" to console
+	set {_version} to System.getProperty("java.version")
+	if {_version} is set:
+		send "[reflect] system: yes" to console
+	send "[reflect] loaded" to console
+
+on ServerCommandEvent:
+	if event.getCommand() is "reflect-event":
+		send "[reflect] event: %event.getCommand()%" to console
+
+command /reflect-missing:
+	trigger:
+		set {_list} to new ArrayList()
+		{_list}.sise()
+		send "[reflect] missing done" to console
+
+command /reflect-bench:
+	trigger:
+		set {_list} to new ArrayList()
+		{_list}.add("a")
+		# The fastest of five rounds of calls, less the fastest of five of the same loop without them, so the JIT has
+		# warmed up and a slow round of either doesn't count.
+		loop 5 times:
+			set {_start} to System.nanoTime()
+			loop 1000000 times:
+				set {_size} to {_list}.size()
+			set {_calls} to System.nanoTime() - {_start}
+			set {_start} to System.nanoTime()
+			loop 1000000 times:
+				set {_size} to 1
+			set {_empty} to System.nanoTime() - {_start}
+			if {_bestCalls} is not set:
+				set {_bestCalls} to {_calls}
+				set {_bestEmpty} to {_empty}
+			if {_calls} < {_bestCalls}:
+				set {_bestCalls} to {_calls}
+			if {_empty} < {_bestEmpty}:
+				set {_bestEmpty} to {_empty}
+		send "[reflect] bench ns per call: %({_bestCalls} - {_bestEmpty}) / 1000000%" to console
+		# The same call on six classes of collection, more than a call site keeps for itself: each class's member is
+		# found again, as for 'loop-entity.getHandle()' over many kinds of entity.
+		set {_all::*} to new ArrayList(), new LinkedList(), new HashSet(), new TreeSet(), new ArrayDeque() and new LinkedHashSet()
+		delete {_bestCalls} and {_bestEmpty}
+		loop 5 times:
+			set {_start} to System.nanoTime()
+			loop 20000 times:
+				loop {_all::*}:
+					set {_size} to loop-value-3.size()
+			set {_calls} to System.nanoTime() - {_start}
+			set {_start} to System.nanoTime()
+			loop 20000 times:
+				loop {_all::*}:
+					set {_size} to 1
+			set {_empty} to System.nanoTime() - {_start}
+			if {_bestCalls} is not set:
+				set {_bestCalls} to {_calls}
+				set {_bestEmpty} to {_empty}
+			if {_calls} < {_bestCalls}:
+				set {_bestCalls} to {_calls}
+			if {_empty} < {_bestEmpty}:
+				set {_bestEmpty} to {_empty}
+		send "[reflect] poly bench ns per call: %({_bestCalls} - {_bestEmpty}) / 120000%" to console

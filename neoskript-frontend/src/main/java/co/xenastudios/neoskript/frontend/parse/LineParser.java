@@ -692,34 +692,48 @@ final class LineParser {
 
     /** Skript's warnings about the lists in what was parsed of this line, added to the line's warnings. */
     void listWarnings(Object parsed) {
-        listWarnings(input, parsed, warnings);
+        listWarnings(input, parsed, warnings, registry);
+    }
+
+    static void listWarnings(String input, Object parsed, java.util.Set<String> into) {
+        listWarnings(input, parsed, into, null);
     }
 
     /**
      * Skript's warnings about the lists in {@code parsed}, whose positions are in {@code input}: a list of more
      * than one value joined only by commas, which is an 'and' list, and one with both 'and' and 'or'.
      */
-    static void listWarnings(String input, Object parsed, java.util.Set<String> into) {
+    static void listWarnings(String input, Object parsed, java.util.Set<String> into, SyntaxRegistry registry) {
         switch (parsed) {
             case ParsedSyntax syntax -> {
-                syntax.match().values().forEach(value -> listWarnings(input, value, into));
-                syntax.match().regexValues().forEach(value -> listWarnings(input, value, into));
+                // An addon's call whose arguments Skript parses as a function's (skript-reflect's Java calls): its
+                // own lists aren't warned about, but what's inside them is.
+                boolean quiet = registry != null && registry.quietLists(syntax.syntax().id());
+                for (Object value : syntax.match().values()) {
+                    if (quiet && value instanceof Expr.ListOf list) {
+                        list.items().forEach(item -> listWarnings(input, item, into, registry));
+                    } else {
+                        listWarnings(input, value, into, registry);
+                    }
+                }
+                syntax.match().regexValues().forEach(value -> listWarnings(input, value, into, registry));
             }
-            case Expr.Syntax syntax -> listWarnings(input, syntax.syntax(), into);
+            case Expr.Syntax syntax -> listWarnings(input, syntax.syntax(), into, registry);
             case Expr.ListOf list -> {
-                listWarning(input, list, into);
-                list.items().forEach(item -> listWarnings(input, item, into));
+                listWarning(input, list, into, registry);
+                list.items().forEach(item -> listWarnings(input, item, into, registry));
             }
             // Skript throws away the warnings parsing function arguments gives.
             case Expr.FunctionCall call -> {}
-            case Expr.Text text -> text.embedded().forEach(part -> listWarnings(input, part, into));
-            case Expr.Variable variable -> variable.embedded().forEach(part -> listWarnings(input, part, into));
+            case Expr.Text text -> text.embedded().forEach(part -> listWarnings(input, part, into, registry));
+            case Expr.Variable variable -> variable.embedded().forEach(part -> listWarnings(input, part, into, registry));
             case null, default -> {}
         }
     }
 
     /** Skript's {@code parseExpressionList} warnings for one list, from the words between its items. */
-    private static void listWarning(String input, Expr.ListOf list, java.util.Set<String> into) {
+    private static void listWarning(String input, Expr.ListOf list, java.util.Set<String> into,
+            SyntaxRegistry registry) {
         List<Expr> items = list.items();
         if (items.size() < 2 || list.end() > input.length()) {
             return;
@@ -746,7 +760,7 @@ final class LineParser {
                 and = true;
             }
         }
-        if (and == null) {
+        if (and == null && (registry == null || !registry.missingAndOrOff())) {
             into.add("conjunction:List is missing 'and' or 'or', defaulting to 'and': " + text);
         }
     }
@@ -2277,7 +2291,9 @@ final class LineParser {
         if (!open) {
             return null;
         }
-        boolean verified = expected.types().stream().anyMatch(type -> type.openLiterals() && registry.isLiteral(type, text));
+        boolean verified = expected.types().stream().anyMatch(type -> type.openLiterals() && registry.isLiteral(type, text))
+                // Where any value goes, words only an addon's strict type takes (an imported class) are known too.
+                || expected.anything() && registry.isAddonStrictLiteral(text);
         return new Expr.Unresolved(start, end, text, verified);
     }
 

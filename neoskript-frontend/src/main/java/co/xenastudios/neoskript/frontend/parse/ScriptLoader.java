@@ -94,6 +94,14 @@ public final class ScriptLoader {
     }
 
     public List<ParsedScript> load(List<SourceFile> files) {
+        // Addons' structures start afresh: every script is parsed again.
+        for (co.xenastudios.neoskript.api.registration.StructureHandler handler : registry.structureHandlers()) {
+            try {
+                handler.reset();
+            } catch (RuntimeException | LinkageError e) {
+                // An addon's failure is its own: the scripts still load.
+            }
+        }
         List<ScriptParser.Result> results = parallel(files).map(ScriptParser::parse).toList();
         Map<String, List<FunctionInfo>> functions = new HashMap<>();
         Map<String, Map<String, List<FunctionInfo>>> locals = new HashMap<>();
@@ -139,6 +147,15 @@ public final class ScriptLoader {
     }
 
     private ParsedScript parse(ScriptParser.Result result, ParserContext context) {
+        String before = LoadingScript.set(result.file().name());
+        try {
+            return parseScript(result, context);
+        } finally {
+            LoadingScript.set(before);
+        }
+    }
+
+    private ParsedScript parseScript(ScriptParser.Result result, ParserContext context) {
         Diagnostics diagnostics = new Diagnostics(result.file());
         context.scriptLines(result.file().lines().size());
         for (Diagnostic diagnostic : result.diagnostics()) {
@@ -163,9 +180,13 @@ public final class ScriptLoader {
         context.hints().enable(experiments.contains("type hints")
                 || experiments.stream().anyMatch(name -> name.matches("(local variable )?type hints")));
         StatementParser statements = new StatementParser(context, diagnostics);
+        // Addons' structures first, wherever they are in the script, as Skript loads skript-reflect's 'import:' before
+        // the triggers that use what it imports.
+        java.util.Set<Structure> handled = addonStructures(result.structures(), context, diagnostics);
         List<ParsedStructure> parsed = new ArrayList<>();
         for (Structure structure : result.structures()) {
-            ParsedStructure p = structure(structure, context, statements, diagnostics);
+            ParsedStructure p = handled.contains(structure) ? new ParsedStructure.Data(structure)
+                    : structure(structure, context, statements, diagnostics);
             if (p != null) {
                 parsed.add(p);
             }
@@ -274,6 +295,80 @@ public final class ScriptLoader {
         }
     }
 
+    /** Gives each of the script's addon structures to its handler, returning those it handled. */
+    private java.util.Set<Structure> addonStructures(List<Structure> structures, ParserContext context,
+            Diagnostics diagnostics) {
+        if (registry.structureHandlers().isEmpty()) {
+            return java.util.Set.of();
+        }
+        java.util.Set<Structure> handled = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (Structure structure : structures) {
+            if (structure.kind() != Structure.Kind.EVENT
+                    || structure.section().line().key().equalsIgnoreCase(PARSE_STRUCTURE)) {
+                continue;
+            }
+            String key = structure.section().line().key();
+            ParsedSyntax custom = new LineParser(context, key).structure(0, key.length());
+            co.xenastudios.neoskript.api.registration.StructureHandler handler = custom == null ? null
+                    : registry.structureHandler(custom.syntax().id());
+            if (handler != null) {
+                addonStructure(handler, custom, structure.section(), diagnostics);
+                handled.add(structure);
+            }
+        }
+        return handled;
+    }
+
+    /** Gives an addon's structure to its handler, with its lines as written. */
+    private static void addonStructure(co.xenastudios.neoskript.api.registration.StructureHandler handler,
+            ParsedSyntax syntax, Node.Section section, Diagnostics diagnostics) {
+        Line header = section.line();
+        List<co.xenastudios.neoskript.api.registration.ScriptStructure.Entry> entries = new ArrayList<>();
+        for (Node child : section.children()) {
+            entries.add(new co.xenastudios.neoskript.api.registration.ScriptStructure.Entry(child.line().number(),
+                    child.line().text()));
+        }
+        String script = diagnostics.file().name();
+        co.xenastudios.neoskript.api.registration.ScriptStructure structure =
+                new co.xenastudios.neoskript.api.registration.ScriptStructure() {
+                    @Override
+                    public String script() {
+                        return script;
+                    }
+
+                    @Override
+                    public String header() {
+                        return header.key();
+                    }
+
+                    @Override
+                    public int pattern() {
+                        return syntax.pattern();
+                    }
+
+                    @Override
+                    public List<Entry> entries() {
+                        return List.copyOf(entries);
+                    }
+
+                    @Override
+                    public void error(int line, String message) {
+                        diagnostics.error(line, 0, 0, message);
+                    }
+
+                    @Override
+                    public void warning(int line, String message) {
+                        diagnostics.warning(line, 0, 0, message);
+                    }
+                };
+        try {
+            handler.load(structure);
+        } catch (RuntimeException | LinkageError e) {
+            diagnostics.error(header.number(), header.column(), header.key().length(),
+                    "The addon handling '" + header.key() + "' failed: " + e);
+        }
+    }
+
     /** Parses the structures in a top-level {@code parse:} block's {@code code:}, capturing their problems. */
     private ParsedStructure parseBlock(Structure structure, ParserContext context, StatementParser statements,
             Diagnostics diagnostics) {
@@ -303,6 +398,11 @@ public final class ScriptLoader {
         LineParser parser = new LineParser(context, key);
         ParsedSyntax custom = parser.structure(0, key.length());
         EventValues values = registry.eventValues();
+        if (custom != null && registry.structureHandler(custom.syntax().id()) != null) {
+            // Inside a 'parse:' block: given to its handler with the rest.
+            addonStructure(registry.structureHandler(custom.syntax().id()), custom, section, diagnostics);
+            return new ParsedStructure.Data(structure);
+        }
         if (custom != null) {
             context.eventScope(values == null ? null : values.structure(custom.syntax()));
             return new ParsedStructure.Custom(structure, custom, statements.body(section.children()));
@@ -316,7 +416,7 @@ public final class ScriptLoader {
             return null;
         }
         java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
-        LineParser.listWarnings(key, event, warnings);
+        LineParser.listWarnings(key, event, warnings, registry);
         statements.warn(line, warnings);
         context.eventScope(values == null ? null : values.event(event.syntax()));
         return new ParsedStructure.Event(structure, event, statements.body(section.children()));

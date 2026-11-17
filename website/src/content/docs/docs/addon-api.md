@@ -223,6 +223,35 @@ registrar.onlyInEvents("MyAddonExprQuestion", -1, QuestionEvent.class);  // -1: 
 
 Elsewhere, other syntax that reads the text is tried first. Only if none does is your element used, and its factory throws the `SyntaxError` the script's author sees.
 
+## Structures, and what skript-reflect needed
+
+These are experimental: they may change in a minor release. NeoSkript's own [reflect addon](/docs/addons/reflect/) uses them.
+
+A **structure** is a top-level block with lines under it, like skript-reflect's `import:`. NeoSkript reads its header and lines and hands them to your handler as each script loads, before the script's triggers are parsed, so what it sets up (names for classes, say) is there when they are:
+
+```java
+registrar.structure("MyAddonStructAliases", new StructureHandler() {
+    public void reset() { aliases.clear(); }               // every script is loaded again: start afresh
+    public void load(ScriptStructure structure) {          // one structure in one script
+        for (ScriptStructure.Entry entry : structure.entries()) {
+            if (!add(structure.script(), entry.text())) {
+                structure.error(entry.line(), entry.text() + " isn't an alias");
+            }
+        }
+    }
+}, "aliases");
+```
+
+`reset` is called once before each load of all scripts, and `load` for each structure, in any order and on any thread, so keep what it stores per script, in something safe to share between threads. `NeoSkript.get().scriptBeingLoaded()` is the script being parsed on the calling thread, while scripts load: a literal parser or an element's factory can use it to look up what that script's structure set up. It's `null` at any other time.
+
+Three more for syntax that reads like Java:
+
+- `argumentsLikeFunctions(id)`: the element's arguments are written as a function call's, `Math.max(3, 7)`, so a list joined by commas alone isn't warned about, as Skript doesn't for function calls.
+- `strictType(typeId)`: only values of your type itself, its subtypes and what converts to it are taken where it goes, as in Skript. Without it, a value of any other type is taken, and converted when the line runs: a `location` where a class goes would give none rather than the words being read as your type. Words your type's literal parser takes are also known words where any value goes, so they aren't read as something else.
+- `noMissingAndOrWarnings()`: Skript's "List is missing 'and' or 'or'" warning is off for every script, as when Skript's `disable variable missing and/or warnings` is on. skript-reflect turns it on when it's installed.
+- `TriggerContext.outermostRun()`: the run a context is part of: a trigger's own, and for a function the run that called it, however deep. Keep something for one run by its identity, and the functions the run calls share it.
+- `NeoSkript.get().runtimeWarning(message)` and `runtimeError(message)`: report something that went wrong while a trigger runs, as Skript's syntax does, with the script, line and element, and the trigger carries on.
+
 ## Functions
 
 ```java

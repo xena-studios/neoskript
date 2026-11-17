@@ -843,4 +843,47 @@ public interface Registrar {
      *     the id of one of NeoSkript's elements or another addon's
      */
     default void affinity(String id, ThreadAffinity affinity) {}
+
+    /**
+     * A top-level structure of an addon's own, as Skript's {@code import:} in skript-reflect: a header matching one of
+     * {@code patterns}, and lines under it that aren't code. NeoSkript gives each use to {@code handler} while the
+     * script is parsed, before the structures after it in the same script, so what it declares can change how the
+     * rest of the script reads. What it gives can be found again while the script is set up through
+     * {@link co.xenastudios.neoskript.api.NeoSkript#scriptBeingLoaded()}.
+     *
+     * @param id the structure's id, as the other elements'
+     * @param handler what to do with each use
+     * @param patterns the header's patterns, without the {@code :}
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void structure(String id, StructureHandler handler, String... patterns) {}
+
+    /**
+     * Says that element {@code id}'s arguments are written as a function call's ({@code Math.max(3, 7)} in
+     * skript-reflect), so a list of them joined by commas alone isn't warned about, as Skript doesn't for function
+     * calls.
+     *
+     * @param id the element's id: one this addon registered
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void argumentsLikeFunctions(String id) {}
+
+    /**
+     * Turns Skript's "List is missing 'and' or 'or', defaulting to 'and'" warning off for every script, as Skript's
+     * {@code disable variable missing and/or warnings} option does. For an addon whose original turns that option on
+     * when it's installed, as skript-reflect does, so the same scripts load with the same warnings.
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void noMissingAndOrWarnings() {}
+
+    /**
+     * Says that only values of type {@code typeId} itself, its subtypes and what converts to it are taken where it's
+     * wanted, as in Skript. Without this, a value of an unrelated type is taken and converted when the script runs:
+     * a {@code location} where skript-reflect's {@code javatype} goes would give no class rather than the parser
+     * reading {@code Location} as the imported class.
+     *
+     * @param typeId a type this addon registered
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void strictType(String typeId) {}
 }
