@@ -23,6 +23,12 @@ import java.nio.file.StandardOpenOption;
  */
 final class Durable {
 
+    /**
+     * Whether this is Windows, where renaming over a file another handle has open can be refused, so a backup that
+     * copies without its storage's lock could make a save fail.
+     */
+    static final boolean WINDOWS = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows");
+
     private Durable() {}
 
     /** What goes in a file, written to a stream. */
@@ -103,10 +109,17 @@ final class Durable {
         // channel opened here, not Files.copy, which gives the copy the source's permissions.
         Path parent = to.toAbsolutePath().getParent();
         Path temp = temporary(to);
-        // The backup it was for was never made, so this is what a crash left of it.
-        Files.deleteIfExists(temp);
+        FileChannel created;
         try {
-            try (FileChannel out = FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
+            // CREATE_NEW, never deleting what's there: another copy may be writing this temporary name right now, and
+            // a crash's leftovers are removed at startup. Taken, it counts as the name being taken, so the caller
+            // numbers the next one.
+            created = FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW);
+        } catch (FileAlreadyExistsException busy) {
+            throw new FileAlreadyExistsException(to.toString());
+        }
+        try {
+            try (FileChannel out = created) {
                 long done = 0;
                 if (head != null) {
                     writeFully(out, head);

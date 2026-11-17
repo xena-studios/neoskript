@@ -521,10 +521,22 @@ public final class NativeVariableStorage implements VariableBackend {
      * Holds this storage's lock only to open the file and read its header: a save appends after the end and then
      * rewrites a commit in the header, and a compaction replaces the whole file in one step, so the bytes up to the
      * size read here, under the header read here, are one whole committed file however long the copy takes. Saves,
-     * the server's last one included, don't wait for it.
+     * the server's last one included, don't wait for it. Except on Windows, where a rename over a file that's open can
+     * be refused: there the copy holds the lock throughout.
      */
     @Override
     public Path backupNow() throws IOException {
+        if (Durable.WINDOWS) {
+            // On Windows a compaction's rename over the file can be refused while the copy has it open, so saves wait
+            // for the copy there; stopping the server cancels it.
+            synchronized (this) {
+                return copyForBackup();
+            }
+        }
+        return copyForBackup();
+    }
+
+    private Path copyForBackup() throws IOException {
         if (backupCancelled) {
             return null;
         }

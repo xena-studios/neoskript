@@ -166,10 +166,22 @@ public final class VariableStorage implements VariableBackend {
 
     /**
      * Not under this storage's lock: a save replaces the file in one step, so the channel opened here reads one whole
-     * file however long the copy takes, and saves, the server's last one included, don't wait for it.
+     * file however long the copy takes, and saves, the server's last one included, don't wait for it. Except on
+     * Windows, where a rename over a file that's open can be refused: there the copy holds the lock, as it used to.
      */
     @Override
     public Path backupNow() throws IOException {
+        if (Durable.WINDOWS) {
+            // On Windows a save's rename over the file can be refused while the copy has it open, so a save waits
+            // for the copy there, as before; stopping the server cancels the copy, so its last save doesn't wait long.
+            synchronized (this) {
+                return copyForBackup();
+            }
+        }
+        return copyForBackup();
+    }
+
+    private Path copyForBackup() throws IOException {
         if (backupCancelled) {
             return null;
         }
