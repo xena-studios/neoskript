@@ -133,7 +133,7 @@ public final class NativeVariableStorage implements VariableBackend {
         }
         NativeVariableFile.Contents contents = NativeVariableFile.read(Files.readAllBytes(file));
         if (contents.damaged()) {
-            // Keep the file as it was before anything is dropped from it.
+            // Keep the file as it was, synced, before the save cut off at its end is dropped.
             recoveryBackup = VariableStorage.backup(file);
             recoveredBytes = contents.length() - contents.validEnd();
             try (FileChannel truncate = FileChannel.open(file, StandardOpenOption.WRITE)) {
@@ -167,11 +167,13 @@ public final class NativeVariableStorage implements VariableBackend {
         if (!skipped.isEmpty() && backup == null) {
             backup = VariableStorage.backup(file);
         }
+        // The backup keeps the values skipped, and the first save writes the file without them, so they aren't
+        // skipped and backed up again on every start.
         // A compacted file is in Skript's order, which the store takes in one pass.
         store.load(names, values);
         fileBytes = contents.validEnd();
         // A file of many saves that's grown past its limit is compacted by the first save.
-        compactNext = contents.records() > 1 && fileBytes > 2 * liveBytes + COMPACT_SLACK;
+        compactNext = !skipped.isEmpty() || contents.records() > 1 && fileBytes > 2 * liveBytes + COMPACT_SLACK;
         openChannel();
         savedAt = store.modifications();
         loaded = true;
@@ -253,7 +255,7 @@ public final class NativeVariableStorage implements VariableBackend {
             for (byte[] record : records) {
                 appended += record.length;
             }
-            if (compactNext || fileBytes + appended > 2 * live + COMPACT_SLACK) {
+            if (compactNext || channel == null || fileBytes + appended > 2 * live + COMPACT_SLACK) {
                 compact(all);
             } else {
                 append(records, appended);
@@ -278,22 +280,19 @@ public final class NativeVariableStorage implements VariableBackend {
     private void append(List<byte[]> records, long appended) throws IOException {
         try {
             for (byte[] record : records) {
-                ByteBuffer buffer = ByteBuffer.wrap(record);
-                while (buffer.hasRemaining()) {
-                    channel.write(buffer);
-                }
+                Durable.writeFully(channel, record);
             }
             channel.force(false);
             fileBytes += appended;
             appends++;
-        } catch (IOException e) {
-            // Whatever was written of the record isn't whole, so the next save writes a new file instead of
+        } catch (IOException | RuntimeException e) {
+            // Whatever was written of the save isn't whole, so the next save writes a new file instead of
             // appending after it.
             compactNext = true;
             try {
                 channel.truncate(fileBytes);
-            } catch (IOException ignored) {
-                // The reader stops at the broken record anyway.
+            } catch (IOException | RuntimeException ignored) {
+                // A reader drops the cut-off save anyway.
             }
             throw e;
         }
@@ -305,48 +304,27 @@ public final class NativeVariableStorage implements VariableBackend {
             write(file, all);
             compactNext = false;
             compactions++;
+        } catch (IOException | RuntimeException e) {
+            compactNext = true;
+            throw e;
         } finally {
-            fileBytes = Files.size(file);
-            openChannel();
+            try {
+                fileBytes = Files.size(file);
+                openChannel();
+            } catch (IOException | RuntimeException e) {
+                // Without a channel to append to, the next save writes a new file.
+                closeQuietly();
+                compactNext = true;
+            }
         }
     }
 
     /** Writes the ops as a whole new file: a temporary file, synced, then moved over {@code target}. */
     static void write(Path target, List<NativeVariableFile.Op> ops) throws IOException {
-        Path parent = target.toAbsolutePath().getParent();
-        Files.createDirectories(parent);
-        Path temp = Files.createTempFile(parent, target.getFileName().toString(), ".tmp");
-        try {
-            try (FileChannel out = FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
-                List<byte[]> chunks = new ArrayList<>();
-                chunks.add(NativeVariableFile.HEADER);
-                chunks.addAll(NativeVariableFile.records(ops));
-                for (byte[] chunk : chunks) {
-                    ByteBuffer buffer = ByteBuffer.wrap(chunk);
-                    while (buffer.hasRemaining()) {
-                        out.write(buffer);
-                    }
-                }
-                out.force(true);
-            }
-            try {
-                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException e) {
-                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } finally {
-            Files.deleteIfExists(temp);
-        }
-        syncDirectory(parent);
-    }
-
-    /** Makes the rename itself durable, where the system allows opening a directory (not on Windows). */
-    private static void syncDirectory(Path dir) {
-        try (FileChannel channel = FileChannel.open(dir, StandardOpenOption.READ)) {
-            channel.force(true);
-        } catch (IOException | UnsupportedOperationException e) {
-            // Best effort.
-        }
+        List<byte[]> chunks = new ArrayList<>();
+        chunks.add(NativeVariableFile.HEADER);
+        chunks.addAll(NativeVariableFile.records(ops));
+        Durable.replace(target, chunks);
     }
 
     /** Removes temporary files a compaction left when the server stopped in the middle of it. */
@@ -366,9 +344,30 @@ public final class NativeVariableStorage implements VariableBackend {
         }
     }
 
+    /** Opens the file to append to. A seam for tests, which make writes fail. */
+    interface Opener {
+        FileChannel open(Path file) throws IOException;
+    }
+
+    Opener opener = file -> FileChannel.open(file, StandardOpenOption.WRITE);
+
     private void openChannel() throws IOException {
-        channel = FileChannel.open(file, StandardOpenOption.WRITE);
-        channel.position(fileBytes);
+        FileChannel opened = opener.open(file);
+        try {
+            opened.position(fileBytes);
+        } catch (IOException | RuntimeException e) {
+            opened.close();
+            throw e;
+        }
+        channel = opened;
+    }
+
+    private void closeQuietly() {
+        try {
+            closeChannel();
+        } catch (IOException ignored) {
+            channel = null;
+        }
     }
 
     private void closeChannel() throws IOException {
@@ -380,6 +379,8 @@ public final class NativeVariableStorage implements VariableBackend {
 
     @Override
     public synchronized void close() throws IOException {
+        // Nothing saves through a closed storage.
+        loaded = false;
         closeChannel();
     }
 }

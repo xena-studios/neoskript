@@ -10,7 +10,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -108,7 +107,7 @@ public final class VariableStorage implements VariableBackend {
 
     /**
      * Copies {@code file} to {@code backups/<name>_<time>.<extension>} beside it, as Skript's backups are named,
-     * and returns the copy.
+     * and returns the copy, synced to disk.
      */
     public static Path backup(Path file) throws IOException {
         Path dir = file.toAbsolutePath().getParent().resolve("backups");
@@ -121,7 +120,8 @@ public final class VariableStorage implements VariableBackend {
         for (int n = 1; ; n++) {
             Path target = dir.resolve(base + "_" + time + (n == 1 ? "" : "-" + n) + extension);
             try {
-                return Files.copy(file, target, StandardCopyOption.COPY_ATTRIBUTES);
+                // Synced, with its directory, so a step that relies on the backup can't outlive it.
+                return Durable.copy(file, target);
             } catch (FileAlreadyExistsException taken) {
                 // Two backups in the same second: number the next.
             }
