@@ -130,3 +130,13 @@ Each addon gets its own Modrinth project, which only the owner can create. For e
 - **Dependencies:** required, NeoSkript (`FuVeJ2X5`). skript-db isn't on Modrinth (it's on Hangar), so there's no incompatible dependency to add; the addon says to remove its jar.
 - **Icon:** NeoSkript's, with a database mark, in the family look.
 - **Files:** `addons/db/build/libs/NeoSkriptDb-<version>.jar`, about 2.4 MB (HikariCP, MariaDB's and PostgreSQL's drivers, relocated).
+
+### NeoSkript Proxy (`addons/proxy`)
+
+- name `NeoSkript Proxy`, slug `neoskript-proxy`;
+- summary: "Messages and proxy actions across a BungeeCord or Velocity network from NeoSkript scripts, over plugin messaging or Redis, with SkProxy's, Skelocity's and SkRedis's syntax.";
+- description: NeoSkript's own network addon (issue #19): messages between servers, server lists, player counts, where a player is; it also runs scripts written for SkProxy 2.4, Skelocity 1.1 and SkRedis 2.3.5's messaging, and talks to servers still on SkRedis; goes on each backend server, not the proxy; needs NeoSkript at the same version; Paper and Folia; links to [the docs](https://neoskript.dev/docs/addons/proxy/), which list the differences;
+- categories: utility, social; licence GPL-3.0-only; source this repository's `addons/proxy`; loaders Paper and Folia, NeoSkript's Minecraft versions; environment server only;
+- dependencies: **required** NeoSkript (`FuVeJ2X5`); **incompatible** SkProxy (`HaSv4ey2`), Skelocity (`URMrn6g1`) and SkRedis (`3R33dfbs`), all on Modrinth, since NeoSkriptProxy replaces them and they need Skript;
+- the jar is `addons/proxy/build/libs/NeoSkriptProxy-<version>.jar` (no libraries shaded: its Redis client is its own), and the project id goes into the release steps next to NeoSkript's.
+
