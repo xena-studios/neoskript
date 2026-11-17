@@ -181,7 +181,8 @@ public final class ScriptCompiler {
                     // Code too big for a method is the script's doing; anything else is a bug in NeoSkript, not
                     // the script. Either way this structure is left out and the rest still load.
                     boolean big = tooBig(e);
-                    String message = big ? TOO_BIG : "NeoSkript couldn't compile this (" + e + "). Please report it.";
+                    String message = big ? TOO_BIG_TRIGGER
+                            : "NeoSkript couldn't compile this (" + e + "). Please report it.";
                     diagnostics.add(new Diagnostic(Severity.ERROR, name, header.number(), 0, 0, message));
                     if (!big) {
                         crashed.add(name);
@@ -279,6 +280,9 @@ public final class ScriptCompiler {
 
     /** The error for a line whose expressions are nested too deeply to compile, or code too big for its method. */
     static final String TOO_BIG = "This line is too complex to be compiled";
+
+    /** The error for a trigger whose code, line by line within the limits, is too big for one method. */
+    static final String TOO_BIG_TRIGGER = "This trigger is too big to be compiled";
 
     /** Whether {@code e} is ASM saying the code is too big for a method or class: the script's doing, not a bug. */
     static boolean tooBig(Throwable e) {
