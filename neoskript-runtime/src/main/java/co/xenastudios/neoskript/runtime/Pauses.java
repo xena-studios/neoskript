@@ -116,6 +116,8 @@ public final class Pauses {
             pending.abandon();
         }
         PENDING.clear();
+        // The dropped triggers never reach the end of the pausing sections they're in.
+        PausingSections.abandonEverything();
         if (stopped != null) {
             stopped.shutdownNow();
         }
@@ -287,14 +289,20 @@ public final class Pauses {
     public static Object value(Frame frame) {
         Object result = frame.result;
         frame.result = null;
-        return result == FAILED ? null : KeyedValues.plain(result);
+        return result == FAILED || sentinel(result) ? null : KeyedValues.plain(result);
+    }
+
+    /** {@code PausingEffect.UNCHANGED} or {@code PausingSection.LEAVE}: never a script's value. */
+    private static boolean sentinel(Object result) {
+        return result == co.xenastudios.neoskript.api.element.PausingEffect.UNCHANGED
+                || result == co.xenastudios.neoskript.api.element.PausingSection.LEAVE;
     }
 
     /** A pausing effect's value for its target, with the indices a map gave it ({@link KeyedValues}). */
     public static Object keyed(Frame frame) {
         Object result = frame.result;
         frame.result = null;
-        return result == FAILED ? null : result;
+        return result == FAILED || sentinel(result) ? null : result;
     }
 
     /**
@@ -319,8 +327,10 @@ public final class Pauses {
     }
 
     /**
-     * Whether a pausing section's code runs after its start: not if the start failed, timed out, or gave
-     * {@code false} or {@link co.xenastudios.neoskript.api.element.PausingEffect#UNCHANGED}.
+     * Whether a pausing section's code runs after its start: not if the start failed or timed out, or its stage
+     * completed with {@code false}, {@link co.xenastudios.neoskript.api.element.PausingEffect#UNCHANGED} (it
+     * reported the problem itself) or {@link co.xenastudios.neoskript.api.element.PausingSection#LEAVE}. In each of
+     * those, the code is skipped and the section's end runs.
      */
     public static boolean proceeds(Frame frame) {
         Object result = frame.result;

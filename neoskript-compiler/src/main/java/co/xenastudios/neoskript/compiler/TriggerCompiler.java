@@ -164,7 +164,9 @@ final class TriggerCompiler {
         SECTION,
         /** Code whose {@code return} gives values to the section, not the function: Skript's returnable sections. */
         RETURNABLE,
-        RETURNABLE_PLURAL
+        RETURNABLE_PLURAL,
+        /** A pausing section's code, run once ({@code transaction on {db}:}): left by {@code exit section}. */
+        PAUSING
     }
 
     /**
@@ -765,6 +767,11 @@ final class TriggerCompiler {
         // Errors from a function called here already say where they happened, so they pass through as is.
         method.visitLabel(handler);
         method.visitVarInsn(ASTORE, EXCEPTION_SLOT);
+        if (usesPausingSections) {
+            // The trigger stopped with an error inside them: the pausing sections it was in are told.
+            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+            method.visitMethodInsn(INVOKESTATIC, PAUSING_SECTIONS, "abandonAll", "(" + CONTEXT + ")V", false);
+        }
         String exception = Type.getInternalName(ScriptRuntimeException.class);
         method.visitVarInsn(ALOAD, EXCEPTION_SLOT);
         method.visitLdcInsn(scriptName);
@@ -1046,7 +1053,7 @@ final class TriggerCompiler {
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "ticks", "(" + OBJECT_DESC + ")J", false);
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "schedule",
                 "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + "J)V", false);
-        exitTrigger();
+        suspendTrigger();
         method.visitLabel(wait.resume());
     }
 
@@ -1071,7 +1078,8 @@ final class TriggerCompiler {
         method.visitJumpInsn(GOTO, after);
         method.visitLabel(start.resume());
         statements(section.body());
-        exitTrigger();
+        // The delayed code's own end: the code after the section, which already ran, goes on with any section.
+        suspendTrigger();
         method.visitLabel(after);
     }
 
@@ -1086,8 +1094,20 @@ final class TriggerCompiler {
         }
     }
 
-    /** Ends the trigger or function: {@code return} (a function returns nothing). */
+    /**
+     * Ends the trigger or function for good: {@code return} (a function returns nothing). The pausing sections it's
+     * inside are told they were left ({@link co.xenastudios.neoskript.runtime.PausingSections}).
+     */
     private void exitTrigger() {
+        abandonPausingSections(null);
+        suspendTrigger();
+    }
+
+    /**
+     * Returns from the trigger's method because it waits: it carries on later from where it stopped, so nothing it's
+     * inside has been left.
+     */
+    private void suspendTrigger() {
         if (function != null) {
             method.visitInsn(ACONST_NULL);
             method.visitInsn(ARETURN);
@@ -1559,7 +1579,7 @@ final class TriggerCompiler {
                 + Type.getDescriptor(co.xenastudios.neoskript.runtime.Pauses.Point.class) + ")Z", false);
         Label now = new Label();
         method.visitJumpInsn(IFEQ, now);
-        exitTrigger();
+        suspendTrigger();
         method.visitLabel(wait.resume());
         method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
         method.visitTypeInsn(CHECKCAST, Type.getInternalName(Frame.class));
@@ -1621,8 +1641,41 @@ final class TriggerCompiler {
         leaveIfAsked(frame);
     }
 
-    /** The code of the pausing sections being compiled, innermost first, for {@link #leaveIfAsked}. */
-    private final java.util.Deque<Block> pausingSections = new java.util.ArrayDeque<>();
+    /** A pausing section whose code is being compiled, and its element. */
+    private record OpenSection(Block block, co.xenastudios.neoskript.api.element.PausingSection element) {}
+
+    /** The pausing sections whose code is being compiled, innermost first. */
+    private final java.util.Deque<OpenSection> pausingSections = new java.util.ArrayDeque<>();
+
+    /** Whether the trigger or function has a pausing section, so its error handler tells them. */
+    private boolean usesPausingSections;
+
+    private static final String PAUSING_SECTIONS =
+            Type.getInternalName(co.xenastudios.neoskript.runtime.PausingSections.class);
+
+    /**
+     * Before a jump to {@code target} (or out of the trigger, with {@code null}): tells the pausing sections it
+     * leaves without reaching their end, innermost first.
+     */
+    private void abandonPausingSections(Block target) {
+        if (pausingSections.isEmpty()) {
+            return;
+        }
+        for (Block block : blocks) { // innermost first
+            if (block == target) {
+                return;
+            }
+            for (OpenSection open : pausingSections) {
+                if (open.block() == block) {
+                    constant(open.element(), co.xenastudios.neoskript.api.element.PausingSection.class);
+                    method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+                    method.visitMethodInsn(INVOKESTATIC, PAUSING_SECTIONS, "abandon", "("
+                            + Type.getDescriptor(co.xenastudios.neoskript.api.element.PausingSection.class) + CONTEXT
+                            + ")V", false);
+                }
+            }
+        }
+    }
 
     /**
      * After a pausing effect in a pausing section: leaves the section if its stage said to
@@ -1630,7 +1683,7 @@ final class TriggerCompiler {
      * section.
      */
     private void leaveIfAsked(int frame) {
-        Block section = pausingSections.peek();
+        Block section = pausingSections.isEmpty() ? null : pausingSections.peek().block();
         if (section == null) {
             return;
         }
@@ -1666,9 +1719,15 @@ final class TriggerCompiler {
         method.visitVarInsn(ALOAD, frame);
         method.visitMethodInsn(INVOKESTATIC, PAUSES, "proceeds", "(" + FRAME_DESC + ")Z", false);
         method.visitJumpInsn(IFEQ, end);
-        Block code = new Block(BlockKind.CONDITIONAL, end, null, -1, -1, -1);
+        usesPausingSections = true;
+        String sectionType = Type.getDescriptor(co.xenastudios.neoskript.api.element.PausingSection.class);
+        // Inside it now: a way out other than its end tells it.
+        constant(element, co.xenastudios.neoskript.api.element.PausingSection.class);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        method.visitMethodInsn(INVOKESTATIC, PAUSING_SECTIONS, "enter", "(" + sectionType + CONTEXT + ")V", false);
+        Block code = new Block(BlockKind.PAUSING, end, null, -1, -1, -1);
         blocks.push(code);
-        pausingSections.push(code);
+        pausingSections.push(new OpenSection(code, element));
         try {
             statements(section.body());
         } finally {
@@ -1676,6 +1735,9 @@ final class TriggerCompiler {
             blocks.pop();
         }
         method.visitLabel(end);
+        constant(element, co.xenastudios.neoskript.api.element.PausingSection.class);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        method.visitMethodInsn(INVOKESTATIC, PAUSING_SECTIONS, "leave", "(" + sectionType + CONTEXT + ")V", false);
         PausingEffect finish = (context, arguments) -> element.end(context);
         pause(header, PausingEffect.class, finish, false);
     }
@@ -2310,7 +2372,8 @@ final class TriggerCompiler {
         method.visitJumpInsn(GOTO, after);
         method.visitLabel(start.resume());
         statements(section.body());
-        exitTrigger();
+        // The delayed code's own end: the code after the section, which already ran, goes on with any section.
+        suspendTrigger();
         method.visitLabel(after);
         lineOf(section, section.line().key());
         precomputed.put(made, valuesSlot);
@@ -2373,6 +2436,7 @@ final class TriggerCompiler {
         }
         convert(plural);
         method.visitMethodInsn(INVOKESTATIC, VALUES, "returned", "(" + OBJECT_DESC + ")V", false);
+        abandonPausingSections(handler);
         method.visitJumpInsn(GOTO, handler.end());
     }
 
@@ -2696,6 +2760,7 @@ final class TriggerCompiler {
                 } finally {
                     literalTypes = outerLiteralTypes;
                 }
+                abandonPausingSections(null);
                 method.visitInsn(ARETURN);
             }
             case CoreSyntax.CHANGE -> change(effect);
@@ -2883,6 +2948,7 @@ final class TriggerCompiler {
      * first.
      */
     private void leaving(Block target) throws CompileException {
+        abandonPausingSections(target);
         boolean left = false;
         int thread = -1;
         for (RunOn runOn : runOns) {
@@ -2957,7 +3023,7 @@ final class TriggerCompiler {
                 "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + OBJECT_DESC + ")Z", false);
         // Not scheduled: this thread owns it already, so the trigger carries straight on.
         method.visitJumpInsn(IFEQ, wait.resume());
-        exitTrigger();
+        suspendTrigger();
         method.visitLabel(wait.resume());
     }
 
@@ -2967,7 +3033,7 @@ final class TriggerCompiler {
 
     private Block innermostLoop() throws CompileException {
         for (Block block : blocks) {
-            if (block.kind() != BlockKind.CONDITIONAL) {
+            if (block.kind() != BlockKind.CONDITIONAL && block.kind() != BlockKind.PAUSING) {
                 return block;
             }
         }
@@ -2987,7 +3053,7 @@ final class TriggerCompiler {
     private List<Block> loops() {
         List<Block> loops = new ArrayList<>();
         blocks.descendingIterator().forEachRemaining(block -> {
-            if (block.kind() != BlockKind.CONDITIONAL) {
+            if (block.kind() != BlockKind.CONDITIONAL && block.kind() != BlockKind.PAUSING) {
                 loops.add(block);
             }
         });

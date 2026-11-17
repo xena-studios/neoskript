@@ -54,6 +54,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        co.xenastudios.neoskript.runtime.PausingSections.install(message -> getSLF4JLogger().warn(message));
         // D10: NeoSkript replaces Skript, so running both would fight over scripts and commands.
         if (getServer().getPluginManager().getPlugin("Skript") != null) {
             getSLF4JLogger().error(
@@ -200,6 +201,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             loadVariables();
         }
         AddonApi api = new AddonApi(this, addons, scripts.globals(), library, getSLF4JLogger());
+        addonApi = api;
         co.xenastudios.neoskript.api.Installed.install(api);
         // An addon disables before NeoSkript when the server stops, and its classes go with it. Its values in
         // variables become their saved bytes now, so later saves, after unload events, never need its code.
@@ -785,6 +787,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         current.notes().forEach(line -> getSLF4JLogger().warn(line));
     }
 
+    /** The API addons reach, once it's installed. */
+    private AddonApi addonApi;
+
     /** How long the server's stop waits, at most, for what its unload triggers paused for. */
     private static final java.time.Duration PAUSE_GRACE = java.time.Duration.ofSeconds(3);
 
@@ -808,6 +813,11 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         // gets a moment to finish before the server exits. Then triggers still waiting are dropped, as after a
         // wait, and the pauses' timer stops.
         co.xenastudios.neoskript.runtime.Pauses.close(PAUSE_GRACE);
+        // Addons that kept what scripts use until now (a database's connections) let go of it.
+        AddonApi api = addonApi;
+        if (api != null) {
+            api.stopped();
+        }
         getServer().getAsyncScheduler().cancelTasks(this);
         if (storage != null) {
             // A backup still copying a big file is cut off, so the last save and the close don't wait for it.

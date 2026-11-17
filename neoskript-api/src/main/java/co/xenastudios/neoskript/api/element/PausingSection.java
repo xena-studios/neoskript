@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.api.element;
 
+import co.xenastudios.neoskript.api.annotation.Experimental;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -15,13 +16,17 @@ import java.util.concurrent.CompletionStage;
  * on its own thread once the stage completes, a failure or a timeout is a runtime error on the section's line,
  * and a stage that completes with {@link PausingEffect#UNCHANGED} is neither. The code under the section runs
  * once, after {@link #start}, unless that stage fails, times out, or completes with {@link Boolean#FALSE}.
- * {@link #end} runs whenever the trigger reaches the end of the section, whether or not its code ran; code that
- * leaves the section another way ({@code stop}, {@code return}, {@code exit}) skips it, so an addon should clean
- * up what such a section left open itself.
+ * {@link #end} runs whenever the trigger reaches the end of the section, whether or not its code ran, including
+ * through {@code exit section}. Code that leaves the section another way ({@code stop}, {@code return}, a failed
+ * condition, an exit or {@code continue} past it, an error) skips it, and {@link #abandoned} is called at once
+ * instead, so an addon can let go of what the section opened.
  *
  * <p>The element is shared by every run of the trigger, and by every trigger the section is in: keep what a run
  * opened by its {@link TriggerContext#event()}, not in the element.
+ *
+ * <p>Experimental until a second addon uses it.
  */
+@Experimental
 public interface PausingSection {
 
     /**
@@ -57,4 +62,14 @@ public interface PausingSection {
     default CompletionStage<?> end(TriggerContext context) {
         return null;
     }
+
+    /**
+     * The trigger left the section's code without reaching its end: {@code stop}, {@code return}, a failed
+     * condition, an {@code exit} or {@code continue} past it, an error, or NeoSkript dropping the trigger as the
+     * server stops. Called at once, on the trigger's thread (or the stopping server's): it mustn't block. Not
+     * called if {@link #start} didn't let the code run.
+     *
+     * @param context the trigger
+     */
+    default void abandoned(TriggerContext context) {}
 }
