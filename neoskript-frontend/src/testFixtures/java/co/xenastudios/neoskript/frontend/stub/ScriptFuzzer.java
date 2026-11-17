@@ -113,6 +113,9 @@ public final class ScriptFuzzer {
         return new Case(seed, text);
     }
 
+    /** About how long a line made by repeating another may get. */
+    private static final int MAX_REPEATED = 64 * 1024;
+
     private String mutate(String file, Random random) {
         List<String> out = new ArrayList<>(List.of(file.split("\n", -1)));
         int mutations = 1 + random.nextInt(8);
@@ -138,7 +141,16 @@ public final class ScriptFuzzer {
                 case 8 -> out.set(at, line + " " + lines.get(random.nextInt(lines.size())).strip());
                 case 9 -> out.set(at, line.replaceFirst("\\S+", tokens.get(random.nextInt(tokens.size()))
                         .replace("\\", "\\\\").replace("$", "\\$")));
-                case 10 -> out.set(at, line + " " + line.strip().repeat(1 + random.nextInt(60)));
+                // Repeated, but the line never past about 64 KiB: repeating a line repeated already grows it
+                // 60-fold each time. The same draw is made either way, so the cases after it don't change.
+                case 10 -> {
+                    int times = 1 + random.nextInt(60);
+                    if (line.length() < MAX_REPEATED) {
+                        String repeated = line + " " + line.strip().repeat(Math.min(times,
+                                1 + MAX_REPEATED / Math.max(1, line.length())));
+                        out.set(at, repeated.length() > MAX_REPEATED ? repeated.substring(0, MAX_REPEATED) : repeated);
+                    }
+                }
                 case 11 -> out.set(at, insert(line, deepNesting(random).strip(), random));
                 case 12 -> out.set(at, new StringBuilder(line).reverse().toString());
                 default -> out.set(at, insert(line, Character.toString(random.nextInt(0x20, 0x2FFF)), random));

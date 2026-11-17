@@ -365,6 +365,32 @@ public interface Registrar {
     void event(String id, List<Class<?>> eventClasses, ElementFactory<Condition> filter, String... patterns);
 
     /**
+     * Says that pattern {@code pattern} of syntax {@code id} only works in events of {@code eventClasses} (or their
+     * subclasses), as Skript's elements whose set-up checks the event they're in. Elsewhere, a line's other readings
+     * are tried first, as Skript tries the next element when one fails to set up: {@code the result} is a
+     * placeholder's result in a placeholder and the smelted item in a smelting event. Only if none fits is this one
+     * used, and its factory gives its error.
+     *
+     * @param id the syntax's id
+     * @param pattern the index of the pattern, or -1 for all of them
+     * @param eventClasses the classes of the events it works in
+     */
+    @Experimental
+    default void onlyInEvents(String id, int pattern, Class<?>... eventClasses) {}
+
+    /**
+     * Tells the addon which triggers of its server event {@code id} are loaded, for an event it runs itself with
+     * {@link LoadedTrigger#run} rather than firing it through Bukkit: {@code loaded} gets every such trigger of the
+     * loaded scripts, in their order, each time scripts load, reload or unload (an empty list when none are left).
+     * It's called on the thread that loaded them, the global thread on Folia; an exception from it is logged. Each
+     * list replaces the one before: drop the old triggers, which run nothing once their script has unloaded.
+     *
+     * @param id the id of one of this addon's server events
+     * @param loaded what gets the loaded triggers
+     */
+    default void eventTriggers(String id, java.util.function.Consumer<? super List<LoadedTrigger>> loaded) {}
+
+    /**
      * One of Skript's events, as Skript names it in errors ({@code On Break / Mine}), whether NeoSkript has it or
      * not: a trigger of an event registered with the same patterns is {@code an on break / mine event} in errors,
      * and syntax that only works in some events names those registered so, in the order they were registered.

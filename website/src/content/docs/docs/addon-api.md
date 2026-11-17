@@ -193,6 +193,36 @@ registrar.eventValue(LotteryDrawEvent.class, "ticket", LotteryDrawEvent::winner)
 
 Scripts then write `on lottery draw:`, and get the winner as `event-ticket`. A filter, in place of `null`, gets the values of the pattern's placeholders, as in `on draw of %tickets%`. `eventDefault(typeId)` makes a placeholder of that type, when left out, take the event's value, as `send "hi"` goes to the event's player.
 
+### Events an addon runs itself
+
+Some events don't come from Bukkit: another plugin asks the addon for something, and a script's trigger answers, as a placeholder asked for by PlaceholderAPI. Register the event as above, and ask to be told which of its triggers are loaded:
+
+```java
+registrar.event("MyAddonEvtQuestion", List.of(QuestionEvent.class), info -> new TopicFilter(info.argumentLiteral(0)),
+        "question about %*text%");
+registrar.eventTriggers("MyAddonEvtQuestion", triggers -> {
+    // Every loaded trigger of the event, in script order, each time scripts load, reload or unload.
+    for (LoadedTrigger trigger : triggers) {
+        TopicFilter topic = (TopicFilter) trigger.filter();  // the filter your factory made for its line
+        ...
+    }
+});
+```
+
+Each list replaces the one before: drop the old triggers when it arrives. A trigger whose script has unloaded or reloaded since runs nothing. Each `LoadedTrigger` can `run(event, owner)` right away, from any thread, on that thread: its filter, then its code, until it ends or waits. A runtime error in it is logged as any trigger's, and doesn't reach your code. `owner` is the entity, block or location whose thread it carries on on after a `wait`, or `null` for the global thread. The list is given on the thread that loaded the scripts, the global thread on Folia, with an empty list once none are left, so what you register for them can follow scripts as they reload, with nothing left behind. On Folia, NeoSkript's region rules apply to what the code reads, as for any trigger. A trigger's code may run another (a placeholder asking for one); limit how deep and how much yourself. NeoSkript's own [placeholders addon](/docs/addons/placeholders/) is built this way.
+
+### Syntax for some events only
+
+This is experimental: it may change in a minor release.
+
+Skript's elements that only work in some events fail to set up elsewhere, and Skript then tries the line's other readings: `the result` is the smelted item in a smelting event and a placeholder's result in a placeholder. Say which events an element is for, and NeoSkript does the same:
+
+```java
+registrar.onlyInEvents("MyAddonExprQuestion", -1, QuestionEvent.class);  // -1: every pattern
+```
+
+Elsewhere, other syntax that reads the text is tried first. Only if none does is your element used, and its factory throws the `SyntaxError` the script's author sees.
+
 ## Functions
 
 ```java
@@ -271,6 +301,8 @@ Map<String, Object> all = neoskript.variables().list("coins");       // {coins::
 Object prize = neoskript.scripts().call("lotteryPrize", 3L);         // a script's function, or a built-in one
 neoskript.scripts().reload("quests/main.sk");
 ```
+
+`neoskript.text(value)` writes any value as a script's text would show it (`"%value%"`): `5` for the number 5, a player's name for a player. Unlike the rest, it works before NeoSkript is ready too.
 
 Use them once NeoSkript is ready (see `whenReady` above). A variable's name is written as in a script, without braces, with `%...%` already filled in. Players are their UUIDs in variable names, as in Skript's default config. Each variable call is atomic and works from any thread; a sequence of them isn't.
 

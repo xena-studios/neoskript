@@ -32,10 +32,11 @@ import org.bukkit.plugin.java.JavaPlugin;
  * it's gone by, as {@code skript-reflect} and {@code skript-mirror}), which the build also makes a soft
  * dependency, so it loads first if it can load at all:
  * <ul>
- *   <li>if it's loaded, which it can only be through Skript's addon compatibility layer, this addon doesn't load,
- *       so the two don't register the same syntax, and the console says to remove one;</li>
- *   <li>if only its jar is in {@code plugins/}, it can't load (it needs Skript, and NeoSkript doesn't run next to
- *       Skript), so this addon loads, and the console says to remove that jar.</li>
+ *   <li>if it's running, which it can only be through Skript's addon compatibility layer, this addon doesn't
+ *       load, so the two don't register the same syntax, and the console says to remove one;</li>
+ *   <li>if only its jar is in {@code plugins/}, it can't run (it needs Skript, and NeoSkript doesn't run next to
+ *       Skript), so this addon loads, and the console says to remove that jar. That includes an addon Paper loaded
+ *       that then disabled itself, as one that only soft-depends on Skript does.</li>
  * </ul>
  *
  * <p><b>NeoSkript's version:</b> an addon is released with NeoSkript, at the same version. On an older NeoSkript
@@ -58,11 +59,13 @@ public final class OfficialAddon {
         try {
             Properties properties = properties(plugin.getClass().getClassLoader());
             List<String> replaces = list(properties.getProperty("replaces", ""));
-            // Loaded, whether or not it has enabled yet: load order mustn't decide.
+            // Running: loaded and enabled. It's a soft dependency, so it has enabled already if it can: one that's
+            // loaded but disabled (skript-placeholders only soft-depends on Skript, so Paper loads it, and it
+            // disables itself without Skript) has failed, and counts as only its jar.
             Map<String, String> running = new LinkedHashMap<>();
             for (String name : replaces) {
                 Plugin original = plugin.getServer().getPluginManager().getPlugin(name);
-                if (original != null && original != plugin) {
+                if (original != null && original != plugin && original.isEnabled()) {
                     running.put(name, original.getPluginMeta().getVersion());
                 }
             }

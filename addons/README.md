@@ -42,7 +42,7 @@ Every folder in `addons/` with a `build.gradle.kts` is part of the build (`setti
 NeoSkript doesn't run next to Skript ([D10](../docs/PLAN.md#2-locked-decisions)), and a community addon like skript-db needs Skript, so today it can't load with NeoSkript at all: Paper refuses it. What happens when both jars are in `plugins/` is [D21](../docs/PLAN.md#2-locked-decisions):
 
 - **Only the original's jar is there** (it can't run): ours loads, and the console says that jar is the original, that ours replaces it and scripts written for it should work unchanged (with the addon's docs listing any differences), and to remove the jar.
-- **The original is loaded** (only possible once Skript's addon compatibility layer exists): ours doesn't load, so the two never register the same syntax, and the console says to remove one of them. It's a soft dependency of ours, so it loads first if it loads at all, and ours checks whether it's loaded rather than enabled, so load order can't change the outcome.
+- **The original is running** (only possible once Skript's addon compatibility layer exists): ours doesn't load, so the two never register the same syntax, and the console says to remove one of them. It's a soft dependency of ours, so it enables first if it can at all. One that Paper loads but that disables itself without Skript (skript-placeholders only soft-depends on Skript, so Paper loads it) isn't running, and counts as only its jar.
 
 `OfficialAddon.start` does both. It asks the server for each original by name first, and only if none is loaded reads the jars in `plugins/`, finding the original by the `name:` in its plugin.yml, whatever the file is called. When the compatibility layer comes, it should skip loading a community addon that an installed official one replaces, so ours wins by default; then the second case only happens if someone asks for the original.
 
@@ -76,3 +76,11 @@ Each addon gets its own Modrinth project, which only the owner can create. For e
 - the project: name (`NeoSkript DB`), slug (`neoskript-db`), summary, description (what it replaces, that scripts run unchanged, that it needs NeoSkript), icon, licence GPL-3.0-only, the source link to this repository, Paper and Folia as loaders, the Minecraft versions NeoSkript supports;
 - a **required dependency** on the NeoSkript project (`FuVeJ2X5`), and an **incompatible** one on the community addon's project, if it's on Modrinth;
 - the project id added to the release steps, so each release uploads the addon's jar to it with the same version and changelog as NeoSkript's.
+
+### NeoSkript Placeholders (`addons/placeholders`)
+
+- Name **NeoSkript Placeholders**, slug `neoskript-placeholders`, licence GPL-3.0-only, source this repository, loaders Paper and Folia.
+- Summary: "PlaceholderAPI from scripts, with skript-placeholders' syntax, for NeoSkript."
+- Description: it replaces skript-placeholders, scripts written for it load unchanged, it needs NeoSkript and PlaceholderAPI, and it links to [the docs](https://neoskript.dev/docs/addons/placeholders/), which list the differences.
+- Dependencies: **required** NeoSkript (`FuVeJ2X5`) and **required** PlaceholderAPI (`lKEzGugV`). skript-placeholders itself isn't on Modrinth; a fork by someone else is (`skript-placeholders-fork`), which can be marked **incompatible**.
+- Once it exists, an entry in `website/src/data/addons.json` lists it on neoskript.dev/addons with its Modrinth link.

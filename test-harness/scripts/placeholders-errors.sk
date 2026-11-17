@@ -1,0 +1,22 @@
+# The neoskript-placeholders scenario: lines skript-placeholders refuses, with its errors. Each must be an error on
+# both Skript and NeoSkript, with the same message.
+
+placeholderapi placeholder with the prefix "my_server":
+	set the result to "x"
+
+placeholderapi placeholder with the prefix "":
+	set the result to "x"
+
+placeholderapi placeholder with the prefix "a{b":
+	set the result to "x"
+
+mvdw placeholder named "nsk_test":
+	set the result to "x"
+
+placeholderapi placeholder with the prefix "nskerrors":
+	set the result to "%the first player%"
+
+on load:
+	set {_x} to the placeholder result
+	set {_y} to the placeholder identifier
+	set {_z} to relational placeholder "rel_x_y" from {_p}

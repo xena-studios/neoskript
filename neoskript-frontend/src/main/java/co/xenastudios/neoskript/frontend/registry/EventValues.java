@@ -49,6 +49,15 @@ public interface EventValues {
         }
 
         /**
+         * Whether pattern {@code pattern} of {@code syntax} works here: not if it only works in some events and
+         * this isn't one of them, as Skript's elements whose set-up checks the event. The parser then tries the
+         * text's other readings first, and takes this one only if none fits.
+         */
+        default boolean allowsSyntax(SyntaxInfo syntax, int pattern) {
+            return true;
+        }
+
+        /**
          * Skript's error for an event value {@link #allows} turns down, as its event value expression's init gives
          * it ({@code There's no player in an on damage event.}), or {@code null} if it can't tell.
          */

@@ -1,0 +1,107 @@
+# The neoskript-placeholders scenario: PlaceholderAPI from scripts, with skript-placeholders' syntax. It runs on
+# Skript with skript-placeholders and on NeoSkript with NeoSkriptPlaceholders, both with PlaceholderAPI, and what
+# they print as "[harness] ph ..." must be the same. Placeholders registered here are read back through
+# PlaceholderAPI, so both halves go through it.
+
+on load:
+	send "[harness] ph loaded" to console
+
+placeholderapi placeholder with the prefix "nsktest":
+	if the identifier is "static":
+		set the result to "hello"
+	else if the identifier is "number":
+		set the result to 5
+	else if the identifier is "decimal":
+		set the result to 1.5
+	else if the identifier starts with "parts":
+		set the result to "%the placeholder%|%the prefix%|%the identifier%|%the placeholder prefix%|%the placeholder identifier%"
+	else if the identifier is "player":
+		set the result to "%player%/%event-offlineplayer%"
+	else if the identifier is "deleted":
+		set the result to "x"
+		delete the result
+	else if the identifier is "reset":
+		set the result to "x"
+		reset the result
+	else if the identifier is "read":
+		set the result to "a"
+		set the result to "%the result%b"
+	else if the identifier is "colour":
+		set the result to "&aGreen"
+	else if the identifier is "nested":
+		set the result to "<%placeholder "nsktest_static"%>"
+	else if the identifier is "empty":
+		set the result to ""
+	else if the identifier is "health":
+		set the result to "%health of player%"
+
+# A second trigger for the same prefix, which only answers what the first leaves alone.
+papi placeholder for prefix "nsktest":
+	if the identifier is "second":
+		set the result to "from the second"
+
+placeholder api placeholder with prefix "NskCase":
+	set the result to "case %the placeholder%"
+
+placeholderapi relational placeholder with the prefix "nskrel":
+	set the result to "%the first player% vs %the second player% (%player%) %the identifier%"
+
+function ph(label: text, value: objects):
+	send "[harness] ph %{_label}%: %{_value::*}%" to console
+
+command /nsk-placeholders:
+	trigger:
+		set {_alice} to "Alice" parsed as offline player
+		ph("static", placeholder "nsktest_static")
+		ph("with percent", the placeholder "%%nsktest_static%%")
+		ph("number", the value of placeholder "nsktest_number")
+		ph("decimal", placeholder "nsktest_decimal")
+		ph("parts", placeholder "nsktest_parts_a_b")
+		ph("player", placeholder "nsktest_player" from {_alice})
+		ph("no player", placeholder "nsktest_player")
+		ph("deleted", placeholder "nsktest_deleted")
+		ph("reset", placeholder "nsktest_reset")
+		ph("read", placeholder "nsktest_read")
+		set {_colour} to placeholder "nsktest_colour"
+		replace all "§" with "<S>" in {_colour}
+		replace all "&" with "<A>" in {_colour}
+		ph("colour", {_colour})
+		ph("nested", placeholder "nsktest_nested")
+		ph("empty", placeholder "nsktest_empty")
+		ph("unanswered", placeholder "nsktest_unknown")
+		ph("second trigger", placeholder "nsktest_second")
+		ph("unknown prefix", placeholder "nskmissing_x")
+		ph("case", placeholder "nskcase_x")
+		ph("case upper", placeholder "NSKCASE_y")
+		ph("several", placeholders "nsktest_static" and "nsktest_number")
+		ph("several players", placeholder "nsktest_player" from {_alice} and ("Bob" parsed as offline player))
+		ph("in text", placeholder "Value: %%nsktest_static%% and %%nsktest_number%% and %%nskmissing_x%%")
+		ph("possessive", placeholder "nsktest_static"'s value)
+		ph("in", the values of the placeholders in "nsktest_static")
+		ph("no underscore", placeholder "nsktest")
+		send "[harness] ph done" to console
+
+# Run by Alice, on her region's thread on Folia, where Bob is too.
+command /nsk-placeholders-online:
+	trigger:
+		set {_alice} to "Alice" parsed as player
+		set {_bob} to "Bob" parsed as player
+		ph("online player", placeholder "nsktest_player" from {_alice})
+		ph("relational", relational placeholder "rel_nskrel_x" from {_alice} and {_bob})
+		ph("relational reversed", relational placeholder "%%rel_nskrel_y_z%%" from {_bob} and {_alice})
+		ph("relational unknown", relational placeholder "rel_nskmissing_x" from {_alice} and {_bob})
+		ph("relational as plain", placeholder "nskrel_x" from {_alice})
+		send "[harness] ph online done" to console
+
+# From the console: on Folia, the global thread doesn't own Alice, so reading her is a runtime error, not a
+# read of another region's player.
+command /nsk-placeholders-health:
+	trigger:
+		ph("health", placeholder "nsktest_health" from "Alice" parsed as player)
+		send "[harness] ph health done" to console
+
+command /nsk-placeholders-reload:
+	trigger:
+		ph("one", placeholder "nskone_x")
+		ph("two", placeholder "nsktwo_x")
+		send "[harness] ph reload done" to console

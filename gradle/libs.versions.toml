@@ -13,6 +13,7 @@ run-paper = "3.1.0"
 maven-publish = "0.37.0"
 # Plugins NeoSkript hooks into (compile-only).
 vault-api = "1.7.1"
+placeholderapi = "2.12.3"
 worldguard = "7.0.12"
 worldedit = "7.3.0"
 griefprevention = "16.18.4"
@@ -26,6 +27,7 @@ gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+placeholderapi = { module = "me.clip:placeholderapi", version.ref = "placeholderapi" }
 vault-api = { module = "com.github.MilkBowl:VaultAPI", version.ref = "vault-api" }
 worldguard-bukkit = { module = "com.sk89q.worldguard:worldguard-bukkit", version.ref = "worldguard" }
 worldguard-core = { module = "com.sk89q.worldguard:worldguard-core", version.ref = "worldguard" }

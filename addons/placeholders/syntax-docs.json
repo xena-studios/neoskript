@@ -1,0 +1,49 @@
+{
+  "elements": {
+    "NeoSkriptPlaceholdersEvtPlaceholder": {
+      "name": "Custom Placeholder",
+      "description": [
+        "Registers placeholders with PlaceholderAPI: the code runs each time a plugin asks for a placeholder with this prefix, and sets the result.",
+        "A relational placeholder (%rel_prefix_identifier%) is about two players: the first player and the second player."
+      ],
+      "examples": [
+        "placeholderapi placeholder with the prefix \"myserver\":\n\tif the identifier is \"coins\": # %myserver_coins%\n\t\tset the result to {coins::%player's uuid%}",
+        "placeholderapi relational placeholder with the prefix \"teams\":\n\tif the identifier is \"same\": # %rel_teams_same%\n\t\tset the result to \"%{team::%the first player's uuid%} is {team::%the second player's uuid%}%\""
+      ],
+      "since": ["0.1.0"]
+    },
+    "NeoSkriptPlaceholdersExprPlaceholder": {
+      "name": "Placeholder",
+      "description": ["The placeholder asked for in a custom placeholder, without %, or the part of it before the first _ (the prefix) or after it (the identifier)."],
+      "examples": ["placeholderapi placeholder with the prefix \"myserver\":\n\tsend \"%the placeholder%: %the prefix% and %the identifier%\" to console"],
+      "since": ["0.1.0"]
+    },
+    "NeoSkriptPlaceholdersExprResult": {
+      "name": "Placeholder Result",
+      "description": ["The value a custom placeholder gives. Set it to text or any other value, which becomes its text; delete or reset it for none, which leaves the placeholder as it is."],
+      "examples": ["placeholderapi placeholder with the prefix \"myserver\":\n\tif the identifier is \"online\":\n\t\tset the result to size of all players"],
+      "since": ["0.1.0"]
+    },
+    "NeoSkriptPlaceholdersExprRelationalPlayers": {
+      "name": "Relational Placeholder Players",
+      "description": ["The two players in a custom relational placeholder: the one it's shown to, and the one it's about."],
+      "examples": ["placeholderapi relational placeholder with the prefix \"duel\":\n\tset the result to \"%the first player% vs %the second player%\""],
+      "since": ["0.1.0"]
+    },
+    "NeoSkriptPlaceholdersExprValue": {
+      "name": "Placeholder Value",
+      "description": [
+        "The value of any plugin's PlaceholderAPI placeholder, for players or for nobody. The % around a placeholder can be left out when it's the whole text. A placeholder nothing answers gives nothing.",
+        "A relational placeholder takes two online players."
+      ],
+      "examples": [
+        "set {_ping} to the placeholder \"player_ping\" from player",
+        "set {_line} to placeholder \"Online: %%server_online%%\"",
+        "set {_status} to the relational placeholder \"rel_friends_status\" from player and arg-1"
+      ],
+      "since": ["0.1.0"]
+    }
+  },
+  "types": {},
+  "functions": {}
+}

@@ -472,5 +472,10 @@ final class Workstations {
                 }
             });
         }, "[the] (smelted item|result[ item])", "[the] extracted item[s]", "[the] smelting item", "[the] burned (fuel|item)");
+        // Skript's fail to set up elsewhere, and it tries the next: 'the result' in another addon's event is that's.
+        registrar.onlyInEvents("ExprFurnaceEventItems", 0, FurnaceSmeltEvent.class);
+        registrar.onlyInEvents("ExprFurnaceEventItems", 1, FurnaceExtractEvent.class);
+        registrar.onlyInEvents("ExprFurnaceEventItems", 2, FurnaceStartSmeltEvent.class);
+        registrar.onlyInEvents("ExprFurnaceEventItems", 3, FurnaceBurnEvent.class);
     }
 }

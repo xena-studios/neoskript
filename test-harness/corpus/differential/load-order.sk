@@ -1,0 +1,10 @@
+# Probe: the order scripts load in, and so their 'on load' triggers run in. Skript loads each folder's
+# subfolders first, then its own files, so this script (in probes/) loads before differential-show.sk (in the
+# scripts folder itself), though its path sorts after it.
+
+on load:
+	add "probes/load-order.sk" to {diff::load-order::*}
+
+function probe_load_order():
+	show("load order", {diff::load-order::*})
+	delete {diff::load-order::*}

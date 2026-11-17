@@ -384,6 +384,56 @@ public final class Library implements Registrar {
         eventPatterns.put(id, List.of(patterns));
     }
 
+    /** The events syntax only works in ({@link #onlyInEvents}), by its id, then pattern (-1 for all). */
+    private final Map<String, Map<Integer, List<Class<?>>>> eventOnly = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    public void onlyInEvents(String id, int pattern, Class<?>... eventClasses) {
+        checkOpen();
+        if (eventClasses.length == 0) {
+            throw new IllegalArgumentException("Syntax " + id + " is said to work in no events");
+        }
+        eventOnly.computeIfAbsent(id, k -> new java.util.concurrent.ConcurrentHashMap<>())
+                .put(pattern, List.of(eventClasses));
+    }
+
+    /**
+     * The classes of the events pattern {@code pattern} of syntax {@code id} only works in, or {@code null} if it
+     * works anywhere.
+     */
+    List<Class<?>> eventOnly(String id, int pattern) {
+        Map<Integer, List<Class<?>>> patterns = eventOnly.get(id);
+        if (patterns == null) {
+            return null;
+        }
+        List<Class<?>> classes = patterns.get(pattern);
+        return classes != null ? classes : patterns.get(-1);
+    }
+
+    /** What addons that run their events themselves are told about loaded triggers, by event id. */
+    private final Map<String, List<java.util.function.Consumer<? super List<co.xenastudios.neoskript.api.registration.LoadedTrigger>>>>
+            triggerWatchers = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    public void eventTriggers(String id,
+            java.util.function.Consumer<? super List<co.xenastudios.neoskript.api.registration.LoadedTrigger>> loaded) {
+        checkOpen();
+        java.util.Objects.requireNonNull(loaded, "loaded");
+        if (!(bindings.get(new Key(SyntaxKind.EVENT, id)) instanceof ServerEvent)) {
+            throw new IllegalArgumentException("No server event has the id " + id);
+        }
+        triggerWatchers.computeIfAbsent(id, k -> new java.util.concurrent.CopyOnWriteArrayList<>()).add(loaded);
+    }
+
+    /**
+     * What's told about the loaded triggers of each server event that has watchers ({@link #eventTriggers}), by the
+     * event's id.
+     */
+    public Map<String, List<java.util.function.Consumer<? super List<co.xenastudios.neoskript.api.registration.LoadedTrigger>>>>
+            triggerWatchers() {
+        return java.util.Collections.unmodifiableMap(triggerWatchers);
+    }
+
     @Override
     public void eventName(String name, List<Class<?>> eventClasses, String... patterns) {
         checkOpen();

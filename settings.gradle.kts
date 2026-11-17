@@ -21,6 +21,11 @@ dependencyResolutionManagement {
                 includeGroupByRegex("org\\.enginehub.*")
             }
         }
+        // PlaceholderAPI, for addons/placeholders; compile-only, never shaded.
+        exclusiveContent {
+            forRepository { maven("https://repo.extendedclip.com/releases/") { name = "extendedclip" } }
+            filter { includeGroup("me.clip") }
+        }
         exclusiveContent {
             forRepository { maven("https://jitpack.io") { name = "jitpack" } }
             filter {

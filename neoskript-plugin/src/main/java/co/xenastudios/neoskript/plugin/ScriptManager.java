@@ -280,7 +280,8 @@ final class ScriptManager {
 
         // Scripts that load cleanly, or for the first time, switch to the new version; a script with
         // errors keeps its previous version if it has one.
-        Set<String> switching = new HashSet<>();
+        // In the files' order, which Skript loads them in: their load events run in it.
+        Set<String> switching = new java.util.LinkedHashSet<>();
         int inScope = 0;
         for (SourceFile file : files) {
             String name = file.name();
@@ -332,6 +333,9 @@ final class ScriptManager {
             sources.put(name, byName.get(name).text());
             loadedCommands.put(name, scriptCommands.getOrDefault(name, List.of()));
         }
+        // In the files' order, though scripts were added or enabled since: addons told of their triggers get them so.
+        reorder(loaded, files);
+        reorder(loadedCommands, files);
         updateListenersAndCommands();
         long millis = (System.nanoTime() - start) / 1_000_000;
 
@@ -441,13 +445,36 @@ final class ScriptManager {
     private List<SourceFile> read() throws IOException {
         List<SourceFile> files = new ArrayList<>();
         modified.clear();
-        try (Stream<Path> paths = Files.walk(scriptsDir)) {
-            for (Path path : paths.filter(this::isLoadable).sorted().toList()) {
+        for (Path path : skriptOrder(scriptsDir)) {
+            if (isLoadable(path)) {
                 modified.put(name(path), Files.getLastModifiedTime(path).toMillis());
                 files.add(new SourceFile(name(path), Files.readString(path)));
             }
         }
         return files;
+    }
+
+    /**
+     * The files in {@code folder} in the order Skript loads scripts ({@code ScriptLoader.loadStructures}): each
+     * folder's entries sorted, its subfolders first, each walked the same way, then its own files. So
+     * {@code b/x.sk} comes before {@code a.sk}. Load events and compile errors follow this order.
+     */
+    static List<Path> skriptOrder(Path folder) throws IOException {
+        List<Path> entries;
+        try (Stream<Path> list = Files.list(folder)) {
+            entries = list.sorted().toList();
+        }
+        List<Path> ordered = new ArrayList<>();
+        List<Path> files = new ArrayList<>();
+        for (Path entry : entries) {
+            if (Files.isDirectory(entry)) {
+                ordered.addAll(skriptOrder(entry));
+            } else {
+                files.add(entry);
+            }
+        }
+        ordered.addAll(files);
+        return ordered;
     }
 
     /**
@@ -630,6 +657,7 @@ final class ScriptManager {
         } catch (RuntimeException e) {
             logger.error("Couldn't register the scripts' commands", e);
         }
+        tellWatchers();
     }
 
     /**
@@ -664,6 +692,86 @@ final class ScriptManager {
                 run(trigger);
             }
         }
+    }
+
+    /**
+     * Tells the addons that run their events themselves ({@code Registrar.eventTriggers}) which of those events'
+     * triggers are loaded now.
+     */
+    private void tellWatchers() {
+        var watchers = library.triggerWatchers();
+        if (watchers.isEmpty()) {
+            return;
+        }
+        List<CompiledScripts.CompiledTrigger> all = loaded.values().stream().flatMap(List::stream).toList();
+        // What's loaded now: a trigger an addon still holds from before runs nothing (LoadedTrigger.run).
+        Set<CompiledScripts.CompiledTrigger> now = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        now.addAll(all);
+        live = now;
+        for (var entry : watchers.entrySet()) {
+            List<co.xenastudios.neoskript.api.registration.LoadedTrigger> triggers = all.stream()
+                    .filter(trigger -> entry.getKey().equals(trigger.eventId()))
+                    .map(trigger -> (co.xenastudios.neoskript.api.registration.LoadedTrigger) new Loaded(trigger, this, logger))
+                    .toList();
+            for (var watcher : entry.getValue()) {
+                try {
+                    watcher.accept(triggers);
+                } catch (RuntimeException | LinkageError e) {
+                    logger.error("An addon failed when told which triggers of its event {} are loaded", entry.getKey(), e);
+                }
+            }
+        }
+    }
+
+    /** The loaded triggers, by identity, as addons running their own events were last told. */
+    private volatile Set<CompiledScripts.CompiledTrigger> live = Set.of();
+
+    /** A loaded trigger of an event an addon runs itself. */
+    private record Loaded(CompiledScripts.CompiledTrigger compiled, ScriptManager manager, Logger logger)
+            implements co.xenastudios.neoskript.api.registration.LoadedTrigger {
+
+        @Override
+        public String script() {
+            return compiled.script();
+        }
+
+        @Override
+        public int line() {
+            return compiled.line();
+        }
+
+        @Override
+        public co.xenastudios.neoskript.api.element.Condition filter() {
+            return compiled.filter();
+        }
+
+        @Override
+        public void run(Object event, Object owner) {
+            if (!manager.live.contains(compiled)) {
+                // Its script has unloaded or reloaded since: its code doesn't run any more.
+                return;
+            }
+            try {
+                compiled.trigger().execute(new SimpleTriggerContext(event, owner));
+            } catch (Throwable e) {
+                // As any trigger's: never to the addon that ran it.
+                TriggerErrors.report(logger, e);
+            }
+        }
+    }
+
+    /** Puts {@code byScript}'s entries in the order of {@code files}, any others after them. */
+    private static <V> void reorder(Map<String, V> byScript, List<SourceFile> files) {
+        Map<String, V> ordered = new LinkedHashMap<>();
+        for (SourceFile file : files) {
+            V value = byScript.get(file.name());
+            if (value != null) {
+                ordered.put(file.name(), value);
+            }
+        }
+        byScript.forEach(ordered::putIfAbsent);
+        byScript.clear();
+        byScript.putAll(ordered);
     }
 
     /** Runs every loaded script's unload events, as the server stops. */
