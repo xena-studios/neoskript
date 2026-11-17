@@ -356,12 +356,23 @@ public final class SqlVariableStorage implements VariableBackend {
     /** A transaction whose commit wasn't answered, until the marker row says whether it committed. */
     private Uncertain uncertain;
 
-    /** @param connection on MySQL, the server's id for the connection the commit was sent on, or 0 */
-    private record Uncertain(long number, Resolution resolution, List<Op> letGoOf, long connection) {}
+    /**
+     * @param connection on MySQL, the server's id for the connection the commit was sent on, or 0
+     * @param serial that connection's serial ({@link #serials}), which it carries as a connect attribute
+     */
+    private record Uncertain(long number, Resolution resolution, List<Op> letGoOf, long connection, long serial) {}
 
     /** On MySQL, the connection {@link #connectionId} is for, and its id. Only touched on the database's thread. */
     private Connection idFor;
     private long connectionId;
+
+    /** The connect attributes each MySQL connection carries: this run's update_guid, and the connection's serial. */
+    static final String RUN_ATTRIBUTE = "neoskript_run";
+    static final String SERIAL_ATTRIBUTE = "neoskript_connection";
+
+    /** Each connection's serial, numbered as they're made in this run. */
+    private final java.util.concurrent.atomic.AtomicLong connections = new java.util.concurrent.atomic.AtomicLong();
+    private final Map<Connection, Long> serials = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
     /** For tests: connecting fails, as if the database couldn't be reached. */
     volatile boolean unreachable;
@@ -1397,6 +1408,7 @@ public final class SqlVariableStorage implements VariableBackend {
         List<Op> write = resolution.write;
         long number = ++transactions;
         long id = settings.merging() ? connectionId() : 0;
+        Long serial = serials.get(connection);
         if (settings.merging()) {
             for (Op op : write) {
                 List<Op> sent = attempts.computeIfAbsent(op.name(), k -> new ArrayList<>(1));
@@ -1428,7 +1440,7 @@ public final class SqlVariableStorage implements VariableBackend {
             }
         } catch (SQLException lost) {
             if (settings.merging()) {
-                uncertain = new Uncertain(number, resolution, letGoOf, id);
+                uncertain = new Uncertain(number, resolution, letGoOf, id, serial == null ? 0 : serial);
             }
             throw lost;
         }
@@ -1471,6 +1483,39 @@ public final class SqlVariableStorage implements VariableBackend {
     /** For tests: where this run's update_guid is kept. */
     Path runFile() {
         return runFile;
+    }
+
+    /**
+     * Whether the connection whose connect attributes are {@code attributes} is certainly this run's connection
+     * {@code serial}, so killing it can't touch anyone else's: connection ids start again at 1 when MySQL restarts,
+     * and any client of the same user can have the old one. {@code null} attributes (unreadable, as when
+     * performance_schema is off) never allow it.
+     */
+    static boolean mayKill(Map<String, String> attributes, String run, long serial) {
+        return attributes != null && run.equals(attributes.get(RUN_ATTRIBUTE))
+                && Long.toString(serial).equals(attributes.get(SERIAL_ATTRIBUTE));
+    }
+
+    /**
+     * The connect attributes of the connection with the server id {@code id}, from performance_schema; an empty map if
+     * there's no such connection, or {@code null} if they can't be read.
+     */
+    private Map<String, String> attributesOf(long id) {
+        Map<String, String> attributes = new java.util.HashMap<>();
+        try (PreparedStatement read = connection.prepareStatement("SELECT ATTR_NAME, ATTR_VALUE FROM "
+                + "performance_schema.session_connect_attrs WHERE PROCESSLIST_ID = ?")) {
+            read.setLong(1, id);
+            try (ResultSet result = read.executeQuery()) {
+                while (result.next()) {
+                    attributes.put(result.getString(1), result.getString(2));
+                }
+            }
+            connection.commit();
+            return attributes;
+        } catch (SQLException unreadable) {
+            rollbackQuietly();
+            return null;
+        }
     }
 
     /** On MySQL, the server's id for the current connection (CONNECTION_ID()), or 0 if it can't be had. */
@@ -1526,7 +1571,9 @@ public final class SqlVariableStorage implements VariableBackend {
         }
         Uncertain was = uncertain;
         String number;
-        if (settings.dialect() == Dialect.MYSQL && was.connection() > 0 && was.connection() != connectionId()) {
+        if (settings.dialect() == Dialect.MYSQL && was.connection() > 0 && was.serial() > 0
+                && was.connection() != connectionId()
+                && mayKill(attributesOf(was.connection()), guid, was.serial())) {
             // The commit's connection may be half-open, its transaction holding the marker's lock until the server
             // notices, hours later. Killed, a transaction not yet committing is rolled back and lets go at once; a
             // COMMIT already running still finishes, and the locked read below waits for it, so the answer stays
@@ -2646,6 +2693,7 @@ public final class SqlVariableStorage implements VariableBackend {
         }
         Driver driver = driver(settings.dialect());
         Properties properties = new Properties();
+        long serial = 0;
         String url;
         if (settings.dialect() == Dialect.SQLITE) {
             url = "jdbc:sqlite:" + settings.file().toAbsolutePath();
@@ -2658,6 +2706,10 @@ public final class SqlVariableStorage implements VariableBackend {
             properties.setProperty("connectTimeout", "5000");
             properties.setProperty("socketTimeout", "60000");
             properties.setProperty("tcpKeepAlive", "true");
+            // Which connection of which run it is, for settling a commit whose answer was lost (mayKill).
+            serial = connections.incrementAndGet();
+            properties.setProperty("connectionAttributes", RUN_ATTRIBUTE + ":" + guid + "," + SERIAL_ATTRIBUTE + ":"
+                    + serial);
         }
         Properties extra = extraProperties;
         if (extra != null) {
@@ -2666,6 +2718,9 @@ public final class SqlVariableStorage implements VariableBackend {
         Connection c = driver.connect(url, properties);
         if (c == null) {
             throw new SQLException("the " + settings.dialect() + " driver didn't take " + url);
+        }
+        if (serial > 0) {
+            serials.put(c, serial);
         }
         try {
             c.setAutoCommit(false);

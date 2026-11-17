@@ -1516,4 +1516,20 @@ class SqlVariableStorageTest {
             assertFalse(Files.readString(runFile).strip().equals("crashed-run"), "this run's own is kept now");
         }
     }
+
+    @Test
+    void aStalledCommitsConnectionIsKilledOnlyIfItsCertainlyThisRunsOwn() {
+        String run = "3f6c2a1e-0000-4000-8000-000000000001";
+        Map<String, String> ours = Map.of(SqlVariableStorage.RUN_ATTRIBUTE, run, SqlVariableStorage.SERIAL_ATTRIBUTE,
+                "4", "_client_name", "MySQL Connector/J");
+        assertTrue(SqlVariableStorage.mayKill(ours, run, 4));
+        // Another of this run's connections, another run's (another server, or this one before a restart), a client
+        // without the attributes, no such connection, or attributes that can't be read: never killed.
+        assertFalse(SqlVariableStorage.mayKill(ours, run, 3));
+        assertFalse(SqlVariableStorage.mayKill(Map.of(SqlVariableStorage.RUN_ATTRIBUTE, "another-run",
+                SqlVariableStorage.SERIAL_ATTRIBUTE, "4"), run, 4));
+        assertFalse(SqlVariableStorage.mayKill(Map.of("_client_name", "some app"), run, 4));
+        assertFalse(SqlVariableStorage.mayKill(Map.of(), run, 4));
+        assertFalse(SqlVariableStorage.mayKill(null, run, 4));
+    }
 }
