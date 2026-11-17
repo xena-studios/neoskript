@@ -78,7 +78,7 @@ public final class SyntaxRegistry {
     private final EventValues eventValues;
 
     private SyntaxRegistry(Builder builder) {
-        this.typesById = Collections.unmodifiableMap(new LinkedHashMap<>(builder.typesById));
+        this.typesById = Collections.unmodifiableMap(builder.typesInOrder());
         Map<String, Integer> orders = new java.util.HashMap<>();
         for (String id : typesById.keySet()) {
             orders.put(id, orders.size());
@@ -827,6 +827,9 @@ public final class SyntaxRegistry {
          */
         public Builder type(TypeInfo type, String... aliases) {
             String id = Text.lower(type.id());
+            if (inserting && !typesById.containsKey(id)) {
+                insertedTypes.add(id);
+            }
             typesById.put(id, type);
             nameType(id, type);
             nameType(normalize(type.name()), type);
@@ -873,8 +876,59 @@ public final class SyntaxRegistry {
         }
 
         public Builder syntax(SyntaxInfo syntax) {
-            syntaxes.computeIfAbsent(syntax.kind(), k -> new ArrayList<>()).add(syntax);
+            List<SyntaxInfo> list = syntaxes.computeIfAbsent(syntax.kind(), k -> new ArrayList<>());
+            if (inserting) {
+                // At the addons' place, after what was inserted there already.
+                int at = marks.getOrDefault(syntax.kind(), 0) + inserted.merge(syntax.kind(), 1, Integer::sum) - 1;
+                list.add(Math.min(at, list.size()), syntax);
+            } else {
+                list.add(syntax);
+            }
             return this;
+        }
+
+        /** Where each kind's syntax and the types stood when {@link #mark} was called. */
+        private final Map<SyntaxKind, Integer> marks = new EnumMap<>(SyntaxKind.class);
+        private final Map<SyntaxKind, Integer> inserted = new EnumMap<>(SyntaxKind.class);
+        private int typeMark = -1;
+        private final List<String> insertedTypes = new ArrayList<>();
+        private boolean inserting;
+
+        /**
+         * Marks the place addons' syntax and types go, as the standard library registers: what's added later while
+         * {@link #inserting(boolean)} goes there, in the order it's added, as if it had been registered at this point.
+         */
+        public Builder mark() {
+            for (SyntaxKind kind : SyntaxKind.values()) {
+                marks.put(kind, syntaxes.getOrDefault(kind, List.of()).size());
+            }
+            typeMark = typesById.size();
+            return this;
+        }
+
+        /** Whether what's added now goes at the {@link #mark}, rather than after everything. */
+        public Builder inserting(boolean inserting) {
+            this.inserting = inserting && typeMark >= 0;
+            return this;
+        }
+
+        /** The types in the order they're tried: those added while inserting at the mark. */
+        private Map<String, TypeInfo> typesInOrder() {
+            if (insertedTypes.isEmpty()) {
+                return new LinkedHashMap<>(typesById);
+            }
+            Map<String, TypeInfo> ordered = new LinkedHashMap<>();
+            int index = 0;
+            for (Map.Entry<String, TypeInfo> entry : typesById.entrySet()) {
+                if (index++ == typeMark) {
+                    insertedTypes.forEach(id -> ordered.put(id, typesById.get(id)));
+                }
+                if (!insertedTypes.contains(entry.getKey())) {
+                    ordered.put(entry.getKey(), entry.getValue());
+                }
+            }
+            insertedTypes.forEach(id -> ordered.putIfAbsent(id, typesById.get(id)));
+            return ordered;
         }
 
         /** Adds a built-in function, or another overload of one. */

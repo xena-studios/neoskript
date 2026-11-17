@@ -55,8 +55,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         co.xenastudios.neoskript.runtime.PausingSections.install(message -> getSLF4JLogger().warn(message));
-        // D10: NeoSkript replaces Skript, so running both would fight over scripts and commands.
-        if (getServer().getPluginManager().getPlugin("Skript") != null) {
+        // D10: NeoSkript replaces Skript, so running both would fight over scripts and commands. By the plugin's own
+        // name: NeoSkriptCompat provides "Skript" for Skript addons (D22), and isn't Skript.
+        if (skriptRunning(getServer().getPluginManager().getPlugin("Skript"))) {
             getSLF4JLogger().error(
                     "Skript is installed. NeoSkript replaces Skript, so they can't run together. "
                             + "Remove Skript.jar from the plugins folder to use NeoSkript. NeoSkript is now disabled.");
@@ -117,6 +118,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
 
         Library library = new Library();
+        this.library = library;
         if (TestRunner.enabled()) {
             library.enableTesting();
         }
@@ -130,19 +132,22 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         // With addons, which enable after NeoSkript, the syntax is registered on the first tick, theirs with it, and
         // variables load after that, so the addons' types load too. Without them, nothing waits.
         boolean deferSyntax = Addons.anyInstalled(this) && !co.xenastudios.neoskript.plugin.check.CheckMode.requested();
-        Runnable registerSyntax = () -> {
-            StandardLibrary.register(library, registrar -> {
-                if (hooks) {
-                    co.xenastudios.neoskript.paper.Hooks.register(registrar, getPluginMeta().getVersion(), getSLF4JLogger());
-                }
-                // Addons' syntax goes with the hooks': before comparisons and what matches almost anything.
+        // The standard library and the hooks register now, with or without addons, so addons enabling after
+        // NeoSkript (and Skript addons, through NeoSkriptCompat) can ask what types there are. Addons' syntax goes
+        // with the hooks': before comparisons and what matches almost anything. With addons, it's registered on the
+        // first tick, at that place.
+        StandardLibrary.register(library, registrar -> {
+            if (hooks) {
+                co.xenastudios.neoskript.paper.Hooks.register(registrar, getPluginMeta().getVersion(), getSLF4JLogger());
+            }
+            if (deferSyntax) {
+                library.markAddonPoint();
+            } else {
                 addons.registerAll(registrar);
-            });
-            StandardLibrary.usePlayerUuidsInVariableNames(settings.variables().playerUuidsInNames());
-        };
-        if (!deferSyntax) {
-            registerSyntax.run();
-        }
+            }
+        });
+        StandardLibrary.usePlayerUuidsInVariableNames(settings.variables().playerUuidsInNames());
+        Runnable registerSyntax = () -> library.insertingAtMark(() -> addons.registerAll(library));
         aliases = new AliasManager(getDataPath(), getSLF4JLogger());
         if (co.xenastudios.neoskript.plugin.check.CheckMode.requested()) {
             // Started by NeoSkript's CLI to check scripts: check them, write the report, and stop.
@@ -268,6 +273,24 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         // What /sk reload config compares with: the settings the server started with.
         settingsReloader = new SettingsReloader(configFile(), settings, reloadEffects());
         getCommand("skript").setExecutor(new SkriptCommand(this, scripts));
+    }
+
+    private Library library;
+
+    /**
+     * The library scripts are compiled against: for NeoSkriptCompat, which registers Skript addons' syntax into it
+     * (D22). Not part of the addon API.
+     */
+    public Library library() {
+        return library;
+    }
+
+    /**
+     * Whether {@code plugin}, what the server has under the name "Skript", is Skript itself rather than a plugin that
+     * only provides that name, as NeoSkriptCompat does (D22).
+     */
+    static boolean skriptRunning(org.bukkit.plugin.Plugin plugin) {
+        return plugin != null && plugin.getName().equals("Skript");
     }
 
     /** The addons registered through NeoSkript's API, as {@code name version}, for {@code /sk info}. */

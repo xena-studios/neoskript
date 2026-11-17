@@ -78,6 +78,16 @@ public final class Library implements Registrar {
         return SyntaxRegistry.OBJECT.equals(type) ? null : type;
     }
 
+    /** The id of the type whose values are exactly {@code javaClass}, or {@code null}: for NeoSkriptCompat. */
+    public String exactTypeOf(Class<?> javaClass) {
+        return exactType(javaClass);
+    }
+
+    /** Whether a type has this id: for NeoSkriptCompat. */
+    public boolean hasType(String id) {
+        return javaClasses.containsKey(id);
+    }
+
     /** Text as a value of type {@code typeId}, as a command argument, or {@code null}: for addons. */
     public Object parse(String text, String typeId) {
         java.util.function.Function<String, ?> parser = parsers.get(typeId);
@@ -146,7 +156,43 @@ public final class Library implements Registrar {
 
     private void putJavaClass(String id, Class<?> javaClass) {
         if (javaClasses.put(id, javaClass) == null) {
-            javaClassOrder.add(id);
+            if (inserting) {
+                javaClassOrder.add(javaClassMark + insertedClasses++, id);
+            } else {
+                javaClassOrder.add(id);
+            }
+        }
+    }
+
+    private int javaClassMark = -1;
+    private int insertedClasses;
+    private boolean inserting;
+
+    /**
+     * Marks the place addons' syntax and types go, as the standard library registers (where it calls its hooks):
+     * {@link #insertingAtMark} registers there later, as if then.
+     */
+    public void markAddonPoint() {
+        checkOpen();
+        builder.mark();
+        javaClassMark = javaClassOrder.size();
+    }
+
+    /**
+     * Runs {@code registration} with what it registers going at the {@link #markAddonPoint mark}: addons' syntax
+     * registered after the standard library, in the place it would have had if registered with it, so it's tried in
+     * the same order. Without a mark, it goes after everything.
+     */
+    public void insertingAtMark(Runnable registration) {
+        checkOpen();
+        boolean marked = javaClassMark >= 0;
+        inserting = marked;
+        builder.inserting(marked);
+        try {
+            registration.run();
+        } finally {
+            inserting = false;
+            builder.inserting(false);
         }
     }
 
