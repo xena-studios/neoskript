@@ -230,7 +230,9 @@ the addon's name and the element's class (`SkBee:ExprWorldHeight`).
   gives none of its syntax a priority, so Skript gives it the level of its patterns, and some of it (`item model of
   %itemstacks/itemtypes/slots%`, combined) comes before Skript's own (a property). `neoskript-skript-suite-skbee`
   runs Skript's whole suite with NeoSkriptCompat and SkBee installed, and Skript's own runner on Skript 2.17 with the
-  same SkBee: every test that passes there must pass on NeoSkript. 857 of 862 pass; the other 5 don't pass on Skript
+  same SkBee (at least 800 tests must pass there, with SkBee enabled): every test that passes there must pass on
+  NeoSkript, unless SkBee's own code threw the same exception on both, or it's a test NeoSkript's runner doesn't run
+  in the plain suite either (`health utils update`, which uses the runner's `on test` event). 857 of 862 pass; the other 5 don't pass on Skript
   with SkBee either (SkBee's damage source, item model and book pages syntax takes those lines there too), one of
   them because SkBee's own code throws on both (`add fire aspect 0 to stored enchantments`). Addons' syntax and types
   are inserted at the place the standard library marks for them, as before; their literal parsers, named types,
@@ -243,7 +245,10 @@ the addon's name and the element's class (`SkBee:ExprWorldHeight`).
 - **Types** an addon registers become NeoSkript's types, with their parser, text and values. One NeoSkript has
   already (by code name or class) stays NeoSkript's: SkBee checks first and leaves those alone. Their values can't
   be saved in variables yet.
-- **Value adapters** (D24) so far: `ItemType` and `EntityData`.
+- **Runtime errors** name the addon: what an element throws while it runs becomes "SkBee's ExprStoredEnchant threw in
+  SkBee's code: ..." ("in SkBee's code" when the addon's own code threw, not NeoSkriptCompat's), and the trigger goes
+  on as with NeoSkript's other runtime errors.
+- **Value adapters** (D24) so far: `ItemType`, `EntityData`, `EnchantmentType`, and `Slot` (an inventory's as `InventorySlot`).
 - **Conversions, comparisons and event values** go to NeoSkript where they involve a class NeoSkript has no type
   for, so they don't change how NeoSkript's own types behave. **Functions** an addon writes in Java become
   NeoSkript's.

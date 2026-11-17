@@ -52,7 +52,7 @@ final class CompatElements {
         registrar.expression(id, compat.typeId(returns), element -> {
             ch.njol.skript.lang.Expression<?> expression = setup(compat, addon, info, placeholders, element,
                     "expression");
-            return new ExpressionAdapter(expression, changes(expression));
+            return new ExpressionAdapter(addon, expression, changes(expression));
         }, patterns(info));
         priority(registrar, id, info);
         if (returns == Object.class) {
@@ -71,7 +71,7 @@ final class CompatElements {
         String id = id(addon, info);
         registrar.effect(id, element -> {
             ch.njol.skript.lang.Effect effect = setup(compat, addon, info, placeholders, element, "effect");
-            return (Effect) (context, arguments) -> CompatArgument.with(arguments,
+            return (Effect) (context, arguments) -> run(addon, effect, arguments,
                     () -> effect.run(CompatEvent.of(context.event())));
         }, patterns(info));
         priority(registrar, id, info);
@@ -82,7 +82,7 @@ final class CompatElements {
         String id = id(addon, info);
         registrar.condition(id, element -> {
             ch.njol.skript.lang.Condition condition = setup(compat, addon, info, placeholders, element, "condition");
-            return (Condition) (context, arguments) -> CompatArgument.with(arguments,
+            return (Condition) (context, arguments) -> run(addon, condition, arguments,
                     () -> condition.check(CompatEvent.of(context.event())));
         }, patterns(info));
         priority(registrar, id, info);
@@ -94,6 +94,50 @@ final class CompatElements {
      */
     private static void priority(Registrar registrar, String id, SyntaxInfo<?> info) {
         registrar.priority(id, CompatPriority.level(info.priority()));
+    }
+
+    /**
+     * Runs an addon's element with its arguments. What it throws (but the JVM running out of memory or stack) becomes
+     * an error naming the addon and the element, so a script's runtime error says whose it is, and whether the
+     * addon's own code threw.
+     */
+    private static <R> R run(String addon, Object element, Object[] arguments, java.util.function.Supplier<R> body) {
+        try {
+            return CompatArgument.with(arguments, body);
+        } catch (VirtualMachineError e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new AddonError(addon, element, e);
+        }
+    }
+
+    /** An error an addon's element threw while it ran. */
+    static final class AddonError extends RuntimeException {
+
+        AddonError(String addon, Object element, Throwable cause) {
+            super(addon + "'s " + element.getClass().getSimpleName() + " threw"
+                    + (thrownBy(element.getClass(), cause) ? " in " + addon + "'s code" : "") + ": " + cause, cause);
+        }
+
+        /**
+         * Whether the first frame of {@code cause}'s that isn't Java's, Bukkit's, Paper's or Minecraft's is in the
+         * addon's code: in its element's package or one above it (as {@code com.shanebeestudios.skbee}).
+         */
+        static boolean thrownBy(Class<?> element, Throwable cause) {
+            String[] parts = element.getPackageName().split("\\.");
+            String root = String.join(".", java.util.Arrays.copyOf(parts, Math.min(3, parts.length))) + ".";
+            for (StackTraceElement frame : cause.getStackTrace()) {
+                String name = frame.getClassName();
+                if (name.startsWith("java.") || name.startsWith("jdk.") || name.startsWith("sun.")
+                        || name.startsWith("org.bukkit.") || name.startsWith("io.papermc.")
+                        || name.startsWith("net.minecraft.") || name.startsWith("com.google.")
+                        || name.startsWith("net.kyori.") || name.startsWith("com.mojang.")) {
+                    continue;
+                }
+                return name.startsWith(root);
+            }
+            return false;
+        }
     }
 
     /** The element's id: the addon's name and the element's class, as {@code SkBee:ExprWorldHeight}. */
@@ -316,11 +360,14 @@ final class CompatElements {
     /** An addon's expression as NeoSkript's: its values, and changing it. */
     private static final class ExpressionAdapter implements Expression, Changeable {
 
+        private final String addon;
         private final ch.njol.skript.lang.Expression<?> expression;
         private final Map<ChangeMode, Class<?>[]> changes;
         private final boolean single;
 
-        ExpressionAdapter(ch.njol.skript.lang.Expression<?> expression, Map<ChangeMode, Class<?>[]> changes) {
+        ExpressionAdapter(String addon, ch.njol.skript.lang.Expression<?> expression,
+                Map<ChangeMode, Class<?>[]> changes) {
+            this.addon = addon;
             this.expression = expression;
             this.changes = changes;
             this.single = expression.isSingle();
@@ -328,7 +375,7 @@ final class CompatElements {
 
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
-            return CompatArgument.with(arguments, () -> {
+            return run(addon, expression, arguments, () -> {
                 Object[] values = expression.getArray(CompatEvent.of(context.event()));
                 if (single) {
                     return values == null || values.length == 0 ? null : CompatValuesBridge.result(values[0]);
@@ -373,14 +420,14 @@ final class CompatElements {
             if (given != null && given.length == 0 && skriptMode != ChangeMode.DELETE && skriptMode != ChangeMode.RESET) {
                 // Setting to nothing deletes, where the expression can be deleted; else nothing happens (EffChange).
                 if (skriptMode == ChangeMode.SET && changes.containsKey(ChangeMode.DELETE)) {
-                    CompatArgument.with(arguments, () -> {
+                    run(addon, expression, arguments, () -> {
                         expression.change(CompatEvent.of(context.event()), null, ChangeMode.DELETE);
                         return null;
                     });
                 }
                 return;
             }
-            CompatArgument.with(arguments, () -> {
+            run(addon, expression, arguments, () -> {
                 expression.change(CompatEvent.of(context.event()), given, skriptMode);
                 return null;
             });
