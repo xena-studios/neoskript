@@ -26,6 +26,15 @@ final class SkriptConfigFile {
 
     private record Section(int indent, String path) {}
 
+    /**
+     * A config file's text as Skript reads it: UTF-8, through a reader that turns bytes that aren't UTF-8 (a Latin-1
+     * {@code é}) into U+FFFD rather than failing, without a byte order mark at the start.
+     */
+    static String text(java.nio.file.Path file) throws java.io.IOException {
+        String text = new String(java.nio.file.Files.readAllBytes(file), java.nio.charset.StandardCharsets.UTF_8);
+        return text.startsWith("\uFEFF") ? text.substring(1) : text;
+    }
+
     static Map<String, String> read(String text) {
         Map<String, String> entries = new LinkedHashMap<>();
         Deque<Section> sections = new ArrayDeque<>();

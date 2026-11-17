@@ -52,13 +52,14 @@ final class SkriptMigration {
      * were all dealt with ({@code false} if some couldn't be read or copied, so they're tried again on the next start).
      * If config.sk's settings couldn't be read, {@code settingsProblem} says why. {@code caseClashes} are the groups of
      * variables Skript kept apart that NeoSkript, whose variable names always ignore case, reads as one, when config.sk
-     * turned Skript's {@code case-insensitive variables} off ({@code null} if it didn't).
+     * turned Skript's {@code case-insensitive variables} off ({@code null} if it didn't), found in NeoSkript's copy of
+     * the CSV file, {@code caseClashFile}.
      */
     record Result(List<String> copied, int scriptCount, Map<String, Object> settings, Path variablesBackup,
-            String settingsProblem, List<List<String>> caseClashes, List<String> notes, boolean aliasesDone) {
+            String settingsProblem, List<List<String>> caseClashes, Path caseClashFile, List<String> notes, boolean aliasesDone) {
 
         Result(List<String> copied, int scriptCount) {
-            this(copied, scriptCount, Map.of(), null, null, null, List.of(), true);
+            this(copied, scriptCount, Map.of(), null, null, null, null, List.of(), true);
         }
     }
 
@@ -82,6 +83,17 @@ final class SkriptMigration {
             return new Result(List.of(), 0);
         }
         Files.createDirectories(neoskriptDir);
+        // Before anything is copied: config.sk's databases section says where Skript's variables are, so if it can't
+        // be read at all, copying variables.csv could bring over the wrong ones. Nothing is copied or marked done, and
+        // the next start tries again.
+        List<SkriptDatabase> databases;
+        try {
+            databases = databases(skriptDir.resolve("config.sk"));
+        } catch (IOException | RuntimeException | StackOverflowError e) {
+            throw new IOException("Couldn't read Skript's config.sk (" + (e.getMessage() == null ? e : e.getMessage())
+                    + "), so nothing was copied from plugins/Skript: its databases section says where Skript's"
+                    + " variables are. Fix it and restart, and NeoSkript copies everything then.", e);
+        }
         if (!retry) {
             Files.writeString(neoskriptDir.resolve(STARTED), "Copying from " + skriptDir.toAbsolutePath() + " since "
                     + Instant.now() + "\n");
@@ -89,14 +101,6 @@ final class SkriptMigration {
         List<String> copied = new ArrayList<>();
         int[] scripts = {0};
         String problem = null;
-        List<SkriptDatabase> databases;
-        try {
-            databases = databases(skriptDir.resolve("config.sk"));
-        } catch (IOException | RuntimeException | StackOverflowError e) {
-            // A config.sk that can't be read stops none of the rest: its settings just aren't copied.
-            databases = List.of();
-            problem = String.valueOf(e.getMessage() == null ? e : e.getMessage());
-        }
         for (String name : List.of("scripts", "variables.csv", "lang")) {
             Path source = skriptDir.resolve(name);
             if (!Files.exists(source) || (name.equals("variables.csv") && !databases.isEmpty())
@@ -154,7 +158,7 @@ final class SkriptMigration {
             problem = problem != null ? problem : String.valueOf(e.getMessage() == null ? e : e.getMessage());
         }
         // The marker is written by finish(), once config.yml has the settings.
-        return new Result(copied, scripts[0], settings, backup, problem, clashes, List.copyOf(notes),
+        return new Result(copied, scripts[0], settings, backup, problem, clashes, csv, List.copyOf(notes),
                 aliases.complete());
     }
 
@@ -298,7 +302,7 @@ final class SkriptMigration {
         Files.writeString(marker, recorded + (copied.isEmpty() ? "" : "Copied " + copied + " from "
                 + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n") + (aliases.complete() ? ALIASES_DONE + "\n" : ""));
         if (copied.isEmpty()) {
-            return new Result(List.of(), 0, Map.of(), null, null, null, List.copyOf(notes), aliases.complete());
+            return new Result(List.of(), 0, Map.of(), null, null, null, null, List.copyOf(notes), aliases.complete());
         }
         Map<String, Object> settings = new java.util.LinkedHashMap<>();
         String problem = null;
@@ -308,7 +312,7 @@ final class SkriptMigration {
             problem = String.valueOf(e.getMessage() == null ? e : e.getMessage());
         }
         settings.keySet().retainAll(List.of("aliases.load-defaults"));
-        return new Result(copied, 0, settings, null, problem, null, List.copyOf(notes), aliases.complete());
+        return new Result(copied, 0, settings, null, problem, null, null, List.copyOf(notes), aliases.complete());
     }
 
     /** Where a database's file is for NeoSkript, and the backup of what was copied. */
@@ -415,7 +419,8 @@ final class SkriptMigration {
         String sectionIndent = null;
         String name = null;
         Map<String, String> options = null;
-        for (String line : Files.readAllLines(config)) {
+        // As Skript reads it: UTF-8 with bad bytes replaced, a byte order mark left out.
+        for (String line : SkriptConfigFile.text(config).split("\r\n|\r|\n", -1)) {
             String content = value(line);
             if (content.isEmpty()) {
                 continue;

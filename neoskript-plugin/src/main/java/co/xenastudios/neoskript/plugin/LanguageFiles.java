@@ -46,7 +46,7 @@ final class LanguageFiles {
         // A name like '../x' can't reach outside the folder.
         Path own = folder == null || !file.matches("[\\w.-]+") ? null : folder.resolve(file);
         if (own != null && Files.isRegularFile(own)) {
-            entries.putAll(SkriptConfigFile.read(Files.readString(own, StandardCharsets.UTF_8)));
+            entries.putAll(SkriptConfigFile.read(SkriptConfigFile.text(own)));
             found = true;
         }
         return found && !entries.isEmpty() ? entries : null;

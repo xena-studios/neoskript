@@ -5,7 +5,6 @@
 package co.xenastudios.neoskript.plugin;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -100,13 +99,7 @@ final class SkriptSettings {
         if (!Files.isRegularFile(config)) {
             return settings;
         }
-        Map<String, String> entries;
-        try {
-            entries = SkriptConfigFile.read(Files.readString(config, StandardCharsets.UTF_8));
-        } catch (java.nio.charset.CharacterCodingException e) {
-            // Skript reads config.sk as UTF-8; one that isn't can't have been read as Skript reads it.
-            throw new IOException("config.sk isn't UTF-8", e);
-        }
+        Map<String, String> entries = SkriptConfigFile.read(SkriptConfigFile.text(config));
         String language = entries.get("language");
         if (language != null) {
             String name = language.toLowerCase(Locale.ENGLISH);
@@ -136,7 +129,7 @@ final class SkriptSettings {
         if (!Files.isRegularFile(config)) {
             return false;
         }
-        String value = SkriptConfigFile.read(Files.readString(config, StandardCharsets.UTF_8))
+        String value = SkriptConfigFile.read(SkriptConfigFile.text(config))
                 .get("case-insensitive variables");
         return value != null && Boolean.FALSE.equals(SkriptConfigFile.bool(value));
     }

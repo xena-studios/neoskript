@@ -84,13 +84,48 @@ class SkriptMigrationTest {
     }
 
     @Test
-    void anUnreadableConfigSkStillCopiesTheScripts() throws Exception {
+    void aLatin1ConfigSkIsReadAsSkriptReadsIt() throws Exception {
         Path skript = skript();
-        Files.write(skript.resolve("config.sk"), new byte[] {(byte) 0xff, (byte) 0xfe, 'x', '\n'});
+        // Skript's reader turns bytes that aren't UTF-8 into U+FFFD rather than failing: here an é in a comment.
+        String latin1 = "# Paramètres\nnumber accuracy: 4\ndatabases:\n\tmine:\n\t\ttype: CSV\n"
+                + "\t\tfile: ./plugins/Skript/variables.csv\n";
+        Files.write(skript.resolve("config.sk"), latin1.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
         SkriptMigration.Result result = SkriptMigration.migrate(skript, plugins.resolve("NeoSkript"));
-        assertEquals(List.of("scripts", "variables.csv"), result.copied());
-        assertEquals(java.util.Map.of(), result.settings());
-        assertTrue(result.settingsProblem().contains("UTF-8"), result.settingsProblem());
+        assertEquals(null, result.settingsProblem());
+        assertEquals(4, result.settings().get("text.number-accuracy"));
+        assertTrue(result.settings().containsKey("databases"), result.settings().toString());
+        // The databases section names the file, so variables.csv isn't copied on its own.
+        assertFalse(result.copied().contains("variables.csv"), result.copied().toString());
+    }
+
+    @Test
+    void aByteOrderMarkBeforeTheFirstOptionIsLeftOut() throws Exception {
+        Path skript = skript();
+        Files.write(skript.resolve("config.sk"), ("\uFEFFnumber accuracy: 3\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(3, SkriptMigration.migrate(skript, plugins.resolve("NeoSkript")).settings().get("text.number-accuracy"));
+        Files.write(skript.resolve("config.sk"), ("\uFEFFdatabases:\n\tmine:\n\t\ttype: csv\n").getBytes(
+                java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(1, SkriptMigration.databases(skript.resolve("config.sk")).size());
+    }
+
+    @Test
+    void aConfigSkThatCantBeReadCopiesNothingAndIsTriedAgain() throws Exception {
+        Path skript = skript();
+        Path config = skript.resolve("config.sk");
+        org.junit.jupiter.api.Assumptions.assumeTrue(config.getFileSystem().supportedFileAttributeViews().contains("posix"));
+        Files.setPosixFilePermissions(config, java.util.Set.of());
+        org.junit.jupiter.api.Assumptions.assumeFalse(Files.isReadable(config), "running as a user who reads anything");
+        Path neoskript = plugins.resolve("NeoSkript");
+        try {
+            org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
+                    () -> SkriptMigration.migrate(skript, neoskript));
+            assertFalse(Files.exists(neoskript.resolve("variables.csv")), "Skript's variables.csv isn't copied");
+            assertFalse(Files.exists(neoskript.resolve(SkriptMigration.MARKER)));
+        } finally {
+            Files.setPosixFilePermissions(config, java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+        }
+        // Readable again, the next start copies everything.
+        assertEquals(List.of("scripts", "variables.csv"), SkriptMigration.migrate(skript, neoskript).copied());
     }
 
     @Test

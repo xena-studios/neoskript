@@ -433,11 +433,11 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         int count = migration.caseClashes().size();
         getSLF4JLogger().error("Skript's config.sk has 'case-insensitive variables: false', but NeoSkript's variable"
                 + " names always ignore case. {} {} of saved variables differ only by case, and NeoSkript keeps only one"
-                + " of each (the last in the file); the next save drops the others. Skript's variables.csv is untouched in"
-                + " plugins/Skript{}. Rename them in your scripts and variables before relying on them:", count,
-                count == 1 ? "group" : "groups", migration.variablesBackup() == null ? ""
-                        : ", and the copy NeoSkript read is backed up as "
-                        + getDataPath().toAbsolutePath().relativize(migration.variablesBackup().toAbsolutePath()));
+                + " of each (the last in {}); the next save drops the others. Skript's own file is left as it was{}. Rename"
+                + " them in your scripts and variables before relying on them:", count, count == 1 ? "group" : "groups",
+                migration.caseClashFile() == null ? "the file" : shown(migration.caseClashFile()),
+                migration.variablesBackup() == null ? ""
+                        : ", and the copy NeoSkript read is backed up as " + shown(migration.variablesBackup()));
         int shown = 0;
         for (java.util.List<String> names : migration.caseClashes()) {
             if (shown++ == 50) {
@@ -447,6 +447,14 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             getSLF4JLogger().error("  {}", names.stream().map(name -> "{" + name + "}")
                     .collect(java.util.stream.Collectors.joining(", ")));
         }
+    }
+
+    /** A path as the console shows it: relative to NeoSkript's folder when it's in it. */
+    private String shown(java.nio.file.Path path) {
+        java.nio.file.Path absolute = path.toAbsolutePath().normalize();
+        java.nio.file.Path folder = getDataPath().toAbsolutePath().normalize();
+        return absolute.startsWith(folder) ? "plugins/NeoSkript/" + folder.relativize(absolute).toString().replace('\\', '/')
+                : absolute.toString();
     }
 
     /** Applies the settings scripts read, logging what couldn't be used. */
