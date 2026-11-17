@@ -148,6 +148,9 @@ final class Emitter {
 
     /** {@code value} with Bukkit's sections as plain maps, for SnakeYAML. */
     private static Object plain(Object value) {
+        if (Reader.BLANK.equals(value)) {
+            return null; // a key the owner left empty, inside a list of maps
+        }
         if (value instanceof ConfigurationSection section) {
             java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
             for (String key : section.getKeys(false)) {

@@ -522,6 +522,16 @@ class NeoSkriptConfigTest {
     }
 
     @Test
+    void carryingForwardKeepsEmptyKeysInListsOfMaps() throws Exception {
+        Files.writeString(file(), version1() + "stuff:\n- a:\n  b: 1\n");
+        load();
+        String text = Files.readString(file());
+        assertFalse(text.contains(Reader_BLANK), text);
+        assertTrue(text.contains("a: null") || text.contains("a:\n") || text.contains("a: ~"), text);
+        assertTrue(text.contains("b: 1"), text);
+    }
+
+    @Test
     void theDocsShowTheDefaultConfig() throws IOException {
         Path page = Path.of("../website/src/content/docs/docs/configuration.md");
         String docs = Files.readString(page);
