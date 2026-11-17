@@ -48,8 +48,9 @@ final class SkriptOrder {
         for (SyntaxInfo syntax : syntaxes) {
             Integer level = declared.apply(syntax.id());
             if (level != null) {
+                // After all of Skript's own syntax of its level, then by complexity, as Skript orders an addon's.
                 // Not 'previous': syntax after it that Skript doesn't have goes with the built-in syntax before it.
-                ranked.add(Map.entry(syntax, new Rank(level, Integer.MAX_VALUE, false)));
+                ranked.add(Map.entry(syntax, new Rank(level, ADDON_SCORE + complexity(syntax), false)));
                 continue;
             }
             Rank rank = rank(prefix, syntax.id());
@@ -65,6 +66,33 @@ final class SkriptOrder {
         ranked.sort(Comparator.comparingInt((Map.Entry<SyntaxInfo, Rank> entry) -> entry.getValue().level())
                 .thenComparingInt(entry -> entry.getValue().score()));
         return ranked.stream().map(Map.Entry::getKey).toList();
+    }
+
+    /** Added to an addon's complexity score, so it comes after every one of Skript's own of its level. */
+    private static final int ADDON_SCORE = 1_000_000;
+
+    /** Skript's complexity score of syntax: that of its most complex pattern ({@code calculateComplexityScore}). */
+    static int complexity(SyntaxInfo syntax) {
+        int score = 0;
+        for (var pattern : syntax.patterns()) {
+            score = Math.max(score, complexity(pattern.source()));
+        }
+        return score;
+    }
+
+    /**
+     * A pattern's complexity score, as Skript's {@code SyntaxRegister}: one for each placeholder, five for one just
+     * after another ({@code %a% %b%}, {@code %a% [%b%]}).
+     */
+    static int complexity(String pattern) {
+        int score = 0;
+        for (int i = 0; i < pattern.length(); i++) {
+            if (pattern.charAt(i) == '%') {
+                boolean close = (i >= 2 && pattern.charAt(i - 2) == '%') || (i >= 3 && pattern.charAt(i - 3) == '%');
+                score += close ? 5 : 1;
+            }
+        }
+        return score;
     }
 
     /** NeoSkript's syntax that's Skript's under another name or kind, as Skript's kind and class. */

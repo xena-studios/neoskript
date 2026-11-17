@@ -306,8 +306,13 @@ public interface Registrar {
      * line that both it and a built-in element match is read as Skript reads it: skJson's {@code keys of %json%},
      * {@link SyntaxPriority#SIMPLE}, is tried before Skript's {@code key of %minecraft tag%}, a property.
      *
-     * @param id the element's id, of any kind
+     * <p>Among an addon's syntax of one level, the least complex is tried first, as Skript does: by its most complex
+     * pattern, a point for each placeholder and five for one just after another ({@code %a% %b%}).
+     *
+     * @param id the element's id: one this addon registered, without {@code -}
      * @param priority its priority, as the Skript addon registers it
+     * @throws IllegalArgumentException if the id isn't one of this addon's elements, or is also the id of one of
+     *     NeoSkript's elements or another addon's
      */
     @Experimental
     default void priority(String id, SyntaxPriority priority) {}

@@ -53,4 +53,24 @@ class SyntaxPriorityTest {
     void anAddonsPropertyComesAfterTheBuiltInOnes() {
         assertEquals(List.of("<none>"), run(SyntaxPriority.PROPERTY));
     }
+
+    @Test
+    void amongAnAddonsOfOneLevelTheLessComplexComesFirst() {
+        // Both match 'pick 1'. Skript scores 'pick %number% [%number%]' 6 (a placeholder just after another counts 5)
+        // and 'pick %number%' 1, and tries the lower first, whichever was registered first.
+        List<String> said = new ArrayList<>();
+        Library library = new Library();
+        StandardLibrary.register(library);
+        library.effect("TestSay", info -> (context, args) -> said.add(Values.text(args[0])), "say %objects%");
+        library.expression("TestExprBoth", "string", info -> (context, args) -> "both", "pick %number% [%number%]");
+        library.expression("TestExprOne", "string", info -> (context, args) -> "one", "pick %number%");
+        library.priority("TestExprBoth", SyntaxPriority.SIMPLE);
+        library.priority("TestExprOne", SyntaxPriority.SIMPLE);
+        List<ParsedScript> parsed = new ScriptLoader(library.registry())
+                .load(List.of(new SourceFile("test.sk", "on load:\n\tsay pick 1\n")));
+        CompiledScripts compiled = new ScriptCompiler(library, new VariableStore()).compile(parsed);
+        compiled.linkFunctions();
+        compiled.triggers().forEach(t -> t.trigger().execute(new SimpleTriggerContext(null)));
+        assertEquals(List.of("one"), said);
+    }
 }
