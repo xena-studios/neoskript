@@ -35,6 +35,8 @@ class RedisTest {
         final ServerSocket server;
         final List<OutputStream> subscribers = new CopyOnWriteArrayList<>();
         final List<Socket> sockets = new CopyOnWriteArrayList<>();
+        /** What was published to it: channel and message. */
+        final List<String> published = new CopyOnWriteArrayList<>();
         final Thread thread;
 
         FakeRedis(int port) throws IOException {
@@ -81,6 +83,7 @@ class RedisTest {
                             write(out, "*3\r\n$10\r\npsubscribe\r\n$1\r\n*\r\n:1\r\n");
                         }
                         case "PUBLISH" -> {
+                            published.add(args.get(1) + " " + args.get(2));
                             String message = "*4\r\n$8\r\npmessage\r\n$1\r\n*\r\n" + bulk(args.get(1)) + bulk(args.get(2));
                             for (OutputStream subscriber : subscribers) {
                                 write(subscriber, message);
@@ -178,14 +181,15 @@ class RedisTest {
         await(link::up);
         link.publish("events", "one");
         await(() -> got.contains("events one"));
-        // Redis goes away: what's published waits, and arrives once it's back on the same port.
+        // Redis goes away: what's published waits, and reaches Redis once it's back on the same port. (Whether a
+        // subscriber hears it depends on who reconnects first: pub/sub keeps nothing for late listeners.)
         redis.close();
         await(() -> !link.up());
         link.publish("events", "two");
         FakeRedis back = new FakeRedis(port);
         closing.add(back);
         await(link::up);
-        await(() -> got.contains("events two"));
+        await(() -> back.published.contains("events two"));
         link.close(1000);
         assertEquals(0, link.queued());
     }
