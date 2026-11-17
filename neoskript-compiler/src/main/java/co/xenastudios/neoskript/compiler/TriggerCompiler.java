@@ -3479,9 +3479,13 @@ final class TriggerCompiler {
     /** Whether this is the code of syntax a script declared, where {@code continue} outside a loop proceeds. */
     private boolean declaredSyntax;
 
-    /** Whether there's a loop around the line being compiled. */
+    /**
+     * Whether a bare {@code continue} on the line being compiled is Skript's, not skript-reflect's that ends declared
+     * syntax's code: in a loop, or in code Skript loads apart ({@code spawn a pig:}), which is in an event of its
+     * own, not the declared syntax's, so there it's Skript's, with its error if there's no loop in it.
+     */
     private boolean inLoop() {
-        return !loops().isEmpty();
+        return detachedAt >= 0 || !loops().isEmpty();
     }
 
     /**
