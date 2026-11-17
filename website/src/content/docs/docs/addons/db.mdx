@@ -107,7 +107,7 @@ In a single variable, a query stores how many rows it found, and a change (`INSE
 execute "INSERT INTO homes (owner) VALUES (%player's uuid%)" in {@db} and store the generated keys in {_id}
 ```
 
-A list gets at most `max-rows` rows (100,000): a result with more fails, rather than running the server out of memory. Ask for fewer with `LIMIT`.
+A list gets at most `max-cells` values, rows times columns (1,000,000): a result with more fails, with `the last sql error` saying so, rather than running the server out of memory. Ask for fewer with `LIMIT`. A count keeps no rows in memory, though the database still sends them.
 
 ### Errors
 
@@ -133,7 +133,7 @@ A database that isn't set (`execute "..." in {nothing}`) is a runtime error on t
 [(sql|database)] transaction (on|in) %datasource%:
 ```
 
-Every statement in the section on that database runs in one transaction, committed at the end of the section. If one fails, the whole transaction is rolled back, the rest of the section is skipped, and `the last sql error` says why.
+Every statement in the section on that database runs in one transaction, committed at the end of the section. If one fails, the whole transaction is rolled back, the rest of the section is skipped, and `the last sql error` says why. `exit section` ends it as its end does, committing, as in skript-db.
 
 ```skript nocheck
 transaction on {@db}:
@@ -143,7 +143,7 @@ if the last sql error is set:
 	send "The transfer failed: %the last sql error%" to player
 ```
 
-Don't leave the section with `stop`, `return` or `exit`: such a transaction is rolled back once it has been idle for `transaction-timeout` (30 seconds), and the console says so.
+Leaving the section another way (`stop`, `return`, `exit` or `continue` past it, an error) rolls the transaction back at once, and gives its connection back. A trigger that waits inside the section (`wait 1 minute`) keeps the transaction open until it carries on; if it stays open longer than `transaction-timeout` (30 seconds), the console says so, once.
 
 ## Threads and waiting
 
@@ -153,7 +153,7 @@ A statement runs on one of NeoSkript DB's threads, and the trigger waits for it 
 - **In an async event**, such as `on connect`, the statement runs where the trigger is and the trigger waits for it, as in skript-db, so the event's outcome (kicking the player, say) can depend on it.
 - **How long:** a statement may run for `query-timeout` (30 seconds) before it's stopped, and may wait `connection-timeout` (30 seconds) for a connection. A trigger waits at most that long plus 5 seconds; with no query timeout, 10 minutes.
 - **Reloading:** a trigger whose script is reloaded while it waits carries on with its old code, as after `wait`.
-- **Stopping the server:** statements in `on unload` triggers still run, and get a few seconds to finish, before NeoSkript DB closes its connections. Transactions left open are rolled back.
+- **Stopping the server, `/reload`, a plugin manager:** NeoSkript DB disables before NeoSkript, so it keeps its connections until NeoSkript has run its `on unload` triggers: their statements still run, and get a few seconds to finish. Then statements still running are cancelled, open transactions are rolled back and the connections close, without holding up the server however a statement behaves. Disabled on its own, with NeoSkript still running, it closes its connections 30 seconds later.
 
 ## config.yml
 
@@ -166,9 +166,9 @@ skript-db's settings, with the same names, and a few of NeoSkript DB's own. A va
 | `max-connection-lifetime` | 1800000 | How long a connection is kept, in milliseconds |
 | `connection-timeout` | 30000 | How long a statement waits for a connection, in milliseconds |
 | `query-timeout` | 30 | How long a statement may run, in seconds; 0 for no limit (skript-db's default) |
-| `transaction-timeout` | 30 | How long an abandoned transaction stays open, in seconds |
+| `transaction-timeout` | 30 | Seconds a transaction may stay open before the console says so (skript-db rolls back an idle one) |
 | `sql-driver-class-name` | `default` | A JDBC driver for every database, or `default` to pick it from the URL |
-| `max-rows` | 100000 | NeoSkript DB's own: the most rows a list gets; 0 for no limit |
+| `max-cells` | 1000000 | NeoSkript DB's own: the most values a list gets, rows times columns; 0 for no limit |
 | `idle-close` | 600 | NeoSkript DB's own: seconds a database may go unused before its connections close; 0 for never |
 
 ## Differences from skript-db
@@ -177,9 +177,10 @@ NeoSkript DB is tested against skript-db 2.0.0, the version that runs on Paper 2
 
 - **Threads:** with `quickly`, skript-db carries on on its own thread, off the server's, where touching the world isn't safe; on Folia, it carries every trigger on on the global thread, even a player's. NeoSkript DB always carries on on the trigger's own thread.
 - **Time limits:** skript-db's statements have no time limit by default, and SQLite's driver ignores one anyway. NeoSkript DB stops any statement at `query-timeout`, 30 seconds unless set.
-- **Large results:** skript-db reads every row into memory. NeoSkript DB stores at most `max-rows` in a list, and reads no rows at all where nothing stores them (a count reads none into memory).
+- **Large results:** skript-db reads every row into memory. NeoSkript DB stores at most `max-cells` values in a list, skips the rows where nothing stores them, and keeps none for a count (which still steps through them).
+- **Transactions:** skript-db rolls back a transaction idle for `transaction-timeout`, even under a trigger still in its section, after which the trigger's remaining statements commit one by one with no error. NeoSkript DB keeps a transaction open while its trigger waits inside it, and rolls one back the moment its trigger leaves the section another way. One rolled back from outside (as NeoSkript DB stops) fails the trigger's later statements, with `the last sql error` saying so.
 - **Connections:** skript-db keeps each pool, with up to `pool-size` idle connections, open until the server stops. NeoSkript DB keeps no idle connections for long, and closes a database's pool once nothing has used it for `idle-close`, so a URL a script stops using (after a reload, say) holds nothing.
-- **Passwords:** skript-db hides them where it shows a URL. NeoSkript DB also takes them out of errors that quote the URL.
+- **Passwords:** skript-db hides them where it shows a URL. NeoSkript DB also takes them out of errors, and gives them to the pool apart from the URL, so the pool's debug logging, which prints the URL, never shows one.
 - **config.yml:** skript-db replaces the whole file's settings with the defaults if one value is wrong. NeoSkript DB replaces only that value.
 - **Too few or many arguments:** for `with arguments` with a different number of values than question marks, skript-db gives a runtime warning on the line; NeoSkript DB says the same in the console, without the line.
 - **Older forks:** `synchronously`, from skript-db before 2.0, is accepted. The Limework fork's `on complete of sql query` event and `sql query` expression aren't there, as they're not in 2.0.

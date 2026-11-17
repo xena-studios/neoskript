@@ -387,6 +387,27 @@ final class DbSyntax {
                 return null;
             }, Running.untimed());
         }
+
+        /**
+         * The trigger left the section another way (stop, return, an error): its transaction is rolled back at
+         * once, off the trigger's thread, so its connection goes back to the pool.
+         */
+        @Override
+        public void abandoned(TriggerContext context) {
+            Object scope = scope(context);
+            Transactions.Transaction transaction = engine.transactions().findOwned(scope, this);
+            if (transaction == null) {
+                return;
+            }
+            engine.transactions().end(scope, transaction);
+            CompletionStage<Object> rolledBack = engine.run(() -> {
+                transaction.rollback();
+                return null;
+            }, Running.untimed());
+            // Not on a server thread (an async event's trigger), it ran already; if NeoSkriptDb is stopping, its
+            // close rolls back what's left.
+            rolledBack.exceptionally(failure -> null);
+        }
     }
 
     /**

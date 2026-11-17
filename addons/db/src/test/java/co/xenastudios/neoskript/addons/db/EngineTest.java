@@ -192,7 +192,7 @@ class EngineTest {
         engine = engine(new Settings(10, 2, 1_800_000, 30_000, 30, 30, null, 1, 600));
         Object result = run(execute(text("SELECT * FROM homes"), true, true, Set.of(), false), database());
         assertEquals(PausingEffect.UNCHANGED, result);
-        assertTrue(engine.errors().get(event).startsWith("The result has more than 1 rows"));
+        assertTrue(engine.errors().get(event).startsWith("The result has more than 1 values"), engine.errors().get(event));
         // Counting needs no rows kept, so it has no limit.
         assertEquals(2L, run(execute(text("SELECT * FROM homes"), false, true, Set.of(), false), database()));
     }
@@ -227,18 +227,113 @@ class EngineTest {
     }
 
     @Test
-    void anAbandonedTransactionIsRolledBack() throws Exception {
+    void aTransactionItsTriggerLeftIsRolledBackAtOnce() throws Exception {
+        DbSyntax.Transaction section = new DbSyntax.Transaction(engine);
+        section.start(context, new Object[] {database()}).toCompletableFuture().get();
+        run(execute(text("DELETE FROM homes"), false, false, Set.of(), false), database());
+        assertEquals(1, database().inUse());
+        section.abandoned(context);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (database().inUse() > 0 && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertEquals(0, database().inUse(), "the connection went back");
+        assertEquals(0, engine.transactions().open());
+        assertEquals(2L, run(execute(text("SELECT * FROM homes"), false, true, Set.of(), false), database()));
+    }
+
+    @Test
+    void aTransactionStaysOpenWhileItsTriggerWaits() throws Exception {
         engine.close(Duration.ZERO);
         engine = engine(new Settings(10, 2, 1_800_000, 30_000, 30, 1, null, 100, 600));
         DbSyntax.Transaction section = new DbSyntax.Transaction(engine);
         section.start(context, new Object[] {database()}).toCompletableFuture().get();
-        run(execute(text("DELETE FROM homes"), false, false, Set.of(), false), database());
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-        while (engine.transactions().open() > 0 && System.nanoTime() < deadline) {
-            Thread.sleep(50);
-        }
-        assertEquals(0, engine.transactions().open());
+        run(execute(text("DELETE FROM homes WHERE owner = 'Steve'"), false, false, Set.of(), false), database());
+        // Longer than transaction-timeout: skript-db rolls back here, and the rest then commits on its own.
+        Thread.sleep(2_500);
+        run(execute(text("DELETE FROM homes WHERE owner = 'Alex'"), false, false, Set.of(), false), database());
+        assertNull(engine.errors().get(event));
+        section.end(context).toCompletableFuture().get();
+        assertEquals(0L, run(execute(text("SELECT * FROM homes"), false, true, Set.of(), false), database()));
+    }
+
+    @Test
+    void aTransactionRolledBackFromOutsideFailsItsLaterStatements() throws Exception {
+        DbSyntax.Transaction section = new DbSyntax.Transaction(engine);
+        section.start(context, new Object[] {database()}).toCompletableFuture().get();
+        Transactions.Transaction transaction = engine.transactions().find(event, database());
+        transaction.rollbackBy(System.nanoTime() + TimeUnit.SECONDS.toNanos(1), "a test rolled it back");
+        assertEquals(PausingSection.LEAVE, run(execute(text("DELETE FROM homes"), false, false, Set.of(), false),
+                database()));
+        assertEquals("The transaction was rolled back: a test rolled it back", engine.errors().get(event));
+        assertNull(section.end(context));
         assertEquals(2L, run(execute(text("SELECT * FROM homes"), false, true, Set.of(), false), database()));
+    }
+
+    @Test
+    void stoppingNeverHangsOnAStatementRunningInATransaction() throws Exception {
+        DbSyntax.Transaction section = new DbSyntax.Transaction(engine);
+        section.start(context, new Object[] {database()}).toCompletableFuture().get();
+        Call forever = execute(text("WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c)"
+                + " SELECT COUNT(*) FROM c"), false, true, Set.of(), false);
+        CompletionStage<?> running = forever.effect().start(context, new Object[] {forever.query(), database(), null,
+                null});
+        Thread.sleep(300);
+        long started = System.nanoTime();
+        engine.close(Duration.ofMillis(200));
+        assertTrue(System.nanoTime() - started < TimeUnit.SECONDS.toNanos(5),
+                "close took " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) + " ms");
+        running.toCompletableFuture().handle((value, failure) -> null).get(5, TimeUnit.SECONDS);
+        assertEquals(0, database().inUse());
+    }
+
+    @Test
+    void passwordsNeverReachTheLogsOnAFailedConnect() throws Exception {
+        java.util.List<String> logged = java.util.Collections.synchronizedList(new ArrayList<>());
+        java.util.logging.Handler capture = new java.util.logging.Handler() {
+            @Override
+            public void publish(java.util.logging.LogRecord record) {
+                StringBuilder text = new StringBuilder(String.valueOf(record.getMessage()));
+                if (record.getParameters() != null) {
+                    for (Object parameter : record.getParameters()) {
+                        text.append(' ').append(parameter);
+                    }
+                }
+                for (Throwable thrown = record.getThrown(); thrown != null; thrown = thrown.getCause()) {
+                    text.append(' ').append(thrown);
+                }
+                logged.add(text.toString());
+            }
+
+            @Override
+            public void flush() {}
+
+            @Override
+            public void close() {}
+        };
+        java.util.logging.Logger root = java.util.logging.Logger.getLogger("");
+        java.util.logging.Level level = root.getLevel();
+        root.addHandler(capture);
+        root.setLevel(java.util.logging.Level.ALL);
+        try {
+            engine.close(Duration.ZERO);
+            engine = engine(new Settings(2, 2, 1_800_000, 500, 30, 30, null, 100, 600));
+            for (String url : List.of("mariadb://admin:pw9@127.0.0.1:1/game?password=hunter22",
+                    "mysql://127.0.0.1:1/game?user=admin&password=hunter22",
+                    "postgresql://127.0.0.1:1/game?user=admin&password=hunter22")) {
+                Database down = engine.database(url, null, null);
+                run(execute(text("SELECT 1"), false, false, Set.of(), false), down);
+                String error = engine.errors().get(event);
+                assertFalse(error.contains("hunter22") || error.contains("pw9"), error);
+            }
+        } finally {
+            root.removeHandler(capture);
+            root.setLevel(level);
+        }
+        assertFalse(logged.isEmpty(), "HikariCP logged something to check");
+        for (String line : logged) {
+            assertFalse(line.contains("hunter22") || line.contains("pw9"), line);
+        }
     }
 
     @Test

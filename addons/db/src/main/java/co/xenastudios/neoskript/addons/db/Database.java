@@ -99,7 +99,9 @@ public final class Database {
             inUse.incrementAndGet();
             lastUsed = System.nanoTime();
             try {
-                return new Lease(current.getConnection(), this);
+                Lease lease = new Lease(current.getConnection(), this, new java.util.concurrent.atomic.AtomicBoolean());
+                leases.add(lease);
+                return lease;
             } catch (SQLException | RuntimeException e) {
                 inUse.decrementAndGet();
                 // Closed for being idle just now: once more, with a new pool.
@@ -120,16 +122,55 @@ public final class Database {
      * @param connection the connection
      * @param database its database
      */
-    record Lease(Connection connection, Database database) implements AutoCloseable {
+    record Lease(Connection connection, Database database, java.util.concurrent.atomic.AtomicBoolean returned)
+            implements AutoCloseable {
 
         @Override
         public void close() throws SQLException {
+            if (!returned.compareAndSet(false, true)) {
+                return;
+            }
+            database.leases.remove(this);
             try {
                 connection.close();
             } finally {
                 database.inUse.decrementAndGet();
                 database.lastUsed = System.nanoTime();
             }
+        }
+
+        /** Drops the connection without waiting for it, as NeoSkriptDb stops: whatever it was doing is lost. */
+        void abort() {
+            try {
+                connection.abort(Runnable::run);
+            } catch (SQLException | RuntimeException | LinkageError ignored) {
+                // Closed below either way.
+            }
+            try {
+                close();
+            } catch (SQLException | RuntimeException ignored) {
+                // Aborted already.
+            }
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return this == other;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(this);
+        }
+    }
+
+    /** The connections lent and not given back. */
+    private final java.util.Set<Lease> leases = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** Drops every connection still lent, as NeoSkriptDb stops after its grace. */
+    void abortLeases() {
+        for (Lease lease : java.util.List.copyOf(leases)) {
+            lease.abort();
         }
     }
 
@@ -157,7 +198,15 @@ public final class Database {
         String chosen = driver != null ? driver : settings.driverClassName();
         Drivers.Resolution resolution = drivers.resolve(url, chosen);
         HikariDataSource created = new HikariDataSource();
-        created.setJdbcUrl(resolution.url());
+        // The password goes to the pool on its own: HikariCP logs its URL when debugging, never its password.
+        Secrets.Split split = Secrets.split(resolution.url());
+        created.setJdbcUrl(split.url());
+        if (split.user() != null) {
+            created.setUsername(split.user());
+        }
+        if (split.password() != null) {
+            created.setPassword(split.password());
+        }
         if (resolution.driver() != null) {
             created.setDriverClassName(resolution.driver());
         }

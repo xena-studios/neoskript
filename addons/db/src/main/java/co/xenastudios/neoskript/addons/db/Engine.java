@@ -167,8 +167,11 @@ public final class Engine {
 
     /** What a statement's work runs, timed by {@code query-timeout}. */
     Running running() {
-        return new Running(housekeeping, settings.queryTimeoutSeconds() * 1000L);
+        return new Running(housekeeping, settings.queryTimeoutSeconds() * 1000L, live);
     }
+
+    /** The statements running now, to cancel as NeoSkriptDb stops. */
+    private final java.util.Set<Running> live = ConcurrentHashMap.newKeySet();
 
     /** Work for {@link #run}. */
     @FunctionalInterface
@@ -186,10 +189,10 @@ public final class Engine {
         return database == null ? message : Secrets.hide(message, database.url());
     }
 
-    /** Rolls back abandoned transactions, and closes databases nothing has used for {@code idle-close}. */
+    /** Warns of transactions open a long time, and closes databases nothing has used for {@code idle-close}. */
     private void tidy() {
         try {
-            transactions.rollBackAbandoned();
+            transactions.warnLongOpen();
             if (settings.idleCloseSeconds() > 0) {
                 long idle = TimeUnit.SECONDS.toNanos(settings.idleCloseSeconds());
                 for (Database database : databases.values()) {
@@ -207,8 +210,10 @@ public final class Engine {
     }
 
     /**
-     * Stops: statements already started get up to {@code grace} to finish, then the rest are interrupted, open
-     * transactions are rolled back and every database's connections close. Statements started after this fail.
+     * Stops: statements already started get up to {@code grace} to finish; then those still running are
+     * cancelled, open transactions are rolled back (a statement that won't let go has its connection dropped, a
+     * second later at most) and every database's connections close. Statements started after this fail. Never
+     * waits much longer than {@code grace}, so it's safe on the main thread.
      *
      * @param grace how long running statements get
      */
@@ -220,21 +225,28 @@ public final class Engine {
         workers.shutdown();
         try {
             if (!workers.awaitTermination(grace.toMillis(), TimeUnit.MILLISECONDS)) {
-                workers.shutdownNow();
                 for (Database database : databases.values()) {
                     if (database.inUse() > 0) {
                         logger.warning("A statement on " + database.shown() + " was still running as NeoSkriptDb"
                                 + " stopped, and was stopped.");
                     }
                 }
+                live.forEach(Running::cancel);
+                workers.shutdownNow();
+                workers.awaitTermination(500, TimeUnit.MILLISECONDS);
             }
         } catch (InterruptedException e) {
+            live.forEach(Running::cancel);
             workers.shutdownNow();
             Thread.currentThread().interrupt();
         }
         housekeeping.shutdownNow();
-        transactions.close();
-        databases.values().forEach(Database::close);
+        transactions.close(System.nanoTime() + TimeUnit.SECONDS.toNanos(1));
+        for (Database database : databases.values()) {
+            // What's still lent belongs to work that didn't stop: dropped, so closing the pool doesn't wait for it.
+            database.abortLeases();
+            database.close();
+        }
         databases.clear();
     }
 

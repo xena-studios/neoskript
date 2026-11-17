@@ -24,8 +24,9 @@ import java.util.Map;
  *   <li>in a single variable: the number of rows a query gave, or the rows a change affected; with
  *       {@code generated keys}, the first key.</li>
  * </ul>
- * Unlike skript-db, a list gets at most {@code max-rows} rows (a result with more fails, rather than running the
- * server out of memory), and rows aren't read at all where nothing stores them.
+ * Unlike skript-db, a list gets at most {@code max-cells} values, rows times columns (a result with more fails,
+ * rather than running the server out of memory), and where nothing stores the rows they aren't read, and a count
+ * steps through them without keeping any.
  */
 final class Statements {
 
@@ -55,41 +56,47 @@ final class Statements {
      * @param running set to the statement while it runs, so it can be cancelled
      * @return what to store: a map for a list (its indices), a {@code Long} or a key for a single variable, or
      *     {@code null} for nothing
-     * @throws SQLException if it fails, or a list would get more than {@code max-rows} rows
+     * @throws SQLException if it fails, or a list would get more than {@code max-cells} values
      */
     Object execute(Connection connection, Query query, boolean keys, Target target, Running running)
             throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(query.sql(),
                 keys ? Statement.RETURN_GENERATED_KEYS : Statement.NO_GENERATED_KEYS)) {
             running.started(statement);
-            bind(statement, query.parameters());
-            if (settings.queryTimeoutSeconds() > 0) {
-                statement.setQueryTimeout(settings.queryTimeoutSeconds());
+            try {
+                return run(statement, query, keys, target);
+            } finally {
+                running.finished(statement);
             }
-            if (target == Target.LIST && settings.maxRows() > 0) {
-                // One more than the most, to tell a result that's too big.
-                statement.setMaxRows(settings.maxRows() == Integer.MAX_VALUE ? 0 : settings.maxRows() + 1);
-            }
-            if (statement.execute()) {
-                try (ResultSet rows = statement.getResultSet()) {
-                    return read(rows, target, false);
-                }
-            }
-            long affected = Math.max(statement.getUpdateCount(), 0);
-            if (keys) {
-                try (ResultSet generated = statement.getGeneratedKeys()) {
-                    return read(generated, target, true);
-                }
-            }
-            return switch (target) {
-                case SINGLE -> affected;
-                // A list for a change gets nothing: it's emptied, as skript-db does.
-                case LIST -> new LinkedHashMap<String, Object>();
-                case NONE -> null;
-            };
-        } finally {
-            running.finished();
         }
+    }
+
+    private Object run(PreparedStatement statement, Query query, boolean keys, Target target) throws SQLException {
+        bind(statement, query.parameters());
+        if (settings.queryTimeoutSeconds() > 0) {
+            statement.setQueryTimeout(settings.queryTimeoutSeconds());
+        }
+        if (target == Target.LIST && settings.maxCells() > 0 && settings.maxCells() < Integer.MAX_VALUE) {
+            // At most one cell a row: one row more than that tells a result that's too big early.
+            statement.setMaxRows(settings.maxCells() + 1);
+        }
+        if (statement.execute()) {
+            try (ResultSet rows = statement.getResultSet()) {
+                return read(rows, target, false);
+            }
+        }
+        long affected = Math.max(statement.getUpdateCount(), 0);
+        if (keys) {
+            try (ResultSet generated = statement.getGeneratedKeys()) {
+                return read(generated, target, true);
+            }
+        }
+        return switch (target) {
+            case SINGLE -> affected;
+            // A list for a change gets nothing: it's emptied, as skript-db does.
+            case LIST -> new LinkedHashMap<String, Object>();
+            case NONE -> null;
+        };
     }
 
     /**
@@ -109,18 +116,22 @@ final class Statements {
         }
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             running.started(statement);
-            if (settings.queryTimeoutSeconds() > 0) {
-                statement.setQueryTimeout(settings.queryTimeoutSeconds());
-            }
-            for (List<Object> row : rows) {
-                bind(statement, row);
-                statement.addBatch();
-            }
             long total = 0;
-            for (int count : statement.executeBatch()) {
-                if (count > 0) {
-                    total += count;
+            try {
+                if (settings.queryTimeoutSeconds() > 0) {
+                    statement.setQueryTimeout(settings.queryTimeoutSeconds());
                 }
+                for (List<Object> row : rows) {
+                    bind(statement, row);
+                    statement.addBatch();
+                }
+                for (int count : statement.executeBatch()) {
+                    if (count > 0) {
+                        total += count;
+                    }
+                }
+            } finally {
+                running.finished(statement);
             }
             if (own) {
                 connection.commit();
@@ -136,7 +147,6 @@ final class Statements {
             }
             throw e;
         } finally {
-            running.finished();
             if (own) {
                 connection.setAutoCommit(true);
             }
@@ -185,12 +195,12 @@ final class Statements {
             list.put(names.getLast(), label);
         }
         int row = 0;
-        int max = settings.maxRows();
+        long max = settings.maxCells();
         while (rows.next()) {
             row++;
-            if (max > 0 && row > max) {
-                throw new SQLException("The result has more than " + max + " rows, the most a list gets"
-                        + " (max-rows in plugins/NeoSkriptDb/config.yml). Ask for fewer with LIMIT.");
+            if (max > 0 && (long) row * Math.max(columns, 1) > max) {
+                throw new SQLException("The result has more than " + max + " values (rows times columns), the most"
+                        + " a list gets (max-cells in plugins/NeoSkriptDb/config.yml). Ask for fewer with LIMIT.");
             }
             for (int column = 1; column <= columns; column++) {
                 put(list, names.get(column - 1) + "::" + row, JdbcValues.fromJdbc(rows.getObject(column)));

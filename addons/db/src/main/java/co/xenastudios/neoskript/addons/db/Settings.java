@@ -19,16 +19,16 @@ import java.util.function.Function;
  * @param queryTimeoutSeconds how long a statement may run, 0 for no limit
  * @param transactionTimeoutSeconds how long an abandoned transaction stays open
  * @param driverClassName the driver for every database, or {@code null} to pick it from the URL
- * @param maxRows the most rows stored in a list, 0 for no limit
+ * @param maxCells the most values stored in a list, rows times columns, 0 for no limit
  * @param idleCloseSeconds how long a database may go unused before its connections close, 0 for never
  */
 public record Settings(int poolSize, int workerThreads, long maxLifetimeMillis, long connectionTimeoutMillis,
-        int queryTimeoutSeconds, int transactionTimeoutSeconds, String driverClassName, int maxRows,
+        int queryTimeoutSeconds, int transactionTimeoutSeconds, String driverClassName, int maxCells,
         int idleCloseSeconds) {
 
     /** The defaults: skript-db's, but with a 30-second query timeout. */
     public static final Settings DEFAULTS = new Settings(10, automaticThreads(), 1_800_000, 30_000, 30, 30, null,
-            100_000, 600);
+            1_000_000, 600);
 
     /** How long a trigger waits for a statement when statements have no time limit. */
     static final long UNLIMITED_WAIT_MILLIS = 10 * 60 * 1000;
@@ -70,7 +70,7 @@ public record Settings(int poolSize, int workerThreads, long maxLifetimeMillis, 
                 reader.number("connection-timeout", 30_000, 250, 24L * 60 * 60 * 1000),
                 (int) reader.number("query-timeout", 30, 0, 24 * 60 * 60),
                 (int) reader.number("transaction-timeout", 30, 1, 24 * 60 * 60), driver,
-                (int) reader.number("max-rows", 100_000, 0, Integer.MAX_VALUE),
+                (int) reader.number("max-cells", 1_000_000, 0, Integer.MAX_VALUE),
                 (int) reader.number("idle-close", 600, 0, 7 * 24 * 60 * 60));
     }
 
