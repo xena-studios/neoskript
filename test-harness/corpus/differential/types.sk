@@ -3,6 +3,10 @@
 function probe_types():
 	show("booleans", (true, false))
 	show("items", (stone, 2 diamonds, a diamond sword, oak log))
+	# Blocks with no item form (issue #60): their type is the block.
+	show("type of a block with no item", (type of fire, type of water, type of nether portal))
+	show("type of fire as text", "%type of fire%")
+	show("type of fire is fire", whether type of fire is fire)
 	show("colors", (red, light blue, rgb(10, 20, 30)))
 	show("vectors", (vector(1, 2, 3), vector(0.5, 0, -1)))
 	set {_v} to vector(3, 4, 0)
