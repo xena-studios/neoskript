@@ -32,6 +32,7 @@ public final class NeoSkriptProxy extends JavaPlugin implements Listener {
     private PluginMessaging messaging;
     private RedisLink redis;
     private Network network;
+    private NetworkVariables networkVariables;
     private volatile boolean closed;
 
     @Override
@@ -69,6 +70,13 @@ public final class NeoSkriptProxy extends JavaPlugin implements Listener {
             redis.start();
         }
         network.use(settings.pluginMessaging() ? messaging : null, redis);
+        networkVariables = new NetworkVariables(settings, getLogger(), network, timer);
+        network.notices(networkVariables::heard);
+        NeoSkript.get().whenReady(() -> {
+            if (!closed) {
+                networkVariables.start(NeoSkript.get().variables().databases());
+            }
+        });
         if (settings.pluginMessaging()) {
             getServer().getMessenger().registerOutgoingPluginChannel(this, PluginMessaging.CHANNEL);
             getServer().getMessenger().registerIncomingPluginChannel(this, PluginMessaging.CHANNEL,
@@ -76,7 +84,7 @@ public final class NeoSkriptProxy extends JavaPlugin implements Listener {
             getServer().getPluginManager().registerEvents(this, this);
         }
         NeoSkript.get().addon(getName(), getPluginMeta().getVersion(),
-                registrar -> ProxySyntax.register(registrar, network, messaging, getLogger(),
+                registrar -> ProxySyntax.register(registrar, network, messaging, networkVariables, getLogger(),
                         settings.proxyTimeoutMillis()));
     }
 
@@ -171,6 +179,7 @@ public final class NeoSkriptProxy extends JavaPlugin implements Listener {
             return;
         }
         closed = true;
+        networkVariables.stop();
         messaging.close();
         if (redis != null) {
             redis.close(2_000);

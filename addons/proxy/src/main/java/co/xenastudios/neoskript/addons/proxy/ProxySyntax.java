@@ -32,9 +32,15 @@ final class ProxySyntax {
 
     private ProxySyntax() {}
 
-    static void register(Registrar registrar, Network network, PluginMessaging messaging, Logger logger,
-            long proxyTimeoutMillis) {
+    static void register(Registrar registrar, Network network, PluginMessaging messaging,
+            NetworkVariables networkVariables, Logger logger, long proxyTimeoutMillis) {
         Duration wait = Duration.ofMillis(proxyTimeoutMillis + 2_000);
+
+        // Network variables: whether their shared database answers now.
+        registrar.condition(ID + "CondNetworkVariables", info -> {
+            boolean expected = info.pattern() == 0;
+            return (context, args) -> networkVariables.available() == expected;
+        }, "[the] network variables are available", "[the] network variables (aren't|are not) available");
 
         // Messages arriving.
         registrar.event(ID + "EvtNetwork", List.of(NetworkMessageEvent.class), info -> (context, args) -> {
