@@ -1,0 +1,32 @@
+# Probe: words nothing else reads, where any object goes, read as Skript's unparsed literal reads them: the first of
+# its types, in its order, whose parser takes them (issue #88). Written as lists, which Skript doesn't warn about.
+
+function unparsed_words_show(label: text, v: objects):
+	send "%{_label}%: %{_v::*}%" to console
+
+function probe_unparsed_words():
+	set {_w::*} to fall and lava
+	unparsed_words_show("fall and lava", {_w::*})
+	send "fall is a damage type: %whether {_w::1} is damage type%" to console
+	send "fall is a damage cause: %whether {_w::1} is damage cause%" to console
+	set {_w::*} to potion and magic
+	unparsed_words_show("potion and magic", {_w::*})
+	send "potion is a heal reason: %whether {_w::1} is heal reason%" to console
+	set {_w::*} to day and night
+	unparsed_words_show("day and night", {_w::*})
+	send "day is a time: %whether {_w::1} is time%" to console
+	set {_t} to 7:00
+	send "7:00 is day: %whether {_t} is {_w::1}%" to console
+	send "7:00 is night: %whether {_t} is {_w::2}%" to console
+	set {_w::*} to dusk and dawn
+	unparsed_words_show("dusk and dawn", {_w::*})
+	set {_w::*} to survival and creative
+	unparsed_words_show("survival and creative", {_w::*})
+	send "creative is a game mode: %whether {_w::2} is gamemode%" to console
+	set {_w::*} to egg and void
+	unparsed_words_show("egg and void", {_w::*})
+	set {_w::*} to normal and drowning
+	unparsed_words_show("normal and drowning", {_w::*})
+	set {_w::*} to stone and zombie
+	unparsed_words_show("stone and zombie", {_w::*})
+	send "end" to console
