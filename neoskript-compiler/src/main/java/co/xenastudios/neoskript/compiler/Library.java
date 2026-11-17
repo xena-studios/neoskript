@@ -327,6 +327,50 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public void pausingEffect(String id, ElementFactory<co.xenastudios.neoskript.api.element.PausingEffect> factory,
+            String... patterns) {
+        add(SyntaxKind.EFFECT, id, null, factory, patterns);
+        builder.delays(SyntaxKind.EFFECT, id);
+    }
+
+    @Override
+    public void pausingExpression(String id, String returnType,
+            ElementFactory<co.xenastudios.neoskript.api.element.PausingExpression> factory, String... patterns) {
+        if (!javaClasses.containsKey(returnType)) {
+            throw new IllegalArgumentException("Expression " + id + " returns unknown type '" + returnType + "'");
+        }
+        add(SyntaxKind.EXPRESSION, id, returnType, factory, patterns);
+        builder.delays(SyntaxKind.EXPRESSION, id);
+    }
+
+    /** How long triggers wait for each pausing element, in milliseconds, by id. */
+    private final Map<String, Long> timeouts = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    public void timeout(String id, java.time.Duration timeout) {
+        checkOpen();
+        java.util.Objects.requireNonNull(id, "id");
+        if (timeout == null || timeout.isNegative() || timeout.isZero()) {
+            throw new IllegalArgumentException("A timeout has to be more than zero: " + timeout);
+        }
+        if (!builder.isDelaying(SyntaxKind.EFFECT, id) && !builder.isDelaying(SyntaxKind.EXPRESSION, id)) {
+            throw new IllegalArgumentException(id + " isn't a pausing effect or expression: register it first");
+        }
+        long millis;
+        try {
+            millis = timeout.toMillis();
+        } catch (ArithmeticException tooLong) {
+            millis = Long.MAX_VALUE;
+        }
+        timeouts.put(id, Math.max(millis, 1));
+    }
+
+    /** How long triggers wait for pausing element {@code id}, in milliseconds. */
+    long timeoutMillis(String id) {
+        return timeouts.getOrDefault(id, co.xenastudios.neoskript.runtime.Pauses.DEFAULT_TIMEOUT_MILLIS);
+    }
+
+    @Override
     public void event(String id, ScriptEvent event, String... patterns) {
         add(SyntaxKind.EVENT, id, null, event, patterns);
     }

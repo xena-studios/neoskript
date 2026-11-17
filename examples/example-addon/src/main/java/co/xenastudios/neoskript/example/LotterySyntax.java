@@ -77,5 +77,8 @@ final class LotterySyntax {
         // A function: lotteryPrize(3) is 300.
         registrar.function("lotteryPrize", List.of(Parameter.of("tickets", "integer")), "integer", false,
                 arguments -> arguments[0] instanceof Number tickets ? tickets.longValue() * 100 : null);
+
+        // Syntax that pauses the trigger until a slow service answers.
+        LotteryOffice.register(registrar);
     }
 }

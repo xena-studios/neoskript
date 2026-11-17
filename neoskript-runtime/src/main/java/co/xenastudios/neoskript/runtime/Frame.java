@@ -21,4 +21,9 @@ public final class Frame {
      * {@code null}, and it carries on on the trigger's own thread.
      */
     public Object owner;
+    /**
+     * After a pausing effect or expression, what its stage completed with (see {@link Pauses}), or
+     * {@link Pauses#FAILED}.
+     */
+    public Object result;
 }

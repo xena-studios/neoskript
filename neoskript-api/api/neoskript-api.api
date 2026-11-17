@@ -117,6 +117,14 @@ public interface co.xenastudios.neoskript.api.element.KeyAware @Experimental
   public boolean implicitKeys()
   public boolean keysRecommended()
 
+public interface co.xenastudios.neoskript.api.element.PausingEffect
+  public abstract java.util.concurrent.CompletionStage start(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[]) signature (Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;)Ljava/util/concurrent/CompletionStage<*>;
+  public static co.xenastudios.neoskript.api.element.PausingEffect storing(int, java.util.function.BiFunction) signature (ILjava/util/function/BiFunction<Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;+Ljava/util/concurrent/CompletionStage<*>;>;)Lco/xenastudios/neoskript/api/element/PausingEffect;
+  public int target()
+
+public interface co.xenastudios.neoskript.api.element.PausingExpression
+  public abstract java.util.concurrent.CompletionStage start(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[]) signature (Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;)Ljava/util/concurrent/CompletionStage<*>;
+
 public interface co.xenastudios.neoskript.api.element.Section
   public abstract java.lang.Object run(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[])
 
@@ -205,6 +213,8 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public abstract void literalParser(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/String;*>;)V
   public abstract void namedType(java.lang.String, java.lang.String, java.lang.Class, java.util.Map) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/Map<Ljava/lang/String;+TT;>;)V
   public abstract void parser(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/String;*>;)V
+  public abstract void pausingEffect(java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/PausingEffect;>;[Ljava/lang/String;)V
+  public abstract void pausingExpression(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/PausingExpression;>;[Ljava/lang/String;)V
   public void property(java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Function) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/function/Function<-TT;*>;)V
   public void propertyCondition(java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Predicate) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/function/Predicate<-TT;>;)V
   public void propertySyntax(java.lang.String, int, java.util.function.Function, boolean) signature (Ljava/lang/String;ILjava/util/function/Function<Ljava/util/Set<Ljava/lang/String;>;Ljava/lang/String;>;Z)V @Experimental
@@ -217,6 +227,7 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public abstract void text(java.lang.Class, java.util.function.Function) signature <T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;Ljava/util/function/Function<-TT;Ljava/lang/String;>;)V
   public void timeStates(java.lang.String, int, java.lang.Class[]) signature (Ljava/lang/String;I[Ljava/lang/Class<*>;)V
   public abstract void timeStates(java.lang.String, java.util.function.Predicate) signature (Ljava/lang/String;Ljava/util/function/Predicate<Lco/xenastudios/neoskript/api/element/ElementInfo;>;)V
+  public abstract void timeout(java.lang.String, java.time.Duration)
   public abstract void type(java.lang.String, java.lang.String, java.lang.Class) signature (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<*>;)V
   public void typeProperty(java.lang.String, java.lang.String[]) @Experimental
   public abstract void typedExpression(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/Expression;>;[Ljava/lang/String;)V

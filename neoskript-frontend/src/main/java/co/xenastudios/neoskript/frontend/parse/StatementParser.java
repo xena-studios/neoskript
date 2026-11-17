@@ -289,6 +289,11 @@ final class StatementParser {
             error(line, unusable);
             return new Statement.Invalid(line);
         }
+        if (parsed != null && PausingExpressions.any(parsed, context.registry())) {
+            // The rest of the line runs once the trigger has waited for an addon's value: it's after a delay.
+            delay = DelayState.DELAYED;
+            delays.put(line, delay);
+        }
         if (parsed instanceof Expr.FunctionCall call) {
             return new Statement.Call(line, call);
         }

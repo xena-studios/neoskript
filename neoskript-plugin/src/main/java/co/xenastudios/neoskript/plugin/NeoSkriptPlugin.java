@@ -594,6 +594,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         co.xenastudios.neoskript.api.Installed.install(null);
+        // Triggers waiting for an addon's result don't carry on, and the pauses' timer stops.
+        co.xenastudios.neoskript.runtime.Pauses.close();
         if (runtimeErrorFrames != null) {
             runtimeErrorFrames.run();
         }

@@ -202,6 +202,48 @@ registrar.function("lotteryPrize", List.of(Parameter.of("tickets", "integer")), 
 
 Scripts call it as `lotteryPrize(3)`. A script's own function with the same name takes precedence.
 
+## Waiting for a result
+
+Some syntax has to wait for something slow: a database query, a web request, another server. Never make the server wait for it. A **pausing** element starts the work and returns a `CompletionStage`, and the trigger stops there, as it does at `wait`, until the stage completes:
+
+```java
+registrar.pausingEffect("MyAddonEffPing", info -> (context, args) ->
+        CompletableFuture.runAsync(() -> ping((String) args[0]), executor),
+        "ping %text%");
+
+registrar.pausingExpression("MyAddonExprStatus", "text", info -> (context, args) ->
+        CompletableFuture.supplyAsync(() -> fetchStatus((String) args[0]), executor),
+        "[the] status of [the] server %text%");
+```
+
+```
+ping "lobby"
+set {_status} to the status of the server "lobby"
+send "Lobby: %{_status}%"
+```
+
+Do the slow part on your own executor (or `threads().runAsync`), and complete the stage from there. `start` itself runs on the trigger's thread, so it mustn't block.
+
+When the stage completes, the trigger carries on from where it stopped, with its local variables and the loops it's in, on the thread it was on: the main thread on Paper; on Folia, the thread of what started the trigger, or of the `run on` section it's in. A stage that's complete already carries straight on. A pausing expression's value arrives before its line runs: each one on a line is worked out first, in the order written. They can be used in effects, conditions and function calls on a line of their own, not in `if`, `loop` or `while` headers; set a variable first.
+
+To store the result where the script says, as `execute ... and store the result in {_rows::*}` does, give the placeholder's index to `PausingEffect.storing`:
+
+```java
+registrar.pausingEffect("MyAddonEffQuery", info -> PausingEffect.storing(1, (context, args) ->
+        CompletableFuture.supplyAsync(() -> query((String) args[0]), executor)),
+        "query %text% [and store [the] result in %-objects%]");
+```
+
+The value is stored as `set` would. A `Map` sets a list's indices, and a map or list in it makes a list under its index: `{"name": ["Steve", "Alex"]}` gives `{_rows::name::1}` and `{_rows::name::2}`. A `Collection` or an array is several values, numbered from 1.
+
+**What scripts see.** A pausing element is a delay for Skript's rules, as `wait` is: after it, the event has passed. A stage that fails is a runtime error on the line, with its exception's message, and the trigger carries on: the expression has no value, the variable isn't changed. If the stage takes longer than a minute, the same happens, and NeoSkript tries to cancel it. Change the limit per element:
+
+```java
+registrar.timeout("MyAddonEffQuery", Duration.ofSeconds(30));
+```
+
+**Reloads and stopping.** A trigger whose script is reloaded or unloaded while it waits carries on with the code it started with, as after a `wait`. When the server stops, triggers still waiting are dropped and their stages cancelled. A stage that completes after a timeout or a stop is ignored, and NeoSkript keeps nothing of the trigger once its pause is over, so holding on to a stage doesn't hold on to old scripts.
+
 ## Converters, comparisons and arithmetic
 
 ```java
@@ -248,7 +290,8 @@ On Paper, everything runs on the main thread. On Folia, an entity, a block and a
 Your elements run on the trigger's thread. By default, NeoSkript treats them as touching the entities, blocks and locations they're given:
 
 - an expression or condition given one that another thread owns is a runtime error naming the line, and gives nothing;
-- an effect given one runs on the owner's thread, soon, while the trigger carries on.
+- an effect given one runs on the owner's thread, soon, while the trigger carries on;
+- a pausing effect or expression given one is a runtime error, and doesn't start: it starts where the trigger is, so it can't run elsewhere.
 
 Say so when an element is different, by the id of one of your own elements:
 

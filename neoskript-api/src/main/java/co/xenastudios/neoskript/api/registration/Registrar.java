@@ -147,6 +147,55 @@ public interface Registrar {
     void expression(String id, String returnType, ElementFactory<Expression> factory, String... patterns);
 
     /**
+     * An effect that pauses the trigger until the work it starts is done, as {@code wait} does: {@code execute
+     * %text% in %database%}. The trigger carries on from the next line when the element's stage completes, with its
+     * local variables and the loops it's in, on the thread it was on: the main thread on Paper; on Folia, the
+     * thread of what started the trigger (a player's region, the global thread for {@code on load}), or of the
+     * {@code run on} section it's in. If the stage has completed already, the trigger carries straight on.
+     *
+     * <p>For Skript's rules it's a delay, as {@code wait} is: after it, the event has passed, so it can't be
+     * cancelled, and {@code is delayed} is true. A script reloaded or unloaded while a trigger waits doesn't stop
+     * it: it carries on with the code it started with, as after a {@code wait}. When the server stops, triggers
+     * still waiting don't carry on, and NeoSkript tries to cancel their stages.
+     *
+     * <p>On Folia, it's given the entities, blocks and locations of the trigger's own thread only: given one another
+     * thread owns, it's a runtime error and doesn't start (see {@link #affinity}).
+     *
+     * @param id the effect's id
+     * @param factory makes the effect for each place it's used
+     * @param patterns its patterns
+     * @see co.xenastudios.neoskript.api.element.PausingEffect
+     */
+    void pausingEffect(String id, ElementFactory<co.xenastudios.neoskript.api.element.PausingEffect> factory,
+            String... patterns);
+
+    /**
+     * An expression whose value takes a while to arrive. Where a line uses it, the trigger pauses before the line
+     * until the element's stage completes, then runs the line with its value, as {@link #pausingEffect} describes.
+     *
+     * @param id the expression's id
+     * @param returnType the id of the type it returns, or {@code object} for any
+     * @param factory makes the expression for each place it's used
+     * @param patterns its patterns
+     * @see co.xenastudios.neoskript.api.element.PausingExpression
+     */
+    void pausingExpression(String id, String returnType,
+            ElementFactory<co.xenastudios.neoskript.api.element.PausingExpression> factory, String... patterns);
+
+    /**
+     * How long a trigger waits for pausing effect or expression {@code id} before it gives up: a runtime error on
+     * the line, after which the trigger carries on without the result, and NeoSkript tries to cancel the stage.
+     * Without this, it's one minute.
+     *
+     * @param id the element's id: one this addon registered with {@link #pausingEffect} or
+     *     {@link #pausingExpression}
+     * @param timeout how long, more than zero
+     * @throws IllegalArgumentException if the timeout isn't more than zero, or the id isn't one of this addon's
+     *     pausing elements
+     */
+    void timeout(String id, java.time.Duration timeout);
+
+    /**
      * An expression whose patterns name a type in each {@code <...>} part, like Skript's classinfo placeholders:
      * {@code [the] [<.+>] data tag %text% of %objects%}. The types matched reach the factory in
      * {@link co.xenastudios.neoskript.api.element.ElementInfo#types()}.

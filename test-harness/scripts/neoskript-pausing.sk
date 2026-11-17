@@ -1,0 +1,43 @@
+# Harness check: the example addon's pausing syntax (examples/example-addon, LotteryOffice), which waits for a slow
+# service as 'wait' waits, driven by console commands. Each line prints "[pausetest] <check>".
+on load:
+	send "[pausetest] loaded" to console
+
+command /pausetest <text>:
+	trigger:
+		if arg-1 is "values":
+			set {_kept} to "kept"
+			set {_jackpot} to the lottery jackpot
+			send "[pausetest] jackpot %{_jackpot}% %{_kept}%" to console
+			set {_steve} to a new ticket for "Steve"
+			set {_alex} to a new ticket for "Alex"
+			register {_steve} and {_alex} with the lottery office and store the receipts in {_receipts::*}
+			send "[pausetest] receipts %size of {_receipts::2::*}% %{_receipts::2::owner}% %{_receipts::2::receipt}%" to console
+			loop 2 times:
+				send "[pausetest] loop %loop-value% %the lottery jackpot%" to console
+		else if arg-1 is "failures":
+			set {_nothing} to the lottery jackpot from "nowhere"
+			send "[pausetest] after failure %{_nothing}%" to console
+			wait for the lottery office to answer
+			send "[pausetest] after timeout" to console
+		else if arg-1 is "region":
+			run on location(4104, 80, 4104, world "world"):
+				spawn a pig at location(4104, 80, 4104, world "world")
+				set {_pig} to last spawned entity
+				set health of {_pig} to 3
+			run on {_pig}:
+				set {_jackpot} to the lottery jackpot
+				# Back on the pig's thread on Folia: reading it is no error.
+				send "[pausetest] pig after pause %health of {_pig}% %{_jackpot}%" to console
+			set {_jackpot} to the lottery jackpot
+			# Back on the console's thread, the global one, which doesn't own the pig on Folia.
+			set {_far} to health of {_pig}
+			send "[pausetest] global after pause %{_far}%" to console
+		else if arg-1 is "reload":
+			send "[pausetest] waiting across a reload" to console
+			set {_jackpot} to the lottery jackpot from "the slow office"
+			send "[pausetest] old code carried on %{_jackpot}%" to console
+		else if arg-1 is "hang":
+			send "[pausetest] hanging" to console
+			wait for the lottery office to answer
+			send "[pausetest] after hang" to console
