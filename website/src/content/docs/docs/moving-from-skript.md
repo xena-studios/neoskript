@@ -17,7 +17,7 @@ It starts a throwaway headless Paper server (downloaded once into `~/.neoskript/
 
 ## Switching
 
-On its first start, NeoSkript copies `scripts/` and `variables.csv` from `plugins/Skript` into `plugins/NeoSkript`, then leaves a marker so it never copies again. It **copies** rather than moves, so Skript's folder stays exactly as it was, and switching back means putting `Skript.jar` back.
+On its first start, NeoSkript copies `scripts/` and `variables.csv` from `plugins/Skript` into `plugins/NeoSkript`, then leaves a marker so it never copies again. It **copies** rather than moves, so Skript's folder stays exactly as it was, and switching back means putting `Skript.jar` back. If you turned on [native variable storage](/docs/variables/#native-storage), set it back to `csv` and restart once first, so NeoSkript writes `variables.csv` for Skript, and copy that file to `plugins/Skript`.
 
 A few of Skript's `config.sk` settings carry over to NeoSkript's `config.yml` in that first start: whether players are saved by UUID in variable names, and the effect command settings. The rest of `config.sk` isn't copied; NeoSkript's defaults match Skript's.
 

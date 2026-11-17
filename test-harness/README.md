@@ -34,6 +34,7 @@ Reports go to `test-harness/build/harness/reports/`, and each run's server direc
 | `neoskript-hooks` | baseline | Paper 26.x | Skript's plugin hooks against the real plugins, pinned by SHA-256: WorldGuard 7.0.20 (with WorldEdit 7.4.6) regions written into its `regions.yml`, Vault 1.7.3 with EssentialsX 2.22.0 money and balances, and LuckPerms 5.5.71 groups. Baseline, as it downloads about 16 MB of plugins |
 | `neoskript-skript-suite` | baseline | all | Every one of Skript's own tests, run by NeoSkript: reports how many pass, fail and can't run yet (M4's progress measure). Only fails if no results come back |
 | `neoskript-variables` | smoke | Skript envs | M3's exit check: Skript's `variables.csv` round-trips through NeoSkript byte for byte, and Skript reads and rewrites NeoSkript's file byte for byte. A file with its last line cut short is backed up, the rest loads, and it isn't written over with less |
+| `neoskript-native-variables` | smoke | all | Native variable storage across restarts in one server folder: CSV storage saves variables of many types, switching to `native` moves them into `variables.nsv` after a backup and appends changes, a restart reads them back and writes nothing, and switching back to `csv` writes `variables.csv` again with the same values |
 | `neoskript-skript-migration` | smoke | all | With only `plugins/Skript/scripts`, NeoSkript copies the scripts over on first start and runs them |
 | `neoskript-skript-conflict` | smoke | Skript envs | With Skript installed, NeoSkript refuses to run and Skript still works (D10) |
 | `skript-smoke` | smoke | Skript envs | The reference Skript runs `scripts/smoke.sk` |
@@ -48,7 +49,7 @@ Reports go to `test-harness/build/harness/reports/`, and each run's server direc
 | `neoskript-load-benchmark` | baseline | Skript envs | The same measurement on NeoSkript, for the comparison on neoskript.dev |
 | `event-benchmark` | baseline | Skript envs | What a trigger costs per event, on Skript and NeoSkript with `scripts/event-benchmark.sk`: the harness bot fires each toggle event 20,000 times in a row, 12 rounds, and the median of the last 8 is the result |
 | `tick-benchmark` | baseline | Skript envs | Milliseconds per tick with 20 bots online and `scripts/tick-benchmark.sk` running, on Skript, on NeoSkript and with no scripts: the median of 8 readings of the server's mean over 100 ticks |
-| `variable-benchmark` | baseline | Skript envs | Loading 140,000 saved variables when the server starts: Skript saves them with `scripts/variables-benchmark.sk`, then each loads that `variables.csv` 3 times |
+| `variable-benchmark` | baseline | Skript envs | Loading 140,000 saved variables when the server starts: Skript saves them with `scripts/variables-benchmark.sk`, then each loads that `variables.csv` 3 times, and NeoSkript imports it into its native storage and loads that 3 times |
 
 ## Pins
 

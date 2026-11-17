@@ -12,4 +12,4 @@ Scripts go in `plugins/NeoSkript/scripts/`, as `.sk` files, like Skript's. `/skr
 
 ## Configuration
 
-`plugins/NeoSkript/config.yml` is written on the first start, with a comment on every option. It covers where variables are saved, the event priority scripts listen at, how runtime errors are rate-limited, effect commands, the update checker, which tells you about newer versions on Modrinth (`update-checker: false` turns it off), and bStats, which you can turn off with `metrics: false`.
+`plugins/NeoSkript/config.yml` is written on the first start, with a comment on every option. It covers where variables are saved, the event priority scripts listen at, how runtime errors are rate-limited, effect commands, the update checker, which tells you about newer versions on Modrinth (`update-checker: false` turns it off), and bStats, which you can turn off with `metrics: false`. Variables are saved in Skript's `variables.csv` by default; [saving variables](/docs/variables/) has the faster native storage.

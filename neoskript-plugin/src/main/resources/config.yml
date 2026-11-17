@@ -12,6 +12,11 @@ variables:
   # Where global variables are saved, in Skript's variables.csv format (Skript can read it too).
   # Relative to plugins/NeoSkript. Variables whose names start with - aren't saved.
   file: variables.csv
+  # csv saves to the file above, as Skript does. native saves to NeoSkript's own file beside it
+  # (variables.nsv): faster to load, each save writes only what changed, and a crash can't cut a save in
+  # half. Switching moves the variables over when the server starts, after a backup in backups/. Switch
+  # back to csv to write variables.csv again, for example to go back to Skript.
+  storage: csv
   # How often changed variables are saved. They're also saved when the server stops.
   save-interval: 5 minutes
   # Whether players are their UUIDs in variable names ({money::%player%}) or their names, as Skript's

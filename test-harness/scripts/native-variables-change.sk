@@ -1,0 +1,9 @@
+# Harness: reads the variables as moved into native storage, then changes a few, so the next save appends only these.
+on load:
+	send "[harness] native before: %{n::text}% | %{n::long}% | %{n::double}% | %{n::bool}% | %{n::timespan}% | %{n::list::*}% | %{n::quoted ""name""}%" to console
+	send "[harness] native items before: %{n::item}% | %{n::block}% | %{n::stack}% | %{n::mode}% | %{n::added}% | %{-n::memory}%" to console
+	set {n::long} to 8
+	delete {n::bool}
+	add "w" to {n::list::*}
+	set {n::added} to location(1, 2, 3, world "world")
+	send "[harness] native changed" to console
