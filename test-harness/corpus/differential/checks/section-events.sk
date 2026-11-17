@@ -2,6 +2,10 @@
 # is, with what it gives (its location, the player it is), and none of the trigger's event values; and none of the
 # loops around it, as for the other sections Skript loads apart.
 
+# The triggers that spawn or shoot are 'on join', which no one does here: run at load, their arrows and pigs would
+# fire other scripts' shoot and spawn events, which Skript doesn't, as it runs each script's 'on load' before later
+# scripts are loaded (#54).
+
 on damage:
 	spawn a pig at victim:
 		set {_1} to event-entity
@@ -47,7 +51,7 @@ on damage:
 		set {_12} to shooter
 		set {_13} to event-projectile
 
-on load:
+on join:
 	loop 2 times:
 		wait 1 tick:
 			set {_1} to loop-number
@@ -60,22 +64,22 @@ on load:
 		set {_b} to a new bossbar:
 			set {_c} to event-entity
 
-on load:
+on join:
 	loop 2 times:
 		spawn a pig at spawn of world "world":
 			exit section
 
-on load:
+on join:
 	loop 2 times:
 		spawn a pig at spawn of world "world":
 			continue
 
-on load:
+on join:
 	loop 2 times:
 		spawn a pig at spawn of world "world":
 			exit loop
 
-on load:
+on join:
 	spawn a pig at spawn of world "world":
 		stop
 	spawn a pig at spawn of world "world":
