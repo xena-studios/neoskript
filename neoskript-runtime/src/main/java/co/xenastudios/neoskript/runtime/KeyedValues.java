@@ -78,12 +78,14 @@ public record KeyedValues(Object[] values, String[] keys) implements co.xenastud
     /**
      * An addon's result as scripts have values: a map is keyed values, each key an index, with a nested map, collection
      * or array making a list under its key ({@code home::x}); a collection or an array is several values; anything else
-     * is itself. A map nested deeper than {@value #MAX_DEPTH} (one that contains itself) throws.
+     * is itself. A map or list that contains itself, one nested deeper than {@value #MAX_DEPTH}, or one with more than
+     * {@value #MAX_NODES} maps, lists and values in all throws {@link IllegalArgumentException}.
      */
     public static Object result(Object value) {
         if (value instanceof Map<?, ?> map) {
             Map<String, Object> flat = new LinkedHashMap<>();
-            flatten("", map, flat, 0);
+            flatten("", map, flat, 0, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()),
+                    new int[1]);
             return new KeyedValues(flat.values().toArray(), flat.keySet().toArray(String[]::new));
         }
         if (value instanceof java.util.Collection<?> collection) {
@@ -103,27 +105,51 @@ public record KeyedValues(Object[] values, String[] keys) implements co.xenastud
     /** How deep maps and lists in a result are followed, against one that contains itself. */
     public static final int MAX_DEPTH = 64;
 
-    private static void flatten(String prefix, Object value, Map<String, Object> into, int depth) {
+    /** How many maps, lists and values a result may have in all, so one that shares its parts can't take forever. */
+    public static final int MAX_NODES = 1_000_000;
+
+    /**
+     * Flattens {@code value} into {@code into}. {@code path} holds the maps and lists being flattened above it, by
+     * identity, so one that contains itself throws at once rather than after its paths are walked; {@code nodes}
+     * counts every part, so one that holds the same map many times over is stopped too.
+     */
+    private static void flatten(String prefix, Object value, Map<String, Object> into, int depth,
+            java.util.Set<Object> path, int[] nodes) {
         if (value == null) {
             return;
+        }
+        if (++nodes[0] > MAX_NODES) {
+            throw new IllegalArgumentException("The result has more than " + MAX_NODES + " parts");
         }
         if (depth > MAX_DEPTH) {
             throw new IllegalArgumentException("The result is nested more than " + MAX_DEPTH + " deep");
         }
-        if (value instanceof Map<?, ?> map) {
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                if (entry.getKey() != null) {
-                    flatten(child(prefix, String.valueOf(entry.getKey())), entry.getValue(), into, depth + 1);
+        boolean container = value instanceof Map<?, ?> || value instanceof java.util.Collection<?>
+                || value instanceof Object[];
+        if (container && !path.add(value)) {
+            throw new IllegalArgumentException("The result contains itself");
+        }
+        try {
+            if (value instanceof Map<?, ?> map) {
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    if (entry.getKey() != null) {
+                        flatten(child(prefix, String.valueOf(entry.getKey())), entry.getValue(), into, depth + 1, path,
+                                nodes);
+                    }
                 }
+            } else if (container) {
+                List<Object> items = value instanceof java.util.Collection<?> collection ? new ArrayList<>(collection)
+                        : java.util.Arrays.asList((Object[]) value);
+                for (int i = 0; i < items.size(); i++) {
+                    flatten(child(prefix, Integer.toString(i + 1)), items.get(i), into, depth + 1, path, nodes);
+                }
+            } else if (!prefix.isEmpty()) {
+                into.put(prefix, value);
             }
-        } else if (value instanceof java.util.Collection<?> || value instanceof Object[]) {
-            List<Object> items = value instanceof java.util.Collection<?> collection ? new ArrayList<>(collection)
-                    : java.util.Arrays.asList((Object[]) value);
-            for (int i = 0; i < items.size(); i++) {
-                flatten(child(prefix, Integer.toString(i + 1)), items.get(i), into, depth + 1);
+        } finally {
+            if (container) {
+                path.remove(value);
             }
-        } else if (!prefix.isEmpty()) {
-            into.put(prefix, value);
         }
     }
 
