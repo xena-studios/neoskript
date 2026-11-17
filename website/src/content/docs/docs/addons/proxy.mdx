@@ -115,7 +115,9 @@ The database holds the value every server agrees on. A change a server hasn't wr
 
 - **Numbers added to or taken from** (`add`, `remove`, with numbers) **all count.** `add 1 to {network::joins}` on two servers at once adds 2, and a balance that loses 100 on one server while it gains 50 on another ends up 50 down. This holds through an outage too: additions on every server while the database was down all count once it's back.
 - **Values added to a list are all kept.** Two servers that add to `{network::queue::*}` at once both pick the same next index; the first write keeps it, and the other value moves to the next free one.
-- **Anything else is the last write's**, on every server, as in Skript: a `set` or a `delete` (even of a number, and even with additions on another server), or a value one server sets while another adds to it. When one server should decide a value, set it only there, or give each server a name of its own, as `{network::online::%this server's network name%}`.
+- **Anything else is the last write's**, on every server, as in Skript: a `set` or a `delete` (even of a number, and even with additions on another server), or a value one server sets while another adds to it. A deletion racing an addition on another server ends deleted, or at just the addition, whichever is written last. When one server should decide a value, set it only there, or give each server a name of its own, as `{network::online::%this server's network name%}`.
+
+Which list index a value lands at, and so a list's order, isn't guaranteed across servers. Merging applies to every database with `monitor-changes`, not only `network`; `merge-changes: false` on a database keeps Skript's last-write-wins exactly ([variables](/docs/server/variables/#sharing-variables-between-servers)).
 
 ### When the database is down
 

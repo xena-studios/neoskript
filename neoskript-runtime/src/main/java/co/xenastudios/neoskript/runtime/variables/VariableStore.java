@@ -538,21 +538,30 @@ public final class VariableStore {
     }
 
     /**
-     * Told of the changes that only add to something: a number added to or taken from, or a value added to a list at
-     * its next free index. Storage shared between servers needs these to merge two servers' changes to one variable
-     * rather than keep only one of them. Called on the thread that makes the change; each must be quick.
+     * Told of every change to a variable, and of which changes only add to it: a number added to or taken from, or a
+     * value added to a list at its next free index. Storage shared between servers needs this to merge two servers'
+     * changes to one variable rather than keep only one of them, and to know exactly when it can't. Called on the
+     * thread that makes the change; each call must be quick.
      */
-    public interface Additions {
-
-        /** {@code add} or {@code remove} is about to change {@code {name}}: {@link #added} follows, always. */
-        void adding(String name);
+    public interface Changes {
 
         /**
-         * The change {@link #adding} announced is done. {@code amount} is what it added to the number in
-         * {@code {name}}, negative for a removal, if it only added plain numbers ({@code Long} or {@code Double}) to a
-         * plain number or to nothing; otherwise {@code null}.
+         * {@code {name}} is about to change: {@link #changed} follows, always. A change to a whole list
+         * ({@code set}, {@code delete} or {@code sort} of {@code {x::*}}, removing from it) is told for {@code x::*}.
+         *
+         * @param adding whether it's {@code add} or {@code remove}, which may turn out to only add a number
          */
-        void added(String name, Number amount);
+        void changing(String name, boolean adding);
+
+        /**
+         * The change {@link #changing} announced is done.
+         *
+         * @param adding as {@link #changing} had it
+         * @param amount what an {@code add} or {@code remove} added to the number in {@code {name}}, negative for a
+         *     removal, if it only added plain numbers ({@code Long} or {@code Double}) to a plain number or to nothing;
+         *     otherwise {@code null}
+         */
+        void changed(String name, boolean adding, Number amount);
 
         /**
          * {@code {name}} is about to be made by adding a value to its list at the list's next free index: told before
@@ -561,17 +570,33 @@ public final class VariableStore {
         void appending(String name);
     }
 
-    private final java.util.concurrent.CopyOnWriteArrayList<Additions> additions =
+    private final java.util.concurrent.CopyOnWriteArrayList<Changes> watchers =
             new java.util.concurrent.CopyOnWriteArrayList<>();
 
     /**
-     * Tells {@code watcher} of every change that only adds ({@link Additions}) from now on.
+     * Tells {@code watcher} of every change from now on ({@link Changes}).
      *
      * @return what stops it
      */
-    public Runnable watchAdditions(Additions watcher) {
-        additions.add(watcher);
-        return () -> additions.remove(watcher);
+    public Runnable watch(Changes watcher) {
+        watchers.add(watcher);
+        return () -> watchers.remove(watcher);
+    }
+
+    private void before(String name, boolean adding) {
+        for (Changes watcher : watchers) {
+            watcher.changing(name, adding);
+        }
+    }
+
+    private void after(String name, boolean adding, Number amount) {
+        for (Changes watcher : watchers) {
+            watcher.changed(name, adding, amount);
+        }
+    }
+
+    private static String whole(String prefix) {
+        return prefix + SEPARATOR + "*";
     }
 
     private static boolean plainNumber(Object value) {
@@ -680,6 +705,19 @@ public final class VariableStore {
 
     /** Sets {@code {name}}; {@code null} deletes it. Values under it ({@code {name::*}}) are kept. */
     public void set(String name, Object value) {
+        if (watchers.isEmpty()) {
+            setNow(name, value);
+            return;
+        }
+        before(name, false);
+        try {
+            setNow(name, value);
+        } finally {
+            after(name, false, null);
+        }
+    }
+
+    private void setNow(String name, Object value) {
         changed();
         if (value == null) {
             // One walk down the name, whose nodes are then taken out bottom up if they're left empty.
@@ -698,6 +736,19 @@ public final class VariableStore {
 
     /** Atomically replaces {@code {name}} with {@code change} applied to its current value. */
     public void update(String name, UnaryOperator<Object> change) {
+        if (watchers.isEmpty()) {
+            updateNow(name, change);
+            return;
+        }
+        before(name, false);
+        try {
+            updateNow(name, change);
+        } finally {
+            after(name, false, null);
+        }
+    }
+
+    private void updateNow(String name, UnaryOperator<Object> change) {
         changed();
         while (true) {
             Node node = create(name);
@@ -719,19 +770,16 @@ public final class VariableStore {
     public void add(String name, Object[] values) {
         // A value with its own way of being added to, like a queue, changes in place.
         Object current = get(name);
-        if (current != null && Values.changeValue(current, values, Changeable.Mode.ADD)) {
-            changed();
+        if (current != null && changedInPlace(name, current, values, Changeable.Mode.ADD)) {
             return;
         }
-        boolean watched = !additions.isEmpty();
+        boolean watched = !watchers.isEmpty();
         Object[] amount = watched ? new Object[1] : null;
         if (watched) {
-            for (Additions watcher : additions) {
-                watcher.adding(name);
-            }
+            before(name, true);
         }
         try {
-            update(name, old -> {
+            updateNow(name, old -> {
                 Object result = old;
                 // What was added, while it's only plain numbers to a plain number (or to nothing).
                 Object added = watched && (old == null || plainNumber(old)) ? 0L : null;
@@ -758,10 +806,7 @@ public final class VariableStore {
             });
         } finally {
             if (watched) {
-                Number number = amount[0] instanceof Number n ? n : null;
-                for (Additions watcher : additions) {
-                    watcher.added(name, number);
-                }
+                after(name, true, amount[0] instanceof Number n ? n : null);
             }
         }
     }
@@ -773,8 +818,7 @@ public final class VariableStore {
      */
     public void subtractAll(String name, Object[] values) {
         Object current = get(name);
-        if (current != null && Values.changeValue(current, values, Changeable.Mode.REMOVE_ALL)) {
-            changed();
+        if (current != null && changedInPlace(name, current, values, Changeable.Mode.REMOVE_ALL)) {
             return;
         }
         subtract(name, values);
@@ -782,19 +826,16 @@ public final class VariableStore {
 
     public void subtract(String name, Object[] values) {
         Object current = get(name);
-        if (current != null && Values.changeValue(current, values, Changeable.Mode.REMOVE)) {
-            changed();
+        if (current != null && changedInPlace(name, current, values, Changeable.Mode.REMOVE)) {
             return;
         }
-        boolean watched = !additions.isEmpty();
+        boolean watched = !watchers.isEmpty();
         Object[] amount = watched ? new Object[1] : null;
         if (watched) {
-            for (Additions watcher : additions) {
-                watcher.adding(name);
-            }
+            before(name, true);
         }
         try {
-            update(name, old -> {
+            updateNow(name, old -> {
                 Object result = old == null ? 0L : old;
                 Object taken = watched && (old == null || plainNumber(old)) ? 0L : null;
                 for (Object value : values) {
@@ -814,11 +855,39 @@ public final class VariableStore {
             });
         } finally {
             if (watched) {
-                Number number = amount[0] instanceof Number n ? n : null;
-                for (Additions watcher : additions) {
-                    watcher.added(name, number);
-                }
+                after(name, true, amount[0] instanceof Number n ? n : null);
             }
+        }
+    }
+
+    /**
+     * A value with its own way of being changed, like a queue, changed in place: whether it was. Told as a change
+     * once it's done (numbers never change in place, so it's never one that could be merged).
+     */
+    private boolean changedInPlace(String name, Object current, Object[] values, Changeable.Mode mode) {
+        if (!Values.changeValue(current, values, mode)) {
+            return false;
+        }
+        changed();
+        if (!watchers.isEmpty()) {
+            before(name, false);
+            after(name, false, null);
+        }
+        return true;
+    }
+
+    /** Runs a change to the whole of {@code {prefix::*}}, told to the watchers as {@code prefix::*}. */
+    private void wholeList(String prefix, Runnable change) {
+        if (watchers.isEmpty()) {
+            change.run();
+            return;
+        }
+        String key = whole(prefix);
+        before(key, false);
+        try {
+            change.run();
+        } finally {
+            after(key, false, null);
         }
     }
 
@@ -897,8 +966,12 @@ public final class VariableStore {
 
     /** Replaces {@code {prefix::*}} with {@code values}, at indices 1, 2, 3... */
     public void setList(String prefix, Object[] values) {
+        wholeList(prefix, () -> setListNow(prefix, values));
+    }
+
+    private void setListNow(String prefix, Object[] values) {
         changed();
-        deleteList(prefix);
+        deleteListNow(prefix);
         if (!hasValue(values)) {
             return;
         }
@@ -953,8 +1026,12 @@ public final class VariableStore {
             setList(prefix, values instanceof Object[] array ? array : values == null ? new Object[0] : new Object[] {values});
             return;
         }
+        wholeList(prefix, () -> setListKeyedNow(prefix, keyed));
+    }
+
+    private void setListKeyedNow(String prefix, KeyedValues keyed) {
         changed();
-        deleteList(prefix);
+        deleteListNow(prefix);
         if (!hasValue(keyed.values())) {
             return;
         }
@@ -1052,7 +1129,7 @@ public final class VariableStore {
                 if (node.dead()) {
                     continue;
                 }
-                boolean watched = !additions.isEmpty();
+                boolean watched = !watchers.isEmpty();
                 for (Object value : values) {
                     if (value == null) {
                         continue;
@@ -1061,7 +1138,7 @@ public final class VariableStore {
                     int index = children == null ? 1 : children.nextOpen();
                     if (watched) {
                         String made = prefix + SEPARATOR + index;
-                        for (Additions watcher : additions) {
+                        for (Changes watcher : watchers) {
                             watcher.appending(made);
                         }
                     }
@@ -1074,6 +1151,10 @@ public final class VariableStore {
 
     /** Removes {@code values} from {@code {prefix::*}}: the first match of each, or every match if {@code all}. */
     public void removeFromList(String prefix, Object[] values, boolean all) {
+        wholeList(prefix, () -> removeFromListNow(prefix, values, all));
+    }
+
+    private void removeFromListNow(String prefix, Object[] values, boolean all) {
         changed();
         Path path = walk(prefix);
         Node node = path == null ? null : path.last();
@@ -1154,9 +1235,13 @@ public final class VariableStore {
 
     /** Replaces {@code {to::*}} with a copy of {@code {from::*}}, nested lists and indices included. */
     public void copyList(String from, String to) {
+        wholeList(to, () -> copyListNow(from, to));
+    }
+
+    private void copyListNow(String from, String to) {
         changed();
         Node source = find(from);
-        deleteList(to);
+        deleteListNow(to);
         if (source == null || source.children == null || source.children.isEmpty()) {
             return;
         }
@@ -1218,6 +1303,10 @@ public final class VariableStore {
      * longer a list is free for {@code add} again once it has no value ({@link Node#freeable}).
      */
     public void deleteList(String prefix) {
+        wholeList(prefix, () -> deleteListNow(prefix));
+    }
+
+    private void deleteListNow(String prefix) {
         changed();
         Path path = walk(prefix);
         if (path == null || path.last().children == null) {

@@ -169,7 +169,15 @@ Each server writes its own changes before it reads the others', and a change it 
 
 Unlike Skript, a variable deleted on one server is deleted on the others: with `monitor-changes` on, a deletion is written as a row without a value, which Skript ignores when it reads, and such rows are removed a while later, as Skript removes them. Skript servers on the same database see NeoSkript's changes, but not its deletions.
 
-Also unlike Skript, two servers changing one variable at once don't lose a change. With `monitor-changes` on, each write checks the rows it writes against what the server last saw of them (locking them, on MySQL, until it's done); where another server wrote one since, numbers that were only added to or taken from have this server's additions added to the other's value, so `add 1 to {x}` on two servers at once adds 2, and a value added to a list at an index the other server filled first moves to the next free one. Anything else is the last write's, as in Skript. This covers an outage too: additions made on every server while the database was down all count once it's back. [NeoSkript Proxy](/docs/addons/proxy/#network-variables) builds `{network::...}` variables on this, and tells the other servers about each write so they don't wait for `monitor-interval`.
+Also unlike Skript, two servers changing one variable at once don't lose a change. **This applies to every database with `monitor-changes: true`, not only network variables.** Each write checks the rows it writes against what the server last saw of them (locking them, on MySQL, until it's done). Where another server wrote one since:
+
+- **Numbers only added to or taken from** on this server since its last write (`add` and `remove` with numbers, nothing else) have this server's additions added to the other's value: `add 1 to {x}` on two servers at once adds 2. NeoSkript knows which changes were only additions, rather than guessing from the numbers: a `set`, even to the same value, followed by an `add` is a set.
+- **A value added to a list** at an index the other server filled first moves to the next free one, so both are kept. Which value ends up at which index isn't guaranteed to be the same as the order they were added on the servers, and a list's order across servers isn't guaranteed at all: sort it where order matters.
+- **Anything else is the last write's**, as in Skript: a `set`, a `delete`, a whole list set, sorted or deleted. A deletion racing an addition on another server ends either deleted (if the deletion is written last) or at just the other server's addition (if the addition is: it's added to nothing).
+
+This covers an outage too: additions made on every server while the database was down all count once it's back. A write whose answer the database never sent back (the connection dropped just after it committed) is recognised by its `update_guid` and counted once. To keep Skript's rule exactly, set `merge-changes: false` on the database: the last write wins, whatever it was.
+
+[NeoSkript Proxy](/docs/addons/proxy/#network-variables) builds `{network::...}` variables on this, and tells the other servers about each write so they don't wait for `monitor-interval`.
 
 ### When a database is down
 

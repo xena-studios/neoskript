@@ -661,6 +661,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                                         database.name(), database.host(), database.port(), database.database(),
                                         database.user(), database.password(), database.table(),
                                         database.monitorChanges(), database.monitorInterval().millis());
+                sql = sql.withMerge(database.mergeChanges());
                 // Kept per database, by a hash of its type, where it is and its table.
                 return new co.xenastudios.neoskript.runtime.variables.storage.SqlVariableStorage(globals, codecs, sql,
                         routing, data.resolve("pending"), console);
