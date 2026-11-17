@@ -160,36 +160,49 @@ public final class SkBeeDifferentialScenario implements Scenario {
         return labels;
     }
 
+    /**
+     * Runs each part on a server started with {@code builder}; then, if there are parts named
+     * {@code after-restart-...}, starts the same server again and runs those, so they read what the others saved.
+     */
     private static Result run(ServerBuilder builder, List<String> parts) throws Exception {
         List<String[]> lines = new ArrayList<>();
         List<String> unfinished = new ArrayList<>();
-        List<String> console;
-        try (ServerProcess server = builder.start()) {
-            server.await(ServerProcess.DONE, WAIT);
-            for (String part : parts) {
-                int mark = server.mark();
-                server.command("skbeetest-" + part);
-                server.command("skbeeping " + part);
-                server.await(Pattern.compile("\\[skbee] ping " + Pattern.quote(part) + "$"), mark, PART);
-                try {
-                    server.await(Pattern.compile("\\[skbee] end " + Pattern.quote(part) + "$"), mark, END);
-                } catch (HarnessFailure missing) {
-                    unfinished.add(part);
+        List<String> console = new ArrayList<>();
+        List<String> first = parts.stream().filter(part -> !part.startsWith("after-restart-")).toList();
+        List<String> after = parts.stream().filter(part -> part.startsWith("after-restart-")).toList();
+        for (List<String> run : after.isEmpty() ? List.of(first) : List.of(first, after)) {
+            try (ServerProcess server = builder.start()) {
+                server.await(ServerProcess.DONE, WAIT);
+                for (String part : run) {
+                    runPart(server, part, lines, unfinished);
                 }
-                for (String line : server.lines(mark)) {
-                    Matcher matcher = LINE.matcher(line);
-                    if (matcher.find() && !matcher.group(1).equals("ping") && !matcher.group(1).startsWith("end ")) {
-                        lines.add(new String[] {part + " / " + matcher.group(1), matcher.group(2)});
-                    }
-                }
-                if (!unfinished.contains(part) && server.lines(mark).stream().anyMatch(
-                        line -> line.contains("An internal error occurred") || line.contains("Exception"))) {
-                    unfinished.add(part);
-                }
+                console.addAll(server.lines(0));
+                server.stop();
             }
-            console = server.lines(0);
-            server.stop();
         }
         return new Result(lines, unfinished, console);
+    }
+
+    private static void runPart(ServerProcess server, String part, List<String[]> lines, List<String> unfinished)
+            throws Exception {
+        int mark = server.mark();
+        server.command("skbeetest-" + part);
+        server.command("skbeeping " + part);
+        server.await(Pattern.compile("\\[skbee] ping " + Pattern.quote(part) + "$"), mark, PART);
+        try {
+            server.await(Pattern.compile("\\[skbee] end " + Pattern.quote(part) + "$"), mark, END);
+        } catch (HarnessFailure missing) {
+            unfinished.add(part);
+        }
+        for (String line : server.lines(mark)) {
+            Matcher matcher = LINE.matcher(line);
+            if (matcher.find() && !matcher.group(1).equals("ping") && !matcher.group(1).startsWith("end ")) {
+                lines.add(new String[] {part + " / " + matcher.group(1), matcher.group(2)});
+            }
+        }
+        if (!unfinished.contains(part) && server.lines(mark).stream().anyMatch(
+                line -> line.contains("An internal error occurred") || line.contains("Exception"))) {
+            unfinished.add(part);
+        }
     }
 }

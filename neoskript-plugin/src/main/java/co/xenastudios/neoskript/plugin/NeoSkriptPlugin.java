@@ -233,10 +233,14 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler
             public void onAddonDisable(org.bukkit.event.server.PluginDisableEvent event) {
-                if (!Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin())) {
+                boolean addon = Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin());
+                if (!detachesOnDisable(event.getPlugin() == NeoSkriptPlugin.this, addon,
+                        () -> library.hasCodecsFrom(event.getPlugin().getClass().getClassLoader()))) {
                     return;
                 }
-                addons.remove(event.getPlugin().getName());
+                if (addon) {
+                    addons.remove(event.getPlugin().getName());
+                }
                 VariableBackend current = storage;
                 if (current != null && current.loaded()) {
                     VariableStorage.Detached detached = current.detach(event.getPlugin().getClass().getClassLoader());
@@ -303,6 +307,16 @@ public final class NeoSkriptPlugin extends JavaPlugin {
      */
     public Library library() {
         return library;
+    }
+
+    /**
+     * Whether a plugin being disabled has its values in variables turned into their saved bytes, so later saves never
+     * need its code: an addon, or a plugin whose classes a codec saves (a Skript addon's types through NeoSkriptCompat:
+     * SkBee disables before NeoSkriptCompat, and its classes can't be loaded after). Never NeoSkript itself: its own
+     * codecs stay until its last save, which is after its unload triggers.
+     */
+    static boolean detachesOnDisable(boolean self, boolean addon, java.util.function.BooleanSupplier ownsCodecs) {
+        return !self && (addon || ownsCodecs.getAsBoolean());
     }
 
     /**
