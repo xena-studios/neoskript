@@ -26,7 +26,7 @@ import java.util.Map;
  * <p>Nothing is saved until {@link #load} has succeeded, so a file that couldn't be read is never written over
  * with fewer variables. When some lines couldn't be read, the file is first copied to {@code backups/}.
  */
-public final class VariableStorage {
+public final class VariableStorage implements VariableBackend {
 
     /**
      * What a load or save did: the lines skipped, where the file was backed up because of them, and how many
@@ -54,11 +54,13 @@ public final class VariableStorage {
         this.file = file;
     }
 
+    @Override
     public Path file() {
         return file;
     }
 
     /** Whether {@link #load} succeeded, so the variables may be saved. */
+    @Override
     public boolean loaded() {
         return loaded;
     }
@@ -68,6 +70,7 @@ public final class VariableStorage {
      * backed up before anything can write over it. If the file can't be read, or the backup can't be made, this
      * throws and the variables are never saved.
      */
+    @Override
     public synchronized Result load() throws IOException {
         loaded = false;
         int leftovers = removeLeftovers();
@@ -150,11 +153,13 @@ public final class VariableStorage {
     }
 
     /** Whether variables changed since they were last loaded or saved. Never, if they didn't load. */
+    @Override
     public boolean changed() {
         return loaded && store.modifications() != savedAt;
     }
 
     /** Saves every variable except memory-only ones, once they have loaded. Values whose type can't be saved are skipped. */
+    @Override
     public synchronized Result save() throws IOException {
         if (!loaded) {
             // The store may be missing variables the file has.

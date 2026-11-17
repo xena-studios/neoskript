@@ -12,6 +12,9 @@ import co.xenastudios.neoskript.runtime.scheduler.FoliaScheduler;
 import co.xenastudios.neoskript.runtime.scheduler.PaperScheduler;
 import co.xenastudios.neoskript.runtime.scheduler.Scheduler;
 import co.xenastudios.neoskript.runtime.Timespan;
+import co.xenastudios.neoskript.runtime.variables.storage.NativeVariableStorage;
+import co.xenastudios.neoskript.runtime.variables.storage.VariableBackend;
+import co.xenastudios.neoskript.runtime.variables.storage.VariableBackends;
 import co.xenastudios.neoskript.runtime.variables.storage.VariableStorage;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -22,7 +25,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class NeoSkriptPlugin extends JavaPlugin {
 
-    private VariableStorage storage;
+    private VariableBackend storage;
     private ScriptCommands commands;
     private ScriptManager scripts;
     /** What stops the runtime error frames. */
@@ -153,9 +156,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         effectCommands = new EffectCommands(scripts, scheduler, getSLF4JLogger(), TestRunner.enabled(),
                 EffectCommands.Settings.read(getConfig().getConfigurationSection("effect-commands")));
         getServer().getPluginManager().registerEvents(effectCommands, this);
-        storage = new VariableStorage(scripts.globals(), library.codecs(),
-                getDataPath().resolve(getConfig().getString("variables.file", "variables.csv")));
-        loadVariables();
+        storage = openVariables(scripts.globals(), library.codecs());
+        if (storage != null) {
+            loadVariables();
+        }
         Runnable start = () -> {
             if (hooks) {
                 co.xenastudios.neoskript.paper.Hooks.hookServices(getSLF4JLogger());
@@ -233,6 +237,34 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
     }
 
+    /**
+     * Where variables are saved, from {@code variables.storage}: {@code csv} (Skript's variables.csv, the default)
+     * or {@code native} (NeoSkript's own file). Switching moves the variables over, after a backup. If that fails,
+     * {@code null}: the variables stay where they are and aren't loaded or saved.
+     */
+    private VariableBackend openVariables(co.xenastudios.neoskript.runtime.variables.VariableStore globals,
+            co.xenastudios.neoskript.runtime.variables.storage.VariableCodecs codecs) {
+        java.nio.file.Path csv = getDataPath().resolve(getConfig().getString("variables.file", "variables.csv"));
+        String setting = getConfig().getString("variables.storage", "csv");
+        VariableBackends.Kind kind = VariableBackends.Kind.parse(setting);
+        if (kind == null) {
+            // Keep using the file that's in use, rather than moving the variables because of a typo.
+            kind = java.nio.file.Files.exists(VariableBackends.nativeFile(csv)) ? VariableBackends.Kind.NATIVE
+                    : VariableBackends.Kind.CSV;
+            getSLF4JLogger().warn("Unknown variables.storage '{}' in config.yml (csv or native); using {}", setting,
+                    kind.name().toLowerCase(java.util.Locale.ROOT));
+        }
+        try {
+            VariableBackends.Opened opened = VariableBackends.open(kind, globals, codecs, csv);
+            opened.log().forEach(line -> getSLF4JLogger().info(line));
+            return opened.backend();
+        } catch (IOException | RuntimeException e) {
+            getSLF4JLogger().error("Couldn't move the variables to {} storage. They're left as they were, and won't "
+                    + "be loaded or saved until it's fixed.", kind.name().toLowerCase(java.util.Locale.ROOT), e);
+            return null;
+        }
+    }
+
     /** Loads saved variables, then saves changed ones every {@code variables.save-interval}. */
     private void loadVariables() {
         try {
@@ -258,6 +290,12 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                         + "The next save leaves those lines out, and the backup keeps them.", count,
                         count == 1 ? "line" : "lines", storage.file().getFileName());
             }
+            if (storage instanceof NativeVariableStorage nsv && nsv.recoveryBackup() != null) {
+                getSLF4JLogger().warn("The last {} bytes of {} were a save cut off by a crash, or damaged, and were "
+                        + "dropped; every save before it loaded. The whole file was backed up as {}",
+                        nsv.recoveredBytes(), storage.file().getFileName(),
+                        getDataPath().toAbsolutePath().relativize(nsv.recoveryBackup().toAbsolutePath()));
+            }
             getSLF4JLogger().info("Loaded {} {} in {} ms{}", loaded.variables(), loaded.variables() == 1 ? "variable" : "variables",
                     (System.nanoTime() - start) / 1_000_000,
                     loaded.raw() == 0 ? "" : " (" + loaded.raw() + " kept as saved until NeoSkript supports their types)");
@@ -276,7 +314,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     }
 
     private void saveVariables(boolean always) {
-        VariableStorage current = storage;
+        VariableBackend current = storage;
         if (current == null || !current.loaded() || (!always && !current.changed())) {
             return;
         }
@@ -305,5 +343,12 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             commands.unregister(getServer().getCommandMap());
         }
         saveVariables(false);
+        if (storage != null) {
+            try {
+                storage.close();
+            } catch (IOException e) {
+                getSLF4JLogger().warn("Couldn't close {}", storage.file(), e);
+            }
+        }
     }
 }

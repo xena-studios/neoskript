@@ -1,0 +1,4 @@
+# Harness: NeoSkript reads its variables back after a restart, from whichever storage config.yml picks.
+on load:
+	send "[harness] native read: %{n::text}% | %{n::long}% | %{n::double}% | %{n::bool}% | %{n::timespan}% | %{n::list::*}% | %{n::quoted ""name""}%" to console
+	send "[harness] native items: %{n::item}% | %{n::block}% | %{n::stack}% | %{n::mode}% | %{n::added}%" to console
