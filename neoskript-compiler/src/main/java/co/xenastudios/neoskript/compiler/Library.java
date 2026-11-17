@@ -918,6 +918,11 @@ public final class Library implements Registrar {
         codecs.register(name, type, codec);
     }
 
+    /** Whether values of exactly {@code type} already have a codec. */
+    public boolean saves(Class<?> type) {
+        return codecs.hasCodec(type);
+    }
+
     @Override
     public void unsavable(Class<?> type) {
         codecs.unsavable(type);
@@ -1462,6 +1467,35 @@ public final class Library implements Registrar {
      */
     Object binding(SyntaxInfo syntax) {
         return bindings.get(new Key(syntax.kind(), syntax.id()));
+    }
+
+    /**
+     * Whether an element of any kind is registered as {@code id}, or as a variant of it ({@code id-2}): what an
+     * element's thread affinity would apply to.
+     */
+    public boolean known(String id) {
+        for (Key key : bindings.keySet()) {
+            if (key.id().equals(id) || key.id().startsWith(id + "-")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public void affinity(String id, co.xenastudios.neoskript.api.registration.ThreadAffinity affinity) {
+        checkOpen();
+        if (id.indexOf('-') >= 0) {
+            throw new IllegalArgumentException("An element's id can't contain '-', which marks variants: " + id);
+        }
+        co.xenastudios.neoskript.runtime.region.Regions.declare(id,
+                affinity == co.xenastudios.neoskript.api.registration.ThreadAffinity.ANY,
+                affinity == co.xenastudios.neoskript.api.registration.ThreadAffinity.GLOBAL);
+    }
+
+    /** Whether everything is registered: scripts have been parsed with it, and nothing more can be added. */
+    public synchronized boolean frozen() {
+        return registry != null;
     }
 
     private void checkOpen() {

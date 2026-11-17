@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.api.element;
 
+import co.xenastudios.neoskript.api.annotation.Internal;
 import java.util.Set;
 
 /**
@@ -49,6 +50,8 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
      */
     public record TypeArgument(String id, String name, boolean plural, Class<?> javaClass) {}
 
+    /** Made by the compiler; addons are given one. */
+    @Internal
     public ElementInfo {
         tags = Set.copyOf(tags);
         types = java.util.List.copyOf(types);
@@ -57,35 +60,45 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
         eventClasses = java.util.List.copyOf(eventClasses);
     }
 
+    /**
+     * Made by the compiler for an element outside a trigger; addons are given one.
+     *
+     * @param pattern the index of the pattern that matched
+     * @param mark the parse marks used
+     * @param tags the parse tags used
+     * @param orArguments a bit for each argument written as an or-list
+     * @param listArguments a bit for each argument written as a list
+     * @param types the types named in the pattern's type parts
+     * @param argumentTypes the type id each argument is known to give
+     * @param singleArguments a bit for each argument that's certainly one value
+     * @param argumentLiterals each argument's value as written, if it's a literal
+     */
+    @Internal
     public ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,
             java.util.List<TypeArgument> types, java.util.List<String> argumentTypes, long singleArguments,
             java.util.List<String> argumentLiterals) {
         this(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments, argumentLiterals,
-                null, java.util.List.of());
+                null, java.util.List.of(), null, 0, 0, null);
     }
 
-    public ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,
-            java.util.List<TypeArgument> types, java.util.List<String> argumentTypes, long singleArguments,
-            java.util.List<String> argumentLiterals, String eventName, java.util.List<Class<?>> eventClasses) {
-        this(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments, argumentLiterals,
-                eventName, eventClasses, null, 0);
-    }
-
-    public ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,
-            java.util.List<TypeArgument> types, java.util.List<String> argumentTypes, long singleArguments,
-            java.util.List<String> argumentLiterals, String eventName, java.util.List<Class<?>> eventClasses,
-            String sectionType, long defaultArguments) {
-        this(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments, argumentLiterals,
-                eventName, eventClasses, sectionType, defaultArguments, 0, null);
-    }
-
-    /** This element as it's wanted at {@code time}, a time state: -1 before the event, 1 after it, 0 now. */
+    /**
+     * This element as it's wanted at {@code time}, a time state: -1 before the event, 1 after it, 0 now.
+     *
+     * @param time the time state
+     * @return the element at that time state
+     */
+    @Internal
     public ElementInfo withTime(int time) {
         return new ElementInfo(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments,
                 argumentLiterals, eventName, eventClasses, sectionType, defaultArguments, time, text);
     }
 
-    /** The element's text as written, or {@code written} where that isn't known. */
+    /**
+     * The element's text as written, as an error quotes it.
+     *
+     * @param written what to give where the text isn't known
+     * @return the text, or {@code written}
+     */
     public String textOr(String written) {
         return text != null ? text : written;
     }
@@ -93,6 +106,9 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
     /**
      * Whether the element is in an event of one of {@code classes} (or of a subclass), as Skript's
      * {@code isCurrentEvent}.
+     *
+     * @param classes the event classes
+     * @return whether it is
      */
     public boolean isEvent(Class<?>... classes) {
         for (Class<?> current : eventClasses) {
@@ -105,49 +121,53 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
         return false;
     }
 
-    /** Whether argument {@code index} was left out or is an event value, as Skript's default expressions are. */
+    /**
+     * Whether argument {@code index} was left out or is an event value, as Skript's default expressions are.
+     *
+     * @param index the argument's index
+     * @return whether it is
+     */
     public boolean isDefault(int index) {
         return index < 64 && (defaultArguments & (1L << index)) != 0;
-    }
-
-    public ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,
-            java.util.List<TypeArgument> types, java.util.List<String> argumentTypes) {
-        this(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, 0, java.util.List.of());
-    }
-
-    public ElementInfo(int pattern, int mark, Set<String> tags) {
-        this(pattern, mark, tags, 0, 0, java.util.List.of(), java.util.List.of(), 0, java.util.List.of());
-    }
-
-    public ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments) {
-        this(pattern, mark, tags, orArguments, listArguments, java.util.List.of(), java.util.List.of(), 0,
-                java.util.List.of());
     }
 
     /**
      * Whether argument {@code index} is certainly one value: a literal, a text, a variable that isn't a list, or
      * an element that always gives one (or does when its arguments do), as Skript's isSingle.
+     *
+     * @param index the argument's index
+     * @return whether it is
      */
     public boolean isSingle(int index) {
         return index < 64 && (singleArguments & (1L << index)) != 0;
     }
 
-    /** Argument {@code index} as written, if it's a literal or a plain text, else {@code null}. */
+    /**
+     * Argument {@code index} as written, if it's a literal or a plain text.
+     *
+     * @param index the argument's index
+     * @return it as written, or {@code null}
+     */
     public String argumentLiteral(int index) {
         return index < argumentLiterals.size() ? argumentLiterals.get(index) : null;
     }
 
-    public ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,
-            java.util.List<TypeArgument> types) {
-        this(pattern, mark, tags, orArguments, listArguments, types, java.util.List.of());
-    }
-
-    /** The type id argument {@code index} is known to give, or {@code null} if that isn't known until it runs. */
+    /**
+     * The type argument {@code index} is known to give.
+     *
+     * @param index the argument's index
+     * @return the type's id, or {@code null} if that isn't known until it runs
+     */
     public String argumentType(int index) {
         return index < argumentTypes.size() ? argumentTypes.get(index) : null;
     }
 
-    /** Whether argument {@code index} was written as a list ({@code {_x::*}}, {@code a and b}), not one value. */
+    /**
+     * Whether argument {@code index} was written as a list ({@code {_x::*}}, {@code a and b}), not one value.
+     *
+     * @param index the argument's index
+     * @return whether it was
+     */
     public boolean isList(int index) {
         return index < 64 && (listArguments & (1L << index)) != 0;
     }
@@ -155,11 +175,20 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
     /**
      * Whether argument {@code index} means all its values ({@code a and b}, a list variable), rather than any
      * one of them ({@code a or b}), as conditions check them.
+     *
+     * @param index the argument's index
+     * @return whether it means all
      */
     public boolean and(int index) {
         return index >= 64 || (orArguments & (1L << index)) == 0;
     }
 
+    /**
+     * Whether an alternative written with this tag ({@code tag:text}) was used.
+     *
+     * @param tag the tag
+     * @return whether it was
+     */
     public boolean hasTag(String tag) {
         return tags.contains(tag);
     }

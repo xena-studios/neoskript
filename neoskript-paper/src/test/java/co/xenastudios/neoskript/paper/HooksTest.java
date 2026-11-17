@@ -371,4 +371,19 @@ class HooksTest {
                 """, false));
         assertEquals(List.of(deprecated, deprecated, deprecated), warnings);
     }
+
+    @Test
+    void addonsRegisterAfterNeoSkriptsCodecs() {
+        Library library = new Library();
+        java.util.List<Class<?>> savedWhenAddonsRan = new java.util.ArrayList<>();
+        StandardLibrary.register(library, registrar -> {
+            for (Class<?> type : java.util.List.of(org.bukkit.Location.class, org.bukkit.World.class,
+                    org.bukkit.inventory.ItemStack.class, org.bukkit.OfflinePlayer.class)) {
+                if (library.saves(type)) {
+                    savedWhenAddonsRan.add(type);
+                }
+            }
+        });
+        org.junit.jupiter.api.Assertions.assertEquals(4, savedWhenAddonsRan.size(), savedWhenAddonsRan.toString());
+    }
 }

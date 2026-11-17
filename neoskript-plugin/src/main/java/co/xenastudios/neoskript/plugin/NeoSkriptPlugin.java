@@ -36,6 +36,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     private Scheduler scheduler;
     private io.papermc.paper.threadedregions.scheduler.ScheduledTask saveTask;
     private SettingsReloader settingsReloader;
+    /** The addons registered through the API. */
+    private Addons addons;
 
     /** https://bstats.org/plugin/bukkit/NeoSkript/34868 */
     private static final int BSTATS_PLUGIN_ID = 34868;
@@ -89,12 +91,26 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
         // Syntax of the plugins NeoSkript hooks into, as Skript's hooks, only when they're installed.
         boolean hooks = co.xenastudios.neoskript.paper.Hooks.anyInstalled();
-        StandardLibrary.register(library, registrar -> {
-            if (hooks) {
-                co.xenastudios.neoskript.paper.Hooks.register(registrar, getPluginMeta().getVersion(), getSLF4JLogger());
-            }
-        });
-        StandardLibrary.usePlayerUuidsInVariableNames(settings.variables().playerUuidsInNames());
+        addons = new Addons(getSLF4JLogger());
+        addons.frozenWhen(library::frozen);
+        addons.knownWhen(library::known);
+        addons.savedWhen(library::saves);
+        // With addons, which enable after NeoSkript, the syntax is registered on the first tick, theirs with it, and
+        // variables load after that, so the addons' types load too. Without them, nothing waits.
+        boolean deferSyntax = Addons.anyInstalled(this) && !co.xenastudios.neoskript.plugin.check.CheckMode.requested();
+        Runnable registerSyntax = () -> {
+            StandardLibrary.register(library, registrar -> {
+                if (hooks) {
+                    co.xenastudios.neoskript.paper.Hooks.register(registrar, getPluginMeta().getVersion(), getSLF4JLogger());
+                }
+                // Addons' syntax goes with the hooks': before comparisons and what matches almost anything.
+                addons.registerAll(registrar);
+            });
+            StandardLibrary.usePlayerUuidsInVariableNames(settings.variables().playerUuidsInNames());
+        };
+        if (!deferSyntax) {
+            registerSyntax.run();
+        }
         if (co.xenastudios.neoskript.plugin.check.CheckMode.requested()) {
             // Started by NeoSkript's CLI to check scripts: check them, write the report, and stop.
             try {
@@ -107,7 +123,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             return;
         }
         if (TestRunner.enabled()) {
-            StandardLibrary.registerTesting(library);
+            if (!deferSyntax) {
+                StandardLibrary.registerTesting(library);
+            }
             // As Skript's test mode does: the chunks tests use stay loaded and ticking.
             try {
                 org.bukkit.World world = getServer().getWorlds().getFirst();
@@ -144,8 +162,44 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(effectCommands, this);
         storage = new VariableStorage(scripts.globals(), library.codecs(),
                 getDataPath().resolve(settings.variables().file()));
-        loadVariables();
-        Runnable start = () -> {
+        if (!deferSyntax) {
+            loadVariables();
+        }
+        AddonApi api = new AddonApi(this, addons, scripts.globals(), getSLF4JLogger());
+        co.xenastudios.neoskript.api.Installed.install(api);
+        // An addon disables before NeoSkript when the server stops, and its classes go with it. Its values in
+        // variables become their saved bytes now, so later saves, after unload events, never need its code.
+        getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler
+            public void onAddonDisable(org.bukkit.event.server.PluginDisableEvent event) {
+                if (!Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin())) {
+                    return;
+                }
+                addons.remove(event.getPlugin().getName());
+                VariableStorage current = storage;
+                if (current != null && current.loaded()) {
+                    VariableStorage.Detached detached = current.detach(event.getPlugin().getClass().getClassLoader());
+                    if (!detached.kept().isEmpty()) {
+                        getSLF4JLogger().info("{} was disabled: kept {} {} its codecs save as saved bytes",
+                                event.getPlugin().getName(), detached.kept().size(),
+                                detached.kept().size() == 1 ? "variable" : "variables");
+                    }
+                    if (!detached.notSaved().isEmpty()) {
+                        getSLF4JLogger().warn("{} was disabled, and {} couldn't be encoded and had nothing saved before:"
+                                + " they keep their values until the server stops, but won't be saved",
+                                event.getPlugin().getName(), String.join(", ", detached.notSaved()));
+                    }
+                }
+            }
+        }, this);
+        Runnable start = () -> Startup.run(() -> {
+            if (deferSyntax) {
+                registerSyntax.run();
+                if (TestRunner.enabled()) {
+                    StandardLibrary.registerTesting(library);
+                }
+                loadVariables();
+            }
             if (hooks) {
                 co.xenastudios.neoskript.paper.Hooks.hookServices(getSLF4JLogger());
             }
@@ -158,10 +212,12 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             // Events NeoSkript fires itself: experience spawning, times of day, starting and stopping.
             co.xenastudios.neoskript.paper.EventBridges.start(this, eventPriority());
             co.xenastudios.neoskript.paper.Hooks.start(this, eventPriority());
-        };
-        if (hooks) {
+            // Scripts and variables are there now (or what of them could load): addons waiting for them carry on.
+        }, api::ready, getSLF4JLogger());
+        if (hooks || deferSyntax) {
             // As Skript: with plugins to hook into, taking Vault's services and then loading scripts wait for the
-            // server to start, when every plugin has enabled and registered its services.
+            // server to start, when every plugin has enabled and registered its services. With addons, so does
+            // registering the syntax, for theirs.
             getServer().getGlobalRegionScheduler().run(this, task -> start.run());
         } else {
             start.run();
@@ -175,6 +231,16 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         // What /sk reload config compares with: the settings the server started with.
         settingsReloader = new SettingsReloader(configFile(), settings, reloadEffects());
         getCommand("skript").setExecutor(new SkriptCommand(this, scripts));
+    }
+
+    /** The addons registered through NeoSkript's API, as {@code name version}, for {@code /sk info}. */
+    java.util.List<String> registeredAddons() {
+        return addons == null ? java.util.List.of() : addons.names();
+    }
+
+    /** The plugins that registered addons through NeoSkript's API, by name. */
+    java.util.Set<String> addonPlugins() {
+        return addons == null ? java.util.Set.of() : addons.plugins();
     }
 
     /**
@@ -381,7 +447,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             getSLF4JLogger().info("Loaded {} {} in {} ms{}", loaded.variables(), loaded.variables() == 1 ? "variable" : "variables",
                     (System.nanoTime() - start) / 1_000_000,
                     loaded.raw() == 0 ? "" : " (" + loaded.raw() + " kept as saved until NeoSkript supports their types)");
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException | LinkageError e) {
             // Don't run with an empty set of variables that would then overwrite the file. The storage never saves
             // until it has loaded, so nothing writes over the file, not even when the server stops.
             getSLF4JLogger().error("Couldn't load variables from {}. Variables won't be saved until it's fixed.",
@@ -409,13 +475,23 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             if (saved.unsaved() > 0) {
                 getSLF4JLogger().warn("{} variables have values that can't be saved yet, so they weren't", saved.unsaved());
             }
-        } catch (IOException | RuntimeException e) {
-            getSLF4JLogger().error("Couldn't save variables to {}", current.file(), e);
+            // Variables whose codec failed, or whose addon's classes are gone: the rest were saved.
+            if (!saved.keptPrevious().isEmpty()) {
+                getSLF4JLogger().warn("Couldn't save the new values of {}, so they keep what was saved before",
+                        String.join(", ", saved.keptPrevious()));
+            }
+            if (!saved.notSaved().isEmpty()) {
+                getSLF4JLogger().warn("Couldn't save {}, which had no value saved before, so they were left out",
+                        String.join(", ", saved.notSaved()));
+            }
+        } catch (IOException | RuntimeException | LinkageError e) {
+            getSLF4JLogger().error("Couldn't save variables to {}: {}", current.file(), e.getMessage(), e);
         }
     }
 
     @Override
     public void onDisable() {
+        co.xenastudios.neoskript.api.Installed.install(null);
         if (runtimeErrorFrames != null) {
             runtimeErrorFrames.run();
         }

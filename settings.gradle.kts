@@ -43,4 +43,8 @@ include(
     "neoskript-cli",
     "neoskript-web",
     "test-harness",
+    "example-addon",
 )
+
+// An example addon, built in CI against the API and run by the harness, never shipped.
+project(":example-addon").projectDir = file("examples/example-addon")

@@ -61,6 +61,11 @@ public final class ScenarioContext {
         return config.botJar();
     }
 
+    /** The example addon ({@code examples/example-addon}), which registers syntax through NeoSkript's API. */
+    public Path exampleAddonJar() {
+        return config.exampleAddonJar();
+    }
+
     public Path skriptJar() throws IOException, InterruptedException {
         return downloads.fetch(
                 referenceSkript.jarUrl(), referenceSkript.jarSha256(), "Skript-" + referenceSkript.version() + ".jar");

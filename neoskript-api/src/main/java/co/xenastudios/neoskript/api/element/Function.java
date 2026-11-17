@@ -12,5 +12,11 @@ package co.xenastudios.neoskript.api.element;
 @FunctionalInterface
 public interface Function {
 
+    /**
+     * Calls the function.
+     *
+     * @param arguments the parameters' values, in order
+     * @return one value, an {@code Object[]} of several, or {@code null} for none
+     */
     Object call(Object[] arguments);
 }
