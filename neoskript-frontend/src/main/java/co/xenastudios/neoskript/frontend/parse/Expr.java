@@ -84,7 +84,15 @@ public sealed interface Expr {
      * @param problem the best error found while trying to read the words as something else, which Skript's unparsed
      *     literal keeps and gives if nothing can make sense of it, or {@code null}
      */
-    record Unresolved(int start, int end, String text, boolean verified, String problem) implements Expr {
+    record Unresolved(int start, int end, String text, boolean verified, String problem, Expr cause) implements Expr {
+
+        /**
+         * Words with the problem reading them; {@code cause}, if not {@code null}, is the expression the problem is
+         * about, which Skript sets up first: its own error, if it has one, comes before the problem.
+         */
+        public Unresolved(int start, int end, String text, boolean verified, String problem) {
+            this(start, end, text, verified, problem, null);
+        }
 
         public Unresolved(int start, int end, String text) {
             this(start, end, text, false);

@@ -310,6 +310,7 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public void scriptsUnloaded(java.util.function.Consumer) signature (Ljava/util/function/Consumer<-Ljava/util/Set<Ljava/lang/String;>;>;)V
   public abstract void section(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/Section;>;[Ljava/lang/String;)V
   public void sectionEvent(java.lang.String, java.lang.String) @Experimental
+  public void sectionEvent(java.lang.String, java.lang.String, java.lang.Class, java.util.function.Function) signature <E:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TE;>;Ljava/util/function/Function<Ljava/lang/Object;+TE;>;)V @Experimental
   public abstract void sectionExpression(java.lang.String, java.lang.String)
   public abstract void storage(java.lang.String, java.lang.Class, co.xenastudios.neoskript.api.storage.VariableCodec) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/Class<TT;>;Lco/xenastudios/neoskript/api/storage/VariableCodec<TT;>;)V
   public void strictType(java.lang.String) @Experimental

@@ -32,6 +32,14 @@ public interface EventValues {
     boolean keepsEventValues(SyntaxInfo header);
 
     /**
+     * What code in a section with {@code header} can use, if the section's code is in an event of its own, as a spawn
+     * section's is in Skript; else {@code null}, and it may use anything, as the section may give values of its own.
+     */
+    default Scope section(SyntaxInfo header) {
+        return null;
+    }
+
+    /**
      * How many times the parser has used up an event value's error so far ({@code Use 'attacker' and/or 'victim'...}),
      * which Skript gives only the first time any script asks: which script that is depends on the order scripts are
      * read in.

@@ -256,6 +256,8 @@ final class TriggerCompiler {
      * used in it, nor a returnable section's from around it.
      */
     private int detachedAt = -1;
+    /** As {@link #detachedAt}, but counting the section block the code is of, whose values it has; or -1. */
+    private int valuesAt = -1;
     /** The text expression positions refer to: the current line, a section header's key, or a default value. */
     private String source;
     private int line;
@@ -1111,12 +1113,20 @@ final class TriggerCompiler {
 
     /** Compiles code Skript loads as a trigger of its own: see {@link #detachedAt}. */
     private void detached(List<Statement> body) throws CompileException {
+        detached(body, false);
+    }
+
+    /** {@link #detached(List)}; {@code ownBlock} if the innermost block is the section's, whose values the code has. */
+    private void detached(List<Statement> body, boolean ownBlock) throws CompileException {
         int outer = detachedAt;
+        int outerValues = valuesAt;
         detachedAt = blocks.size();
+        valuesAt = ownBlock ? blocks.size() - 1 : blocks.size();
         try {
             statements(body);
         } finally {
             detachedAt = outer;
+            valuesAt = outerValues;
         }
     }
 
@@ -1434,11 +1444,12 @@ final class TriggerCompiler {
             return null;
         }
         String event = library.sectionEvent(waiting.id());
+        Library.SectionEventClass own = library.sectionEventClass(waiting.id());
         String type = library.sectionType(waiting.id()) != null ? library.sectionType(waiting.id())
                 : library.sectionExpressionType(waiting.id());
         CompileException error = firstErrorApart(waiting.body(), event == null ? eventClasses
-                : List.of(co.xenastudios.neoskript.runtime.SectionEvent.class), event == null ? eventLabel : event, type, true,
-                true);
+                : List.of(own != null ? own.eventClass() : co.xenastudios.neoskript.runtime.SectionEvent.class),
+                event == null ? eventLabel : event, type, true, true);
         if (error == null || waiting.firstErrorLine() >= 0 && error.line() >= waiting.firstErrorLine()) {
             return null;
         }
@@ -1532,6 +1543,28 @@ final class TriggerCompiler {
         return errors;
     }
 
+    /**
+     * The error setting up the expression the problem with {@code words} is about ({@link Expr.Unresolved#cause}),
+     * which Skript gives first: 'past damage' where 'damage' can't be used is about 'damage'. {@code null} if none.
+     */
+    private String causeError(Expr.Unresolved words) {
+        if (words.cause() == null) {
+            return null;
+        }
+        List<String> errors = new ArrayList<>();
+        Expr outer = settingUpCause;
+        settingUpCause = words.cause();
+        try {
+            setupErrors(words.cause(), errors);
+        } finally {
+            settingUpCause = outer;
+        }
+        return errors.isEmpty() ? null : errors.getFirst();
+    }
+
+    /** The expression {@link #causeError} sets up, which isn't in the line's parse: its text is where it was written. */
+    private Expr settingUpCause;
+
     private void setupErrors(ParsedSyntax syntax, List<String> errors) {
         if (syntax == null) {
             return;
@@ -1577,6 +1610,10 @@ final class TriggerCompiler {
     private String textOf(ParsedSyntax target) {
         if (target != null && target == eventHeader && source != null) {
             return source.strip();
+        }
+        if (settingUpCause instanceof Expr.Syntax cause && cause.syntax() == target && source != null
+                && cause.end() <= source.length()) {
+            return source.substring(cause.start(), cause.end()).strip();
         }
         if (currentStatement == null || source == null) {
             return null;
@@ -2455,6 +2492,15 @@ final class TriggerCompiler {
         method.visitVarInsn(ASTORE, valuesSlot);
         method.visitInsn(ICONST_0);
         method.visitVarInsn(ISTORE, indexSlot);
+        // As Skript loads a spawn section's code: in an event of its own, made of each value, whose values are all
+        // there is: the trigger's aren't.
+        Library.SectionEventClass own = library.sectionEventClass(header.syntax().id());
+        int outerContextSlot = -1;
+        if (own != null) {
+            outerContextSlot = nextSlot++;
+            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+            method.visitVarInsn(ASTORE, outerContextSlot);
+        }
 
         Label top = new Label();
         Label next = new Label();
@@ -2464,20 +2510,44 @@ final class TriggerCompiler {
         method.visitVarInsn(ALOAD, valuesSlot);
         method.visitInsn(ARRAYLENGTH);
         method.visitJumpInsn(IF_ICMPGE, end);
+        List<Class<?>> outerClasses = eventClasses;
+        String outerLabel = eventLabel;
+        if (own != null) {
+            method.visitVarInsn(ALOAD, outerContextSlot);
+            constant(own.event(), java.util.function.Function.class);
+            method.visitVarInsn(ALOAD, valuesSlot);
+            method.visitVarInsn(ILOAD, indexSlot);
+            method.visitInsn(AALOAD);
+            method.visitMethodInsn(INVOKESTATIC, VALUES, "sectionContext", "(" + CONTEXT
+                    + "Ljava/util/function/Function;" + OBJECT_DESC + ")" + CONTEXT, false);
+            method.visitVarInsn(ASTORE, CONTEXT_SLOT);
+            eventClasses = List.of(own.eventClass());
+            eventLabel = library.sectionEvent(header.syntax().id());
+        }
         blocks.push(new Block(BlockKind.SECTION, end, next, valuesSlot, -1, indexSlot,
                 library.sectionType(header.syntax().id())));
         try {
-            detached(section.body());
+            detached(section.body(), true);
         } finally {
             blocks.pop();
+            eventClasses = outerClasses;
+            eventLabel = outerLabel;
             if (place >= 0) {
                 runOns.pop();
             }
         }
         method.visitLabel(next);
+        if (own != null) {
+            method.visitVarInsn(ALOAD, outerContextSlot);
+            method.visitVarInsn(ASTORE, CONTEXT_SLOT);
+        }
         method.visitIincInsn(indexSlot, 1);
         method.visitJumpInsn(GOTO, top);
         method.visitLabel(end);
+        if (own != null) {
+            method.visitVarInsn(ALOAD, outerContextSlot);
+            method.visitVarInsn(ASTORE, CONTEXT_SLOT);
+        }
         if (place >= 0) {
             // Back to the thread of the 'run on' around this one, or the trigger's own.
             hop(outer == null ? -1 : outer.slot());
@@ -2548,7 +2618,7 @@ final class TriggerCompiler {
             eventLabel = sectionEvent;
         }
         try {
-            detached(section.body());
+            detached(section.body(), true);
         } finally {
             eventClasses = outerClasses;
             eventLabel = outerLabel;
@@ -2803,9 +2873,25 @@ final class TriggerCompiler {
         return false;
     }
 
+    /**
+     * The section blocks whose values the current code can use, innermost first: in code Skript loads as a trigger
+     * of its own, those in it and the section it's the code of, not the ones around that.
+     */
+    private List<Block> valueBlocks() {
+        List<Block> found = new ArrayList<>();
+        int open = valuesAt < 0 ? blocks.size() : blocks.size() - valuesAt;
+        for (Block block : blocks) {
+            if (open-- <= 0) {
+                break;
+            }
+            found.add(block);
+        }
+        return found;
+    }
+
     /** The innermost library section whose values are of a type {@code typeId} is a kind of, or {@code null}. */
     private Block widerSection(String typeId) {
-        for (Block block : blocks) {
+        for (Block block : valueBlocks()) {
             if (block.kind() == BlockKind.SECTION && block.valueType() != null && !block.valueType().equals(SyntaxRegistry.OBJECT)
                     && registry.isSubtype(typeId, block.valueType())) {
                 return block;
@@ -2816,7 +2902,7 @@ final class TriggerCompiler {
 
     /** The innermost library section whose values are of type {@code typeId}, or {@code null}. */
     private Block sectionFor(String typeId) {
-        for (Block block : blocks) {
+        for (Block block : valueBlocks()) {
             if (block.kind() == BlockKind.SECTION
                     && (block.valueType().equals(typeId) || registry.isSubtype(block.valueType(), typeId))) {
                 return block;
@@ -3217,7 +3303,7 @@ final class TriggerCompiler {
                 : effect.match().hasTag("conditional") ? BlockKind.CONDITIONAL : null;
         String names = kind == BlockKind.LOOP ? "loops" : kind == BlockKind.CONDITIONAL ? "conditionals" : "sections";
         List<Block> matching = new ArrayList<>();
-        for (Block block : blocks) { // innermost first
+        for (Block block : visibleBlocks()) { // innermost first
             if (kind == null || block.kind() == kind || (kind == BlockKind.LOOP && block.kind() == BlockKind.WHILE)) {
                 matching.add(block);
             }
@@ -3325,32 +3411,66 @@ final class TriggerCompiler {
         return Integer.parseInt(((java.util.regex.MatchResult) syntax.match().regexValues().getFirst()).group());
     }
 
-    private Block innermostLoop() throws CompileException {
+    /**
+     * The blocks the current code is in, innermost first, that it can see: in code Skript loads as a trigger of its
+     * own ({@link #detachedAt}), only those opened in it, as Skript's parser has no sections around it.
+     */
+    private List<Block> visibleBlocks() {
+        List<Block> visible = new ArrayList<>();
+        int open = detachedAt < 0 ? blocks.size() : blocks.size() - detachedAt;
         for (Block block : blocks) {
-            if (block.kind() != BlockKind.CONDITIONAL && block.kind() != BlockKind.PAUSING) {
-                return block;
+            if (open-- <= 0) {
+                break;
             }
+            visible.add(block);
         }
-        throw new CompileException(line, "There's no loop here");
+        return visible;
     }
 
-    /** The {@code n}th loop, counting from the outermost. */
+    /** The loop {@code continue} goes on with: the innermost, with Skript's EffContinue's error if there's none. */
+    private Block innermostLoop() throws CompileException {
+        List<Block> loops = continuableLoops();
+        if (loops.isEmpty()) {
+            throw new CompileException(line, "The 'continue' effect may only be used in loops");
+        }
+        return loops.getLast();
+    }
+
+    /** The {@code n}th loop, counting from the outermost, for {@code continue the 2nd loop}, as Skript's EffContinue. */
     private Block loopNumber(int n) throws CompileException {
-        List<Block> loops = loops();
-        if (n < 1 || n > loops.size()) {
-            throw new CompileException(line, "There's no loop number " + n + " here");
+        List<Block> loops = continuableLoops();
+        if (loops.isEmpty()) {
+            throw new CompileException(line, "The 'continue' effect may only be used in loops");
+        }
+        if (n < 1) {
+            throw new CompileException(line, "Can't understand this condition/effect: " + source.strip());
+        }
+        if (n > loops.size()) {
+            throw new CompileException(line, "Can't continue the " + ordinalText(n) + " loop as there "
+                    + (loops.size() == 1 ? "is only 1 loop" : "are only " + loops.size() + " loops") + " present");
         }
         return loops.get(n - 1);
+    }
+
+    /** The loops (Skript's loop sections: loop, for and while) around the current statement, outermost first. */
+    private List<Block> continuableLoops() {
+        List<Block> loops = new ArrayList<>();
+        for (Block block : loops()) {
+            if (block.kind() == BlockKind.LOOP || block.kind() == BlockKind.WHILE) {
+                loops.add(block);
+            }
+        }
+        return loops;
     }
 
     /** The loops around the current statement, outermost first. */
     private List<Block> loops() {
         List<Block> loops = new ArrayList<>();
-        blocks.descendingIterator().forEachRemaining(block -> {
+        for (Block block : visibleBlocks().reversed()) {
             if (block.kind() != BlockKind.CONDITIONAL && block.kind() != BlockKind.PAUSING) {
                 loops.add(block);
             }
-        });
+        }
         return loops;
     }
 
@@ -4350,7 +4470,8 @@ final class TriggerCompiler {
                 for (Object value : values) {
                     if (value instanceof Expr.Unresolved words && words.problem() != null) {
                         // Skript's comparison first tries to read its unparsed literal, which gives the error it kept.
-                        throw new CompileException(line, words.problem());
+                        String caused = causeError(words);
+                        throw new CompileException(line, caused != null ? caused : words.problem());
                     }
                 }
                 if (typed || values.size() > 2) {
@@ -6095,6 +6216,15 @@ final class TriggerCompiler {
      * {@code the argument} in a command with several: all of them.
      */
     private int argumentIndex(Expr.Syntax expr) throws CompileException {
+        if (detachedAt >= 0) {
+            // Skript loads this code apart from the command: in an event of its own, no command event's arguments;
+            // in the command's event (a delayed section's code), none of the command's arguments.
+            boolean command = eventClasses != null && eventClasses.stream()
+                    .anyMatch(co.xenastudios.neoskript.runtime.command.CommandEvent.class::isAssignableFrom);
+            throw new CompileException(line, command ? "This command doesn't have any arguments"
+                    : "'" + source.substring(expr.start(), expr.end()).strip() + "' can only be used in the on unknown"
+                            + " command execution event, the on command event or the on command event");
+        }
         List<CommandPattern.Argument> arguments = commandArguments(expr);
         ParsedSyntax syntax = expr.syntax();
         if (isCore(syntax, CoreSyntax.TYPED_ARGUMENT)) {
@@ -6556,6 +6686,10 @@ final class TriggerCompiler {
                     throw new CompileException(line, library.literalError(unresolved.text()));
                 }
                 if (value == null) {
+                    String caused = causeError(unresolved);
+                    if (caused != null) {
+                        throw new CompileException(line, caused);
+                    }
                     throw new CompileException(line, unknownWords(unresolved), true);
                 }
                 constant(value, Object.class);

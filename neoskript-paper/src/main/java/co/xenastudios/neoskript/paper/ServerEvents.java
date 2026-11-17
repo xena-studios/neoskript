@@ -221,6 +221,9 @@ final class ServerEvents {
             case EffectCommandEvent command -> command.getSender();
             case co.xenastudios.neoskript.runtime.command.CommandEvent command -> (CommandSender) command.sender();
             case PlayerEvent player -> player.getPlayer();
+            // In a spawn or shoot section, the entity, as Skript's command sender event value is of it.
+            case WorldSyntax.SpawnSectionEvent spawn -> spawn.entity();
+            case WorldSyntax.ShootSectionEvent shoot -> shoot.entity();
             case null, default -> null;
         };
     }

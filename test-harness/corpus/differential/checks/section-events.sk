@@ -1,0 +1,100 @@
+# Checks: the code in a spawn or shoot section is in an event of its own, as Skript loads it: the entity is all there
+# is, with what it gives (its location, the player it is), and none of the trigger's event values; and none of the
+# loops around it, as for the other sections Skript loads apart.
+
+on damage:
+	spawn a pig at victim:
+		set {_1} to event-entity
+		set {_2} to entity
+		set {_3} to spawned entity
+		set {_4} to event-pig
+		set {_5} to event-living entity
+		set {_6} to event-location
+		set {_7} to location
+		set {_8} to location of event-entity
+		set {_9} to event-world
+		set {_11} to world of event-entity
+		set {_12} to event-player
+		set {_13} to player
+		set {_14} to victim
+		set {_15} to attacker
+		set {_17} to event-block
+		set {_19} to event-damage cause
+		set {_20} to the attacker
+		set {_21} to event-entity's health
+		broadcast "%damage%"
+		set {_23} to event-zombie
+		set {_24} to event-item
+		set {_25} to event-vector
+		cancel event
+		set name of entity to "x"
+		kill entity
+
+on damage:
+	shoot an arrow from victim:
+		set {_1} to event-projectile
+		set {_2} to projectile
+		set {_3} to shooter
+		set {_4} to event-entity
+		set {_5} to event-location
+		set {_6} to event-arrow
+		set {_7} to victim
+		set {_8} to event-world
+		set {_9} to the shooter's location
+		set {_10} to event-living entity
+	make victim shoot a pig:
+		set {_11} to event-pig
+		set {_12} to shooter
+		set {_13} to event-projectile
+
+on load:
+	loop 2 times:
+		wait 1 tick:
+			set {_1} to loop-number
+		set {_b} to a new bossbar:
+			set {_2} to loop-number
+		shoot an arrow from spawn of world "world":
+			set {_y} to loop-value
+	spawn a pig at spawn of world "world":
+		set {_3} to event-world
+		set {_b} to a new bossbar:
+			set {_c} to event-entity
+
+on load:
+	loop 2 times:
+		spawn a pig at spawn of world "world":
+			exit section
+
+on load:
+	loop 2 times:
+		spawn a pig at spawn of world "world":
+			continue
+
+on load:
+	loop 2 times:
+		spawn a pig at spawn of world "world":
+			exit loop
+
+on load:
+	spawn a pig at spawn of world "world":
+		stop
+	spawn a pig at spawn of world "world":
+		loop 2 times:
+			set {_x} to loop-number
+			if loop-number is 1:
+				exit loop
+			continue
+		exit 1 section
+
+on damage:
+	spawn a pig at victim:
+		set {_x} to past damage
+
+on damage:
+	spawn a pig at victim:
+		set {_x} to past damage
+		wait 1 tick
+
+on join:
+	set {_x} to past attacker
+	set {_y} to future victim

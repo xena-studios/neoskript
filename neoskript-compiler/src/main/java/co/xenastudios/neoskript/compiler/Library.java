@@ -304,9 +304,27 @@ public final class Library implements Registrar {
         sectionEvents.put(expressionId, eventName);
     }
 
+    /** A library section's own event: its class, and how it's made of each value the section gives. */
+    record SectionEventClass(Class<?> eventClass, java.util.function.Function<Object, ?> event) {}
+
+    private final Map<String, SectionEventClass> sectionEventClasses = new HashMap<>();
+
+    @Override
+    public <E> void sectionEvent(String sectionId, String eventName, Class<E> eventClass,
+            java.util.function.Function<Object, ? extends E> event) {
+        checkOpen();
+        sectionEvents.put(sectionId, eventName);
+        sectionEventClasses.put(sectionId, new SectionEventClass(eventClass, event));
+    }
+
     /** What the event of expression {@code id}'s section is called, or {@code null} if it has none of its own. */
     String sectionEvent(String id) {
         return sectionEvents.get(id);
+    }
+
+    /** Library section {@code id}'s own event, or {@code null} if its code is in the trigger's event. */
+    SectionEventClass sectionEventClass(String id) {
+        return sectionEventClasses.get(id);
     }
 
     @Override

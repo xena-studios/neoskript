@@ -49,6 +49,16 @@ public final class Values {
         setter.accept(context.event(), given[0]);
     }
 
+    /**
+     * The context the code in a library section runs in for one of its values, as Skript runs a spawn section's code:
+     * in the section's own event, made of the value, on the same thread as {@code outer}.
+     */
+    public static co.xenastudios.neoskript.api.element.TriggerContext sectionContext(
+            co.xenastudios.neoskript.api.element.TriggerContext outer, java.util.function.Function<Object, ?> event,
+            Object value) {
+        return new SimpleTriggerContext(event.apply(value), outer instanceof SimpleTriggerContext simple ? simple.owner() : null);
+    }
+
     /** The values that are instances of one of {@code classes}: what a changed expression accepts. */
     public static Object[] narrow(Object value, Class<?>[] classes) {
         List<Object> values = new ArrayList<>();
