@@ -31,8 +31,8 @@ import java.util.zip.ZipFile;
  * given to the reference Skript and to NeoSkript moving over from it, with Vault and EssentialsX for Vault's hook.
  * NeoSkript must copy the changed settings to its config.yml, {@code scripts/config-settings.sk} must write the same
  * {@code logs/cfg.log} on both (the timestamps in the date format too) and show the harness bot's player the same
- * things, and {@code scripts/config-warnings.sk} must get the same warnings and errors when it loads. Lines the
- * verbosity logs must be in both consoles, and lines it hides in neither.
+ * things, and {@code scripts/config-warnings.sk} must get the same warnings and errors when it loads, as must a
+ * variant's own script. Lines the verbosity logs must be in both consoles, and lines it hides in neither.
  *
  * <p>Skript's results are cached by their inputs in {@code .harness-cache/config-settings}.
  */
@@ -47,14 +47,20 @@ public final class ConfigSettingsScenario implements Scenario {
     /**
      * A config.sk: Skript's options changed from its default config ({@code runtime errors.total errors per frame}
      * for one in a section), what NeoSkript's config.yml must then have, the date format the log's timestamps are
-     * in, and the lines where NeoSkript doesn't follow Skript on purpose, with what each gives.
+     * in, the lines where NeoSkript doesn't follow Skript on purpose, with what each gives, the console lines the
+     * verbosity logs and hides, and a script of the variant's own that loads with the others, if any.
      */
     private record Variant(String name, Map<String, String> changes, List<String> configYml, Pattern timestamp,
-            Map<String, List<String>> differences, List<Pattern> logged, List<Pattern> hidden) {
+            Map<String, List<String>> differences, List<Pattern> logged, List<Pattern> hidden, String script) {
 
         Variant(String name, Map<String, String> changes, List<String> configYml, Pattern timestamp,
                 Map<String, List<String>> differences) {
             this(name, changes, configYml, timestamp, differences, List.of(), List.of());
+        }
+
+        Variant(String name, Map<String, String> changes, List<String> configYml, Pattern timestamp,
+                Map<String, List<String>> differences, List<Pattern> logged, List<Pattern> hidden) {
+            this(name, changes, configYml, timestamp, differences, logged, hidden, null);
         }
     }
 
@@ -114,16 +120,19 @@ public final class ConfigSettingsScenario implements Scenario {
                             Pattern.compile("loaded 3 structures from 'config-settings\\.sk'$"),
                             Pattern.compile("Successfully hooked into Vault$"),
                             Pattern.compile("== org\\.bukkit\\.event\\.player\\.PlayerJoinEvent with priority HIGH ==$")),
-                    List.of()));
+                    List.of()),
+            // Skript's syntax from before 2.13 in place of its type properties: names, amounts, values and so on.
+            new Variant("type-properties", Map.of("use type properties", "false"), List.of("^  type-properties: false$"),
+                    DEFAULT_TIMESTAMP, POSITIONS, List.of(), List.of(), "type-properties.sk"));
 
     /**
      * What one plugin did: its log lines without their timestamps, what the player was shown, what
-     * {@code config-warnings.sk} got when it loaded, and the variant's logged and hidden lines its console had.
+     * {@code config-warnings.sk} got when it loaded (and the variant's script, after its name), and the variant's logged and hidden lines its console had.
      */
     record Results(List<String> log, List<String> player, List<String> problems, List<String> console) {}
 
     private static final Pattern PREFIX = Pattern.compile("^\\[\\d\\d:\\d\\d:\\d\\d \\w+]: (?:\\[[\\w ]+] )?");
-    private static final Pattern PROBLEM = Pattern.compile("^Line (\\d+): \\(config-warnings\\.sk\\)$");
+    private static final Pattern PROBLEM = Pattern.compile("^Line (\\d+): \\((.+\\.sk)\\)$");
 
     @Override
     public String name() {
@@ -150,7 +159,7 @@ public final class ConfigSettingsScenario implements Scenario {
         for (Variant variant : VARIANTS) {
             String configSk = change(stock, variant.changes());
             Path cached = context.config().cacheDir().resolve("config-settings")
-                    .resolve(key(context, configSk, script) + ".json");
+                    .resolve(key(context, configSk, script + own(context, variant)) + ".json");
             Results skript;
             if (Files.exists(cached)) {
                 skript = gson.fromJson(Files.readString(cached), Results.class);
@@ -198,7 +207,7 @@ public final class ConfigSettingsScenario implements Scenario {
             }
         }
         if (!skript.problems().equals(neoskript.problems())) {
-            failures.add(variant.name() + ": config-warnings.sk got " + skript.problems() + " on Skript and "
+            failures.add(variant.name() + ": the scripts got " + skript.problems() + " on Skript and "
                     + neoskript.problems() + " on NeoSkript");
         }
         List<String> expected = new ArrayList<>();
@@ -235,6 +244,9 @@ public final class ConfigSettingsScenario implements Scenario {
                 .file("plugins/Skript/config.sk", configSk)
                 .file("plugins/Skript/scripts/config-settings.sk", script)
                 .file("plugins/Skript/scripts/config-warnings.sk", context.script("config-warnings.sk"));
+        if (variant.script() != null) {
+            builder.file("plugins/Skript/scripts/" + variant.script(), own(context, variant));
+        }
         // Vault with an economy, for Vault's hook.
         for (NeoSkriptHooksScenario.PinnedPlugin pinned : NeoSkriptHooksScenario.PLUGINS) {
             if (pinned.fileName().startsWith("Vault") || pinned.fileName().startsWith("EssentialsX")) {
@@ -270,9 +282,10 @@ public final class ConfigSettingsScenario implements Scenario {
             for (int i = 0; i + 1 < all.size(); i++) {
                 Matcher prefix = PREFIX.matcher(all.get(i));
                 Matcher problem = PROBLEM.matcher(prefix.find() ? all.get(i).substring(prefix.end()) : all.get(i));
-                if (problem.matches()) {
+                boolean own = problem.matches() && problem.group(2).equals(variant.script());
+                if (problem.matches() && (own || problem.group(2).equals("config-warnings.sk"))) {
                     Matcher next = PREFIX.matcher(all.get(i + 1));
-                    problems.add(problem.group(1) + ": "
+                    problems.add((own ? variant.script() + " " : "") + problem.group(1) + ": "
                             + (next.find() ? all.get(i + 1).substring(next.end()) : all.get(i + 1)).strip());
                 }
             }
@@ -337,6 +350,11 @@ public final class ConfigSettingsScenario implements Scenario {
             map.put(pairs[i], pairs[i + 1]);
         }
         return map;
+    }
+
+    /** The variant's own script, or nothing. */
+    private static String own(ScenarioContext context, Variant variant) throws IOException {
+        return variant.script() == null ? "" : context.script(variant.script());
     }
 
     private static String key(ScenarioContext context, String configSk, String script) throws Exception {

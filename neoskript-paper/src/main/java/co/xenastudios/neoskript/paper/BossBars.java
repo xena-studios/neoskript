@@ -173,24 +173,27 @@ final class BossBars {
                 "%bossbars% [do[es]] create[s] fog", "%bossbars% (doesn't|does not|do not|don't) create fog",
                 "%bossbars% [do[es]] play[s] boss music", "%bossbars% (doesn't|does not|do not|don't) play boss music");
 
-        // Skript's title, progress, style and viewers properties, for the things that have them.
-        registrar.expression("PropExprTitle", "string", info -> new Property(BossBars::title, BossBars::setTitle,
-                new Class<?>[] {Object.class}, Changeable.Mode.SET, Changeable.Mode.DELETE, Changeable.Mode.RESET),
-                Patterns.property("title[s]", "objects"));
-        registrar.expression("PropExprProgress", "number", info -> new Property(
-                owner -> owner instanceof BossBar bar ? bar.getProgress() : null, BossBars::setProgress,
-                new Class<?>[] {Number.class}, Changeable.Mode.SET, Changeable.Mode.RESET, Changeable.Mode.ADD,
-                Changeable.Mode.REMOVE), Patterns.property("progress", "objects"));
-        registrar.expression("PropExprStyle", "bossbarstyle", info -> new Property(
-                owner -> owner instanceof BossBar bar ? bar.getStyle() : null, (owner, delta, mode) -> {
-                    if (owner instanceof BossBar bar) {
-                        bar.setStyle(delta == null || delta.length == 0 ? BarStyle.SOLID : (BarStyle) delta[0]);
-                    }
-                }, new Class<?>[] {BarStyle.class}, Changeable.Mode.SET, Changeable.Mode.RESET),
-                Patterns.property("style[s]", "objects"));
-        registrar.expression("PropExprViewers", "player", info -> new Property(BossBars::viewers, BossBars::setViewers,
-                new Class<?>[] {Player.class}, Changeable.Mode.SET, Changeable.Mode.ADD, Changeable.Mode.REMOVE,
-                Changeable.Mode.DELETE, Changeable.Mode.RESET), Patterns.property("viewer[s]", "objects"));
+        if (TypeProperties.enabled()) {
+            // Without type properties, Skript has none of these.
+            // Skript's title, progress, style and viewers properties, for the things that have them.
+            registrar.expression("PropExprTitle", "string", info -> new Property(BossBars::title, BossBars::setTitle,
+                    new Class<?>[] {Object.class}, Changeable.Mode.SET, Changeable.Mode.DELETE, Changeable.Mode.RESET),
+                    Patterns.property("title[s]", "objects"));
+            registrar.expression("PropExprProgress", "number", info -> new Property(
+                    owner -> owner instanceof BossBar bar ? bar.getProgress() : null, BossBars::setProgress,
+                    new Class<?>[] {Number.class}, Changeable.Mode.SET, Changeable.Mode.RESET, Changeable.Mode.ADD,
+                    Changeable.Mode.REMOVE), Patterns.property("progress", "objects"));
+            registrar.expression("PropExprStyle", "bossbarstyle", info -> new Property(
+                    owner -> owner instanceof BossBar bar ? bar.getStyle() : null, (owner, delta, mode) -> {
+                        if (owner instanceof BossBar bar) {
+                            bar.setStyle(delta == null || delta.length == 0 ? BarStyle.SOLID : (BarStyle) delta[0]);
+                        }
+                    }, new Class<?>[] {BarStyle.class}, Changeable.Mode.SET, Changeable.Mode.RESET),
+                    Patterns.property("style[s]", "objects"));
+            registrar.expression("PropExprViewers", "player", info -> new Property(BossBars::viewers, BossBars::setViewers,
+                    new Class<?>[] {Player.class}, Changeable.Mode.SET, Changeable.Mode.ADD, Changeable.Mode.REMOVE,
+                    Changeable.Mode.DELETE, Changeable.Mode.RESET), Patterns.property("viewer[s]", "objects"));
+        }
     }
 
     private static Object title(Object owner) {

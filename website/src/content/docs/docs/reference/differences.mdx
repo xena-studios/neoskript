@@ -51,6 +51,7 @@ These are the differences the test harness knows about, from `known-differences.
 - **Skript's suite on Folia: 860 of 862.** The two left read a chest at the spawn of a random world from the test's region. Folia only allows that from the chest's own region.
 - **`permission message:`** is deprecated in Skript 2.17, and gives the same warning on NeoSkript.
 - **The `prefix:` command entry** is read, but commands are always registered under the `skript:` namespace.
+- **`use type properties: false`** gives Skript's syntax from before 2.13, with a few gaps. Item words written straight into it (`name of diamond`, `amount of 3 diamonds`) and `size of chest inventory` aren't read as Skript reads them, nor is `x of location(1, 2, 3)`. `name of "hello"` is none rather than an error, and a few lines that are errors on both, such as `title of "hello"`, `5 is empty` and `{_list::*} is empty`, give other messages, as does `{_list::*} and "x" is empty` (Skript says variables can't be used there). `set name of random element of all players` isn't refused when the script loads, as Skript refuses a player's name: NeoSkript knows the values are players only when it runs, where setting the name does nothing. Items, slots and locations in variables work as in Skript.
 
 <Aside type="note">
 Found a difference that isn't here? [Open an issue](https://github.com/xena-studios/neoskript/issues/new/choose) with the script, and what Skript and NeoSkript each did.

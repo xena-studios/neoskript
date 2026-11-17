@@ -71,6 +71,7 @@ final class SkriptSettings {
                 return List.of("lowest", "low", "normal", "high", "highest", "monitor").contains(name) ? name : null;
             }, "normal"),
             bool("listen to cancelled events by default", "events.listen-to-cancelled", false),
+            bool("use type properties", "syntax.type-properties", true),
             new Option("runtime errors.frame duration", "runtime-errors.frame-duration", value -> {
                 try {
                     return NeoSkriptConfig.Interval.parse(value).toString();

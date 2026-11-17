@@ -92,6 +92,8 @@ The element itself is called with its **arguments**: the values of the pattern's
 
 Patterns use Skript's pattern language: `[optional]`, `(this|that)`, `%type%`, `%-type%` for one that may be left out, parse marks (`1¦`) and tags (`all:`).
 
+A placeholder that mixes single and plural types, as `%inventories/strings/numbered%`, takes several values only where a plural type's are written, and refuses a list variable such as `{_items::*}`, as Skript does: which type its values will be isn't known until it runs. Make every type plural to take one.
+
 ## Types
 
 ```java

@@ -102,35 +102,41 @@ final class Logic {
                         : range(((Number) args[0]).doubleValue(), ((Number) args[1]).doubleValue(), info.hasTag("integers")),
                 "[(all [[of] the]|the)] (numbers|integers:integers|decimals:decimals) (between|from) %number% (and|to) %number%");
 
-        // As Skript 2.17's PropCondContains: what's in each container (an inventory, a text...), falling back to
-        // whether the values are among them; 'contains' after several only the latter, 'contents of' only the former.
-        registrar.describe("CondContains", (info, args) -> args.get(0) + (info.hasTag("not") ? " doesn't contain " : " contains ")
-                + args.get(1));
-        registrar.condition("CondContains", info -> {
-            boolean negated = info.hasTag("not");
-            boolean containersAnd = info.and(0);
-            boolean valuesAnd = info.and(1);
-            // Only containers written as several ('a and b', a list variable) are taken as several: an 'or' list
-            // is one of them, as in Skript.
-            boolean containment = info.pattern() >= 2 || !info.hasTag("s") || !(info.isList(0) && containersAnd);
-            boolean direct = info.pattern() < 2;
-            return (context, args) -> {
-                Object[] containers = (Object[]) args[0];
-                if (containers.length == 0) {
-                    return negated;
-                }
-                return negated != contains(containers, containersAnd, (Object[]) args[1], valuesAnd, containment, direct);
-            };
-        }, "%objects% contain[s:s] %objects%", "%objects% (not:(s:doesn't|s:does not|do not|don't) contain) %objects%",
-                "contents of %objects% contain %objects%", "contents of %objects% (not:(do not|don't)) contain %objects%");
+        if (TypeProperties.enabled()) {
+            // Skript's type property; without it, Skript's old 'contains' (LegacyProperties).
+            // As Skript 2.17's PropCondContains: what's in each container (an inventory, a text...), falling back to
+            // whether the values are among them; 'contains' after several only the latter, 'contents of' only the former.
+            registrar.describe("CondContains", (info, args) -> args.get(0) + (info.hasTag("not") ? " doesn't contain " : " contains ")
+                    + args.get(1));
+            registrar.condition("CondContains", info -> {
+                boolean negated = info.hasTag("not");
+                boolean containersAnd = info.and(0);
+                boolean valuesAnd = info.and(1);
+                // Only containers written as several ('a and b', a list variable) are taken as several: an 'or' list
+                // is one of them, as in Skript.
+                boolean containment = info.pattern() >= 2 || !info.hasTag("s") || !(info.isList(0) && containersAnd);
+                boolean direct = info.pattern() < 2;
+                return (context, args) -> {
+                    Object[] containers = (Object[]) args[0];
+                    if (containers.length == 0) {
+                        return negated;
+                    }
+                    return negated != contains(containers, containersAnd, (Object[]) args[1], valuesAnd, containment, direct);
+                };
+            }, "%objects% contain[s:s] %objects%", "%objects% (not:(s:doesn't|s:does not|do not|don't) contain) %objects%",
+                    "contents of %objects% contain %objects%", "contents of %objects% (not:(do not|don't)) contain %objects%");
+        }
 
-        // Before elements, as in Skript: 'size of 10 random elements of X' is the size of the elements.
-        // Skript 2.17's PropExprAmount, PropExprSize and PropExprNumber: of one value (or written 'amounts'),
-        // each value's amount; of several, how many there are.
-        registrar.expression("ExprAmount", "integer", info -> new Amount(info.hasTag("s") || info.isSingle(0),
-                !info.isList(0), !info.hasTag("size") && !info.hasTag("number")),
-                "[the] (amount|number:number|size:size)[s:s] of %objects%",
-                "%objects%'[s] (amount|number:number|size:size)[s:s]");
+        if (TypeProperties.enabled()) {
+            // Skript's type properties; without them, Skript's old 'amount of' (LegacyProperties).
+            // Before elements, as in Skript: 'size of 10 random elements of X' is the size of the elements.
+            // Skript 2.17's PropExprAmount, PropExprSize and PropExprNumber: of one value (or written 'amounts'),
+            // each value's amount; of several, how many there are.
+            registrar.expression("ExprAmount", "integer", info -> new Amount(info.hasTag("s") || info.isSingle(0),
+                    !info.isList(0), !info.hasTag("size") && !info.hasTag("number")),
+                    "[the] (amount|number:number|size:size)[s:s] of %objects%",
+                    "%objects%'[s] (amount|number:number|size:size)[s:s]");
+        }
         registrar.expression("ExprElement", "object", info -> new Element(info.pattern(), info.hasTag("last"),
                 info.hasTag("tolast"), info.hasTag("distinct")),
                 "[the] (first|last:last) element [out] (of|in) %objects%",

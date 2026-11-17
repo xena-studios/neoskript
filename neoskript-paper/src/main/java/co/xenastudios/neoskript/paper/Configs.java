@@ -99,26 +99,29 @@ final class Configs {
         registrar.experimental("ExprConfig", "reflection");
         registrar.experimental("ExprNode", "reflection");
         registrar.experimental("ExprSubnodeValue", "reflection", true);
-        registrar.typedExpression("PropExprValueOf", "object", info -> {
-            co.xenastudios.neoskript.api.element.ElementInfo.TypeArgument type = info.types().isEmpty() ? null
-                    : info.types().getFirst();
-            return (context, args) -> {
-                List<Object> values = new ArrayList<>();
-                for (Object value : Values.array(args[0])) {
-                    if (value instanceof ConfigNode node) {
-                        Object converted = valueAs(node, type);
-                        if (converted != null) {
-                            values.add(converted);
+        if (TypeProperties.enabled()) {
+            // Skript's type property; without it, Skript's old 'value of' (LegacyProperties).
+            registrar.typedExpression("PropExprValueOf", "object", info -> {
+                co.xenastudios.neoskript.api.element.ElementInfo.TypeArgument type = info.types().isEmpty() ? null
+                        : info.types().getFirst();
+                return (context, args) -> {
+                    List<Object> values = new ArrayList<>();
+                    for (Object value : Values.array(args[0])) {
+                        if (value instanceof ConfigNode node) {
+                            Object converted = valueAs(node, type);
+                            if (converted != null) {
+                                values.add(converted);
+                            }
                         }
                     }
-                }
-                return values.size() == 1 ? values.getFirst() : values.toArray();
-            };
-        }, "[the] [<.+>] value of %nodes%", "%nodes%'[s] [<.+>] value");
+                    return values.size() == 1 ? values.getFirst() : values.toArray();
+                };
+            }, "[the] [<.+>] value of %nodes%", "%nodes%'[s] [<.+>] value");
+        }
     }
 
     /** An entry's value as {@code type}: text as written, else read as that type. */
-    private static Object valueAs(ConfigNode node, co.xenastudios.neoskript.api.element.ElementInfo.TypeArgument type) {
+    static Object valueAs(ConfigNode node, co.xenastudios.neoskript.api.element.ElementInfo.TypeArgument type) {
         if (node.value() == null) {
             return null;
         }

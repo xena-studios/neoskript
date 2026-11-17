@@ -61,6 +61,8 @@ public final class StandardLibrary {
         DamageSources.register(registrar);
         Displays.register(registrar);
         DefaultConverters.register(registrar);
+        // With Skript's 'use type properties' off, its syntax from before them.
+        LegacyProperties.register(registrar);
         Quaternions.register(registrar);
         BlockSyntax.register(registrar);
         Biomes.register(registrar);
