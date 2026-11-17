@@ -135,6 +135,11 @@ public interface co.xenastudios.neoskript.api.element.Function
 public interface co.xenastudios.neoskript.api.element.KeyAware @Experimental
   public boolean implicitKeys()
   public boolean keysRecommended()
+  public boolean recursiveKeys()
+
+public interface co.xenastudios.neoskript.api.element.Keyed @Experimental
+  public abstract java.lang.String[] keys()
+  public abstract java.lang.Object[] values()
 
 public interface co.xenastudios.neoskript.api.element.LoopValue
   public abstract java.lang.Object get(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[], java.lang.Object)

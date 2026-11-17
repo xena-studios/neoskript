@@ -873,9 +873,18 @@ public final class VariableStore {
      * Puts an update's results back into {@code {prefix::*}} at the indices they came from, as Skript does:
      * {@code replace "a" in {_list::*} with "b"} keeps the list's indices. {@code keys} are the list's indices
      * when it was read; values that weren't given to the update (not of type {@code only}) stay as they are.
-     * If the results don't line up with the values given, the list is set to them, numbered from 1.
+     * If the results don't line up with the values given, the list is set to them, numbered from 1. A
+     * {@link Map} sets the indices it names ({@link KeyedValues#result}) and leaves the others.
      */
     public void updateList(String prefix, String[] keys, Object result, Class<?> only) {
+        if (result instanceof Map<?, ?> map) {
+            // An addon's map: its values go in at the indices it names, and the rest of the list stays.
+            KeyedValues keyed = (KeyedValues) KeyedValues.result(map);
+            for (int i = 0; i < keyed.values().length; i++) {
+                set(prefix + SEPARATOR + keyed.keys()[i].toLowerCase(java.util.Locale.ROOT), keyed.values()[i]);
+            }
+            return;
+        }
         Object[] results = result instanceof Object[] array ? array : result == null ? new Object[0] : new Object[] {result};
         List<String> given = new ArrayList<>(keys.length);
         for (String key : keys) {
