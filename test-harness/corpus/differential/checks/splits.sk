@@ -12,3 +12,6 @@ on join:
 	set {_m::*} to (size of {_a::*}, size of {_b::*})
 	set {_p::*} to size of {_a::*}, size of {_b::*}
 	show("indices or list", (indices of {_a::*} or {_b::*}))
+
+on break of (stone, dirt):
+	set {_x} to 1

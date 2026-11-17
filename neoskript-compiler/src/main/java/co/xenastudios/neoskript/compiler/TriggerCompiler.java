@@ -42,6 +42,7 @@ import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
 import static org.objectweb.asm.Opcodes.ISTORE;
 import static org.objectweb.asm.Opcodes.LADD;
+import static org.objectweb.asm.Opcodes.LCONST_0;
 import static org.objectweb.asm.Opcodes.LCONST_1;
 import static org.objectweb.asm.Opcodes.NEW;
 import static org.objectweb.asm.Opcodes.POP;
@@ -5900,12 +5901,27 @@ final class TriggerCompiler {
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.ANY_OF) ->
                     expression((Expr) syntax.syntax().match().values().getFirst());
             case Expr.Syntax syntax when isCore(syntax.syntax(), CoreSyntax.RECURSIVE_SIZE) -> {
-                Expr.Variable list = listVariable(syntax.syntax(), "Only list variables have a recursive size");
-                variableStore(list);
-                variableName(list);
-                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "recursiveList", "(" + STRING_DESC + ")" + OBJECTS, false);
-                method.visitInsn(ARRAYLENGTH);
-                method.visitInsn(I2L);
+                // Of a list variable, or of several ('recursive size of {_a::*} and {_b::*}'), added up, as Skript.
+                List<Expr.Variable> lists = new ArrayList<>();
+                if (syntax.syntax().match().values().getFirst() instanceof Expr.ListOf several) {
+                    for (Expr item : several.items()) {
+                        if (!(item instanceof Expr.Variable variable && variable.list())) {
+                            throw new CompileException(line, "Only list variables have a recursive size: '" + source + "'");
+                        }
+                        lists.add(variable);
+                    }
+                } else {
+                    lists.add(listVariable(syntax.syntax(), "Only list variables have a recursive size"));
+                }
+                method.visitInsn(LCONST_0);
+                for (Expr.Variable list : lists) {
+                    variableStore(list);
+                    variableName(list);
+                    method.visitMethodInsn(INVOKEVIRTUAL, STORE, "recursiveList", "(" + STRING_DESC + ")" + OBJECTS, false);
+                    method.visitInsn(ARRAYLENGTH);
+                    method.visitInsn(I2L);
+                    method.visitInsn(LADD);
+                }
                 method.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
             }
             case Expr.Syntax syntax when recursiveIndices(syntax.syntax()) != null ->

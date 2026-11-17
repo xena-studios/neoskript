@@ -34,6 +34,10 @@ class ListSplitsTest {
         StandardLibrary.register(library);
         library.effect("TestSay", info -> (context, args) -> said.add(Values.text(args[0])), "say %objects%");
         StringBuilder script = new StringBuilder("""
+                function show(label: text, values: objects) :: text:
+                \treturn "%{_label}%: %{_values::*}%"
+                function all(values: objects) :: text:
+                \treturn "%{_values::*}%"
                 on load:
                 \tset {_n::*} to "a" and "b"
                 \tset {_a::*} to 1 and 2
@@ -80,5 +84,19 @@ class ListSplitsTest {
                 "(size of {_a::*} and last element of {_b::*})",
                 "(first element of {_o::*} and length of {_t})",
                 "(length of {_t} and \"de\")"));
+    }
+
+    @Test
+    void aFunctionsArgumentCanBeAListWithListsInIt() {
+        assertEquals(List.of("x: 1, 2 and 3", "x: 1, 2, 5 and 7", "x: 5, 1, 2 and 6", "1, 2 and 3"), run(
+                "show(\"x\", ((1, 2), 3))",
+                "show(\"x\", ((indices of {_a::*}, 5), 7))",
+                "show(\"x\", (5, (indices of {_a::*}, 6)))",
+                "all(1, 2, 3)"));
+    }
+
+    @Test
+    void aRecursiveSizeOfSeveralListsIsAllOfTheirs() {
+        assertEquals(List.of("4", "2"), run("(recursive size of {_a::*} and {_b::*})", "recursive size of {_n::*}"));
     }
 }

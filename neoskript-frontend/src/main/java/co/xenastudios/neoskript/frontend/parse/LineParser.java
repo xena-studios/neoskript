@@ -1198,6 +1198,11 @@ final class LineParser {
         if (value instanceof Expr argument && listVariable(argument)) {
             return null;
         }
+        // A recursive size of several list variables is all of theirs, as in Skript.
+        if (!indices && value instanceof Expr.ListOf several && several.and()
+                && several.items().stream().allMatch(item -> item instanceof Expr.Variable variable && variable.list())) {
+            return null;
+        }
         if (indices) {
             return "The indices expression may only be used with keyed expressions";
         }
@@ -1944,6 +1949,8 @@ final class LineParser {
         if (mixesNamedAndUnnamed(pieces, parameters)) {
             return "Mixing named and unnamed arguments is not allowed";
         }
+        // A function whose one parameter is a list, as Skript sorts its 'list references' from its 'exact' ones.
+        boolean listFunction = parameters.size() == 1 && parameters.getFirst().plural();
         Expr[] byParameter = new Expr[parameters.size()];
         int next = 0;
         for (int p = 0; p < pieces.size(); p++) {
@@ -1983,8 +1990,9 @@ final class LineParser {
             if (argument == null) {
                 int[] value = trim(valueStart, piece[1]);
                 String written = input.substring(value[0], value[1]);
-                if (nestedList(value[0], value[1])) {
-                    // A list with a list in it: no function takes that, so there's no such function.
+                if (listFunction && nestedList(value[0], value[1])) {
+                    // A list with a list in it, for a function whose one parameter is a list: there's no such
+                    // function, as Skript's getListReferences has it.
                     return null;
                 }
                 if (embeddedError != null && written.startsWith("\"")) {
@@ -2006,8 +2014,10 @@ final class LineParser {
             if (argument instanceof Expr.ListOf list && !list.and()) {
                 return OR_IN_ARGUMENTS;
             }
-            if (argument instanceof Expr.ListOf list && list.items().stream().anyMatch(Expr.ListOf.class::isInstance)) {
-                // A list of lists isn't an argument: 'f(ns: (1, (2, 3)))'.
+            if (listFunction && argument instanceof Expr.ListOf list
+                    && list.items().stream().anyMatch(Expr.ListOf.class::isInstance)) {
+                // A list of lists isn't an argument of a function whose one parameter is a list: 'f(ns: (1, (2, 3)))'.
+                // Other functions take one, as Skript's exact references do: 'show("x", ((1, 2), 3))'.
                 return null;
             }
             if (!parameter.plural() && Plurality.plural(argument, registry) && ref != null) {

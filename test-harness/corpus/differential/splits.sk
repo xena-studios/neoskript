@@ -20,3 +20,8 @@ function probe_splits():
 	show("lengths of a list", (length of {_t} and "de"))
 	show("recursive size then size", (recursive size of {_a::*}, size of {_b::*}))
 	show("sorted then size", (sorted {_a::*}, size of {_b::*}))
+	# Lists in brackets inside a function's arguments: flattened, as Skript's exact function references take them.
+	show("nested in arguments", ((1, 2), 3))
+	show("nested indices first", ((indices of {_a::*}, 5), 7))
+	show("nested indices last", (5, (indices of {_a::*}, 6)))
+	show("recursive size of lists", (recursive size of {_a::*} and {_b::*}))
