@@ -63,7 +63,7 @@ Values are kept in Skript's own format inside it, as in `variables.csv`, so movi
 
 ### Snapshots and damage
 
-Each time the file is written afresh, a copy goes to `backups/snapshots/`, and the last 3 are kept, ordered by a counter in the file rather than by their times. Until the next time, that copy is exactly the start of `variables.nsv`. Count on up to about 5 times your variables' size on disk: `variables.nsv` can grow to twice what its variables need before it's written afresh, and each snapshot is about their size.
+Each time the file is written afresh, a copy goes to `backups/snapshots/`, and the last 3 are kept, ordered by a counter in the file rather than by their times. Until the next time, that copy is exactly the start of `variables.nsv`. A native file holds up to 2 GiB of variables; a save that would need more is refused, keeping the file as it was, and the console says so. Count on up to about 5 times your variables' size on disk: `variables.nsv` can grow to twice what its variables need before it's written afresh, and each snapshot is about their size.
 
 Committed saves were already on disk, so anything wrong with them is damage, from the disk or something else, not a crash:
 

@@ -808,13 +808,19 @@ class NativeVariableStorageTest {
         Path backupTemp = dir.resolve("backups/variables_2026-11-17_01-02-03.nsv8123.tmp");
         Path snapshotTemp = snapshots.resolve("variables_2026-11-17_01-02-03-004.nsv99.tmp");
         Path someoneElses = dir.resolve("backups/other.tmp");
+        Path ownersNotes = dir.resolve("backups/variables_notes.tmp");
+        Path ownersCopy = snapshots.resolve("variables_2026-11-17_01-02-03-004.nsv.tmp");
         Files.writeString(backupTemp, "half");
         Files.writeString(snapshotTemp, "half");
         Files.writeString(someoneElses, "not ours");
+        Files.writeString(ownersNotes, "not ours either");
+        Files.writeString(ownersCopy, "an owner's own copy");
         open(new VariableStore()).close();
         assertFalse(Files.exists(backupTemp));
         assertFalse(Files.exists(snapshotTemp));
         assertTrue(Files.exists(someoneElses));
+        assertTrue(Files.exists(ownersNotes), "only the exact shape a copy's temporary file has is removed");
+        assertTrue(Files.exists(ownersCopy));
     }
 
     @Test
@@ -864,6 +870,40 @@ class NativeVariableStorageTest {
             storage.save();
             assertTrue(storage.notes().stream().anyMatch(line -> line.contains("(repaired from a snapshot)")));
         }
+    }
+
+    @Test
+    void recoveringWithANewerCsvBesideItStillStopsAtTheConflict() throws Exception {
+        Path nsv = damagedAfterTheSnapshot();
+        byte[] damaged = Files.readAllBytes(nsv);
+        Path csv = skriptFile();
+        olderThan(nsv, csv);
+        byte[] csvBytes = Files.readAllBytes(csv);
+        assertThrows(VariableBackends.Conflict.class,
+                () -> VariableBackends.open(VariableBackends.Kind.NATIVE, new VariableStore(), codecs, csv, true));
+        assertArrayEquals(csvBytes, Files.readAllBytes(csv), "the newer csv is left alone");
+        assertArrayEquals(damaged, Files.readAllBytes(nsv), "and nothing was written over variables.nsv");
+    }
+
+    @Test
+    void twoWholeSavesPastTheCommitApplyOnlyTheFirst() throws Exception {
+        VariableStore store = new VariableStore();
+        Path file = dir.resolve("variables.nsv");
+        byte[] first;
+        try (NativeVariableStorage storage = open(store)) {
+            store.set("a", 1L);
+            storage.save();
+            first = Files.readAllBytes(file);
+            store.set("b", 2L);
+            storage.save();
+            store.set("c", 3L);
+            storage.save();
+        }
+        byte[] whole = Files.readAllBytes(file);
+        Files.write(file, crashed(first, whole, whole.length));
+        VariableStore loaded = reload();
+        assertEquals(2L, loaded.get("b"));
+        assertNull(loaded.get("c"), "the spec reads one save past the commit, and no further");
     }
 
     private Path onlySnapshot() throws IOException {
@@ -931,6 +971,8 @@ class NativeVariableStorageTest {
         // A record of a kind a newer NeoSkript might write, with a good checksum, after the committed saves.
         byte[] payload = {7, 0, 0};
         java.util.zip.CRC32C crc = new java.util.zip.CRC32C();
+        // Seeded with the file id, at bytes 8 to 23 of the identity block.
+        crc.update(Files.readAllBytes(file), 8, 16);
         crc.update(payload);
         java.nio.ByteBuffer record = java.nio.ByteBuffer.allocate(8 + payload.length);
         record.putInt(payload.length).putInt((int) crc.getValue()).put(payload);

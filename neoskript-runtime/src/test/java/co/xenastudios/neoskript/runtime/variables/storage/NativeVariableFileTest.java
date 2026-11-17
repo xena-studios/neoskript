@@ -28,7 +28,7 @@ class NativeVariableFileTest {
     Path dir;
 
     private static byte[] file(byte[] id, long sequence0, long sequence1) {
-        List<byte[]> records = NativeVariableFile.records(List.of(new NativeVariableFile.Op("a", "string", new byte[] {1})));
+        List<byte[]> records = NativeVariableFile.records(List.of(new NativeVariableFile.Op("a", "string", new byte[] {1})), id);
         int end = NativeVariableFile.HEADER_LENGTH + records.getFirst().length;
         byte[] data = new byte[end];
         System.arraycopy(NativeVariableFile.header(id, 1, end), 0, data, 0, NativeVariableFile.HEADER_LENGTH);
@@ -127,6 +127,97 @@ class NativeVariableFileTest {
         List<Long> kept = Snapshots.list(file).stream().map(NativeVariableFile::generation).toList();
         assertEquals(List.of(5L, 4L, 3L), kept);
         assertEquals(5, NativeVariableFile.generation(file));
+    }
+
+    /** A file with id {@code id}, committed to the end of {@code records}, with {@code after} appended. */
+    private static byte[] file(byte[] id, byte[] records, byte[] after) {
+        int end = NativeVariableFile.HEADER_LENGTH + records.length;
+        byte[] data = new byte[end + after.length];
+        System.arraycopy(NativeVariableFile.header(id, 1, end), 0, data, 0, NativeVariableFile.HEADER_LENGTH);
+        System.arraycopy(records, 0, data, NativeVariableFile.HEADER_LENGTH, records.length);
+        System.arraycopy(after, 0, data, end, after.length);
+        return data;
+    }
+
+    private static byte[] save(byte[] id, String name) {
+        return NativeVariableFile.records(List.of(new NativeVariableFile.Op(name, "string", new byte[] {1})), id).getFirst();
+    }
+
+    @Test
+    void aRecordLeftFromAnotherFileAtTheCommittedEndIsntRead() throws Exception {
+        byte[] id = NativeVariableFile.newId();
+        byte[] old = NativeVariableFile.newId();
+        // Exposed after a crash exactly at the committed end: a whole record, but from an earlier file.
+        NativeVariableFile.Contents stale = NativeVariableFile.read(file(id, save(id, "a"), save(old, "stale")));
+        assertEquals(List.of("a"), List.copyOf(stale.entries().keySet()));
+        assertTrue(stale.damaged(), "a tail to drop");
+        // The same record written for this file is a save whose commit didn't happen, and is kept.
+        NativeVariableFile.Contents own = NativeVariableFile.read(file(id, save(id, "a"), save(id, "own")));
+        assertEquals(List.of("a", "own"), List.copyOf(own.entries().keySet()));
+    }
+
+    @Test
+    void onlyOneSavePastTheCommittedEndIsRead() throws Exception {
+        byte[] id = NativeVariableFile.newId();
+        byte[] after = new byte[save(id, "b").length + save(id, "c").length];
+        System.arraycopy(save(id, "b"), 0, after, 0, save(id, "b").length);
+        System.arraycopy(save(id, "c"), 0, after, save(id, "b").length, save(id, "c").length);
+        NativeVariableFile.Contents contents = NativeVariableFile.read(file(id, save(id, "a"), after));
+        assertEquals(List.of("a", "b"), List.copyOf(contents.entries().keySet()));
+        assertEquals(NativeVariableFile.HEADER_LENGTH + 2L * save(id, "a").length, contents.validEnd());
+    }
+
+    /** A committed record of {@code payload}, with a right checksum. */
+    private static byte[] withPayload(byte[] id, byte... payload) {
+        byte[] record = new byte[8 + payload.length];
+        ByteBuffer.wrap(record).putInt(payload.length)
+                .putInt(NativeVariableFile.recordCrc(id, payload, 0, payload.length)).put(payload);
+        return file(id, record, new byte[0]);
+    }
+
+    @Test
+    void varintsMustBeInRangeAndShortest() throws Exception {
+        byte[] id = NativeVariableFile.newId();
+        // Kind 0, no types, no entries.
+        assertEquals(0, NativeVariableFile.read(withPayload(id, (byte) 0, (byte) 0, (byte) 0)).entries().size());
+        // A type count of 80 80 80 80 10, which overflows to 0.
+        assertThrows(IOException.class, () -> NativeVariableFile.read(withPayload(id, (byte) 0, (byte) 0x80, (byte) 0x80,
+                (byte) 0x80, (byte) 0x80, (byte) 0x10, (byte) 0)));
+        // 0 written in two bytes, 80 00.
+        assertThrows(IOException.class, () -> NativeVariableFile.read(withPayload(id, (byte) 0, (byte) 0x80, (byte) 0,
+                (byte) 0)));
+    }
+
+    @Test
+    void aSaveNeverWritesAFileLargerThanAReaderAccepts() throws Exception {
+        long limit = NativeVariableStorage.maxLength;
+        NativeVariableStorage.maxLength = NativeVariableFile.HEADER_LENGTH + 4_000;
+        Path file = dir.resolve("variables.nsv");
+        VariableStore store = new VariableStore();
+        try (NativeVariableStorage storage = new NativeVariableStorage(store, new VariableCodecs(), file)) {
+            storage.load();
+            // Small changes, saved many times: compacted before the file would pass the limit.
+            for (int i = 0; i < 200; i++) {
+                store.set("v", new RawValue("string", ("value " + i).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                storage.save();
+                assertTrue(Files.size(file) <= NativeVariableStorage.maxLength, "save " + i);
+            }
+            byte[] before = Files.readAllBytes(file);
+            // More than any file can hold: refused, and the old file kept.
+            for (int i = 0; i < 100; i++) {
+                store.set("big::" + i, new RawValue("string", new byte[100]));
+            }
+            IOException refused = assertThrows(IOException.class, storage::save);
+            assertTrue(refused.getMessage().contains("can hold"), refused.getMessage());
+            assertTrue(java.util.Arrays.equals(before, Files.readAllBytes(file)));
+        } finally {
+            NativeVariableStorage.maxLength = limit;
+        }
+        VariableStore loaded = new VariableStore();
+        try (NativeVariableStorage storage = new NativeVariableStorage(loaded, new VariableCodecs(), file)) {
+            storage.load();
+        }
+        assertEquals(new RawValue("string", "value 199".getBytes(java.nio.charset.StandardCharsets.UTF_8)), loaded.get("v"));
     }
 
     /** A channel that opens, then fails to be positioned. */

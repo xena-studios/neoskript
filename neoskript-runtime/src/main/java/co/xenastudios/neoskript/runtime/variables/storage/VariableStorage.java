@@ -160,21 +160,25 @@ public final class VariableStorage implements VariableBackend {
     /**
      * Removes the temporary files a backup or snapshot copy left in {@code backups/} and {@code backups/snapshots/}
      * beside {@code file} when the server stopped in the middle of one. A copy is only renamed to its backup name
-     * once it's whole, so they're never a backup. How many were removed.
+     * once it's whole, so they're never a backup. Only names of exactly the shape a copy's temporary file has are
+     * removed: a backup's or snapshot's name ({@code variables_2026-11-17_01-02-03.csv}, {@code
+     * variables_2026-11-17_01-02-03-004.nsv}), then the digits the system adds, then {@code .tmp}. How many were
+     * removed.
      */
     public static int removeBackupLeftovers(Path file) throws IOException {
         Path backups = file.toAbsolutePath().getParent().resolve("backups");
         String name = file.getFileName().toString();
         int dot = name.lastIndexOf('.');
-        String prefix = (dot < 0 ? name : name.substring(0, dot)) + "_";
+        java.util.regex.Pattern shape = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(
+                dot < 0 ? name : name.substring(0, dot))
+                + "_\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}(-\\d{3})?([-_]\\d+)?(\\.[A-Za-z0-9]+)?\\d+\\.tmp");
         int removed = 0;
         for (Path dir : List.of(backups, backups.resolve("snapshots"))) {
             if (!Files.isDirectory(dir)) {
                 continue;
             }
             try (DirectoryStream<Path> temps = Files.newDirectoryStream(dir, path -> {
-                String each = path.getFileName().toString();
-                return each.startsWith(prefix) && each.endsWith(".tmp") && Files.isRegularFile(path);
+                return shape.matcher(path.getFileName().toString()).matches() && Files.isRegularFile(path);
             })) {
                 for (Path temp : temps) {
                     Files.deleteIfExists(temp);

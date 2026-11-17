@@ -111,7 +111,20 @@ public final class VariableBackends {
      * that's finished. Otherwise the newer file wins if it's {@code variables.nsv}, and the other is backed up.
      */
     private static void both(Kind kind, Path nsv, Path csv, boolean recover, List<String> log) throws IOException {
+        // Both times first, before anything is written: a recovery below rewrites variables.nsv.
+        Instant nativeTime = Files.getLastModifiedTime(nsv).toInstant();
+        Instant csvTime = Files.getLastModifiedTime(csv).toInstant();
+        String times = csv.getFileName() + " was last changed " + csvTime + ", " + nsv.getFileName() + " " + nativeTime;
         NativeVariableStorage.Opened read = NativeVariableStorage.open(nsv, recover, log);
+        List<NativeVariableFile.Op> fromNative = inOrder(read.entries().values());
+        List<NativeVariableFile.Op> fromCsv = inOrder(VariableFile.load(csv).entries().values());
+        boolean same = same(fromNative, fromCsv);
+        if (!same && csvTime.isAfter(nativeTime)) {
+            throw new Conflict(csv.getFileName() + " and " + nsv.getFileName() + " are both there with different "
+                    + "variables, and " + csv.getFileName() + " is newer, so something that doesn't read "
+                    + nsv.getFileName() + " (an older NeoSkript, or Skript) saved it. NeoSkript won't pick one: move "
+                    + "the one you don't want out of the folder and restart. " + times);
+        }
         if (read.salvaged() != null && kind == Kind.NATIVE) {
             // Recovered: the new native file is written now, so loading it doesn't recover it again.
             NativeVariableStorage.Written written = NativeVariableStorage.write(nsv,
@@ -120,12 +133,7 @@ public final class VariableBackends {
                 log.add(written.problem());
             }
         }
-        List<NativeVariableFile.Op> fromNative = inOrder(read.entries().values());
-        List<NativeVariableFile.Op> fromCsv = inOrder(VariableFile.load(csv).entries().values());
-        Instant nativeTime = Files.getLastModifiedTime(nsv).toInstant();
-        Instant csvTime = Files.getLastModifiedTime(csv).toInstant();
-        String times = csv.getFileName() + " was last changed " + csvTime + ", " + nsv.getFileName() + " " + nativeTime;
-        if (same(fromNative, fromCsv)) {
+        if (same) {
             if (kind == Kind.NATIVE) {
                 Path backup = VariableStorage.backup(csv);
                 Durable.delete(csv);
@@ -138,12 +146,6 @@ public final class VariableBackends {
                         + " variables and is now " + relative(csv, backup));
             }
             return;
-        }
-        if (csvTime.isAfter(nativeTime)) {
-            throw new Conflict(csv.getFileName() + " and " + nsv.getFileName() + " are both there with different "
-                    + "variables, and " + csv.getFileName() + " is newer, so something that doesn't read "
-                    + nsv.getFileName() + " (an older NeoSkript, or Skript) saved it. NeoSkript won't pick one: move "
-                    + "the one you don't want out of the folder and restart. " + times);
         }
         if (kind == Kind.NATIVE) {
             Path backup = VariableStorage.backup(csv);

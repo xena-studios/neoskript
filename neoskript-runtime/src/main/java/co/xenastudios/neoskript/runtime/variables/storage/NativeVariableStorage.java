@@ -39,6 +39,11 @@ import java.util.Map;
  */
 public final class NativeVariableStorage implements VariableBackend {
 
+    /**
+     * The largest file a save writes: what a reader accepts ({@link NativeVariableFile#MAX_LENGTH}). Lower in tests.
+     */
+    static volatile long maxLength = NativeVariableFile.MAX_LENGTH;
+
     /** How far past twice the variables' size the file may grow before it's compacted. */
     static final long COMPACT_SLACK = 1 << 20;
 
@@ -270,10 +275,10 @@ public final class NativeVariableStorage implements VariableBackend {
             throws IOException {
         int[] kept = {0};
         long[] stopped = {0};
-        LinkedHashMap<String, VariableFile.Entry> entries = NativeVariableFile.salvage(data, kept, stopped);
+        LinkedHashMap<String, VariableFile.Entry> entries = NativeVariableFile.salvage(data, damaged.fileId(), kept, stopped);
         long end = damaged.committed() > 0 ? damaged.committed() : data.length;
         int[] readable = {0};
-        List<String> changed = NativeVariableFile.readableAfter(data, stopped[0], end, readable);
+        List<String> changed = NativeVariableFile.readableAfter(data, damaged.fileId(), stopped[0], end, readable);
         Path backup = VariableStorage.backup(file);
         java.util.Set<String> distinct = new java.util.LinkedHashSet<>(changed);
         String names = String.join(", ", distinct.stream().limit(20).toList()) + (distinct.size() > 20 ? ", ..." : "");
@@ -441,12 +446,14 @@ public final class NativeVariableStorage implements VariableBackend {
             live -= Saved.size(name, last.type, last.bytes);
         }
         if (!changes.isEmpty() || compactNext) {
-            List<byte[]> records = NativeVariableFile.records(changes);
+            List<byte[]> records = NativeVariableFile.records(changes, fileId);
             long appended = 0;
             for (byte[] record : records) {
                 appended += record.length;
             }
-            if (compactNext || channel == null || fileBytes + appended > 2 * live + COMPACT_SLACK) {
+            // Compacted before it would grow past what a reader accepts, too.
+            if (compactNext || channel == null || fileBytes + appended > 2 * live + COMPACT_SLACK
+                    || fileBytes + appended > maxLength) {
                 compact(all);
             } else {
                 append(records, appended);
@@ -591,13 +598,19 @@ public final class NativeVariableStorage implements VariableBackend {
      * written, and the problem is returned.
      */
     static Written write(Path target, List<NativeVariableFile.Op> ops) throws IOException {
-        List<byte[]> records = NativeVariableFile.records(ops);
+        byte[] id = NativeVariableFile.newId();
+        List<byte[]> records = NativeVariableFile.records(ops, id);
         long end = NativeVariableFile.HEADER_LENGTH;
         for (byte[] record : records) {
             end += record.length;
         }
-        byte[] id = NativeVariableFile.newId();
         // One more than any file written here before, so snapshots are ordered without the clock.
+        if (end > maxLength) {
+            // A file no reader would accept would lock the server out at the next start: keep the old one.
+            throw new IOException("The variables need " + end / (1 << 20) + " MiB, more than the " + maxLength / (1 << 20)
+                    + " MiB a native variable file can hold, so they weren't saved and " + target.getFileName()
+                    + " is as it was. Delete variables you don't need, or move to csv storage.");
+        }
         byte[] header = NativeVariableFile.header(id, Snapshots.latestGeneration(target) + 1, end);
         Durable.replace(target, out -> {
             out.write(header);
