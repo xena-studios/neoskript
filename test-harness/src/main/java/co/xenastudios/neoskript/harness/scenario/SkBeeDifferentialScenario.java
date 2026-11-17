@@ -47,9 +47,10 @@ public final class SkBeeDifferentialScenario implements Scenario {
         return "skbee-differential";
     }
 
+    /** Smoke, so CI runs it on every pull request (on Paper 26.x, where SkBee 3.26.0 runs). */
     @Override
     public Group group() {
-        return Group.BASELINE;
+        return Group.SMOKE;
     }
 
     @Override
