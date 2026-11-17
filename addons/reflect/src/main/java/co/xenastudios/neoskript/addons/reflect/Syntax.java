@@ -137,7 +137,7 @@ final class Syntax {
         registrar.expression("NeoSkriptReflectExprEvent", "event", info -> (context, arguments) -> context.event(),
                 "[the] event");
         registrar.expression("NeoSkriptReflectExprJavaError", "object", info -> (context, arguments) ->
-                LastError.get(), "[the] [last] [java] (throwable|exception|error)");
+                LastError.get(context), "[the] [last] [java] (throwable|exception|error)");
 
         // Any Bukkit event by its imported class: 'on EnderDragonChangePhaseEvent:'.
         registrar.event("NeoSkriptReflectEvtByReflection", List.of(Event.class), info -> {
@@ -274,11 +274,18 @@ final class Syntax {
                 continue;
             }
             Class<?> type = target instanceof JavaType javaType ? javaType.javaClass() : Coercion.classOf(target);
-            List<? extends Member> members = switch (which) {
-                case 0 -> Members.fields(type);
-                case 1 -> Members.methods(type);
-                default -> Members.constructors(type);
-            };
+            List<? extends Member> members;
+            try {
+                members = switch (which) {
+                    case 0 -> Members.fields(type);
+                    case 1 -> Members.methods(type);
+                    default -> Members.constructors(type);
+                };
+            } catch (LinkageError broken) {
+                // A class whose members name one that isn't there: it has none that can be listed.
+                NeoSkript.get().runtimeWarning(Coercion.debugName(type) + "'s members can't be looked at: " + broken);
+                continue;
+            }
             for (Member member : members) {
                 all.add(switch (member) {
                     case Field field -> field.toGenericString();
@@ -298,8 +305,12 @@ final class Syntax {
                 continue;
             }
             Class<?> type = target instanceof JavaType javaType ? javaType.javaClass() : Coercion.classOf(target);
-            (fields ? Members.fields(type).stream().map(Field::getName)
-                    : Members.methods(type).stream().map(Method::getName)).forEach(all::add);
+            try {
+                (fields ? Members.fields(type).stream().map(Field::getName)
+                        : Members.methods(type).stream().map(Method::getName)).forEach(all::add);
+            } catch (LinkageError broken) {
+                NeoSkript.get().runtimeWarning(Coercion.debugName(type) + "'s members can't be looked at: " + broken);
+            }
         }
         return all.toArray();
     }

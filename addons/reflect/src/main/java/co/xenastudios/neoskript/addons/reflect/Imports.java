@@ -22,7 +22,11 @@ final class Imports implements StructureHandler {
     static final String PACKAGE = "(?:" + IDENTIFIER + "\\.)*(?:" + IDENTIFIER + ")";
     private static final Pattern STATEMENT = Pattern.compile("(" + PACKAGE + ")(?:\\s+as (" + IDENTIFIER + "))?");
 
-    private final Map<String, Map<String, JavaType>> byScript = new ConcurrentHashMap<>();
+    /**
+     * Each script's names, replaced whole at the start of each load. A call keeps its own script's map from when it
+     * was set up ({@link #of}), so triggers still running from before a reload keep theirs.
+     */
+    private volatile Map<String, Map<String, JavaType>> byScript = new ConcurrentHashMap<>();
     private final ClassLoader loader;
 
     Imports(ClassLoader loader) {
@@ -31,7 +35,7 @@ final class Imports implements StructureHandler {
 
     @Override
     public void reset() {
-        byScript.clear();
+        byScript = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -62,6 +66,15 @@ final class Imports implements StructureHandler {
                         + "remapped to " + javaClass + ".");
             }
         }
+    }
+
+    /**
+     * {@code script}'s imports, by name: complete once the script's triggers are being parsed, as structures are
+     * handled first. Empty for a script that imports nothing.
+     */
+    Map<String, JavaType> of(String script) {
+        Map<String, JavaType> imports = script == null ? null : byScript.get(script);
+        return imports == null ? Map.of() : imports;
     }
 
     /** What {@code name} is imported as in {@code script}, or {@code null}. */

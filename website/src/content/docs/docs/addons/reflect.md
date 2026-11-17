@@ -79,13 +79,27 @@ The [syntax reference](/syntax/) has every pattern, with a badge saying it's fro
 
 ## How calls run
 
-skript-reflect looks a method up each time a line runs, matching the arguments against every overload again, and calls it with `invokeWithArguments`, which the JVM can't turn into a direct call. NeoSkript Reflect looks it up once per line and argument classes, keeps what it found, and calls it through a method handle, which the JVM compiles like a direct call. When the same line is called with arguments of other classes (a whole number one time and a text the next), it keeps the last four.
+skript-reflect looks a method up each time a line runs, matching the arguments against every overload again, and calls it with `invokeWithArguments`, which the JVM can't turn into a direct call. NeoSkript Reflect keeps what it found, in two places:
 
-NeoSkript's test harness times calling `{_list}.size()` in a loop on the same server, on Paper 26.3: **40 to 120 ns a call** here, against **270 to 1,000 ns** with skript-reflect on Skript 2.17.0, over nine runs: three to fifteen times faster in each. Your numbers will depend on the machine.
+- **Each class's members** are looked up once, the first time any line calls one of them, and kept with the class (and let go of with it, if a plugin's classes are unloaded).
+- **Each line** keeps the member it chose for the last four combinations of the target's class and the arguments' classes, and checks it still takes the values it's given (a text is a `char` only if it's one letter).
+
+It then calls the member through a method handle, which the JVM compiles like a direct call.
+
+NeoSkript's test harness times `set {_size} to {_list}.size()` in a loop, on the same server, on Paper 26.3, against skript-reflect 2.6.3 on Skript 2.17.0:
+
+| | NeoSkript Reflect | skript-reflect |
+|---|---|---|
+| One class (the same list every time) | 33 to 120 ns a call | 270 to 1,000 ns |
+| Six classes in turn (`loop-value.size()` over six kinds of collection, as `loop-entity.getHandle()` over many kinds of entity) | about 60 ns | about 200 ns |
+
+The times vary from run to run and depend on the machine; what holds in every run is that the calls are several times faster.
+
+A call that can't be made never stops the trigger: a missing method, arguments no overload takes, a method that throws, and a class whose members can't be looked at (a plugin's class whose methods name a class from a plugin that isn't installed) each give no value and a warning for the line.
 
 ## Threads and Folia
 
-A Java call runs on the thread running the trigger: the main thread on Paper, and on Folia the thread of the region (or the global thread) the trigger runs on. `last java error` is each thread's own, so a region never sees another region's error.
+A Java call runs on the thread running the trigger: the main thread on Paper, and on Folia the thread of the region (or the global thread) the trigger runs on. `last java error` is each run of a trigger's own, so a region never sees another region's error, and a trigger that waits and carries on on another thread still sees its own. It's let go of when the trigger ends.
 
 :::caution[Folia's rules]
 On Folia, NeoSkript checks that a script's own syntax only touches what the current region owns, and stops a line that doesn't with a runtime error. It can't check Java code. A Java call that reads or changes an entity, block or chunk another region owns (`Bukkit.getWorlds().get(0).getEntities()` from a player's region, say) breaks Folia's rules: it can corrupt the world or throw from deep inside the server. Keep Java calls to what the trigger's own region owns, or to things that aren't in a world, and use Folia's schedulers (through Java) for the rest.
@@ -102,8 +116,10 @@ NeoSkript's test harness runs the same script on Skript 2.17.0 with skript-refle
 - **Overloads:** where several overloads of a method take the arguments, skript-reflect took whichever Java happened to list first, which can change between Java versions: `Math.max(3, 7)` could be the `double` one and give `7.0`. NeoSkript Reflect takes the closest: a parameter of the argument's own class, then of a superclass, then a number of the same kind, so it's the `long` one.
 - **Nested classes:** `EnderDragon.Phase.LEAVE_PORTAL` gave no value on skript-reflect, which read `Phase` as a field. It's the nested class here, as in Java. Importing `org.bukkit.entity.EnderDragon$Phase` works on both.
 - **NeoSkript's values as Java's:** where nothing else fits a parameter, a timespan is passed as a `java.time.Duration`, a date as an `Instant`, an item type as an `ItemStack` and a slot as its item, through NeoSkript's own conversions. skript-reflect had none, and said no method matched.
-- **`last java error`** is each thread's own (skript-reflect's was shared by every thread).
+- **`last java error`** is each run of a trigger's own (skript-reflect's was shared by the whole server).
 - **Java events** are listened to only for the classes named. A trigger for an event class that has no handler list of its own (an abstract one, like `PlayerEvent`) is an error saying so, rather than a trigger that never runs.
+
+Numbers keep their Java type, as on skript-reflect: `{_list}.size()` is an `Integer`, so it's found in a set of integers, and it works in arithmetic, comparisons and texts as any number does. Saved in a variable, it's saved as Skript saves an `Integer`.
 
 The values scripts get are NeoSkript's own: an item type, a timespan or a date is NeoSkript's class, not Skript's (`ch.njol.skript...`), so calls to Skript's own Java classes' methods don't work. Calls on Bukkit's and Java's classes, which is nearly all of them, are the same.
 
