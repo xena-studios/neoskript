@@ -111,7 +111,8 @@ final class Placeholders {
             if (closed) {
                 return;
             }
-            byPrefix = Map.copyOf(next);
+            // In script order, which expansions are registered in.
+            byPrefix = java.util.Collections.unmodifiableMap(next);
         }
         onGlobalThread.accept(this::apply);
     }
