@@ -40,8 +40,9 @@ import java.util.zip.ZipOutputStream;
  *       included, in Skript's exact layout ({@code ucs2}).
  *   <li>Two NeoSkript servers at once with {@code monitor changes}: each sees the other's changes and deletions.
  *   <li>One NeoSkript and one Skript server at once: each sees the other's changes.
- *   <li>The database killed in the middle of writes, and while the server stops; a wrong password; rows NeoSkript
- *       can't read. Nothing is lost, the server never stalls, and the password never shows in the console.
+ *   <li>The database killed in the middle of writes, and while the server stops; paused, so it hangs, at startup and
+ *       at shutdown; a wrong password, then the right one; rows NeoSkript can't read. Nothing is lost, the server never
+ *       stalls past its bounds, and the password never shows in the console.
  * </ol>
  *
  * <p>Skript's MySQL storage can't work on current Paper as it ships: SQLibrary asks for
@@ -92,6 +93,7 @@ public final class MySqlVariablesScenario implements Scenario {
             twoNeoSkripts(context, runs, mysql);
             neoskriptAndSkript(context, runs, mysql);
             outages(context, runs, mysql);
+            hungDatabase(context, runs, mysql);
             wrongPassword(context, runs, mysql);
             badRows(context, runs, mysql);
             passwordNeverShows(runs);
@@ -204,8 +206,10 @@ public final class MySqlVariablesScenario implements Scenario {
             server.await(ServerProcess.DONE, WAIT);
             int mark = server.mark();
             command(server, "dbfill k 3000", "dbfill k 3000");
-            // Killed while those are being written.
+            // Killed while those are being written, or just after.
             mysql.kill();
+            // A change after the kill, so a write has to fail, however far the fill had got.
+            command(server, "dbset after-kill 1", "dbset after-kill");
             server.await(Pattern.compile("Lost database 'mysql'"), mark, Duration.ofSeconds(60));
             command(server, "dbfill k2 500", "dbfill k2 500");
             expectInfo(server, "down since");
@@ -221,6 +225,7 @@ public final class MySqlVariablesScenario implements Scenario {
         }
         expectRows(mysql, "outage", "db_k::", 3000);
         expectRows(mysql, "outage", "db_k2::", 500);
+        expectRows(mysql, "outage", "db_after-kill", 1);
 
         // Down when the server stops: what's waiting is kept, and written at the next start.
         try (ServerProcess server = builder.start()) {
@@ -230,15 +235,12 @@ public final class MySqlVariablesScenario implements Scenario {
             int mark = server.mark();
             server.command("stop");
             server.awaitExit(WAIT);
-            if (server.lines(mark).stream().noneMatch(l -> l.contains("pending/mysql.pending.csv"))) {
+            if (server.lines(mark).stream().noneMatch(l -> l.contains("pending/mysql-") && l.contains(".pending.csv"))) {
                 throw new HarnessFailure("NeoSkript didn't say where it kept the changes it couldn't write. See "
                         + server.logFile());
             }
         }
-        Path pending = builder.runDir().resolve("plugins/NeoSkript/pending/mysql.pending.csv");
-        if (!Files.exists(pending)) {
-            throw new HarnessFailure("No " + pending);
-        }
+        Path pending = pendingFile(builder, ".pending.csv");
         mysql.restart();
         try (ServerProcess server = builder.start()) {
             server.await(Pattern.compile("Applied \\d+ changes that couldn't be written"), WAIT);
@@ -251,10 +253,79 @@ public final class MySqlVariablesScenario implements Scenario {
         }
     }
 
-    // ---- 5. A wrong password -------------------------------------------------------------------------------------
+    /** The one kept file ending in {@code suffix} in the server's pending folder. */
+    private static Path pendingFile(ServerBuilder builder, String suffix) throws IOException {
+        Path dir = builder.runDir().resolve("plugins/NeoSkript/pending");
+        try (var files = Files.list(dir)) {
+            List<Path> found = files.filter(f -> f.getFileName().toString().startsWith("mysql-")
+                    && f.getFileName().toString().endsWith(suffix)).toList();
+            if (found.size() != 1) {
+                throw new HarnessFailure("Expected one mysql-*" + suffix + " in " + dir + ", found " + found);
+            }
+            return found.getFirst();
+        }
+    }
+
+    // ---- 5. A database that hangs --------------------------------------------------------------------------------
+
+    /**
+     * MariaDB paused, so connections open but nothing answers: at startup the server waits no longer than its bound
+     * and loads the database when it answers; at shutdown it stops within its bound and keeps what it couldn't write.
+     */
+    private void hungDatabase(ScenarioContext context, Path runs, MySqlServer mysql) throws Exception {
+        ServerBuilder builder = neoskript(context, runs.resolve("9-neoskript-hung"), mysql, "hung", false);
+        try (ServerProcess server = builder.start()) {
+            server.await(ServerProcess.DONE, WAIT);
+            command(server, "dbset before-hang 1", "dbset before-hang");
+            stop(server);
+        }
+        mysql.pause();
+        try (ServerProcess server = builder.start()) {
+            int mark = server.mark();
+            server.await(Pattern.compile("Enabling NeoSkript"), mark, WAIT);
+            long start = System.nanoTime();
+            server.await(Pattern.compile("Couldn't reach database 'mysql'"), mark, WAIT);
+            long waited = (System.nanoTime() - start) / 1_000_000;
+            if (waited > 20_000) {
+                throw new HarnessFailure("Startup waited " + waited + " ms for a database that hangs");
+            }
+            context.summary("startup wait for a hung database (ms)", waited);
+            server.await(ServerProcess.DONE, WAIT);
+            command(server, "dbset during-hang 1", "dbset during-hang");
+            mysql.unpause();
+            server.await(Pattern.compile("Reached database 'mysql'"), mark, Duration.ofSeconds(120));
+            expectValue(server, "before-hang", "1");
+            // Hung again while the server stops.
+            mysql.pause();
+            command(server, "dbset at-stop 1", "dbset at-stop");
+            long stopping = System.nanoTime();
+            server.command("stop");
+            server.awaitExit(WAIT);
+            long stopped = (System.nanoTime() - stopping) / 1_000_000;
+            context.summary("shutdown with a hung database (ms)", stopped);
+            if (stopped > 45_000) {
+                throw new HarnessFailure("Stopping took " + stopped + " ms with a database that hangs");
+            }
+        }
+        pendingFile(builder, ".pending.csv");
+        mysql.unpause();
+        try (ServerProcess server = builder.start()) {
+            server.await(ServerProcess.DONE, WAIT);
+            expectValue(server, "at-stop", "1");
+            stop(server);
+        }
+        Map<String, SqlVariablesScenario.Row> rows = rows(mysql, "hung");
+        for (String name : List.of("db_before-hang", "db_during-hang", "db_at-stop")) {
+            if (!rows.containsKey(name)) {
+                throw new HarnessFailure(name + " isn't in the table after the database hung: " + rows.keySet());
+            }
+        }
+    }
+
+    // ---- 6. A wrong password -------------------------------------------------------------------------------------
 
     private void wrongPassword(ScenarioContext context, Path runs, MySqlServer mysql) throws Exception {
-        ServerBuilder builder = context.server(runs.resolve("9-wrong-password"))
+        ServerBuilder builder = context.server(runs.resolve("10-wrong-password"))
                 .plugin(context.neoskriptJar())
                 .file("plugins/NeoSkript/config.yml", neoskriptConfig(mysql, "wrong", false, WRONG_PASSWORD))
                 .file("plugins/NeoSkript/scripts/commands.sk", context.script("sql-variables-commands.sk"));
@@ -262,18 +333,29 @@ public final class MySqlVariablesScenario implements Scenario {
             server.await(Pattern.compile("Couldn't reach database 'mysql'.*Access denied"), WAIT);
             server.await(ServerProcess.DONE, WAIT);
             expectInfo(server, "not reached yet");
-            // Scripts run; their db_ variables stay in memory, and the CSV database still saves the rest.
+            // Scripts run; their db_ variables stay in memory, and are kept for when the database is reached.
             command(server, "dbset x 1", "dbset x");
             expectValue(server, "x", "1");
             stop(server);
         }
+        pendingFile(builder, ".unloaded.csv");
+        // The password fixed: what was set meanwhile reaches the table.
+        builder.file("plugins/NeoSkript/config.yml", neoskriptConfig(mysql, "wrong", false, MySqlServer.PASSWORD));
+        try (ServerProcess server = builder.start()) {
+            server.await(ServerProcess.DONE, WAIT);
+            expectValue(server, "x", "1");
+            stop(server);
+        }
+        if (!rows(mysql, "wrong").containsKey("db_x")) {
+            throw new HarnessFailure("db_x, set while the password was wrong, isn't in the table once it's right");
+        }
     }
 
-    // ---- 6. Rows NeoSkript can't read ----------------------------------------------------------------------------
+    // ---- 7. Rows NeoSkript can't read ----------------------------------------------------------------------------
 
     private void badRows(ScenarioContext context, Path runs, MySqlServer mysql) throws Exception {
         String table = "bad";
-        ServerBuilder builder = neoskript(context, runs.resolve("10-bad-rows"), mysql, table, false);
+        ServerBuilder builder = neoskript(context, runs.resolve("11-bad-rows"), mysql, table, false);
         try (ServerProcess server = builder.start()) {
             server.await(ServerProcess.DONE, WAIT);
             command(server, "dbset good good", "dbset good");
