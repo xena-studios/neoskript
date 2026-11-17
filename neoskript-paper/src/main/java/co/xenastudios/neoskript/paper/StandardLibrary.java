@@ -85,6 +85,10 @@ public final class StandardLibrary {
         Fireworks.register(registrar);
         EventSyntax.register(registrar);
         Collections.register(registrar);
+        // Codecs before addons, so an addon can't register one for a class NeoSkript saves (Location, ItemStack...).
+        StorageCodecs.register(registrar);
+        ItemCodecs.register(registrar);
+        ParticleCodecs.register(registrar);
         hooks.accept(registrar);
         Logic.register(registrar);
         MathFunctions.register(registrar);
@@ -96,9 +100,6 @@ public final class StandardLibrary {
         Configs.register(registrar);
         WorldSyntax.registerLate(registrar);
         WorldProperties.registerLate(registrar);
-        StorageCodecs.register(registrar);
-        ItemCodecs.register(registrar);
-        ParticleCodecs.register(registrar);
     }
 
     /** Syntax Skript's test environment provides, for running Skript's own tests: {@code test-location}... */
