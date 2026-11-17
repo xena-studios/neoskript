@@ -5503,6 +5503,24 @@
     },
     {
       "kind": "event",
+      "id": "NeoSkriptWebEvtSkJsonResponse",
+      "patterns": [
+        "received [http] response",
+        "http response received"
+      ],
+      "eventValues": [
+        {
+          "type": "response",
+          "time": 0
+        }
+      ],
+      "parser": {
+        "scope": 178
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "event",
       "id": "NeoSkriptPlaceholdersEvtPlaceholder",
       "patterns": [
         "(placeholder[ ]api|papi) [:relational] placeholder (with|for) [the] prefix %*string%",
@@ -5521,7 +5539,7 @@
         }
       ],
       "parser": {
-        "scope": 178
+        "scope": 179
       },
       "addon": "NeoSkriptPlaceholders"
     },
@@ -6894,6 +6912,40 @@
     },
     {
       "kind": "effect",
+      "id": "NeoSkriptWebEffSkJsonExecute",
+      "patterns": [
+        "execute %request% [as [(:non|:not)(-| )blocking]]",
+        "send %request% [as [(:non|:not)(-| )blocking]]",
+        "run %request% [as [(:non|:not)(-| )blocking]]"
+      ],
+      "parser": {
+        "delays": true
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptWebEffSkJsonMap",
+      "patterns": [
+        "[:async] (map|copy) %jsonelement% to %objects%",
+        "[:async] store json %jsonelement% in %objects%",
+        "[:async] copy json %jsonelement% to %objects%"
+      ],
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptWebEffReqnRequest",
+      "patterns": [
+        "send [a[n]] [http] [%-string%] [web] request to [the] [url] %string% [with (0¦[the] header[s] %-strings% [and [the] body %-strings%]|1¦[the] body %-strings% [and [the] header[s] %-strings%])]"
+      ],
+      "parser": {
+        "delays": true
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "effect",
       "id": "EffExit",
       "patterns": [
         "(exit|stop) [[the] trigger]",
@@ -7571,6 +7623,39 @@
         "%chunks/worlds% (is|are)[not:(n't| not)] loaded",
         "world[s] %worlds% (is|are)[not:(n't| not)] loaded"
       ]
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptWebCondSkJsonType",
+      "patterns": [
+        "json type of %jsonelement% is (json[ ](:object)|json[ ](:array)|json[ ](:primitive)|json[ ](:null))",
+        "json type of %jsonelement% (is(n't| not)) (json[ ](:object)|json[ ](:array)|json[ ](:primitive)|json[ ](:null))",
+        "%jsonelement% is [a] json[ ](:object|:array|:primitive|:null)",
+        "%jsonelement% is(n't| not) [a] json[ ](:object|:array|:primitive|:null)"
+      ],
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptWebCondSkJsonEmpty",
+      "patterns": [
+        "json %jsonelement% is empty",
+        "json %jsonelement% is(n't| not) empty",
+        "%jsonelement% is empty json",
+        "%jsonelement% is(n't| not) empty json"
+      ],
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptWebCondSkJsonHas",
+      "patterns": [
+        "[json] %jsonelement% has [:all] (:value[s]|:key[s]) %objects%",
+        "[json] %jsonelement% does(n't| not) have [:all] (:value[s]|:key[s]) %objects%",
+        "%jsonelement% contains [:all] (:value[s]|:key[s]) %objects%",
+        "%jsonelement% does(n't| not) contain [:all] (:value[s]|:key[s]) %objects%"
+      ],
+      "addon": "NeoSkriptWeb"
     },
     {
       "kind": "condition",
@@ -9598,6 +9683,94 @@
     },
     {
       "kind": "expression",
+      "id": "NeoSkriptWebExprReqnLastResponse",
+      "patterns": [
+        "[the] [last[ly]] [received] [http] [web] response"
+      ],
+      "returnType": "httpresponse",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnUrlEncode",
+      "patterns": [
+        "(http|ur(i|l)) (safe|encoded|escaped) %strings%"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnJsonEncode",
+      "patterns": [
+        "json (safe|encoded|escaped) %strings%"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonFromUrl",
+      "patterns": [
+        "json from [the] (website|url) %strings%",
+        "json from url %strings%",
+        "fetch json from [url] %strings%"
+      ],
+      "returnType": "jsonelement",
+      "parser": {
+        "delays": true
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonNew",
+      "patterns": [
+        "json (from|of) %objects%",
+        "parse %objects% as json",
+        "json (parsed|created) from %objects%"
+      ],
+      "returnType": "jsonelement",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonPretty",
+      "patterns": [
+        "%jsonelement% as pretty[ printed]",
+        "%jsonelement% as (pretty[ printed]|formatted) json",
+        "%jsonelement% as uncolo[u]red pretty[ printed]",
+        "%jsonelement% as unformatted pretty[ printed]",
+        "%jsonelement% as (compact|minified) json",
+        "%jsonelement% as compact json"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonRequest",
+      "patterns": [
+        "prepare %requestmethod% request on %string%",
+        "prepare [a] %requestmethod% request [to [url]] %string%",
+        "create [a] %requestmethod% request [for [url]] %string%"
+      ],
+      "returnType": "request",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonKeys",
+      "patterns": [
+        "[all] keys [%-string%] of %jsonelement%",
+        "[every|all] key[s] (at|in) [path] [%-string%] (of|in) %jsonelement%",
+        "keys (at|in) [path] [%-string%] (of|in) %jsonelement%"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
       "id": "ExprCommandSender",
       "patterns": [
         "[the] [command['s]] sender"
@@ -10666,6 +10839,27 @@
         "%number%(\\%| percent) of %numbers%"
       ],
       "returnType": "number"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonValues",
+      "patterns": [
+        "[json] :values [%-string%] of %jsonelement%",
+        "[json] values [of] %jsonelement%",
+        "[json] :value [%-string%] of %jsonelement%",
+        ":values at path [%-string%] in %jsonelement%",
+        "values at path [%-string%] in %jsonelement%",
+        "value at path [%-string%] in %jsonelement%",
+        ":values of path [%-string%] in %jsonelement%",
+        "values of path [%-string%] in %jsonelement%",
+        "value of path [%-string%] in %jsonelement%",
+        "path %string% of %jsonelement%",
+        "the path %string% in %jsonelement%",
+        "%jsonelement%'s path %string%",
+        "%jsonelement%'s value at path %string%"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptWeb"
     },
     {
       "kind": "expression",
@@ -13496,6 +13690,126 @@
         "[(1¦sky|1¦sun|2¦block)[ ]]light[ ]level [(of|%direction%) %location%]"
       ],
       "returnType": "integer"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonLastResponse",
+      "patterns": [
+        "[the] [last] response of %requests%",
+        "%requests%'[s] [last] response"
+      ],
+      "returnType": "response",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonQueryParams",
+      "patterns": [
+        "[the] query param(s|meters) of %requests%",
+        "%requests%'[s] query param(s|meters)"
+      ],
+      "returnType": "jsonelement",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonFormatted",
+      "patterns": [
+        "[the] form[atted [json]] of %objects%",
+        "%objects%'[s] form[atted [json]]"
+      ],
+      "returnType": "jsonelement",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonSize",
+      "patterns": [
+        "[the] json size of %jsonelements%",
+        "%jsonelements%'[s] json size"
+      ],
+      "returnType": "integer",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprBody",
+      "patterns": [
+        "[the] [response] bod(y|ies) of %httpresponses/requests/responses%",
+        "%httpresponses/requests/responses%'[s] [response] bod(y|ies)"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprStatusCode",
+      "patterns": [
+        "[the] [response] [status] code[s] of %httpresponses/responses%",
+        "%httpresponses/responses%'[s] [response] [status] code[s]"
+      ],
+      "returnType": "integer",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprHeaders",
+      "patterns": [
+        "[the] [response] header[s] of %httpresponses/requests/responses%",
+        "%httpresponses/requests/responses%'[s] [response] header[s]"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprStatus",
+      "patterns": [
+        "[the] [response] status[(es| line[s])] of %httpresponses/responses%",
+        "%httpresponses/responses%'[s] [response] status[(es| line[s])]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnHeaderKeys",
+      "patterns": [
+        "[the] [response] header key[s] of %httpresponses%",
+        "%httpresponses%'[s] [response] header key[s]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnHeaderValues",
+      "patterns": [
+        "[the] [response] header value[s] of %httpresponses%",
+        "%httpresponses%'[s] [response] header value[s]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnMessage",
+      "patterns": [
+        "[the] [response] [status] (message|reason)[s] of %httpresponses%",
+        "%httpresponses%'[s] [response] [status] (message|reason)[s]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnHeader",
+      "patterns": [
+        "[the] %string% [response] header[ value][s] of %httpresponses%",
+        "%httpresponses%'[s] %string% [response] header[ value][s]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
     },
     {
       "kind": "expression",
@@ -17885,6 +18199,92 @@
           "queues"
         ]
       }
+    },
+    {
+      "id": "httpresponse",
+      "name": "http response",
+      "plural": "http responses",
+      "parser": {
+        "names": [
+          "http response",
+          "httpresponse"
+        ],
+        "pluralNames": [
+          "http responses",
+          "httpresponses"
+        ]
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "id": "request",
+      "name": "request",
+      "plural": "requests",
+      "parser": {
+        "names": [
+          "request"
+        ],
+        "pluralNames": [
+          "requests"
+        ]
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "id": "response",
+      "name": "response",
+      "plural": "responses",
+      "parser": {
+        "names": [
+          "response"
+        ],
+        "pluralNames": [
+          "responses"
+        ]
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "id": "requestmethod",
+      "name": "request method",
+      "plural": "request methods",
+      "literals": [
+        "delete",
+        "get",
+        "head",
+        "mock",
+        "patch",
+        "post",
+        "put"
+      ],
+      "parser": {
+        "names": [
+          "request method",
+          "requestmethod"
+        ],
+        "pluralNames": [
+          "request methods",
+          "requestmethods"
+        ],
+        "enumerable": true
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "id": "jsonelement",
+      "name": "json element",
+      "plural": "json elements",
+      "parser": {
+        "names": [
+          "json element",
+          "jsonelement"
+        ],
+        "pluralNames": [
+          "json elements",
+          "jsonelements"
+        ]
+      },
+      "addon": "NeoSkriptWeb"
     },
     {
       "id": "datasource",
@@ -25254,6 +25654,14 @@
       },
       {
         "values": [
+          "object",
+          "response"
+        ],
+        "plurals": [],
+        "defaults": []
+      },
+      {
+        "values": [
           "audience",
           "commandsender",
           "offlineplayer",
@@ -25342,7 +25750,7 @@
         "defaults": []
       }
     ],
-    "commandScope": 179,
-    "functionScope": 180
+    "commandScope": 180,
+    "functionScope": 181
   }
 }
