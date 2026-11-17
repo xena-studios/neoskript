@@ -277,6 +277,31 @@ command /skbeetest-text:
 		set {skbee::saved-text} to {_m}
 		send "[skbee] end text" to console
 
+# A trigger that runs a NeoSkriptCompat effect while another one runs, as releasing a bee fires its spawn: the outer
+# effect still sets its variable argument.
+on spawn of bee:
+	{skbee::releasing} is true
+	set {_c} to text component from "[skbee] release spawn: bee"
+	send component {_c} to console
+
+command /skbeetest-storage:
+	trigger:
+		set {_l} to location(20, 100, 20, world "world")
+		set block at {_l} to bee nest
+		spawn a bee at location(20.5, 102, 20.5, world "world")
+		set {_bee} to last spawned entity
+		add {_bee} to storage of block at {_l}
+		skbee("stored bee valid", whether {_bee} is valid)
+		set time in world "world" to 12:00
+		set weather in world "world" to clear
+		set {skbee::releasing} to true
+		release all entities from storage of block at {_l} into {_bees::*}
+		delete {skbee::releasing}
+		skbee("released bees", size of {_bees::*})
+		kill {_bees::*}
+		set block at {_l} to air
+		send "[skbee] end storage" to console
+
 command /skbeetest-after-restart-text:
 	trigger:
 		set {_j} to serialized json string of {skbee::saved-text}

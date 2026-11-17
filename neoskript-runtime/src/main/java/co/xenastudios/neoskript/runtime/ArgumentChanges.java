@@ -4,6 +4,8 @@
  */
 package co.xenastudios.neoskript.runtime;
 
+import co.xenastudios.neoskript.api.element.Effect;
+import co.xenastudios.neoskript.api.element.TriggerContext;
 import java.util.Arrays;
 
 /**
@@ -20,34 +22,51 @@ public final class ArgumentChanges {
 
     private ArgumentChanges() {}
 
-    /** An element with {@code count} arguments starts running: none changed yet. */
-    public static void begin(int count) {
-        Object[] changes = new Object[count];
-        Arrays.fill(changes, NONE);
+    /**
+     * Runs {@code effect} with {@code count} arguments on this thread, recording what it sets them to: by index, then
+     * at {@code count} what it threw, if anything ({@link #rethrow}). The changes of an effect that runs inside it (a
+     * trigger its event fires) are their own, and what was recorded around it is back once it's run.
+     */
+    public static Object[] execute(Effect effect, TriggerContext context, Object[] arguments, int count) {
+        Object[] previous = CHANGES.get();
+        Object[] changes = new Object[count + 1];
+        Arrays.fill(changes, 0, count, NONE);
         CHANGES.set(changes);
+        try {
+            effect.execute(context, arguments);
+        } catch (Throwable thrown) {
+            // Written first, as Skript's addons change their arguments as they go.
+            changes[count] = thrown;
+        } finally {
+            if (previous == null) {
+                CHANGES.remove();
+            } else {
+                CHANGES.set(previous);
+            }
+        }
+        return changes;
     }
 
-    /** The element set argument {@code index} to {@code value}: a value, an array for a list, or null to delete. */
+    /**
+     * The element set argument {@code index} to {@code value}: a value, an array for a list, or null to delete. Kept
+     * only while the effect runs on this thread.
+     */
     public static void put(int index, Object value) {
         Object[] changes = CHANGES.get();
-        if (changes != null && index >= 0 && index < changes.length) {
+        if (changes != null && index >= 0 && index < changes.length - 1) {
             changes[index] = value;
         }
     }
 
-    /** What argument {@code index} was set to, or {@link #NONE}: once. */
-    public static Object take(int index) {
-        Object[] changes = CHANGES.get();
-        if (changes == null || index < 0 || index >= changes.length) {
-            return NONE;
+    /** Throws what the effect threw, once its changes are written. */
+    public static void rethrow(Object[] changes) {
+        if (changes[changes.length - 1] instanceof Throwable thrown) {
+            ArgumentChanges.<RuntimeException>sneaky(thrown);
         }
-        Object value = changes[index];
-        changes[index] = NONE;
-        return value;
     }
 
-    /** The changes are written: nothing's kept for the thread. */
-    public static void end() {
-        CHANGES.remove();
+    @SuppressWarnings("unchecked")
+    private static <T extends Throwable> void sneaky(Throwable thrown) throws T {
+        throw (T) thrown;
     }
 }

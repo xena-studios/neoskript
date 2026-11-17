@@ -787,6 +787,7 @@ final class TriggerCompiler {
             body.emit();
         } finally {
             co.xenastudios.neoskript.api.element.Warnings.install(outer);
+            library.settingUpVariables(null);
         }
         exitTrigger();
         method.visitLabel(end);
@@ -3010,11 +3011,12 @@ final class TriggerCompiler {
         }
         if (!(library.binding(effect.syntax()) instanceof Library.Core core)) {
             callThrough(effect, Effect.class);
-            method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Effect.class), "execute",
-                    "(" + CONTEXT + OBJECTS + ")V", true);
             if (library.hasWriteBack(effect.syntax().id())) {
                 writeBackArguments(effect);
+                return;
             }
+            method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Effect.class), "execute",
+                    "(" + CONTEXT + OBJECTS + ")V", true);
             return;
         }
         switch (core.id()) {
@@ -4719,6 +4721,8 @@ final class TriggerCompiler {
                 single |= 1L << i;
             }
         }
+        // Only the element this is for gets them: every element set up after it gets its own, or none.
+        long[] variableMasks = null;
         if (library.hasWriteBack(syntax.syntax().id())) {
             long variables = 0;
             long listVariables = 0;
@@ -4730,8 +4734,9 @@ final class TriggerCompiler {
                     }
                 }
             }
-            library.settingUpVariables(variables, listVariables);
+            variableMasks = new long[] {variables, listVariables};
         }
+        library.settingUpVariables(variableMasks);
         long defaults = 0;
         for (int i = 0; i < values.size() && i < 64; i++) {
             Object value = values.get(i);
@@ -5729,6 +5734,7 @@ final class TriggerCompiler {
             return false;
         } finally {
             co.xenastudios.neoskript.api.element.Warnings.install(outer);
+            library.settingUpVariables(null);
             settingUp = outerSettingUp;
             settingUpSource = outerSource;
         }
@@ -6856,20 +6862,27 @@ final class TriggerCompiler {
     // ---------------------------------------------------------------- variables
 
     /**
-     * Writes what an addon's effect set its variable arguments to back to them, as Skript's addons change their
-     * arguments: each variable argument's change ({@link co.xenastudios.neoskript.runtime.ArgumentChanges}), if it
-     * has one, set (or deleted, for null).
+     * Runs an addon's effect, its element and arguments pushed, and writes what it set its variable arguments to back
+     * to them, as Skript's addons change their arguments: each variable argument's change
+     * ({@link co.xenastudios.neoskript.runtime.ArgumentChanges}), if it has one, set (or deleted, for null). The
+     * changes are recorded on this thread, the caller's, and written even if the effect throws, which is then thrown.
      */
     private void writeBackArguments(ParsedSyntax effect) throws CompileException {
         String changes = "co/xenastudios/neoskript/runtime/ArgumentChanges";
         List<Object> values = effect.match().values();
+        pushInt(values.size());
+        method.visitMethodInsn(INVOKESTATIC, changes, "execute", "(" + Type.getDescriptor(Effect.class) + CONTEXT
+                + OBJECTS + "I)" + OBJECTS, false);
+        int all = nextSlot++;
+        method.visitVarInsn(ASTORE, all);
         for (int i = 0; i < values.size(); i++) {
             if (!(values.get(i) instanceof Expr.Variable variable)) {
                 continue;
             }
             int slot = nextSlot++;
+            method.visitVarInsn(ALOAD, all);
             pushInt(i);
-            method.visitMethodInsn(INVOKESTATIC, changes, "take", "(I)" + OBJECT_DESC, false);
+            method.visitInsn(AALOAD);
             method.visitVarInsn(ASTORE, slot);
             Label unchanged = new Label();
             method.visitVarInsn(ALOAD, slot);
@@ -6895,7 +6908,8 @@ final class TriggerCompiler {
             }
             method.visitLabel(unchanged);
         }
-        method.visitMethodInsn(INVOKESTATIC, changes, "end", "()V", false);
+        method.visitVarInsn(ALOAD, all);
+        method.visitMethodInsn(INVOKESTATIC, changes, "rethrow", "(" + OBJECTS + ")V", false);
     }
 
     private void variableStore(Expr.Variable variable) {

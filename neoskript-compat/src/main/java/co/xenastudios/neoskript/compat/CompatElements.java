@@ -82,11 +82,9 @@ final class CompatElements {
         String id = id(addon, info);
         registrar.effect(id, element -> {
             ch.njol.skript.lang.Effect effect = setup(compat, addon, info, placeholders, element, "effect");
-            return (Effect) (context, arguments) -> {
-                // What it sets its variable arguments to is written back to them once it's run.
-                co.xenastudios.neoskript.runtime.ArgumentChanges.begin(arguments == null ? 0 : arguments.length);
-                run(addon, effect, arguments, () -> effect.run(CompatEvent.of(context.event())));
-            };
+            // What it sets its variable arguments to is written back to them once it's run (ArgumentChanges).
+            return (Effect) (context, arguments) ->
+                    run(addon, effect, arguments, () -> effect.run(CompatEvent.of(context.event())));
         }, patterns(info));
         compat.library().writesBackArguments(id);
         priority(registrar, id, info);

@@ -168,11 +168,19 @@ public final class Library implements Registrar {
         return writesBackArguments.contains(id);
     }
 
-    /** Which of the element being set up's arguments are a variable, and which a list variable: bits by index. */
-    private static final ThreadLocal<long[]> variableArguments = new ThreadLocal<>();
+    /**
+     * Which of the arguments of the element being set up on this thread are a variable and which a list variable,
+     * for syntax that writes back: set for each element as it's set up, and cleared once it's made.
+     */
+    private final ThreadLocal<long[]> variableArguments = new ThreadLocal<>();
 
-    void settingUpVariables(long single, long list) {
-        variableArguments.set(new long[] {single, list});
+    /** The element about to be set up has these variable arguments, or none of either when {@code null}. */
+    void settingUpVariables(long[] masks) {
+        if (masks == null) {
+            variableArguments.remove();
+        } else {
+            variableArguments.set(masks);
+        }
     }
 
     /**
