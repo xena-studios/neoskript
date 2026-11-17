@@ -13,9 +13,27 @@ import co.xenastudios.neoskript.api.registration.Registrar;
  * with Skript's error: "The expression '5' returns the following types that do not have the name property:
  * integer".
  */
-final class TypeProperties {
+public final class TypeProperties {
 
     private TypeProperties() {}
+
+    /** Skript's 'use type properties': whether the property syntax is registered, or the old syntax before it. */
+    private static volatile boolean enabled = true;
+
+    /**
+     * Sets Skript's 'use type properties' for the syntax registered after this: on, its type properties; off, the
+     * syntax before them ({@link LegacyProperties}).
+     *
+     * @param on whether to use type properties
+     */
+    public static void enabled(boolean on) {
+        enabled = on;
+    }
+
+    /** Whether Skript's type properties are in use ('use type properties', on in Skript's default config). */
+    public static boolean enabled() {
+        return enabled;
+    }
 
     /** The types Skript's {@code AnyAmount} takes: its numbered things. */
     private static final String[] NUMBERED = {"numbered", "queue", "slot", "itemtype", "itemstack"};
@@ -42,6 +60,11 @@ final class TypeProperties {
         registrar.typeProperty("Y", "quaternion", "location", "vector");
         registrar.typeProperty("Z", "quaternion", "chunk", "location", "vector");
 
+        if (!enabled) {
+            // The syntax before type properties: only the scale property is Skript's then.
+            registrar.propertySyntax("PropExprScale", 0, tags -> "scale", false);
+            return;
+        }
         registrar.propertySyntax("PropExprName", 0, tags -> "name", false);
         registrar.propertySyntax("PropExprName-display", 0, tags -> "display name", false);
         registrar.propertySyntax("ExprAmount", 0, tags -> tags.contains("size") ? "size"

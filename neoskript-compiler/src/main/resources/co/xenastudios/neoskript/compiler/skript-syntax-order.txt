@@ -843,3 +843,12 @@ section	EffSecShoot	2	8	-
 section	SecConditional	4	0	-
 section	SecWhile	4	0	-
 section	EffSecSpawn	4	16	-
+# Registered only with 'use type properties: false', in place of the type properties above (NeoSkript's ids for
+# those with the names of others end in -old): their priority and complexity score as Skript registers them.
+condition	CondContains	2	4	-
+condition	CondIsEmpty	3	2	-
+expression	ExprName	2	2	object
+expression	ExprAmount	3	2	-
+expression	ExprValue	3	4	object
+expression	ExprCoordinate	3	2	-
+expression	ExprXYZComponent	3	2	-

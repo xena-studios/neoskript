@@ -1,0 +1,170 @@
+# For the config-settings scenario's type-properties variant: Skript's syntax from before 2.13, which it has in
+# place of its type properties with 'use type properties: false' in config.sk. What each line gives is written to
+# logs/cfg.log, and the errors are compared too. Each is its own trigger, so one that fails to load hides nothing.
+
+on load:
+	log "tp name world: %name of world "world"%" to "cfg"
+
+on load:
+	log "tp name item: %name of diamond named "Gem"%" to "cfg"
+
+on load:
+	log "tp name offline: %name of ("Alice" parsed as offline player)%" to "cfg"
+
+on load:
+	log "tp name inventory: %name of chest inventory named "Box"%" to "cfg"
+
+on load:
+	log "tp name number: %name of 5%" to "cfg"
+
+on load:
+	log "tp names list: %names of world "world" and diamond named "Gem"%" to "cfg"
+
+on load:
+	log "tp display name item: %display name of diamond named "Gem"%" to "cfg"
+
+on load:
+	log "tp custom name item: %custom name of diamond named "Gem"%" to "cfg"
+
+on load:
+	log "tp display name world: %display name of world "world"%" to "cfg"
+
+on load:
+	log "tp world name possessive: %world "world"'s name%" to "cfg"
+
+on load:
+	log "tp name script: %name of script%" to "cfg"
+
+on load:
+	log "tp name gamerule: %name of gamerule keepInventory%" to "cfg"
+
+on load:
+	set {_l::*} to 1, 2 and 3
+	log "tp amount list: %amount of {_l::*}%" to "cfg"
+
+on load:
+	set {_l::*} to 1, 2 and 3
+	log "tp size list: %size of {_l::*}%" to "cfg"
+
+on load:
+	set {_l::*} to 1, 2 and 3
+	log "tp number list: %number of {_l::*}%" to "cfg"
+
+on load:
+	log "tp size text: %size of "hello"%" to "cfg"
+
+on load:
+	log "tp amount number: %amount of 5%" to "cfg"
+
+on load:
+	log "tp amount two: %amount of 3 and 4%" to "cfg"
+
+on load:
+	log "tp amount items list: %amount of 3 diamonds and 2 dirt%" to "cfg"
+
+on load:
+	log "tp x coordinate: %x coordinate of location(1, 2, 3)%" to "cfg"
+
+on load:
+	log "tp y-pos: %y-pos of location(1, 2, 3)%" to "cfg"
+
+on load:
+	log "tp z loc: %location(1, 2, 3)'s z-location%" to "cfg"
+
+on load:
+	log "tp x of vector: %x of vector(1, 2, 3)%" to "cfg"
+
+on load:
+	log "tp x component: %x component of vector(4, 5, 6)%" to "cfg"
+
+on load:
+	log "tp vector y: %vector(4, 5, 6)'s y component%" to "cfg"
+
+on load:
+	log "tp x of chunk: %x of chunk at location(40, 2, 3, world "world")%" to "cfg"
+
+on load:
+	log "tp viewers inventory: %viewers of chest inventory%" to "cfg"
+
+on load:
+	log "tp title item: %title of diamond%" to "cfg"
+
+on load:
+	log "tp scale: %scale of 5%" to "cfg"
+
+on load:
+	if "" is empty:
+		log "tp empty text: yes" to "cfg"
+	else:
+		log "tp empty text: no" to "cfg"
+
+on load:
+	if "a" is not empty:
+		log "tp not empty text: yes" to "cfg"
+	else:
+		log "tp not empty text: no" to "cfg"
+
+on load:
+	if "hello" contains "ell":
+		log "tp contains text: yes" to "cfg"
+	else:
+		log "tp contains text: no" to "cfg"
+
+on load:
+	set {_l::*} to 1, 2 and 3
+	if {_l::*} contains 2:
+		log "tp contains list: yes" to "cfg"
+	else:
+		log "tp contains list: no" to "cfg"
+
+on load:
+	if 5 contains 2:
+		log "tp contains number: yes" to "cfg"
+	else:
+		log "tp contains number: no" to "cfg"
+
+on load:
+	if "hello" does not contain "z":
+		log "tp not contains text: yes" to "cfg"
+	else:
+		log "tp not contains text: no" to "cfg"
+
+on load:
+	if chest inventory has diamond:
+		log "tp has item: yes" to "cfg"
+	else:
+		log "tp has item: no" to "cfg"
+
+on load:
+	if "Hello" contains "hello":
+		log "tp contains case: yes" to "cfg"
+	else:
+		log "tp contains case: no" to "cfg"
+
+on load:
+	set {_loc} to location(1, 2, 3)
+	set {_vec} to vector(4, 5, 6)
+	set {_item} to 2 diamonds named "Gem"
+	set {_text} to "hello"
+	log "tp x of var location: %x of {_loc}%" to "cfg"
+	log "tp x component of var location: %x component of {_loc}%" to "cfg"
+	log "tp x coordinate of var vector: %x coordinate of {_vec}%" to "cfg"
+	log "tp x coordinate of var location: %x coordinate of {_loc}%" to "cfg"
+	log "tp x of var vector: %x of {_vec}%" to "cfg"
+	log "tp name of var item: %name of {_item}%" to "cfg"
+	log "tp amount of var item: %amount of {_item}%" to "cfg"
+	log "tp name of var text: %name of {_text}%" to "cfg"
+	log "tp w of var vector: %w of {_vec}%" to "cfg"
+
+on load:
+	set {_item} to 2 diamonds named "Gem"
+	set name of {_item} to "Jewel"
+	add 3 to amount of {_item}
+	log "tp changed item: %name of {_item}%, %amount of {_item}%" to "cfg"
+	set {_loc} to location(1, 2, 3)
+	set x coordinate of {_loc} to 7
+	add 2 to y-pos of {_loc}
+	log "tp changed location: %x coordinate of {_loc}%, %y coordinate of {_loc}%" to "cfg"
+	set {_vec} to vector(4, 5, 6)
+	set x component of {_vec} to 9
+	log "tp changed vector: %x component of {_vec}%" to "cfg"

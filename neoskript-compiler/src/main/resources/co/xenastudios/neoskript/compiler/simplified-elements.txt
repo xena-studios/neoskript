@@ -66,3 +66,4 @@ ExprVectorSpherical
 ExprVectorSquaredLength
 ExprXOf
 ExprXYZComponent
+CondContains-old

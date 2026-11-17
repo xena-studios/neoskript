@@ -81,6 +81,11 @@ final class Expected {
         return false;
     }
 
+    /** Whether some of the types take several values and some only one, as in {@code %number/booleans%}. */
+    boolean mixed() {
+        return pluralTypes != null;
+    }
+
     List<TypeInfo> types() {
         return types;
     }

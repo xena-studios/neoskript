@@ -430,3 +430,21 @@ type	itemcomponent
 type	biome
 type	villagertype
 type	object
+# With 'use type properties: false', Skript's DefaultConverters also convert these to named things.
+conv	audience	named
+conv	commandsender	named
+conv	display	named
+conv	entity	named
+conv	gamerule	named
+conv	itementity	named
+conv	livingentity	named
+conv	metadataholder	named
+conv	nameable	named
+conv	offlineplayer	named
+conv	player	named
+conv	projectile	named
+conv	string	named
+conv	textcomponent	named
+conv	uuid	named
+conv	vehicle	named
+conv	world	named

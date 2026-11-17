@@ -1361,6 +1361,12 @@ final class LineParser {
             problem("'" + input.substring(start, end) + "' can only be a single " + typeNames(expected) + ", not more.");
             return null;
         }
+        if (expr instanceof Expr.Variable variable && variable.list() && expected.mixed()) {
+            // Skript can't tell which of a placeholder's types a variable's values will be when only some take
+            // several, as in '%inventories/strings/numbered%', so a list variable there is an error.
+            problem("'" + input.substring(start, end) + "' can only be a single " + typeNames(expected) + ", not more.");
+            return null;
+        }
         return expr;
     }
 
