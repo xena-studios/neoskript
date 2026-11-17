@@ -568,6 +568,136 @@ class LanguageTest {
         assertEquals(List.of("false", "unknown", "true", "<none>", "true"), said);
     }
 
+    /** Each error compiling {@code script}, as {@code <line>: <message>}. */
+    private List<String> lineErrors(String script) {
+        Library library = new Library();
+        library.enableTesting();
+        StandardLibrary.register(library);
+        library.effect("TestSay", info -> (context, args) -> said.add(Values.text(args[0])), "say %objects%");
+        List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk", script)));
+        List<co.xenastudios.neoskript.frontend.source.Diagnostic> found = new ArrayList<>(errors(parsed.getFirst().diagnostics()));
+        found.addAll(errors(new ScriptCompiler(library, globals).compile(parsed).diagnostics()));
+        return found.stream().sorted(java.util.Comparator.comparingInt(
+                co.xenastudios.neoskript.frontend.source.Diagnostic::line)).map(d -> d.line() + ": " + d.message()).toList();
+    }
+
+    @Test
+    void returnAfterAWaitIsRefusedAsInSkript() {
+        String useless = "A return statement after a delay is useless, as the calling trigger will resume when the delay"
+                + " starts (and won't get any returned value)";
+        assertEquals(List.of("3: " + useless, "8: " + useless, "14: " + useless, "15: " + useless,
+                "22: " + useless, "26: The return statement cannot be used here", "31: " + useless,
+                "35: " + useless), lineErrors("""
+                function a() :: number:
+                \twait 1 tick
+                \treturn 1
+
+                function b(x: number) :: number:
+                \tif {_x} is 1:
+                \t\twait 1 tick
+                \treturn 1
+
+                function c(x: number) :: number:
+                \tloop 2 times:
+                \t\tif {_x} is 1:
+                \t\t\twait 1 tick
+                \t\treturn 1
+                \treturn 2
+
+                function d(x: number) :: number:
+                \tif {_x} is 1:
+                \t\treturn 1
+                \telse:
+                \t\twait 1 tick
+                \treturn 2
+
+                function e() :: number:
+                \twait 1 tick:
+                \t\treturn 1
+                \treturn 2
+
+                function f(x: number) :: number:
+                \twait 1 tick
+                \treturn 1 if {_x} is 1
+
+                function g():
+                \twait 1 tick
+                \treturn 1
+
+                function h(x: number) :: number:
+                \tif {_x} is 1:
+                \t\twait 1 tick
+                \t\tstop
+                \treturn 2
+                """));
+    }
+
+    @Test
+    void aBranchThatSurelyStopsLeavesNoWait() {
+        // The branch waits, but every way through it stops: as Skript's execution intents, the wait doesn't count.
+        assertEquals(List.of(), lineErrors("""
+                function f(x: number) :: number:
+                \tif {_x} is 1:
+                \t\twait 1 tick
+                \t\tif {_x} is 2:
+                \t\t\tstop
+                \t\telse:
+                \t\t\tstop
+                \treturn 1
+                """));
+    }
+
+    @Test
+    void codeInADelayedSectionHasNotWaitedToSkript() {
+        // Skript loads it as a trigger of its own, which resets its parser's delay; the code after it hasn't waited.
+        // The checks fail while parsing if they're wrong.
+        Library library = new Library();
+        library.enableTesting();
+        StandardLibrary.register(library);
+        assertEquals(List.of(), errors(new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk", """
+                test "delayed section":
+                \twait 1 tick:
+                \t\thas delay before is false failing if wrong
+                \t\twait 1 tick
+                \t\thas delay before is true failing if wrong
+                \thas delay before is false failing if wrong
+                \twait 1 tick if true is true
+                \thas delay before is true failing if wrong
+                """))).getFirst().diagnostics()));
+    }
+
+    @Test
+    void unreachableCodeFollowsSkriptsExecutionIntents() {
+        Library library = new Library();
+        StandardLibrary.register(library);
+        List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk", """
+                function a(x: number):
+                \tif {_x} is 1:
+                \t\tstop
+                \telse:
+                \t\tstop
+                \tset {_y} to 1
+
+                function b(x: number):
+                \tloop 2 times:
+                \t\tif {_x} is 1:
+                \t\t\texit loop
+                \t\telse:
+                \t\t\texit loop
+                \t\tset {_y} to 1
+                \tloop 1, 2 and 3:
+                \t\tstop
+                \tset {_y} to 1
+
+                function c(x: number):
+                \tstop
+                \tzzz
+                \tset {_y} to 1
+                """)));
+        assertEquals(List.of(6, 17, 22), parsed.getFirst().diagnostics().stream()
+                .filter(d -> d.message().startsWith("Unreachable code")).map(d -> d.line()).toList());
+    }
+
     @Test
     void chanceDatesAndText() {
         assertEquals(List.of("true", "false", "true", "true", "false", "true", "false", "x: 2, y: 0, z: 0"), run("""

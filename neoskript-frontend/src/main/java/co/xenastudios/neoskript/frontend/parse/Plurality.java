@@ -115,6 +115,8 @@ public final class Plurality {
             case Expr.Variable variable -> !variable.list();
             case Expr.Literal literal -> true;
             case Expr.Text text -> true;
+            // As Skript's ExpressionList: an 'or' list of single values is one of them.
+            case Expr.ListOf list -> !list.and() && list.items().stream().allMatch(item -> single(item, registry));
             case Expr.FunctionCall call -> call.function() != null && !call.function().returnsPlural();
             case Expr.Syntax syntax -> {
                 String id = syntax.syntax().syntax().id();

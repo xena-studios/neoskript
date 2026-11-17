@@ -132,10 +132,35 @@ public final class ScriptLoader {
         this.duplicates = duplicates;
         this.registered = registered;
         this.functions = functions;
-        return parallel(results)
-                .map(result -> parse(result, new ParserContext(registry, functions,
-                        locals.getOrDefault(result.file().name(), Map.of()))))
-                .toList();
+        EventValues values = registry.eventValues();
+        Object saved = values == null ? null : values.save();
+        // Each script is parsed on one thread, so what it used up is counted on that thread.
+        boolean[] usedUp = new boolean[results.size()];
+        List<ParsedScript> parsed = new ArrayList<>(parallel(java.util.stream.IntStream.range(0, results.size()).boxed().toList())
+                .map(i -> {
+                    long before = values == null ? 0 : values.usedUpHere();
+                    ParsedScript script = parse(results.get(i), new ParserContext(registry, functions,
+                            locals.getOrDefault(results.get(i).file().name(), Map.of())));
+                    usedUp[i] = values != null && values.usedUpHere() != before;
+                    return script;
+                })
+                .toList());
+        int asked = 0;
+        for (boolean used : usedUp) {
+            asked += used ? 1 : 0;
+        }
+        if (asked > 1) {
+            // An event value's error Skript gives only the first time was used up by whichever of them was parsed
+            // first: those scripts are parsed again one after another, so it's the first in order that gets it.
+            values.restore(saved);
+            for (int i = 0; i < results.size(); i++) {
+                if (usedUp[i]) {
+                    parsed.set(i, parse(results.get(i), new ParserContext(registry, functions,
+                            locals.getOrDefault(results.get(i).file().name(), Map.of()))));
+                }
+            }
+        }
+        return parsed;
     }
 
     /**
@@ -192,7 +217,8 @@ public final class ScriptLoader {
             }
         }
         return new ParsedScript(result.file(), parsed, diagnostics.all(), statements.delays(), statements.suppressions(),
-                statements.statementErrors(), statements.unreachableAfter());
+                statements.statementErrors(), statements.unreachableAfter(), statements.waitingSections(),
+                statements.sectionStatements());
     }
 
     private ParsedStructure structure(Structure structure, ParserContext context, StatementParser statements,

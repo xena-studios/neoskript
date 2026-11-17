@@ -683,6 +683,48 @@ public final class Library implements Registrar {
         eventValue(eventClass, typeId, 0, getter);
     }
 
+    /** An event value {@code set} can change: see {@link #eventValueChanger}. */
+    private record EventValueChanger(Class<?> eventClass, String typeId, int time,
+            java.util.function.BiConsumer<Object, Object> setter) {}
+
+    private final List<EventValueChanger> eventValueChangers = new ArrayList<>();
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <E> void eventValueChanger(Class<E> eventClass, String typeId, int time,
+            java.util.function.BiConsumer<? super E, Object> setter) {
+        checkOpen();
+        eventValueChangers.add(new EventValueChanger(eventClass, typeId, time,
+                (java.util.function.BiConsumer<Object, Object>) setter));
+    }
+
+    /**
+     * What sets the event value of type {@code typeId} at {@code time} in events of {@code eventClasses}, for
+     * whichever of them the code runs for; {@code null} if none of them has one, as Skript's
+     * {@code EventValueExpression.acceptChange}.
+     */
+    java.util.function.BiConsumer<Object, Object> eventValueChanger(List<Class<?>> eventClasses, String typeId, int time) {
+        List<EventValueChanger> found = new ArrayList<>();
+        for (EventValueChanger changer : eventValueChangers) {
+            if (changer.typeId().equals(typeId) && changer.time() == time
+                    && eventClasses.stream().anyMatch(changer.eventClass()::isAssignableFrom)) {
+                found.add(changer);
+            }
+        }
+        if (found.isEmpty()) {
+            return null;
+        }
+        List<EventValueChanger> changers = List.copyOf(found);
+        return (event, value) -> {
+            for (EventValueChanger changer : changers) {
+                if (changer.eventClass().isInstance(event)) {
+                    changer.setter().accept(event, value);
+                    return;
+                }
+            }
+        };
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     public <E> void eventValue(Class<E> eventClass, String typeId, int time,
@@ -1003,6 +1045,49 @@ public final class Library implements Registrar {
      */
     void parserAsked(List<Class<?>> eventClasses, Class<?> valueClass, String type, String error) {
         parserAsked.put(eventClasses + "/" + valueClass.getName() + "/" + type, error);
+        usedUp.incrementAndGet();
+    }
+
+    /** How many times the parser has used up an excluded value's error: see {@link EventValues#usedUp}. */
+    private final java.util.concurrent.atomic.AtomicLong usedUp = new java.util.concurrent.atomic.AtomicLong();
+
+    long usedUp() {
+        return usedUp.get();
+    }
+
+    /** {@link #usedUp} on this thread. */
+    private final ThreadLocal<long[]> usedUpHere = ThreadLocal.withInitial(() -> new long[1]);
+
+    long usedUpHere() {
+        return usedUpHere.get()[0];
+    }
+
+    /**
+     * Notes on this thread that the parser asked for an excluded event value of {@code valueClass} in events of
+     * {@code eventClasses}, whether its once-only error was still there to use up or not: see {@link #usedUpHere}.
+     */
+    void askedExcluded(List<Class<?>> eventClasses, Class<?> valueClass, String type) {
+        EventValueResolver resolver = resolver();
+        for (Class<?> eventClass : eventClasses) {
+            if (resolver.peek(eventClass, valueClass, type, 0, EventValueResolver.DEFAULT & ~EventValueResolver.CONVERSION)
+                    .errored() || resolver.peek(eventClass, valueClass, type, 0, EventValueResolver.DEFAULT).errored()) {
+                usedUpHere.get()[0]++;
+                return;
+            }
+        }
+    }
+
+    /** The excluded values whose errors are used up so far, and those the parser kept for the compiler. */
+    Object saveUsedUp() {
+        return List.of(resolver().save(), Map.copyOf(parserAsked));
+    }
+
+    @SuppressWarnings("unchecked")
+    void restoreUsedUp(Object saved) {
+        List<Object> both = (List<Object>) saved;
+        resolver().restore(both.get(0));
+        parserAsked.clear();
+        parserAsked.putAll((Map<String, String>) both.get(1));
     }
 
     /** The error {@link #parserAsked} kept for this value, now taken, or {@code null}. */

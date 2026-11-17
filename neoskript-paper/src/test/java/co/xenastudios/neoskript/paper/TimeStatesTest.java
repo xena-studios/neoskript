@@ -132,7 +132,7 @@ class TimeStatesTest {
                 "level of {_p} does not have a past state",
                 "gamemode of player does not have a future state",
                 "target of entity does not have a past state",
-                "damage cause does not have a future state",
+                "event-damage cause does not have a future state",
                 "currently selected hotbar slot does not have a past state",
                 "Cannot use time states after the event has already passed",
                 "past level of player can't be set to anything",

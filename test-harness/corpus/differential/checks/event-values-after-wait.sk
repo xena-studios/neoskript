@@ -1,0 +1,116 @@
+# Checks: event values with a changer, the brewing results and the MOTD, after a wait; and the state a chain or loop
+# leaves once the code has surely waited, which a teleport in it makes 'maybe'.
+
+on consume:
+	set event-item to bread
+
+on consume:
+	wait 1 tick
+	set event-item to bread
+
+on consume:
+	if player is op:
+		wait 1 tick
+	set event-item to bread
+
+on consume:
+	wait 1 tick
+	set event-itemstack to bread
+
+on vault display item:
+	wait 1 tick
+	set event-item to diamond
+
+on villager career change:
+	wait 1 tick
+	set event-villager profession to librarian profession
+
+on teleport:
+	set event-location to spawn of world "world"
+
+on teleport:
+	wait 1 tick
+	set event-location to spawn of world "world"
+
+on consume:
+	wait 1 tick
+	set event-player to {_p}
+
+on brew complete:
+	wait 1 tick
+	set the brewing results to stone
+
+on brew complete:
+	if the brewing results contain stone:
+		wait 1 tick
+	set the brewing results to stone
+
+on consume:
+	set the brewing results to stone
+
+on server list ping:
+	wait 1 tick
+	set default motd to "x"
+
+on server list ping:
+	set default motd to "x"
+
+on server list ping:
+	set shown motd to "x"
+	wait 1 tick
+	set shown motd to "x"
+
+on join:
+	set default motd to "x"
+	set motd to "x"
+	set {_m} to default motd
+
+on join:
+	set shown motd to "x"
+
+on damage:
+	wait 1 tick
+	if attacker is a player:
+		set {_x} to 1
+	else:
+		teleport victim to victim
+	cancel event
+
+on damage:
+	wait 1 tick
+	if attacker is a player:
+		teleport victim to victim
+	else:
+		set {_x} to 1
+	cancel event
+
+on damage:
+	wait 1 tick
+	loop 2 times:
+		teleport victim to victim
+	cancel event
+
+on damage:
+	wait 1 tick
+	loop 2 times:
+		set {_x} to 1
+	cancel event
+
+on damage:
+	wait 1 tick
+	if attacker is a player:
+		teleport victim to victim
+	cancel event
+
+on server list ping:
+	reset motd
+
+on teleport:
+	set past event-location to spawn of world "world"
+
+on teleport:
+	wait 1 tick
+	set past event-location to spawn of world "world"
+
+on teleport:
+	set event-location to "somewhere"

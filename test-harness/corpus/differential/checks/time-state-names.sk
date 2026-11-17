@@ -1,0 +1,13 @@
+# Checks: Skript names an expression with no past or future state as it writes it.
+
+on damage:
+	set {_a} to past damage
+	set {_b} to future damage
+	set {_c} to past attacker
+	set {_d} to past final damage
+	set {_e} to past victim
+	set {_f} to future damage cause
+	set {_g} to past victim zombie
+	set {_h} to past event-damage cause
+	set {_i} to past attacked pigs
+	set {_j} to past the damage

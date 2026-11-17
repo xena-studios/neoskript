@@ -139,6 +139,9 @@ final class ItemEvents {
         registrar.eventValue(EntityPickupItemEvent.class, "itemtype", event -> new ItemType(event.getItem().getItemStack(), true));
         registrar.eventValue(EntityPickupItemEvent.class, "location", event -> event.getItem().getLocation());
         registrar.eventValue(PlayerItemConsumeEvent.class, "itemstack", PlayerItemConsumeEvent::getItem);
+        // Skript's event values with a changer: 'set event-item to bread'.
+        registrar.eventValueChanger(PlayerItemConsumeEvent.class, "itemstack", 0,
+                (event, item) -> event.setItem((ItemStack) item));
 
         registrar.eventValue(InventoryClickEvent.class, "player", event -> player(event.getWhoClicked()));
         registrar.eventValue(InventoryClickEvent.class, "world", event -> event.getWhoClicked().getWorld());

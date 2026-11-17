@@ -274,6 +274,7 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public abstract void eventValue(java.lang.Class, java.lang.String, int, java.util.function.Function) signature <E:Ljava/lang/Object;>(Ljava/lang/Class<TE;>;Ljava/lang/String;ILjava/util/function/Function<-TE;*>;)V
   public abstract void eventValue(java.lang.Class, java.lang.String, java.lang.Class, int, java.util.function.Function) signature <E:Ljava/lang/Object;>(Ljava/lang/Class<TE;>;Ljava/lang/String;Ljava/lang/Class<*>;ILjava/util/function/Function<-TE;*>;)V @Experimental
   public abstract void eventValue(java.lang.Class, java.lang.String, java.util.function.Function) signature <E:Ljava/lang/Object;>(Ljava/lang/Class<TE;>;Ljava/lang/String;Ljava/util/function/Function<-TE;*>;)V
+  public void eventValueChanger(java.lang.Class, java.lang.String, int, java.util.function.BiConsumer) signature <E:Ljava/lang/Object;>(Ljava/lang/Class<TE;>;Ljava/lang/String;ILjava/util/function/BiConsumer<-TE;Ljava/lang/Object;>;)V @Experimental
   public abstract void eventValueExcluded(java.lang.Class, java.lang.String, java.lang.String) signature (Ljava/lang/Class<*>;Ljava/lang/String;Ljava/lang/String;)V @Experimental
   public void eventValueExpression(java.lang.String) @Experimental
   public void experimental(java.lang.String, java.lang.String)

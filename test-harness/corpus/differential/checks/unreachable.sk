@@ -1,0 +1,121 @@
+# Checks: where Skript warns that code is unreachable, from how far each statement stops execution (its execution
+# intents): an if chain with an else stops as little as its branch that stops least, a loop only if it surely runs.
+
+function unreachable_1(x: number) :: number:
+	if {_x} is 1:
+		stop
+	else:
+		stop
+	return 2
+
+function unreachable_2(x: number):
+	if {_x} is 1:
+		stop
+	else if {_x} is 2:
+		return
+	broadcast "a"
+
+function unreachable_3(x: number):
+	loop 3 times:
+		if {_x} is 1:
+			exit loop
+		else:
+			continue
+		broadcast "b"
+	broadcast "c"
+
+function unreachable_4(x: number):
+	loop 1, 2 and 3:
+		stop
+	broadcast "d"
+
+function unreachable_5(x: number):
+	loop {_x} times:
+		stop
+	broadcast "e"
+
+function unreachable_6(x: number):
+	do while {_x} is 1:
+		stop
+	broadcast "f"
+
+function unreachable_7(x: number):
+	while {_x} is 1:
+		stop
+	broadcast "g"
+
+function unreachable_8(x: number):
+	if {_x} is 1:
+		if {_x} is 2:
+			stop
+		else:
+			exit 2 sections
+	else:
+		stop
+	broadcast "h"
+
+function unreachable_9(x: number):
+	loop 2 times:
+		if {_x} is 1:
+			exit loop
+		else:
+			exit loop
+		broadcast "i"
+	broadcast "j"
+
+function unreachable_10(x: number):
+	stop
+	zzz
+	broadcast "k"
+
+function unreachable_11(x: number):
+	if any:
+		{_x} is 1
+		{_x} is 2
+	then:
+		stop
+	else:
+		stop
+	broadcast "l"
+
+function unreachable_12(x: number):
+	loop "a" and "b":
+		exit all loops
+	broadcast "m"
+
+function unreachable_13(x: number):
+	if {_x} is 1:
+		loop 2 times:
+			exit all sections
+		broadcast "n"
+	broadcast "o"
+
+function unreachable_for_literals(x: number):
+	for each {_v} in 1, 2 and 3:
+		stop
+	broadcast "a"
+
+function unreachable_text_literals(x: number):
+	loop "a" and "b":
+		stop
+	broadcast "b"
+
+function unreachable_split(x: number):
+	loop split "a,b" at ",":
+		stop
+	broadcast "c"
+
+function unreachable_reversed_list(x: number):
+	loop reversed 1, 2 and 3:
+		stop
+	broadcast "d"
+
+function unreachable_or_single(x: number):
+	loop "a" or "b":
+		stop
+	broadcast "e"
+
+function unreachable_text_variable(x: number):
+	loop "a%{_x}%b" and "c":
+		stop
+	broadcast "f"

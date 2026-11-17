@@ -1,0 +1,14 @@
+# Checks: Skript reads an enchantment's level in digits only, never in Roman numerals.
+
+function enchantment_levels():
+	set {_a} to diamond sword of unbreaking III
+	set {_b} to diamond sword of unbreaking 3
+	set {_c} to diamond sword of sharpness 2 and unbreaking IV
+	set {_d} to sharpness X
+	set {_e} to sharpness 10
+	set {_f} to 2 diamond swords of sharpness ii
+	set {_g} to "sharpness V" parsed as enchantment type
+	enchant {_b} with sharpness V
+	give {_p} a diamond sword of mending I
+	if {_b} is enchanted with sharpness II:
+		broadcast "x"

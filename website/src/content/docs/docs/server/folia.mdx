@@ -44,6 +44,8 @@ every 5 seconds:
 
 A `wait` inside `run on` stays on that thread. With nothing to run on, the code doesn't run.
 
+Getting to the other thread and back may take a tick, so the code in `run on` and after it counts as maybe after a wait, as after a `teleport`. A function can't `return` a value after `run on`, and `set damage to` and other changes to the event that Skript refuses after a maybe-wait are refused there too. This is the same on Paper, so a script loads the same on both. See [waits](/docs/scripts/waits/#when-code-counts-as-after-a-wait).
+
 <Aside type="caution">
 `run on` is NeoSkript only. A script that uses it doesn't load on Skript.
 </Aside>

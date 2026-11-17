@@ -75,3 +75,18 @@ Reports go to `test-harness/build/harness/reports/`, and each run's server direc
 **Real-world scripts** live in `corpus/real-world/`. They're written like the scripts a typical server runs, and use a wide spread of syntax: functions across files, commands with cooldowns, GUIs, list variables, timespans, `if all:` and so on. Each `<name>.sk` must define `selftest_<name>()` (with `-` as `_`) that checks its own logic with `check(suite, label, actual, expected)`, `check_true` and `fail` from `scripts/corpus-assert.sk`. The harness generates a `/corpustest` command that runs every self-test, so a new script is picked up just by adding the file. Keep scripts free of errors and warnings on the reference Skript, since the scenario fails on either.
 
 **Skript's own tests:** `./gradlew :test-harness:fetchSkriptTests` extracts Skript's own test scripts (GPL-3.0) for the pinned version into `build/corpus/skript/`, in the same layout as Skript's repo.
+
+## The differential and Skript's variation
+
+Skript breaks ties between syntax of equal priority by identity hash, so a few units get a different answer from one Skript run to the next: which error a line gets, or none. The `differential` scenario handles that in three ways, and only that: any other difference still fails, unless `known-differences.txt` lists it.
+
+- **Several runs.** It runs Skript `-Pharness.differential.skriptRuns` times (3 by default), each run cached in `.harness-cache/differential` by its inputs, and a unit matches when NeoSkript gives what Skript gave in any of them.
+- **Recorded answers.** `corpus/differential/skript-varies.json` lists each unit seen to vary and every answer Skript has given for it. Each entry's key starts with the Skript jar's hash, so answers only count for the Skript build they were recorded with, and the entry holds a hash of the unit's script, so they only count while the script is the same. A unit there also matches when NeoSkript gives one of those answers, though this time's runs didn't happen to give it. An answer with a message whose text is empty (`2 INFO: `) is a console capture cut short, and is never recorded or accepted. The report lists the units that matched only so (`matchedARecordedSkriptAnswer`) and those whose recorded answers would change (`skriptAnswersToRecord`).
+- **Keeping it up to date.** Run it with more runs and `-Pharness.differential.recordVariations=true`, then commit the file. Recording replaces this Skript build's entries with what the runs found: a unit that still varies keeps the answers given this time, and one that no longer varies, or an answer Skript no longer gives, is dropped. So record with many runs:
+
+  ```sh
+  ./gradlew :test-harness:harness -Pharness.env=paper-26.3 -Pharness.scenario=differential \
+      -Pharness.differential.skriptRuns=10 -Pharness.differential.recordVariations=true
+  ```
+
+  A unit where NeoSkript's own answer varies isn't Skript's variation and isn't recorded: fix NeoSkript. For example, NeoSkript parses scripts in parallel, and an event value error Skript gives only the first time (`Use 'attacker' and/or 'victim' in damage/death events`) went to whichever script was parsed first. When more than one script asks for one, those scripts are now parsed again one after another, in order.

@@ -81,6 +81,7 @@ final class ServerEvents {
         registrar.expression("ExprCommandSender", "commandsender", info -> (context, args) -> sender(context.event()),
                 "[the] [command['s]] sender");
         registrar.effect("EffCancelEvent", info -> {
+            EventPassed.refuse("An event cannot be cancelled after it has already passed");
             boolean cancel = info.pattern() == 0;
             cancellable(info);
             return (context, args) -> {
@@ -118,7 +119,8 @@ final class ServerEvents {
      */
     static void registerMessages(Registrar registrar) {
         registrar.expression("ExprChatMessage", "textcomponent", info -> new EventMessage<>(AsyncChatEvent.class,
-                AsyncChatEvent::message, (event, text) -> event.message(Messages.component(text))),
+                AsyncChatEvent::message, (event, text) -> event.message(Messages.component(text)),
+                changedAfter("the chat message")),
                 "[the] [chat( |-)]message");
         registrar.expression("ExprChatFormat", "string", info -> new EventMessage<>(AsyncChatEvent.class,
                 event -> "<[player]> [message]", (event, text) -> {
@@ -127,25 +129,69 @@ final class ServerEvents {
                             .replaceText(b -> b.matchLiteral("[player]").replacement(displayName))
                             .replaceText(b -> b.matchLiteral("[display name]").replacement(displayName))
                             .replaceText(b -> b.matchLiteral("[message]").replacement(message)));
-                }), "[the] (message|chat) format[ting]");
+                }, changedAfter("the chat format")), "[the] (message|chat) format[ting]");
         registrar.expression("ExprJoinMessage", "textcomponent", info -> new EventMessage<>(PlayerJoinEvent.class,
                 PlayerJoinEvent::joinMessage,
-                (event, text) -> event.joinMessage(text == null ? null : Messages.component(text))),
+                (event, text) -> event.joinMessage(text == null ? null : Messages.component(text)),
+                changedAfter("the join message")),
                 "[the] (join|log[ ]in)( |-)message");
         registrar.expression("ExprQuitMessage", "textcomponent", info -> new EventMessage<>(PlayerQuitEvent.class,
                 PlayerQuitEvent::quitMessage,
-                (event, text) -> event.quitMessage(text == null ? null : Messages.component(text))),
+                (event, text) -> event.quitMessage(text == null ? null : Messages.component(text)),
+                changedAfter("the quit message")),
                 "[the] (quit|leave|log[ ]out)( |-)message");
-        registrar.expression("ExprMOTD", "textcomponent", info -> new EventMessage<>(ServerListPingEvent.class,
-                ServerListPingEvent::motd,
-                (event, text) -> event.motd(text == null ? Component.empty() : Messages.component(text))),
-                "[the] [default|shown|displayed] (MOTD|message of [the] day)");
+        // As Skript's ExprMOTD: outside a server list ping, or written 'default', it's the server's own MOTD, which
+        // can't be changed; 'shown' only in a ping.
+        registrar.expression("ExprMOTD", "textcomponent", info -> {
+            boolean ping = info.isEvent(ServerListPingEvent.class);
+            if (info.mark() == 2 && !ping) {
+                throw new co.xenastudios.neoskript.api.element.SyntaxError(
+                        "The 'shown' MOTD expression can't be used outside of a server list ping event");
+            }
+            if (info.mark() == 1 || info.mark() == 0 && !ping) {
+                return new DefaultMotd();
+            }
+            // 'reset motd' is the server's own, as in Skript.
+            return new EventMessage<>(ServerListPingEvent.class, ServerListPingEvent::motd,
+                    (event, text) -> event.motd(text == null ? Component.empty() : Messages.component(text)),
+                    "'the MOTD' cannot be changed after the event has passed", org.bukkit.Bukkit::motd);
+        }, "[the] [1¦default|2¦shown|2¦displayed] (MOTD|message of [the] day)");
+        registrar.describe("ExprMOTD", (info, args) -> info.mark() == 1 || info.mark() == 0
+                && !info.isEvent(ServerListPingEvent.class) ? "the default MOTD" : "the MOTD");
     }
 
 
-    /** An event's message, which {@code set} and {@code delete} change. */
+    /** The server's own MOTD, which nothing changes, as Skript's default MOTD. */
+    private record DefaultMotd() implements Expression, Changeable {
+        @Override
+        public Object get(TriggerContext context, Object[] arguments) {
+            return org.bukkit.Bukkit.motd();
+        }
+
+        @Override
+        public Class<?>[] acceptChange(Mode mode) {
+            return null;
+        }
+
+        @Override
+        public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {}
+    }
+
+    /** Skript's error for changing an event's message, which it writes as {@code written}, after a wait. */
+    private static String changedAfter(String written) {
+        return "'" + written + "' can't be changed after the event has passed";
+    }
+
+    /** An event's message, which {@code set} and {@code delete} change, until a wait lets the event pass. */
     private record EventMessage<E>(Class<E> eventClass, java.util.function.Function<E, Object> getter,
-            java.util.function.BiConsumer<E, Object> setter) implements Expression, Changeable {
+            java.util.function.BiConsumer<E, Object> setter, String passed, java.util.function.Supplier<Object> reset)
+            implements Expression, Changeable {
+
+        /** A message that {@code reset} doesn't change. */
+        EventMessage(Class<E> eventClass, java.util.function.Function<E, Object> getter,
+                java.util.function.BiConsumer<E, Object> setter, String passed) {
+            this(eventClass, getter, setter, passed, null);
+        }
 
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
@@ -154,13 +200,16 @@ final class ServerEvents {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
-            return mode == Mode.SET ? new Class<?>[] {Object.class} : mode == Mode.DELETE ? new Class<?>[0] : null;
+            EventPassed.refuse(passed);
+            return mode == Mode.SET ? new Class<?>[] {Object.class}
+                    : mode == Mode.DELETE || mode == Mode.RESET && reset != null ? new Class<?>[0] : null;
         }
 
         @Override
         public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
             if (eventClass.isInstance(context.event())) {
-                setter.accept(eventClass.cast(context.event()), delta == null || delta.length == 0 ? null : delta[0]);
+                setter.accept(eventClass.cast(context.event()), mode == Mode.RESET && reset != null ? reset.get()
+                        : delta == null || delta.length == 0 ? null : delta[0]);
             }
         }
     }
@@ -223,6 +272,10 @@ final class ServerEvents {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            if (!real) {
+                EventPassed.refuse("Can't change the fake max players count anymore after the server list ping event has"
+                        + " already passed");
+            }
             return switch (mode) {
                 case SET, ADD, REMOVE -> new Class<?>[] {Number.class};
                 case RESET, DELETE -> real ? null : new Class<?>[] {Number.class};

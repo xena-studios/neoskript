@@ -164,6 +164,9 @@ tasks.register<JavaExec>("harness") {
     val skriptRuns = providers.gradleProperty("harness.differential.skriptRuns").orElse("3")
     // -Pharness.soak.reloads=N sets how many reloads neoskript-reload-soak measures (300 by default).
     val soakReloads = providers.gradleProperty("harness.soak.reloads").orElse("300")
+    // -Pharness.differential.recordVariations=true adds the answers of units that vary in Skript to
+    // corpus/differential/skript-varies.json.
+    val recordVariations = providers.gradleProperty("harness.differential.recordVariations").orElse("false")
     val projectDir = layout.projectDirectory
     val buildDir = layout.buildDirectory
     val cacheDir = layout.settingsDirectory.dir(".harness-cache")
@@ -190,6 +193,7 @@ tasks.register<JavaExec>("harness") {
             "-Dharness.echo=" + echo.get(),
             "-Dharness.differential.skriptRuns=" + skriptRuns.get(),
             "-Dharness.soak.reloads=" + soakReloads.get(),
+            "-Dharness.differential.recordVariations=" + recordVariations.get(),
         )
     })
 

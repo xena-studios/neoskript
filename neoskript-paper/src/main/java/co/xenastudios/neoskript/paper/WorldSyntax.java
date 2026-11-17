@@ -567,7 +567,7 @@ final class WorldSyntax {
 
     /** ExprDirection's {@code in the (horizontal) direction/facing of X}, {@code length} long. */
     /** An entity type as Skript's entity data writes itself: by its name, in the singular ('pig' for 'pigs'). */
-    private static String singular(String written) {
+    static String singular(String written) {
         EntityKind kind = written == null ? null : EntityKind.parse(written);
         return kind != null && kind.type() != null && kind.variants().isEmpty() && kind.amount() == 1
                 ? EntityKind.name(kind.type()) : written;

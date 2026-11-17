@@ -64,8 +64,10 @@ class StandardLibraryFuzzTest {
         CompiledScripts compiled = new ScriptCompiler(library, new VariableStore()).compile(parsed);
         List<Diagnostic> diagnostics = new ArrayList<>(parsed.getFirst().diagnostics());
         diagnostics.addAll(compiled.diagnostics());
-        // With no server, Paper's registries can't start, so what needs them fails here; on a server it doesn't.
-        diagnostics.removeIf(d -> d.message().contains("org.bukkit.Registry") || d.message().contains("RegistryAccess"));
+        // With no server, Paper's registries can't start and Bukkit has no server (block data is read by it), so what
+        // needs them fails here; on a server it doesn't.
+        diagnostics.removeIf(d -> d.message().contains("org.bukkit.Registry") || d.message().contains("RegistryAccess")
+                || d.message().contains("\"org.bukkit.Bukkit.server\" is null"));
         CompileFuzz.assertNoInternalErrors(fuzzCase, diagnostics);
         compiled.linkFunctions();
         if (CompileFuzz.mightNotEnd(fuzzCase.text())) {
