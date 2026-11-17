@@ -168,6 +168,31 @@ public final class Values {
         return i >= 0 && i < count ? Long.valueOf(i + 1) : null;
     }
 
+    private record Container(Class<?> type, java.util.function.Function<Object, Object[]> contents) {}
+
+    private static final java.util.List<Container> CONTAINERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /**
+     * Registers what looping a value of {@code type} written as words goes through, as Skript's loop does for its
+     * containers: an item type's items.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> void registerContainer(Class<T> type, java.util.function.Function<? super T, Object[]> contents) {
+        CONTAINERS.add(new Container(type, (java.util.function.Function<Object, Object[]>) contents));
+    }
+
+    /** What a loop over {@code values}, written as words, goes through: a container's contents, else them. */
+    public static Object[] containerValues(Object[] values) {
+        if (values.length == 1 && values[0] != null) {
+            for (Container container : CONTAINERS) {
+                if (container.type().isInstance(values[0])) {
+                    return container.contents().apply(values[0]);
+                }
+            }
+        }
+        return values;
+    }
+
     /** What a loop goes through: the values, or a queue's elements, which looping takes out of it. */
     public static Object[] loopValues(Object[] values) {
         return loopedQueue(values) != null ? new Object[0] : values;
