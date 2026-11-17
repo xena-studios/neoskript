@@ -39,6 +39,8 @@ final class ScriptReport implements BiConsumer<Diagnostic, SourceFile> {
 
     private final String label;
     private final Map<String, List<Problem>> byScript = new LinkedHashMap<>();
+    /** The alias files among {@link #byScript}, whose command reloads the aliases rather than a script. */
+    private final java.util.Set<String> aliasFiles = new java.util.HashSet<>();
     private int errors;
     private int warnings;
 
@@ -61,6 +63,16 @@ final class ScriptReport implements BiConsumer<Diagnostic, SourceFile> {
         } else {
             warnings++;
         }
+    }
+
+    /** Takes the problems of alias files, listed as {@code aliases/<file>}, with {@code /sk reload aliases} to click. */
+    BiConsumer<Diagnostic, SourceFile> aliases() {
+        return (problem, file) -> {
+            String name = "aliases/" + problem.file();
+            aliasFiles.add(name);
+            accept(new Diagnostic(problem.severity(), name, problem.line(), problem.column(), problem.length(),
+                    problem.message()), file);
+        };
     }
 
     int errors() {
@@ -100,7 +112,8 @@ final class ScriptReport implements BiConsumer<Diagnostic, SourceFile> {
         for (Map.Entry<String, List<Problem>> script : byScript.entrySet()) {
             int scriptErrors = (int) script.getValue().stream().filter(Problem::error).count();
             String counts = problems(scriptErrors, script.getValue().size() - scriptErrors);
-            Component name = Messages.command(script.getKey(), "/" + label + " reload " + script.getKey());
+            Component name = Messages.command(script.getKey(), "/" + label + " reload "
+                    + (aliasFiles.contains(script.getKey()) ? "aliases" : script.getKey()));
             Component problems = scriptErrors > 0 ? ERROR.render(text("text", counts)) : Component.text(counts);
             lines.add(Messages.REPORT_SCRIPT.chat(component("script", name), component("problems", problems)));
             for (Problem problem : script.getValue()) {

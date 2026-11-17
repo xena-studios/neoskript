@@ -50,6 +50,8 @@ Script problems at startup and runtime errors keep Skript's look, since tools an
 
 `metrics`, `variables.file`, `variables.storage`, `variables.recover` and the `events` settings apply when the server restarts. The reload says so when one of them changed.
 
+`aliases.load-defaults` applies on `/sk reload aliases` (after `/sk reload config`), on `/sk reload all`, or on restart.
+
 ## config-version
 
 | Setting | Default | What it does |
@@ -73,6 +75,14 @@ bStats can also be turned off for every plugin at once in `plugins/bStats/config
 | `update-checker` | `true` | Checks Modrinth for newer NeoSkript versions when the server starts and once a day. `false` turns it off. |
 
 See [updates and bStats](/docs/server/updates-and-metrics/) for who hears about a new version.
+
+## aliases
+
+| Setting | Default | What it does |
+|---|---|---|
+| `aliases.load-defaults` | `true` | Loads Skript's default aliases, such as `speed potion` or `flight 1 firework rocket`. Skript's `load default aliases`. With `false`, items are named only by the alias files in `plugins/NeoSkript/aliases` and after their Minecraft ids (`red dye`). |
+
+Moving over from Skript copies Skript's `load default aliases`. See [custom aliases](/docs/scripts/items/#custom-aliases) for the alias files.
 
 ## variables
 
@@ -124,7 +134,7 @@ These commands can do anything, so give the permission carefully. See [effect co
 
 ## Moving from Skript
 
-The first start copies Skript's settings for effect commands and `use player UUIDs in variable names` from `config.sk`. Skript's other `config.sk` settings aren't copied: NeoSkript's behaviour matches Skript's defaults for them. See [moving from Skript](/docs/moving-from-skript/).
+The first start copies Skript's settings for effect commands, `use player UUIDs in variable names` and `load default aliases` from `config.sk`. Skript's other `config.sk` settings aren't copied: NeoSkript's behaviour matches Skript's defaults for them. See [moving from Skript](/docs/moving-from-skript/).
 
 ## Updating NeoSkript
 
@@ -178,6 +188,13 @@ metrics: true
 # Check Modrinth for newer NeoSkript versions when the server starts and once a day. A newer version is
 # logged to the console and shown to players with skript.admin when they join. Development builds never check.
 update-checker: true
+
+aliases:
+  # Load Skript's default aliases, as Skript's 'load default aliases' in config.sk. Off, items are only named
+  # after their Minecraft ids (red dye) and by the alias files in plugins/NeoSkript/aliases, so some, like
+  # potions of each kind, have no names. Moving over from Skript copies its setting. Applies on
+  # /sk reload aliases.
+  load-defaults: true
 
 variables:
   # Where global variables are saved, in Skript's variables.csv format (Skript can read it too).

@@ -9,6 +9,7 @@ import co.xenastudios.neoskript.harness.HarnessFailure;
 import co.xenastudios.neoskript.harness.Scenario;
 import co.xenastudios.neoskript.harness.ScenarioContext;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.nio.charset.StandardCharsets;
@@ -21,8 +22,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The migration CLI, as a server owner runs it: {@code neoskript-cli check} on the real-world corpus loads every
- * script cleanly, and on a script with known hazards gives the Folia and performance hints for them. The CLI
- * starts its own check server, from the Paper build this environment pins.
+ * script cleanly, on a script with known hazards gives the Folia and performance hints for them, and on a Skript
+ * folder reads the alias files beside its scripts. The CLI starts its own check server, from the Paper build this
+ * environment pins.
  */
 public final class NeoSkriptCliScenario implements Scenario {
 
@@ -92,6 +94,19 @@ public final class NeoSkriptCliScenario implements Scenario {
         List<String> expected = List.of("performance 1", "folia 4", "folia 6");
         if (!found.equals(expected)) {
             throw new HarnessFailure("The CLI's hints for the hazards script were " + found + ", expected " + expected);
+        }
+        // plugins/Skript, with an alias file beside the scripts that a script uses.
+        Path skript = dir.resolve("Skript");
+        Files.createDirectories(skript.resolve("scripts"));
+        Files.createDirectories(skript.resolve("aliases"));
+        Files.writeString(skript.resolve("scripts/gems.sk"), "on load:\n\tset {_gems} to 2 rubys\n");
+        Files.writeString(skript.resolve("aliases/gems.sk"), "gems:\n\truby¦s = minecraft:red_dye\n\tbad = minecraft:nope\n");
+        JsonObject aliased = check(context, skript.resolve("scripts"), cache, dir.resolve("aliases.json"), 0);
+        JsonObject aliases = aliased.getAsJsonObject("aliases");
+        JsonArray aliasProblems = aliases.getAsJsonArray("problems");
+        if (aliases.get("files").getAsInt() != 1 || aliasProblems.size() != 1 || !aliasProblems.get(0).getAsJsonObject()
+                .get("message").getAsString().equals("Minecraft id minecraft:nope is not valid")) {
+            throw new HarnessFailure("The CLI didn't read the alias files beside the scripts as expected: " + aliases);
         }
         context.summary("scripts", corpus.getAsJsonArray("scripts").size());
         context.summary("hints", found.size());
