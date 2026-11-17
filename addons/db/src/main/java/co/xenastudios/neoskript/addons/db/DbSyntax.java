@@ -19,7 +19,6 @@ import co.xenastudios.neoskript.api.storage.BinaryReader;
 import co.xenastudios.neoskript.api.storage.BinaryWriter;
 import co.xenastudios.neoskript.api.storage.VariableCodec;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,7 +28,6 @@ import java.util.Map;
 import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * skript-db's syntax, as skript-db 2.0.0 has it, and the older forks' {@code synchronously}:
@@ -118,6 +116,11 @@ final class DbSyntax {
             this.arguments = isWritten(info, ARGUMENTS);
             TextTemplate text = info.argumentText(QUERY);
             if (text == null && !UNSAFE.equals(info.argumentElement(QUERY))) {
+                String written = Warnings.argument(QUERY);
+                if (written != null && written.contains("{")) {
+                    // What Skript 2.17 says when skript-db turns down a statement with a variable in it.
+                    throw new SyntaxError("Variables cannot be used here.");
+                }
                 throw new SyntaxError("Database statements must be string literals. If you must use an expression,"
                         + " you may use \"%unsafe (your expression)%\", but keep in mind that you may be vulnerable"
                         + " to SQL injection attacks!");
@@ -218,7 +221,7 @@ final class DbSyntax {
                 query = render(args[QUERY]);
             }
             Transactions.Transaction transaction = engine.transactions().find(scope, database);
-            AtomicReference<Statement> running = new AtomicReference<>();
+            Running running = engine.running();
             List<List<Object>> batchRows = rows;
             return engine.run(() -> {
                 try {
@@ -242,14 +245,14 @@ final class DbSyntax {
         }
 
         private Object runLeased(Database database, Query query, List<List<Object>> rows,
-                AtomicReference<Statement> running) throws SQLException {
+                Running running) throws SQLException {
             try (Database.Lease lease = database.lease()) {
                 return run(lease.connection(), query, rows, false, running);
             }
         }
 
         private Object run(java.sql.Connection connection, Query query, List<List<Object>> rows, boolean inTransaction,
-                AtomicReference<Statement> running) throws SQLException {
+                Running running) throws SQLException {
             if (rows != null) {
                 long affected = engine.statements().executeBatch(connection, query.sql(), rows, !inTransaction, running);
                 return switch (target) {
@@ -361,7 +364,7 @@ final class DbSyntax {
                     engine.errors().record(scope, Engine.message(e, database));
                     return Boolean.FALSE;
                 }
-            }, new AtomicReference<>());
+            }, Running.untimed());
         }
 
         @Override
@@ -382,7 +385,7 @@ final class DbSyntax {
                     engine.transactions().end(scope, transaction);
                 }
                 return null;
-            }, new AtomicReference<>());
+            }, Running.untimed());
         }
     }
 
