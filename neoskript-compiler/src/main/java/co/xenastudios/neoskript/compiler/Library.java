@@ -393,6 +393,22 @@ public final class Library implements Registrar {
         builder.delays(SyntaxKind.EXPRESSION, id);
     }
 
+    /** The ids of the pausing sections. */
+    private final java.util.Set<String> pausingSections = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    @Override
+    public void pausingSection(String id, ElementFactory<co.xenastudios.neoskript.api.element.PausingSection> factory,
+            String... patterns) {
+        add(SyntaxKind.SECTION, id, null, factory, patterns);
+        builder.delays(SyntaxKind.SECTION, id);
+        pausingSections.add(id);
+    }
+
+    /** Whether {@code id} is a pausing section. */
+    boolean isPausingSection(String id) {
+        return id != null && pausingSections.contains(id);
+    }
+
     /** How long triggers wait for each pausing element, in milliseconds, by id. */
     private final Map<String, Long> timeouts = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -403,8 +419,9 @@ public final class Library implements Registrar {
         if (timeout == null || timeout.isNegative() || timeout.isZero()) {
             throw new IllegalArgumentException("A timeout has to be more than zero: " + timeout);
         }
-        if (!builder.isDelaying(SyntaxKind.EFFECT, id) && !builder.isDelaying(SyntaxKind.EXPRESSION, id)) {
-            throw new IllegalArgumentException(id + " isn't a pausing effect or expression: register it first");
+        if (!builder.isDelaying(SyntaxKind.EFFECT, id) && !builder.isDelaying(SyntaxKind.EXPRESSION, id)
+                && !builder.isDelaying(SyntaxKind.SECTION, id)) {
+            throw new IllegalArgumentException(id + " isn't a pausing effect, expression or section: register it first");
         }
         long millis;
         try {

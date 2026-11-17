@@ -34,11 +34,16 @@ import java.util.Set;
  *     ({@code future gamemode}), 0 now. Only elements that take time states
  *     ({@link co.xenastudios.neoskript.api.registration.Registrar#timeStates}) are ever made with another
  * @param text the element as written ({@code the drops}), as Skript's errors quote it, or {@code null} if unknown
+ * @param argumentTexts each argument that's a text in quotes, as a {@link TextTemplate} whose holes have no values
+ *     yet, else {@code null}
+ * @param argumentElements the id of the registered element each argument is, without its variant
+ *     ({@code NeoSkriptDbExprUnsafe}), or {@code null} where it's something else
  */
 public record ElementInfo(int pattern, int mark, Set<String> tags, long orArguments, long listArguments,
         java.util.List<TypeArgument> types, java.util.List<String> argumentTypes, long singleArguments,
         java.util.List<String> argumentLiterals, String eventName, java.util.List<Class<?>> eventClasses,
-        String sectionType, long defaultArguments, int time, String text) {
+        String sectionType, long defaultArguments, int time, String text,
+        java.util.List<TextTemplate> argumentTexts, java.util.List<String> argumentElements) {
 
     /**
      * A type named in a pattern, as {@code strings} in {@code strings data tag "x" of {_item}}.
@@ -58,6 +63,10 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
         argumentTypes = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(argumentTypes));
         argumentLiterals = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(argumentLiterals));
         eventClasses = java.util.List.copyOf(eventClasses);
+        argumentTexts = argumentTexts == null ? java.util.List.of()
+                : java.util.Collections.unmodifiableList(new java.util.ArrayList<>(argumentTexts));
+        argumentElements = argumentElements == null ? java.util.List.of()
+                : java.util.Collections.unmodifiableList(new java.util.ArrayList<>(argumentElements));
     }
 
     /**
@@ -78,7 +87,7 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
             java.util.List<TypeArgument> types, java.util.List<String> argumentTypes, long singleArguments,
             java.util.List<String> argumentLiterals) {
         this(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments, argumentLiterals,
-                null, java.util.List.of(), null, 0, 0, null);
+                null, java.util.List.of(), null, 0, 0, null, null, null);
     }
 
     /**
@@ -90,7 +99,8 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
     @Internal
     public ElementInfo withTime(int time) {
         return new ElementInfo(pattern, mark, tags, orArguments, listArguments, types, argumentTypes, singleArguments,
-                argumentLiterals, eventName, eventClasses, sectionType, defaultArguments, time, text);
+                argumentLiterals, eventName, eventClasses, sectionType, defaultArguments, time, text, argumentTexts,
+                argumentElements);
     }
 
     /**
@@ -191,5 +201,28 @@ public record ElementInfo(int pattern, int mark, Set<String> tags, long orArgume
      */
     public boolean hasTag(String tag) {
         return tags.contains(tag);
+    }
+
+    /**
+     * Argument {@code index} if it's a text written in quotes, with the expressions in it kept apart, for a
+     * {@link TemplateAware} element to check while the script loads. The holes have no values yet.
+     *
+     * @param index the argument's index
+     * @return the text, or {@code null} if the argument isn't a text in quotes
+     */
+    public TextTemplate argumentText(int index) {
+        return index < argumentTexts.size() ? argumentTexts.get(index) : null;
+    }
+
+    /**
+     * The id of the registered element argument {@code index} is, without its variant, as its addon named it:
+     * {@code NeoSkriptDbExprUnsafe} for skript-db's {@code unsafe %text%}.
+     *
+     * @param index the argument's index
+     * @return the id, or {@code null} if the argument isn't a registered element (a text, a variable, a literal,
+     *     a function call) or was left out
+     */
+    public String argumentElement(int index) {
+        return index < argumentElements.size() ? argumentElements.get(index) : null;
     }
 }
