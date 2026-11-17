@@ -179,8 +179,17 @@ final class TriggerCompiler {
     /** What each loop loops, for which loop a {@code loop-<name>} is of. */
     private final Map<Block, Expr> looped = new java.util.IdentityHashMap<>();
 
+    /**
+     * A block being compiled. A {@code loop N times} has its count in {@code countSlot} and works its values out
+     * ({@link Values#timesElement}) instead of keeping them in {@code valuesSlot}, which is empty; else it's -1.
+     */
     private record Block(BlockKind kind, Label end, Label next, int valuesSlot, int indicesSlot, int indexSlot,
-            String valueType, int queueSlot) {
+            String valueType, int queueSlot, int countSlot) {
+
+        Block(BlockKind kind, Label end, Label next, int valuesSlot, int indicesSlot, int indexSlot,
+                String valueType, int queueSlot) {
+            this(kind, end, next, valuesSlot, indicesSlot, indexSlot, valueType, queueSlot, -1);
+        }
 
         Block(BlockKind kind, Label end, Label next, int valuesSlot, int indicesSlot, int indexSlot) {
             this(kind, end, next, valuesSlot, indicesSlot, indexSlot, null);
@@ -916,6 +925,9 @@ final class TriggerCompiler {
                 saved.add(new int[] {block.indexSlot(), SAVED_INDEX});
                 if (block.queueSlot() >= 0) {
                     saved.add(new int[] {block.queueSlot(), SAVED_QUEUE});
+                }
+                if (block.countSlot() >= 0) {
+                    saved.add(new int[] {block.countSlot(), SAVED_INDEX});
                 }
             } else if (block.kind() == BlockKind.WHILE) {
                 saved.add(new int[] {block.indexSlot(), SAVED_INDEX});
@@ -1789,7 +1801,16 @@ final class TriggerCompiler {
         int indicesSlot = -1;
         int indexSlot = nextSlot++;
         int queueSlot = -1;
-        if (isKeyed(looped, true)) {
+        int countSlot = -1;
+        if (isTimes(looped)) {
+            // 'loop N times' counts to N as it goes, as Skript's iterator does, instead of making N numbers first.
+            countSlot = nextSlot++;
+            timesCount((Expr.Syntax) looped);
+            method.visitVarInsn(ISTORE, countSlot);
+            method.visitInsn(ICONST_0);
+            method.visitTypeInsn(ANEWARRAY, OBJECT);
+            method.visitVarInsn(ASTORE, valuesSlot);
+        } else if (isKeyed(looped, true)) {
             // A list variable, or anything keeping indices: loop-index is each value's index.
             indicesSlot = nextSlot++;
             keyed(looped, true);
@@ -1827,10 +1848,15 @@ final class TriggerCompiler {
             method.visitVarInsn(ASTORE, valuesSlot);
         }
         method.visitVarInsn(ILOAD, indexSlot);
-        method.visitVarInsn(ALOAD, valuesSlot);
-        method.visitInsn(ARRAYLENGTH);
+        if (countSlot >= 0) {
+            method.visitVarInsn(ILOAD, countSlot);
+        } else {
+            method.visitVarInsn(ALOAD, valuesSlot);
+            method.visitInsn(ARRAYLENGTH);
+        }
         method.visitJumpInsn(IF_ICMPGE, end);
-        Block block = new Block(BlockKind.LOOP, end, next, valuesSlot, indicesSlot, indexSlot, null, queueSlot);
+        Block block = new Block(BlockKind.LOOP, end, next, valuesSlot, indicesSlot, indexSlot, null, queueSlot,
+                countSlot);
         if (looped instanceof Expr.Syntax syntax && syntax.syntax().syntax().id().equals("ExprTestLoopPeeking")
                 && syntax.syntax().pattern() == 0) {
             // Skript's test expression whose values can't be peeked at.
@@ -1841,7 +1867,7 @@ final class TriggerCompiler {
         if (value != null) {
             variableStore(value);
             variableName(value);
-            element(valuesSlot, indexSlot, 0);
+            loopElement(block, 0);
             method.visitMethodInsn(INVOKEVIRTUAL, STORE, "set", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
         }
         if (key != null) {
@@ -5908,7 +5934,7 @@ final class TriggerCompiler {
                     method.visitMethodInsn(INVOKESTATIC, "java/lang/String", "valueOf", "(J)Ljava/lang/String;", false);
                 }
             }
-            default -> element(loop.valuesSlot(), loop.indexSlot(), offset);
+            default -> loopElement(loop, offset);
         }
     }
 
@@ -6037,6 +6063,42 @@ final class TriggerCompiler {
         method.visitInsn(LCONST_1);
         method.visitInsn(LADD);
         method.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
+    }
+
+    /** Pushes the loop's value at its index + {@code offset}, or {@code null} if there's none there. */
+    private void loopElement(Block loop, int offset) {
+        if (loop.countSlot() < 0) {
+            element(loop.valuesSlot(), loop.indexSlot(), offset);
+            return;
+        }
+        method.visitVarInsn(ILOAD, loop.indexSlot());
+        pushInt(offset);
+        method.visitVarInsn(ILOAD, loop.countSlot());
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "timesElement", "(III)" + OBJECT_DESC, false);
+    }
+
+    /** Whether {@code looped} is Skript's {@code N times} ({@code once}, {@code twice}, {@code thrice}). */
+    private boolean isTimes(Expr looped) {
+        return looped instanceof Expr.Syntax syntax && syntax.syntax().syntax().id().equals("ExprTimes")
+                && library.binding(syntax.syntax().syntax()) instanceof ElementFactory<?>;
+    }
+
+    /**
+     * Pushes how many times {@code N times} counts ({@link Values#timesCount}), N worked out once, as Skript's
+     * iterator does: changing it inside the loop doesn't change the loop. The element is still made, for its
+     * checks (a negative literal is an error, zero or one a warning).
+     */
+    private void timesCount(Expr.Syntax times) throws CompileException {
+        ParsedSyntax syntax = times.syntax();
+        ((ElementFactory<?>) library.binding(syntax.syntax())).create(info(syntax));
+        if (syntax.pattern() == 1) {
+            pushInt(syntax.match().hasTag("once") ? 1 : syntax.match().hasTag("twice") ? 2 : 3);
+            return;
+        }
+        arguments(syntax);
+        pushInt(0);
+        method.visitInsn(AALOAD);
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "timesCount", "(" + OBJECT_DESC + ")I", false);
     }
 
     /** Pushes {@code array[index + offset]}, or {@code null} if that's outside the array. */
