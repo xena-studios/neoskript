@@ -80,7 +80,9 @@ public interface NeoSkript {
      * the error is logged and the server carries on with what it registered before that.
      *
      * <p>Call it from the addon's {@code onEnable}. Syntax can't be added once scripts have loaded: {@code /sk reload}
-     * reuses what's registered.
+     * reuses what's registered. So enabling an addon while the server runs (PlugMan and the like) isn't supported, and
+     * this throws "Scripts have loaded": restart instead. An addon disabled while the server runs keeps its syntax
+     * registered until a restart; the variables its codecs save are kept as their saved bytes.
      *
      * @param name the addon's name, as {@code /sk info} lists it
      * @param version the addon's version, as {@code /sk info} lists it

@@ -80,4 +80,32 @@ class AddonsTest {
         addons.registerAll(REGISTRAR);
         assertEquals(List.of("Lottery-Eff", "LotteryEffOther", "EffMessage"), errors);
     }
+
+    @Test
+    void anAddonCantReplaceACodecNeoSkriptHas() {
+        Addons addons = new Addons(NOPLogger.NOP_LOGGER);
+        addons.savedWhen(type -> type == String.class);
+        List<String> errors = new ArrayList<>();
+        addons.add("Lottery", "1.0", registrar -> {
+            try {
+                registrar.storage("lottery:text", String.class, null);
+            } catch (IllegalArgumentException refused) {
+                errors.add("String");
+            }
+            registrar.storage("lottery:ticket", Long.class, null);
+        });
+        addons.registerAll(REGISTRAR);
+        assertEquals(List.of("String"), errors);
+    }
+
+    @Test
+    void anAddonsEntryGoesWhenItsPluginDisables() {
+        Addons addons = new Addons(NOPLogger.NOP_LOGGER);
+        addons.add("Lottery", "1.0", registrar -> {}, "LotteryPlugin");
+        addons.add("Other", "2.0", registrar -> {}, "OtherPlugin");
+        assertEquals(java.util.Set.of("LotteryPlugin", "OtherPlugin"), addons.plugins());
+        addons.remove("LotteryPlugin");
+        assertEquals(List.of("Other 2.0"), addons.names());
+        assertEquals(java.util.Set.of("OtherPlugin"), addons.plugins());
+    }
 }

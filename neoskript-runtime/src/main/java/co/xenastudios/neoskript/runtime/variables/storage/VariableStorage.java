@@ -162,18 +162,21 @@ public final class VariableStorage {
     /**
      * Replaces each value whose saving needs code {@code loader} loaded (its class, or the codec registered for it)
      * with its saved bytes, as a {@link RawValue}, for an addon that's being disabled: later saves then never run
-     * its code, whose classes go with it. Values that can't be saved are deleted, as no save would keep them. The
-     * addon's codecs are then dropped.
+     * its code, whose classes go with it. The addon's codecs are then dropped. No value is ever deleted: one whose
+     * codec fails now keeps the bytes it has in the file; one with none there stays as it is, and isn't saved.
      *
-     * @return the names of the variables changed
+     * @return the variables kept as saved bytes, and those that couldn't be and won't be saved
      */
-    public synchronized List<String> detach(ClassLoader loader) {
+    public synchronized Detached detach(ClassLoader loader) {
         java.util.Map<String, Object> found = new java.util.LinkedHashMap<>();
         store.forEach((name, value) -> {
             if (codecs.usesCodeOf(value, loader)) {
                 found.put(name, value);
             }
         });
+        List<String> kept = new ArrayList<>();
+        List<String> notSaved = new ArrayList<>();
+        Map<String, VariableFile.Entry> previous = null;
         for (java.util.Map.Entry<String, Object> entry : found.entrySet()) {
             VariableCodecs.Encoded encoded;
             try {
@@ -181,10 +184,41 @@ public final class VariableStorage {
             } catch (RuntimeException | LinkageError e) {
                 encoded = null;
             }
-            store.set(entry.getKey(), encoded == null ? null : new RawValue(encoded.type(), encoded.bytes()));
+            if (encoded == null) {
+                // What the file has for it, if anything.
+                if (previous == null) {
+                    previous = previousEntries();
+                }
+                VariableFile.Entry before = previous.get(entry.getKey().toLowerCase(Locale.ROOT));
+                if (before == null) {
+                    notSaved.add(entry.getKey());
+                    continue;
+                }
+                encoded = new VariableCodecs.Encoded(before.type(), before.bytes());
+            }
+            store.set(entry.getKey(), new RawValue(encoded.type(), encoded.bytes()));
+            kept.add(entry.getKey());
         }
         codecs.forget(loader);
-        return List.copyOf(found.keySet());
+        return new Detached(List.copyOf(kept), List.copyOf(notSaved));
+    }
+
+    /**
+     * What {@link #detach} did.
+     *
+     * @param kept the variables now kept as their saved bytes
+     * @param notSaved those whose value couldn't be encoded and that the file has nothing for: they keep their value
+     *     in memory, but aren't saved
+     */
+    public record Detached(List<String> kept, List<String> notSaved) {}
+
+    /** The entries the file has now, or none if it can't be read. */
+    private Map<String, VariableFile.Entry> previousEntries() {
+        try {
+            return Files.exists(file) ? VariableFile.read(file) : Map.of();
+        } catch (IOException | RuntimeException unreadable) {
+            return Map.of();
+        }
     }
 
     /** Saves every variable except memory-only ones, once they have loaded. Values whose type can't be saved are skipped. */
@@ -222,12 +256,7 @@ public final class VariableStorage {
         List<String> kept = new ArrayList<>();
         List<String> notSaved = new ArrayList<>();
         if (!broken.isEmpty()) {
-            Map<String, VariableFile.Entry> previous;
-            try {
-                previous = Files.exists(file) ? VariableFile.read(file) : Map.of();
-            } catch (IOException | RuntimeException unreadable) {
-                previous = Map.of();
-            }
+            Map<String, VariableFile.Entry> previous = previousEntries();
             for (String name : broken) {
                 VariableFile.Entry before = previous.get(name);
                 if (before != null) {

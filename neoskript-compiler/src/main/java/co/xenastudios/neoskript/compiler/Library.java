@@ -918,6 +918,11 @@ public final class Library implements Registrar {
         codecs.register(name, type, codec);
     }
 
+    /** Whether values of exactly {@code type} already have a codec. */
+    public boolean saves(Class<?> type) {
+        return codecs.hasCodec(type);
+    }
+
     @Override
     public void unsavable(Class<?> type) {
         codecs.unsavable(type);

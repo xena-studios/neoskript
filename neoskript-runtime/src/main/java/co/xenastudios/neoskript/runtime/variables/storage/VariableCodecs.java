@@ -46,6 +46,12 @@ public final class VariableCodecs {
         resolved.clear();
     }
 
+    /** Whether values of exactly {@code type} have a codec registered. */
+    public boolean hasCodec(Class<?> type) {
+        Registration registration = byClass.get(type);
+        return registration != null && registration.codec() != null;
+    }
+
     /**
      * Whether saving {@code value} runs code {@code loader} loaded: its own class, or the codec that saves it, which
      * an addon may register for a type it didn't load (a JDK or Bukkit type).

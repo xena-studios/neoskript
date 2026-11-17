@@ -19,7 +19,9 @@ final class Startup {
         try {
             work.run();
         } catch (RuntimeException | LinkageError e) {
-            logger.error("NeoSkript couldn't finish starting; scripts or variables may be missing", e);
+            // NeoSkript stays enabled, so addons and /sk still work, but loudly: scripts may not be running.
+            logger.error("NeoSkript couldn't finish starting, so scripts or saved variables didn't all load: {}."
+                    + " Fix it and restart the server.", e.toString(), e);
         } finally {
             ready.run();
         }

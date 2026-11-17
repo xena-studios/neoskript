@@ -94,6 +94,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         addons = new Addons(getSLF4JLogger());
         addons.frozenWhen(library::frozen);
         addons.knownWhen(library::known);
+        addons.savedWhen(library::saves);
         // With addons, which enable after NeoSkript, the syntax is registered on the first tick, theirs with it, and
         // variables load after that, so the addons' types load too. Without them, nothing waits.
         boolean deferSyntax = Addons.anyInstalled(this) && !co.xenastudios.neoskript.plugin.check.CheckMode.requested();
@@ -171,13 +172,22 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler
             public void onAddonDisable(org.bukkit.event.server.PluginDisableEvent event) {
+                if (!Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin())) {
+                    return;
+                }
+                addons.remove(event.getPlugin().getName());
                 VariableStorage current = storage;
-                if (current != null && current.loaded() && Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin())) {
-                    java.util.List<String> detached = current.detach(event.getPlugin().getClass().getClassLoader());
-                    if (!detached.isEmpty()) {
-                        getSLF4JLogger().info("Kept {} {} of {}'s types as saved, since it was disabled",
-                                detached.size(), detached.size() == 1 ? "variable" : "variables",
-                                event.getPlugin().getName());
+                if (current != null && current.loaded()) {
+                    VariableStorage.Detached detached = current.detach(event.getPlugin().getClass().getClassLoader());
+                    if (!detached.kept().isEmpty()) {
+                        getSLF4JLogger().info("{} was disabled: kept {} {} its codecs save as saved bytes",
+                                event.getPlugin().getName(), detached.kept().size(),
+                                detached.kept().size() == 1 ? "variable" : "variables");
+                    }
+                    if (!detached.notSaved().isEmpty()) {
+                        getSLF4JLogger().warn("{} was disabled, and {} couldn't be encoded and had nothing saved before:"
+                                + " they keep their values until the server stops, but won't be saved",
+                                event.getPlugin().getName(), String.join(", ", detached.notSaved()));
                     }
                 }
             }
@@ -226,6 +236,11 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     /** The addons registered through NeoSkript's API, as {@code name version}, for {@code /sk info}. */
     java.util.List<String> registeredAddons() {
         return addons == null ? java.util.List.of() : addons.names();
+    }
+
+    /** The plugins that registered addons through NeoSkript's API, by name. */
+    java.util.Set<String> addonPlugins() {
+        return addons == null ? java.util.Set.of() : addons.plugins();
     }
 
     /**

@@ -439,12 +439,14 @@ public interface Registrar {
 
     /**
      * How values of {@code type} are saved in variables files, as Skript's type {@code name} (its type
-     * column in {@code variables.csv}, e.g. {@code location}). An addon's own type needs a name Skript doesn't use.
+     * column in {@code variables.csv}, e.g. {@code location}). An addon's own type needs a name Skript doesn't use,
+     * and an addon can't register a codec for a class NeoSkript (or another addon) already saves.
      *
      * @param <T> the values' class
      * @param name the name saved with each value
      * @param type the values' class
      * @param codec how they're written and read
+     * @throws IllegalArgumentException for an addon, if {@code type} already has a codec
      */
     <T> void storage(String name, Class<T> type, co.xenastudios.neoskript.api.storage.VariableCodec<T> codec);
 

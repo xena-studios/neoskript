@@ -552,11 +552,12 @@ final class SkriptCommand implements TabExecutor {
      */
     private List<String> addons() {
         List<String> addons = new ArrayList<>(plugin.registeredAddons());
+        // A plugin that registered through the API is listed by that, not again by its plugin name.
+        java.util.Set<String> registered = plugin.addonPlugins();
         for (Plugin other : Bukkit.getPluginManager().getPlugins()) {
             var meta = other.getPluginMeta();
             if ((meta.getPluginDependencies().contains("NeoSkript") || meta.getPluginSoftDependencies().contains("NeoSkript"))
-                    && addons.stream().noneMatch(addon -> addon.equalsIgnoreCase(meta.getName())
-                            || addon.toLowerCase(java.util.Locale.ROOT).startsWith(meta.getName().toLowerCase(java.util.Locale.ROOT) + " "))) {
+                    && !registered.contains(meta.getName())) {
                 addons.add(meta.getDisplayName());
             }
         }

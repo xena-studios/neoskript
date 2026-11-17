@@ -106,7 +106,7 @@ class VariableStorageDetachTest {
         // A JDK type the addon didn't load, saved by the addon's codec.
         store.set("wait", Duration.ofSeconds(3));
         store.set("text", "kept");
-        assertEquals(List.of("ticket", "wait"), storage.detach(addon));
+        assertEquals(new VariableStorage.Detached(List.of("ticket", "wait"), List.of()), storage.detach(addon));
         assertInstanceOf(RawValue.class, store.get("ticket"));
         assertInstanceOf(RawValue.class, store.get("wait"));
         assertEquals("kept", store.get("text"));
@@ -161,5 +161,30 @@ class VariableStorageDetachTest {
         assertInstanceOf(RawValue.class, store.get("ticket"));
         storage.save();
         assertEquals(ticketLine, line(storage, "ticket"));
+    }
+
+    @Test
+    void aCodecThatFailsDuringDetachKeepsTheFilesBytesAndNeverDeletesTheValue() throws Exception {
+        VariableStore store = new VariableStore();
+        VariableStorage storage = storage(store);
+        store.set("ticket", ticket(7));
+        storage.save();
+        String ticketBefore = line(storage, "ticket");
+        // The codec fails while the addon disables: one variable was saved before, one never was.
+        gone.set(true);
+        store.set("ticket", ticket(8));
+        Object fresh = ticket(9);
+        store.set("fresh", fresh);
+        VariableStorage.Detached detached = storage.detach(addon);
+        assertEquals(List.of("ticket"), detached.kept());
+        assertEquals(List.of("fresh"), detached.notSaved());
+        assertInstanceOf(RawValue.class, store.get("ticket"));
+        // Never null: the value stays in memory, though it isn't saved.
+        assertEquals(fresh, store.get("fresh"));
+        VariableStorage.Result saved = storage.save();
+        assertEquals(ticketBefore, line(storage, "ticket"));
+        // Its codec is gone, so it's one of the values that can't be saved, which the console counts.
+        assertEquals(1, saved.unsaved());
+        assertEquals(null, line(storage, "fresh"));
     }
 }

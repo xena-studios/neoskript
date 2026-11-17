@@ -25,7 +25,10 @@ import org.slf4j.Logger;
  */
 final class Addons {
 
-    private record Addon(String name, String version, Consumer<? super Registrar> registration) {}
+    /**
+     * @param plugin the name of the plugin that registered it, or {@code null} if no plugin's class did
+     */
+    private record Addon(String name, String version, Consumer<? super Registrar> registration, String plugin) {}
 
     /** The registrar methods whose first argument is the id of an element they register. */
     private static final Set<String> REGISTERS_ELEMENT = Set.of("effect", "condition", "section", "expression",
@@ -37,6 +40,8 @@ final class Addons {
     private Registrar registered;
     /** Whether an element is registered as an id, or a variant of it: NeoSkript's own, before addons register. */
     private Predicate<String> known = id -> false;
+    /** Whether a class already has a codec, NeoSkript's or another addon's. */
+    private Predicate<Class<?>> saved = type -> false;
     /** Whether scripts have loaded, after which nothing more can be registered. */
     private java.util.function.BooleanSupplier frozen = () -> false;
 
@@ -69,12 +74,26 @@ final class Addons {
         this.frozen = frozen;
     }
 
+    /** Says which classes have a codec already, so an addon can't replace one. */
+    void savedWhen(Predicate<Class<?>> saved) {
+        this.saved = saved;
+    }
+
     /** Says which ids are taken, by NeoSkript or another addon, so an addon can't change their thread affinity. */
     void knownWhen(Predicate<String> known) {
         this.known = known;
     }
 
     synchronized void add(String name, String version, Consumer<? super Registrar> registration) {
+        add(name, version, registration, null);
+    }
+
+    /**
+     * Adds an addon.
+     *
+     * @param plugin the name of the plugin that registered it, or {@code null}
+     */
+    synchronized void add(String name, String version, Consumer<? super Registrar> registration, String plugin) {
         java.util.Objects.requireNonNull(name, "name");
         java.util.Objects.requireNonNull(registration, "registration");
         if (frozen.getAsBoolean()) {
@@ -86,7 +105,7 @@ final class Addons {
                 throw new IllegalStateException("An addon called " + name + " is registered already");
             }
         }
-        Addon addon = new Addon(name, version == null ? "" : version, registration);
+        Addon addon = new Addon(name, version == null ? "" : version, registration, plugin);
         addons.add(addon);
         if (registered != null) {
             run(addon, registered);
@@ -128,6 +147,11 @@ final class Addons {
                     }
                     if (method.getName().equals("affinity") && args.length == 2 && args[1] instanceof ThreadAffinity) {
                         checkAffinity(addon, (String) args[0], own, taken);
+                    } else if (method.getName().equals("storage") && args.length == 3 && args[1] instanceof Class<?> type
+                            && saved.test(type)) {
+                        // Replacing a codec would lose it for good when the addon disables.
+                        throw new IllegalArgumentException(type.getName() + " is already saved by NeoSkript or another"
+                                + " addon, so " + addon.name() + " can't register a codec for it");
                     } else if (REGISTERS_ELEMENT.contains(method.getName()) && args.length > 0
                             && args[0] instanceof String id && !own.contains(id)) {
                         if (known.test(id)) {
@@ -159,6 +183,25 @@ final class Addons {
         } catch (InvocationTargetException e) {
             throw e.getCause();
         }
+    }
+
+    /**
+     * Forgets the addons {@code plugin} registered, as when it's disabled: {@code /sk info} stops listing them, and
+     * their registrations no longer hold its classes. Their syntax stays until the server restarts.
+     */
+    synchronized void remove(String plugin) {
+        addons.removeIf(addon -> plugin.equals(addon.plugin()));
+    }
+
+    /** The names of the plugins that registered addons. */
+    synchronized Set<String> plugins() {
+        Set<String> plugins = new HashSet<>();
+        for (Addon addon : addons) {
+            if (addon.plugin() != null) {
+                plugins.add(addon.plugin());
+            }
+        }
+        return plugins;
     }
 
     /** Each addon as {@code name version}, in the order added. */

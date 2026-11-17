@@ -58,7 +58,8 @@ final class AddonApi implements NeoSkript {
 
     @Override
     public void addon(String name, String version, Consumer<? super Registrar> registration) {
-        addons.add(name, version, registration);
+        Plugin owner = threads.callingPlugin();
+        addons.add(name, version, registration, owner == null ? null : owner.getName());
     }
 
     @Override
@@ -265,14 +266,7 @@ final class AddonApi implements NeoSkript {
          * the first time, as the task then outlives the addon.
          */
         private Plugin caller() {
-            Map<ClassLoader, Plugin> loaders = new java.util.HashMap<>();
-            for (Plugin candidate : plugin.getServer().getPluginManager().getPlugins()) {
-                ClassLoader loader = candidate.getClass().getClassLoader();
-                loaders.put(loader, candidate);
-                libraries.computeIfAbsent(loader, AddonApi::librariesOf).ifPresent(library -> loaders.put(library, candidate));
-            }
-            Plugin owner = walker.walk(frames -> owner(frames.map(frame -> frame.getDeclaringClass().getClassLoader()),
-                    AddonApi.class.getClassLoader(), loaders::get));
+            Plugin owner = callingPlugin();
             if (owner != null) {
                 return owner;
             }
@@ -282,6 +276,18 @@ final class AddonApi implements NeoSkript {
                         new Throwable("Scheduled here"));
             }
             return plugin;
+        }
+
+        /** The plugin whose class called the API, past NeoSkript's and the JDK's frames, or {@code null}. */
+        Plugin callingPlugin() {
+            Map<ClassLoader, Plugin> loaders = new java.util.HashMap<>();
+            for (Plugin candidate : plugin.getServer().getPluginManager().getPlugins()) {
+                ClassLoader loader = candidate.getClass().getClassLoader();
+                loaders.put(loader, candidate);
+                libraries.computeIfAbsent(loader, AddonApi::librariesOf).ifPresent(library -> loaders.put(library, candidate));
+            }
+            return walker.walk(frames -> owner(frames.map(frame -> frame.getDeclaringClass().getClassLoader()),
+                    AddonApi.class.getClassLoader(), loaders::get));
         }
         private Server server() {
             return plugin.getServer();

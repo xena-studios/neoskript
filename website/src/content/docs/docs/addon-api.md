@@ -230,7 +230,16 @@ neoskript.scripts().reload("quests/main.sk");
 
 Use them once NeoSkript is ready (see `whenReady` above). A variable's name is written as in a script, without braces, with `%...%` already filled in. Players are their UUIDs in variable names, as in Skript's default config. Each variable call is atomic and works from any thread; a sequence of them isn't.
 
-When your addon disables, values of its types in variables are kept as their saved bytes, so they're still saved, and load again with your codec on the next start.
+When your addon disables, the variables your codecs save are kept as the bytes they save as, so they're still saved and load again with your codecs on the next start. If a codec fails then, the variable keeps what `variables.csv` already has for it. A variable with nothing there keeps its value until the server stops, isn't saved, and the console says so.
+
+A codec can only be registered for a class nothing saves yet: registering one for a class NeoSkript already saves, like a location, throws `IllegalArgumentException`.
+
+## Disabling and reloading addons
+
+Restart the server to add, update or remove an addon:
+
+- **After an addon disables while the server runs,** its syntax stays registered until a restart, because scripts are compiled against it. Scripts that use it fail at run time.
+- **Enabling an addon while the server runs** (PlugMan and the like) isn't supported. Its `addon(...)` call fails with "Scripts have loaded", because syntax can only be registered before scripts load.
 
 ## Threads and Folia
 
