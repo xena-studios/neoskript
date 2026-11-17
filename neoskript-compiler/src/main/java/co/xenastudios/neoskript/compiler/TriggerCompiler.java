@@ -4463,6 +4463,7 @@ final class TriggerCompiler {
         if (!(library.binding(syntax.syntax()) instanceof ElementFactory<?> factory)) {
             throw unsupported(syntax.syntax().id());
         }
+        unpropertiedWords(syntax);
         Object element = factory.create(info(syntax));
         if (element instanceof PausingExpression || element instanceof PausingEffect) {
             String text = textOf(syntax);
@@ -4630,6 +4631,78 @@ final class TriggerCompiler {
             }
         }
         return null;
+    }
+
+    /**
+     * Skript's error for a type property of words whose value can't have it ({@code name of arrow}): Skript reads
+     * the words as the first of its types that takes them, in its order (an arrow is a damage type), and its
+     * property syntax turns that type down ({@code PropertyBaseSyntax.getBadTypesErrorMessage}), writing the value
+     * as text and the type by Skript's name for it.
+     */
+    private void unpropertiedWords(ParsedSyntax syntax) throws CompileException {
+        SyntaxRegistry.PropertySyntax property = registry.propertySyntax(syntax.syntax());
+        if (property == null || property.argument() >= syntax.match().values().size()
+                || !(syntax.match().values().get(property.argument()) instanceof Expr.Unresolved words)) {
+            return;
+        }
+        String name = property.property().apply(syntax.match().tags());
+        if (name == null || name.length() == 1) {
+            return;
+        }
+        String type;
+        String text;
+        int[] period = TIME_PERIODS.get(words.text().strip().toLowerCase(Locale.ROOT));
+        if (period != null) {
+            // Skript reads these as a time period, which NeoSkript has no type for, not a time.
+            type = "timeperiod";
+            text = skriptTime(period[0]) + "-" + skriptTime(period[1]);
+        } else {
+            type = wordsType(words.text(), skriptTypeOrder());
+            if (type == null) {
+                return;
+            }
+            Object value = wordsAs(words.text(), List.of(type));
+            text = value == null ? words.text().strip() : co.xenastudios.neoskript.runtime.Values.text(value);
+        }
+        if (registry.hasProperty(type, name)) {
+            return;
+        }
+        throw new CompileException(line, "The expression '" + text + "' returns the following types that do not"
+                + " have the " + name + " property: " + skriptTypeName(type));
+    }
+
+    /** Skript's named time periods, by the ticks they start and end at. */
+    private static final Map<String, int[]> TIME_PERIODS = Map.of("day", new int[] {0, 11999}, "dusk",
+            new int[] {12000, 13799}, "night", new int[] {13800, 22199}, "dawn", new int[] {22200, 23999});
+
+    /** A time of day as Skript's {@code Time.toString} writes it: {@code 19:48}. */
+    private static String skriptTime(int ticks) {
+        long minutes = Math.round(Math.floorMod(ticks + 6000, 24000) * 60 / 1000.0);
+        return (minutes / 60 % 24) + ":" + String.format(Locale.ROOT, "%02d", minutes % 60);
+    }
+
+    /** Skript's name for a type, as its errors write it: {@code gamemode}, {@code color}. */
+    private String skriptTypeName(String id) {
+        String name = SKRIPT_TYPE_NAMES.get(id);
+        if (name != null) {
+            return name;
+        }
+        co.xenastudios.neoskript.frontend.registry.TypeInfo info = registry.type(id);
+        return info == null ? id : info.name().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /** Skript's names for its types, by NeoSkript's ids. */
+    private static final Map<String, String> SKRIPT_TYPE_NAMES = loadNames("skript-type-names.txt");
+
+    private static Map<String, String> loadNames(String resource) {
+        Map<String, String> names = new java.util.HashMap<>();
+        for (String line : loadLines(resource)) {
+            int equals = line.indexOf('=');
+            if (equals > 0) {
+                names.put(line.substring(0, equals).strip(), line.substring(equals + 1).strip());
+            }
+        }
+        return Map.copyOf(names);
     }
 
     /** The registry's types in the order Skript tries its own, then those Skript doesn't have. */
@@ -6064,7 +6137,8 @@ final class TriggerCompiler {
                 // Words are first tried as the placeholder's own types: 'armor stand' is an entity type in
                 // 'spawn an armor stand', though it names an item too.
                 Object value = wordsAs(unresolved.text(), literalTypes);
-                if (value == null) {
+                // Where any value goes, Skript's parsers don't take 'the': 'the stone' is nothing there.
+                if (value == null && !unresolved.text().strip().toLowerCase(Locale.ROOT).startsWith("the ")) {
                     value = library.literal(unresolved.text());
                     if (value != null) {
                         if (inList == 0 && callArguments == 0) {

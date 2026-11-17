@@ -1122,8 +1122,14 @@ final class LineParser {
         };
     }
 
-    /** Whether some type's parser takes {@code words}, as Skript's {@code Classes.parse(words, Object.class)}. */
+    /**
+     * Whether some type's parser takes {@code words}, as Skript's {@code Classes.parse(words, Object.class)}. Its
+     * parsers don't take 'the': 'the stone' and 'the player' are nothing there, though 'a stone' is an item.
+     */
     private boolean anyLiteral(String words) {
+        if (Text.lower(words.strip()).startsWith("the ")) {
+            return false;
+        }
         if (context.isItemAlias(words)) {
             return true;
         }
