@@ -278,7 +278,7 @@ class EngineTest {
         engine = engine(new Settings(1, 1, 1_800_000, 30_000, 30, 30, null, 100, 600));
         CompletableFuture<Object> block = new CompletableFuture<>();
         // The only thread is busy, so the next statement waits, and is given up on.
-        engine.run(block::get, new java.util.concurrent.atomic.AtomicReference<>());
+        engine.run(block::get, Running.untimed());
         CompletionStage<?> waiting = element(text("DELETE FROM homes"), false, false, Set.of(), false)
                 .start(context, new Object[] {text("DELETE FROM homes"), database(), null, null});
         waiting.toCompletableFuture().cancel(true);
@@ -333,5 +333,18 @@ class EngineTest {
         seen.put("a", engine.database(url, null, null));
         assertInstanceOf(Database.class, seen.get("a"));
         assertTrue(seen.get("a") == engine.database(" jdbc:" + url, null, null));
+    }
+
+    @Test
+    void aSlowStatementIsStoppedAtTheQueryTimeout() throws Exception {
+        engine.close(Duration.ZERO);
+        engine = engine(new Settings(2, 2, 1_800_000, 30_000, 1, 30, null, 100, 600));
+        long started = System.nanoTime();
+        Object result = run(execute(text("WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c)"
+                + " SELECT COUNT(*) FROM c"), false, true, Set.of(), false), database());
+        assertEquals(PausingEffect.UNCHANGED, result);
+        assertTrue(System.nanoTime() - started < TimeUnit.SECONDS.toNanos(15));
+        assertNotNull(engine.errors().get(event));
+        assertEquals(0, database().inUse());
     }
 }

@@ -4,8 +4,6 @@
  */
 package co.xenastudios.neoskript.addons.db;
 
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -20,7 +18,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
 
@@ -130,10 +127,10 @@ public final class Engine {
      * Runs {@code work} off the server's threads, or where it is if that isn't a server thread.
      *
      * @param work the work, which may throw
-     * @param running the statement it runs, which is cancelled if the stage is (NeoSkript gave up waiting)
+     * @param running the statement it runs, which is stopped if the stage is cancelled (NeoSkript gave up waiting)
      * @return what the trigger waits for
      */
-    CompletionStage<Object> run(Work work, AtomicReference<Statement> running) {
+    CompletionStage<Object> run(Work work, Running running) {
         if (closed) {
             return CompletableFuture.failedFuture(new IllegalStateException("NeoSkriptDb is disabled"));
         }
@@ -148,7 +145,7 @@ public final class Engine {
         CompletableFuture<Object> stage = new CompletableFuture<>();
         stage.whenComplete((value, failure) -> {
             if (stage.isCancelled()) {
-                cancel(running.get());
+                running.cancel();
             }
         });
         try {
@@ -168,14 +165,9 @@ public final class Engine {
         return stage;
     }
 
-    private static void cancel(Statement statement) {
-        if (statement != null) {
-            try {
-                statement.cancel();
-            } catch (SQLException | RuntimeException ignored) {
-                // It finishes or fails on its own, then.
-            }
-        }
+    /** What a statement's work runs, timed by {@code query-timeout}. */
+    Running running() {
+        return new Running(housekeeping, settings.queryTimeoutSeconds() * 1000L);
     }
 
     /** Work for {@link #run}. */

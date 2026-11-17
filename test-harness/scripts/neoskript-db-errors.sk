@@ -1,0 +1,15 @@
+# Harness check: skript-db's load warnings and errors, compared between Skript with skript-db and NeoSkript.
+# Never run: only loaded.
+options:
+	db: the database "sqlite:plugins/dbtest/test.db"
+
+every 1000 days:
+	set {_x} to "a"
+	execute "SELECT * FROM players WHERE name = '%{_x}%'" in {@db}
+	execute "SELECT * FROM players WHERE name = '%unsafe {_x}%'" in {@db}
+	execute "SELECT * FROM players WHERE name = %{_x}% OR name = ?" in {@db} with arguments "b"
+	execute {_x} in {@db}
+	execute name of {_x} in {@db}
+	execute {_x} and {_x} in {@db}
+	execute "SELECT 1" in {@db} with batch arguments "a" and "b"
+	execute "SELECT 1" in {@db} and store the result in "nowhere"
