@@ -33,7 +33,12 @@ public final class VariableStorage {
      * temporary files an interrupted save left were removed.
      */
     public record Result(int variables, int raw, int unsaved, List<VariableFile.Problem> skipped, Path backup,
-            int leftovers) {
+            int leftovers, List<String> keptPrevious, List<String> notSaved) {
+
+        public Result(int variables, int raw, int unsaved, List<VariableFile.Problem> skipped, Path backup,
+                int leftovers) {
+            this(variables, raw, unsaved, skipped, backup, leftovers, List.of(), List.of());
+        }
 
         public Result(int variables, int raw, int unsaved) {
             this(variables, raw, unsaved, List.of(), null, 0);
@@ -84,7 +89,7 @@ public final class VariableStorage {
             Object value;
             try {
                 value = codecs.decode(entry.type(), entry.bytes());
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
                 skipped.add(new VariableFile.Problem(0, entry.name(), entry.name(),
                         "variable " + entry.name() + " could not be loaded: " + e));
                 continue;
@@ -154,6 +159,34 @@ public final class VariableStorage {
         return loaded && store.modifications() != savedAt;
     }
 
+    /**
+     * Replaces each value whose saving needs code {@code loader} loaded (its class, or the codec registered for it)
+     * with its saved bytes, as a {@link RawValue}, for an addon that's being disabled: later saves then never run
+     * its code, whose classes go with it. Values that can't be saved are deleted, as no save would keep them. The
+     * addon's codecs are then dropped.
+     *
+     * @return the names of the variables changed
+     */
+    public synchronized List<String> detach(ClassLoader loader) {
+        java.util.Map<String, Object> found = new java.util.LinkedHashMap<>();
+        store.forEach((name, value) -> {
+            if (codecs.usesCodeOf(value, loader)) {
+                found.put(name, value);
+            }
+        });
+        for (java.util.Map.Entry<String, Object> entry : found.entrySet()) {
+            VariableCodecs.Encoded encoded;
+            try {
+                encoded = codecs.encode(entry.getValue());
+            } catch (RuntimeException | LinkageError e) {
+                encoded = null;
+            }
+            store.set(entry.getKey(), encoded == null ? null : new RawValue(encoded.type(), encoded.bytes()));
+        }
+        codecs.forget(loader);
+        return List.copyOf(found.keySet());
+    }
+
     /** Saves every variable except memory-only ones, once they have loaded. Values whose type can't be saved are skipped. */
     public synchronized Result save() throws IOException {
         if (!loaded) {
@@ -163,11 +196,20 @@ public final class VariableStorage {
         long modifications = store.modifications();
         List<VariableFile.Entry> entries = new ArrayList<>();
         int[] counts = new int[2];
+        List<String> broken = new ArrayList<>();
         store.forEach((name, value) -> {
             if (name.startsWith("-")) {
                 return;
             }
-            VariableCodecs.Encoded encoded = codecs.encode(value);
+            VariableCodecs.Encoded encoded;
+            try {
+                encoded = codecs.encode(value);
+            } catch (RuntimeException | LinkageError failed) {
+                // A codec that fails, or whose classes are gone: this variable keeps what was saved before, and the
+                // rest are saved as usual.
+                broken.add(name.toLowerCase(Locale.ROOT));
+                return;
+            }
             if (encoded == null) {
                 counts[1]++;
                 return;
@@ -177,8 +219,28 @@ public final class VariableStorage {
             }
             entries.add(new VariableFile.Entry(name.toLowerCase(Locale.ROOT), encoded.type(), encoded.bytes()));
         });
+        List<String> kept = new ArrayList<>();
+        List<String> notSaved = new ArrayList<>();
+        if (!broken.isEmpty()) {
+            Map<String, VariableFile.Entry> previous;
+            try {
+                previous = Files.exists(file) ? VariableFile.read(file) : Map.of();
+            } catch (IOException | RuntimeException unreadable) {
+                previous = Map.of();
+            }
+            for (String name : broken) {
+                VariableFile.Entry before = previous.get(name);
+                if (before != null) {
+                    entries.add(before);
+                    kept.add(name);
+                } else {
+                    notSaved.add(name);
+                }
+            }
+        }
         VariableFile.write(file, entries);
         savedAt = modifications;
-        return new Result(entries.size(), counts[0], counts[1]);
+        return new Result(entries.size(), counts[0], counts[1], List.of(), null, 0, List.copyOf(kept),
+                List.copyOf(notSaved));
     }
 }

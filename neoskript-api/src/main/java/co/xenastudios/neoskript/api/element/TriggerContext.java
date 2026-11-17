@@ -4,9 +4,14 @@
  */
 package co.xenastudios.neoskript.api.element;
 
-/** What a running trigger knows: the event that started it. */
+/** What a running trigger knows: the event that started it. Addons are given one; they don't implement it. */
 public interface TriggerContext {
 
-    /** The event that started the trigger, e.g. a Bukkit event, or {@code null} for a script load. */
+    /**
+     * The event that started the trigger.
+     *
+     * @return a Bukkit event, or for NeoSkript's own (a script load, a script command, an {@code every} period) an
+     *     object of its own, or {@code null}
+     */
     Object event();
 }

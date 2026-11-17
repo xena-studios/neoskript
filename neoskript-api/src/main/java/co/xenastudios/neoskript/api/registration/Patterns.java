@@ -12,7 +12,9 @@ public final class Patterns {
     /**
      * {@code [the] <property> of %owners%} and {@code %owners%'[s] <property>}.
      *
+     * @param property the property's words
      * @param owners the owners' types, plural, as in a placeholder: {@code offlineplayers}
+     * @return the two patterns
      */
     public static String[] property(String property, String owners) {
         return new String[] {"[the] " + property + " of %" + owners + "%", "%" + owners + "%'[s] " + property};
@@ -21,6 +23,10 @@ public final class Patterns {
     /**
      * {@code %owners% (is|are) <property>}, then the negated pattern {@code %owners% (isn't|is not|aren't|are
      * not) <property>}: pattern 1 is the negated one.
+     *
+     * @param property the property's words
+     * @param owners the owners' types, plural, as in a placeholder
+     * @return the two patterns
      */
     public static String[] isProperty(String property, String owners) {
         return new String[] {"%" + owners + "% (is|are) " + property,
@@ -30,6 +36,10 @@ public final class Patterns {
     /**
      * {@code %owners% (has|have) <property>}, then the negated pattern {@code %owners% (doesn't|does not|do
      * not|don't) have <property>}: pattern 1 is the negated one.
+     *
+     * @param property the property's words
+     * @param owners the owners' types, plural, as in a placeholder
+     * @return the two patterns
      */
     public static String[] hasProperty(String property, String owners) {
         return new String[] {"%" + owners + "% (has|have) " + property,

@@ -53,6 +53,11 @@ public final class Regions {
     /** The subject of an element that acts on what only the global thread may change ({@link #GLOBAL_CHANGES}). */
     public static final int GLOBAL_SUBJECT = -2;
 
+    /** Addons' elements declared safe from any thread ({@code ThreadAffinity.ANY}), by id. */
+    private static final Set<String> DECLARED_EXEMPT = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    /** Addons' elements declared to change what only the global thread may ({@code ThreadAffinity.GLOBAL}), by id. */
+    private static final Set<String> DECLARED_GLOBAL = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     private static volatile RegionAccess access;
     private static volatile Consumer<ScriptRuntimeException> errors = e -> RuntimeErrors.logError(e.getMessage());
 
@@ -83,7 +88,23 @@ public final class Regions {
     /** Whether the element {@code id} changes what only Folia's global thread may ({@link #GLOBAL_CHANGES}). */
     public static boolean global(String id) {
         int dash = id.indexOf('-');
-        return GLOBAL_CHANGES.contains(dash < 0 ? id : id.substring(0, dash));
+        String base = dash < 0 ? id : id.substring(0, dash);
+        return GLOBAL_CHANGES.contains(base) || DECLARED_GLOBAL.contains(base);
+    }
+
+    /**
+     * Declares which thread element {@code id} needs, as an addon does through the registrar: {@code exempt} for one
+     * that's safe anywhere, {@code global} for one that changes what only the global thread may, neither for the
+     * default, the thread that owns its arguments.
+     */
+    public static void declare(String id, boolean exempt, boolean global) {
+        DECLARED_EXEMPT.remove(id);
+        DECLARED_GLOBAL.remove(id);
+        if (exempt) {
+            DECLARED_EXEMPT.add(id);
+        } else if (global) {
+            DECLARED_GLOBAL.add(id);
+        }
     }
 
     /**
@@ -102,7 +123,7 @@ public final class Regions {
     public static boolean exempt(String id) {
         int dash = id.indexOf('-');
         String base = dash < 0 ? id : id.substring(0, dash);
-        return SAFE_READS.contains(base) || SENDING.contains(base);
+        return SAFE_READS.contains(base) || SENDING.contains(base) || DECLARED_EXEMPT.contains(base);
     }
 
     // ------------------------------------------------------------------------------------------------- reads

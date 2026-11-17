@@ -1,0 +1,16 @@
+name: NeoSkriptExampleAddon
+version: '${version}'
+main: co.xenastudios.neoskript.example.ExampleAddon
+api-version: '1.21.4'
+folia-supported: true
+# An addon depends on NeoSkript, so it enables after NeoSkript, and NeoSkript waits for its syntax.
+depend: [NeoSkript]
+description: An example NeoSkript addon, a lottery of tickets.
+commands:
+  lottery:
+    description: Shows the last lottery draw, from the variable a script keeps it in.
+    usage: /lottery
+    permission: neoskriptexample.lottery
+permissions:
+  neoskriptexample.lottery:
+    default: op

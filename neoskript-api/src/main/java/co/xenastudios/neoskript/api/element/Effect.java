@@ -13,5 +13,11 @@ package co.xenastudios.neoskript.api.element;
 @FunctionalInterface
 public interface Effect {
 
+    /**
+     * Does what the effect does.
+     *
+     * @param context the running trigger
+     * @param arguments the placeholders' values, by index
+     */
     void execute(TriggerContext context, Object[] arguments);
 }

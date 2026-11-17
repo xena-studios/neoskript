@@ -107,10 +107,14 @@ const builtIn = [
 
       <h2 id="make-one">Making an addon</h2>
       <p class="section-lead">
-        NeoSkript's own standard library is built on its addon API, <code>neoskript-api</code>: syntax is registered
-        with builders, typed, and says which thread it's safe on, for Folia. The API is open in the{" "}
-        <a href={`${repo}/tree/main/neoskript-api`}>repository<External /></a>, and marked experimental until it's
-        declared stable after 1.0.
+        NeoSkript's own standard library is built on its addon API, <code>neoskript-api</code>, and addons use the same
+        one: a plugin registers its types, events, effects, expressions, conditions, sections and functions, says which
+        thread each is safe on for Folia, and reaches scripts and their variables.
+      </p>
+      <p class="section-lead">
+        The <a href="/docs/addon-api/">Addon API guide</a> shows how, and the{" "}
+        <a href={`${repo}/tree/main/examples/example-addon`}>example addon<External /></a> uses all of it. What's
+        stable is checked in every build, so an addon built against 1.0 runs on every 1.x.
       </p>
     </div>
   </section>
