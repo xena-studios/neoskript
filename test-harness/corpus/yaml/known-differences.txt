@@ -1,0 +1,41 @@
+# Where NeoSkriptYaml differs from skript-yaml 1.7.2 on purpose, for the yaml-differential scenario: each line is
+# "output <part> / <label> | why" or "file <path in plugins/YamlTest> | why". The addon's docs list the same
+# differences for server owners (website/src/content/docs/docs/addons/yaml.md).
+
+# skript-yaml reads Minecraft 26.3 as a version before 1.13 (minor version 3), so its representer looks for a
+# SnakeYAML method that's gone, and every save of a location, vector, !skriptclass value or text with & throws halfway,
+# leaving the file empty. NeoSkriptYaml writes them as skript-yaml does on 1.21: the scenario runs these parts on
+# Paper 1.21.11 too, where they must match skript-yaml byte for byte, with no known differences.
+file types/location.yml | skript-yaml fails to save locations on Minecraft 26
+file types/vector.yml | skript-yaml fails to save vectors on Minecraft 26
+file types/gamemode.yml | skript-yaml fails to save !skriptclass values on Minecraft 26
+file types/text-with-colour.yml | skript-yaml fails to save text with & on Minecraft 26
+file colour-text.yml | skript-yaml fails to save text with & on Minecraft 26
+output type-location / type location read | skript-yaml's save failed, so there's nothing to read
+output type-vector / type vector read | skript-yaml's save failed, so there's nothing to read
+output type-text-with-colour / type text with colour read | skript-yaml's save failed, so there's nothing to read
+output type-gamemode / type gamemode read | skript-yaml's save failed, so there's nothing to read
+# skript-yaml on Skript 2.17 stores nothing for an entity type, from a literal or a variable, without an error, on
+# Paper 1.21.11 too (the scenario's run there showed it), so the file stays empty. NeoSkriptYaml stores it as
+# !skriptclass, as it does a game mode, which matches skript-yaml byte for byte on 1.21.11.
+output type-entitytype / type entitytype set | skript-yaml stores nothing for an entity type on Skript 2.17
+output type-entitytype / type entitytype read | skript-yaml stores nothing for an entity type on Skript 2.17
+file types/entitytype.yml | skript-yaml stores nothing for an entity type on Skript 2.17
+
+# Fixed: skript-yaml lists nested paths twice.
+output given / given nodes | all yaml nodes lists each path once
+# Fixed: skript-yaml only adds the first of several node keys.
+output node-keys / node keys added | every node key given is added
+file node-keys.yml | every node key given is added
+# Fixed: skript-yaml compares a whole number read from a file (an Integer) with a script's (a Long), and finds them
+# different, so it removes nothing.
+output numbers / numbers after remove | numbers read from files are script numbers
+file numbers.yml | numbers read from files are script numbers
+# skript-yaml's 'delete all yaml from directory' extends Skript's Delay, which Skript 2.17 no longer takes as a
+# statement: the line fails as the script loads (ClassCastException), so that command doesn't exist there.
+output delete-folder / before | skript-yaml's command fails to load on Skript 2.17
+output delete-folder / after | skript-yaml's command fails to load on Skript 2.17
+output delete-folder / file after | skript-yaml's command fails to load on Skript 2.17
+output delete-folder / kept | skript-yaml's command fails to load on Skript 2.17
+file doomed-folder/a.yml | skript-yaml's command fails to load on Skript 2.17, so nothing is deleted
+file doomed-folder/b.yaml | skript-yaml's command fails to load on Skript 2.17, so nothing is deleted
