@@ -68,6 +68,9 @@ tasks.named<Jar>("shadowJar") {
     from(licence) { into("META-INF") }
     withGroovyBuilder {
         "relocate"("co.xenastudios.neoskript.addon.support", "$relocationBase.support")
+        // Libraries find their parts through META-INF/services (JDBC drivers, MariaDB's codecs): the files are
+        // merged, and renamed and rewritten with the relocations, so they still find them.
+        "mergeServiceFiles"()
     }
 }
 
