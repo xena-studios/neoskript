@@ -2286,6 +2286,9 @@ final class TriggerCompiler {
     /** A loop over {@code looped}; with {@code key} and {@code value}, each index and value is put in them first. */
     private void loop(Statement.Section section, Expr looped, Expr.Variable key, Expr.Variable value)
             throws CompileException {
+        // Skript sets up what's looped first: an event value the code can't have is the error, unless it's words
+        // read as a value ('loop the block:' in a function has no block; 'loop block and executor:' is the types).
+        checkEventValues(looped, true);
         // As Skript's loops, what's certainly one value can't be looped. A variable may hold a queue, which can.
         if (!(looped instanceof Expr.Variable) && !"queue".equals(looped.type()) && surelySingle(looped)) {
             // A list is in brackets, as Skript's ExpressionList writes itself: '("a" or "b")'.
@@ -5804,6 +5807,11 @@ final class TriggerCompiler {
                     request.valueClass(), request.type()) : null;
             if (asked != null) {
                 throw new CompileException(line, asked);
+            }
+            if (ref.type().id().equals("world") && source != null && syntax.end() <= source.length()
+                    && source.substring(syntax.start(), syntax.end()).strip().matches("(?i)(the )?world")) {
+                // Skript's 'the world' is its world of a location left out, which the event's location stands for.
+                throw new CompileException(line, "There's no location in " + eventDescription() + ".");
             }
             // Skript tries 'event-zombie' as a value named so first, whose error is kept.
             throw new CompileException(line, request.words() != null
