@@ -1464,6 +1464,19 @@ public final class Library implements Registrar {
         return bindings.get(new Key(syntax.kind(), syntax.id()));
     }
 
+    @Override
+    public void affinity(String id, co.xenastudios.neoskript.api.registration.ThreadAffinity affinity) {
+        checkOpen();
+        co.xenastudios.neoskript.runtime.region.Regions.declare(id,
+                affinity == co.xenastudios.neoskript.api.registration.ThreadAffinity.ANY,
+                affinity == co.xenastudios.neoskript.api.registration.ThreadAffinity.GLOBAL);
+    }
+
+    /** Whether everything is registered: scripts have been parsed with it, and nothing more can be added. */
+    public synchronized boolean frozen() {
+        return registry != null;
+    }
+
     private void checkOpen() {
         if (registry != null) {
             throw new IllegalStateException("The library is frozen: register everything before parsing scripts");

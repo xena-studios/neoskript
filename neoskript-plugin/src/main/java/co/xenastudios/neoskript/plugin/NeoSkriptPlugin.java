@@ -28,6 +28,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     /** What stops the runtime error frames. */
     private Runnable runtimeErrorFrames;
     private EffectCommands effectCommands;
+    /** The addons registered through the API. */
+    private Addons addons;
 
     /** https://bstats.org/plugin/bukkit/NeoSkript/34868 */
     private static final int BSTATS_PLUGIN_ID = 34868;
@@ -100,12 +102,24 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
         // Syntax of the plugins NeoSkript hooks into, as Skript's hooks, only when they're installed.
         boolean hooks = co.xenastudios.neoskript.paper.Hooks.anyInstalled();
-        StandardLibrary.register(library, registrar -> {
-            if (hooks) {
-                co.xenastudios.neoskript.paper.Hooks.register(registrar, getPluginMeta().getVersion(), getSLF4JLogger());
-            }
-        });
-        StandardLibrary.usePlayerUuidsInVariableNames(getConfig().getBoolean("variables.player-uuids-in-names", true));
+        addons = new Addons(getSLF4JLogger());
+        addons.frozenWhen(library::frozen);
+        // With addons, which enable after NeoSkript, the syntax is registered on the first tick, theirs with it, and
+        // variables load after that, so the addons' types load too. Without them, nothing waits.
+        boolean deferSyntax = Addons.anyInstalled(this) && !co.xenastudios.neoskript.plugin.check.CheckMode.requested();
+        Runnable registerSyntax = () -> {
+            StandardLibrary.register(library, registrar -> {
+                if (hooks) {
+                    co.xenastudios.neoskript.paper.Hooks.register(registrar, getPluginMeta().getVersion(), getSLF4JLogger());
+                }
+                // Addons' syntax goes with the hooks': before comparisons and what matches almost anything.
+                addons.registerAll(registrar);
+            });
+            StandardLibrary.usePlayerUuidsInVariableNames(getConfig().getBoolean("variables.player-uuids-in-names", true));
+        };
+        if (!deferSyntax) {
+            registerSyntax.run();
+        }
         if (co.xenastudios.neoskript.plugin.check.CheckMode.requested()) {
             // Started by NeoSkript's CLI to check scripts: check them, write the report, and stop.
             try {
@@ -118,7 +132,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             return;
         }
         if (TestRunner.enabled()) {
-            StandardLibrary.registerTesting(library);
+            if (!deferSyntax) {
+                StandardLibrary.registerTesting(library);
+            }
             // As Skript's test mode does: the chunks tests use stay loaded and ticking.
             try {
                 org.bukkit.World world = getServer().getWorlds().getFirst();
@@ -155,8 +171,29 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(effectCommands, this);
         storage = new VariableStorage(scripts.globals(), library.codecs(),
                 getDataPath().resolve(getConfig().getString("variables.file", "variables.csv")));
-        loadVariables();
+        if (!deferSyntax) {
+            loadVariables();
+        }
+        co.xenastudios.neoskript.api.NeoSkript.install(
+                new AddonApi(this, addons, scripts.globals(), scheduler, platform == Platform.FOLIA));
+        // An addon disables before NeoSkript when the server stops, and its classes go with it: save variables while
+        // its codecs can still write its types.
+        getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler
+            public void onAddonDisable(org.bukkit.event.server.PluginDisableEvent event) {
+                if (Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin())) {
+                    saveVariables(false);
+                }
+            }
+        }, this);
         Runnable start = () -> {
+            if (deferSyntax) {
+                registerSyntax.run();
+                if (TestRunner.enabled()) {
+                    StandardLibrary.registerTesting(library);
+                }
+                loadVariables();
+            }
             if (hooks) {
                 co.xenastudios.neoskript.paper.Hooks.hookServices(getSLF4JLogger());
             }
@@ -170,9 +207,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             co.xenastudios.neoskript.paper.EventBridges.start(this, eventPriority());
             co.xenastudios.neoskript.paper.Hooks.start(this, eventPriority());
         };
-        if (hooks) {
+        if (hooks || deferSyntax) {
             // As Skript: with plugins to hook into, taking Vault's services and then loading scripts wait for the
-            // server to start, when every plugin has enabled and registered its services.
+            // server to start, when every plugin has enabled and registered its services. With addons, so does
+            // registering the syntax, for theirs.
             getServer().getGlobalRegionScheduler().run(this, task -> start.run());
         } else {
             start.run();
@@ -182,7 +220,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             UpdateNotices.start(this, getSLF4JLogger());
         }
         // D10: NeoSkript takes over /skript and /sk, with /neoskript as an alias.
-        getCommand("skript").setExecutor(new SkriptCommand(this, scripts, this::reloadSettings));
+        getCommand("skript").setExecutor(new SkriptCommand(this, scripts, this::reloadSettings, addons::names));
     }
 
     /**
@@ -292,6 +330,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        co.xenastudios.neoskript.api.NeoSkript.install(null);
         if (runtimeErrorFrames != null) {
             runtimeErrorFrames.run();
         }

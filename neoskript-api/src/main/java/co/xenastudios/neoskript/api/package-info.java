@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 /**
- * The public addon API: syntax registration, types, converters, events, and codegen hooks.
+ * NeoSkript's addon API. Start with {@link co.xenastudios.neoskript.api.NeoSkript}, which addons get with
+ * {@link co.xenastudios.neoskript.api.NeoSkript#get()} and register their syntax through.
  *
- * <p>NeoSkript's own standard library is built on this API. It must not depend on Bukkit at
- * runtime, so the CLI and language server can load the syntax registry without a server.
+ * <p>NeoSkript's own standard library is built on this API. It has no Bukkit types, and doesn't need Bukkit at run
+ * time, so the CLI, the language server and the in-browser parser can load the syntax registry without a server.
  */
 package co.xenastudios.neoskript.api;

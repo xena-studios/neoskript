@@ -13,13 +13,28 @@ import java.util.function.BiFunction;
  */
 public interface Update extends Effect {
 
-    /** The index of the placeholder that's set. */
+    /**
+     * The placeholder that's set.
+     *
+     * @return its index
+     */
     int target();
 
-    /** The new values for the target, given every placeholder's value. */
+    /**
+     * The new values for the target.
+     *
+     * @param context the running trigger
+     * @param arguments every placeholder's value, by index
+     * @return one value, an {@code Object[]} of several, or {@code null} for none
+     */
     Object update(TriggerContext context, Object[] arguments);
 
-    /** Updates are compiled into a {@code set}; this is only for running one directly. */
+    /**
+     * Updates are compiled into a {@code set}; this is only for running one directly.
+     *
+     * @param context the running trigger
+     * @param arguments every placeholder's value, by index
+     */
     @Override
     default void execute(TriggerContext context, Object[] arguments) {
         update(context, arguments);
@@ -28,12 +43,20 @@ public interface Update extends Effect {
     /**
      * Whether the target has to be one that can be set. If not, the effect does its work on the values
      * themselves where it can't be ({@code zombify last spawned villager}), as Skript's do.
+     *
+     * @return whether it has to be settable
      */
     default boolean setRequired() {
         return true;
     }
 
-    /** An update whose target needn't be settable: see {@link #setRequired}. */
+    /**
+     * An update whose target needn't be settable: see {@link #setRequired}.
+     *
+     * @param target the index of the placeholder that's set
+     * @param update the new values for it, given every placeholder's value
+     * @return the update
+     */
     static Update inPlace(int target, BiFunction<TriggerContext, Object[], Object> update) {
         return new Update() {
             @Override
@@ -53,6 +76,13 @@ public interface Update extends Effect {
         };
     }
 
+    /**
+     * An update whose target has to be settable.
+     *
+     * @param target the index of the placeholder that's set
+     * @param update the new values for it, given every placeholder's value
+     * @return the update
+     */
     static Update of(int target, BiFunction<TriggerContext, Object[], Object> update) {
         return new Update() {
             @Override

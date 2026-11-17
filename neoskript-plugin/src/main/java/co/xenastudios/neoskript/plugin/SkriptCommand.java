@@ -74,16 +74,21 @@ final class SkriptCommand implements TabExecutor {
     private final Plugin plugin;
     private final ScriptManager scripts;
     private final Runnable reloadConfig;
+    /** The addons registered through the API, for {@code /skript info}. */
+    private final java.util.function.Supplier<List<String>> addons;
     /** What {@code /skript reload last} reloads. */
     private String lastReloaded;
 
     /**
      * @param reloadConfig reloads {@code config.yml} and applies what can change while the server runs
+     * @param addons the addons registered, as {@code name version}
      */
-    SkriptCommand(Plugin plugin, ScriptManager scripts, Runnable reloadConfig) {
+    SkriptCommand(Plugin plugin, ScriptManager scripts, Runnable reloadConfig,
+            java.util.function.Supplier<List<String>> addons) {
         this.plugin = plugin;
         this.scripts = scripts;
         this.reloadConfig = reloadConfig;
+        this.addons = addons;
     }
 
     private static Sub find(String alias) {
@@ -466,8 +471,9 @@ final class SkriptCommand implements TabExecutor {
         info(sender, "info.tutorials");
         info(sender, "info.server", serverVersion());
         info(sender, "info.version", plugin.getPluginMeta().getVersion());
-        // NeoSkript has no addons yet.
-        info(sender, "info.addons", "None");
+        // As Skript lists its addons: NeoSkript's, registered through its API.
+        List<String> installed = addons.get();
+        info(sender, "info.addons", installed.isEmpty() ? "None" : String.join(", ", installed));
         List<String> dependencies = new ArrayList<>();
         for (String name : plugin.getPluginMeta().getPluginSoftDependencies()) {
             Plugin dependency = Bukkit.getPluginManager().getPlugin(name);

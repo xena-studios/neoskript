@@ -111,7 +111,7 @@ Rules on Folia:
 
 ### 3.6 Addon APIs
 
-- **Modern API (1.0, `@Experimental` until 1.1):** builder-based registration, typed `Expression<T>`, optional codegen hooks for intrinsics, explicit thread-affinity declarations, versioned and published to Maven.
+- **Modern API (stable, [M6 step 9](PROGRESS.md#step-9-the-addon-api-declared-stable)):** registration through a `Registrar` an addon gets from `NeoSkript.get().addon(...)`, script, variable and thread access, explicit thread-affinity declarations, and a Maven publication. What's public is stable unless marked `@Experimental` or `@Internal`, and a committed signature file, checked in the build, keeps changes deliberate. Still to come: typed `Expression<T>` and codegen hooks for addons' intrinsics.
 - **Skript compat shim (1.x):** implements `ch.njol.skript.*` (`SyntaxElement.init(Expression[], int, Kleenean, ParseResult)`, `ClassInfo`, `Converters`, `Skript.registerX`), wrapping each addon element as a call-through node. Target order: **SkBee → skript-yaml → SkQuery → skript-reflect**. skript-reflect leans heavily on Skript internals and may need special handling.
 
 ## 4. Quality: corpus, differential testing, benchmarks
@@ -139,7 +139,7 @@ Milestones are ordered by dependency, not dated. A milestone is done when its ex
 | **M4** | Standard library | Types, converters, aliases, events, effects, expressions, conditions and commands, most-used first | ≥95% of the corpus behaves identically under differential testing, and all of Skript's own tests pass |
 | **M5** | Folia hardening and tooling | Region-ownership enforcement, the `run on` section, Folia differential tests, the migration CLI | The corpus runs on Folia without thread violations, and the CLI is released |
 | **M6** | Beta → 1.0 | Public beta on Modrinth and GitHub Releases, published benchmarks, a syntax-docs export for the docs site, bStats and the update checker (both can be turned off), bug burn-down | 1.0 is released |
-| **1.x** | After 1.0 | LSP and VS Code extension, the Skript-addon shim (SkBee first), the addon API declared stable, an optional native variable backend, opt-in language extensions | |
+| **1.x** | After 1.0 | The Skript-addon shim (SkBee first), an optional native variable backend, opt-in language extensions. Done early, in M6: the LSP and editor extensions, and the addon API declared stable | |
 
 ## 7. Top risks
 

@@ -10,6 +10,12 @@ package co.xenastudios.neoskript.api.element;
  */
 public interface SettableCondition extends Condition {
 
-    /** Makes the condition {@code value} for the values in {@code arguments}. */
+    /**
+     * Makes the condition {@code value} for the values in {@code arguments}.
+     *
+     * @param context the running trigger
+     * @param arguments the placeholders' values, by index
+     * @param value what it's made
+     */
     void set(TriggerContext context, Object[] arguments, boolean value);
 }

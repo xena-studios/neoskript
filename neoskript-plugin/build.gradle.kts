@@ -12,6 +12,7 @@ dependencies {
     // Paper ships Gson; the update checker reads Modrinth's answers with it.
     compileOnly(libs.gson)
     testImplementation(libs.gson)
+    testImplementation(libs.paper.api)
 }
 
 tasks.processResources {

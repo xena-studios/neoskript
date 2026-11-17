@@ -1,0 +1,19 @@
+# Harness check: syntax from the example addon (examples/example-addon), registered through NeoSkript's API.
+# Each line prints "[harness] addon <check>: <value>".
+options:
+	prefix: [harness] addon
+
+on load:
+	set {_steve} to a new ticket for "Steve"
+	set {_alex} to a new ticket for "Alex"
+	send "{@prefix} type: %{_steve}% and %{_alex}%" to console
+	if {_alex} is winning:
+		send "{@prefix} condition: %{_alex}% wins" to console
+	if {_steve} is not winning:
+		send "{@prefix} negated condition: %{_steve}% doesn't" to console
+	send "{@prefix} function: %lotteryPrize(3)%" to console
+	draw the lottery with {_steve} and {_alex}
+
+on lottery draw:
+	set {lottery::last} to event-ticket
+	send "{@prefix} event: %event-ticket% won" to console
