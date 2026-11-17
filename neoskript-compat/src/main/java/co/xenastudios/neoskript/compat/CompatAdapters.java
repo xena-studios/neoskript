@@ -28,6 +28,9 @@ final class CompatAdapters {
                     co.xenastudios.neoskript.paper.CompatBridge.enchantmentTypeClass(),
                     ch.njol.skript.util.EnchantmentType::of,
                     value -> ((ch.njol.skript.util.EnchantmentType) value).neoskript()),
+            new Adapter(ch.njol.skript.util.Timespan.class, co.xenastudios.neoskript.runtime.Timespan.class,
+                    ch.njol.skript.util.Timespan::of,
+                    value -> ((ch.njol.skript.util.Timespan) value).neoskript()),
             new Adapter(ch.njol.skript.util.slot.Slot.class, co.xenastudios.neoskript.paper.CompatBridge.slotClass(),
                     ch.njol.skript.util.slot.Slot::of,
                     // A slot an addon made itself stays the addon's.

@@ -295,12 +295,29 @@ command /skbeetest-storage:
 		set time in world "world" to 12:00
 		set weather in world "world" to clear
 		set {skbee::releasing} to true
-		release all entities from storage of block at {_l} into {_bees::*}
+		release all entities from storage of block at {_l} for 1 minute into {_bees::*}
 		delete {skbee::releasing}
 		skbee("released bees", size of {_bees::*})
 		kill {_bees::*}
 		set block at {_l} to air
 		send "[skbee] end storage" to console
+
+command /skbeetest-timespans:
+	trigger:
+		set {_l} to location(28, 100, 28, world "world")
+		set inhabited time of chunk at {_l} to 1 day
+		skbee("inhabited time", inhabited time of chunk at {_l})
+		add 10 minutes to inhabited time of chunk at {_l}
+		remove 3 minutes from inhabited time of chunk at {_l}
+		skbee("inhabited time changed", inhabited time of chunk at {_l})
+		skbee("inhabited over an hour", whether inhabited time of chunk at {_l} > 1 hour)
+		set {_t} to inhabited time of chunk at {_l}
+		skbee("inhabited time plus", {_t} + 2 seconds)
+		set block at {_l} to spawner
+		set spawner spawn delay of block at {_l} to 3 seconds
+		skbee("spawn delay", spawner spawn delay of block at {_l})
+		set block at {_l} to air
+		send "[skbee] end timespans" to console
 
 command /skbeetest-after-restart-text:
 	trigger:

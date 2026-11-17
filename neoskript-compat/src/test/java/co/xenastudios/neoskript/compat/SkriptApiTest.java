@@ -28,6 +28,23 @@ import org.skriptlang.skript.util.Priority;
 class SkriptApiTest {
 
     @Test
+    void timespansAreSkriptsHoldingNeoSkriptsLength() {
+        ch.njol.skript.util.Timespan minute = ch.njol.skript.util.Timespan.parse("1 minute");
+        assertEquals(60_000, minute.getAs(ch.njol.skript.util.Timespan.TimePeriod.MILLISECOND));
+        assertEquals(1200, minute.getAs(ch.njol.skript.util.Timespan.TimePeriod.TICK));
+        assertEquals(new co.xenastudios.neoskript.runtime.Timespan(60_000), minute.neoskript());
+        assertEquals("1 minute", minute.toString());
+        ch.njol.skript.util.Timespan mixed = new ch.njol.skript.util.Timespan(90_061_000);
+        assertEquals(1, mixed.get(java.time.temporal.ChronoUnit.DAYS));
+        assertEquals(1, mixed.get(java.time.temporal.ChronoUnit.HOURS));
+        assertEquals(1, mixed.get(java.time.temporal.ChronoUnit.SECONDS));
+        assertTrue(ch.njol.skript.util.Timespan.infinite().add(minute).isInfinite());
+        assertEquals(0, minute.subtract(mixed).getAs(ch.njol.skript.util.Timespan.TimePeriod.MILLISECOND));
+        assertEquals(null, ch.njol.skript.util.Timespan.parse("not a time"));
+        assertThrows(IllegalArgumentException.class, () -> new ch.njol.skript.util.Timespan(-1));
+    }
+
+    @Test
     void propertyPatternsAreSkripts() {
         assertArrayEquals(new String[] {"[the] (min|:max) height of %worlds%", "%worlds%'[s] (min|:max) height"},
                 PropertyExpression.getPatterns("(min|:max) height", "worlds"));
