@@ -225,6 +225,12 @@ final class TriggerCompiler {
     private MethodVisitor method;
     private int nextSlot = PARSE_LOGS_SLOT + 1;
     private FunctionInfo function;
+    /**
+     * How many blocks were open when the code Skript loads as a trigger of its own began ({@code wait 1 tick:},
+     * {@code spawn a pig:}), or -1. Skript resets its parser for that code, so the function's {@code return} can't be
+     * used in it, nor a returnable section's from around it.
+     */
+    private int detachedAt = -1;
     /** The text expression positions refer to: the current line, a section header's key, or a default value. */
     private String source;
     private int line;
@@ -1007,9 +1013,20 @@ final class TriggerCompiler {
                 "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + "J)V", false);
         method.visitJumpInsn(GOTO, after);
         method.visitLabel(start.resume());
-        statements(section.body());
+        detached(section.body());
         exitTrigger();
         method.visitLabel(after);
+    }
+
+    /** Compiles code Skript loads as a trigger of its own: see {@link #detachedAt}. */
+    private void detached(List<Statement> body) throws CompileException {
+        int outer = detachedAt;
+        detachedAt = blocks.size();
+        try {
+            statements(body);
+        } finally {
+            detachedAt = outer;
+        }
     }
 
     private Object define(byte[] bytes) {
@@ -1755,7 +1772,7 @@ final class TriggerCompiler {
         blocks.push(new Block(BlockKind.SECTION, end, next, valuesSlot, -1, indexSlot,
                 library.sectionType(header.syntax().id())));
         try {
-            statements(section.body());
+            detached(section.body());
         } finally {
             blocks.pop();
             if (place >= 0) {
@@ -1836,7 +1853,7 @@ final class TriggerCompiler {
             eventLabel = sectionEvent;
         }
         try {
-            statements(section.body());
+            detached(section.body());
         } finally {
             eventClasses = outerClasses;
             eventLabel = outerLabel;
@@ -1905,9 +1922,30 @@ final class TriggerCompiler {
         return ref.type().id();
     }
 
+    /**
+     * What {@code return} returns to, after Skript's EffReturn checks, in its order: there's something to return to,
+     * and the code can't have waited. A returnable section, or {@code null} for the function.
+     */
+    private Block returnable() throws CompileException {
+        Block handler = returnHandler();
+        if (handler == null && (function == null || detachedAt >= 0)) {
+            throw new CompileException(line, "The return statement cannot be used here");
+        }
+        if (currentLine != null && script.delayBefore(currentLine)
+                != co.xenastudios.neoskript.frontend.registry.DelayState.NOT_DELAYED) {
+            throw new CompileException(line, "A return statement after a delay is useless, as the calling trigger"
+                    + " will resume when the delay starts (and won't get any returned value)");
+        }
+        return handler;
+    }
+
     /** The innermost returnable section {@code return} gives its values to, or {@code null} for the function's. */
     private Block returnHandler() {
+        int open = detachedAt < 0 ? blocks.size() : blocks.size() - detachedAt;
         for (Block block : blocks) {
+            if (open-- <= 0) {
+                break;
+            }
             if (block.kind() == BlockKind.RETURNABLE || block.kind() == BlockKind.RETURNABLE_PLURAL) {
                 return block;
             }
@@ -2218,16 +2256,14 @@ final class TriggerCompiler {
                 method.visitJumpInsn(GOTO, loop.next());
             }
             case CoreSyntax.RETURN -> {
-                Block handler = returnHandler();
+                Block handler = returnable();
                 if (handler != null) {
                     returnFromSection(handler, (Expr) effect.match().values().getFirst());
                     return;
                 }
-                if (function == null || function.returnType() == null) {
-                    throw new CompileException(line, function == null
-                            ? "The return statement cannot be used here"
-                            : "function " + function.name() + " (simple event) doesn't return any value. Please use"
-                                    + " 'stop' or 'exit' if you want to stop the trigger.");
+                if (function.returnType() == null) {
+                    throw new CompileException(line, "function " + function.name() + " (simple event) doesn't return any"
+                            + " value. Please use 'stop' or 'exit' if you want to stop the trigger.");
                 }
                 Expr returned = (Expr) effect.match().values().getFirst();
                 List<String> outerLiteralTypes = literalTypes;
@@ -2322,6 +2358,10 @@ final class TriggerCompiler {
                     throw unsupported("'" + source + "'");
                 }
                 Label skip = new Label();
+                if (effect.match().regexValues().getFirst() instanceof ParsedSyntax inner && isCore(inner, CoreSyntax.RETURN)) {
+                    // Skript sets the effect up before the condition, so a return that can't be used fails first.
+                    returnable();
+                }
                 try {
                     condition(condition);
                 } catch (CompileException e) {

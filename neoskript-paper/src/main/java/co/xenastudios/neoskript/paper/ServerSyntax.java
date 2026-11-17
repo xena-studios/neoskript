@@ -206,10 +206,8 @@ final class ServerSyntax {
         }, "[the] [(1¦(default)|2¦(shown|sent))] [server] icon");
         registrar.effect("EffPlayerInfoVisibility", info -> {
             SkriptEventNames.restrict(info, "hide player info", PaperServerListPingEvent.class);
-            if (co.xenastudios.neoskript.api.element.Warnings.surelyDelayed()) {
-                throw new SyntaxError("Can't change the player info visibility anymore after the server list ping event"
-                        + " has already passed");
-            }
+            EventPassed.refuse("Can't change the player info visibility anymore after the server list ping event"
+                    + " has already passed");
             boolean hide = info.pattern() == 0;
             return (context, args) -> {
                 if (context.event() instanceof PaperServerListPingEvent ping) {
@@ -218,22 +216,27 @@ final class ServerSyntax {
             };
         }, "hide [all] player [related] info[rmation] [(in|on|from) [the] server list]",
                 "(show|reveal) [all] player [related] info[rmation] [(in|to|on|from) [the] server list]");
-        registrar.effect("EffHidePlayerFromServerList", info -> (context, args) -> {
-            if (!(context.event() instanceof ServerListPingEvent ping)) {
-                return;
-            }
-            List<Object> hidden = List.of(owners(args[0]));
-            for (Iterator<Player> players = ping.iterator(); players.hasNext(); ) {
-                if (hidden.contains(players.next())) {
-                    players.remove();
+        registrar.effect("EffHidePlayerFromServerList", info -> {
+            EventPassed.refuse("Can't hide players from the server list anymore after the server list ping event has"
+                    + " already passed");
+            return (context, args) -> {
+                if (!(context.event() instanceof ServerListPingEvent ping)) {
+                    return;
                 }
-            }
+                List<Object> hidden = List.of(owners(args[0]));
+                for (Iterator<Player> players = ping.iterator(); players.hasNext(); ) {
+                    if (hidden.contains(players.next())) {
+                        players.remove();
+                    }
+                }
+            };
         }, "hide %players% (in|on|from) [the] server list", "hide %players%'[s] info[rmation] (in|on|from) [the] server list");
         registrar.expression("ExprProtocolVersion", "integer", info -> new PingValue(
                 ping -> (long) ping.getProtocolVersion(), (ping, value) -> ping.setProtocolVersion(((Number) value).intValue()),
-                Number.class), "[the] [server] [(sent|required|fake)] protocol version [number]");
+                Number.class, "protocol version"), "[the] [server] [(sent|required|fake)] protocol version [number]");
         registrar.expression("ExprVersionString", "string", info -> new PingValue(PaperServerListPingEvent::getVersion,
-                (ping, value) -> ping.setVersion(Values.text(value)), String.class), "[the] [shown|custom] version [string|text]");
+                (ping, value) -> ping.setVersion(Values.text(value)), String.class, "version string"),
+                "[the] [shown|custom] version [string|text]");
     }
 
     /** Values of other events: the connecting player's host name, a chat message's recipients, a kick's message. */
@@ -350,6 +353,10 @@ final class ServerSyntax {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            if (!real && !max) {
+                EventPassed.refuse("Can't change the shown online players count anymore after the server list ping event"
+                        + " has already passed");
+            }
             return switch (mode) {
                 case SET, ADD, REMOVE -> real && !max ? null : new Class<?>[] {Number.class};
                 case RESET, DELETE -> real ? null : new Class<?>[] {Number.class};
@@ -396,6 +403,9 @@ final class ServerSyntax {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            if (!defaultIcon) {
+                EventPassed.refuse("Can't change the server icon anymore after the server list ping event has already passed");
+            }
             return !defaultIcon && (mode == Mode.SET || mode == Mode.RESET) ? new Class<?>[] {CachedServerIcon.class} : null;
         }
 
@@ -410,7 +420,7 @@ final class ServerSyntax {
 
     /** A value of a server list ping, which can be set there. */
     private record PingValue(java.util.function.Function<PaperServerListPingEvent, Object> getter,
-            java.util.function.BiConsumer<PaperServerListPingEvent, Object> setter, Class<?> valueClass)
+            java.util.function.BiConsumer<PaperServerListPingEvent, Object> setter, Class<?> valueClass, String what)
             implements Expression, Changeable {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
@@ -419,6 +429,7 @@ final class ServerSyntax {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            EventPassed.refuse("Can't change the " + what + " anymore after the server list ping event has already passed");
             return mode == Mode.SET ? new Class<?>[] {valueClass} : null;
         }
 
@@ -439,6 +450,7 @@ final class ServerSyntax {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            EventPassed.refuse("'the chat recipients' can't be changed after the event has passed");
             return switch (mode) {
                 case ADD, SET, REMOVE, DELETE, RESET -> new Class<?>[] {Audience.class};
                 default -> null;
@@ -477,6 +489,7 @@ final class ServerSyntax {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            EventPassed.refuse("'the on-screen kick message' can't be changed after the event has passed");
             return mode == Mode.SET || mode == Mode.DELETE ? new Class<?>[] {Object.class} : null;
         }
 

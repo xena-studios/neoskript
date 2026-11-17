@@ -277,8 +277,11 @@ final class LineParser {
             // level' is the difference of two levels. (Which event values have one is for the compiler to say.)
             if (syntax.id().equals("ExprTimeState") && parsed.match().values().getFirst() instanceof Expr timed
                     && !mayHaveTimeState(timed)) {
-                problem(input.substring(timed.start(), timed.end()).strip() + " does not have a "
-                        + (candidate.pattern() >= 2 ? "future" : "past") + " state");
+                // Skript's init first refuses any time state after a wait.
+                problem(context.delay() == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED
+                        ? "Cannot use time states after the event has already passed"
+                        : input.substring(timed.start(), timed.end()).strip() + " does not have a "
+                                + (candidate.pattern() >= 2 ? "future" : "past") + " state");
                 continue;
             }
             // A direction after a direction word is another one written out, as Skript's init refuses anything else:

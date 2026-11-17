@@ -81,6 +81,7 @@ final class ServerEvents {
         registrar.expression("ExprCommandSender", "commandsender", info -> (context, args) -> sender(context.event()),
                 "[the] [command['s]] sender");
         registrar.effect("EffCancelEvent", info -> {
+            EventPassed.refuse("An event cannot be cancelled after it has already passed");
             boolean cancel = info.pattern() == 0;
             cancellable(info);
             return (context, args) -> {
@@ -118,7 +119,8 @@ final class ServerEvents {
      */
     static void registerMessages(Registrar registrar) {
         registrar.expression("ExprChatMessage", "textcomponent", info -> new EventMessage<>(AsyncChatEvent.class,
-                AsyncChatEvent::message, (event, text) -> event.message(Messages.component(text))),
+                AsyncChatEvent::message, (event, text) -> event.message(Messages.component(text)),
+                changedAfter("the chat message")),
                 "[the] [chat( |-)]message");
         registrar.expression("ExprChatFormat", "string", info -> new EventMessage<>(AsyncChatEvent.class,
                 event -> "<[player]> [message]", (event, text) -> {
@@ -127,25 +129,33 @@ final class ServerEvents {
                             .replaceText(b -> b.matchLiteral("[player]").replacement(displayName))
                             .replaceText(b -> b.matchLiteral("[display name]").replacement(displayName))
                             .replaceText(b -> b.matchLiteral("[message]").replacement(message)));
-                }), "[the] (message|chat) format[ting]");
+                }, changedAfter("the chat format")), "[the] (message|chat) format[ting]");
         registrar.expression("ExprJoinMessage", "textcomponent", info -> new EventMessage<>(PlayerJoinEvent.class,
                 PlayerJoinEvent::joinMessage,
-                (event, text) -> event.joinMessage(text == null ? null : Messages.component(text))),
+                (event, text) -> event.joinMessage(text == null ? null : Messages.component(text)),
+                changedAfter("the join message")),
                 "[the] (join|log[ ]in)( |-)message");
         registrar.expression("ExprQuitMessage", "textcomponent", info -> new EventMessage<>(PlayerQuitEvent.class,
                 PlayerQuitEvent::quitMessage,
-                (event, text) -> event.quitMessage(text == null ? null : Messages.component(text))),
+                (event, text) -> event.quitMessage(text == null ? null : Messages.component(text)),
+                changedAfter("the quit message")),
                 "[the] (quit|leave|log[ ]out)( |-)message");
         registrar.expression("ExprMOTD", "textcomponent", info -> new EventMessage<>(ServerListPingEvent.class,
                 ServerListPingEvent::motd,
-                (event, text) -> event.motd(text == null ? Component.empty() : Messages.component(text))),
+                (event, text) -> event.motd(text == null ? Component.empty() : Messages.component(text)),
+                "'the MOTD' cannot be changed after the event has passed"),
                 "[the] [default|shown|displayed] (MOTD|message of [the] day)");
     }
 
 
-    /** An event's message, which {@code set} and {@code delete} change. */
+    /** Skript's error for changing an event's message, which it writes as {@code written}, after a wait. */
+    private static String changedAfter(String written) {
+        return "'" + written + "' can't be changed after the event has passed";
+    }
+
+    /** An event's message, which {@code set} and {@code delete} change, until a wait lets the event pass. */
     private record EventMessage<E>(Class<E> eventClass, java.util.function.Function<E, Object> getter,
-            java.util.function.BiConsumer<E, Object> setter) implements Expression, Changeable {
+            java.util.function.BiConsumer<E, Object> setter, String passed) implements Expression, Changeable {
 
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
@@ -154,6 +164,7 @@ final class ServerEvents {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            EventPassed.refuse(passed);
             return mode == Mode.SET ? new Class<?>[] {Object.class} : mode == Mode.DELETE ? new Class<?>[0] : null;
         }
 
@@ -223,6 +234,10 @@ final class ServerEvents {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            if (!real) {
+                EventPassed.refuse("Can't change the fake max players count anymore after the server list ping event has"
+                        + " already passed");
+            }
             return switch (mode) {
                 case SET, ADD, REMOVE -> new Class<?>[] {Number.class};
                 case RESET, DELETE -> real ? null : new Class<?>[] {Number.class};

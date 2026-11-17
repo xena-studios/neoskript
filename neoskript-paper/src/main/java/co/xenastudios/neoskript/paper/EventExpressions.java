@@ -176,7 +176,7 @@ final class EventExpressions {
                     }
                     default -> {}
                 }
-            }, false);
+            }, false, false, "Can't change the damage anymore after the event has already passed");
         }, "[the:the] damage");
         registrar.expression("ExprFinalDamage", "number", info -> {
             restrict(info, the(info, "final damage"), EntityDamageEvent.class);
@@ -247,10 +247,14 @@ final class EventExpressions {
 
     /** A number of the event that {@code set}, {@code add}, {@code remove} and {@code delete} change. */
     private record EventNumber(Function<Object, Double> getter, BiConsumer<Object, Double> setter, boolean reset,
-            boolean whole) implements Expression, Changeable {
+            boolean whole, String passed) implements Expression, Changeable {
 
         EventNumber(Function<Object, Double> getter, BiConsumer<Object, Double> setter, boolean reset) {
             this(getter, setter, reset, false);
+        }
+
+        EventNumber(Function<Object, Double> getter, BiConsumer<Object, Double> setter, boolean reset, boolean whole) {
+            this(getter, setter, reset, whole, null);
         }
 
         @Override
@@ -261,6 +265,10 @@ final class EventExpressions {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            if (passed != null) {
+                // Skript's damage and heal amount can't be changed if the code may have waited.
+                EventPassed.refuseMaybe(passed);
+            }
             return switch (mode) {
                 case SET, ADD, REMOVE, DELETE -> new Class<?>[] {Number.class};
                 case RESET -> reset ? new Class<?>[0] : null;
@@ -297,6 +305,7 @@ final class EventExpressions {
                     BlockDropItemEvent.class, PlayerHarvestBlockEvent.class);
             boolean items = !info.hasTag("xp");
             boolean experience = !info.hasTag("items");
+            EventPassed.refuse("Can't cancel the drops anymore after the event has already passed");
             return (context, args) -> {
                 switch (context.event()) {
                     case EntityDeathEvent death -> {
@@ -351,6 +360,7 @@ final class EventExpressions {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            EventPassed.refuse("Can't change the drops after the event has already passed");
             return switch (mode) {
                 case SET, ADD, REMOVE, REMOVE_ALL -> death ? new Class<?>[] {ItemType.class, Inventory.class, Experience.class}
                         : new Class<?>[] {ItemType.class, Inventory.class};
@@ -528,13 +538,14 @@ final class EventExpressions {
             BiConsumer<Object, net.kyori.adventure.text.Component> setter, String pattern) {
         registrar.expression(id, "textcomponent", info -> {
             restrict(info, written, eventClass);
-            return new EventMessage(eventClass, getter, setter);
+            return new EventMessage(eventClass, getter, setter, written);
         }, pattern);
     }
 
     /** An event's message as text, which {@code set} and {@code delete} (to nothing) change. */
     private record EventMessage(Class<?> eventClass, Function<Object, net.kyori.adventure.text.Component> getter,
-            BiConsumer<Object, net.kyori.adventure.text.Component> setter) implements Expression, Changeable {
+            BiConsumer<Object, net.kyori.adventure.text.Component> setter, String written)
+            implements Expression, Changeable {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
             if (!eventClass.isInstance(context.event())) {
@@ -545,6 +556,7 @@ final class EventExpressions {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            EventPassed.refuse("'" + written + "' can't be changed after the event has passed");
             return mode == Mode.SET ? new Class<?>[] {Object.class} : mode == Mode.DELETE ? new Class<?>[0] : null;
         }
 
@@ -737,7 +749,8 @@ final class EventExpressions {
         registrar.expression("ExprHealAmount", "number", info -> {
             restrict(info, "the heal amount", EntityRegainHealthEvent.class);
             return new EventNumber(event -> event instanceof EntityRegainHealthEvent heal ? heal.getAmount() : null,
-                    (event, value) -> ((EntityRegainHealthEvent) event).setAmount(value), false);
+                    (event, value) -> ((EntityRegainHealthEvent) event).setAmount(value), false, false,
+                    "The heal amount cannot be changed after the event has already passed");
         }, "[the] heal[ing] amount");
         // 'past heal amount' and 'future heal amount' in a heal event are the amount, as in Skript.
         registrar.timeStates("ExprHealAmount", -1, EntityRegainHealthEvent.class);
@@ -771,6 +784,8 @@ final class EventExpressions {
             if (!isIn(info, org.bukkit.event.player.PlayerCommandSendEvent.class)) {
                 throw new SyntaxError("The 'command list' expression can only be used in a 'send command list' event");
             }
+            // Skript refuses it even to read, once the code may have waited.
+            EventPassed.refuseMaybe("Can't change the command list after the event has already passed");
             return new SentCommands();
         }, "[the] [sent] [server] command[s] list");
         registrar.expression("ExprBreedingFamily", "livingentity", info -> {
@@ -1019,6 +1034,7 @@ final class EventExpressions {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
+            EventPassed.refuseMaybe("Can't change the piglin bartering drops after the event has already passed");
             return switch (mode) {
                 case SET, ADD, REMOVE, REMOVE_ALL, DELETE -> new Class<?>[] {ItemType.class};
                 default -> null;

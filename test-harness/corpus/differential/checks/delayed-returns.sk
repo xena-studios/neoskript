@@ -1,0 +1,123 @@
+# Checks: where Skript refuses a function's 'return' because the code may have waited, or can't return there at all.
+
+function delayed_return_wait() :: number:
+	wait 1 tick
+	return 1
+
+function delayed_return_branch(x: number) :: number:
+	if {_x} is 1:
+		wait 1 tick
+	return 1
+
+function delayed_return_both(x: number) :: number:
+	if {_x} is 1:
+		wait 1 tick
+	else:
+		wait 1 tick
+	return 2
+
+function delayed_return_one_stops(x: number) :: number:
+	if {_x} is 1:
+		return 1
+	else:
+		wait 1 tick
+	return 2
+
+function delayed_return_in_branch(x: number) :: number:
+	if {_x} is 1:
+		wait 1 tick
+		return 1
+	return 2
+
+function delayed_return_stopped(x: number) :: number:
+	if {_x} is 1:
+		wait 1 tick
+		stop
+	return 2
+
+function delayed_return_loop() :: number:
+	loop 2 times:
+		wait 1 tick
+	return 1
+
+function delayed_return_in_loop() :: number:
+	loop 2 times:
+		wait 1 tick
+		return 1
+	return 2
+
+function delayed_return_loop_branch(x: number) :: number:
+	loop 2 times:
+		if {_x} is 1:
+			wait 1 tick
+		return 1
+	return 2
+
+function delayed_return_while(x: number) :: number:
+	while {_x} is 1:
+		wait 1 tick
+		exit loop
+	return 2
+
+function delayed_return_do_while(x: number) :: number:
+	do while {_x} is 1:
+		wait 1 tick
+	return 2
+
+function delayed_return_zero_ticks() :: number:
+	wait 0 ticks
+	return 1
+
+function delayed_return_teleport(e: entity, l: location) :: number:
+	teleport {_e} to {_l}
+	return 1
+
+function delayed_return_forced(e: entity, l: location) :: number:
+	force teleport {_e} to {_l}
+	return 2
+
+function delayed_return_called() :: number:
+	delayed_return_none()
+	return 1
+
+function delayed_return_section() :: number:
+	wait 1 tick:
+		return 1
+	return 2
+
+function delayed_return_after_section() :: number:
+	wait 1 tick:
+		wait 1 tick
+	return 2
+
+function delayed_return_spawn(l: location) :: number:
+	spawn a pig at {_l}:
+		return 1
+	return 2
+
+function delayed_return_after_spawn(l: location) :: number:
+	wait 1 tick
+	spawn a pig at {_l}:
+		set {_a} to 1
+	return 2
+
+function delayed_return_bossbar() :: number:
+	set {_b} to a new bossbar:
+		return 1
+	return 2
+
+function delayed_return_do_if(x: number) :: number:
+	wait 1 tick
+	return 1 if {_x} is 1
+
+function delayed_return_unreachable() :: number:
+	wait 1 tick
+	return 1
+	broadcast "x"
+
+function delayed_return_no_type():
+	wait 1 tick
+	return 1
+
+function delayed_return_none():
+	wait 1 tick
