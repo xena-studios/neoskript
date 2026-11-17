@@ -34,8 +34,8 @@ import java.util.regex.Pattern;
  * <p>{@code a} and {@code b} run the same script ({@code scripts/neoskript-proxy.sk}) and must print the same, with
  * Redis messages going both ways between SkRedis and NeoSkriptProxy. {@code b} and {@code c} check NeoSkriptProxy's
  * own syntax, a message signed and forwarded through the proxy, questions with nobody online refused, a message
- * that waited for a player, Redis going down and back with a message waiting, and, with SkProxy's jar in
- * {@code c}'s plugins, D21's warning.
+ * that waited for a player, Redis going down and back with a message waiting (it reaches Redis), and, with
+ * SkProxy's jar in {@code c}'s plugins, D21's warning.
  */
 public final class NeoSkriptProxyScenario implements Scenario {
 
@@ -198,13 +198,14 @@ public final class NeoSkriptProxyScenario implements Scenario {
                 join(serverA, serverC, "Carol", proxyPort, "c");
                 serverB.await(line("[neotest] got waited from c on events"), markB, WAIT);
 
-                // Redis goes away with a message waiting on b; it reaches SkRedis on a once Redis is back.
+                // Redis goes away with a message waiting on b; it reaches Redis once Redis is back. Whether SkRedis on
+                // a hears it depends on a reconnecting before b publishes (pub/sub keeps nothing for a subscriber that
+                // isn't there), so what's checked is the restarted Redis taking b's PUBLISH: nothing else publishes.
                 docker("stop", redis);
-                markA = serverA.mark();
                 serverB.command("redissend while-down");
                 Thread.sleep(3_000);
                 docker("start", redis);
-                serverA.await(line("[proxytest] redis while-down on net"), markA, WAIT);
+                awaitPublished(redis);
 
                 for (ServerProcess server : List.of(serverB, serverC)) {
                     List<String> errors = server.linesMatching(NeoSkriptBootScenario.NEOSKRIPT_ERROR);
@@ -333,6 +334,20 @@ public final class NeoSkriptProxyScenario implements Scenario {
                   trustStorePath: ""
                   trustStorePassword: ""
                 """.formatted(redisPort);
+    }
+
+    /** Waits until Redis, since it last started, has taken a PUBLISH. */
+    private static void awaitPublished(String container) throws Exception {
+        Pattern calls = Pattern.compile("cmdstat_publish:calls=(\\d+)");
+        long deadline = System.nanoTime() + WAIT.toNanos();
+        while (System.nanoTime() < deadline) {
+            Matcher matcher = calls.matcher(docker("exec", container, "redis-cli", "INFO", "commandstats"));
+            if (matcher.find() && Long.parseLong(matcher.group(1)) > 0) {
+                return;
+            }
+            Thread.sleep(500);
+        }
+        throw new HarnessFailure("The message waiting on b never reached Redis after it came back");
     }
 
     static void awaitRedis(String container) throws Exception {
