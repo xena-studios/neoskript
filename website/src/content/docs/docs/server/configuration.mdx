@@ -5,7 +5,7 @@ description: Every setting in NeoSkript's config.yml, its default, when a change
 
 import { Aside } from "@astrojs/starlight/components";
 
-NeoSkript's settings are in `plugins/NeoSkript/config.yml`. It's written on the first start, with a comment on every setting. NeoSkript has no `config.sk`: Skript's settings for text, some syntax, the language, events, runtime errors, effect commands and player variables are here, with Skript's defaults, and moving over copies the ones you changed. Those that don't apply to NeoSkript, or aren't here yet, are [listed](#skript-settings-that-dont-apply).
+NeoSkript's settings are in `plugins/NeoSkript/config.yml`. It's written on the first start, with a comment on every setting. NeoSkript has no `config.sk`: Skript's settings for text, some syntax, the language, logging, warnings, hooks, events, runtime errors, effect commands and player variables are here, with Skript's defaults, and moving over copies the ones you changed. Those that don't apply to NeoSkript, or aren't here yet, are [listed](#skript-settings-that-dont-apply).
 
 Apply changes with `/sk reload config`. Most settings apply at once; [some wait for a restart](#what-applies-when).
 
@@ -44,14 +44,14 @@ Script problems at startup and runtime errors keep Skript's look, since tools an
 
 - the theme;
 - `update-checker`;
-- `language`, `text` and `syntax`;
+- `language`, `text`, `syntax`, `verbosity` and `warnings`;
 - `variables.player-uuids-in-names`, `variables.player-variable-fix` and `variables.save-interval`;
 - the `runtime-errors` limits;
 - `effect-commands`.
 
-`text.case-sensitive` applies at once to comparisons and `contains`; replace and split read it when a script loads, as in Skript, so reload the scripts too.
+`text.case-sensitive` applies at once to comparisons and `contains`; replace and split read it when a script loads, as in Skript, so reload the scripts too. The same goes for `warnings`: they're given when scripts load.
 
-`metrics`, `databases`, `variables.recover` and the `events` settings apply when the server restarts. The reload says so when one of them changed.
+`metrics`, `databases`, `variables.recover`, `hooks` and the `events` settings apply when the server restarts. The reload says so when one of them changed.
 
 `aliases.load-defaults` applies on `/sk reload aliases`, which reads it from `config.yml` itself, on `/sk reload all`, or on restart.
 
@@ -120,6 +120,44 @@ Settings for particular syntax. Skript's options of the same names.
 |---|---|---|
 | `syntax.target-block-distance` | `100` | How many blocks away `targeted block`, `target` and `blocks in front of` look, from 0 to 1000. Skript's `maximum target block distance`. |
 | `syntax.player-name-pattern` | `[a-zA-Z0-9_]{1,16}` | The text that can be read as an offline player's name, as a Java regular expression. A UUID always can. Skript's `player name regex pattern`. |
+| `syntax.legacy-tab-completion` | `true` | Whether other plugins can add tab completions to script commands, through Bukkit's `TabCompleteEvent`. Off, a script command's completions are only its own. Skript's `enable legacy tab completion event compatibility`. |
+
+## verbosity
+
+| Setting | Default | What it does |
+|---|---|---|
+| `verbosity` | `normal` | How much NeoSkript logs. Skript's `verbosity`. |
+
+- `low`: not even how many scripts and variables loaded.
+- `normal`: those, and problems.
+- `high`: also how many structures each script has, and each plugin hooked into.
+- `very high`: also each structure as it loads, and each event as it fires, with the triggers it runs and how long each took. Write it `very-high` or `"very high"`.
+- `debug`: as `very high`. Skript also writes out every line it parses; NeoSkript doesn't.
+
+Events are named by their class, as in Skript, and triggers by their script and line.
+
+## warnings
+
+Warnings scripts get when they load. Each is Skript's `disable ... warnings` turned round: `false` turns that warning off for every script. A script can still turn one off for itself, as in Skript.
+
+| Setting | Default | The warning |
+|---|---|---|
+| `warnings.variable-not-saved` | `true` | A global variable set to a value that can't be saved, so it's lost when the server stops. Skript's `disable variable will not be saved warnings`. |
+| `warnings.missing-and-or` | `true` | A list without `and` or `or`. Skript's `disable variable missing and/or warnings`. |
+| `warnings.variable-starting-with-expression` | `true` | A variable's name starting with an expression, as in `{%player%::money}`. Skript's `disable starting a variable's name with an expression warnings`. |
+| `warnings.single-colon-in-variable-name` | `true` | A single `:` in a variable's name, as in `{money:%player%}`. Skript's `disable single colon in variable name warnings`. |
+| `warnings.unreachable-code` | `true` | Code after a `stop`, `return` or `exit`. Skript's `disable unreachable code warnings`. |
+| `warnings.long-parse-time` | `2 seconds` | A line that takes longer than this to parse. `0 seconds` turns it off. Skript's `long parse time warning threshold`. |
+
+## hooks
+
+The plugins NeoSkript hooks into for their syntax, when they're installed. Each is Skript's `disable hooks` turned round: `false` leaves that plugin alone, so its syntax isn't there. Applies on restart.
+
+| Setting | Default | Hook |
+|---|---|---|
+| `hooks.vault` | `true` | Vault: money, chat prefixes and suffixes, permission groups. Skript's `disable hooks.vault`. |
+| `hooks.worldguard` | `true` | WorldGuard's regions. Skript's `disable hooks.regions.worldguard`. |
+| `hooks.grief-prevention` | `true` | GriefPrevention's claims, as regions. Skript's `disable hooks.regions.grief prevention`. |
 
 ## variables
 
@@ -216,23 +254,36 @@ The first start copies these settings from Skript's `config.sk`, read as Skript 
 | `player variable fix` | `variables.player-variable-fix` |
 | `plugin priority` | `events.priority` |
 | `listen to cancelled events by default` | `events.listen-to-cancelled` |
+| `enable legacy tab completion event compatibility` | `syntax.legacy-tab-completion` |
+| `verbosity` | `verbosity` |
+| `disable variable will not be saved warnings` | `warnings.variable-not-saved`, turned round |
+| `disable variable missing and/or warnings` | `warnings.missing-and-or`, turned round |
+| `disable starting a variable's name with an expression warnings` | `warnings.variable-starting-with-expression`, turned round |
+| `disable single colon in variable name warnings` | `warnings.single-colon-in-variable-name`, turned round |
+| `disable unreachable code warnings` | `warnings.unreachable-code`, turned round |
+| `long parse time warning threshold` | `warnings.long-parse-time` |
+| `disable hooks` (`vault`, `regions.worldguard`, `regions.grief prevention`) | `hooks`, turned round |
 | `runtime errors` | `runtime-errors` |
 | `databases`, with the files it names | `databases` |
 | `enable effect commands`, `effect command token`, `allow ops to use effect commands`, `log effect commands` | `effect-commands` |
 
 Values are read as Skript reads them: `yes` and `on` are true but `True` isn't, `1_000` is a number, and `Strict` isn't a link mode. A number accuracy beyond 1000 either way is copied as 1000 or -1000, and a target distance below 0 as 0 or above 1000 as 1000 (see [differences](/docs/reference/differences/)).
 
-A setting `config.sk` doesn't have keeps NeoSkript's default, which is the value in Skript's default `config.sk`. One Skript can't read, such as `plugin priority: hihg`, is copied as what Skript then runs with: its built-in default (`normal` for the priority). The console lists what was copied. See [moving from Skript](/docs/moving-from-skript/).
+A setting `config.sk` doesn't have keeps NeoSkript's default, which is the value in Skript's default `config.sk`. One Skript can't read, such as `plugin priority: hihg`, is copied as what Skript then runs with: its built-in default (`normal` for the priority). The console lists what was copied, and any setting it found that doesn't apply, with why. See [moving from Skript](/docs/moving-from-skript/).
 
 ## Skript settings that don't apply
 
 | Skript's `config.sk` | Why |
 |---|---|
 | `check for new version`, `update check interval`, `release channel` | NeoSkript checks Modrinth for its own versions instead: `update-checker`. |
+| `enable timings` | Paper has had no Timings since 1.19.4, and on Paper Skript only warns that it can't turn them on. To see what scripts cost, use [spark](https://spark.lucko.me/), which is built into Paper. |
+| `soft api exceptions` | It turns two failures Skript stops on into errors: alias files without an item Skript's own code needs (`type ... not found`), and Skript addons' mistakes registering types. NeoSkript names every Minecraft item after its id whatever the alias files have, and doesn't load Skript addons. |
+| `disable hooks.regions.precious stones`, `disable hooks.regions.residence` | NeoSkript doesn't hook into PreciousStones or Residence. |
+| `use type properties` | Not yet: with it off, Skript reads `name of`, `amount of` and the other type property syntax with its older versions, which NeoSkript doesn't have. NeoSkript reads scripts as with it on, Skript's default. Tracked in [#26](https://github.com/xena-studios/neoskript/issues/26). |
 | `script loader thread size` | NeoSkript loads scripts its own way: each file is parsed in parallel, and nothing waits on the main thread. There's nothing to size. |
 | `version` | Skript's own record of its config's version. NeoSkript's is `config-version`. |
 | `case-insensitive variables` | Not here: NeoSkript's variable names always ignore case, as Skript's do by default. If `config.sk` turned it off, moving over says so, and names, as errors, the saved variables that differ only by case (`{coins::Bob}` and `{coins::bob}`), as NeoSkript keeps only one of each. Skript's `variables.csv` is left as it was. |
-| `verbosity`, the `disable ... warnings` options, `long parse time warning threshold`, `disable hooks`, `enable legacy tab completion event compatibility`, `use type properties`, `enable timings`, `soft api exceptions`, `compress backups`, `variable changes until save` | Not here yet: NeoSkript behaves as Skript's default `config.sk` for them. |
+| `compress backups`, `variable changes until save` | Not here yet: NeoSkript behaves as Skript's default `config.sk` for them. |
 
 ## Updating NeoSkript
 
@@ -362,6 +413,39 @@ syntax:
   # Skript's 'player name regex pattern': the text that can be read as an offline player's name, as a
   # Java regular expression. Names that don't match aren't players (UUIDs always are).
   player-name-pattern: "[a-zA-Z0-9_]{1,16}"
+  # Skript's 'enable legacy tab completion event compatibility': other plugins can add tab completions to
+  # script commands (through Bukkit's TabCompleteEvent). Off, a script command's completions are its own.
+  legacy-tab-completion: true
+
+# How much NeoSkript logs, as Skript's 'verbosity': low (not even how many scripts and variables loaded),
+# normal, high (also each script's structures and each hooked plugin), very high (also each structure as
+# it loads, and each event with the triggers it runs and how long they took) or debug (as very high).
+verbosity: "normal"
+
+warnings:
+  # Off is Skript's 'disable variable will not be saved warnings': setting a global variable to a value
+  # that can't be saved, which is lost when the server stops.
+  variable-not-saved: true
+  # Off is Skript's 'disable variable missing and/or warnings': a list without 'and' or 'or'.
+  missing-and-or: true
+  # Off is Skript's 'disable starting a variable's name with an expression warnings', as in
+  # {%player%::money}.
+  variable-starting-with-expression: true
+  # Off is Skript's 'disable single colon in variable name warnings', as in {money:%player%}.
+  single-colon-in-variable-name: true
+  # Off is Skript's 'disable unreachable code warnings': code after a stop, return or exit.
+  unreachable-code: true
+  # Skript's 'long parse time warning threshold': a line that takes longer than this to parse gets a
+  # warning. 0 seconds turns it off.
+  long-parse-time: "2 seconds"
+
+hooks:
+  # Vault: money, chat prefixes and suffixes, permission groups. Off is Skript's 'disable hooks.vault'.
+  vault: true
+  # WorldGuard's regions. Off is Skript's 'disable hooks.regions.worldguard'.
+  worldguard: true
+  # GriefPrevention's claims, as regions. Off is Skript's 'disable hooks.regions.grief prevention'.
+  grief-prevention: true
 
 events:
   # The priority scripts listen to events at: lowest, low, normal, high, highest or monitor. As in Skript,

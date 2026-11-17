@@ -123,6 +123,19 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             library.enableTesting();
         }
         // Syntax of the plugins NeoSkript hooks into, as Skript's hooks, only when they're installed.
+        // config.yml's hooks, which apply on restart, and verbosity, which logs each plugin hooked into from high.
+        java.util.Set<String> unhooked = new java.util.HashSet<>();
+        if (!settings.hooks().vault()) {
+            unhooked.add("Vault");
+        }
+        if (!settings.hooks().worldguard()) {
+            unhooked.add("WorldGuard");
+        }
+        if (!settings.hooks().griefPrevention()) {
+            unhooked.add("GriefPrevention");
+        }
+        co.xenastudios.neoskript.paper.Hooks.configure(unhooked,
+                settings.verbosity().compareTo(NeoSkriptConfig.Verbosity.HIGH) >= 0);
         boolean hooks = co.xenastudios.neoskript.paper.Hooks.anyInstalled();
         addons = new Addons(getSLF4JLogger());
         addons.frozenWhen(library::frozen);
@@ -203,6 +216,11 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         effectCommands = new EffectCommands(scripts, scheduler, getSLF4JLogger(), TestRunner.enabled(),
                 EffectCommands.Settings.of(settings.effectCommands()));
         getServer().getPluginManager().registerEvents(effectCommands, this);
+        // Skript's legacy tab completion compatibility, when config.yml turns it off.
+        getServer().getPluginManager().registerEvent(org.bukkit.event.server.TabCompleteEvent.class,
+                new org.bukkit.event.Listener() {}, org.bukkit.event.EventPriority.HIGHEST,
+                (listener, event) -> ScriptCommand.keepOwnCompletions((org.bukkit.event.server.TabCompleteEvent) event),
+                this, false);
         storage = openVariables(scripts.globals(), library.codecs());
         if (!deferSyntax) {
             loadVariables();
@@ -370,6 +388,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (migration.caseClashes() != null) {
             caseClashes(migration);
         }
+        migration.notCopied().forEach(note -> getSLF4JLogger().info(note));
         if (migration.settingsProblem() != null) {
             getSLF4JLogger().warn("Couldn't read Skript's config.sk ({}), so its settings weren't copied. NeoSkript runs"
                     + " on its defaults, which are Skript's; set any you changed in config.yml.", migration.settingsProblem());
@@ -728,9 +747,12 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 }
             }
             storage.notes().forEach(line -> getSLF4JLogger().warn(line));
-            getSLF4JLogger().info("Loaded {} {} in {} ms{}", loaded.variables(), loaded.variables() == 1 ? "variable" : "variables",
-                    (System.nanoTime() - start) / 1_000_000,
-                    loaded.raw() == 0 ? "" : " (" + loaded.raw() + " kept as saved until NeoSkript supports their types)");
+            // Skript doesn't say at config.yml's 'verbosity: low'.
+            if (Logging.logs(NeoSkriptConfig.Verbosity.NORMAL)) {
+                getSLF4JLogger().info("Loaded {} {} in {} ms{}", loaded.variables(),
+                        loaded.variables() == 1 ? "variable" : "variables", (System.nanoTime() - start) / 1_000_000,
+                        loaded.raw() == 0 ? "" : " (" + loaded.raw() + " kept as saved until NeoSkript supports their types)");
+            }
         } catch (IOException | RuntimeException | LinkageError e) {
             // Don't run with an empty set of variables that would then overwrite the file. The storage never saves
             // until it has loaded, so nothing writes over the file, not even when the server stops.

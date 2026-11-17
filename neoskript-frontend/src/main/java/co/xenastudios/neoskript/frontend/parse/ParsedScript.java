@@ -66,8 +66,14 @@ public record ParsedScript(SourceFile file, List<ParsedStructure> structures, Li
         return delays.getOrDefault(line, DelayState.NOT_DELAYED);
     }
 
-    /** Whether the script suppresses the warnings tagged {@code tag} at {@code line}. */
+    /**
+     * Whether the script suppresses the warnings tagged {@code tag} at {@code line}, or they're turned off for every
+     * script ({@link WarningSettings}).
+     */
     public boolean suppresses(Line line, String tag) {
+        if (WarningSettings.disabled(tag)) {
+            return true;
+        }
         Set<String> tags = line == null ? null : suppressions.get(line);
         return tags != null && tags.contains(tag);
     }
