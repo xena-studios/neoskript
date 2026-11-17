@@ -850,7 +850,7 @@ Nothing a script does, at load or while it runs, may take NeoSkript or the serve
 - **Damaged variables:** a value in `variables.csv` whose length said a gigabyte ran the server out of memory, an error the load didn't catch, so NeoSkript didn't start. Lengths are now checked against the bytes there, and such a value is kept as saved.
 - **Variables under stress** (`VariableStorageStressTest`): saving while 16 threads write, as Folia's regions do, always leaves a file that loads back whole; a save into a folder that can't be written keeps the old file, and the next save has everything. A 300 MB `variables.csv` (2.2 million variables) loads in 20 seconds.
 
-### Step 13: Reloading hundreds of times
+### Step 16: Reloading hundreds of times
 
 **`neoskript-reload-soak`** (baseline, 26.3) reloads a varied set of scripts 350 times: events, commands with aliases and a cooldown, a GUI, functions and a function reference, list variables, `every` timers, a timer whose trigger is still waiting when the reload comes, a command waiting across reloads, `auto reload`, a script disabled and enabled again, and one broken every other time, which keeps its last version. After 50 to warm up, the harness bot forces a full GC every 50 reloads and samples the loaded classes, the heap, and NeoSkript's listeners, commands (in Brigadier's tree too), tasks and threads.
 
