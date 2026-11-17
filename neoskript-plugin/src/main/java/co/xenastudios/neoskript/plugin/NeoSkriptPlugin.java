@@ -825,7 +825,13 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                     java.nio.file.Path backup = backend.backupNow();
                     if (backup != null && this.settings.variables().compressBackups()) {
                         try {
-                            backup = VariableStorage.compress(backup, () -> stopping);
+                            VariableStorage.Compressed compressed = VariableStorage.compress(backup, () -> stopping);
+                            if (compressed.copyLeft() != null) {
+                                getSLF4JLogger().warn("Compressed the backup as {}, but couldn't remove the copy {}: {}",
+                                        compressed.file().getFileName(), backup.getFileName(),
+                                        compressed.copyLeft().getMessage());
+                            }
+                            backup = compressed.file();
                         } catch (IOException | RuntimeException e) {
                             getSLF4JLogger().error("Couldn't compress the backup {}, so it's kept as it is: {}",
                                     backup.getFileName(), e.getMessage());

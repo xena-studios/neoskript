@@ -158,6 +158,8 @@ class SkriptSettingsTest {
                 .replace("enable timings: false", "enable timings: true"));
         List<String> notes = SkriptSettings.notCopied(file);
         assertEquals(2, notes.size(), notes.toString());
+        Files.writeString(file, stockConfig() + "execute functions with missing parameters: false\nsimplify syntax on parse: false\n");
+        assertEquals(2, SkriptSettings.notCopied(file).size(), SkriptSettings.notCopied(file).toString());
         Files.writeString(file, stockConfig().replace("variable changes until save: 1000", "variable changes until save: 50"));
         assertTrue(SkriptSettings.notCopied(file).getFirst().startsWith("Skript's 'variable changes until save: 50'"));
         assertTrue(notes.getFirst().startsWith("Skript's 'use type properties: false' isn't copied"), notes.toString());

@@ -167,13 +167,15 @@ final class Durable {
             throw new FileAlreadyExistsException(to.toString());
         }
         try {
-            try (FileChannel out = created; java.io.InputStream in = Files.newInputStream(from)) {
-                java.util.zip.GZIPOutputStream gzip = new java.util.zip.GZIPOutputStream(
-                        java.nio.channels.Channels.newOutputStream(out), 1 << 16) {
-                    {
-                        def.setLevel(java.util.zip.Deflater.BEST_COMPRESSION);
-                    }
-                };
+            // The stream is closed whatever happens, so its native deflater is always freed, cut off or not; closing it
+            // closes the channel too.
+            try (FileChannel out = created; java.io.InputStream in = Files.newInputStream(from);
+                    java.util.zip.GZIPOutputStream gzip = new java.util.zip.GZIPOutputStream(
+                            java.nio.channels.Channels.newOutputStream(out), 1 << 16) {
+                        {
+                            def.setLevel(java.util.zip.Deflater.BEST_COMPRESSION);
+                        }
+                    }) {
                 byte[] buffer = new byte[1 << 16];
                 long since = 0;
                 for (int read; (read = in.read(buffer)) > 0; ) {

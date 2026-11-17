@@ -209,15 +209,24 @@ public final class VariableStorage implements VariableBackend {
     /**
      * Gzips a scheduled backup, as Skript's {@code compress backups} does, at its best compression, into
      * {@code <backup>.gz}, written as {@link Durable#copy} writes a copy ({@link Durable#gzip}), then removes the
-     * uncompressed backup. Returns the compressed backup. It reads only the backup, so it holds no lock on the
+     * uncompressed backup. Returns the compressed backup, and the problem if the copy couldn't be removed. It reads only the backup, so it holds no lock on the
      * variables; once {@code cancelled} is true, as when the server stops, it stops. If it fails, the uncompressed
      * backup stays.
      */
-    public static Path compress(Path backup, java.util.function.BooleanSupplier cancelled) throws IOException {
+    public static Compressed compress(Path backup, java.util.function.BooleanSupplier cancelled) throws IOException {
         Path compressed = Durable.gzip(backup, backup.resolveSibling(backup.getFileName() + ".gz"), cancelled);
-        Durable.delete(backup);
-        return compressed;
+        try {
+            Durable.delete(backup);
+        } catch (IOException e) {
+            // The compressed backup is whole and stays; the copy beside it counts as the same backup for
+            // backups-to-keep, and goes with it.
+            return new Compressed(compressed, e);
+        }
+        return new Compressed(compressed, null);
     }
+
+    /** A compressed backup, and why the uncompressed copy couldn't be removed, or {@code null} if it was. */
+    public record Compressed(Path file, IOException copyLeft) {}
 
     /**
      * What a scheduled backup's name has after its time ({@code variables_<time>_scheduled.csv}), so removing old ones
@@ -255,9 +264,19 @@ public final class VariableStorage implements VariableBackend {
             String n = p.getFileName().toString();
             return n.substring(base.length() + 1, base.length() + 20);
         }).thenComparing(p -> p.getFileName().toString().length()).thenComparing(p -> p.getFileName().toString()));
+        // A backup and its compressed copy ('x' and 'x.gz', when removing the copy after compressing failed) are one.
+        java.util.Map<String, List<Path>> byBackup = new java.util.LinkedHashMap<>();
+        for (Path backup : backups) {
+            String n = backup.getFileName().toString();
+            byBackup.computeIfAbsent(n.endsWith(".gz") ? n.substring(0, n.length() - 3) : n, k -> new ArrayList<>())
+                    .add(backup);
+        }
+        List<List<Path>> ordered = new ArrayList<>(byBackup.values());
         int removed = 0;
-        for (int i = 0; i < backups.size() - keep; i++) {
-            Durable.delete(backups.get(i));
+        for (int i = 0; i < ordered.size() - keep; i++) {
+            for (Path backup : ordered.get(i)) {
+                Durable.delete(backup);
+            }
             removed++;
         }
         return removed;
