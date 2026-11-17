@@ -249,15 +249,21 @@ the addon's name and the element's class (`SkBee:ExprWorldHeight`).
   SkBee's code: ..." ("in SkBee's code" when the addon's own code threw, not NeoSkriptCompat's), and the trigger goes
   on as with NeoSkript's other runtime errors.
 - **Value adapters** (D24) so far: `ItemType`, `EntityData`, `EnchantmentType`, and `Slot` (an inventory's as `InventorySlot`).
-- **Conversions, comparisons and event values** go to NeoSkript where they involve a class NeoSkript has no type
-  for, so they don't change how NeoSkript's own types behave. **Functions** an addon writes in Java become
-  NeoSkript's.
-- **Not yet:** sections, events and structures an addon registers (SkBee's 60 sections, 69 events and 2 structures
-  are left out, and the console says so), event values of NeoSkript's own types, type properties, saving addon
-  types' values, and reading an addon's language files.
+- **Conversions and comparisons** go to NeoSkript where they involve a class NeoSkript has no type for, so they
+  don't change how NeoSkript's own types behave. **Event values** go where NeoSkript has no value of that type for
+  the event (or a superclass of it): an addon's events get theirs, and NeoSkript's own event values stay as they
+  are. **Functions** an addon writes in Java become NeoSkript's.
+- **Events:** NeoSkript listens to an addon event's classes, and runs the event's `check` as the trigger's filter,
+  with the literals written in its header (`on zombie knockback by skeleton`). An event's arguments are all
+  literals, as on Skript; a list of them (`zombies or skeletons`) gets its values from the header when `check` runs.
+  Skript's code names for types that NeoSkript has under another id are mapped (`entitydata` is NeoSkript's
+  `entitytype`).
+- **Not yet:** sections and structures an addon registers (SkBee's 60 sections and 2 structures are left out, and
+  the console says so), event values of types NeoSkript has none of, type properties, saving addon types' values,
+  and reading an addon's language files.
 
 SkBee 3.26.0 enables with all its modules, and NeoSkriptCompat registers its 78 types, 258 expressions, 77 effects,
-31 conditions and 17 functions on NeoSkript. Not every one of those works yet: an element that reaches a part of
+31 conditions, 69 events, 162 event values and 17 functions on NeoSkript. Not every one of those works yet: an element that reaches a part of
 Skript's API NeoSkriptCompat doesn't have fails when a script uses it, with an error naming what's missing. What's
 compared with Skript + SkBee is tracked in issue #45.
 

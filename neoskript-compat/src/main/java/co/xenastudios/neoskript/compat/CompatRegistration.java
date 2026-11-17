@@ -228,12 +228,20 @@ final class CompatRegistration {
         count("functions");
     }
 
+    /**
+     * An addon's event value, where NeoSkript has none of that type for the event: NeoSkript's own event values stay
+     * as they are, and an addon's events (and NeoSkript's events missing one) get the addon's.
+     */
     private <E extends org.bukkit.event.Event> void eventValue(EventValue<E, ?> value) {
-        if (!addonOnly(value.valueClass())) {
-            skip("event values of NeoSkript's types");
+        String type = compat.typeId(value.valueClass());
+        if ("object".equals(type)) {
+            skip("event values of types NeoSkript doesn't have");
             return;
         }
-        registrar.eventValue(value.eventClass(), compat.typeId(value.valueClass()), value.time().value(),
+        if (compat.library().hasEventValue(value.eventClass(), type, value.time().value())) {
+            return;
+        }
+        registrar.eventValue(value.eventClass(), type, value.time().value(),
                 event -> CompatValuesBridge.result(value.get(event)));
         count("event values");
     }
@@ -255,6 +263,8 @@ final class CompatRegistration {
                         () -> CompatElements.effect(compat, registrar, addon, info));
                 case "condition" -> attempt("condition", info.type().getName(),
                         () -> CompatElements.condition(compat, registrar, addon, info));
+                case "event" -> attempt("event", info.type().getName(),
+                        () -> CompatElements.event(compat, registrar, addon, info));
                 default -> {
                     skip(kind + "s");
                     yield false;

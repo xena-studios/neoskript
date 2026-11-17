@@ -17,7 +17,7 @@ Put `NeoSkriptCompat.jar` in `plugins/`, next to NeoSkript and the addon. It com
 
 ## What works
 
-**SkBee 3.26.0** enables with all its modules. Its types, expressions, effects, conditions and functions are registered on NeoSkript; its sections, events and structures aren't yet, and the console says what was left out when the server starts.
+**SkBee 3.26.0** enables with all its modules. Its types, expressions, effects, conditions, events and functions are registered on NeoSkript; its sections and structures aren't yet, and the console says what was left out when the server starts.
 
 What's compared with Skript 2.17.0 + SkBee 3.26.0, by NeoSkript's test harness on Paper 26.3:
 
@@ -29,12 +29,13 @@ What's compared with Skript 2.17.0 + SkBee 3.26.0, by NeoSkript's test harness o
 | Chunks: `chunk x/z of %chunk%`, `chunk key of %chunk%`, `chunk key at %location%`, `chunk key at %number%, %number%` | Same as on Skript |
 | Keys: `minecraft key of %objects%` (items, worlds, text), `translation key of %objects%` | Same as on Skript |
 | `server is paused` | Same as on Skript |
+| Events: `on entity removed from world`, `on server tick start`, `on async chat` (with `async chat message`), `on unknown command` (with `event-string`), `on player chunk send` | Same as on Skript |
 
 The rest of SkBee's registered syntax may work, but isn't checked yet. Syntax that reaches a part of Skript NeoSkriptCompat doesn't have yet fails with an error that names what's missing: when the script loads if it reaches it while the line is set up, otherwise when the line runs.
 
 ## What doesn't work yet
 
-- An addon's **sections, events and structures** (for SkBee: text component sections, its events, `on load` style structures).
+- An addon's **sections and structures** (for SkBee: text component and bound sections, its structures).
 - **Saving** an addon's own types in variables.
 - An addon's **type properties** (Skript 2.17's `name of`, `amount of` for an addon's types).
 - An addon element that **changes its argument** (`set`, `add` on what it was given).

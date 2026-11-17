@@ -52,6 +52,16 @@ class CompatArgument<T> implements Expression<T> {
         }
     }
 
+    /** Whether an element is running on this thread, so its arguments have values. */
+    static boolean running() {
+        ArrayDeque<Object[]> frames = FRAMES.get();
+        if (frames.isEmpty()) {
+            FRAMES.remove();
+            return false;
+        }
+        return true;
+    }
+
     Object argument() {
         Object[] arguments = FRAMES.get().peek();
         if (arguments == null) {
@@ -157,7 +167,7 @@ class CompatArgument<T> implements Expression<T> {
 
     @Override
     public String toString(Event event, boolean debug) {
-        if (event != null && FRAMES.get().peek() != null) {
+        if (event != null && running()) {
             return ch.njol.skript.registrations.Classes.toString(getAll(event), and);
         }
         return written != null ? written : type.getSimpleName().toLowerCase(java.util.Locale.ENGLISH);
@@ -180,7 +190,10 @@ class CompatArgument<T> implements Expression<T> {
         Written(int index, Class<T> type, boolean single, boolean and, boolean isDefault, String written) {
             super(index, type, single, and, isDefault, written);
             Object parsed;
-            try {
+            if (written == null) {
+                // No one written value (a list, in an event): its values are the trigger's, when it's checked.
+                parsed = null;
+            } else try {
                 parsed = Compat.get().types().parse(written, CompatValuesBridge.boxed(type),
                         ch.njol.skript.lang.ParseContext.DEFAULT);
                 if (parsed == null) {
@@ -196,19 +209,26 @@ class CompatArgument<T> implements Expression<T> {
             }
         }
 
+        /** The values: the running element's, while it runs, else those written. */
+        @SuppressWarnings("unchecked")
+        private T[] values() {
+            return running() ? (T[]) CompatValuesBridge.array(argument(), type) : value.clone();
+        }
+
         @Override
         public T[] getArray() {
-            return value.clone();
+            return values();
         }
 
         @Override
         public T getSingle() {
-            return value.length == 0 ? null : value[0];
+            T[] values = values();
+            return values.length == 0 ? null : values[0];
         }
 
         @Override
         public T[] getAll() {
-            return value.clone();
+            return values();
         }
 
         @Override

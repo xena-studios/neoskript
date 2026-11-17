@@ -73,3 +73,66 @@ command /skbeetest-conditions:
 		if server is not paused:
 			skbee("not paused", "yes")
 		send "[skbee] end conditions" to console
+
+# ---- SkBee's events. Each prints only while its part has set {-skbee::watch}.
+
+on entity removed from world:
+	{-skbee::watch} is set
+	event-entity is a zombie
+	skbee("removed from world", type of event-entity)
+
+on server tick start:
+	{-skbee::ticks} is set
+	add 1 to {-skbee::ticks}
+	if {-skbee::ticks} is 3:
+		skbee("server tick start", "counted 3")
+
+on async chat:
+	{-skbee::watch} is set
+	skbee("async chat", "%player%: %async chat message%")
+
+on unknown command:
+	{-skbee::watch} is set
+	skbee("unknown command", event-string)
+
+on player chunk send:
+	{-skbee::watch} is set
+	{-skbee::chunk} is not set
+	set {-skbee::chunk} to true
+	skbee("player chunk send", player)
+
+on player track entity:
+	{-skbee::watch} is set
+	event-entity is a zombie
+	skbee("player track entity", "%player% %type of event-entity%")
+
+command /skbeetest-events:
+	trigger:
+		set {-skbee::watch} to true
+		spawn a zombie at location(10.5, 100, 10.5, world "world")
+		set {_z} to last spawned entity
+		delete entity within {_z}
+		set {-skbee::ticks} to 0
+		wait 10 ticks
+		clear {-skbee::ticks}
+		clear {-skbee::watch}
+		send "[skbee] end events" to console
+
+command /skbeetest-player-events:
+	trigger:
+		set {-skbee::watch} to true
+		execute console command "bot join Alice"
+		wait 3 seconds
+		execute console command "bot chat Alice hello there"
+		wait 1 second
+		execute console command "bot command Alice nosuchcommand abc"
+		wait 1 second
+		spawn a zombie at location of player "Alice"
+		set {_z} to last spawned entity
+		wait 1 second
+		delete entity within {_z}
+		execute console command "bot quit Alice"
+		wait 1 second
+		clear {-skbee::watch}
+		clear {-skbee::chunk}
+		send "[skbee] end player-events" to console

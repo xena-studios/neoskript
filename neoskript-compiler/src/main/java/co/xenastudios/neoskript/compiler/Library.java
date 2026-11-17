@@ -83,6 +83,21 @@ public final class Library implements Registrar {
         return exactType(javaClass);
     }
 
+    /**
+     * Whether events of {@code eventClass} already have a value of type {@code typeId} at {@code time}, registered for
+     * that class or a superclass of it: for NeoSkriptCompat, which adds an addon's event values only where NeoSkript
+     * has none.
+     */
+    public synchronized boolean hasEventValue(Class<?> eventClass, String typeId, int time) {
+        for (EventValue value : eventValues) {
+            if (value.excluded() == null && value.time() == time && value.type().equals(typeId)
+                    && value.eventClass().isAssignableFrom(eventClass)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Whether a type has this id: for NeoSkriptCompat. */
     public boolean hasType(String id) {
         return javaClasses.containsKey(id);

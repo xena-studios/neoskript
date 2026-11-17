@@ -77,6 +77,25 @@ final class CompatElements {
         priority(registrar, id, info);
     }
 
+    /**
+     * An addon's event: NeoSkript listens to its event classes, and the event's {@code check} filters each one that
+     * fires, with the literals written in the trigger's header ({@code on wave of zombies}).
+     */
+    static void event(Compat compat, Registrar registrar, String addon, SyntaxInfo<?> info) {
+        List<Class<?>> classes = info instanceof org.skriptlang.skript.bukkit.registration.BukkitSyntaxInfos.Event<?> event
+                ? List.copyOf(event.events()) : List.of();
+        if (classes.isEmpty()) {
+            throw new IllegalArgumentException("it has no event classes");
+        }
+        List<List<Placeholder>> placeholders = placeholders(compat, info);
+        String id = id(addon, info);
+        registrar.event(id, classes, element -> {
+            ch.njol.skript.lang.SkriptEvent event = setup(compat, addon, info, placeholders, element, "event");
+            return (Condition) (context, arguments) -> context.event() instanceof Event fired
+                    && run(addon, event, arguments, () -> event.check(fired));
+        }, patterns(info));
+    }
+
     static void condition(Compat compat, Registrar registrar, String addon, SyntaxInfo<?> info) {
         List<List<Placeholder>> placeholders = placeholders(compat, info);
         String id = id(addon, info);
@@ -204,7 +223,8 @@ final class CompatElements {
                 javaClass = javaClass == null ? null : CompatAdapters.skriptClass(javaClass);
                 type = javaClass == null ? Object.class : javaClass;
             }
-            arguments[i] = argument(i, type, element);
+            // An event's arguments are all literals, as Skript gives them.
+            arguments[i] = argument(i, type, element, instance instanceof ch.njol.skript.lang.SkriptEvent);
         }
         ParseResult result = new ParseResult(text, arguments);
         result.mark = mark(element);
@@ -216,8 +236,9 @@ final class CompatElements {
         boolean[] ok = {false};
         String error;
         try {
-            error = Compat.withSetupErrors(() -> ok[0] = instance.preInit()
-                    && instance.init(arguments, element.pattern(), Kleenean.FALSE, result));
+            error = Compat.withSetupErrors(() -> ok[0] = instance instanceof ch.njol.skript.lang.SkriptEvent event
+                    ? event.init(literals(arguments), element.pattern(), result)
+                    : instance.preInit() && instance.init(arguments, element.pattern(), Kleenean.FALSE, result));
         } catch (VirtualMachineError e) {
             throw e;
         } catch (Throwable e) {
@@ -256,9 +277,17 @@ final class CompatElements {
         return element.isDefault(index) && element.argumentType(index) == null && element.argumentLiteral(index) == null;
     }
 
-    private static <T> CompatArgument<T> argument(int index, Class<T> type, ElementInfo element) {
+    private static ch.njol.skript.lang.Literal<?>[] literals(ch.njol.skript.lang.Expression<?>[] arguments) {
+        ch.njol.skript.lang.Literal<?>[] literals = new ch.njol.skript.lang.Literal<?>[arguments.length];
+        for (int i = 0; i < arguments.length; i++) {
+            literals[i] = (ch.njol.skript.lang.Literal<?>) arguments[i];
+        }
+        return literals;
+    }
+
+    private static <T> CompatArgument<T> argument(int index, Class<T> type, ElementInfo element, boolean literal) {
         String written = element.argumentLiteral(index);
-        if (written != null) {
+        if (written != null || literal) {
             return new CompatArgument.Written<>(index, type, element.isSingle(index), element.and(index),
                     element.isDefault(index), written);
         }

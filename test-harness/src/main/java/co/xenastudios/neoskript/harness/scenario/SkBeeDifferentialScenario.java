@@ -22,7 +22,8 @@ import java.util.regex.Pattern;
 /**
  * NeoSkriptCompat against Skript, with a real Skript addon: {@code scripts/skbee-differential.sk} on Skript 2.17 with
  * SkBee 3.26.0 (pinned by SHA-256), and on NeoSkript with NeoSkriptCompat and the same SkBee jar. Each part of the
- * script is a command, run from the console with a ping after it. Each label's {@code [skbee] label: value} lines must
+ * script is a command, run from the console with a ping after it; the harness bot is there for parts that need a
+ * player ({@code bot join Alice}, run by the script). Each label's {@code [skbee] label: value} lines must
  * match. On NeoSkript, SkBee must enable, NeoSkriptCompat must register its syntax, and no part may throw.
  *
  * <p>SkBee 3.26.0 needs Skript 2.15 or later and Minecraft 26.1 or later, so this runs on Paper 26.x only. Folia is
@@ -32,7 +33,7 @@ public final class SkBeeDifferentialScenario implements Scenario {
 
     private static final Duration WAIT = Duration.ofMinutes(3);
     private static final Duration PART = Duration.ofSeconds(30);
-    private static final Duration END = Duration.ofSeconds(10);
+    private static final Duration END = Duration.ofSeconds(20);
     private static final Pattern LINE = Pattern.compile("\\[skbee] (.+?): (.*)$");
     private static final Pattern PART_NAME = Pattern.compile("(?m)^command /skbeetest-(\\S+):");
 
@@ -73,11 +74,13 @@ public final class SkBeeDifferentialScenario implements Scenario {
         Result original = run(context.server(runs.resolve("skript"))
                 .plugin(context.skriptJar())
                 .plugin(skbee)
+                .plugin(context.botJar())
                 .file("plugins/Skript/scripts/skbee.sk", script), parts);
         Result ours = run(context.server(runs.resolve("neoskript"))
                 .plugin(context.neoskriptJar())
                 .plugin(context.compatJar())
                 .plugin(skbee)
+                .plugin(context.botJar())
                 .file("plugins/NeoSkript/scripts/skbee.sk", script), parts);
 
         List<String> unexpected = new ArrayList<>();
