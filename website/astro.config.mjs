@@ -5,6 +5,8 @@
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 import starlightLinksValidator from "starlight-links-validator";
+// The VS Code extension's TextMate grammar, so ```skript blocks in the guides are highlighted as in the editors.
+import skriptGrammar from "../editors/vscode/syntaxes/skript.tmLanguage.json" with { type: "json" };
 
 export default defineConfig({
   site: "https://neoskript.dev",
@@ -24,6 +26,7 @@ export default defineConfig({
       customCss: ["./src/styles/theme.css"],
       expressiveCode: {
         themes: ["github-dark-default", "github-light-default"],
+        shiki: { langs: [{ ...skriptGrammar, name: "skript", aliases: ["sk"] }] },
         // GitHub's token colours, on the site's own surfaces: raised night (or the light theme's tint) under a
         // hairline, the frame's bar in the page colour, and flat, as everything else (DESIGN.md).
         styleOverrides: {
@@ -53,10 +56,58 @@ export default defineConfig({
       editLink: { baseUrl: "https://github.com/xena-studios/neoskript/edit/main/website/" },
       lastUpdated: true,
       // Custom pages (src/pages) can't be validated; the rest of the site is.
-      plugins: [starlightLinksValidator({ exclude: ["/", "/download/", "/syntax/", "/syntax/**", "/parser/", "/llms.txt"] })],
+      plugins: [starlightLinksValidator({ exclude: ["/", "/download/", "/addons/", "/syntax/", "/syntax/**", "/parser/", "/llms.txt"] })],
       sidebar: [
-        { label: "Start here", items: ["docs", "docs/install", "docs/moving-from-skript", "docs/ai"] },
-        { label: "Tools", items: ["docs/editors", "docs/parser", "docs/parser-checks"] },
+        {
+          label: "Start here",
+          items: ["docs", "docs/install", "docs/moving-from-skript", "docs/first-script", "docs/faq"],
+        },
+        {
+          label: "Writing scripts",
+          items: [
+            "docs/scripts/structure",
+            "docs/scripts/events",
+            "docs/scripts/commands",
+            "docs/scripts/conditions",
+            "docs/scripts/loops",
+            "docs/scripts/variables",
+            "docs/scripts/functions",
+            "docs/scripts/options",
+            "docs/scripts/types",
+            "docs/scripts/text",
+            "docs/scripts/waits",
+            "docs/scripts/items",
+            "docs/scripts/entities",
+            "docs/scripts/menus",
+            "docs/scripts/errors",
+            "docs/ai",
+          ],
+        },
+        {
+          label: "Running a server",
+          items: [
+            "docs/server/configuration",
+            "docs/server/commands",
+            "docs/server/effect-commands",
+            "docs/server/variables",
+            "docs/server/reloading",
+            "docs/server/folia",
+            "docs/server/performance",
+            "docs/server/updates-and-metrics",
+            "docs/server/troubleshooting",
+          ],
+        },
+        { label: "Tools", items: ["docs/cli", "docs/editors", "docs/parser", "docs/parser-checks"] },
+        { label: "Addons", items: ["docs/addons"] },
+        {
+          label: "Reference",
+          items: [
+            "docs/reference/differences",
+            "docs/reference/versions",
+            "docs/reference/releases",
+            { label: "Syntax reference", link: "/syntax/" },
+          ],
+        },
       ],
     }),
   ],

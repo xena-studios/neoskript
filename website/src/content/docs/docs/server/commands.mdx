@@ -1,0 +1,60 @@
+---
+title: Commands and permissions
+description: The /skript command and its subcommands, and Skript's permissions, as NeoSkript has them.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+NeoSkript takes over Skript's `/skript` command, with `/sk` and `/neoskript` as other names for it. Its subcommands, messages and tab completion are Skript's, so habits and tools that use them keep working. Using it needs `skript.admin`, which ops have.
+
+## /skript subcommands
+
+| Command | What it does |
+|---|---|
+| `/sk help` | Lists the subcommands. |
+| `/sk reload <script>` | Reloads a script, or every script in a folder. |
+| `/sk reload scripts` | Reloads every script. |
+| `/sk reload config` | Reads `config.yml` again. See [configuration](/docs/server/configuration/#when-changes-apply) for what applies straight away. |
+| `/sk reload all` | Reloads `config.yml` and every script. |
+| `/sk reload last` | Reloads the script you last reloaded by name. |
+| `/sk reload aliases` | Does nothing more than say it's done: NeoSkript's item names are built in, with nothing to read again. |
+| `/sk enable <script>` | Enables a disabled script, or every disabled script in a folder, and loads it. |
+| `/sk enable all` | Enables and loads every disabled script. |
+| `/sk disable <script>` | Unloads a script, or every script in a folder, and disables it. |
+| `/sk disable all` | Unloads and disables every script. |
+| `/sk list` | Lists enabled and disabled scripts. `/sk show` is the same. |
+| `/sk info` | Shows the server and NeoSkript versions, and the plugins NeoSkript hooks into that are installed. |
+| `/sk restore` | Writes the loaded scripts, as they were when they loaded, to a new folder in `plugins/NeoSkript/dump/`. For when script files were deleted. `/sk dump` is the same. |
+| `/sk update` | Says where new versions are released. NeoSkript's [update checker](/docs/server/updates-and-metrics/) tells admins about new versions on its own. |
+
+Script names can leave out `.sk`, and can be in folders: `/sk reload economy/shop`. A name ending in `/` is a folder.
+
+## Disabling and enabling
+
+A disabled script's file name starts with `-`: `/sk disable shop` renames `shop.sk` to `-shop.sk`, and `/sk enable shop` renames it back. Renaming a file yourself does the same. Disabled scripts aren't loaded when the server starts.
+
+## Reloading
+
+A reload reads the scripts again and swaps them in together. If a script has errors, its errors are reported and the version already running keeps running. See [reloading](/docs/server/reloading/).
+
+The player who reloads, the console, and players with `skript.reloadnotify` hear about it.
+
+## Permissions
+
+| Permission | Default | What it allows |
+|---|---|---|
+| `skript.admin` | op | `/skript` and its subcommands, and hearing about new NeoSkript versions when joining. |
+| `skript.effectcommands` | nobody | [Effect commands](/docs/server/effect-commands/), when they're turned on. Ops need it too, unless `effect-commands.allow-ops` is on. |
+| `skript.reloadnotify` | nobody | Hearing when someone else reloads scripts, and `auto reload` messages. |
+| `skript.see_runtime_errors` | op | Being told in chat when runtime errors happen. |
+| `skript.*` | nobody | All four. |
+
+These are Skript's permissions, so permission plugin setups made for Skript keep working.
+
+<Aside type="note">
+NeoSkript won't start when Skript is installed too: the two would fight over the same scripts and the same `/skript` command. NeoSkript logs an error saying so and disables itself.
+</Aside>
+
+## Script commands
+
+Commands that scripts add with `command /name:` are registered under the `skript:` namespace, as Skript registers them, and take their permissions from their `permission:` entry. See [commands](/docs/scripts/commands/).

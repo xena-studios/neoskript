@@ -1,0 +1,43 @@
+---
+title: Releases
+description: NeoSkript's releases, the script checker's and the editor extensions', and where to get development builds.
+---
+
+import { LinkCard } from "@astrojs/starlight/components";
+
+Releases are on [GitHub Releases](https://github.com/xena-studios/neoskript/releases), each with a `SHA256SUMS` file. The plugin is also on [Modrinth](https://modrinth.com/plugin/neoskript). What each milestone delivered is in the [progress log](https://github.com/xena-studios/neoskript/blob/main/docs/PROGRESS.md).
+
+## NeoSkript 0.1.0-beta.1
+
+The first public beta, for Paper and Folia, Minecraft 1.21.4 to 26.3, on Java 21 or newer. [Release notes](https://github.com/xena-studios/neoskript/releases/tag/v0.1.0-beta.1).
+
+- Skript 2.17's whole test suite: 862 of 862 on Paper, 860 on Folia.
+- Every unit of the differential harness behaves as on Skript 2.17.0.
+- Skript's `variables.csv`, byte for byte, both ways.
+- Folia's region threads, with `run on`.
+- `/skript`, `/sk` and `/neoskript`, with Skript's subcommands and permissions.
+- Effect commands, runtime error limits and event priority, as in Skript's `config.sk`.
+- Vault, WorldGuard and GriefPrevention.
+- The update checker and bStats, both of which can be turned off.
+
+Not in it: Skript addons, and databases for variables.
+
+## Since 0.1.0-beta.1
+
+On main, in the [development build](https://github.com/xena-studios/neoskript/releases/tag/dev), for the next release:
+
+- **Damaged variable files:** a `variables.csv` whose last line was cut short by a crash could be wiped. Now lines that can't be read are skipped and the file is backed up first, nothing is saved until variables have loaded, and the file copied from Skript is backed up before its first load. See [variables and storage](/docs/server/variables/#backups).
+
+## neoskript-cli 0.1.0
+
+The [script checker](/docs/cli/)'s first release: errors, warnings, and Folia and performance hints for a folder of scripts, on a throwaway server. [Release notes](https://github.com/xena-studios/neoskript/releases/tag/cli-v0.1.0).
+
+## Editor support 0.1.0
+
+The language server and the VS Code extension: problems as you type, hover docs, completion, an outline and go to definition. See [code editors](/docs/editors/). [Release notes](https://github.com/xena-studios/neoskript/releases/tag/language-server-v0.1.0).
+
+## Development builds
+
+Every push to main that passes CI replaces the [development build](https://github.com/xena-studios/neoskript/releases/tag/dev). It's not a release: use it on a server you can afford to break. Development builds don't check for updates.
+
+<LinkCard title="Download" description="The latest release, then the development build." href="/download/" />

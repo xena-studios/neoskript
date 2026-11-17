@@ -1,0 +1,120 @@
+---
+title: Variables
+description: Global, local and list variables, what's saved and what isn't, and keying data by player.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+A variable is a name in curly brackets that holds a value: `{coins}`, `{_target}`, `{homes::%player's uuid%::*}`.
+
+| Kind | Written | Lasts | Saved |
+|---|---|---|---|
+| Global | `{coins}` | Until it's deleted | Yes, in `variables.csv` |
+| Memory-only | `{-coins}` | Until the server stops | No |
+| Local | `{_coins}` | Until the trigger ends | No |
+
+## Setting and changing
+
+```skript
+command /coins:
+	executable by: players
+	trigger:
+		set {coins::%player's uuid%} to 100
+		add 25 to {coins::%player's uuid%}
+		remove 5 from {coins::%player's uuid%}
+		send "You have %{coins::%player's uuid%}% coins." to player
+		delete {coins::%player's uuid%}
+```
+
+A variable that was never set is `<none>`, and in arithmetic it counts as 0: `add 1 to {joins}` works the first time. `X ? Y` gives `Y` when `X` isn't set: `{coins} ? 0`.
+
+## Global variables
+
+A variable without `_` or `-` at the start is global: every script sees it, and it's saved, so it's still there after a restart. Saved variables go in `plugins/NeoSkript/variables.csv`, in the same format as Skript's, so Skript can read the file too. See [variables and storage](/docs/server/variables/) for how and when it's saved.
+
+Values that can't be saved get a warning when the script loads. Entities are one:
+
+```text
+an entity cannot be saved. That is, the contents of the variable {lastmob} will be lost when the server stops.
+```
+
+## Memory-only variables
+
+A global variable whose name starts with `-` isn't saved. It's shared between scripts like any global, and gone when the server stops. Use it for things that change often and don't need to last, like counters for a minigame round: saving them would cost time for nothing.
+
+```skript
+on join:
+	set {-joined-at::%player's uuid%} to now
+
+on quit:
+	delete {-joined-at::%player's uuid%}
+```
+
+## Local variables
+
+A variable whose name starts with `_` belongs to one run of one trigger. Two players running the same command at once each have their own. Use locals for anything temporary; they're the cheapest kind.
+
+```skript
+command /roll:
+	trigger:
+		set {_roll} to random integer between 1 and 6
+		send "You rolled %{_roll}%." to sender
+```
+
+A function's parameters are locals inside it: `{_p}` in `function greet(p: player)`.
+
+## Lists
+
+`::` splits a variable's name into parts, and `::*` at the end is every variable under that name: a list.
+
+```skript
+command /addhome <text>:
+	executable by: players
+	trigger:
+		set {homes::%player's uuid%::%arg-1%} to location of player
+		send "Home %arg-1% set. You have %size of {homes::%player's uuid%::*}%." to player
+
+command /listhomes:
+	executable by: players
+	trigger:
+		loop {homes::%player's uuid%::*}:
+			send loop-index to player
+
+command /clearhomes:
+	executable by: players
+	trigger:
+		delete {homes::%player's uuid%::*}
+```
+
+- `add X to {list::*}` adds a value at the next free number, and `remove X from {list::*}` takes it out.
+- `size of {list::*}` counts the values, and `indices of {list::*}` gives their names.
+- `set {_list::*} to 1, 2 and 3` sets a whole list. Write `and` or `or` in a list: `1, 2, 3` alone gives a warning that it's missing.
+- `delete {list::*}` (or `clear`) deletes every value in it.
+- Indices are kept in Skript's order, with numbers sorted by value: 2 comes before 10.
+
+## Keying data by player
+
+Players change their names, so key per-player data by their UUID: `{coins::%player's uuid%}`.
+
+When `%player%` itself is in a variable's name, it's the player's UUID too, by default, as in Skript's default config: `{coins::%player%}` and `{coins::%player's uuid%}` are the same variable. Servers that turned this off in Skript keep it off when they move over, so the variables they saved are found. It's [`player-uuids-in-names`](/docs/server/configuration/#variables) in config.yml.
+
+## Default values
+
+`variables:` sets global variables when the script loads, but only those that aren't set yet:
+
+```skript
+variables:
+	{joins::total} = 0
+	{spawn-message} = "Welcome to spawn!"
+
+on join:
+	add 1 to {joins::total}
+```
+
+<Aside type="caution">
+A global list that only grows makes saving and loading slower. Delete what you no longer need, and keep data that changes every tick in `{-memory-only}` or local variables.
+</Aside>
+
+## Folia
+
+On Folia, triggers in different regions run at the same time. Each single change to a global variable happens in one step: `add 1 to {count}` never loses a count. But reading a variable and then setting it is two steps, and another trigger can change it between them. Use `add` and `remove` rather than `set {x} to {x} + 1`. [Folia](/docs/server/folia/#global-variables) has more.

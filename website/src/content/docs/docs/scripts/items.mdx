@@ -1,0 +1,94 @@
+---
+title: Items and inventories
+description: Writing items, names, lore and enchantments, giving and taking them, and working with inventories and slots.
+---
+
+## Writing items
+
+Items are written by name, with an amount in front if you want more than one: `diamond`, `3 iron ingots`, `a stone sword`, `64 oak logs`. The names are Minecraft's, from the server's registries, singular or plural.
+
+```skript
+command /kit:
+	executable by: players
+	cooldown: 1 hour
+	trigger:
+		give player 1 iron sword of sharpness 2
+		give player 16 cooked beef
+		give player an iron helmet named "<gray>Starter helmet"
+		give player a diamond named "<aqua>Lucky gem" with lore "<gray>Found on day one"
+		send "<green>Kit given." to player
+```
+
+- `of <enchantment> <level>` enchants it: `diamond pickaxe of efficiency 5`, or with Roman numerals, `of unbreaking III`.
+- `named "..."` sets its name, and `with lore "..."` its lore.
+
+## Giving and taking
+
+```skript
+command /trade:
+	executable by: players
+	trigger:
+		if player has 5 diamonds:
+			remove 5 diamonds from player
+			give player 1 netherite ingot
+			send "Traded." to player
+		else:
+			send "<red>You need 5 diamonds." to player
+```
+
+`give X to player` and `give player X` are the same. `remove X from player` takes from their inventory. `drop X at location` drops it on the ground.
+
+## The item in hand
+
+`player's tool` is the item in the player's main hand. It's a slot, so it can be changed.
+
+```skript
+command /rename <text>:
+	executable by: players
+	trigger:
+		if player's tool is air:
+			send "<red>Hold an item." to player
+			stop
+		set name of player's tool to arg-1
+		send "Renamed to %arg-1%." to player
+```
+
+## Inventories and slots
+
+`player's inventory` is a player's inventory, `slot 0 of player's inventory` one slot of it, and `the helmet of player` an armour slot.
+
+```skript
+command /inv:
+	executable by: players
+	trigger:
+		if player's inventory contains diamond:
+			send "You have diamonds." to player
+		set slot 0 of player's inventory to 5 golden apples
+		set the helmet of player to a diamond helmet
+		send "Amount in your hand: %item amount of player's tool%" to player
+
+command /wipe <player>:
+	permission: server.wipe
+	trigger:
+		clear arg-1's inventory
+		send "Cleared %arg-1%'s inventory." to sender
+```
+
+## Items in variables
+
+Items in global variables are saved, names, lore, enchantments and all, in the same format as Skript's `variables.csv`. An item put in a variable is a copy: changing the variable's item doesn't change the one it came from.
+
+```skript
+command /saveitem:
+	executable by: players
+	trigger:
+		set {saved::%player's uuid%} to player's tool
+		send "Saved %{saved::%player's uuid%}%." to player
+
+command /loaditem:
+	executable by: players
+	trigger:
+		give player {saved::%player's uuid%}
+```
+
+For menus made of items, see [menus](/docs/scripts/menus/). Every item expression is in the [expressions reference](/syntax/expressions/).

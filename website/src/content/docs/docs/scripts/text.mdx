@@ -1,0 +1,100 @@
+---
+title: Text and formatting
+description: Sending messages, putting values in text, colours and styles, clickable text, titles and action bars.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+## Sending messages
+
+- `send "..." to player` messages one player, or several: `send "..." to all players`.
+- `message "..."` messages the event's player, or the command's sender.
+- `broadcast "..."` messages everyone, and the console.
+- `send "..." to console` writes to the server's console.
+
+```skript
+on join:
+	send "Welcome, %player%!" to player
+	broadcast "%player% joined."
+	send "%player% joined from %player's world%." to console
+```
+
+## Values in text
+
+Put an expression between `%` signs in text, and it's replaced by its value: `"%player% has %{coins::%player's uuid%}% coins"`. For a `%` sign itself, write `%%`. For a `"` inside text, write it twice: `"She said ""hi""."`
+
+```skript
+command /stats:
+	executable by: players
+	trigger:
+		send "You're at %location of player%, with %health of player% health." to player
+		send "100%% of your stats, right here." to player
+```
+
+Text that's only one value doesn't need quotes and `%`: `send arg-1 to player`, not `send "%arg-1%" to player`, which gives a warning.
+
+## Colours and styles
+
+Colours and styles are tags in angle brackets, as in Skript 2.17. A tag lasts until another colour or `<reset>`.
+
+```skript
+on join:
+	send "<gold>Welcome <bold>back<reset>, <aqua>%player%<reset>!" to player
+	send "<#ff8800>An orange line, in hex." to player
+	send "&aOld colour codes work too." to player
+	send "<gradient:red:blue>A gradient across this text</gradient>" to player
+```
+
+- **Colours:** `<black>`, `<dark blue>`, `<dark green>`, `<dark aqua>`, `<dark red>`, `<dark purple>`, `<gold>`, `<gray>`, `<dark gray>`, `<blue>`, `<green>`, `<aqua>`, `<red>`, `<light purple>`, `<yellow>`, `<white>`, and Skript's other names for them, such as `<orange>`, `<pink>` and `<lime>`. Any colour in hex: `<#ff8800>`.
+- **Styles:** `<bold>`, `<italic>`, `<underline>`, `<strikethrough>`, `<obfuscated>` (or `<magic>`), and `<reset>`.
+- **Old codes:** `&a`, `&l` and the rest work as in Skript.
+- **Gradients and rainbows:** `<gradient:red:blue>...</gradient>`, `<rainbow>...</rainbow>`.
+
+`uncolored "..."` gives the text with its tags removed, and `colored "..."` reads the tags in text that came from somewhere else, such as a command argument.
+
+## Clickable text
+
+Tags can make part of a message do something when it's clicked, or show a tooltip when it's hovered.
+
+```skript
+command /links:
+	executable by: players
+	trigger:
+		send "<link:https://neoskript.dev>Open the website</link>" to player
+		send "<run command:/spawn>Click to go to spawn</run command>" to player
+		send "<suggest command:/msg >Click to start a message</suggest command>" to player
+		send "<tooltip:Shown on hover>Point at this</tooltip>" to player
+```
+
+## Titles, action bars and sounds
+
+```skript
+on join:
+	send title "<gold>Welcome" with subtitle "to the server" to player for 3 seconds
+	send action bar "<green>Loading your data..." to player
+	play sound "entity.experience_orb.pickup" to player
+```
+
+## Working with text
+
+```skript
+command /words <text>:
+	trigger:
+		set {_parts::*} to arg-1 split at " "
+		send "%size of {_parts::*}% words, %length of arg-1% characters." to sender
+		send "Upper case: %arg-1 in upper case%" to sender
+		send "Joined: %join {_parts::*} with ", "%" to sender
+		if arg-1 contains "skript":
+			send "It mentions Skript." to sender
+		set {_text} to arg-1
+		replace all "a" in {_text} with "4"
+		send "Replaced: %{_text}%" to sender
+```
+
+Dates and numbers can be formatted: `now formatted as "yyyy-MM-dd"`, `formatNumber(1234567)`.
+
+<Aside type="tip">
+Chat, join, quit, death and kick messages are text components, as in Skript 2.17: `set join message to "<yellow>%player% is here"` keeps its colours. See [chat format](/syntax/expressions/#chat-format) and [join message](/syntax/expressions/#join-message).
+</Aside>
+
+The text syntax is in the [expressions reference](/syntax/expressions/), and the [message effect](/syntax/effects/#message) has `send` in full.

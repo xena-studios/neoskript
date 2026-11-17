@@ -6,13 +6,14 @@
   "packageManager": "pnpm@12.6.0",
   "scripts": {
     "dev": "astro dev",
-    "build": "node scripts/parser.mjs && astro build && node scripts/headers.mjs && node scripts/skill.mjs",
+    "build": "node scripts/parser.mjs && node scripts/syntax-links.mjs && astro build && node scripts/headers.mjs && node scripts/skill.mjs",
     "preview": "astro preview",
     "brand:sync": "node scripts/sync-brand.mjs",
     "syntax:sync": "node scripts/syntax.mjs",
     "syntax:export": "cd .. && ./gradlew :test-harness:harness -Pharness.env=paper-26.3 -Pharness.scenario=syntax-export && cd website && node scripts/syntax.mjs",
     "deploy": "pnpm build && wrangler deploy",
-    "parser": "cd .. && ./gradlew :neoskript-web:website"
+    "parser": "cd .. && ./gradlew :neoskript-web:website",
+    "docs:examples": "node scripts/check-examples.mjs"
   },
   "engines": {
     "node": ">=24"

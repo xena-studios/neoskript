@@ -1,0 +1,60 @@
+---
+title: Effect commands
+description: Running one line of Skript from chat or the console, like !set time to 6:00, and who can.
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+An effect command runs one line of Skript straight away, from chat or the console. It starts with a token, `!` by default:
+
+```text
+!set time to 6:00
+!give me a diamond sword
+!broadcast "Restart in 5 minutes"
+```
+
+`me` is whoever typed it. They're Skript's effect commands, with Skript's settings, permission and messages.
+
+## Turning them on
+
+<Steps>
+
+1. In `plugins/NeoSkript/config.yml`, set `effect-commands.enabled` to `true`.
+
+   ```yaml
+   effect-commands:
+     enabled: true
+     token: "!"
+     allow-ops: false
+     log: true
+   ```
+
+2. Run `/sk reload config`. Effect command settings apply straight away.
+
+3. Give the players who should use them the `skript.effectcommands` permission. The console can always use them.
+
+</Steps>
+
+If you used effect commands on Skript, moving over copies its four settings from `config.sk`, so they work as before.
+
+<Aside type="caution">
+An effect command can do anything a script can: give items, change any player, run console commands. Ops don't get the permission unless `allow-ops` is on. Give it only to people you'd give console access.
+</Aside>
+
+## What happens
+
+- The chat message or console command is cancelled, so it isn't sent or run as a command.
+- The sender is told `Executing '<effect>'`, or, if the line doesn't load, the error.
+- With `log: true`, a player's effect command is logged: `<player> issued effect command: <effect>`.
+- A player's effect command runs on that player's thread, their region's on Folia; the console's runs on the global thread.
+
+Other plugins can listen to the `EffectCommandEvent` NeoSkript fires, change the effect, or cancel it. A cancelled one tells the sender `Your effect command '<effect>' was cancelled.`
+
+## Settings
+
+| Option | Default | What it does |
+|---|---|---|
+| `effect-commands.enabled` | `false` | Turns effect commands on. |
+| `effect-commands.token` | `"!"` | What they start with. It can be more than one character, but shouldn't start with `/`. |
+| `effect-commands.allow-ops` | `false` | Lets ops use them without the permission. |
+| `effect-commands.log` | `false` | Logs players' effect commands. |

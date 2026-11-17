@@ -1,0 +1,63 @@
+---
+title: Variables and storage
+description: Where global variables are saved, how often, Skript's variables.csv format, backups, and player UUIDs in names.
+---
+
+import { Aside, FileTree } from "@astrojs/starlight/components";
+
+Global variables (`{name}`, not `{_name}` or `{-name}`) are saved to `plugins/NeoSkript/variables.csv`. For how scripts use variables, see [variables](/docs/scripts/variables/).
+
+<FileTree>
+- plugins/NeoSkript/
+  - variables.csv saved variables
+  - backups/
+    - variables_2026-11-12_16-03-07.csv a backup, made when needed
+  - .migrated-from-skript written by the first start after Skript
+</FileTree>
+
+## Skript's format, both ways
+
+`variables.csv` is in Skript's own format, values and all, byte for byte. NeoSkript reads the file Skript wrote, and Skript can read the file NeoSkript writes, so switching back to Skript keeps your variables. The test harness checks this both ways against a real Skript server, for text, numbers, booleans, timespans, dates, worlds, locations, players, items, vectors, entity types, game modes and more.
+
+A saved value of a type NeoSkript doesn't have yet is kept as it was saved and written back unchanged, so nothing is lost. The startup line counts them: `Loaded 1520 variables in 43 ms (3 kept as saved until NeoSkript supports their types)`.
+
+## When it's saved
+
+- Variables load before scripts, when the server starts.
+- Changed variables are saved every `variables.save-interval`, 5 minutes by default, and when the server stops.
+- A save writes a temporary file and then swaps it in, so a crash in the middle of a save can't leave a half-written file. Temporary files left by an interrupted save are removed at the next start.
+
+If the server crashes, only the changes since the last save are lost.
+
+`{-name}` variables are never saved, and nor are local variables.
+
+## Backups
+
+NeoSkript backs up `variables.csv` to `backups/` beside it, named as Skript names its backups:
+
+- **The first start after moving from Skript** backs up the copied file before loading it.
+- **When some lines can't be read**, for example the last line cut short by a crash under Skript, the file is backed up first. The lines that can't be read are skipped and the rest load, as in Skript. The console lists them with Skript's summary (`1 variable could not be loaded!`, `Affected variables: ...`), and the next save leaves them out; the backup keeps them.
+
+If the file can't be read at all, NeoSkript says so in the console and doesn't save variables until it's fixed, so it never writes an empty file over yours.
+
+<Aside type="caution">
+These backups aren't scheduled. Back up `plugins/NeoSkript` with the rest of your server.
+</Aside>
+
+## Players in variable names
+
+With `variables.player-uuids-in-names: true`, the default, a player in a variable's name is their UUID: `{money::%player%}` is saved as `money::` and the UUID. With `false`, it's their name, which breaks when a player changes it.
+
+This is Skript's `use player UUIDs in variable names`, on by default in Skript too. When you move from Skript, NeoSkript copies the setting from `config.sk`, so the variables Skript saved under names or UUIDs are found. Changing it later doesn't rename saved variables.
+
+## Values that can't be saved
+
+Some values can't go in a file, such as entities. A script that puts one in a global variable gets a warning when it loads, and the variable is gone after a restart. If a save finds values it can't save, the console says how many.
+
+## Databases
+
+NeoSkript saves to `variables.csv` only. Skript 2.17 itself only saves to CSV out of the box: its SQLite and MySQL storage needs a plugin that's no longer maintained. Database storage is planned after 1.0.
+
+<Aside type="note">
+The variable store and backups changed after 0.1.0-beta.1: backups, skipping lines that can't be read, and never saving over a file that didn't load are in the [development build](https://github.com/xena-studios/neoskript/releases/tag/dev) and the next release.
+</Aside>

@@ -1,0 +1,54 @@
+---
+title: What NeoSkript is
+description: A fast, modern drop-in replacement for Skript. Your .sk scripts run unchanged, only faster, on Paper and Folia.
+sidebar:
+  label: Introduction
+---
+
+import { Aside, Card, CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+NeoSkript runs [Skript](https://github.com/SkriptLang/Skript) scripts. It isn't a fork: it's a clean-room rewrite that treats Skript's behaviour as the spec, so the `.sk` files you have today load and behave the same way. What changes is underneath. Each trigger is compiled to JVM bytecode, so the JIT can optimise across a whole script instead of stepping through syntax one element at a time, and the threading model is built for Folia from the start.
+
+<Aside type="caution" title="Public beta">
+NeoSkript is in public beta: [download it](/download/) from Modrinth or GitHub, and try it on a test server before your live one. [Check your scripts](/docs/moving-from-skript/#check-your-scripts-first) before you switch. Where each milestone stands is in [the progress log](https://github.com/xena-studios/neoskript/blob/main/docs/PROGRESS.md).
+</Aside>
+
+<CardGrid>
+	<Card title="Your scripts, unchanged" icon="document">
+		Skript 2.17's syntax, messages and errors. Your scripts, `variables.csv` and `/sk` habits carry over.
+	</Card>
+	<Card title="Faster" icon="rocket">
+		Startup loads in under half Skript's time, `/sk reload` is about six times faster, and triggers cost a fraction. See [performance](/docs/server/performance/).
+	</Card>
+	<Card title="Paper and Folia" icon="random">
+		One jar for both. On Folia, scripts run on region threads, with clear errors and `run on` where a script reaches across regions.
+	</Card>
+	<Card title="Safe reloads" icon="approve-check">
+		A script with errors keeps its last version running, so a typo never takes a live script down.
+	</Card>
+</CardGrid>
+
+## How we check it's a drop-in
+
+- **Skript's own test suite.** Every test in Skript 2.17's suite runs on NeoSkript, and all 862 pass.
+- **Side by side with real Skript.** A [differential test harness](https://github.com/xena-studios/neoskript/tree/main/test-harness) runs the same scripts on a real Skript server and a NeoSkript server and compares what they do, message by message. All 1,613 units, every example in Skript's documentation and NeoSkript's own probes, print the same messages and save the same `variables.csv`.
+- **Your variables, byte for byte.** NeoSkript reads and writes Skript's `variables.csv` exactly, so you can switch back.
+
+## What it runs on
+
+| Platform | Supported |
+|---|---|
+| Server | Paper or Folia |
+| Minecraft | 1.21.4 to 26.3 |
+| Java | 21 or newer |
+
+Skript addons don't load on NeoSkript yet: an addon compatibility layer is planned after 1.0. The plugins Skript hooks into itself, Vault, WorldGuard and GriefPrevention, work. See [addons](/docs/addons/).
+
+## Where to start
+
+<CardGrid>
+	<LinkCard title="Install" description="Put the jar in, start the server." href="/docs/install/" />
+	<LinkCard title="Moving from Skript" description="Check your scripts, swap the jar, and what's copied." href="/docs/moving-from-skript/" />
+	<LinkCard title="Your first script" description="New to Skript? Write and load a script in a few minutes." href="/docs/first-script/" />
+	<LinkCard title="Syntax reference" description="Every event, effect, condition, expression and type." href="/syntax/" />
+</CardGrid>

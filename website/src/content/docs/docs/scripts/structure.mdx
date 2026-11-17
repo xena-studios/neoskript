@@ -1,0 +1,112 @@
+---
+title: How a script is laid out
+description: Script files, structures, indentation and comments, as Skript 2.17 and NeoSkript read them.
+sidebar:
+  label: Script layout
+---
+
+import { Aside, FileTree } from "@astrojs/starlight/components";
+
+A script is a text file ending in `.sk`, in the server's scripts folder. NeoSkript loads every script there when the server starts, and `/sk reload` loads them again.
+
+<FileTree>
+- plugins/
+  - NeoSkript/
+    - config.yml
+    - variables.csv
+    - scripts/
+      - welcome.sk
+      - economy/
+        - shop.sk
+        - bank.sk
+      - -old-kits.sk disabled: the name starts with -
+</FileTree>
+
+Scripts can sit in folders. A file or folder whose name starts with `-` is disabled and isn't loaded, and folders whose names start with `.` are skipped, as in Skript. `/sk disable <script>` and `/sk enable <script>` rename files for you.
+
+## Structures
+
+A script is a list of structures, written at the left edge. Each one is a header line ending in `:`, with its code indented under it.
+
+```skript title="welcome.sk"
+# Greets players, and gives a starter kit with /starter.
+options:
+	prefix: <gold>[Server]<reset>
+
+on join:
+	send "{@prefix} Welcome, %player%!" to player
+
+command /starter:
+	executable by: players
+	cooldown: 1 day
+	trigger:
+		give player 1 stone sword
+		send "{@prefix} Here's a sword." to player
+
+function greet(p: player):
+	send "{@prefix} Hello, %{_p}%." to {_p}
+```
+
+The structures you'll write most:
+
+| Structure | What it does | Guide |
+|---|---|---|
+| `on <event>:` | Runs its code when something happens. | [Events](/docs/scripts/events/) |
+| `every <timespan>:` | Runs its code on a timer. | [Events](/docs/scripts/events/#timers) |
+| `command /<name>:` | Adds a command. | [Commands](/docs/scripts/commands/) |
+| `function <name>(...):` | Code you call by name, from any script. | [Functions](/docs/scripts/functions/) |
+| `options:` | Text you reuse as `{@name}`. | [Options](/docs/scripts/options/) |
+| `variables:` | Default values for global variables. | [Variables](/docs/scripts/variables/#default-values) |
+
+The code under an event, a timer, a command's `trigger:` or a function is a **trigger**: a list of lines that run in order, top to bottom. NeoSkript compiles each trigger to JVM bytecode when the script loads.
+
+## Lines
+
+Each line in a trigger is one of three things:
+
+- An **effect** does something: `send "hi" to player`, `give player 1 diamond`, `set {coins} to 5`.
+- A **condition** checks something: `player has permission "vip"`. On its own line, it stops the trigger when it's false. After `if`, it decides whether the code under it runs. See [conditions](/docs/scripts/conditions/).
+- A **section** is a line ending in `:` with code under it: `if`, `else`, `loop`, `while`.
+
+Inside lines, **expressions** are the values: `player`, `5`, `"text"`, `{coins}`, `the player's health`. See [expressions and types](/docs/scripts/types/).
+
+## Indentation
+
+Code belongs to the line above it that's one level less indented. Indent with tabs or with spaces, and the same way through each structure: the first indented line under a structure sets the unit, and every level after it is one more of that unit.
+
+```skript
+on join:
+	if player has played before:
+		send "Welcome back!" to player
+	else:
+		send "Welcome!" to player
+		give player 1 bread
+```
+
+A line indented differently from what the lines around it allow is an error, and the message says what it expected:
+
+```text
+indentation error: expected 1 tab, but found '->__' [-> = tab, _ = space, ? = other whitespace]
+```
+
+Most editors can show tabs and spaces. The [code editor extensions](/docs/editors/) and [the parser](/parser/) both report indentation problems as you type.
+
+<Aside type="tip">
+A header line ending in `:` with nothing indented under it gives a warning, *Empty configuration section!* It usually means the next line wasn't indented.
+</Aside>
+
+## Comments
+
+`#` starts a comment, to the end of the line. Inside quotes and `{variable names}`, `#` is just a character. To put a `#` in code outside quotes, write `##`.
+
+```skript
+# This whole line is a comment.
+on join:
+	send "Welcome! #1 server" to player # The text keeps its #; this part is a comment.
+```
+
+A line with only `###` on it starts a block comment, and the next `###` line ends it.
+
+## Upper and lower case
+
+Skript's words are read without regard to case: `Send "hi" To Player` works. Variable names don't care about case either: `{Coins}` and `{coins}` are the same variable. Text in quotes keeps its case.

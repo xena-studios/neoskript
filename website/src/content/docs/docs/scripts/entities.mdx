@@ -1,0 +1,125 @@
+---
+title: Entities and the world
+description: Players, mobs, spawning, teleporting, health and potions, blocks, locations and worlds.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+## Players
+
+```skript
+command /fix:
+	executable by: players
+	trigger:
+		heal player
+		set player's food level to 10
+		extinguish player
+		set player's gamemode to survival
+		send "<green>All better." to player
+```
+
+`all players` is everyone online. `player("Notch")` finds an online player by name, and `offlineplayer("Notch")` any player who has played. `player's uuid`, `player's name`, `player's world` and `location of player` are what they say.
+
+## Spawning
+
+`spawn` makes an entity, and `last spawned entity` is the one it made. Written as a section, the code under it runs for each new entity, which is `entity` in there.
+
+```skript
+command /guards:
+	executable by: players
+	permission: server.guards
+	trigger:
+		spawn 3 iron golems at player:
+			set name of entity to "<gold>Guard"
+		spawn a zombie at player
+		set name of last spawned entity to "Bob"
+```
+
+Entity types are written by name: `zombie`, `pig`, `baby cow`, `powered creeper`, `red sheep`. Categories work too: `monster`, `animal`, `projectile`.
+
+## Health, damage and effects
+
+```skript
+command /hurt <player>:
+	permission: server.hurt
+	trigger:
+		damage arg-1 by 2
+		apply speed 2 to arg-1 for 10 seconds
+		send "%arg-1% has %health of arg-1% health left." to sender
+
+on damage of a player:
+	if damage cause is fall:
+		cancel event
+```
+
+Health is in hearts, as in Skript: `set player's health to 10` is full health for a player with 20 health points.
+
+## Moving things
+
+```skript
+command /spawn:
+	executable by: players
+	trigger:
+		teleport player to spawn of world "world"
+
+command /launch:
+	executable by: players
+	trigger:
+		push player upwards with speed 1.5
+```
+
+## Finding entities
+
+```skript
+command /nearby:
+	executable by: players
+	trigger:
+		loop all entities in radius 10 around player:
+			send "%loop-entity% at %distance between player and loop-entity% blocks" to player
+		kill all zombies in player's world
+```
+
+<Aside type="caution">
+`all entities` goes through every entity in every world. Entities in a radius, or of one type, cost far less.
+</Aside>
+
+## Blocks and locations
+
+```skript
+command /pillar:
+	executable by: players
+	trigger:
+		set block below player to glass
+		set block at location 2 meters above player to torch
+		send "You're standing on %block below player%." to player
+
+on break of diamond ore:
+	send "You mined diamonds at %location of event-block%." to player
+```
+
+A location is a place in a world: `location of player`, `spawn of world "world"`, or `location(0, 64, 0, world "world")`. `block at X` is the block there, and `the block above X` and `the block below X` the ones next to it. `distance between X and Y` is in blocks.
+
+## Worlds
+
+```skript
+command /day:
+	permission: server.time
+	trigger:
+		set time in world "world" to 6:00
+		set weather in world "world" to clear
+		broadcast "It's morning."
+```
+
+## Folia
+
+On Folia, only the thread of the region an entity or block is in may read it. Reading a player in another region gives a runtime error that names the line; changing one is sent to its region and happens a moment later. `run on` runs code where something is:
+
+```skript
+every 5 seconds:
+	loop all players:
+		run on loop-player:
+			if health of loop-player < 5:
+				send "You're low on health." to loop-player
+```
+
+On Paper, `run on` just runs its code. See [Folia](/docs/server/folia/) for the details.
