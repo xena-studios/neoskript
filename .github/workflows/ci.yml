@@ -42,8 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Pull requests check the newest Paper and Folia; main checks all four after the merge.
-        env: ${{ fromJSON(github.event_name == 'pull_request' && '["paper-26.3","folia-26.3"]' || '["paper-1.21.4","paper-26.3","folia-1.21.4","folia-26.3"]') }}
+        env: [paper-1.21.4, paper-26.3, folia-1.21.4, folia-26.3]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
