@@ -2320,7 +2320,14 @@ final class TriggerCompiler {
         } else {
             // A queue is taken from as the loop goes, so what the loop adds to it is looped too.
             queueSlot = nextSlot++;
-            expression(looped);
+            // A loop takes any objects: words for an event value that isn't there are a value ('loop block:').
+            List<String> outerLiteralTypes = literalTypes;
+            literalTypes = List.of(SyntaxRegistry.OBJECT);
+            try {
+                expression(looped);
+            } finally {
+                literalTypes = outerLiteralTypes;
+            }
             convert(true);
             method.visitInsn(DUP);
             method.visitMethodInsn(INVOKESTATIC, VALUES, "loopedQueue", "(" + OBJECTS + ")Ljava/util/Queue;", false);
@@ -3364,13 +3371,9 @@ final class TriggerCompiler {
             // isn't there is the line's error first, the last written first ('set ... of player's tool to 10').
             List<Object> values = effect.match().values();
             for (int i = values.size() - 1; i >= 0; i--) {
-                if (i == mode.value && values.get(mode.target) instanceof Expr.Variable
-                        && values.get(i) instanceof Expr.Syntax words && (worldOfNothing(words) || eventLiteral(words) != null)) {
-                    // Words a variable is set to, naming an event value that isn't there: Skript's unparsed literal
-                    // reads them as a value instead ('set {_b} to block' in a function is the type).
-                    continue;
-                }
-                checkEventValues(values.get(i));
+                // Words a variable is set to, naming an event value that isn't there: Skript's unparsed literal
+                // reads them as a value instead ('set {_b} to block' in a function is the type).
+                checkEventValues(values.get(i), i == mode.value && values.get(mode.target) instanceof Expr.Variable);
             }
             changeAll(effect, mode);
         } finally {
@@ -3426,8 +3429,9 @@ final class TriggerCompiler {
     }
 
     /** Fails as Skript does if {@code value} has an event value the trigger's event doesn't have. */
-    private void checkEventValues(Object value) throws CompileException {
+    private void checkEventValues(Object value, boolean words) throws CompileException {
         switch (value) {
+            case Expr.Syntax syntax when words && wordsAsValue(syntax) -> { }
             case Expr.Syntax syntax when (isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE)
                     || isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE_ENTITY))
                     && syntax.syntax().match().regexValues().getFirst() instanceof TypeRef ref -> {
@@ -3438,13 +3442,18 @@ final class TriggerCompiler {
             }
             case Expr.Syntax syntax -> {
                 List<Object> inner = syntax.syntax().match().values();
+                PlaceholderSpec[] specs = placeholderSpecs(syntax.syntax().syntax().patterns().get(syntax.syntax().pattern()));
                 for (int i = inner.size() - 1; i >= 0; i--) {
-                    checkEventValues(inner.get(i));
+                    // Where any object goes ('{_v} ? block'), words are taken as they are.
+                    PlaceholderSpec spec = i < specs.length ? specs[i] : null;
+                    checkEventValues(inner.get(i), spec != null && !spec.changeableOnly() && spec.types().stream()
+                            .map(registry::resolveType).anyMatch(ref -> ref != null
+                                    && ref.type().id().equals(SyntaxRegistry.OBJECT)));
                 }
             }
             case Expr.ListOf list -> {
                 for (Expr item : list.items()) {
-                    checkEventValues(item);
+                    checkEventValues(item, words);
                 }
             }
             case null, default -> { }
@@ -3786,6 +3795,21 @@ final class TriggerCompiler {
         return false;
     }
 
+    /**
+     * What Skript adds to the error for what can't be reset or deleted, when it can be the other way, as
+     * {@code accepts} says: "a block can't be reset. However, it can be deleted which might result in the desired
+     * effect".
+     */
+    private static String otherWay(Changeable.Mode mode, java.util.function.Predicate<Changeable.Mode> accepts) {
+        if (mode == Changeable.Mode.RESET && accepts.test(Changeable.Mode.DELETE)) {
+            return ". However, it can be deleted which might result in the desired effect";
+        }
+        if (mode == Changeable.Mode.DELETE && accepts.test(Changeable.Mode.RESET)) {
+            return ". However, it can be reset which might result in the desired effect";
+        }
+        return "";
+    }
+
     /** Skript's error for an expression that can't be changed in {@code mode}, written as {@code what}. */
     private static String cannotChange(String what, Changeable.Mode mode) {
         return what + switch (mode) {
@@ -3880,7 +3904,8 @@ final class TriggerCompiler {
             return true;
         }
         if (typed.accepted() == null) {
-            throw new CompileException(line, cannotChange(typed.what(), changeMode));
+            throw new CompileException(line, cannotChange(typed.what(), changeMode) + otherWay(changeMode,
+                    other -> typeChange(target, other).accepted() != null));
         }
         if (mode.value >= 0) {
             checkChanger((Expr) effect.match().values().get(mode.value), typed.accepted(), changeMode, typed.what());
@@ -3959,7 +3984,8 @@ final class TriggerCompiler {
         }
         if (accepted == null) {
             throw new CompileException(line, cannotChange(shown == target ? skriptText(target)
-                    : source.substring(shown.start(), shown.end()), changeMode));
+                    : source.substring(shown.start(), shown.end()), changeMode) + otherWay(changeMode,
+                    other -> element instanceof Changeable changeable && changeable.acceptChange(other) != null));
         }
         if (mode.value >= 0) {
             Expr given = (Expr) effect.match().values().get(mode.value);
@@ -4126,6 +4152,10 @@ final class TriggerCompiler {
     private static final java.util.Set<String> NUMERIC_LITERALS = java.util.Set.of("integer", "number", "boolean");
 
     private String skriptText(Expr expr) {
+        if (expr instanceof Expr.Syntax words && wordsValue(words) != null) {
+            // Words read as a value are written as it: 'damage cause' in a function is the type.
+            return Values.text(wordsValue(words));
+        }
         if (expr instanceof Expr.Syntax syntax) {
             ParsedSyntax parsed = syntax.syntax();
             var describer = library.describer(parsed.syntax().id());
@@ -4918,6 +4948,14 @@ final class TriggerCompiler {
             return null;
         }
         String[] types = new String[values.size()];
+        if (values.size() == 2 && words[1] != null && values.get(0) instanceof Expr.Syntax typeWords
+                && wordsValue(typeWords) instanceof co.xenastudios.neoskript.runtime.TypeValue) {
+            // Words naming a type are the type, which Skript compares with a value of any type: the other side's
+            // words are the first of Skript's types that reads them. 'damage cause is fall' where there's no
+            // damage cause compares the type with the damage type 'fall', so is false.
+            types[1] = wordsType(words[1], skriptTypeOrder());
+            return types;
+        }
         // Words compared with a value of any type are read as any type, as everywhere else (with Skript's warning
         // when they're several types' words); only words compared with words or with a type are read here.
         if (words[0] != null && (typed[1] != null || words[1] != null)) {
@@ -4990,8 +5028,26 @@ final class TriggerCompiler {
      */
     private void unpropertiedWords(ParsedSyntax syntax) throws CompileException {
         SyntaxRegistry.PropertySyntax property = registry.propertySyntax(syntax.syntax());
-        if (property == null || property.argument() >= syntax.match().values().size()
-                || !(syntax.match().values().get(property.argument()) instanceof Expr.Unresolved words)) {
+        if (property == null || property.argument() >= syntax.match().values().size()) {
+            return;
+        }
+        Object argument = syntax.match().values().get(property.argument());
+        if (argument instanceof Expr.Syntax typeWords
+                && wordsValue(typeWords) instanceof co.xenastudios.neoskript.runtime.TypeValue) {
+            // Words for an event value that isn't there, read as the type they name ('name of block' in a
+            // function): a type has no such property. On a comparison's side, Skript keeps the event value's error.
+            String name = property.property().apply(syntax.match().tags());
+            if (name == null || registry.hasProperty("classinfo", name)) {
+                return;
+            }
+            if (comparedSide) {
+                checkEventValues(typeWords, false);
+            }
+            throw new CompileException(line, "The expression '" + source.substring(typeWords.start(), typeWords.end())
+                    .strip() + "' returns the following types that do not have the " + name + " property: "
+                    + skriptTypeName("classinfo"));
+        }
+        if (!(argument instanceof Expr.Unresolved words)) {
             return;
         }
         String name = property.property().apply(syntax.match().tags());
@@ -5227,9 +5283,11 @@ final class TriggerCompiler {
             }
             List<String> outerLiteralTypes = literalTypes;
             boolean outerWordsRefused = wordsRefused;
+            boolean outerComparedSide = comparedSide;
             literalTypes = literalTypesFor(syntax, values, i, specs[i]);
             // Where only what changes goes ('%~objects% is set'), Skript takes no words as they are.
             wordsRefused = specs[i].changeableOnly();
+            comparedSide = syntax.syntax().id().equals("CondCompare");
             try {
                 if (specs[i].time() != 0) {
                     timedArgument(expr, specs[i].time());
@@ -5239,6 +5297,7 @@ final class TriggerCompiler {
             } finally {
                 literalTypes = outerLiteralTypes;
                 wordsRefused = outerWordsRefused;
+                comparedSide = outerComparedSide;
             }
             Class<?> target = conversionTarget(specs[i]);
             if (target != null) {
@@ -5622,8 +5681,30 @@ final class TriggerCompiler {
                 null).getter() != null;
     }
 
+    /**
+     * Whether {@code syntax}, where any object goes, is words for an event value that isn't there, which Skript
+     * reads as a value instead ({@link #worldOfNothing}, {@link #eventLiteral}).
+     */
+    private boolean wordsAsValue(Expr.Syntax syntax) {
+        return worldOfNothing(syntax) || wordsValue(syntax) != null;
+    }
+
+    /** What {@code syntax}'s words are where any object goes, if it's read as them ({@link #eventLiteral}). */
+    private Object wordsValue(Expr.Syntax syntax) {
+        List<String> outerLiteralTypes = literalTypes;
+        literalTypes = List.of(SyntaxRegistry.OBJECT);
+        try {
+            return eventLiteral(syntax);
+        } finally {
+            literalTypes = outerLiteralTypes;
+        }
+    }
+
     /** The expression a text's {@code %...%} being compiled is, or {@code null}. */
     private Expr textTop;
+
+    /** Whether the value being compiled is a side of a comparison. */
+    private boolean comparedSide;
 
     /** Whether the placeholder being compiled is one only what changes goes in, which takes no words. */
     private boolean wordsRefused;
