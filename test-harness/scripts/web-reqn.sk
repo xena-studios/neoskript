@@ -1,0 +1,86 @@
+# Reqn 1.2.3's syntax, run on Skript 2.17.0 with Reqn and on NeoSkript with NeoSkriptWeb (the neoskript-web
+# scenario). Each '[web] reqn <label>: <value>' line is compared; test-harness/corpus/web/known-differences.txt lists
+# where NeoSkript differs on purpose. @PORT@ is the harness's test server, @DEAD@ a port nothing listens on.
+
+function show(label: text, value: objects):
+    set {_text} to "%{_value::*}%"
+    replace all nl with "\n" in {_text}
+    send "[web] reqn %{_label}%: %{_text}%" to console
+
+command /webreqn:
+    trigger:
+        set {_before} to "kept"
+        send a "GET" request to "http://127.0.0.1:@PORT@/json"
+        show("local after request", {_before})
+        set {_r} to last response
+        show("code", response code of {_r})
+        show("status", status of {_r})
+        show("status line", {_r}'s status line)
+        show("message", status message of {_r})
+        show("reason", {_r}'s reason)
+        show("body", body of {_r})
+        show("headers", headers of {_r})
+        show("header keys", header keys of {_r})
+        show("header values", header values of {_r})
+        set {_type} to "Content-Type" header of {_r}
+        show("content type", {_type})
+        set {_length} to {_r}'s "Content-Length" header value
+        show("content length", {_length})
+        show("text", "%{_r}%")
+        send a "POST" request to "http://127.0.0.1:@PORT@/echo" with headers "X-Test: yes" and "Content-Type: text/plain" and body "a" and "b"
+        show("post", body of last response)
+        send a "put" request to "http://127.0.0.1:@PORT@/echo" with the body "x=1"
+        show("put", body of the last response)
+        send an http "DELETE" request to url "http://127.0.0.1:@PORT@/echo" with the header "X-Test: deleted"
+        show("delete", body of last http response)
+        send request to "http://127.0.0.1:@PORT@/echo"
+        show("default get", body of last response)
+        send a "GET" request to "http://127.0.0.1:@PORT@/echo?q=1" with body "ignored"
+        show("get with body", body of last response)
+        send request to "http://127.0.0.1:@PORT@/echo" with header "NoColonHere"
+        show("malformed header", body of last response)
+        send request to "http://127.0.0.1:@PORT@/text"
+        show("text body", body of last response)
+        send web request to "http://127.0.0.1:@PORT@/status/404"
+        show("404 1", response code of last response)
+        show("404 2", status of last response)
+        show("404 3", body of last response)
+        send request to "http://127.0.0.1:@PORT@/status/500"
+        show("500 1", response code of last response)
+        show("500 2", status message of last response)
+        send request to "http://127.0.0.1:@PORT@/status/204"
+        show("204 1", response code of last response)
+        show("204 2", body of last response)
+        send request to "http://127.0.0.1:@PORT@/redirect"
+        show("redirect 1", response code of last response)
+        show("redirect 2", body of last response)
+        send a "POST" request to "http://127.0.0.1:@PORT@/see-other" with body "posted"
+        show("see other 1", response code of last response)
+        show("see other 2", body of last response)
+        send request to "http://127.0.0.1:@PORT@/gzip"
+        show("gzip", body of last response)
+        send a "HEAD" request to "http://127.0.0.1:@PORT@/text"
+        show("head 1", response code of last response)
+        show("head 2", body of last response)
+        send request to "http://127.0.0.1:@PORT@/headers"
+        set {_answer} to "x-answer" header of last response
+        show("custom header", {_answer})
+        send request to "http://127.0.0.1:@DEAD@/x"
+        show("refused", last response)
+        send request to "http://127.0.0.1:@PORT@/text"
+        send request to "not a url"
+        show("malformed url", last response)
+        show("url encoded", url encoded "a b&c/é?")
+        show("uri escaped", uri escaped "x=1" and "y z")
+        show("http safe", http safe "100%%")
+        show("json encoded", json encoded "say ""hi"" \ there")
+        show("json escaped", json escaped "tab	end")
+        send request to "http://127.0.0.1:@PORT@/text"
+        wait 1 tick
+        show("after wait", response code of last response)
+        send "[web] reqn done" to console
+
+command /webreqnnone:
+    trigger:
+        send request to {_nowhere}
+        send "[web] reqn none url: carried on" to console

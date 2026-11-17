@@ -135,6 +135,11 @@ public interface co.xenastudios.neoskript.api.element.Function
 public interface co.xenastudios.neoskript.api.element.KeyAware @Experimental
   public boolean implicitKeys()
   public boolean keysRecommended()
+  public boolean recursiveKeys()
+
+public interface co.xenastudios.neoskript.api.element.Keyed @Experimental
+  public abstract java.lang.String[] keys()
+  public abstract java.lang.Object[] values()
 
 public interface co.xenastudios.neoskript.api.element.LoopValue
   public abstract java.lang.Object get(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[], java.lang.Object)
@@ -246,6 +251,7 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public abstract void parser(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/String;*>;)V
   public abstract void pausingEffect(java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/PausingEffect;>;[Ljava/lang/String;)V
   public abstract void pausingExpression(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/PausingExpression;>;[Ljava/lang/String;)V
+  public void priority(java.lang.String, co.xenastudios.neoskript.api.registration.SyntaxPriority) @Experimental
   public void property(java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Function) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/function/Function<-TT;*>;)V
   public void propertyCondition(java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Predicate) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/function/Predicate<-TT;>;)V
   public void propertySyntax(java.lang.String, int, java.util.function.Function, boolean) signature (Ljava/lang/String;ILjava/util/function/Function<Ljava/util/Set<Ljava/lang/String;>;Ljava/lang/String;>;Z)V @Experimental
@@ -274,6 +280,15 @@ public enum co.xenastudios.neoskript.api.registration.ScriptEvent signature Ljav
   public static final co.xenastudios.neoskript.api.registration.ScriptEvent UNLOAD
   public static co.xenastudios.neoskript.api.registration.ScriptEvent valueOf(java.lang.String)
   public static co.xenastudios.neoskript.api.registration.ScriptEvent[] values()
+
+public enum co.xenastudios.neoskript.api.registration.SyntaxPriority signature Ljava/lang/Enum<Lco/xenastudios/neoskript/api/registration/SyntaxPriority;>; @Experimental
+  public static final co.xenastudios.neoskript.api.registration.SyntaxPriority COMBINED
+  public static final co.xenastudios.neoskript.api.registration.SyntaxPriority EVENT_VALUE
+  public static final co.xenastudios.neoskript.api.registration.SyntaxPriority PATTERN_MATCHES_EVERYTHING
+  public static final co.xenastudios.neoskript.api.registration.SyntaxPriority PROPERTY
+  public static final co.xenastudios.neoskript.api.registration.SyntaxPriority SIMPLE
+  public static co.xenastudios.neoskript.api.registration.SyntaxPriority valueOf(java.lang.String)
+  public static co.xenastudios.neoskript.api.registration.SyntaxPriority[] values()
 
 public enum co.xenastudios.neoskript.api.registration.ThreadAffinity signature Ljava/lang/Enum<Lco/xenastudios/neoskript/api/registration/ThreadAffinity;>;
   public static final co.xenastudios.neoskript.api.registration.ThreadAffinity ANY

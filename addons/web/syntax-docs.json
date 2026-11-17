@@ -1,0 +1,413 @@
+{
+  "elements": {
+    "NeoSkriptWebEffReqnRequest": {
+      "name": "Send Web Request (Reqn)",
+      "description": [
+        "Sends an HTTP request and waits for the answer without blocking the server, as Reqn's did. The method is GET unless given; headers are written <code>Name: value</code>, and several body texts are joined with line breaks.",
+        "The trigger carries on when the answer arrives, or with a runtime error if it fails or takes longer than <code>timeout-seconds</code> in NeoSkriptWeb's config.yml. Read it with <code>last response</code>."
+      ],
+      "examples": [
+        "send a \"POST\" request to \"https://discord.com/api/webhooks/...\" with header \"Content-Type: application/json\" and body \"{\"\"content\"\": \"\"Hello\"\"}\"",
+        "send request to \"https://api.example.com/status\"\nsend \"%body of last response%\" to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprReqnLastResponse": {
+      "name": "Last Web Response (Reqn)",
+      "description": [
+        "The answer to the last request this trigger sent with Reqn's syntax, or, if it hasn't sent one, the last one any trigger got. None after a request that failed."
+      ],
+      "examples": [
+        "set {_response} to last response"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprReqnUrlEncode": {
+      "name": "URL Encoded Text",
+      "description": [
+        "Text made safe to put in a URL's query: spaces as <code>+</code>, other characters as <code>%XX</code>."
+      ],
+      "examples": [
+        "send request to \"https://api.example.com/search?q=%url encoded {_query}%\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprReqnJsonEncode": {
+      "name": "JSON Encoded Text",
+      "description": [
+        "Text made safe to put between quotes in JSON: quotes, backslashes and control characters escaped."
+      ],
+      "examples": [
+        "set {_body} to \"{\"\"content\"\": \"\"%json encoded {_message}%\"\"}\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprBody": {
+      "name": "Body",
+      "description": [
+        "The body of a Reqn response (text, each line ending in a line break, as Reqn read it), of an skJson response (JSON if it parses, else text), or of an skJson request.",
+        "A request's body can be set to JSON or text, and reset."
+      ],
+      "examples": [
+        "send body of last response to console",
+        "set body of {_request} to parse \"{\"\"name\"\": \"\"Steve\"\"}\" as json"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprStatusCode": {
+      "name": "Status Code",
+      "description": [
+        "A response's status code: 200, 404 and so on."
+      ],
+      "examples": [
+        "if status code of last response is 200:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprHeaders": {
+      "name": "Headers",
+      "description": [
+        "A Reqn response's headers, each <code>Name: value</code>; an skJson response's or request's headers as JSON.",
+        "A request's headers can be set, to <code>Name: value</code> texts or JSON, and reset."
+      ],
+      "examples": [
+        "set {_request}'s headers to \"Authorization: Bearer %{token}%\"",
+        "send headers of last response to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprStatus": {
+      "name": "Status",
+      "description": [
+        "A Reqn response's status line (<code>HTTP/1.1 200 OK</code>), or an skJson response's status: <code>OK</code> for a status code below 500, <code>FAILED</code>, or <code>UNKNOWN</code> if it got nothing."
+      ],
+      "examples": [
+        "if {_response}'s status is \"OK\":"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprReqnHeaderKeys": {
+      "name": "Header Keys (Reqn)",
+      "description": [
+        "The names of a Reqn response's headers."
+      ],
+      "examples": [
+        "send header keys of last response to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprReqnHeaderValues": {
+      "name": "Header Values (Reqn)",
+      "description": [
+        "The values of a Reqn response's headers."
+      ],
+      "examples": [
+        "send header values of last response to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprReqnMessage": {
+      "name": "Status Message (Reqn)",
+      "description": [
+        "A Reqn response's reason phrase: <code>OK</code>, <code>Not Found</code>."
+      ],
+      "examples": [
+        "send status message of last response to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprReqnHeader": {
+      "name": "Header Value (Reqn)",
+      "description": [
+        "One header's value from a Reqn response, whatever the case of its name."
+      ],
+      "examples": [
+        "set {_type} to \"Content-Type\" header of last response"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprSkJsonRequest": {
+      "name": "Prepare Request (skJson)",
+      "description": [
+        "A request to configure and then send with <code>execute</code>. Methods: GET, POST, PUT, PATCH, DELETE, HEAD, and MOCK, which answers at once without the network. An address without <code>http://</code> gets it."
+      ],
+      "examples": [
+        "set {_request} to prepare POST request on \"https://api.example.com/items\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebEffSkJsonExecute": {
+      "name": "Execute Request (skJson)",
+      "description": [
+        "Sends a prepared request. By default the trigger waits for the answer without blocking the server, then <code>last response of {_request}</code> has it.",
+        "<code>as non blocking</code> carries straight on, and <code>on received http response</code> runs when it's answered."
+      ],
+      "examples": [
+        "execute {_request}\nsend body of last response of {_request} to console",
+        "execute {_request} as non blocking"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprSkJsonLastResponse": {
+      "name": "Last Response of a Request (skJson)",
+      "description": [
+        "What a request got when it was answered. Before that, and after it fails, a response with no status code and the status <code>UNKNOWN</code>."
+      ],
+      "examples": [
+        "set {_response} to last response of {_request}"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprSkJsonQueryParams": {
+      "name": "Query Parameters (skJson)",
+      "description": [
+        "A request's query parameters, as JSON. Set and add them as <code>key:value</code> texts (several in one, split by commas); reset them."
+      ],
+      "examples": [
+        "add \"page:2\" to query params of {_request}"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprSkJsonFromUrl": {
+      "name": "JSON from a URL (skJson)",
+      "description": [
+        "The JSON a GET request to a URL answers with, waited for without blocking the server (skJson blocked it). None for a status code above 400."
+      ],
+      "examples": [
+        "set {_json} to json from url \"https://api.example.com/data.json\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprSkJsonNew": {
+      "name": "New JSON (skJson)",
+      "description": [
+        "JSON from text (read leniently, as skJson does; text that isn't JSON is a JSON string), a number, a boolean or other JSON."
+      ],
+      "examples": [
+        "set {_json} to parse \"{\"\"name\"\": \"\"Steve\"\"}\" as json",
+        "set {_json} to json from {_text}"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebEffSkJsonMap": {
+      "name": "Map JSON to a List Variable (skJson)",
+      "description": [
+        "Puts JSON into a list variable: an object's keys and a list's positions (from 1) are indices, nested ones make lists under them, and null is left out. Other indices already in the list stay."
+      ],
+      "examples": [
+        "map {_json} to {_data::*}\nsend {_data::home::x} to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprSkJsonFormatted": {
+      "name": "List Variable as JSON (skJson)",
+      "description": [
+        "A list variable, nested lists included, as JSON: its indices are keys, and a nested list whose indices are all numbers is a JSON list, its texts read as JSON where they parse."
+      ],
+      "examples": [
+        "set {_json} to {_data::*}'s formatted json"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprSkJsonPretty": {
+      "name": "Printed JSON (skJson)",
+      "description": [
+        "JSON as text: indented and coloured for chat (<code>as pretty printed</code>), indented (<code>as uncolored pretty printed</code>, <code>as formatted json</code>), or on one line (<code>as compact json</code>, <code>as minified json</code>)."
+      ],
+      "examples": [
+        "send {_json} as pretty printed to player"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprSkJsonSize": {
+      "name": "JSON Size (skJson)",
+      "description": [
+        "How many keys a JSON object has, or items a JSON list has."
+      ],
+      "examples": [
+        "send json size of {_json} to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprSkJsonKeys": {
+      "name": "JSON Keys (skJson)",
+      "description": [
+        "A JSON object's keys, or those of the object at a path."
+      ],
+      "examples": [
+        "send keys of {_json} to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebExprSkJsonValues": {
+      "name": "JSON Values (skJson)",
+      "description": [
+        "The value at a path in JSON (<code>home.x</code>, <code>items[0]</code>, lists counted from 0), or every value of an object or list. Objects and lists stay JSON; the rest are text, numbers and booleans."
+      ],
+      "examples": [
+        "set {_x} to value at path \"home.x\" in {_json}",
+        "loop values at path \"items\" in {_json}:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebCondSkJsonType": {
+      "name": "JSON Type (skJson)",
+      "description": [
+        "Whether JSON is an object, a list, a value, or null."
+      ],
+      "examples": [
+        "if {_json} is a json object:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebCondSkJsonEmpty": {
+      "name": "JSON Is Empty (skJson)",
+      "description": [
+        "Whether JSON is an empty object or list."
+      ],
+      "examples": [
+        "if json {_json} is empty:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebCondSkJsonHas": {
+      "name": "JSON Has (skJson)",
+      "description": [
+        "Whether a JSON object has every key given, or JSON has every value given."
+      ],
+      "examples": [
+        "if {_json} has key \"name\":"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptWebEvtSkJsonResponse": {
+      "name": "Received HTTP Response (skJson)",
+      "description": [
+        "A request sent with <code>execute ... as non blocking</code> was answered, or failed. <code>event-response</code> is what it got."
+      ],
+      "examples": [
+        "on received http response:\n\tsend status code of event-response to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    }
+  },
+  "types": {
+    "httpresponse": {
+      "name": "HTTP Response (Reqn)",
+      "description": [
+        "An answer to Reqn's <code>send request</code>: its status, headers and body."
+      ],
+      "examples": [
+        "set {_response} to last response"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "request": {
+      "name": "Request (skJson)",
+      "description": [
+        "A request prepared with skJson's syntax, to send with <code>execute</code>."
+      ],
+      "examples": [
+        "set {_request} to prepare GET request on \"https://example.com\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "response": {
+      "name": "Response (skJson)",
+      "description": [
+        "What an skJson request got: its status code, status, headers and body."
+      ],
+      "examples": [
+        "set {_response} to last response of {_request}"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "requestmethod": {
+      "name": "Request Method (skJson)",
+      "description": [
+        "GET, POST, PUT, PATCH, DELETE, HEAD, or MOCK."
+      ],
+      "examples": [
+        "prepare PATCH request on \"https://example.com\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "jsonelement": {
+      "name": "JSON (skJson)",
+      "description": [
+        "JSON: an object, a list, a value or null. Saved in variables as skJson saved it."
+      ],
+      "examples": [
+        "set {_json} to parse \"[1, 2, 3]\" as json"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    }
+  },
+  "functions": {}
+}

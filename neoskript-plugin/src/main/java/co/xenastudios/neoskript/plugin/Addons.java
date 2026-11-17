@@ -140,8 +140,9 @@ final class Addons {
     }
 
     /**
-     * The registrar as one addon sees it: everything goes to {@code registrar}, but {@link Registrar#affinity} only
-     * takes the ids of elements this addon registered itself, and none that NeoSkript or another addon has.
+     * The registrar as one addon sees it: everything goes to {@code registrar}, but {@link Registrar#affinity},
+     * {@link Registrar#timeout} and {@link Registrar#priority} only take the ids of elements this addon registered
+     * itself, and none that NeoSkript or another addon has.
      */
     private Registrar forAddon(Addon addon, Registrar registrar) {
         Set<String> own = new HashSet<>();
@@ -157,6 +158,9 @@ final class Addons {
                     }
                     if (method.getName().equals("affinity") && args.length == 2 && args[1] instanceof ThreadAffinity) {
                         checkAffinity(addon, (String) args[0], own, taken);
+                    } else if (method.getName().equals("priority") && args.length == 2
+                            && args[1] instanceof co.xenastudios.neoskript.api.registration.SyntaxPriority) {
+                        checkOwn(addon, "priority", (String) args[0], own, taken);
                     } else if (method.getName().equals("timeout") && args.length == 2
                             && args[1] instanceof java.time.Duration) {
                         checkOwn(addon, "timeout", (String) args[0], own, taken);

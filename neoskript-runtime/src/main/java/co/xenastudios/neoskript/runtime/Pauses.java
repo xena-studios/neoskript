@@ -307,50 +307,7 @@ public final class Pauses {
      * key), a collection or an array is several values, and anything else is itself.
      */
     static Object converted(Object value) {
-        if (value instanceof Map<?, ?> map) {
-            Map<String, Object> flat = new LinkedHashMap<>();
-            flatten("", map, flat, 0);
-            return new KeyedValues(flat.values().toArray(), flat.keySet().toArray(String[]::new));
-        }
-        if (value instanceof Collection<?> collection) {
-            return collection.stream().filter(java.util.Objects::nonNull).toArray();
-        }
-        if (value instanceof Object[] array) {
-            return java.util.Arrays.stream(array).filter(java.util.Objects::nonNull).toArray();
-        }
-        return value;
-    }
-
-    /** How deep maps and lists in a stage's value are followed, against one that contains itself. */
-    private static final int MAX_DEPTH = 64;
-
-    private static void flatten(String prefix, Object value, Map<String, Object> into, int depth) {
-        if (value == null) {
-            return;
-        }
-        if (depth > MAX_DEPTH) {
-            throw new IllegalArgumentException("The result is nested more than " + MAX_DEPTH + " deep");
-        }
-        if (value instanceof Map<?, ?> map) {
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                if (entry.getKey() != null) {
-                    flatten(child(prefix, String.valueOf(entry.getKey())), entry.getValue(), into, depth + 1);
-                }
-            }
-        } else if (value instanceof Collection<?> || value instanceof Object[]) {
-            List<Object> items = value instanceof Collection<?> collection ? new ArrayList<>(collection)
-                    : java.util.Arrays.asList((Object[]) value);
-            for (int i = 0; i < items.size(); i++) {
-                flatten(child(prefix, Integer.toString(i + 1)), items.get(i), into, depth + 1);
-            }
-        } else if (!prefix.isEmpty()) {
-            into.put(prefix, value);
-        }
-    }
-
-    /** The index of {@code key} in the list at {@code prefix}: {@code rows::1}. */
-    private static String child(String prefix, String key) {
-        return prefix.isEmpty() ? key : prefix + "::" + key;
+        return KeyedValues.result(value);
     }
 
     /** Reports a stage's failure on the pausing element's line. */

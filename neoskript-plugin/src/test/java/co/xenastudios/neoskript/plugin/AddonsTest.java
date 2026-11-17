@@ -96,6 +96,26 @@ class AddonsTest {
     }
 
     @Test
+    void anAddonSetsThePriorityOfItsOwnElementsOnly() {
+        Addons addons = new Addons(NOPLogger.NOP_LOGGER);
+        addons.knownWhen(id -> id.equals("ExprTagKey"));
+        List<String> errors = new ArrayList<>();
+        addons.add("Lottery", "1.0", registrar -> {
+            registrar.expression("LotteryExprKeys", "string", info -> null, "keys of %objects%");
+            registrar.priority("LotteryExprKeys", co.xenastudios.neoskript.api.registration.SyntaxPriority.SIMPLE);
+            for (String id : List.of("ExprTagKey", "LotteryExprOther")) {
+                try {
+                    registrar.priority(id, co.xenastudios.neoskript.api.registration.SyntaxPriority.SIMPLE);
+                } catch (IllegalArgumentException refused) {
+                    errors.add(id);
+                }
+            }
+        });
+        addons.registerAll(REGISTRAR);
+        assertEquals(List.of("ExprTagKey", "LotteryExprOther"), errors);
+    }
+
+    @Test
     void anAddonCantReplaceACodecNeoSkriptHas() {
         Addons addons = new Addons(NOPLogger.NOP_LOGGER);
         addons.savedWhen(type -> type == String.class);

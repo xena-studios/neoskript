@@ -4106,8 +4106,21 @@ final class TriggerCompiler {
         co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site = site(syntax, element.getClass());
         constant(regional(element, type, syntax, site), type);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
-        arguments(syntax, keyed, implicit);
+        boolean recursive = keyed && element instanceof KeyAware aware && aware.recursiveKeys();
+        boolean outer = recursiveListArguments;
+        recursiveListArguments = recursive;
+        try {
+            arguments(syntax, keyed, implicit || recursive);
+        } finally {
+            recursiveListArguments = outer;
+        }
     }
+
+    /**
+     * Whether the arguments being pushed are a {@link KeyAware#recursiveKeys()} element's: its list variables are
+     * passed with every value under them, at their paths.
+     */
+    private boolean recursiveListArguments;
 
     /** Pushes {@code value} as a constant of the class, typed as {@code type}. */
     private void constant(Object value, Class<?> type) {
@@ -4322,6 +4335,18 @@ final class TriggerCompiler {
     private boolean skriptOrder;
 
     private void argumentsIn(ParsedSyntax syntax, boolean keyed, boolean implicit) throws CompileException {
+        // Only this element's own list variables are recursive, not those of the elements in its arguments.
+        boolean recursive = recursiveListArguments;
+        recursiveListArguments = false;
+        try {
+            argumentsIn(syntax, keyed, implicit, recursive);
+        } finally {
+            recursiveListArguments = recursive;
+        }
+    }
+
+    private void argumentsIn(ParsedSyntax syntax, boolean keyed, boolean implicit, boolean recursive)
+            throws CompileException {
         CompiledPattern pattern = syntax.syntax().patterns().get(syntax.pattern());
         List<Object> values = syntax.match().values();
         PlaceholderSpec[] specs = placeholderSpecs(pattern);
@@ -4392,6 +4417,15 @@ final class TriggerCompiler {
             }
             method.visitInsn(DUP);
             pushInt(i);
+            if (recursive && expr instanceof Expr.Variable list && list.list()) {
+                // Every value under the list, each at its path, for a KeyAware element with recursiveKeys.
+                variableStore(list);
+                variableName(list);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "recursiveKeyedList",
+                        "(" + STRING_DESC + ")" + Type.getDescriptor(KeyedValues.class), false);
+                method.visitInsn(AASTORE);
+                continue;
+            }
             if (keyed && isKeyed(expr, implicit)) {
                 keyed(expr, implicit);
                 method.visitInsn(AASTORE);
@@ -5632,6 +5666,9 @@ final class TriggerCompiler {
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Expression.class), "get",
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
                 if (keyAware) {
+                    // A map it gives is keyed values ({@link KeyAware}).
+                    method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "mapResult",
+                            "(" + OBJECT_DESC + ")" + OBJECT_DESC, false);
                     method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "plain",
                             "(" + OBJECT_DESC + ")" + OBJECT_DESC, false);
                 }
@@ -6265,12 +6302,31 @@ final class TriggerCompiler {
      * as their types (a plural one as a list). Its values come one after another, or grouped by placeholder
      * when set into a list variable, as Skript's ExprParse does.
      */
+    /**
+     * A script's pattern with its {@code :} and {@code ¦} escaped, as Skript's {@code ExprParse.escapeParseTags}: in
+     * {@code parsed as "fruit:apples %number%"} the colon is text to match, not a parse tag.
+     */
+    static String escapeParseTags(String pattern) {
+        StringBuilder escaped = new StringBuilder(pattern.length());
+        for (int i = 0; i < pattern.length(); i++) {
+            char c = pattern.charAt(i);
+            if (c == '\\' && i + 1 < pattern.length()) {
+                escaped.append(c).append(pattern.charAt(++i));
+            } else if (c == ':' || c == '¦') {
+                escaped.append('\\').append(c);
+            } else {
+                escaped.append(c);
+            }
+        }
+        return escaped.toString();
+    }
+
     private void parsePattern(Expr.Syntax syntax) throws CompileException {
         Object regex = syntax.syntax().match().regexValues().getFirst();
         String text = regex instanceof java.util.regex.MatchResult match ? match.group() : String.valueOf(regex);
         co.xenastudios.neoskript.frontend.pattern.CompiledPattern pattern;
         try {
-            pattern = co.xenastudios.neoskript.frontend.pattern.PatternCompiler.compile(text);
+            pattern = co.xenastudios.neoskript.frontend.pattern.PatternCompiler.compile(escapeParseTags(text));
         } catch (RuntimeException e) {
             throw new CompileException(line, "Malformed pattern: " + e.getMessage());
         }
@@ -6483,7 +6539,7 @@ final class TriggerCompiler {
     /** Whether the key-aware element wants list variables' indices even when they aren't written keyed. */
     private boolean implicitKeys(Expr.Syntax syntax) {
         return library.binding(syntax.syntax().syntax()) instanceof ElementFactory<?> factory
-                && factory.create(info(syntax.syntax())) instanceof KeyAware aware && aware.implicitKeys();
+                && factory.create(info(syntax.syntax())) instanceof KeyAware aware && (aware.implicitKeys() || aware.recursiveKeys());
     }
 
     /** Whether the key-aware element's indices are kept even where it isn't written keyed. */
@@ -6526,6 +6582,8 @@ final class TriggerCompiler {
                 callThrough(syntax.syntax(), Expression.class, true, implicit || implicitKeys(syntax));
                 method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Expression.class), "get",
                         "(" + CONTEXT + OBJECTS + ")" + OBJECT_DESC, true);
+                method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(KeyedValues.class), "mapResult",
+                        "(" + OBJECT_DESC + ")" + OBJECT_DESC, false);
             }
             case Expr.Variable variable when variable.list() -> {
                 variableStore(variable);

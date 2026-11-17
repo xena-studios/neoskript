@@ -136,11 +136,27 @@ class PatternTest {
         assertEquals(Set.of("min"), match(pattern, "the min value of 5").tags());
         assertEquals(Set.of("max"), match(pattern, "max value of 5").tags());
         assertEquals(Set.of(), match(pattern, "value of 5").tags());
-        assertEquals(Set.of("a b"), match("x :(a b|c [d])", "x a b").tags());
-        assertEquals(Set.of(), match("x :(a b|c [d])", "x c d").tags());
-        assertEquals(Set.of("down"), match("look :[up|down] now", "look down now").tags());
-        assertEquals(Set.of(), match("look :[up|down] now", "look now").tags());
+        assertEquals(Set.of("down"), match("look [:(up|down)] now", "look down now").tags());
         assertEquals(Set.of("foo bar"), match("[:foo bar [baz]]", "foo bar baz").tags());
+        assertEquals(Set.of("all of"), match("[:all of] %object%", "all of b").tags());
+        assertEquals(Set.of(), match("[:all of] %object%", "b").tags());
+    }
+
+    @Test
+    void textBeforeAColonIsItsTagAndIsntMatched() {
+        // As Skript's PatternCompiler: the text since the last group or placeholder is the tag, and isn't matched.
+        assertEquals(Set.of("x "), match("x :all of %object%", "all of b").tags());
+        assertNull(match("x :all of %object%", "x all of b"));
+        assertEquals(Set.of("look "), match("look :[up|down] now", "down now").tags());
+        assertNull(match("look :[up|down] now", "look down now"));
+        assertEquals(Set.of("x "), match("x :(a b|c [d])", "a b").tags());
+        assertEquals(Set.of("ab"), match("ab:cd %object%", "cd b").tags());
+        // skJson's '[json] :values [%-string%] of %jsonelement%': the tag is the space, and 'json values' doesn't
+        // match, so only 'values of' does.
+        assertEquals(Set.of(" "), match("[json] :values [%string%] of %object%", "values \"a\" of b").tags());
+        assertNull(match("[json] :values [%string%] of %object%", "json values \"a\" of b"));
+        // A colon with nothing before it, before a placeholder, tags nothing.
+        assertEquals(Set.of(), match(":%object%", "b").tags());
     }
 
     @Test
