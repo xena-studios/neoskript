@@ -1,0 +1,272 @@
+{
+  "elements": {
+    "NeoSkriptGuiSecCreateGUI": {
+      "name": "Create/Edit GUI",
+      "description": [
+        "Makes a GUI from an inventory, or edits one. With an id it's a global GUI, kept until it's deleted; without one, it goes once nobody has it open."
+      ],
+      "examples": [
+        "create a gui with virtual chest inventory with 3 rows named \"Shop\":\n\tmake gui slot 13 with diamond:\n\t\tsend \"Clicked!\" to player\nopen the last gui to player"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiSecMakeSlot": {
+      "name": "Make GUI Slot",
+      "description": [
+        "Puts an item in slots of the GUI, by number or by a character of its shape, with code to run when it's clicked. The code keeps the local variables as they were: one copy, shared by every click."
+      ],
+      "examples": [
+        "make gui slot 0 with dirt named \"Home\":\n\tteleport player to {home::%player's uuid%}",
+        "make next gui with removable diamond"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiEffRemoveSlot": {
+      "name": "Remove GUI Slot",
+      "description": [
+        "Empties slots of the GUI."
+      ],
+      "examples": [
+        "remove gui slot 10",
+        "remove all of the gui slots"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiSecOpen": {
+      "name": "GUI Open",
+      "description": [
+        "Code that runs when a player opens the GUI."
+      ],
+      "examples": [
+        "run on gui open:\n\tsend \"Welcome!\" to player"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiSecClose": {
+      "name": "GUI Close",
+      "description": [
+        "Code that runs when a player closes the GUI. 'cancel the gui closing' opens it again."
+      ],
+      "examples": [
+        "run on gui close:\n\tsend \"Bye!\" to player"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiSecSlotChange": {
+      "name": "GUI Slot Change",
+      "description": [
+        "Code that runs when a player changes what's in a slot that can be changed."
+      ],
+      "examples": [
+        "run when slot 4 changes:\n\tsend \"Thanks!\" to player"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiEffCancelClose": {
+      "name": "Cancel GUI Close",
+      "description": [
+        "In a GUI close section: the GUI opens again."
+      ],
+      "examples": [
+        "run on gui close:\n\tcancel the gui closing"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiEffLock": {
+      "name": "Lock/Unlock GUI",
+      "description": [
+        "Whether players can take items from the GUI's slots without code."
+      ],
+      "examples": [
+        "unlock the player's gui"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiEffShowGUI": {
+      "name": "Show GUI",
+      "description": [
+        "Opens a GUI for players."
+      ],
+      "examples": [
+        "show the last gui to player"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiCondHasGUI": {
+      "name": "Has GUI",
+      "description": [
+        "Whether players have a GUI open."
+      ],
+      "examples": [
+        "if player has a gui open:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiCondIsLocked": {
+      "name": "Is GUI Locked",
+      "description": [
+        "Whether a GUI is locked."
+      ],
+      "examples": [
+        "if the player's gui is locked:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiExprGUI": {
+      "name": "GUI of Player",
+      "description": [
+        "The GUI a player has open."
+      ],
+      "examples": [
+        "edit the player's gui:\n\tmake gui slot 1 with dirt"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiExprGUIValues": {
+      "name": "GUI Values",
+      "description": [
+        "Values of the click in a slot's code, and of the GUI: its slot, raw slot, hotbar slot, inventory, inventory action, click type, cursor item, clicked item (which can be set), slot type, player, viewers and slot id. In open and close code, only the GUI, inventory, player and viewers."
+      ],
+      "examples": [
+        "make gui 10 with water bucket:\n\tset the gui clicked item to lava bucket"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiExprGUIWithId": {
+      "name": "GUI with ID",
+      "description": [
+        "A global GUI, by its id."
+      ],
+      "examples": [
+        "open the gui with the id \"menu\" to player"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiExprGlobalGUIs": {
+      "name": "All Global GUIs",
+      "description": [
+        "Every global GUI."
+      ],
+      "examples": [
+        "broadcast \"%size of global guis%\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiExprLastGUI": {
+      "name": "Last GUI",
+      "description": [
+        "The GUI made or edited last in this trigger."
+      ],
+      "examples": [
+        "open the last created gui to player"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiExprId": {
+      "name": "GUI ID",
+      "description": [
+        "A GUI's id. Setting it makes it global."
+      ],
+      "examples": [
+        "set the id of the player's gui to \"menu\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiExprLayout": {
+      "name": "GUI Layout",
+      "description": [
+        "A GUI's shape, which names its slots by characters."
+      ],
+      "examples": [
+        "set the layout of the player's gui to \"xxxxxxxxx\", \"x-------x\" and \"xxxxxxxxx\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiExprLockStatus": {
+      "name": "GUI Lock Status",
+      "description": [
+        "Deprecated: use 'lock' and 'is locked'."
+      ],
+      "examples": [
+        "set the lock status of the player's gui to true"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiExprNextSlot": {
+      "name": "Next GUI Slot",
+      "description": [
+        "The next slot of a GUI not made yet, as a character of its shape."
+      ],
+      "examples": [
+        "make the next gui slot with dirt named \"Slot %the next gui slot%\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiExprPaginatedList": {
+      "name": "Paginated List",
+      "description": [
+        "Pages of a list: page 2 with 10 values per page is values 11 to 20."
+      ],
+      "examples": [
+        "set {_page::*} to page 2 of {_items::*} with 36 values"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptGuiExprVirtualInventory": {
+      "name": "Virtual Inventory",
+      "description": [
+        "A new inventory for a GUI."
+      ],
+      "examples": [
+        "create a gui with virtual chest inventory with 3 rows named \"My GUI\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    }
+  },
+  "types": {},
+  "functions": {}
+}
