@@ -38,6 +38,7 @@ import co.xenastudios.neoskript.harness.scenario.NeoSkriptVariablesScenario;
 import co.xenastudios.neoskript.harness.scenario.SkillExamplesScenario;
 import co.xenastudios.neoskript.harness.scenario.SkriptConflictScenario;
 import co.xenastudios.neoskript.harness.scenario.SqlVariablesScenario;
+import co.xenastudios.neoskript.harness.scenario.MySqlVariablesScenario;
 import co.xenastudios.neoskript.harness.scenario.SkriptCorpusScenario;
 import co.xenastudios.neoskript.harness.scenario.SkriptLoadBenchmark;
 import co.xenastudios.neoskript.harness.scenario.SkriptSmokeScenario;
@@ -62,6 +63,7 @@ public final class HarnessMain {
     static final List<Scenario> SCENARIOS = List.of(
             new NeoSkriptBootScenario(),
             new SqlVariablesScenario(),
+            new MySqlVariablesScenario(),
             new NeoSkriptRunScenario(),
             new NeoSkriptLanguageScenario(),
             new NeoSkriptSkriptTestsScenario(),
