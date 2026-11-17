@@ -1241,4 +1241,137 @@ class SqlVariableStorageTest {
             assertEquals(0, b.conflicts()[0]);
         }
     }
+
+    @Test
+    void aLostAnswerThenAnotherServersMergeIsCountedOnce() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 10L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            // a adds 50 and commits 60, but the answer is lost; before a is back, b adds 3 and merges to 63 under
+            // its own update_guid. a must find its 60 committed, not merge 63 + 50.
+            a.loseNextReply = true;
+            one.add("coins", new Object[] {50L});
+            waitFor(() -> !a.loseNextReply);
+            waitFor(() -> {
+                try {
+                    return Long.valueOf(60).equals(saved("coins"));
+                } catch (SQLException e) {
+                    return false;
+                }
+            });
+            two.add("coins", new Object[] {3L});
+            b.save();
+            assertEquals(63L, saved("coins"));
+            waitFor(() -> a.status().state() == SqlVariableStorage.State.CONNECTED);
+            waitFor(() -> Long.valueOf(63).equals(one.get("coins")) && Long.valueOf(63).equals(two.get("coins")));
+            Thread.sleep(500);
+            assertEquals(63L, one.get("coins"));
+            assertEquals(63L, saved("coins"));
+            // The same with a set: a's lost one doesn't overwrite b's later change.
+            a.loseNextReply = true;
+            one.set("motd", text("from a"));
+            waitFor(() -> !a.loseNextReply);
+            waitFor(() -> {
+                try {
+                    return rows().containsKey("motd");
+                } catch (SQLException e) {
+                    return false;
+                }
+            });
+            two.set("motd", text("from b"));
+            b.save();
+            waitFor(() -> a.status().state() == SqlVariableStorage.State.CONNECTED);
+            waitFor(() -> text("from b").equals(one.get("motd")));
+            Thread.sleep(500);
+            assertEquals(text("from b"), one.get("motd"));
+            assertEquals(text("from b"), two.get("motd"));
+        }
+        // The marker rows are no variables: a fresh load doesn't see one.
+        VariableStore three = new VariableStore();
+        try (SqlVariableStorage c = storage(three, true)) {
+            c.load();
+            List<String> names = new ArrayList<>();
+            three.forEach((name, value) -> names.add(name));
+            assertTrue(names.stream().noneMatch(name -> name.startsWith("-")), names.toString());
+            assertEquals(List.of("coins", "motd"), names.stream().sorted().toList());
+        }
+        assertTrue(rows().keySet().stream().noneMatch(name -> name.startsWith(SqlVariableStorage.MARKER)),
+                "each server's marker goes when it stops");
+    }
+
+    @Test
+    void aChangeMadeWhileALostAnswerIsSettledIsWrittenAndCountsAsChanged() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 10L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            a.loseNextReply = true;
+            one.add("coins", new Object[] {50L});
+            waitFor(() -> !a.loseNextReply);
+            // While a is down, add 5 more: memory 65, the row 60.
+            one.add("coins", new Object[] {5L});
+            waitFor(() -> {
+                try {
+                    return Long.valueOf(65).equals(saved("coins"));
+                } catch (SQLException e) {
+                    return false;
+                }
+            });
+            waitFor(() -> !a.changed());
+            assertEquals(65L, one.get("coins"));
+            waitFor(() -> Long.valueOf(65).equals(two.get("coins")));
+        }
+    }
+
+    @Test
+    void aVariableLeftForTheNextRoundKeepsTheStoreChanged() throws Exception {
+        VariableStore store = new VariableStore();
+        try (SqlVariableStorage storage = storage(store, true)) {
+            storage.load();
+            store.set("x", 1L);
+            storage.underWay("x", true);
+            storage.save();
+            // x was under way: not written, and still changed, so it's written once it's done.
+            assertTrue(storage.changed());
+            assertFalse(rows().containsKey("x"));
+            storage.underWay("x", false);
+            waitFor(() -> {
+                try {
+                    return rows().containsKey("x");
+                } catch (SQLException e) {
+                    return false;
+                }
+            });
+            waitFor(() -> !storage.changed());
+        }
+    }
+
+    @Test
+    void aListBeingSetIsntDeletedFromTheDatabaseMeanwhile() throws Exception {
+        VariableStore store = new VariableStore();
+        try (SqlVariableStorage storage = storage(store, true)) {
+            storage.load();
+            store.setList("top", new Object[] {text("a"), text("b")});
+            storage.save();
+            assertTrue(rows().containsKey("top::1") && rows().containsKey("top::2"));
+            // A set of the list, caught after its old values went and before the new ones are in.
+            storage.underWay("top::*", true);
+            store.deleteList("top");
+            storage.save();
+            assertTrue(rows().containsKey("top::1") && rows().get("top::1")[1] != null, "not deleted meanwhile");
+            assertTrue(storage.changed());
+            store.setList("top", new Object[] {text("c")});
+            storage.underWay("top::*", false);
+            waitFor(() -> {
+                try {
+                    Map<String, Object[]> rows = rows();
+                    return rows.get("top::2") != null && rows.get("top::2")[1] == null
+                            && rows.get("top::1") != null && rows.get("top::1")[1] != null;
+                } catch (SQLException e) {
+                    return false;
+                }
+            });
+        }
+    }
 }

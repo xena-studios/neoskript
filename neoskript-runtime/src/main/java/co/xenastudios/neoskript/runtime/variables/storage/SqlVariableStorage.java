@@ -342,8 +342,31 @@ public final class SqlVariableStorage implements VariableBackend {
      * server's. Only touched on the database's thread.
      */
     private final Map<String, List<Op>> attempts = new java.util.HashMap<>();
+    /** The start of the name of each server's marker row ({@link #commit}): never a variable, as it starts with -. */
+    static final String MARKER = "-neoskript-write::";
+
+    /** The number of this server's transactions, for its marker row. Only touched on the database's thread. */
+    private long transactions;
+
+    /** A transaction whose commit wasn't answered, until the marker row says whether it committed. */
+    private Uncertain uncertain;
+
+    private record Uncertain(long number, Resolution resolution, List<Op> letGoOf) {}
+
+    /** Whether the last write round wrote everything it found changed, nothing left for the next. */
+    private volatile boolean lastRoundWhole = true;
+
     /** For tests: the next commit's answer is lost, as if the connection dropped just after the database committed. */
     volatile boolean loseNextReply;
+    /** For tests: holds a change to {@code key} (a name, or {@code list::*}) under way, or lets it go. */
+    void underWay(String key, boolean on) {
+        if (on) {
+            inFlight.merge(key, 1, Integer::sum);
+        } else {
+            inFlight.computeIfPresent(key, (k, count) -> count <= 1 ? null : count - 1);
+        }
+    }
+
     /** For tests: runs just after a write commits, before memory is changed to match. */
     volatile Runnable afterCommit;
     /** For tests: runs as monitoring is about to put another server's value in memory, with the variable's name. */
@@ -1056,6 +1079,12 @@ public final class SqlVariableStorage implements VariableBackend {
         for (Map.Entry<String, Saved> entry : saved.entrySet()) {
             if (entry.getValue().seen != current && !upserted.contains(entry.getKey())) {
                 String name = entry.getKey();
+                if (merging && inFlight(name)) {
+                    // Gone only for now, maybe: a list being set is deleted before its new values go in. Not deleted
+                    // from the database (and the other servers) until nothing is under way.
+                    defer(name, entry.getValue(), current, deferred);
+                    continue;
+                }
                 Object sum = merging ? added.get(name) : null;
                 ops.add(Op.deletion(name, entry.getValue(), sum, merging ? appended.get(name) : null,
                         sequence.get()));
@@ -1177,6 +1206,16 @@ public final class SqlVariableStorage implements VariableBackend {
         if (!loaded || connection == null) {
             return false;
         }
+        if (uncertain != null) {
+            try {
+                settleUncertain();
+            } catch (SQLException e) {
+                rollbackQuietly();
+                closeConnection();
+                down(e, false);
+                return false;
+            }
+        }
         long start = System.nanoTime();
         long modifications = store.modifications();
         long current = ++round;
@@ -1188,9 +1227,10 @@ public final class SqlVariableStorage implements VariableBackend {
         List<Op> ops = changes(current, kept, notSaved, counts, found);
         lastResult = new VariableStorage.Result(counts[0], 0, counts[1], List.of(), null, 0, List.copyOf(kept),
                 List.copyOf(notSaved));
+        boolean deferredAny = found[1] instanceof java.util.Set<?> deferred && !deferred.isEmpty();
         if (ops.isEmpty()) {
             letGo(List.of(), java.util.Set.of(), found, roundStart, true);
-            finishWrite(modifications, start);
+            finishWrite(modifications, start, !deferredAny);
             return true;
         }
         waiting = ops.size();
@@ -1198,14 +1238,20 @@ public final class SqlVariableStorage implements VariableBackend {
         // Of ops, those whose round is over: written, or refused by the database.
         List<Op> finished = ops;
         boolean whole = true;
+        Resolution partial = null;
+        List<Op> partialFinished = null;
         try {
             for (int attempt = 1; done == null; attempt++) {
                 try {
                     Resolution resolution = resolution(ops);
-                    commit(resolution.write);
+                    commit(resolution, without(ops, resolution.skipped));
                     done = resolution;
                 } catch (SQLException e) {
                     rollbackQuietly();
+                    if (uncertain != null) {
+                        // The commit was sent and its answer lost: settled once the database is back.
+                        throw e;
+                    }
                     if (settings.merging() && busy(e)) {
                         if (attempt < BUSY_TRIES) {
                             continue;
@@ -1217,49 +1263,81 @@ public final class SqlVariableStorage implements VariableBackend {
                         throw e;
                     }
                     // One of the rows: write them one by one, and leave out the ones the database refuses.
-                    done = new Resolution();
-                    finished = new ArrayList<>();
+                    partial = new Resolution();
+                    partialFinished = new ArrayList<>();
                     for (Op op : ops) {
-                        Boolean wrote = writeAlone(op, done);
+                        Boolean wrote = writeAlone(op, partial);
                         if (wrote == null) {
                             // Held by another server's write past the tries: the rest waits for the next round.
                             whole = false;
                             break;
                         }
-                        finished.add(op);
+                        partialFinished.add(op);
                     }
+                    done = partial;
+                    finished = partialFinished;
                 }
             }
         } catch (SQLException e) {
+            if (partial != null) {
+                // Those written one by one before this did commit: memory catches up with them.
+                landedRound(partial, without(partialFinished, partial.skipped));
+            }
             closeConnection();
             down(e, false);
             return false;
         }
-        for (Op op : done.write) {
+        landedRound(done, List.of());
+        letGo(without(finished, done.skipped), done.skipped, found, roundStart, whole);
+        if (!whole) {
+            laterBecauseBusy();
+            return false;
+        }
+        finishWrite(modifications, start, !deferredAny && done.skipped.isEmpty());
+        tellWritten();
+        return true;
+    }
+
+    /** {@code ops} but those for the names in {@code skipped}. */
+    private static List<Op> without(List<Op> ops, java.util.Set<String> skipped) {
+        if (skipped.isEmpty()) {
+            return ops;
+        }
+        List<Op> left = new ArrayList<>(ops.size());
+        for (Op op : ops) {
+            if (!skipped.contains(op.name())) {
+                left.add(op);
+            }
+        }
+        return left;
+    }
+
+    /**
+     * Memory catches up with a transaction that committed: what it wrote is what this server last saw of those rows,
+     * its merges reach memory, and what {@code letGoOf} took in is let go of.
+     */
+    private void landedRound(Resolution resolution, List<Op> letGoOf) {
+        for (Op op : resolution.write) {
             record(op);
+            attempts.remove(op.name());
         }
         applying.set(true);
         try {
-            for (Runnable change : done.after) {
+            for (Runnable change : resolution.after) {
                 change.run();
             }
         } finally {
             applying.set(false);
         }
-        conflicts.addAndGet(done.conflicts);
-        merges.addAndGet(done.merges);
-        List<Op> letGoOf = new ArrayList<>(finished.size());
-        for (Op op : finished) {
-            if (!done.skipped.contains(op.name())) {
-                letGoOf.add(op);
-            }
+        conflicts.addAndGet(resolution.conflicts);
+        merges.addAndGet(resolution.merges);
+        for (Op op : letGoOf) {
+            letGoOf(op);
         }
-        letGo(letGoOf, done.skipped, found, roundStart, whole);
-        if (!whole) {
-            laterBecauseBusy();
-            return false;
-        }
-        finishWrite(modifications, start);
+    }
+
+    /** Tells the listeners this server wrote. */
+    private void tellWritten() {
         for (Runnable listener : writeListeners) {
             try {
                 listener.run();
@@ -1267,7 +1345,6 @@ public final class SqlVariableStorage implements VariableBackend {
                 console.error("A listener for writes to " + describe() + " failed: " + e);
             }
         }
-        return true;
     }
 
     /** What to write for {@code ops}: with merging, worked out against the rows ({@link #resolve}). */
@@ -1276,10 +1353,16 @@ public final class SqlVariableStorage implements VariableBackend {
     }
 
     /**
-     * Writes and commits, remembering what was sent until the commit is known, so a lost answer can be told from
-     * another server's write ({@link #attempts}).
+     * Writes and commits. With merging, the same transaction also writes this server's {@link #MARKER} row with the
+     * transaction's number, so if the database's answer to the commit is lost, reading the marker afterwards says for
+     * sure whether it committed ({@link #settleUncertain}). What was sent is also remembered until the commit is known
+     * ({@link #attempts}), in case the marker is gone by then.
+     *
+     * @param letGoOf what the transaction finishes, let go of once it's known to have committed
      */
-    private void commit(List<Op> write) throws SQLException {
+    private void commit(Resolution resolution, List<Op> letGoOf) throws SQLException {
+        List<Op> write = resolution.write;
+        long number = ++transactions;
         if (settings.merging()) {
             for (Op op : write) {
                 List<Op> sent = attempts.computeIfAbsent(op.name(), k -> new ArrayList<>(1));
@@ -1290,17 +1373,78 @@ public final class SqlVariableStorage implements VariableBackend {
             }
         }
         apply(write);
-        connection.commit();
-        Runnable hook = afterCommit;
-        if (hook != null) {
-            hook.run();
+        if (settings.merging()) {
+            writeMarker(number);
         }
-        if (loseNextReply) {
-            loseNextReply = false;
-            throw new SQLException("the connection dropped before the database answered", "08S01");
+        try {
+            connection.commit();
+            Runnable hook = afterCommit;
+            if (hook != null) {
+                hook.run();
+            }
+            if (loseNextReply) {
+                loseNextReply = false;
+                throw new SQLException("the connection dropped before the database answered", "08S01");
+            }
+        } catch (SQLException lost) {
+            if (settings.merging()) {
+                uncertain = new Uncertain(number, resolution, letGoOf);
+            }
+            throw lost;
         }
         for (Op op : write) {
             attempts.remove(op.name());
+        }
+    }
+
+    /**
+     * The name of this server's marker row: no value (so Skript's loader and NeoSkript's skip it, and it's no
+     * variable), the number of this server's last transaction in {@code type}.
+     */
+    private String markerName() {
+        return MARKER + guid;
+    }
+
+    private void writeMarker(long number) throws SQLException {
+        String replace = settings.dialect() == Dialect.SQLITE
+                ? "REPLACE INTO " + settings.table() + " (rowid, name, type, value, update_guid) VALUES ((SELECT "
+                        + "COALESCE(MAX(rowid), 0) + 1 FROM " + settings.table() + "), ?, ?, NULL, ?)"
+                : "REPLACE INTO " + settings.table() + " (name, type, value, update_guid) VALUES (?, ?, NULL, ?)";
+        try (PreparedStatement marker = connection.prepareStatement(replace)) {
+            marker.setString(1, markerName());
+            marker.setString(2, Long.toString(number));
+            marker.setString(3, guid);
+            marker.executeUpdate();
+        }
+    }
+
+    /**
+     * A transaction whose commit was sent but not answered: once the database is back, its marker row says whether
+     * it committed. If it did, memory catches up with it, before anything else is worked out; if not, its changes are
+     * simply worked out again. If the marker is gone (a Skript server watching the table tidies away rows without a
+     * value), it can't be told: the rows themselves are checked against what was sent instead ({@link #landed}).
+     */
+    private void settleUncertain() throws SQLException {
+        Uncertain was = uncertain;
+        String number;
+        try (PreparedStatement read = connection.prepareStatement("SELECT type FROM " + settings.table()
+                + " WHERE name = ?")) {
+            read.setString(1, markerName());
+            try (ResultSet result = read.executeQuery()) {
+                number = result.next() ? result.getString(1) : null;
+            }
+        }
+        connection.commit();
+        uncertain = null;
+        if (number == null) {
+            return;
+        }
+        for (Op op : was.resolution().write) {
+            attempts.remove(op.name());
+        }
+        if (number.equals(Long.toString(was.number()))) {
+            landedRound(was.resolution(), was.letGoOf());
+            tellWritten();
         }
     }
 
@@ -1312,11 +1456,14 @@ public final class SqlVariableStorage implements VariableBackend {
         for (int attempt = 1; ; attempt++) {
             try {
                 Resolution one = resolution(List.of(op));
-                commit(one.write);
+                commit(one, without(List.of(op), one.skipped));
                 into.add(one);
                 return true;
             } catch (SQLException failed) {
                 rollbackQuietly();
+                if (uncertain != null) {
+                    throw failed;
+                }
                 if (settings.merging() && busy(failed)) {
                     if (attempt < BUSY_TRIES) {
                         continue;
@@ -1622,15 +1769,23 @@ public final class SqlVariableStorage implements VariableBackend {
         }
     }
 
-    private void finishWrite(long modifications, long start) {
-        writtenAt = modifications;
+    /**
+     * @param whole whether the round wrote everything it found changed: if a variable was left for the next round
+     *     (a change under way, a base that moved), the store still counts as changed, so it's written soon, by the
+     *     periodic saves too, and the pending file isn't let go of
+     */
+    private void finishWrite(long modifications, long start, boolean whole) {
+        lastRoundWhole = whole;
+        if (whole) {
+            writtenAt = modifications;
+        }
         waiting = 0;
         written = true;
         lastWriteNanos = System.nanoTime() - start;
         // A write that took long waits ten times as long before the next, so it never takes more than a tenth of a
         // thread however many variables there are.
         nextWriteAt = System.currentTimeMillis() + lastWriteNanos / 100_000;
-        if (pendingApplied || Files.exists(pendingFile) || Files.exists(unloadedFile)) {
+        if (whole && (pendingApplied || Files.exists(pendingFile) || Files.exists(unloadedFile))) {
             try {
                 Files.deleteIfExists(pendingFile);
                 // What was kept while it was never reached is in memory since startup, and written now.
@@ -1750,7 +1905,8 @@ public final class SqlVariableStorage implements VariableBackend {
                             continue;
                         }
                         String name = rows.getString(1);
-                        if (name == null) {
+                        if (name == null || name.startsWith(MARKER)) {
+                            // Another server's marker row: no variable.
                             continue;
                         }
                         String type = rows.getString(2);
@@ -1760,8 +1916,12 @@ public final class SqlVariableStorage implements VariableBackend {
                         if (dirty(key, name, local) || pendingHere(key)) {
                             // Changed here since the last write, which hasn't happened yet: the local change is newer,
                             // and is written over this row (or merged with it), as Skript would have written it at once.
-                            seen.remove(row);
-                            readAgainFrom = Math.min(readAgainFrom, row - 1);
+                            if (!refusedHere(key, local)) {
+                                seen.remove(row);
+                                readAgainFrom = Math.min(readAgainFrom, row - 1);
+                            }
+                            // A value the database refused is never written: this row is as settled as it gets, and
+                            // isn't read again at every check.
                             continue;
                         }
                         Object value = bytes == null || type == null ? null : codecs.decode(type, bytes);
@@ -1814,6 +1974,16 @@ public final class SqlVariableStorage implements VariableBackend {
         cleanups.add(new long[] {System.currentTimeMillis() + 2 * settings.monitorMillis() + 5_000, from});
     }
 
+    /** Whether {@code local} is a value the database refused for {@code key}, so it's never written. */
+    private boolean refusedHere(String key, Object local) {
+        byte[] refusedBytes = refused.get(key);
+        if (refusedBytes == null || local == null) {
+            return false;
+        }
+        VariableCodecs.Encoded encoded = encodeQuietly(local);
+        return encoded != null && Arrays.equals(encoded.bytes(), refusedBytes);
+    }
+
     /**
      * With merging: whether a change here isn't written yet though the value may look unchanged (additions that came
      * to nothing, a set back to the same value), or one is under way.
@@ -1854,7 +2024,7 @@ public final class SqlVariableStorage implements VariableBackend {
                 continue;
             }
             try (PreparedStatement clean = connection.prepareStatement("DELETE FROM " + settings.table()
-                    + " WHERE value IS NULL AND rowid < ?")) {
+                    + " WHERE value IS NULL AND rowid < ? AND name NOT LIKE '" + MARKER + "%'")) {
                 clean.setLong(1, below);
                 clean.executeUpdate();
                 connection.commit();
@@ -2257,7 +2427,7 @@ public final class SqlVariableStorage implements VariableBackend {
         if (closed) {
             return;
         }
-        unwatch.run();
+        // Still watching until the last write is done: a change under way then still finishes, and is written.
         // A backup running on the database's thread would hold up the last write behind it.
         cancelBackup();
         // A load still running (a late one, or one abandoned at startup) is cut off and never applied: what's in
@@ -2274,6 +2444,17 @@ public final class SqlVariableStorage implements VariableBackend {
                 reconnectOnce();
             }
             boolean ok = connection != null && write();
+            // A variable left for the next round (a change under way, finishing within moments) gets a few more.
+            for (int tries = 0; ok && !lastRoundWhole && tries < 20; tries++) {
+                Thread.sleep(10);
+                ok = connection != null && write();
+            }
+            if (ok && settings.merging()) {
+                dropMarker();
+            }
+            if (ok && !lastRoundWhole) {
+                ok = false;
+            }
             if (!ok) {
                 ok = writePending(false);
                 if (ok && Files.exists(pendingFile)) {
@@ -2292,6 +2473,7 @@ public final class SqlVariableStorage implements VariableBackend {
         } catch (ExecutionException | TimeoutException e) {
             done = false;
         }
+        unwatch.run();
         closed = true;
         state = State.CLOSED;
         if (!done) {
@@ -2310,6 +2492,19 @@ public final class SqlVariableStorage implements VariableBackend {
         }
         thread.shutdownNow();
         closeConnection();
+    }
+
+    /** This server's marker row goes as it stops: its transactions are all known by then. */
+    private void dropMarker() {
+        try (PreparedStatement drop = connection.prepareStatement("DELETE FROM " + settings.table()
+                + " WHERE name = ?")) {
+            drop.setString(1, markerName());
+            drop.executeUpdate();
+            connection.commit();
+        } catch (SQLException e) {
+            rollbackQuietly();
+            // Left behind: one small row, which no loader takes for a variable.
+        }
     }
 
     /** One quick try, when the server stops while the database is down. */
@@ -2349,7 +2544,7 @@ public final class SqlVariableStorage implements VariableBackend {
         }
         try {
             c.setAutoCommit(false);
-            if (settings.dialect() == Dialect.MYSQL) {
+            if (settings.dialect() == Dialect.MYSQL && settings.merging()) {
                 // A write locks the rows it reads (resolve), names without a row included: only REPEATABLE READ's
                 // gap locks do that, so two servers can't both write a name each thinks is new. It's InnoDB's default,
                 // but a server can be set otherwise.
