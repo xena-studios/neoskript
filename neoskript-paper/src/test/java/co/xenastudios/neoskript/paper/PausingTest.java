@@ -700,4 +700,31 @@ class PausingTest {
         assertEquals(List.of(), errors);
         assertEquals(0, Pauses.pending());
     }
+
+    @Test
+    void aKeyAwarePausingEffectCanGetEveryValueUnderAList() {
+        final class Batch implements PausingEffect, co.xenastudios.neoskript.api.element.KeyAware {
+            @Override
+            public java.util.concurrent.CompletionStage<?> start(co.xenastudios.neoskript.api.element.TriggerContext context,
+                    Object[] arguments) {
+                co.xenastudios.neoskript.runtime.KeyedValues rows = (co.xenastudios.neoskript.runtime.KeyedValues) arguments[0];
+                said.add(String.join(",", rows.keys()) + " = " + Values.text(rows.values()));
+                return null;
+            }
+
+            @Override
+            public boolean recursiveKeys() {
+                return true;
+            }
+        }
+        library.pausingEffect("TestEffBatch", info -> new Batch(), "batch %objects%");
+        run("""
+                on load:
+                \tset {_rows::1::*} to "Steve" and 100
+                \tset {_rows::2::*} to "Alex" and 250
+                \tset {_rows::3} to "lone"
+                \tbatch {_rows::*}
+                """);
+        assertEquals(List.of("1::1,1::2,2::1,2::2,3 = Steve, 100, Alex, 250 and lone"), said);
+    }
 }
