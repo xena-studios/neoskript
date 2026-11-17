@@ -517,10 +517,52 @@ public final class NativeVariableStorage implements VariableBackend {
         return new VariableStorage.Detached(List.copyOf(kept), List.copyOf(notSaved));
     }
 
+    /**
+     * Holds this storage's lock only to open the file and read its header: a save appends after the end and then
+     * rewrites a commit in the header, and a compaction replaces the whole file in one step, so the bytes up to the
+     * size read here, under the header read here, are one whole committed file however long the copy takes. Saves,
+     * the server's last one included, don't wait for it.
+     */
     @Override
-    public synchronized Path backupNow() throws IOException {
-        return Files.exists(file) ? VariableStorage.backup(file, VariableStorage.SCHEDULED) : null;
+    public Path backupNow() throws IOException {
+        if (backupCancelled) {
+            return null;
+        }
+        java.nio.channels.FileChannel in;
+        byte[] head;
+        long size;
+        java.nio.file.attribute.FileTime modified;
+        synchronized (this) {
+            try {
+                in = java.nio.channels.FileChannel.open(file, java.nio.file.StandardOpenOption.READ);
+            } catch (java.nio.file.NoSuchFileException notYet) {
+                return null;
+            }
+            try {
+                size = in.size();
+                head = new byte[(int) Math.min(size, NativeVariableFile.HEADER_LENGTH)];
+                java.nio.ByteBuffer buffer = java.nio.ByteBuffer.wrap(head);
+                while (buffer.hasRemaining() && in.read(buffer, buffer.position()) > 0) {
+                    // Read on.
+                }
+                modified = Files.getLastModifiedTime(file);
+            } catch (IOException | RuntimeException e) {
+                in.close();
+                throw e;
+            }
+        }
+        try (in) {
+            return VariableStorage.backup(file, VariableStorage.SCHEDULED,
+                    target -> Durable.copy(in, head, size, target, () -> backupCancelled, modified));
+        }
     }
+
+    @Override
+    public void cancelBackup() {
+        backupCancelled = true;
+    }
+
+    private volatile boolean backupCancelled;
 
     @Override
     public synchronized VariableFile.Entry previous(String name) {

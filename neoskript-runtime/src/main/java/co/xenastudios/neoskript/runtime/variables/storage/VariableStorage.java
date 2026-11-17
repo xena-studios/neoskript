@@ -6,6 +6,7 @@ package co.xenastudios.neoskript.runtime.variables.storage;
 
 import co.xenastudios.neoskript.runtime.variables.VariableStore;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -135,6 +136,16 @@ public final class VariableStorage implements VariableBackend {
 
     /** {@link #backup(Path)}, with {@code tag} after the time in the name. */
     static Path backup(Path file, String tag) throws IOException {
+        return backup(file, tag, target -> Durable.copy(file, target));
+    }
+
+    /** How a backup is written to the name it's given; {@link FileAlreadyExistsException} if it's taken. */
+    interface Copier {
+        Path copyTo(Path target) throws IOException;
+    }
+
+    /** A backup of {@code file} in {@code backups/}, named for now and {@code tag}, written by {@code copier}. */
+    static Path backup(Path file, String tag, Copier copier) throws IOException {
         Path dir = file.toAbsolutePath().getParent().resolve("backups");
         Files.createDirectories(dir);
         String name = file.getFileName().toString();
@@ -146,17 +157,42 @@ public final class VariableStorage implements VariableBackend {
             Path target = dir.resolve(base + "_" + time + (n == 1 ? "" : "-" + n) + tag + extension);
             try {
                 // Synced, with its directory, so a step that relies on the backup can't outlive it.
-                return Durable.copy(file, target);
+                return copier.copyTo(target);
             } catch (FileAlreadyExistsException taken) {
                 // Two backups in the same second: number the next.
             }
         }
     }
 
+    /**
+     * Not under this storage's lock: a save replaces the file in one step, so the channel opened here reads one whole
+     * file however long the copy takes, and saves, the server's last one included, don't wait for it.
+     */
     @Override
-    public synchronized Path backupNow() throws IOException {
-        return Files.exists(file) ? backup(file, SCHEDULED) : null;
+    public Path backupNow() throws IOException {
+        if (backupCancelled) {
+            return null;
+        }
+        FileChannel in;
+        try {
+            in = FileChannel.open(file, java.nio.file.StandardOpenOption.READ);
+        } catch (java.nio.file.NoSuchFileException notYet) {
+            return null;
+        }
+        try (in) {
+            java.nio.file.attribute.FileTime modified = Files.getLastModifiedTime(file);
+            long size = in.size();
+            return backup(file, SCHEDULED, target -> Durable.copy(in, null, size, target, () -> backupCancelled,
+                    modified));
+        }
     }
+
+    @Override
+    public void cancelBackup() {
+        backupCancelled = true;
+    }
+
+    private volatile boolean backupCancelled;
 
     /**
      * What a scheduled backup's name has after its time ({@code variables_<time>_scheduled.csv}), so removing old ones
@@ -229,7 +265,9 @@ public final class VariableStorage implements VariableBackend {
      * beside {@code file} when the server stopped in the middle of one. A copy is only renamed to its backup name
      * once it's whole, so they're never a backup. Only names of exactly the shape a copy's temporary file has are
      * removed: a backup's or snapshot's name ({@code variables_2026-11-17_01-02-03.csv}, {@code
-     * variables_2026-11-17_01-02-03-004.nsv}), then the digits the system adds, then {@code .tmp}. How many were
+     * variables_2026-11-17_01-02-03_scheduled.csv}, {@code variables_2026-11-17_01-02-03-004.nsv}), then
+     * {@code .copying.tmp} ({@link Durable#temporary}), or, from versions before it, the digits the system added and
+     * {@code .tmp}. A backup's name with just {@code .tmp} after may be an owner's own copy, and is kept. How many were
      * removed.
      */
     public static int removeBackupLeftovers(Path file) throws IOException {
@@ -238,7 +276,8 @@ public final class VariableStorage implements VariableBackend {
         int dot = name.lastIndexOf('.');
         java.util.regex.Pattern shape = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(
                 dot < 0 ? name : name.substring(0, dot))
-                + "_\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}(-\\d{3})?([-_]\\d+)?(\\.[A-Za-z0-9]+)?\\d+\\.tmp");
+                + "_\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}(-\\d{3})?([-_]\\d+)?(" + java.util.regex.Pattern.quote(SCHEDULED)
+                + ")?(\\.[A-Za-z0-9]+)?(\\d+\\.tmp|" + java.util.regex.Pattern.quote(Durable.TEMPORARY) + ")");
         int removed = 0;
         for (Path dir : List.of(backups, backups.resolve("snapshots"))) {
             if (!Files.isDirectory(dir)) {

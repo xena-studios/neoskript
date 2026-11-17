@@ -835,4 +835,85 @@ class SqlVariableStorageTest {
         }
         assertNull(third.get("a"));
     }
+
+    @Test
+    void aSqliteBackupIsOnlyEverWholeAndWhatACrashLeftGoesAtLoad() throws Exception {
+        Path backups = Files.createDirectories(dir.resolve("backups"));
+        Path leftover = backups.resolve("variables_2026-11-17_01-02-03_scheduled.db.copying.tmp");
+        Path notOurs = backups.resolve("other_2026-11-17_01-02-03_scheduled.db.copying.tmp");
+        Files.writeString(leftover, "part of a backup");
+        Files.writeString(notOurs, "another file's");
+        VariableStore store = new VariableStore();
+        try (SqlVariableStorage storage = storage(store)) {
+            storage.load();
+            assertFalse(Files.exists(leftover), "removed by its exact name");
+            assertTrue(Files.exists(notOurs));
+            store.set("kept", text("yes"));
+            storage.save();
+            Path backup = storage.backupNow();
+            assertTrue(backup.getFileName().toString().endsWith("_scheduled.db"), backup.toString());
+            assertFalse(Files.exists(Durable.temporary(backup)));
+            try (Connection copy = DriverManager.getConnection("jdbc:sqlite:" + backup);
+                    ResultSet rows = copy.createStatement().executeQuery("SELECT COUNT(*) FROM variables21")) {
+                assertTrue(rows.next());
+                assertEquals(1, rows.getInt(1));
+            }
+            storage.cancelBackup();
+            assertNull(storage.backupNow(), "none once the stop has begun");
+        }
+    }
+
+    @Test
+    void theStopCutsOffASqliteBackupRatherThanWaitingForIt() throws Exception {
+        VariableStore store = new VariableStore();
+        try (SqlVariableStorage storage = storage(store)) {
+            storage.load();
+            store.set("first", text("1"));
+            storage.save();
+            // A big file, so VACUUM INTO takes a while.
+            try (Connection direct = DriverManager.getConnection("jdbc:sqlite:" + db())) {
+                direct.setAutoCommit(false);
+                try (Statement create = direct.createStatement()) {
+                    create.execute("CREATE TABLE filler (data BLOB)");
+                }
+                try (PreparedStatement insert = direct.prepareStatement("INSERT INTO filler VALUES (?)")) {
+                    byte[] data = new byte[4096];
+                    for (int i = 0; i < 40_000; i++) {
+                        data[0] = (byte) i;
+                        insert.setBytes(1, data);
+                        insert.addBatch();
+                    }
+                    insert.executeBatch();
+                }
+                direct.commit();
+            }
+            java.util.concurrent.ExecutorService other = java.util.concurrent.Executors.newSingleThreadExecutor();
+            try {
+                java.util.concurrent.Future<Path> backup = other.submit(storage::backupNow);
+                long until = System.nanoTime() + 10_000_000_000L;
+                while (storage.backupStatement == null && !backup.isDone() && System.nanoTime() < until) {
+                    Thread.onSpinWait();
+                }
+                org.junit.jupiter.api.Assumptions.assumeTrue(storage.backupStatement != null,
+                        "the backup finished before it could be cut off");
+                storage.cancelBackup();
+                java.util.concurrent.ExecutionException failed = assertThrows(
+                        java.util.concurrent.ExecutionException.class, () -> backup.get(10, java.util.concurrent.TimeUnit.SECONDS));
+                assertTrue(failed.getCause().getMessage().contains("cut off"), failed.getCause().getMessage());
+            } finally {
+                other.shutdownNow();
+            }
+            try (var files = Files.list(dir.resolve("backups"))) {
+                assertEquals(List.of(), files.toList(), "neither a backup nor part of one");
+            }
+            // The last write isn't held up, and still lands.
+            store.set("last", text("2"));
+            storage.save();
+        }
+        VariableStore back = new VariableStore();
+        try (SqlVariableStorage again = storage(back)) {
+            again.load();
+            assertEquals(text("2"), back.get("last"));
+        }
+    }
 }

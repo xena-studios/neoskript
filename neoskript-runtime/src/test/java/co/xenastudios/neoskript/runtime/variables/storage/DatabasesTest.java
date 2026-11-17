@@ -304,4 +304,114 @@ class DatabasesTest {
         assertTrue(Files.exists(older));
         assertFalse(Files.exists(scheduled));
     }
+
+    /** Runs {@code backup} on another thread while this one holds {@code storage}'s lock, as a save would. */
+    private static Path backupWhileLocked(Object storage, java.util.concurrent.Callable<Path> backup) throws Exception {
+        java.util.concurrent.ExecutorService other = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            synchronized (storage) {
+                return other.submit(backup).get(10, java.util.concurrent.TimeUnit.SECONDS);
+            }
+        } finally {
+            other.shutdownNow();
+        }
+    }
+
+    @Test
+    void aBackupDoesntHoldTheStorageWhileItCopies() throws Exception {
+        Path file = dir.resolve("variables.csv");
+        write(file, "x", "y");
+        VariableStorage csv = new VariableStorage(new VariableStore(), new VariableCodecs(), file);
+        csv.load();
+        // A save, which holds the storage, isn't held up by a backup, nor the backup by it.
+        Path copy = backupWhileLocked(csv, csv::backupNow);
+        assertEquals(Files.readString(file), Files.readString(copy));
+
+        VariableStore store = new VariableStore();
+        Path nsv = dir.resolve("variables.nsv");
+        try (NativeVariableStorage storage = new NativeVariableStorage(store, new VariableCodecs(), nsv)) {
+            storage.load();
+            store.set("a", new RawValue("string", "one".getBytes(StandardCharsets.UTF_8)));
+            storage.save();
+            Path snapshot = storage.backupNow();
+            // Only opening the file and reading its header take the lock.
+            assertTrue(Files.exists(snapshot));
+            store.set("b", new RawValue("string", "two".getBytes(StandardCharsets.UTF_8)));
+            storage.save();
+            VariableStore back = new VariableStore();
+            try (NativeVariableStorage read = new NativeVariableStorage(back, new VariableCodecs(), snapshot)) {
+                read.load();
+            }
+            assertNotNull(back.get("a"));
+            assertNull(back.get("b"), "the backup is the file as it was");
+        }
+    }
+
+    @Test
+    void aNativeBackupKeepsTheHeaderItStartedWith() throws Exception {
+        // A save rewrites a commit in the header after the copy has started: the copy keeps the header it read.
+        Path from = dir.resolve("source.bin");
+        Files.write(from, "HEADERrecords-and-more".getBytes(StandardCharsets.UTF_8));
+        Path to = dir.resolve("copy.bin");
+        try (java.nio.channels.FileChannel in = java.nio.channels.FileChannel.open(from)) {
+            Files.write(from, "CHANGErecords-and-more-appended".getBytes(StandardCharsets.UTF_8));
+            Durable.copy(in, "HEADER".getBytes(StandardCharsets.UTF_8), 22, to, () -> false,
+                    Files.getLastModifiedTime(from));
+        }
+        assertEquals("HEADERrecords-and-more", Files.readString(to));
+    }
+
+    @Test
+    void aBackupCutOffLeavesNothing() throws Exception {
+        Path from = dir.resolve("big.csv");
+        try (java.nio.channels.FileChannel out = java.nio.channels.FileChannel.open(from,
+                java.nio.file.StandardOpenOption.CREATE_NEW, java.nio.file.StandardOpenOption.WRITE)) {
+            out.write(java.nio.ByteBuffer.wrap(new byte[] {1}), 20L << 20);
+        }
+        Path to = dir.resolve("backups").resolve("big_2026-11-17_01-02-03_scheduled.csv");
+        Files.createDirectories(to.getParent());
+        int[] checks = {0};
+        try (java.nio.channels.FileChannel in = java.nio.channels.FileChannel.open(from)) {
+            // Cut off once the first few megabytes are copied, as at the server's stop.
+            assertThrows(IOException.class, () -> Durable.copy(in, null, in.size(), to, () -> checks[0]++ > 0,
+                    Files.getLastModifiedTime(from)));
+        }
+        assertFalse(Files.exists(to));
+        assertFalse(Files.exists(Durable.temporary(to)));
+
+        Path file = dir.resolve("variables.csv");
+        write(file, "x");
+        VariableStorage storage = new VariableStorage(new VariableStore(), new VariableCodecs(), file);
+        storage.load();
+        storage.cancelBackup();
+        assertNull(storage.backupNow(), "none after the stop has begun");
+    }
+
+    @Test
+    void whatABackupCutOffByACrashLeftIsRemovedByItsExactName() throws Exception {
+        Path backups = Files.createDirectories(dir.resolve("backups"));
+        List<String> leftovers = List.of("variables_2026-11-17_01-02-03_scheduled.csv.copying.tmp",
+                "variables_2026-11-17_01-02-03-2.csv.copying.tmp", "variables_2026-11-17_01-02-03.csv1234567.tmp");
+        List<String> kept = List.of("variables_2026-11-17_01-02-03_scheduled.csv", "variables_notes.csv.copying.tmp",
+                "other_2026-11-17_01-02-03_scheduled.csv.copying.tmp",
+                "variables_2026-11-17_01-02-03_scheduled.csv.copying.tmp.old",
+                "myvariables_2026-11-17_01-02-03.csv.copying.tmp",
+                // An owner's own copy, as the native storage's test has it.
+                "variables_2026-11-17_01-02-03_scheduled.csv.tmp");
+        for (String name : leftovers) {
+            Files.writeString(backups.resolve(name), "part");
+        }
+        for (String name : kept) {
+            Files.writeString(backups.resolve(name), "keep");
+        }
+        Path file = dir.resolve("variables.csv");
+        write(file, "x");
+        new VariableStorage(new VariableStore(), new VariableCodecs(), file).load();
+        for (String name : leftovers) {
+            assertFalse(Files.exists(backups.resolve(name)), name);
+        }
+        for (String name : kept) {
+            assertTrue(Files.exists(backups.resolve(name)), name);
+        }
+    }
 }
