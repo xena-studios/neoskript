@@ -199,6 +199,7 @@ public final record co.xenastudios.neoskript.api.element.TextTemplate$Hole
 
 public interface co.xenastudios.neoskript.api.element.TriggerContext
   public abstract java.lang.Object event()
+  public co.xenastudios.neoskript.api.element.TriggerContext outermostRun() @Experimental
 
 public interface co.xenastudios.neoskript.api.element.Update extends co.xenastudios.neoskript.api.element.Effect
   public void execute(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[])
@@ -284,6 +285,7 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public abstract void literalParser(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/String;*>;)V
   public abstract void loopValue(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/LoopValue;>;)V @Experimental
   public abstract void namedType(java.lang.String, java.lang.String, java.lang.Class, java.util.Map) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/Map<Ljava/lang/String;+TT;>;)V
+  public void noMissingAndOrWarnings() @Experimental
   public void onlyInEvents(java.lang.String, int, java.lang.Class[]) signature (Ljava/lang/String;I[Ljava/lang/Class<*>;)V @Experimental
   public abstract void parser(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/String;*>;)V
   public abstract void pausingEffect(java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/PausingEffect;>;[Ljava/lang/String;)V

@@ -61,6 +61,7 @@ public final class SyntaxRegistry {
     private final Map<String, ParseCheck> checks;
     /** Syntax whose arguments' lists aren't warned about, as Skript's function calls. */
     private final java.util.Set<String> quietLists;
+    private final boolean missingAndOrOff;
     /** Addons' structures ({@code import:}), by syntax id: what to do with each use while a script is parsed. */
     private final Map<String, co.xenastudios.neoskript.api.registration.StructureHandler> structureHandlers;
     /** The experiments syntax elements need, by element id. */
@@ -131,6 +132,7 @@ public final class SyntaxRegistry {
         this.checks = Frozen.map(builder.checks);
         this.structureHandlers = Frozen.map(builder.structureHandlers);
         this.quietLists = java.util.Set.copyOf(builder.quietLists);
+        this.missingAndOrOff = builder.missingAndOrOff;
         this.experimental = Frozen.map(builder.experimental);
         this.experimentNames = builder.experimentNames;
         Map<String, Set<String>> propertyTypes = new HashMap<>();
@@ -246,6 +248,11 @@ public final class SyntaxRegistry {
     /** Whether syntax {@code id}'s arguments are parsed as a function's, with no warnings about their lists. */
     public boolean quietLists(String id) {
         return quietLists.contains(id);
+    }
+
+    /** Whether Skript's "List is missing 'and' or 'or'" warning is off: see {@link Builder#missingAndOrOff}. */
+    public boolean missingAndOrOff() {
+        return missingAndOrOff;
     }
 
     /** The addon's handler for structure {@code id}, or {@code null} if it isn't an addon's. */
@@ -759,6 +766,17 @@ public final class SyntaxRegistry {
         }
 
         /** Says syntax {@code id}'s arguments are parsed as a function's: their lists aren't warned about. */
+        /**
+         * Turns Skript's "List is missing 'and' or 'or'" warning off for every script, as Skript's
+         * {@code disable variable missing and/or warnings} does, and as skript-reflect sets it when installed.
+         */
+        public Builder missingAndOrOff() {
+            missingAndOrOff = true;
+            return this;
+        }
+
+        private boolean missingAndOrOff;
+
         public Builder quietLists(String id) {
             quietLists.add(id);
             return this;

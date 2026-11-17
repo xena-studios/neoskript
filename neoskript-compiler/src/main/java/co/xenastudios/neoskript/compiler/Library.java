@@ -354,6 +354,12 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public void noMissingAndOrWarnings() {
+        checkOpen();
+        builder.missingAndOrOff();
+    }
+
+    @Override
     public void argumentsLikeFunctions(String id) {
         checkOpen();
         builder.quietLists(id);

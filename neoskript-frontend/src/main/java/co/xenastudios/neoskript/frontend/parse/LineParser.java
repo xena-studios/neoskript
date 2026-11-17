@@ -720,7 +720,7 @@ final class LineParser {
             }
             case Expr.Syntax syntax -> listWarnings(input, syntax.syntax(), into, registry);
             case Expr.ListOf list -> {
-                listWarning(input, list, into);
+                listWarning(input, list, into, registry);
                 list.items().forEach(item -> listWarnings(input, item, into, registry));
             }
             // Skript throws away the warnings parsing function arguments gives.
@@ -732,7 +732,8 @@ final class LineParser {
     }
 
     /** Skript's {@code parseExpressionList} warnings for one list, from the words between its items. */
-    private static void listWarning(String input, Expr.ListOf list, java.util.Set<String> into) {
+    private static void listWarning(String input, Expr.ListOf list, java.util.Set<String> into,
+            SyntaxRegistry registry) {
         List<Expr> items = list.items();
         if (items.size() < 2 || list.end() > input.length()) {
             return;
@@ -759,7 +760,7 @@ final class LineParser {
                 and = true;
             }
         }
-        if (and == null) {
+        if (and == null && (registry == null || !registry.missingAndOrOff())) {
             into.add("conjunction:List is missing 'and' or 'or', defaulting to 'and': " + text);
         }
     }

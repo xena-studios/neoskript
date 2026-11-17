@@ -21,4 +21,17 @@ public interface TriggerContext {
      *     object of its own, or {@code null}
      */
     Object event();
+
+    /**
+     * The run of a trigger this context is part of, outermost: this context itself for a trigger's run, and for a
+     * function's call the run that called it, however many functions deep. Compare it by identity: what an addon keeps
+     * for one run (skript-reflect's last Java error) is kept by it, so the functions a run calls share it, and no
+     * other run sees it.
+     *
+     * @return the outermost run's context
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default TriggerContext outermostRun() {
+        return this;
+    }
 }

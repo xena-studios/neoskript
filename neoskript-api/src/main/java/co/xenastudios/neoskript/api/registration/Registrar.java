@@ -869,6 +869,14 @@ public interface Registrar {
     default void argumentsLikeFunctions(String id) {}
 
     /**
+     * Turns Skript's "List is missing 'and' or 'or', defaulting to 'and'" warning off for every script, as Skript's
+     * {@code disable variable missing and/or warnings} option does. For an addon whose original turns that option on
+     * when it's installed, as skript-reflect does, so the same scripts load with the same warnings.
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void noMissingAndOrWarnings() {}
+
+    /**
      * Says that only values of type {@code typeId} itself, its subtypes and what converts to it are taken where it's
      * wanted, as in Skript. Without this, a value of an unrelated type is taken and converted when the script runs:
      * a {@code location} where skript-reflect's {@code javatype} goes would give no class rather than the parser

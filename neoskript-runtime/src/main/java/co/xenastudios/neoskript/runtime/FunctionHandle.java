@@ -12,7 +12,6 @@ import co.xenastudios.neoskript.api.element.TriggerContext;
  */
 public final class FunctionHandle {
 
-    private static final SimpleTriggerContext CONTEXT = new SimpleTriggerContext(null);
 
     private final String name;
     private volatile CompiledFunction target;
@@ -45,7 +44,7 @@ public final class FunctionHandle {
     }
 
     public Object call(Object[] arguments) {
-        return call(CONTEXT, arguments);
+        return call(SimpleTriggerContext.NOWHERE, arguments);
     }
 
     /**
@@ -65,6 +64,6 @@ public final class FunctionHandle {
             return null;
         }
         // Straight through: the function's prologue makes its one context from it (SimpleTriggerContext.call).
-        return function.call(caller == null ? CONTEXT : caller, arguments);
+        return function.call(caller == null ? SimpleTriggerContext.NOWHERE : caller, arguments);
     }
 }
