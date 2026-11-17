@@ -77,15 +77,25 @@ public final class VariableBackends {
      * say which to keep.
      */
     public static Opened open(Kind kind, VariableStore store, VariableCodecs codecs, Path csv) throws IOException {
+        return open(kind, store, codecs, csv, false);
+    }
+
+    /**
+     * As {@link #open(Kind, VariableStore, VariableCodecs, Path)}, with {@code variables.recover}: a damaged
+     * {@code variables.nsv} that has to be read to move or compare its variables is recovered (backed up, and the
+     * saves before the damage kept) instead of refused. In native storage the native storage's own load does that.
+     */
+    public static Opened open(Kind kind, VariableStore store, VariableCodecs codecs, Path csv, boolean recover)
+            throws IOException {
         Path nsv = nativeFile(csv);
         List<String> log = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         if (Files.exists(nsv) && Files.exists(csv)) {
-            both(kind, nsv, csv, log);
+            both(kind, nsv, csv, recover, log);
         } else if (kind == Kind.NATIVE && Files.exists(csv)) {
             importCsv(csv, nsv, log);
         } else if (kind == Kind.CSV && Files.exists(nsv)) {
-            exportCsv(nsv, csv, log);
+            exportCsv(nsv, csv, recover, log);
         }
         if (kind == Kind.NATIVE) {
             warnings.add("Variables are saved in " + nsv.getFileName() + " (variables.storage: native), which older "
@@ -100,9 +110,17 @@ public final class VariableBackends {
      * Both files are there. With the same variables, a switch was cut off before it removed the file it read:
      * that's finished. Otherwise the newer file wins if it's {@code variables.nsv}, and the other is backed up.
      */
-    private static void both(Kind kind, Path nsv, Path csv, List<String> log) throws IOException {
-        List<NativeVariableFile.Op> fromNative = inOrder(NativeVariableStorage.readRepaired(nsv, log)
-                .entries().values());
+    private static void both(Kind kind, Path nsv, Path csv, boolean recover, List<String> log) throws IOException {
+        NativeVariableStorage.Opened read = NativeVariableStorage.open(nsv, recover, log);
+        if (read.salvaged() != null && kind == Kind.NATIVE) {
+            // Recovered: the new native file is written now, so loading it doesn't recover it again.
+            NativeVariableStorage.Written written = NativeVariableStorage.write(nsv,
+                    NativeVariableStorage.inOrder(read.salvaged().values()));
+            if (written.problem() != null) {
+                log.add(written.problem());
+            }
+        }
+        List<NativeVariableFile.Op> fromNative = inOrder(read.entries().values());
         List<NativeVariableFile.Op> fromCsv = inOrder(VariableFile.load(csv).entries().values());
         Instant nativeTime = Files.getLastModifiedTime(nsv).toInstant();
         Instant csvTime = Files.getLastModifiedTime(csv).toInstant();
@@ -133,7 +151,7 @@ public final class VariableBackends {
             log.add(csv.getFileName() + " was older than " + nsv.getFileName() + ", which is in use, so it was moved to "
                     + relative(csv, backup) + " unread. " + times);
         } else {
-            exportCsv(nsv, csv, log);
+            exportCsv(nsv, csv, read, log);
             log.add(times + " before the move.");
         }
     }
@@ -177,16 +195,20 @@ public final class VariableBackends {
      * Writes the variables in {@code nsv} to {@code csv}, backing up both, then removes {@code nsv} once the new
      * {@code csv} and the backup are on disk.
      */
-    static void exportCsv(Path nsv, Path csv, List<String> log) throws IOException {
-        NativeVariableFile.Contents contents = NativeVariableStorage.readRepaired(nsv, log);
+    static void exportCsv(Path nsv, Path csv, boolean recover, List<String> log) throws IOException {
+        exportCsv(nsv, csv, NativeVariableStorage.open(nsv, recover, log), log);
+    }
+
+    private static void exportCsv(Path nsv, Path csv, NativeVariableStorage.Opened read, List<String> log)
+            throws IOException {
         if (Files.exists(csv)) {
             log.add("Backed up the old " + csv.getFileName() + " as " + relative(csv, VariableStorage.backup(csv)));
         }
-        if (contents.damaged()) {
-            log.add("The last " + (contents.length() - contents.validEnd()) + " bytes of " + nsv.getFileName()
-                    + " were a save cut off by a crash and weren't exported; the backup keeps them.");
+        if (read.contents() != null && read.contents().damaged()) {
+            log.add("The last " + (read.contents().length() - read.contents().validEnd()) + " bytes of "
+                    + nsv.getFileName() + " were a save cut off by a crash and weren't exported; the backup keeps them.");
         }
-        List<NativeVariableFile.Op> ops = inOrder(contents.entries().values());
+        List<NativeVariableFile.Op> ops = inOrder(read.entries().values());
         List<VariableFile.Entry> entries = new ArrayList<>(ops.size());
         for (NativeVariableFile.Op op : ops) {
             entries.add(new VariableFile.Entry(op.name(), op.type(), op.bytes()));
@@ -198,21 +220,8 @@ public final class VariableBackends {
                 + ", which Skript can read (" + nsv.getFileName() + " is kept as " + relative(csv, backup) + ")");
     }
 
-    /**
-     * The entries in the order NeoSkript saves them, which is Skript's: through a store of their saved bytes,
-     * so names are merged and sorted exactly as when the variables are loaded and saved.
-     */
     private static List<NativeVariableFile.Op> inOrder(Iterable<VariableFile.Entry> entries) {
-        VariableStore sorted = new VariableStore();
-        for (VariableFile.Entry entry : entries) {
-            sorted.set(entry.name(), new RawValue(entry.type(), entry.bytes()));
-        }
-        List<NativeVariableFile.Op> ops = new ArrayList<>();
-        sorted.forEach((name, value) -> {
-            RawValue raw = (RawValue) value;
-            ops.add(new NativeVariableFile.Op(name.toLowerCase(Locale.ROOT), raw.type(), raw.bytes()));
-        });
-        return ops;
+        return NativeVariableStorage.inOrder(entries);
     }
 
     private static String relative(Path beside, Path file) {

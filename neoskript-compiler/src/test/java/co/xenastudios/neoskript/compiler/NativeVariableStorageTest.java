@@ -747,6 +747,125 @@ class NativeVariableStorageTest {
         Files.delete(file);
     }
 
+    /** A native file with a snapshot and a later save, with a bit flipped in that save: past what repair can do. */
+    private Path damagedAfterTheSnapshot() throws IOException {
+        VariableStore store = new VariableStore();
+        Path file = dir.resolve("variables.nsv");
+        try (NativeVariableStorage storage = open(store)) {
+            store.set("kept", "snapshot");
+            storage.save();
+            store.set("lost", "after");
+            storage.save();
+        }
+        byte[] bytes = Files.readAllBytes(file);
+        bytes[bytes.length - 1] ^= 0x01;
+        Files.write(file, bytes);
+        return file;
+    }
+
+    @Test
+    void recoverAlsoWorksWhenSwitchingBackToCsv() throws Exception {
+        damagedAfterTheSnapshot();
+        Path csv = dir.resolve("variables.csv");
+        IOException refused = assertThrows(IOException.class,
+                () -> VariableBackends.open(VariableBackends.Kind.CSV, new VariableStore(), codecs, csv, false));
+        assertTrue(refused.getMessage().contains("variables.recover"), refused.getMessage());
+        assertFalse(Files.exists(csv));
+
+        VariableStore loaded = new VariableStore();
+        VariableBackends.Opened opened = VariableBackends.open(VariableBackends.Kind.CSV, loaded, codecs, csv, true);
+        assertTrue(opened.log().stream().anyMatch(line -> line.startsWith("Recovered") && line.contains("Lost")),
+                opened.log().toString());
+        opened.backend().load();
+        assertEquals("snapshot", loaded.get("kept"));
+        assertNull(loaded.get("lost"));
+        assertFalse(Files.exists(dir.resolve("variables.nsv")));
+    }
+
+    @Test
+    void withBothFilesADamagedNativeFileGetsTheHintOrIsRecovered() throws Exception {
+        Path nsv = damagedAfterTheSnapshot();
+        Path csv = skriptFile();
+        olderThan(csv, nsv);
+        IOException refused = assertThrows(IOException.class,
+                () -> VariableBackends.open(VariableBackends.Kind.NATIVE, new VariableStore(), codecs, csv, false));
+        assertTrue(refused.getMessage().contains("variables.recover"), refused.getMessage());
+
+        olderThan(csv, nsv);
+        VariableStore loaded = new VariableStore();
+        VariableBackends.Opened opened = VariableBackends.open(VariableBackends.Kind.NATIVE, loaded, codecs, csv, true);
+        assertTrue(opened.log().getFirst().startsWith("Recovered"), opened.log().toString());
+        try (VariableBackend backend = opened.backend()) {
+            backend.load();
+        }
+        assertEquals("snapshot", loaded.get("kept"));
+    }
+
+    @Test
+    void temporaryFilesLeftInBackupsAreRemoved() throws Exception {
+        Path snapshots = dir.resolve("backups/snapshots");
+        Files.createDirectories(snapshots);
+        Path backupTemp = dir.resolve("backups/variables_2026-11-17_01-02-03.nsv8123.tmp");
+        Path snapshotTemp = snapshots.resolve("variables_2026-11-17_01-02-03-004.nsv99.tmp");
+        Path someoneElses = dir.resolve("backups/other.tmp");
+        Files.writeString(backupTemp, "half");
+        Files.writeString(snapshotTemp, "half");
+        Files.writeString(someoneElses, "not ours");
+        open(new VariableStore()).close();
+        assertFalse(Files.exists(backupTemp));
+        assertFalse(Files.exists(snapshotTemp));
+        assertTrue(Files.exists(someoneElses));
+    }
+
+    @Test
+    void theLossReportCountsRecordsAfterTheDamagedOneInTheSameSave() throws Exception {
+        VariableStore store = new VariableStore();
+        Path file = dir.resolve("variables.nsv");
+        String kilobyte = "k".repeat(1000);
+        int start;
+        try (NativeVariableStorage storage = open(store)) {
+            store.set("kept", "snapshot");
+            storage.save();
+            start = (int) Files.size(file);
+            for (int i = 1; i <= 3_000; i++) {
+                store.set("y::" + i, kilobyte + i);
+            }
+            storage.save();
+        }
+        byte[] bytes = Files.readAllBytes(file);
+        int second = start + java.nio.ByteBuffer.wrap(bytes, start, 4).getInt() + 8;
+        assertTrue(second < bytes.length - 8, "the save took more than one record");
+        // Damage in the save's second record; its first and third records can still be read.
+        bytes[second + 20] ^= 0x10;
+        Files.write(file, bytes);
+        NativeVariableStorage storage = new NativeVariableStorage(new VariableStore(), codecs, file);
+        storage.recover(true);
+        storage.load();
+        String note = String.join("\n", storage.notes());
+        storage.close();
+        java.util.regex.Matcher counted = java.util.regex.Pattern.compile("changed (\\d+) variables").matcher(note);
+        assertTrue(counted.find(), note);
+        assertTrue(Integer.parseInt(counted.group(1)) > 1_000, "the records around the damaged one count: " + note);
+    }
+
+    @Test
+    void aRepairKeepsItsReasonWhenACrashTailComesWithIt() throws Exception {
+        Path csv = skriptFile();
+        VariableBackends.open(VariableBackends.Kind.NATIVE, new VariableStore(), codecs, csv);
+        Path file = dir.resolve("variables.nsv");
+        byte[] bytes = Files.readAllBytes(file);
+        bytes[NativeVariableFile.HEADER_LENGTH + 3] ^= 0x10;
+        // And a cut-off save after the commit.
+        Files.write(file, Arrays.copyOf(bytes, bytes.length + 64));
+        VariableStore loaded = new VariableStore();
+        try (NativeVariableStorage storage = open(loaded)) {
+            storage.notes();
+            loaded.set("new", 1L);
+            storage.save();
+            assertTrue(storage.notes().stream().anyMatch(line -> line.contains("(repaired from a snapshot)")));
+        }
+    }
+
     private Path onlySnapshot() throws IOException {
         try (Stream<Path> snapshots = Files.list(dir.resolve("backups/snapshots"))) {
             List<Path> found = snapshots.toList();

@@ -147,6 +147,7 @@ public final class NativeVariableStorage implements VariableBackend {
         recoveredBytes = 0;
         backupBeforeCompacting = null;
         removeLeftovers();
+        VariableStorage.removeBackupLeftovers(file);
         if (!Files.exists(file)) {
             // Nothing written yet: the first save makes the file.
             fileBytes = 0;
@@ -169,28 +170,64 @@ public final class NativeVariableStorage implements VariableBackend {
 
     /** The file's contents, repaired from its snapshot, or recovered, if it's damaged and that's possible. */
     private NativeVariableFile.Contents contents() throws IOException {
-        byte[] data = NativeVariableFile.readFile(file);
-        try {
-            return NativeVariableFile.read(data);
-        } catch (NativeVariableFile.Damaged damaged) {
-            byte[] repaired = repair(file, data, damaged, notes);
-            if (repaired != null) {
-                try {
-                    NativeVariableFile.Contents contents = NativeVariableFile.read(repaired);
-                    // The file on disk is still damaged: the first save writes a new one, after backing it up.
-                    backupBeforeCompacting = "repaired from a snapshot";
-                    compactNext = true;
-                    return contents;
-                } catch (NativeVariableFile.Damaged more) {
-                    data = repaired;
-                    damaged = more;
-                }
-            }
-            if (!recover) {
-                throw refusal(damaged);
-            }
-            return recoverFrom(data, damaged);
+        Opened opened = open(file, recover, notes);
+        if (opened.repaired()) {
+            // The file on disk is still damaged: the first save writes a new one, after backing it up.
+            backupBeforeCompacting = "repaired from a snapshot";
+            compactNext = true;
         }
+        if (opened.salvaged() == null) {
+            return opened.contents();
+        }
+        // Recovered: the damaged file is backed up, and a new one is written now, from what was salvaged.
+        recoveryBackup = opened.backup();
+        Written written = write(file, inOrder(opened.salvaged().values()));
+        if (written.problem() != null) {
+            notes.add(written.problem());
+        }
+        return NativeVariableFile.read(NativeVariableFile.readFile(file));
+    }
+
+    /**
+     * What reading a native file gave: its contents (repaired from a snapshot if {@code repaired}), or, after a
+     * recovery, the variables salvaged from the saves before the damage and where the damaged file was backed up.
+     */
+    record Opened(NativeVariableFile.Contents contents, boolean repaired,
+            LinkedHashMap<String, VariableFile.Entry> salvaged, Path backup) {
+
+        /** The variables, whichever way they were read. */
+        java.util.Map<String, VariableFile.Entry> entries() {
+            return salvaged != null ? salvaged : contents.entries();
+        }
+    }
+
+    /**
+     * Reads a native file for loading or for moving its variables to {@code variables.csv}. Damage inside the newest
+     * snapshot's range is repaired from it. Other damage is refused with a message saying what to do, unless
+     * {@code recover}: then the file is backed up and the saves before the damage are salvaged, and what's lost is
+     * added to {@code notes}. Nothing is written but the backup.
+     */
+    static Opened open(Path file, boolean recover, List<String> notes) throws IOException {
+        byte[] data = NativeVariableFile.readFile(file);
+        NativeVariableFile.Damaged damaged;
+        try {
+            return new Opened(NativeVariableFile.read(data), false, null, null);
+        } catch (NativeVariableFile.Damaged e) {
+            damaged = e;
+        }
+        byte[] repaired = repair(file, data, damaged, notes);
+        if (repaired != null) {
+            try {
+                return new Opened(NativeVariableFile.read(repaired), true, null, null);
+            } catch (NativeVariableFile.Damaged more) {
+                data = repaired;
+                damaged = more;
+            }
+        }
+        if (!recover) {
+            throw refusal(file, damaged);
+        }
+        return salvage(file, data, damaged, notes);
     }
 
     /**
@@ -215,69 +252,53 @@ public final class NativeVariableStorage implements VariableBackend {
         return repaired;
     }
 
-    /** Reads {@code file}, repaired from its snapshot if it's damaged inside the snapshot's range. */
-    static NativeVariableFile.Contents readRepaired(Path file, List<String> log) throws IOException {
-        byte[] data = NativeVariableFile.readFile(file);
-        try {
-            return NativeVariableFile.read(data);
-        } catch (NativeVariableFile.Damaged damaged) {
-            byte[] repaired = repair(file, data, damaged, log);
-            if (repaired == null) {
-                throw damaged;
-            }
-            return NativeVariableFile.read(repaired);
-        }
-    }
-
-    private IOException refusal(NativeVariableFile.Damaged damaged) throws IOException {
+    static IOException refusal(Path file, NativeVariableFile.Damaged damaged) throws IOException {
         Path newest = Snapshots.newestGood(file);
+        Path dir = file.toAbsolutePath().getParent();
         String snapshot = newest == null ? "There's no snapshot of it in backups/snapshots."
-                : "The newest snapshot is " + file.toAbsolutePath().getParent().relativize(newest)
-                        + ", which doesn't cover the damage (it's from before the saves after it).";
+                : "The newest snapshot is " + dir.relativize(newest) + ", which doesn't cover the damage (it's from "
+                        + "before the saves after it).";
         return new IOException(file.getFileName() + " is " + damaged.getMessage() + ". NeoSkript didn't load it and "
-                + "won't write over it. " + snapshot + " To load everything up to the last good save, set "
-                + "variables.recover to true in config.yml and restart: the file is backed up first, and what's lost "
-                + "is listed. Or restore the file from your own backups.", damaged);
+                + "won't write over it. " + snapshot + " To load everything up to the last good save: set "
+                + "variables.recover to true in config.yml and restart (with variables.storage still as it is now). "
+                + "The damaged file is backed up first, what's lost is listed, and the switch turns itself off. Or "
+                + "restore the file from your own backups.", damaged);
     }
 
-    /**
-     * Loads everything up to the last good save of a damaged file, backs the file up, and writes a new one at once.
-     * Says what was lost.
-     */
-    private NativeVariableFile.Contents recoverFrom(byte[] data, NativeVariableFile.Damaged damaged)
+    /** Backs up a damaged file and salvages the saves before the damage, saying what's lost. */
+    private static Opened salvage(Path file, byte[] data, NativeVariableFile.Damaged damaged, List<String> notes)
             throws IOException {
         int[] kept = {0};
         long[] stopped = {0};
         LinkedHashMap<String, VariableFile.Entry> entries = NativeVariableFile.salvage(data, kept, stopped);
         long end = damaged.committed() > 0 ? damaged.committed() : data.length;
-        int[] after = {0};
-        List<String> changed = NativeVariableFile.readableAfter(data, stopped[0], end, after);
+        int[] readable = {0};
+        List<String> changed = NativeVariableFile.readableAfter(data, stopped[0], end, readable);
         Path backup = VariableStorage.backup(file);
-        recoveryBackup = backup;
-        List<NativeVariableFile.Op> ops = new ArrayList<>(entries.size());
-        VariableStore sorted = new VariableStore();
-        for (VariableFile.Entry entry : entries.values()) {
-            sorted.set(entry.name(), new RawValue(entry.type(), entry.bytes()));
-        }
-        sorted.forEach((name, value) -> {
-            RawValue raw = (RawValue) value;
-            ops.add(new NativeVariableFile.Op(name, raw.type(), raw.bytes()));
-        });
-        Written written = write(file, ops);
-        if (written.problem() != null) {
-            notes.add(written.problem());
-        }
         java.util.Set<String> distinct = new java.util.LinkedHashSet<>(changed);
         String names = String.join(", ", distinct.stream().limit(20).toList()) + (distinct.size() > 20 ? ", ..." : "");
-        notes.add("Recovered " + file.getFileName() + " (variables.recover): " + damaged.getMessage() + ". Loaded "
-                + entries.size() + " variables from the " + kept[0] + " good save" + (kept[0] == 1 ? "" : "s") + " before byte "
-                + stopped[0] + ". Lost: "
-                + "the committed saves from byte " + stopped[0] + " to byte " + end + " (" + (end - stopped[0])
-                + " bytes)" + (after[0] == 0 ? ", which can't be read." : "; " + after[0] + " of them after the damaged "
-                + "record could still be read, and changed " + distinct.size() + " variables: " + names + ". Those "
-                + "variables are as they were in the last good save.") + " The damaged file is backed up as "
-                + file.toAbsolutePath().getParent().relativize(backup) + ", and a new file was written.");
-        return NativeVariableFile.read(NativeVariableFile.readFile(file));
+        notes.add("Recovered " + file.getFileName() + " (variables.recover): " + damaged.getMessage() + ". Kept "
+                + entries.size() + " variable" + (entries.size() == 1 ? "" : "s") + " from the " + kept[0] + " good save" + (kept[0] == 1 ? "" : "s")
+                + " before byte " + stopped[0] + ". Lost: the committed saves from byte " + stopped[0] + " to byte " + end
+                + " (" + (end - stopped[0]) + " bytes)" + (readable[0] == 0 ? ", none of which can be read."
+                        : "; " + readable[0] + " of their records could still be read, and changed " + distinct.size()
+                                + " variables: " + names + ". Those variables are as they were in the last good save.")
+                + " The damaged file is backed up as " + file.toAbsolutePath().getParent().relativize(backup) + ".");
+        return new Opened(null, false, entries, backup);
+    }
+
+    /** Entries as ops in Skript's order, through a store of their saved bytes. */
+    static List<NativeVariableFile.Op> inOrder(Iterable<VariableFile.Entry> entries) {
+        VariableStore sorted = new VariableStore();
+        for (VariableFile.Entry entry : entries) {
+            sorted.set(entry.name(), new RawValue(entry.type(), entry.bytes()));
+        }
+        List<NativeVariableFile.Op> ops = new ArrayList<>();
+        sorted.forEach((name, value) -> {
+            RawValue raw = (RawValue) value;
+            ops.add(new NativeVariableFile.Op(name.toLowerCase(java.util.Locale.ROOT), raw.type(), raw.bytes()));
+        });
+        return ops;
     }
 
     private VariableStorage.Result loadFrom(NativeVariableFile.Contents contents) throws IOException {
@@ -285,7 +306,9 @@ public final class NativeVariableStorage implements VariableBackend {
             // A save a crash cut off after the last commit. Nothing's written now: the first save drops it, after
             // backing the file up.
             recoveredBytes = contents.length() - contents.validEnd();
-            backupBeforeCompacting = "a save a crash cut off";
+            if (backupBeforeCompacting == null) {
+                backupBeforeCompacting = "a save a crash cut off";
+            }
         }
         int raw = 0;
         List<String> names = new ArrayList<>(contents.entries().size());
@@ -311,7 +334,9 @@ public final class NativeVariableStorage implements VariableBackend {
         if (!skipped.isEmpty()) {
             // As for variables.csv: values that can't be read are skipped. The first save writes the file without
             // them, after backing it up, so they aren't skipped again on every start.
-            backupBeforeCompacting = "values that couldn't be read";
+            if (backupBeforeCompacting == null) {
+                backupBeforeCompacting = "values that couldn't be read";
+            }
         }
         // A compacted file is in Skript's order, which the store takes in one pass.
         store.load(names, values);
@@ -572,7 +597,8 @@ public final class NativeVariableStorage implements VariableBackend {
             end += record.length;
         }
         byte[] id = NativeVariableFile.newId();
-        byte[] header = NativeVariableFile.header(id, end);
+        // One more than any file written here before, so snapshots are ordered without the clock.
+        byte[] header = NativeVariableFile.header(id, Snapshots.latestGeneration(target) + 1, end);
         Durable.replace(target, out -> {
             out.write(header);
             for (byte[] record : records) {

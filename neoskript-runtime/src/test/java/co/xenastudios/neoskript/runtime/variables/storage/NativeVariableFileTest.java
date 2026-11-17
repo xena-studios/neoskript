@@ -31,7 +31,7 @@ class NativeVariableFileTest {
         List<byte[]> records = NativeVariableFile.records(List.of(new NativeVariableFile.Op("a", "string", new byte[] {1})));
         int end = NativeVariableFile.HEADER_LENGTH + records.getFirst().length;
         byte[] data = new byte[end];
-        System.arraycopy(NativeVariableFile.header(id, end), 0, data, 0, NativeVariableFile.HEADER_LENGTH);
+        System.arraycopy(NativeVariableFile.header(id, 1, end), 0, data, 0, NativeVariableFile.HEADER_LENGTH);
         System.arraycopy(records.getFirst(), 0, data, NativeVariableFile.HEADER_LENGTH, records.getFirst().length);
         System.arraycopy(NativeVariableFile.commit(id, sequence0, end), 0, data, (int) NativeVariableFile.commitOffset(0),
                 NativeVariableFile.COMMIT_LENGTH);
@@ -110,6 +110,23 @@ class NativeVariableFileTest {
         assertFalse(storage.loaded());
         assertEquals(1, opened.size());
         assertFalse(opened.getFirst().isOpen(), "closed again");
+    }
+
+    @Test
+    void snapshotsArePrunedByGenerationNotByTime() throws Exception {
+        Path file = dir.resolve("variables.nsv");
+        for (int i = 0; i < 5; i++) {
+            NativeVariableStorage.write(file, List.of(new NativeVariableFile.Op("v", "string", new byte[] {(byte) i})));
+            // Each snapshot's time goes backwards, as after a clock step.
+            for (Path snapshot : Snapshots.list(file)) {
+                if (NativeVariableFile.generation(snapshot) == i + 1) {
+                    Files.setLastModifiedTime(snapshot, java.nio.file.attribute.FileTime.fromMillis(1_000_000_000L - i * 1000L));
+                }
+            }
+        }
+        List<Long> kept = Snapshots.list(file).stream().map(NativeVariableFile::generation).toList();
+        assertEquals(List.of(5L, 4L, 3L), kept);
+        assertEquals(5, NativeVariableFile.generation(file));
     }
 
     /** A channel that opens, then fails to be positioned. */

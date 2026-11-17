@@ -221,20 +221,65 @@ public final class VariableStore {
         final String key;
         final Node node = new Node();
         final List<Pending> children = new ArrayList<>(0);
+        /** The children by index, made the first time one comes out of order. */
+        java.util.HashMap<String, Pending> byKey;
+        /** Whether a child came out of order, so the children are sorted once before linking. */
+        boolean unsorted;
 
         Pending(String key) {
             this.key = key;
         }
 
-        /** Gives the node its children, and theirs, in one pass each. */
-        void link() {
-            if (children.isEmpty()) {
-                return;
+        /** The child at {@code key}: added at the end if it's new. */
+        Pending child(String index) {
+            if (children.isEmpty() || INDEX_ORDER.compare(children.getLast().key, index) < 0) {
+                Pending child = new Pending(index);
+                children.add(child);
+                if (byKey != null) {
+                    byKey.put(index, child);
+                }
+                return child;
             }
+            if (byKey == null) {
+                byKey = new java.util.HashMap<>(children.size() * 2);
+                for (Pending child : children) {
+                    byKey.put(child.key, child);
+                }
+            }
+            Pending found = byKey.get(index);
+            if (found == null) {
+                found = new Pending(index);
+                children.add(found);
+                byKey.put(index, found);
+                unsorted = true;
+            }
+            return found;
+        }
+
+        /**
+         * Gives the node its children, and theirs, in one pass each, sorting them once first if any came out of
+         * order. False if two of them are the same in Skript's order but not equal, which only {@link #set} handles.
+         */
+        boolean link() {
+            if (children.isEmpty()) {
+                return true;
+            }
+            if (unsorted) {
+                children.sort((a, b) -> INDEX_ORDER.compare(a.key, b.key));
+                for (int i = 1; i < children.size(); i++) {
+                    if (INDEX_ORDER.compare(children.get(i - 1).key, children.get(i).key) == 0) {
+                        return false;
+                    }
+                }
+            }
+            byKey = null;
             for (Pending child : children) {
-                child.link();
+                if (!child.link()) {
+                    return false;
+                }
             }
             node.children = new Children(new SortedChildren(children));
+            return true;
         }
     }
 
@@ -359,25 +404,25 @@ public final class VariableStore {
     /**
      * Sets many variables in a store that has none yet, as loading saved variables does: the same as {@link #set}
      * for each in turn, but each list is linked in one pass instead of having its indices sorted in one at a time,
-     * which was most of the time loading took. That's fastest for names in the order {@link #forEach} gives them,
-     * the order they're saved in; others are put in their place. If the store isn't empty, each is {@link #set}.
-     * Not for a store other threads are using yet.
+     * which was most of the time loading took. Names in the order {@link #forEach} gives them, the order a compacted
+     * file has, need no sorting; a list whose names come in any other order is sorted once, so it's never slower than
+     * {@link #set} one by one. If the store isn't empty, each is {@link #set}. Not for a store other threads are using
+     * yet.
      */
     public void load(List<String> names, List<Object> values) {
         ConcurrentSkipListMap<String, Node> existing = root.children;
         Pending top = existing != null && !existing.isEmpty() ? null : tree(names, values);
-        if (top == null) {
+        if (top == null || !top.link()) {
             for (int i = 0; i < names.size(); i++) {
                 set(names.get(i), values.get(i));
             }
             return;
         }
         changed();
-        top.link();
         root.children = top.node.children;
     }
 
-    /** The tree of {@code names}, or {@code null} if two indices are the same in Skript's order but not equal. */
+    /** The tree of {@code names}, not yet linked. */
     private static Pending tree(List<String> names, List<Object> values) {
         Pending top = new Pending(null);
         List<Pending> path = new ArrayList<>();
@@ -393,11 +438,7 @@ public final class VariableStore {
                     while (path.size() > depth) {
                         path.removeLast();
                     }
-                    Pending child = child((depth == 0 ? top : path.get(depth - 1)).children, part);
-                    if (child == null) {
-                        return null;
-                    }
-                    path.add(child);
+                    path.add((depth == 0 ? top : path.get(depth - 1)).child(part));
                 }
                 depth++;
                 if (end < 0) {
@@ -409,32 +450,6 @@ public final class VariableStore {
             path.get(depth - 1).node.value.set(value == null ? null : Values.copy(value));
         }
         return top;
-    }
-
-    /** The child at {@code key}, added in its place if it's new: at the end, when names come in order. */
-    private static Pending child(List<Pending> siblings, String key) {
-        if (siblings.isEmpty() || INDEX_ORDER.compare(siblings.getLast().key, key) < 0) {
-            Pending child = new Pending(key);
-            siblings.add(child);
-            return child;
-        }
-        int low = 0;
-        int high = siblings.size() - 1;
-        while (low <= high) {
-            int middle = (low + high) >>> 1;
-            int order = INDEX_ORDER.compare(siblings.get(middle).key, key);
-            if (order < 0) {
-                low = middle + 1;
-            } else if (order > 0) {
-                high = middle - 1;
-            } else {
-                Pending found = siblings.get(middle);
-                return found.key.equals(key) ? found : null;
-            }
-        }
-        Pending child = new Pending(key);
-        siblings.add(low, child);
-        return child;
     }
 
     private void changed() {

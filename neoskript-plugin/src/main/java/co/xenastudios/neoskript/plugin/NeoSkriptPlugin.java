@@ -442,12 +442,13 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             getSLF4JLogger().warn("Unknown variables.storage '{}' in config.yml (csv or native); using {}", setting,
                     kind.name().toLowerCase(java.util.Locale.ROOT));
         }
+        // variables.recover: a one-shot recovery of a damaged native file. It's turned off in config.yml before it's
+        // used, so it can never stay on and recover later damage nobody chose to; if it can't be, it isn't used.
+        recoverVariables = settings.variables().recover() && turnOffRecover();
         try {
-            VariableBackends.Opened opened = VariableBackends.open(kind, globals, codecs, csv);
+            VariableBackends.Opened opened = VariableBackends.open(kind, globals, codecs, csv, recoverVariables);
             opened.log().forEach(line -> getSLF4JLogger().info(line));
             opened.warnings().forEach(line -> getSLF4JLogger().warn(line));
-            // variables.recover: a one-shot repair of a damaged native file, turned off again once it's run.
-            recoverVariables = settings.variables().recover();
             if (opened.backend() instanceof NativeVariableStorage nsv) {
                 nsv.recover(recoverVariables);
             }
@@ -465,20 +466,28 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     }
 
     /** Sets variables.recover back to false in config.yml, once a recovery has run. */
-    private void turnOffRecover() {
+    /**
+     * Sets variables.recover back to false in config.yml before a recovery may run, and whether that worked. If it
+     * didn't, the switch isn't used: left on, it would recover damage found later without anyone choosing to.
+     */
+    private boolean turnOffRecover() {
+        String why;
         try {
             ConfigLoader.Change change = NeoSkriptConfig.turnOffRecover(configFile());
             change.warnings().forEach(warning -> getSLF4JLogger().warn("config.yml: {}", warning));
             if (change.written()) {
-                getSLF4JLogger().info("Turned variables.recover off again in config.yml");
-            } else {
-                getSLF4JLogger().warn("Couldn't turn variables.recover off in config.yml; set it to false by hand, or "
-                        + "the next start recovers again.");
+                getSLF4JLogger().info("variables.recover is on for this start, and is turned off again in config.yml");
+                accept(ConfigLoader.load(NeoSkriptConfig.SPEC, configFile()));
+                return true;
             }
+            why = "it couldn't be written (see above)";
         } catch (ConfigException | RuntimeException e) {
-            getSLF4JLogger().warn("Couldn't turn variables.recover off in config.yml; set it to false by hand, or the "
-                    + "next start recovers again: {}", e.getMessage());
+            why = e.getMessage();
         }
+        getSLF4JLogger().error("variables.recover is on, but it couldn't be turned off again in config.yml ({}), so it "
+                + "isn't used: left on, it would recover damage found later without you choosing to. Make config.yml "
+                + "writable (or fix it), then restart with it on again.", why);
+        return false;
     }
 
     /** Says plainly that scripts run without their saved variables, and that nothing is saved. */
@@ -528,9 +537,6 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                         storage.file().getFileName());
             }
             storage.notes().forEach(line -> getSLF4JLogger().warn(line));
-            if (recoverVariables) {
-                turnOffRecover();
-            }
             getSLF4JLogger().info("Loaded {} {} in {} ms{}", loaded.variables(), loaded.variables() == 1 ? "variable" : "variables",
                     (System.nanoTime() - start) / 1_000_000,
                     loaded.raw() == 0 ? "" : " (" + loaded.raw() + " kept as saved until NeoSkript supports their types)");

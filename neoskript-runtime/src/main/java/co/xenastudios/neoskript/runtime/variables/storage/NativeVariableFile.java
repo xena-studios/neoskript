@@ -20,41 +20,53 @@ import java.util.Map;
 import java.util.zip.CRC32C;
 
 /**
- * NeoSkript's own variable file ({@code variables.nsv}): three 4 KiB blocks, then saves. Each save is one record,
- * or several when it's large, applied whole or not at all:
+ * NeoSkript's own variable file ({@code variables.nsv}), format version 1: three 4 KiB blocks, then saves. Each
+ * save is one record, or several when it's large, applied whole or not at all.
  *
  * <pre>
- *   block 0 = identity: "NSKV" version (u16, 1) flags (u16, 0) file id (16 bytes) crc32c of the 24 before (u32)
+ *   block 0 = identity: "NSKV" version (u16, 1) flags (u16, 0) file id (16 bytes) generation (u64)
+ *             crc32c of the 32 bytes before (u32)
  *   block 1 = commit slot 0, block 2 = commit slot 1
- *   commit  = "NSKC" version (u16) flags (u16) file id (16) sequence (u64) end (u64) crc32c of the 40 before (u32)
- *   record  = length (u32, at least 1) crc32c (u32) payload
+ *   commit  = "NSKC" version (u16, 1) flags (u16, 0) file id (16 bytes) sequence (u64) end (u64)
+ *             crc32c of the 40 bytes before (u32)
+ *   record  = length (u32, at least 1) crc32c of the payload (u32) payload (length bytes)
  *   payload = kind (u8) types entries
  *   kind    = 0 for a save's last (or only) record, 1 for a record the next one continues
  *   types   = count (varint) then each type name (varint length, UTF-8)
  *   entries = count (varint) then each: shared (varint) suffix (varint length, UTF-8 bytes) type (varint)
+ *             and, unless type is 0, the value (varint length, bytes)
  * </pre>
  *
- * <p>A name is the first {@code shared} bytes of the previous name in the record, then its suffix, so names in
- * the same list cost a few bytes. The type is {@code 0} to delete the variable, or {@code 1 + its index} in the
- * record's types followed by the value (varint length, then the bytes of Skript's binary value format, as in
- * {@code variables.csv}). Later saves win over earlier ones.
+ * <p><b>Encoding.</b> Fixed-width integers are big-endian. A varint is an unsigned LEB128 of at most 5 bytes: 7 bits
+ * at a time, least significant first, the high bit set on every byte but the last; it never exceeds 2^31 - 1. A
+ * record's CRC32C covers its payload only, not its length or itself. A block's bytes after its fields are zero.
+ * Data starts at byte 12288. A commit's {@code end} is an absolute offset in the file: where the committed saves end.
+ * The whole file has to fit in one array, so it's at most 2 GiB (2^31 - 17 bytes).
+ *
+ * <p><b>Entries.</b> Names are stored as NeoSkript keeps them, lower case (as {@code variables.csv} has them). A
+ * name is the first {@code shared} bytes of the previous name in the same record, then its suffix, so names in the
+ * same list cost a few bytes. The type is {@code 0} to delete the variable, or {@code 1 + its index} in the record's
+ * types followed by the value in Skript's binary value format, the same bytes as in {@code variables.csv}. Later
+ * saves win over earlier ones. A compacted file has its names in Skript's order.
  *
  * <p><b>Blocks.</b> Each block is a page of its own, so a power cut while one is written can only garble that one.
  * The identity is written once, when the file is made, and never again. Each commit slot carries its own magic,
  * version and file id, so the file loads from either slot even if the identity block is garbled. The file id is
  * random for each file written, and snapshots of the file in {@code backups/} carry it too, so a snapshot is only
- * ever matched to its own file.
+ * ever matched to its own file. The generation counts the files written in that folder, one more each time, so
+ * snapshots are ordered without trusting the clock.
  *
- * <p><b>Commits.</b> Compaction writes a new file, whose commit in slot 0 ends at the end of the file, syncs it and
- * renames it over the old one. A save appends its records and syncs them, then writes the other commit slot with the
- * next sequence number and the new end, and syncs that. The valid commit with the highest sequence (compared
- * unsigned) says where the committed saves end.
+ * <p><b>Commits.</b> Compaction writes a new file, whose commit in slot 0 (sequence 1) ends at the end of the file,
+ * syncs it and renames it over the old one. A save appends its records and syncs them, then writes the other commit
+ * slot with the next sequence number and the new end, and syncs that. The valid commit with the highest sequence
+ * (compared unsigned) says where the committed saves end.
  *
  * <p><b>Crash or damage.</b> Everything before the committed end was synced before the commit was written, so it
  * must read perfectly: anything wrong there is damage ({@link Damaged}). After the committed end is at most one save
  * whose commit didn't happen. If it's whole, it's applied. Anything else after the committed end, in any state (cut
  * short, torn in any order, zero-filled by the file system), is the tail of a save a crash cut off, and is dropped.
- * No bytes after it are looked at, so values can't look like records.
+ * No bytes after it are looked at, so values can't look like records. A version or flags this reader doesn't know,
+ * or a whole record of a kind it doesn't know, is a newer format: refused, never treated as damage.
  */
 public final class NativeVariableFile {
 
@@ -64,7 +76,7 @@ public final class NativeVariableFile {
     private static final byte[] COMMIT_MAGIC = {'N', 'S', 'K', 'C'};
     private static final short VERSION = 1;
     static final int ID_LENGTH = 16;
-    private static final int IDENTITY_LENGTH = 28;
+    private static final int IDENTITY_LENGTH = 36;
     static final int COMMIT_LENGTH = 44;
 
     /** Where the first record starts, after the identity and the two commit slots. */
@@ -164,10 +176,10 @@ public final class NativeVariableFile {
     }
 
     /** A new file's three blocks: its identity, and a commit in slot 0 up to {@code end}. */
-    static byte[] header(byte[] fileId, long end) {
+    static byte[] header(byte[] fileId, long generation, long end) {
         byte[] header = new byte[HEADER_LENGTH];
         ByteBuffer identity = ByteBuffer.wrap(header, 0, IDENTITY_LENGTH);
-        identity.put(IDENTITY_MAGIC).putShort(VERSION).putShort((short) 0).put(fileId);
+        identity.put(IDENTITY_MAGIC).putShort(VERSION).putShort((short) 0).put(fileId).putLong(generation);
         CRC32C crc = new CRC32C();
         crc.update(header, 0, IDENTITY_LENGTH - 4);
         identity.putInt((int) crc.getValue());
@@ -191,8 +203,22 @@ public final class NativeVariableFile {
         }
     }
 
-    /** A block that's whole: its version, flags and file id, and for a commit, its sequence and end. */
-    private record Block(int version, int flags, byte[] fileId, long sequence, long end) {}
+    /**
+     * A block that's whole: its version, flags and file id, and its generation (identity) or its sequence and end
+     * (commit).
+     */
+    private record Block(int version, int flags, byte[] fileId, long generation, long sequence, long end) {}
+
+    /** The generation in {@code file}'s identity block, or -1 if it can't be read. */
+    static long generation(Path file) {
+        try (var in = Files.newInputStream(file)) {
+            byte[] head = in.readNBytes(IDENTITY_LENGTH);
+            Block identity = block(head, 0, IDENTITY_MAGIC, IDENTITY_LENGTH);
+            return identity == null ? -1 : identity.generation();
+        } catch (IOException e) {
+            return -1;
+        }
+    }
 
     private static Block block(byte[] data, int at, byte[] magic, int length) {
         if (data.length < at + length || !Arrays.equals(data, at, at + 4, magic, 0, 4)) {
@@ -208,9 +234,12 @@ public final class NativeVariableFile {
         int flags = in.getShort() & 0xFFFF;
         byte[] id = new byte[ID_LENGTH];
         in.get(id);
-        long sequence = length == COMMIT_LENGTH ? in.getLong() : 0;
-        long end = length == COMMIT_LENGTH ? in.getLong() : 0;
-        return new Block(version, flags, id, sequence, end);
+        if (length == IDENTITY_LENGTH) {
+            return new Block(version, flags, id, in.getLong(), 0, 0);
+        }
+        long sequence = in.getLong();
+        long end = in.getLong();
+        return new Block(version, flags, id, 0, sequence, end);
     }
 
     private static void supported(Block block) throws IOException {
@@ -287,36 +316,31 @@ public final class NativeVariableFile {
     }
 
     /**
-     * The saves after a damaged one that can still be read, skipping the damaged record by its length if that's
-     * believable: only to say what a recovery loses, never applied. Their variables' names, in order.
+     * What a recovery drops, to say what's lost, never applied: the names in every record from {@code damaged} to
+     * {@code end} that can still be read, the damaged save's other records included, skipping each record by its
+     * length while that's believable. {@code records[0]} is set to how many could be read.
      */
-    static List<String> readableAfter(byte[] data, long damaged, long end, int[] saves) {
+    static List<String> readableAfter(byte[] data, long damaged, long end, int[] records) {
         List<String> names = new ArrayList<>();
-        int at = (int) damaged;
-        if (at + RECORD_HEADER > end) {
-            return names;
-        }
-        int length = readInt(data, at);
-        if (length < 1 || at + RECORD_HEADER + (long) length > end) {
-            return names;
-        }
-        Map<String, VariableFile.Entry> scratch = new LinkedHashMap<>() {
-            @Override
-            public VariableFile.Entry put(String key, VariableFile.Entry value) {
-                names.add(key);
-                return null;
+        CRC32C crc = new CRC32C();
+        long at = damaged;
+        while (end - at >= RECORD_HEADER) {
+            int length = readInt(data, (int) at);
+            if (length < 1 || at + RECORD_HEADER + length > end) {
+                break;
             }
-
-            @Override
-            public VariableFile.Entry remove(Object key) {
-                names.add((String) key);
-                return null;
+            crc.reset();
+            crc.update(data, (int) at + RECORD_HEADER, length);
+            if ((int) crc.getValue() == readInt(data, (int) at + 4)) {
+                List<Op> ops = new ArrayList<>();
+                if (parse(data, (int) at + RECORD_HEADER, length, ops) != null) {
+                    records[0]++;
+                    for (Op op : ops) {
+                        names.add(op.name());
+                    }
+                }
             }
-        };
-        try {
-            saves(data, at + RECORD_HEADER + length, (int) end, scratch, saves);
-        } catch (IOException e) {
-            // Only a count for the log.
+            at += RECORD_HEADER + length;
         }
         return names;
     }

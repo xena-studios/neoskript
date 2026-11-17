@@ -80,7 +80,7 @@ See [updates and bStats](/docs/server/updates-and-metrics/) for who hears about 
 |---|---|---|
 | `variables.file` | `variables.csv` | Where global variables are saved, relative to `plugins/NeoSkript`. The file is in Skript's format. Applies on restart. |
 | `variables.storage` | `csv` | `csv` saves to `variables.file` in Skript's format. `native` saves to NeoSkript's own `variables.nsv` beside it: faster to load, saves only what changed, crash-safe. Switching moves the variables over at the next start, after a backup. See [native storage](/docs/server/variables/#native-storage). Applies on restart. |
-| `variables.recover` | `false` | Native storage only: a one-shot recovery of a damaged `variables.nsv` that no snapshot can repair. Loads everything up to the last good save, backs the damaged file up, lists what's lost, and turns itself off, keeping the file's comments (a config.yml from a newer NeoSkript is left alone, and the console says to set it back by hand). Applies on restart, and only does anything when the file is damaged. |
+| `variables.recover` | `false` | Native storage only: a one-shot recovery of a damaged `variables.nsv` that no snapshot can repair. Loads everything up to the last good save, turns itself off first, keeping the file's comments, then backs the damaged file up and lists what's lost. If config.yml can't be changed (read-only, or from a newer NeoSkript), it isn't used, and the console says so. Works with either storage. Applies on restart, and only does anything when the file is damaged. |
 | `variables.save-interval` | `5 minutes` | How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops. |
 | `variables.player-uuids-in-names` | `true` | Whether a player in a variable's name, as in `{money::%player%}`, is their UUID (`true`) or their name. Skript's `use player UUIDs in variable names`. |
 
@@ -191,7 +191,7 @@ variables:
   storage: "csv"
   # Native storage only. If variables.nsv is damaged where no snapshot in backups/snapshots can repair it,
   # NeoSkript refuses to load it. Set this to true and restart to load everything up to the last good save
-  # instead: the damaged file is backed up, what's lost is logged, and this turns itself off again.
+  # instead: this turns itself off first, then the damaged file is backed up and what's lost is logged.
   recover: false
   # How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops.
   save-interval: "5 minutes"

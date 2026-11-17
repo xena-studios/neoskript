@@ -42,6 +42,15 @@ final class Snapshots {
         return (dot < 0 ? name : name.substring(0, dot)) + "_";
     }
 
+    /** The highest generation among {@code file} and its snapshots, or 0 if there's none. */
+    static long latestGeneration(Path file) throws IOException {
+        long latest = Files.exists(file) ? Math.max(0, NativeVariableFile.generation(file)) : 0;
+        for (Path path : list(file)) {
+            latest = Math.max(latest, NativeVariableFile.generation(path));
+        }
+        return latest;
+    }
+
     /** Copies {@code file}, just compacted, to the snapshots, and removes all but the newest {@value #KEEP}. */
     static Path save(Path file) throws IOException {
         Path dir = dir(file);
@@ -75,13 +84,13 @@ final class Snapshots {
                 String name = p.getFileName().toString();
                 return name.startsWith(prefix) && name.endsWith(".nsv");
             }).toList());
-            found.sort(Comparator.comparing((Path p) -> {
-                try {
-                    return Files.getLastModifiedTime(p).toMillis();
-                } catch (IOException e) {
-                    return 0L;
-                }
-            }).thenComparing(p -> p.getFileName().toString()).reversed());
+            // Newest first by the generation each file carries, not its time, which a clock step can upset.
+            java.util.Map<Path, Long> generations = new java.util.HashMap<>();
+            for (Path path : found) {
+                generations.put(path, NativeVariableFile.generation(path));
+            }
+            found.sort(Comparator.comparing((Path p) -> generations.get(p))
+                    .thenComparing(p -> p.getFileName().toString()).reversed());
             return found;
         }
     }

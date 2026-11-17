@@ -77,7 +77,7 @@ public final class VariableStorage implements VariableBackend {
     @Override
     public synchronized Result load() throws IOException {
         loaded = false;
-        int leftovers = removeLeftovers();
+        int leftovers = removeLeftovers() + removeBackupLeftovers(file);
         if (!Files.exists(file)) {
             savedAt = store.modifications();
             loaded = true;
@@ -152,6 +152,34 @@ public final class VariableStorage implements VariableBackend {
             for (Path temp : temps) {
                 Files.deleteIfExists(temp);
                 removed++;
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * Removes the temporary files a backup or snapshot copy left in {@code backups/} and {@code backups/snapshots/}
+     * beside {@code file} when the server stopped in the middle of one. A copy is only renamed to its backup name
+     * once it's whole, so they're never a backup. How many were removed.
+     */
+    public static int removeBackupLeftovers(Path file) throws IOException {
+        Path backups = file.toAbsolutePath().getParent().resolve("backups");
+        String name = file.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        String prefix = (dot < 0 ? name : name.substring(0, dot)) + "_";
+        int removed = 0;
+        for (Path dir : List.of(backups, backups.resolve("snapshots"))) {
+            if (!Files.isDirectory(dir)) {
+                continue;
+            }
+            try (DirectoryStream<Path> temps = Files.newDirectoryStream(dir, path -> {
+                String each = path.getFileName().toString();
+                return each.startsWith(prefix) && each.endsWith(".tmp") && Files.isRegularFile(path);
+            })) {
+                for (Path temp : temps) {
+                    Files.deleteIfExists(temp);
+                    removed++;
+                }
             }
         }
         return removed;

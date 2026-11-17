@@ -84,7 +84,7 @@ public record NeoSkriptConfig(
             @Comment({
                 "Native storage only. If variables.nsv is damaged where no snapshot in backups/snapshots can repair it,",
                 "NeoSkript refuses to load it. Set this to true and restart to load everything up to the last good save",
-                "instead: the damaged file is backed up, what's lost is logged, and this turns itself off again."})
+                "instead: this turns itself off first, then the damaged file is backed up and what's lost is logged."})
             boolean recover,
             @Comment("How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops.")
             Interval saveInterval,
