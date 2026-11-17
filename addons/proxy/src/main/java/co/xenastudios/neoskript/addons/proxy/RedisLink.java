@@ -138,10 +138,12 @@ final class RedisLink {
                         queue.notifyAll();
                     }
                 }
-            } catch (IOException e) {
+            } catch (IOException | RuntimeException e) {
+                // Anything going wrong (a refused name, a broken reply) backs off and connects again: the thread
+                // never ends but by close.
                 if (publisherUp || pause == 1_000) {
                     logger.warning("Can't publish to Redis at " + settings.redisHost() + ":" + settings.redisPort()
-                            + ": " + e.getMessage() + (settings.redisQueueOnOutage()
+                            + ": " + describe(e) + (settings.redisQueueOnOutage()
                             ? ". Messages wait until it's back." : ". Messages are dropped until it's back."));
                 }
                 publisherUp = false;
@@ -199,16 +201,20 @@ final class RedisLink {
                         }
                     }
                 }
-            } catch (IOException e) {
+            } catch (IOException | RuntimeException e) {
                 if (!closed && (subscriberUp || pause == 1_000)) {
                     logger.warning("Can't listen to Redis at " + settings.redisHost() + ":" + settings.redisPort()
-                            + ": " + e.getMessage() + ". Messages sent meanwhile are missed.");
+                            + ": " + describe(e) + ". Messages sent meanwhile are missed.");
                 }
                 subscriberUp = false;
                 listening = null;
                 pause = sleep(pause);
             }
         }
+    }
+
+    private static String describe(Exception e) {
+        return e instanceof IOException && e.getMessage() != null ? e.getMessage() : e.toString();
     }
 
     private long sleep(long pause) {

@@ -14,7 +14,6 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -50,7 +49,6 @@ final class Envelope {
     /** The secret that turns signing off: messages are sent and taken unsigned. */
     static final String INSECURE = "insecure";
     private static final long WINDOW_MILLIS = 60_000;
-    private static final int REMEMBERED = 10_000;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     /**
@@ -74,13 +72,13 @@ final class Envelope {
     private final byte[] secret;
     private final boolean insecure;
     private final int maxMessageBytes;
-    /** Nonces seen in the last minute, so a message can't be replayed. */
-    private final Map<Long, Long> seen = new LinkedHashMap<>(16, 0.75f, false) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<Long, Long> eldest) {
-            return size() > REMEMBERED;
-        }
-    };
+    /** The most nonces kept: past it, new messages are refused rather than old nonces forgotten. */
+    static final int MAX_REMEMBERED = 100_000;
+    /** Each nonce seen, until the message it came with is too old to be let through anyway. */
+    private final Map<Long, Long> seen = new java.util.HashMap<>();
+    /** The same nonces by when they can go: {expiry, nonce}. */
+    private final java.util.PriorityQueue<long[]> expiries = new java.util.PriorityQueue<>(
+            java.util.Comparator.comparingLong(entry -> entry[0]));
 
     Envelope(String secret, int maxMessageBytes) {
         this.insecure = INSECURE.equals(secret);
@@ -170,9 +168,21 @@ final class Envelope {
                     throw new Refused("it was sent " + (now - sent) / 1000 + " seconds ago");
                 }
                 synchronized (seen) {
-                    if (seen.putIfAbsent(nonce, sent) != null) {
+                    // A nonce is kept until its message would be refused as too old, so a replay within that time
+                    // is always refused; with too many in that time, new messages are refused rather than old ones
+                    // forgotten.
+                    while (!expiries.isEmpty() && expiries.peek()[0] < now) {
+                        seen.remove(expiries.poll()[1]);
+                    }
+                    if (seen.containsKey(nonce)) {
                         throw new Refused("it was seen already");
                     }
+                    if (seen.size() >= MAX_REMEMBERED) {
+                        throw new Refused("more than " + MAX_REMEMBERED + " network messages came in a minute");
+                    }
+                    long expiry = sent + WINDOW_MILLIS;
+                    seen.put(nonce, expiry);
+                    expiries.add(new long[] {expiry, nonce});
                 }
             }
             return new Opened(sent, origin, instance, target, channel, new String(text, StandardCharsets.UTF_8));

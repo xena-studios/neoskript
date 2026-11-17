@@ -17,6 +17,9 @@ plugin-messaging:
   enabled: true
   # How long a question to the proxy (a player count, the servers) waits for its answer, in milliseconds.
   timeout: 5000
+  # SkProxy's and Skelocity's expressions answer from the proxy's last answer and ask again behind it: at most once
+  # this often for each question, in milliseconds, however often scripts read them.
+  refresh: 1000
   # Plugin messages travel through a player's connection, so with nobody online none can be sent. Messages wait
   # for the next player (true), or are dropped (false). Questions to the proxy can't wait: they fail at once.
   queue-without-players: true

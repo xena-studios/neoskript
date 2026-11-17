@@ -205,4 +205,26 @@ class RedisTest {
         await(() -> Thread.getAllStackTraces().keySet().stream()
                 .noneMatch(thread -> thread.isAlive() && thread.getName().startsWith("NeoSkriptProxy-redis")));
     }
+
+    @Test
+    void aConnectionThatFailsOddlyIsTriedAgainNotLost() throws Exception {
+        // TLS to a name with an underscore, nothing listening: each try fails, and both threads keep trying.
+        Map<String, Object> values = new HashMap<>();
+        values.put("redis.enabled", true);
+        values.put("redis.host", "redis_server");
+        values.put("redis.port", 1);
+        values.put("redis.ssl", true);
+        values.put("redis.timeout", 200);
+        RedisLink link = new RedisLink(Settings.read(values::get, new ArrayList<>()), Logger.getLogger("test"),
+                (channel, text) -> {});
+        link.start();
+        Thread.sleep(2_500);
+        assertTrue(Thread.getAllStackTraces().keySet().stream()
+                .filter(thread -> thread.isAlive() && thread.getName().startsWith("NeoSkriptProxy-redis")).count() >= 2,
+                "both threads still running");
+        assertTrue(link.publish("events", "waits"), "messages still wait for it");
+        link.close(0);
+        await(() -> Thread.getAllStackTraces().keySet().stream()
+                .noneMatch(thread -> thread.isAlive() && thread.getName().startsWith("NeoSkriptProxy-redis")));
+    }
 }

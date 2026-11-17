@@ -210,7 +210,7 @@ class MessagingTest {
         }));
         assertEquals(4L, messaging.cached(count));
         assertTrue(messaging.answered(count));
-        assertEquals(2, sent.size(), "each read asks again");
+        assertEquals(1, sent.size(), "a read within the refresh interval doesn't ask again");
     }
 
     @Test
@@ -322,5 +322,63 @@ class MessagingTest {
         assertTrue(settings.pluginMessaging());
         assertEquals(3, warnings.size(), warnings::toString);
         assertNull(null);
+    }
+
+    @Test
+    void theOriginalsAskAtMostOnceARefreshAndHoldNothingPerRead() throws Exception {
+        PluginMessaging messaging = messaging(Map.of("plugin-messaging.refresh", 300));
+        PluginMessaging.Question count = PluginMessaging.Question.playerCount("lobby");
+        for (int i = 0; i < 100_000; i++) {
+            messaging.cached(count);
+        }
+        assertEquals(1, sent.size(), "a scoreboard reading every tick asks once a refresh");
+        assertEquals(0, messaging.futures(), "and no read leaves a stage waiting");
+        messaging.received(PluginMessaging.write(out -> {
+            out.writeUTF("PlayerCount");
+            out.writeUTF("lobby");
+            out.writeInt(2);
+        }));
+        Thread.sleep(350);
+        messaging.cached(count);
+        assertEquals(2, sent.size(), "asked again once the refresh is up");
+    }
+
+    @Test
+    void anAnswerNotRefreshedIsForgotten() throws Exception {
+        PluginMessaging messaging = messaging(Map.of("plugin-messaging.refresh", 50, "plugin-messaging.timeout", 150));
+        PluginMessaging.Question count = PluginMessaging.Question.playerCount("gone");
+        messaging.cached(count);
+        messaging.received(PluginMessaging.write(out -> {
+            out.writeUTF("PlayerCount");
+            out.writeUTF("gone");
+            out.writeInt(1);
+        }));
+        assertTrue(messaging.answered(count));
+        // The proxy drops the server: the next refresh goes unanswered, and it reads as SkProxy's Offline again.
+        Thread.sleep(80);
+        messaging.cached(count);
+        Thread.sleep(400);
+        assertFalse(messaging.answered(count));
+        assertNull(messaging.cached(count));
+    }
+
+    @Test
+    void aReplayIsRefusedHoweverManyMessagesCameBetween() throws Exception {
+        Envelope sealer = new Envelope("k", 1000);
+        Envelope receiver = new Envelope("k", 1000);
+        byte[] first = sealer.seal("x", "a", "ALL", "c", "first");
+        receiver.open(first);
+        for (int i = 0; i < 12_000; i++) {
+            receiver.open(sealer.seal("x", "a", "ALL", "c", "m" + i));
+        }
+        assertThrows(Envelope.Refused.class, () -> receiver.open(first));
+    }
+
+    @Test
+    void aHostSniRefusesIsntSentAsSni() {
+        assertNull(Resp.sniName("redis_server"));
+        assertNull(Resp.sniName("localhost."));
+        assertNull(Resp.sniName("127.0.0.1"));
+        assertEquals("redis.example.com", Resp.sniName("redis.example.com").getAsciiName());
     }
 }

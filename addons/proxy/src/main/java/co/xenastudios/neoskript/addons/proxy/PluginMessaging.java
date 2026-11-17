@@ -240,11 +240,60 @@ final class PluginMessaging {
      * the caller turns into what the original gives then.
      */
     Object cached(Question question) {
-        if (!closed && settings.pluginMessaging()) {
-            ask(question).exceptionally(failure -> null);
-        }
+        refresh(question);
         synchronized (answers) {
             return answers.get(question.key());
+        }
+    }
+
+    /** When each question was last asked for {@link #cached}, so it's asked at most once a refresh interval. */
+    private final Map<String, Long> refreshed = new java.util.LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Long> eldest) {
+            return size() > MAX_CACHED;
+        }
+    };
+
+    /**
+     * Asks {@code question} again, behind the read, unless it's waiting for an answer already or was asked within
+     * {@code plugin-messaging.refresh}: a scoreboard reading a count every tick sends one question a second, not
+     * twenty. Nothing waits on the answer but the cache.
+     */
+    private void refresh(Question question) {
+        if (closed || !settings.pluginMessaging()) {
+            return;
+        }
+        String key = question.key();
+        long now = System.nanoTime();
+        synchronized (refreshed) {
+            Long last = refreshed.get(key);
+            if (last != null && now - last < TimeUnit.MILLISECONDS.toNanos(settings.refreshMillis())) {
+                return;
+            }
+            refreshed.put(key, now);
+        }
+        Waiting asked;
+        synchronized (waiting) {
+            if (waiting.containsKey(key) || waiting.size() >= MAX_WAITING) {
+                return;
+            }
+            asked = new Waiting(question, new ArrayList<>());
+            waiting.put(key, asked);
+        }
+        boolean sent;
+        try {
+            sent = carrier.send(question.payload());
+        } catch (RuntimeException | LinkageError e) {
+            sent = false;
+        }
+        if (!sent) {
+            fail(key, asked, new IllegalStateException("not sent"));
+            return;
+        }
+        try {
+            timer.schedule(() -> timedOut(key, asked), settings.proxyTimeoutMillis(), TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.RejectedExecutionException stopping) {
+            fail(key, asked, new IllegalStateException("NeoSkriptProxy is disabled"));
         }
     }
 
@@ -264,6 +313,11 @@ final class PluginMessaging {
             return;
         }
         Waiting gone = asked;
+        // No answer this time: what was known is forgotten, so a server the proxy dropped reads as SkProxy's
+        // "Offline" and 0 again, not as it last was.
+        synchronized (answers) {
+            answers.remove(key);
+        }
         if (gone.question().alwaysAnswered() && !warnedNoAnswer) {
             warnedNoAnswer = true;
             logger.warning("The proxy didn't answer " + gone.question().subchannel() + " within "
@@ -361,6 +415,13 @@ final class PluginMessaging {
     int queued() {
         synchronized (queued) {
             return queued.size();
+        }
+    }
+
+    /** How many stages wait on answers, for tests. */
+    int futures() {
+        synchronized (waiting) {
+            return waiting.values().stream().mapToInt(asked -> asked.answers().size()).sum();
         }
     }
 

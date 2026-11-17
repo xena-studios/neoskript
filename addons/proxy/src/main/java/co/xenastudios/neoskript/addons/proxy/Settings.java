@@ -15,6 +15,7 @@ import java.util.function.Function;
  * @param secret what network messages over plugin messaging are signed with, or empty
  * @param pluginMessaging whether plugin messaging is on
  * @param proxyTimeoutMillis how long a question to the proxy waits for its answer
+ * @param refreshMillis how often the originals' expressions ask the proxy again, at most
  * @param queueWithoutPlayers whether messages wait for a player when nobody's online
  * @param maxQueued the most messages waiting for a player
  * @param queuedForMillis how long one waits
@@ -33,6 +34,7 @@ import java.util.function.Function;
  * @param maxMessageBytes the longest network message, in bytes of UTF-8
  */
 public record Settings(String serverName, String secret, boolean pluginMessaging, long proxyTimeoutMillis,
+        long refreshMillis,
         boolean queueWithoutPlayers, int maxQueued, long queuedForMillis, boolean redis, String redisHost,
         int redisPort, String redisUser, String redisPassword, int redisDatabase, boolean redisSsl,
         long redisTimeoutMillis, boolean redisQueueOnOutage, int redisMaxQueued, long redisQueuedForMillis,
@@ -52,6 +54,7 @@ public record Settings(String serverName, String secret, boolean pluginMessaging
         Reader r = new Reader(values, warnings);
         return new Settings(r.text("server-name", ""), r.text("secret", ""),
                 r.flag("plugin-messaging.enabled", true), r.number("plugin-messaging.timeout", 5_000, 100, 600_000),
+                r.number("plugin-messaging.refresh", 1_000, 50, 600_000),
                 r.flag("plugin-messaging.queue-without-players", true),
                 (int) r.number("plugin-messaging.max-queued", 1_000, 0, 1_000_000),
                 r.number("plugin-messaging.queued-for", 60, 1, 86_400) * 1000,

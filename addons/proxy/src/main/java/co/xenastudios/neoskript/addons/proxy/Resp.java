@@ -60,8 +60,9 @@ final class Resp implements Closeable {
             // The certificate has to be for the host, as a browser checks it, and the host is named (SNI).
             javax.net.ssl.SSLParameters parameters = tls.getSSLParameters();
             parameters.setEndpointIdentificationAlgorithm("HTTPS");
-            if (!host.isEmpty() && !Character.isDigit(host.charAt(host.length() - 1)) && !host.contains(":")) {
-                parameters.setServerNames(List.of(new javax.net.ssl.SNIHostName(host)));
+            javax.net.ssl.SNIHostName name = sniName(host);
+            if (name != null) {
+                parameters.setServerNames(List.of(name));
             }
             tls.setSSLParameters(parameters);
         }
@@ -85,6 +86,22 @@ final class Resp implements Closeable {
         } catch (IOException | RuntimeException e) {
             socket.close();
             throw e;
+        }
+    }
+
+    /**
+     * The host as SNI names it, or {@code null} where it can't be one: an address, or a name SNI doesn't allow
+     * ({@code redis_server}, as docker-compose names services, or {@code localhost.}). The certificate is still
+     * checked against the host either way.
+     */
+    static javax.net.ssl.SNIHostName sniName(String host) {
+        if (host.isEmpty() || host.contains(":") || Character.isDigit(host.charAt(host.length() - 1))) {
+            return null;
+        }
+        try {
+            return new javax.net.ssl.SNIHostName(host);
+        } catch (IllegalArgumentException notAllowed) {
+            return null;
         }
     }
 
