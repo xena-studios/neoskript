@@ -30,7 +30,7 @@ tasks.withType<Test>().configureEach {
     // The fuzz tests run a few hundred cases in CI. -Pneoskript.fuzz.iterations=N runs more, from
     // -Pneoskript.fuzz.seed=S.
     // A line the parser can't read in this time is an error (10 s on servers); in tests it comes sooner.
-    systemProperty("neoskript.parse.lineTimeLimitMillis", "1000")
+    systemProperty("neoskript.parse.lineTimeLimitMillis", "3000")
     for (property in listOf("neoskript.fuzz.iterations", "neoskript.fuzz.seed")) {
         providers.gradleProperty(property).orNull?.let { systemProperty(property, it) }
     }

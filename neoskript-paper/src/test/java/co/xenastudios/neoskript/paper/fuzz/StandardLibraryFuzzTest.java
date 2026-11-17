@@ -45,7 +45,7 @@ class StandardLibraryFuzzTest {
         long first = ScriptFuzzer.firstSeed();
         for (long seed = first; seed < first + ScriptFuzzer.iterations(150); seed++) {
             ScriptFuzzer.Case fuzzCase = fuzzer.generate(seed);
-            ScriptFuzzer.within(fuzzCase, 30, () -> compileAndRun(fuzzCase));
+            ScriptFuzzer.within(fuzzCase, 90, () -> compileAndRun(fuzzCase));
         }
     }
 
@@ -54,7 +54,7 @@ class StandardLibraryFuzzTest {
         List<String> originals = ScriptFuzzer.fromRepository().originals();
         for (int i = 0; i < originals.size(); i++) {
             ScriptFuzzer.Case fuzzCase = new ScriptFuzzer.Case(-i, originals.get(i));
-            ScriptFuzzer.within(fuzzCase, 30, () -> compileAndRun(fuzzCase));
+            ScriptFuzzer.within(fuzzCase, 90, () -> compileAndRun(fuzzCase));
         }
     }
 

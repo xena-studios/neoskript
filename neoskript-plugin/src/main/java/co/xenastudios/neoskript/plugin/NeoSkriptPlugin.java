@@ -153,6 +153,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             }
         };
         Waits.install(scheduler, laterErrors);
+        // Recursion that runs out of stack is told to admins as Skript tells them.
+        co.xenastudios.neoskript.runtime.Overflows.install(TriggerErrors::broadcastRepeated);
         if (platform == Platform.FOLIA) {
             // Code compiled from now on checks region ownership (plan 3.3); on Paper it never does.
             co.xenastudios.neoskript.runtime.region.Regions.install(

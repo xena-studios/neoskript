@@ -69,4 +69,48 @@ class TriggerIsolationTest {
         assertEquals(3, errors.size(), errors.toString());
         assertTrue(errors.contains("Error in {}, line {}: {}"), errors.toString());
     }
+
+    @Test
+    void recursionIsToldToAdminsInSkriptsWords() {
+        assertEquals("[Skript] The script 'deep.sk' infinitely (or excessively) repeated itself!",
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                        .serialize(TriggerErrors.repeated("deep.sk")));
+    }
+
+    private static final class Other extends Event {
+        private static final HandlerList HANDLERS = new HandlerList();
+
+        @Override
+        public HandlerList getHandlers() {
+            return HANDLERS;
+        }
+
+        public static HandlerList getHandlerList() {
+            return HANDLERS;
+        }
+    }
+
+    @Test
+    void anEventTheServerWontListenToDoesntStopTheOthers() {
+        // One registerEvent that threw left every event class after it without a listener.
+        List<String> errors = new ArrayList<>();
+        List<Class<?>> registered = new ArrayList<>();
+        EventDispatcher dispatcher = new EventDispatcher(null, logger(errors), EventPriority.HIGH, false) {
+            @Override
+            void register(Class<? extends Event> eventClass, Trigger[] listeners) {
+                if (eventClass == Fired.class) {
+                    throw new IllegalArgumentException("no handler list");
+                }
+                registered.add(eventClass);
+            }
+        };
+        Trigger nothing = context -> {};
+        dispatcher.update(List.of(
+                new co.xenastudios.neoskript.compiler.CompiledScripts.CompiledTrigger("a.sk", 1, null,
+                        List.of(Fired.class), null, null, nothing),
+                new co.xenastudios.neoskript.compiler.CompiledScripts.CompiledTrigger("b.sk", 1, null,
+                        List.of(Fired.class, Other.class), null, null, nothing)));
+        assertEquals(List.of(Other.class), registered);
+        assertEquals(List.of("Couldn't listen for {}, so its triggers in {} won't run: {}"), errors);
+    }
 }

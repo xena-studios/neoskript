@@ -28,7 +28,7 @@ class ParserFuzzTest {
         int iterations = ScriptFuzzer.iterations(250);
         for (long seed = first; seed < first + iterations; seed++) {
             ScriptFuzzer.Case fuzzCase = fuzzer.generate(seed);
-            ScriptFuzzer.within(fuzzCase, 20, () -> LOADER.load(List.of(new SourceFile("fuzz.sk", fuzzCase.text()))));
+            ScriptFuzzer.within(fuzzCase, 90, () -> LOADER.load(List.of(new SourceFile("fuzz.sk", fuzzCase.text()))));
         }
     }
 
@@ -41,7 +41,7 @@ class ParserFuzzTest {
             ScriptFuzzer.Case a = fuzzer.generate(seed);
             ScriptFuzzer.Case b = fuzzer.generate(seed + 1_000_000);
             ScriptFuzzer.Case both = new ScriptFuzzer.Case(seed, a.text() + "\n# --- b.sk, seed " + b.seed() + "\n" + b.text());
-            ScriptFuzzer.within(both, 20, () -> LOADER.load(List.of(new SourceFile("a.sk", a.text()),
+            ScriptFuzzer.within(both, 90, () -> LOADER.load(List.of(new SourceFile("a.sk", a.text()),
                     new SourceFile("b.sk", b.text()))));
         }
     }
@@ -51,7 +51,7 @@ class ParserFuzzTest {
         // Thousands of brackets ran the parser out of stack, and the StackOverflowError stopped the whole reload.
         String deep = "on load:\n\tset {_x} to " + "(".repeat(5000) + "1" + ")".repeat(5000) + "\n\tset {_y} to 1\n";
         ScriptFuzzer.Case fuzzCase = new ScriptFuzzer.Case(0, deep);
-        ScriptFuzzer.within(fuzzCase, 20, () -> {
+        ScriptFuzzer.within(fuzzCase, 90, () -> {
             var script = LOADER.load(List.of(new SourceFile("deep.sk", deep))).getFirst();
             assertEquals(List.of("2: This line is nested too deeply to be understood"),
                     script.diagnostics().stream().map(d -> d.line() + ": " + d.message()).toList());

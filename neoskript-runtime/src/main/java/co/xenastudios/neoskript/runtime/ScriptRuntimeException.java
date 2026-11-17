@@ -28,6 +28,19 @@ public final class ScriptRuntimeException extends RuntimeException {
         return new ScriptRuntimeException(script, line, thrown);
     }
 
+    /**
+     * What a compiled function does with {@code thrown}: as {@link #at}, except that a stack that ran out is reported
+     * here and the function returns nothing ({@code null}), so its caller carries on, as in Skript. If reporting runs
+     * out of stack too, that goes up to the caller, which tries in turn.
+     */
+    public static ScriptRuntimeException inFunction(Throwable thrown, String script, int line) {
+        if (thrown instanceof StackOverflowError) {
+            Overflows.report(script);
+            return null;
+        }
+        return at(thrown, script, line);
+    }
+
     public String script() {
         return script;
     }

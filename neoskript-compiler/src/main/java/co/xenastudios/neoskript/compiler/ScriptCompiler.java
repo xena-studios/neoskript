@@ -54,6 +54,8 @@ public final class ScriptCompiler {
     }
 
     public CompiledScripts compile(List<ParsedScript> scripts) {
+        // Used by compiled functions when the stack runs out, when there's no stack left to load it with.
+        co.xenastudios.neoskript.runtime.Overflows.ready();
         List<CompiledScripts.CompiledTrigger> triggers = new ArrayList<>();
         List<Diagnostic> diagnostics = new ArrayList<>();
         warnings = diagnostics;

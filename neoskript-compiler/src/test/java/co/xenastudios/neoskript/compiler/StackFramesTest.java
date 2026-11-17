@@ -33,6 +33,7 @@ class StackFramesTest {
     private CompiledScripts compile(String name, String text) {
         Library library = new Library();
         library.type("number", "number", Number.class);
+        library.type("timespan", "timespan", co.xenastudios.neoskript.runtime.Timespan.class);
         library.type("integer", "integer", Long.class);
         library.subtype("integer", "number");
         library.event("ScriptLoad", ScriptEvent.LOAD, "[script] load");
@@ -97,20 +98,88 @@ class StackFramesTest {
     }
 
     @Test
-    void endlessRecursionIsARuntimeErrorAtItsLine() {
-        CompiledScripts compiled = compile("recurse.sk", """
-                function down(n: number) :: number:
-                \treturn down({_n} + 1)
-                on load:
-                \tset {_x} to down(1)
-                """);
+    void aLoopThatWaitsEachTimeRoundIsNeverReported() {
+        // Waiting time counted as running time: a loop with 'wait 1 tick' was reported after about 55 minutes.
+        List<String> logged = new ArrayList<>();
+        java.util.ArrayDeque<Runnable> later = new java.util.ArrayDeque<>();
+        System.setProperty(co.xenastudios.neoskript.runtime.LongLoops.WARN_AFTER_PROPERTY, "0");
+        logInto(logged);
+        co.xenastudios.neoskript.runtime.Waits.install(new co.xenastudios.neoskript.runtime.scheduler.Scheduler() {
+            @Override
+            public void runGlobal(Runnable task) {
+                later.add(task);
+            }
+
+            @Override
+            public void runGlobalLater(long ticks, Runnable task) {
+                later.add(task);
+            }
+
+            @Override
+            public Runnable runGlobalRepeating(long ticks, Runnable task) {
+                throw new UnsupportedOperationException();
+            }
+        }, e -> {
+            throw e;
+        });
         try {
+            CompiledScripts compiled = compile("loops/waits.sk", """
+                    on load:
+                    \twhile keep going:
+                    \t\twait 1 second
+                    """);
+            rounds[0] = 3_000_000 - 200_000;
             compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
-            throw new AssertionError("Endless recursion ended");
-        } catch (ScriptRuntimeException e) {
-            assertTrue(e.getCause() instanceof StackOverflowError, e.toString());
-            assertEquals("recurse.sk", e.script());
-            assertEquals(2, e.line());
+            int resumed = 0;
+            while (!later.isEmpty()) {
+                later.poll().run();
+                resumed++;
+            }
+            assertTrue(resumed >= 199_000, "the loop waited " + resumed + " times");
+        } finally {
+            System.clearProperty(co.xenastudios.neoskript.runtime.LongLoops.WARN_AFTER_PROPERTY);
+            logInto(null);
         }
+        assertEquals(List.of(), logged);
+    }
+
+    /** Sends {@link RuntimeErrors#logError} to {@code logged}, or nowhere with {@code null}. */
+    private static void logInto(List<String> logged) {
+        RuntimeErrors.install(logged == null ? null : new RuntimeErrors.Consumer() {
+            @Override
+            public void printError(co.xenastudios.neoskript.runtime.errors.RuntimeError error) {}
+
+            @Override
+            public void printFrameOutput(co.xenastudios.neoskript.runtime.errors.ErrorFrame.Output output,
+                    co.xenastudios.neoskript.runtime.errors.RuntimeError.Level level) {}
+
+            @Override
+            public void logError(String message) {
+                logged.add(message);
+            }
+        }, co.xenastudios.neoskript.runtime.errors.ErrorFrame.Limits.DEFAULT,
+                co.xenastudios.neoskript.runtime.errors.ErrorFrame.Limits.DEFAULT);
+    }
+
+    @Test
+    void endlessRecursionStopsTheInnermostCallAsInSkript() {
+        // Skript catches the overflow in the innermost call with room to spare, tells admins once, and the callers
+        // carry on with nothing from it.
+        List<String> reported = new ArrayList<>();
+        co.xenastudios.neoskript.runtime.Overflows.install(reported::add);
+        try {
+            CompiledScripts compiled = compile("loops/recurse.sk", """
+                    function down(n: number) :: number:
+                    \treturn down({_n} + 1)
+                    on load:
+                    \tset {_x} to down(1)
+                    \tcapture the stack
+                    """);
+            compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
+        } finally {
+            co.xenastudios.neoskript.runtime.Overflows.install(null);
+        }
+        assertEquals(List.of("recurse.sk"), reported);
+        assertEquals(1, captured.size(), "the trigger carried on after the call");
     }
 }

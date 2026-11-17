@@ -5,6 +5,8 @@
 package co.xenastudios.neoskript.plugin;
 
 import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.slf4j.Logger;
 
@@ -23,23 +25,39 @@ final class TriggerErrors {
     static void report(Logger logger, Throwable thrown) {
         if (thrown instanceof ScriptRuntimeException e) {
             if (e.getCause() instanceof StackOverflowError) {
-                broadcast("§cThe script '§6" + e.script() + "§c' infinitely (or excessively) repeated itself!");
+                co.xenastudios.neoskript.runtime.Overflows.report(e.script());
                 return;
             }
             logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
         } else if (thrown instanceof StackOverflowError) {
-            broadcast("§cThe script '§6<unknown>§c' infinitely (or excessively) repeated itself!");
+            co.xenastudios.neoskript.runtime.Overflows.report(null);
         } else {
             logger.error("Unexpected error while running a script", thrown);
         }
     }
 
-    @SuppressWarnings("deprecation") // Skript's adminBroadcast sends legacy text.
-    private static void broadcast(String message) {
+    /**
+     * What Skript 2.17 broadcasts to {@code skript.admin} when a script recursed until the stack ran out: its prefix,
+     * then the message, naming the script by its file name.
+     */
+    static Component repeated(String name) {
+        return Component.text()
+                .append(Component.text("[", NamedTextColor.GRAY))
+                .append(Component.text("Skript", NamedTextColor.GOLD))
+                .append(Component.text("] ", NamedTextColor.GRAY))
+                .append(Component.text().color(NamedTextColor.RED)
+                        .append(Component.text("The script '"))
+                        .append(Component.text(name, NamedTextColor.GOLD))
+                        .append(Component.text("' infinitely (or excessively) repeated itself!")))
+                .build();
+    }
+
+    /** Sends {@link #repeated} to everyone with {@code skript.admin}, as Skript's {@code adminBroadcast}. */
+    static void broadcastRepeated(String name) {
         try {
-            Bukkit.broadcast(message, "skript.admin");
+            Bukkit.broadcast(repeated(name), "skript.admin");
         } catch (RuntimeException outsideAServer) {
-            System.err.println(message);
+            System.err.println("The script '" + name + "' infinitely (or excessively) repeated itself!");
         }
     }
 }

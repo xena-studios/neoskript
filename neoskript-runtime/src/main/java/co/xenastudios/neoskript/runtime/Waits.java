@@ -102,8 +102,11 @@ public final class Waits {
         }
         frame.owner = null;
         scheduled(context.event());
+        // The thread is let go of here: loops running on it start their time again (LongLoops).
+        LongLoops.waited();
         current.runLater(null, 0, () -> {
             delay(context.event());
+            LongLoops.waited();
             try {
                 trigger.resume(context, frame);
             } catch (ScriptRuntimeException e) {
@@ -123,8 +126,11 @@ public final class Waits {
         }
         Object owner = frame.owner != null ? frame.owner : owner(context);
         scheduled(context.event());
+        // The thread is let go of here: loops running on it start their time again (LongLoops).
+        LongLoops.waited();
         current.runLater(owner, ticks, () -> {
             delay(context.event());
+            LongLoops.waited();
             try {
                 trigger.resume(context, frame);
             } catch (ScriptRuntimeException e) {
@@ -162,8 +168,11 @@ public final class Waits {
             throw new IllegalStateException("Waiting isn't available: no scheduler is installed");
         }
         scheduled(context.event());
+        // The thread is let go of here: loops running on it start their time again (LongLoops).
+        LongLoops.waited();
         current.runLater(owner, 0, () -> {
             delay(context.event());
+            LongLoops.waited();
             try {
                 trigger.resume(context, carried);
             } catch (ScriptRuntimeException e) {

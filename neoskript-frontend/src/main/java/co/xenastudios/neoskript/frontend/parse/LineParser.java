@@ -116,7 +116,7 @@ final class LineParser {
         }
     }
 
-    /** Thrown when a line takes longer to read than {@link ParserContext#LINE_TIME_LIMIT_MILLIS}. */
+    /** Thrown when a line takes longer to read than {@link ParserContext#LINE_TIME_LIMIT_NANOS}. */
     static final class TooComplex extends RuntimeException {
         TooComplex() {
             super(TOO_COMPLEX, null, false, false);

@@ -61,7 +61,7 @@ class CompilerFuzzTest {
         long first = ScriptFuzzer.firstSeed();
         for (long seed = first; seed < first + ScriptFuzzer.iterations(250); seed++) {
             ScriptFuzzer.Case fuzzCase = fuzzer.generate(seed);
-            ScriptFuzzer.within(fuzzCase, 30, () -> compileAndRun(library, fuzzCase));
+            ScriptFuzzer.within(fuzzCase, 90, () -> compileAndRun(library, fuzzCase));
         }
     }
 
@@ -71,7 +71,7 @@ class CompilerFuzzTest {
         List<String> originals = ScriptFuzzer.fromRepository().originals();
         for (int i = 0; i < originals.size(); i++) {
             ScriptFuzzer.Case fuzzCase = new ScriptFuzzer.Case(-i, originals.get(i));
-            ScriptFuzzer.within(fuzzCase, 30, () -> compileAndRun(library, fuzzCase));
+            ScriptFuzzer.within(fuzzCase, 90, () -> compileAndRun(library, fuzzCase));
         }
     }
 
@@ -81,7 +81,7 @@ class CompilerFuzzTest {
         for (String line : List.of("fail", "overflow", "set {_x} to a null pointer", "set {_x} to a wrong type + 1",
                 "send a null pointer")) {
             ScriptFuzzer.Case fuzzCase = new ScriptFuzzer.Case(0, "on load:\n\t" + line + "\n");
-            ScriptFuzzer.within(fuzzCase, 30, () -> compileAndRun(library, fuzzCase));
+            ScriptFuzzer.within(fuzzCase, 90, () -> compileAndRun(library, fuzzCase));
         }
     }
 

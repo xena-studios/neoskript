@@ -727,9 +727,21 @@ final class TriggerCompiler {
         method.visitVarInsn(ALOAD, EXCEPTION_SLOT);
         method.visitLdcInsn(scriptName);
         method.visitVarInsn(ILOAD, LINE_SLOT);
-        method.visitMethodInsn(INVOKESTATIC, exception, "at",
+        method.visitMethodInsn(INVOKESTATIC, exception, trigger ? "at" : "inFunction",
                 "(Ljava/lang/Throwable;Ljava/lang/String;I)L" + exception + ";", false);
-        method.visitInsn(ATHROW);
+        if (!trigger) {
+            // A function whose call ran out of stack returns nothing, as Skript's: the caller carries on.
+            Label stopped = new Label();
+            method.visitInsn(DUP);
+            method.visitJumpInsn(IFNULL, stopped);
+            method.visitInsn(ATHROW);
+            method.visitLabel(stopped);
+            method.visitInsn(POP);
+            method.visitInsn(ACONST_NULL);
+            method.visitInsn(ARETURN);
+        } else {
+            method.visitInsn(ATHROW);
+        }
         method.visitLabel(dispatch);
         if (!trigger) {
             method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);

@@ -140,6 +140,7 @@ public final class ScriptLoader {
 
     private ParsedScript parse(ScriptParser.Result result, ParserContext context) {
         Diagnostics diagnostics = new Diagnostics(result.file());
+        context.scriptLines(result.file().lines().size());
         for (Diagnostic diagnostic : result.diagnostics()) {
             diagnostics.add(diagnostic);
         }
