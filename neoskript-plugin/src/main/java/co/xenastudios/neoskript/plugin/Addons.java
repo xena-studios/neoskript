@@ -121,12 +121,22 @@ final class Addons {
     }
 
     private void run(Addon addon, Registrar registrar) {
+        registering.accept(addon.name());
         try {
             addon.registration().accept(forAddon(addon, registrar));
             logger.info("Registered the syntax of {} {}", addon.name(), addon.version());
         } catch (RuntimeException | LinkageError e) {
             logger.error("{} {} couldn't register all of its syntax", addon.name(), addon.version(), e);
+        } finally {
+            registering.accept(null);
         }
+    }
+
+    /** Told which addon is registering, and {@code null} after it, so the syntax export can name it. */
+    private java.util.function.Consumer<String> registering = name -> {};
+
+    void registeringWith(java.util.function.Consumer<String> registering) {
+        this.registering = registering;
     }
 
     /**

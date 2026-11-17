@@ -119,8 +119,10 @@ public final class Library implements Registrar {
     @Override
     public void type(String id, String name, Class<?> javaClass) {
         checkOpen();
+        boolean known = javaClasses.containsKey(id);
         builder.type(new TypeInfo(id, name, Set.of(), false));
         putJavaClass(id, javaClass);
+        credit("type:" + id, known);
         co.xenastudios.neoskript.runtime.TypeNames.register(javaClass, name);
         if (STRICT_TYPES.contains(id)) {
             builder.strict(id);
@@ -136,7 +138,9 @@ public final class Library implements Registrar {
     @Override
     public <T> void namedType(String id, String name, Class<T> javaClass, Map<String, ? extends T> values) {
         checkOpen();
+        boolean known = javaClasses.containsKey(id);
         builder.type(new TypeInfo(id, name, values.keySet(), false));
+        credit("type:" + id, known);
         if (STRICT_TYPES.contains(id)) {
             builder.strict(id);
         }
@@ -892,12 +896,14 @@ public final class Library implements Registrar {
     public void function(String name, List<Parameter> parameters, String returnType, boolean returnsPlural,
             Function function) {
         checkOpen();
+        boolean known = functionDefaults.keySet().stream().anyMatch(f -> f.name().equalsIgnoreCase(name));
         FunctionInfo info = new FunctionInfo(name, parameters.stream()
                 .map(p -> new FunctionInfo.Parameter(p.name(), p.type(), p.plural(), p.optional()))
                 .toList(), returnType, returnsPlural);
         functionDefaults.put(info, parameters.stream().map(Parameter::defaultValue).toList());
         builder.function(info);
         functions.put(info, function);
+        credit("function:" + name, known);
     }
 
     /** The types Skript can't save in variables, by id, with their names as its warning writes them. */
@@ -1120,6 +1126,30 @@ public final class Library implements Registrar {
         add(kind, id, returnType, new Core(id), regexRoles, patterns);
     }
 
+    /** The addon registering now, whose name the syntax export gives what it registers, or {@code null}. */
+    private volatile String registering;
+    /** Which addon registered each element ({@code kind:id}), type ({@code type:id}) and function. */
+    private final Map<String, String> addonOf = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Says that what's registered from now on is addon {@code name}'s, for the syntax export, until it's called
+     * with {@code null}.
+     */
+    public void registeringAddon(String name) {
+        registering = name;
+    }
+
+    /**
+     * Credits what's just been registered as {@code key} to the addon registering, unless it was there already
+     * ({@code known}): an addon registering NeoSkript's own type again doesn't make it the addon's.
+     */
+    private void credit(String key, boolean known) {
+        String addon = registering;
+        if (addon != null && !known) {
+            addonOf.putIfAbsent(key, addon);
+        }
+    }
+
     private void add(SyntaxKind kind, String id, String returnType, Object binding, String... patterns) {
         add(kind, id, returnType, binding, List.of(), patterns);
     }
@@ -1130,6 +1160,7 @@ public final class Library implements Registrar {
         if (bindings.putIfAbsent(new Key(kind, id), binding) != null) {
             throw new IllegalArgumentException("Duplicate " + kind.name().toLowerCase() + " id: " + id);
         }
+        credit(kind + ":" + id, false);
         builder.syntax(new SyntaxInfo(kind, id, Arrays.stream(patterns).map(PatternCompiler::compile).toList(),
                 returnType, regexRoles));
     }
@@ -1211,7 +1242,7 @@ public final class Library implements Registrar {
                         syntax.patterns().stream().map(CompiledPattern::source)
                                 .toList(),
                         kind == SyntaxKind.EXPRESSION ? syntax.returnType() : null, name, values,
-                        elementParser(registry, events, syntax, scopeIndex)));
+                        elementParser(registry, events, syntax, scopeIndex), addonOf.get(kind + ":" + syntax.id())));
             }
         }
         List<TypeInfo> types = new ArrayList<>();
@@ -1239,13 +1270,14 @@ public final class Library implements Registrar {
                                                 && registry.parses(t, word)),
                                 takesAnyWords(word -> registry.parses(t, word)),
                                 !t.openLiterals() || takesAnyWords(word -> registry.isLiteral(t, word)) ? List.of()
-                                        : acceptedWords(literalWords, t, word -> registry.isLiteral(t, word)))))
+                                        : acceptedWords(literalWords, t, word -> registry.isLiteral(t, word))),
+                        addonOf.get("type:" + t.id())))
                 .toList();
         List<SyntaxExport.Function> functionList = functions.keySet().stream()
                 .sorted(java.util.Comparator.comparing(FunctionInfo::name)
                         .thenComparingInt(f -> f.parameters().size()))
                 .map(f -> new SyntaxExport.Function(f.name(), f.parameters(),
-                        f.returnType(), f.returnsPlural()))
+                        f.returnType(), f.returnsPlural(), addonOf.get("function:" + f.name())))
                 .toList();
         List<SyntaxExport.Conversion> conversions = new ArrayList<>();
         new java.util.TreeMap<>(registry.conversions()).forEach((from, targets) -> targets.stream().sorted()

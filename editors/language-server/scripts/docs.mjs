@@ -65,7 +65,7 @@ for (const e of syntax.elements) {
     kind: e.kind,
     name: e.name,
     url: `${SITE}/syntax/${PLURAL[e.kind]}/#${e.slug}`,
-    description: e.description.map(markdown).join("\n\n"),
+    description: [...(e.addon ? [`*From the ${e.addon} addon.*`] : []), ...e.description.map(markdown)].join("\n\n"),
     example: e.examples[0] ?? null,
     patterns: e.patterns,
     since: e.since[0] ?? null,
@@ -87,7 +87,7 @@ for (const f of syntax.functions) {
     signature: `${f.name}(${params})${f.returns ? ` :: ${f.returns.plural ? f.returns.name + "s" : f.returns.name}` : ""}`,
     parameters: f.parameters.map((p) => p.name),
     url: `${SITE}/syntax/functions/#${f.slug}`,
-    description: f.description.map(markdown).join("\n\n"),
+    description: [...(f.addon ? [`*From the ${f.addon} addon.*`] : []), ...f.description.map(markdown)].join("\n\n"),
     example: f.examples[0] ?? null,
   };
 }

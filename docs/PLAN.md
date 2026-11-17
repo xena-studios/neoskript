@@ -35,6 +35,7 @@ A fast, modern, **clean-room** replacement for Skript. Existing `.sk` scripts ru
 | D18 | Where the Skript baseline runs | Paper 26.x only. Skript doesn't support Folia, and Skript 2.17.0 needs 1.21.5 or newer. NeoSkript-only checks run on all four servers. | |
 | D19 | Moving over from Skript | NeoSkript uses `plugins/NeoSkript`. On its first start it copies `scripts/` and `variables.csv` from `plugins/Skript`, then leaves a marker so it never copies again. It copies rather than moves, so Skript's folder stays as it was. Skript's `config.sk` isn't copied. | Swapping the jar just works, and switching back is safe. |
 | D20 | Database storage | Deferred to 1.x. Skript 2.17 itself only supports `CSV` and `disabled` out of the box (its SQLite and MySQL storage needs the abandoned SQLibrary plugin), so `variables.csv` is what servers actually use. | M3 matches Skript's CSV byte for byte instead of spreading thin. |
+| D21 | Official addons next to the originals | An official addon finds the community addon it replaces in `plugins/` by its plugin name. If that addon's jar is there but can't run (it needs Skript, D10), ours loads and says to remove the jar. If it is loaded (only possible through the 1.x compat shim), ours doesn't load, and says to remove one. The shim should skip a community addon an installed official one replaces. | Never two plugins registering the same syntax, a clear message instead of a silent clash, and switching from Skript stays a jar swap. Decided 2026-11-16 ([addons/README.md](../addons/README.md)). |
 
 ## 3. Architecture
 
@@ -50,6 +51,7 @@ neoskript-plugin       Bootstrap, /sk commands, config, reload, metrics
 neoskript-cli          Offline migration/diagnostic tool (frontend + syntax registry, no server)
 neoskript-lsp          Language server (1.x)
 neoskript-compat       ch.njol.skript.* shim for Skript addons (1.x)
+addons/*               Official addons (neoskript-db, ...), released with NeoSkript; see addons/README.md
 test-harness           Headless Paper/Folia servers, differential runner, corpus, JMH + server benchmarks
 ```
 

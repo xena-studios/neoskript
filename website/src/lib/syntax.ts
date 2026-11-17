@@ -18,6 +18,8 @@ export type Element = {
   since: string[];
   requirements: string[];
   deprecated: boolean;
+  /** The official addon it comes with, or absent for NeoSkript's own. */
+  addon?: string;
 };
 export type Type = {
   id: string;
@@ -31,6 +33,7 @@ export type Type = {
   description: string[];
   examples: string[];
   since: string[];
+  addon?: string;
 };
 export type Fn = {
   name: string;
@@ -41,6 +44,7 @@ export type Fn = {
   description: string[];
   examples: string[];
   since: string[];
+  addon?: string;
 };
 
 export const syntax = data as unknown as {

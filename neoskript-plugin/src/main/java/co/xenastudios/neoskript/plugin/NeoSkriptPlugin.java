@@ -102,6 +102,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         addons.frozenWhen(library::frozen);
         addons.knownWhen(library::known);
         addons.savedWhen(library::saves);
+        addons.registeringWith(library::registeringAddon);
         // With addons, which enable after NeoSkript, the syntax is registered on the first tick, theirs with it, and
         // variables load after that, so the addons' types load too. Without them, nothing waits.
         boolean deferSyntax = Addons.anyInstalled(this) && !co.xenastudios.neoskript.plugin.check.CheckMode.requested();

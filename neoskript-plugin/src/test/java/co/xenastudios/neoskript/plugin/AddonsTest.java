@@ -37,6 +37,20 @@ class AddonsTest {
     }
 
     @Test
+    void theSyntaxExportIsToldWhichAddonIsRegistering() {
+        Addons addons = new Addons(NOPLogger.NOP_LOGGER);
+        List<String> told = new ArrayList<>();
+        addons.registeringWith(name -> told.add(String.valueOf(name)));
+        addons.add("Lottery", "1.0", registrar -> told.add("registers"));
+        addons.add("Broken", "1.0", registrar -> {
+            throw new IllegalStateException("broken");
+        });
+        addons.registerAll(REGISTRAR);
+        // Ended even when the registration fails, so what's registered after it isn't named for it.
+        assertEquals(List.of("Lottery", "registers", "null", "Broken", "null"), told);
+    }
+
+    @Test
     void oneThatThrowsDoesntStopTheOthers() {
         Addons addons = new Addons(NOPLogger.NOP_LOGGER);
         List<String> ran = new ArrayList<>();

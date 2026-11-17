@@ -18,7 +18,7 @@
 // registers but never documents, and for NeoSkript's own syntax. Skript's docs are GPL-3.0-or-later, used here
 // under v3.
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const reports = process.argv[2] ?? fileURLToPath(new URL("../../test-harness/build/harness/reports/paper-26.3", import.meta.url));
@@ -30,6 +30,14 @@ const neo = JSON.parse(exportText);
 const skript = JSON.parse(await readFile(`${reports}/skript-docs.json`, "utf8"));
 if (neo.format !== 2) throw new Error(`Unknown syntax export format ${neo.format}`);
 const extra = JSON.parse(await readFile(fileURLToPath(new URL("./syntax-extra.json", import.meta.url)), "utf8"));
+// The official addons' docs, from each one's syntax-docs.json in ../addons, written as syntax-extra.json's are:
+// their elements, types and functions are NeoSkript's own, so Skript's docs don't have them.
+const addonsDir = fileURLToPath(new URL("../../addons/", import.meta.url));
+for (const dir of await readdir(addonsDir, { withFileTypes: true }).catch(() => [])) {
+  if (!dir.isDirectory()) continue;
+  const docs = await readFile(`${addonsDir}${dir.name}/syntax-docs.json`, "utf8").then(JSON.parse, () => null);
+  for (const part of ["elements", "types", "functions"]) Object.assign(extra.written[part], docs?.[part] ?? {});
+}
 // Docs written here look like Skript's entries.
 const written = (id, w) => (w ? { id, name: w.name, description: w.description, examples: w.examples, since: w.since ?? [] } : null);
 
@@ -261,6 +269,7 @@ const elements = joined.map(({ el, d, slug }) => ({
   since: since(d?.since),
   requirements: d?.requirements ?? [],
   deprecated: Boolean(d?.deprecated),
+  ...(el.addon ? { addon: el.addon } : {}),
 }));
 elements.sort((a, b) => KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) || a.name.localeCompare(b.name, "en") || a.id.localeCompare(b.id));
 
@@ -284,6 +293,7 @@ const typeList = neo.types
       description: paragraphs(d?.description).map(html),
       examples: examples(d?.examples),
       since: since(d?.since),
+      ...(t.addon ? { addon: t.addon } : {}),
     };
   })
   .sort((a, b) => a.name.localeCompare(b.name, "en"));
@@ -311,6 +321,7 @@ const functionList = neo.functions.map((f) => {
     description: paragraphs(d?.description).map(html),
     examples: examples(d?.examples),
     since: since(d?.since),
+    ...(f.addon ? { addon: f.addon } : {}),
   };
 });
 
