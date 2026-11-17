@@ -1,0 +1,19 @@
+# Harness check: NeoSkriptProxy's own syntax, between two NeoSkript servers (b and c). Lines print "[neotest] ...".
+on network message on channel "events":
+	send "[neotest] got %network message% from %network sender% on %network channel%" to console
+
+command /neotest:
+	trigger:
+		set {_servers::*} to the network servers
+		send "[neotest] servers %{_servers::*}%" to console
+		send "[neotest] count %network player count% on b %network player count of server "b"%" to console
+		send "[neotest] Bob is on %network server of offlineplayer("Bob")%, nobody on %network server of offlineplayer("Nobody")%" to console
+		send "[neotest] this is %this server's network name%" to console
+		send network message "hello" on channel "events" to all servers
+		send "[neotest] sent" to console
+
+command /neoquiet:
+	trigger:
+		send network message "waited" on channel "events" to all servers
+		set {_servers::*} to the network servers
+		send "[neotest] asked with nobody online: %size of {_servers::*}%" to console

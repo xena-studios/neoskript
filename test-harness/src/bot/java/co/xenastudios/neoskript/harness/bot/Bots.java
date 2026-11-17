@@ -156,6 +156,12 @@ final class Bots implements Listener {
             join(sender, name);
             return true;
         }
+        if (action.equals("connect")) {
+            // 'bot connect <name> <port> [host]': as a client over a socket, as through a proxy.
+            String[] where = rest.split(" ");
+            connect(sender, name, Integer.parseInt(where[0]), where.length > 1 ? where[1] : "localhost");
+            return true;
+        }
         Bot bot = bots.get(key(name));
         if (bot == null) {
             sender.sendMessage("[bot] No bot named " + name);
@@ -230,6 +236,46 @@ final class Bots implements Listener {
                 .handler(bot)
                 .connect(serverChannel.localAddress());
         bot.attach(connect.channel());
+    }
+
+    /** The event loops of bots connected over sockets, made when the first connects. */
+    private EventLoopGroupHolder network;
+
+    private synchronized EventLoopGroupHolder network() {
+        if (network == null) {
+            network = EventLoopGroupHolder.remote(false);
+        }
+        return network;
+    }
+
+    /** A bot that connects over a socket to {@code port} (a proxy), saying it's for {@code host}. */
+    private void connect(CommandSender sender, String name, int port, String host) {
+        EventLoopGroupHolder group = network();
+        java.util.concurrent.atomic.AtomicReference<Bot> made = new java.util.concurrent.atomic.AtomicReference<>();
+        ChannelFuture connect = new Bootstrap()
+                .group(group.eventLoopGroup())
+                .channel(group.channelCls())
+                .handler(new ChannelInitializer<>() {
+                    @Override
+                    protected void initChannel(Channel channel) {
+                        NetworkWire.install(channel, wire -> {
+                            Bot bot = new Bot(name, host, port, wire, closed -> bots.remove(key(name), closed));
+                            made.set(bot);
+                            return bot;
+                        });
+                    }
+                })
+                .connect(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
+        connect.addListener(done -> {
+            Bot bot = made.get();
+            if (!done.isSuccess() || bot == null) {
+                LOG.warning("[bot] " + name + " couldn't connect to port " + port + ": " + done.cause());
+                return;
+            }
+            bot.attach(connect.channel());
+            bots.put(key(name), bot);
+            names.add(key(name));
+        });
     }
 
     /** Runs {@code action} on the player's thread: its region's on Folia, the main thread on Paper. */
