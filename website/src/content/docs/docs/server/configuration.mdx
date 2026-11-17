@@ -50,7 +50,7 @@ Script problems at startup and runtime errors keep Skript's look, since tools an
 
 `metrics`, `variables.file`, `variables.storage`, `variables.recover` and the `events` settings apply when the server restarts. The reload says so when one of them changed.
 
-`aliases.load-defaults` applies on `/sk reload aliases` (after `/sk reload config`), on `/sk reload all`, or on restart.
+`aliases.load-defaults` applies on `/sk reload aliases`, which reads it from `config.yml` itself, on `/sk reload all`, or on restart.
 
 ## config-version
 
@@ -193,7 +193,7 @@ aliases:
   # Load Skript's default aliases, as Skript's 'load default aliases' in config.sk. Off, items are only named
   # after their Minecraft ids (red dye) and by the alias files in plugins/NeoSkript/aliases, so some, like
   # potions of each kind, have no names. Moving over from Skript copies its setting. Applies on
-  # /sk reload aliases.
+  # /sk reload aliases (which reads it from this file), /sk reload all or restart.
   load-defaults: true
 
 variables:

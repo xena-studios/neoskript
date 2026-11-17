@@ -25,7 +25,8 @@ import java.util.stream.Stream;
  *
  * <p>With {@code -Dneoskript.check.aliases=<folder>}, the alias files there are read first, as the plugin reads
  * {@code plugins/NeoSkript/aliases}, and with {@code -Dneoskript.check.defaultAliases=false} Skript's default aliases
- * aren't, as Skript's {@code load default aliases: false}. Their problems go in the report's {@code aliases}.
+ * aren't, as Skript's {@code load default aliases: false}. With {@code -Dneoskript.check.dataFolder=<folder>}, an
+ * {@code aliases-english.zip} there replaces the default aliases, as in the plugin's folder. Their problems go in the report's {@code aliases}.
  */
 public final class CheckMode {
 
@@ -33,6 +34,7 @@ public final class CheckMode {
     private static final String REPORT = "neoskript.check.report";
     private static final String ALIASES = "neoskript.check.aliases";
     private static final String DEFAULT_ALIASES = "neoskript.check.defaultAliases";
+    private static final String DATA_FOLDER = "neoskript.check.dataFolder";
 
     private CheckMode() {}
 
@@ -48,7 +50,8 @@ public final class CheckMode {
         List<Map<String, Object>> aliasProblems = new ArrayList<>();
         String aliases = System.getProperty(ALIASES);
         co.xenastudios.neoskript.paper.GlobalAliases.Loaded loaded = co.xenastudios.neoskript.paper.GlobalAliases.load(
-                aliases == null || aliases.isBlank() ? null : Path.of(aliases), null,
+                aliases == null || aliases.isBlank() ? null : Path.of(aliases),
+                System.getProperty(DATA_FOLDER) == null ? null : Path.of(System.getProperty(DATA_FOLDER)),
                 !"false".equalsIgnoreCase(System.getProperty(DEFAULT_ALIASES)));
         loaded.problems((problem, file) -> {
             Map<String, Object> entry = new LinkedHashMap<>();

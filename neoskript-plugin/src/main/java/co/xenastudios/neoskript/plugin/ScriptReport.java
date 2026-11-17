@@ -57,6 +57,10 @@ final class ScriptReport implements BiConsumer<Diagnostic, SourceFile> {
         if (file != null && problem.line() >= 1 && problem.line() <= file.lines().size()) {
             code = file.lines().get(problem.line() - 1).strip();
         }
+        add(problem, code);
+    }
+
+    private void add(Diagnostic problem, String code) {
         byScript.computeIfAbsent(problem.file(), script -> new ArrayList<>()).add(new Problem(problem, code));
         if (problem.severity() == Severity.ERROR) {
             errors++;
@@ -66,12 +70,12 @@ final class ScriptReport implements BiConsumer<Diagnostic, SourceFile> {
     }
 
     /** Takes the problems of alias files, listed as {@code aliases/<file>}, with {@code /sk reload aliases} to click. */
-    BiConsumer<Diagnostic, SourceFile> aliases() {
-        return (problem, file) -> {
+    BiConsumer<Diagnostic, String> aliases() {
+        return (problem, code) -> {
             String name = "aliases/" + problem.file();
             aliasFiles.add(name);
-            accept(new Diagnostic(problem.severity(), name, problem.line(), problem.column(), problem.length(),
-                    problem.message()), file);
+            add(new Diagnostic(problem.severity(), name, problem.line(), problem.column(), problem.length(),
+                    problem.message()), code);
         };
     }
 

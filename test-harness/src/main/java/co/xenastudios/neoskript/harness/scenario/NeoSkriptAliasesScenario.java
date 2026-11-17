@@ -171,6 +171,21 @@ public final class NeoSkriptAliasesScenario implements Scenario {
             	set {_item} to jade
             	send "[aliases] jade script loaded: %{_item}%" to console
             """;
+    /** Mentions topaz, but never as an item: a change to topaz doesn't reload it. */
+    private static final String MENTIONS_TOPAZ = """
+            # topaz is the shop's gem
+            on load:
+            	set {topaz} to "topaz"
+            	send "[aliases] mentions script loaded" to console
+            """;
+    /** Names topaz through an option, which only the loaded script shows. */
+    private static final String OPTION_TOPAZ = """
+            options:
+            	gem: topaz
+            on load:
+            	set {_item} to {@gem}
+            	send "[aliases] option script loaded: %{_item}%" to console
+            """;
     private static final String PLAIN = """
             on load:
             	send "[aliases] plain script loaded" to console
@@ -181,11 +196,14 @@ public final class NeoSkriptAliasesScenario implements Scenario {
                 "plugins/NeoSkript")
                 .file("plugins/NeoSkript/scripts/uses-topaz.sk", USES_TOPAZ)
                 .file("plugins/NeoSkript/scripts/needs-jade.sk", NEEDS_JADE)
-                .file("plugins/NeoSkript/scripts/plain.sk", PLAIN);
+                .file("plugins/NeoSkript/scripts/plain.sk", PLAIN)
+                .file("plugins/NeoSkript/scripts/mentions-topaz.sk", MENTIONS_TOPAZ)
+                .file("plugins/NeoSkript/scripts/option-topaz.sk", OPTION_TOPAZ);
         Path aliases = builder.runDir().resolve("plugins/NeoSkript/aliases");
         try (ServerProcess server = builder.start()) {
             server.await(PROBE_DONE, WAIT);
             server.await(line("[aliases] topaz script loaded: topaz"), WAIT);
+            server.await(line("[aliases] option script loaded: topaz"), WAIT);
             Result result = result(server);
             if (!server.linesMatching(line("[aliases] jade script loaded")).isEmpty()) {
                 throw new HarnessFailure("A script using an alias no file defines loaded. See " + server.logFile());
@@ -219,6 +237,7 @@ public final class NeoSkriptAliasesScenario implements Scenario {
             server.await(Pattern.compile(Pattern.quote("[NeoSkript] Reloaded the aliases and 1 script with ")
                     + "\\d+ errors? and \\d+ warnings? in \\d+ ms\\..*$"), mark, WAIT);
             if (server.lines(mark).stream().anyMatch(each -> each.contains("[aliases] plain script loaded")
+                    || each.contains("[aliases] mentions script loaded")
                     || each.contains("[aliases] topaz script loaded"))) {
                 throw new HarnessFailure("/sk reload aliases reloaded a script that doesn't use the changed aliases. See "
                         + server.logFile());
@@ -234,9 +253,16 @@ public final class NeoSkriptAliasesScenario implements Scenario {
             mark = server.mark();
             server.command("sk reload aliases");
             server.await(Pattern.compile(" uses-topaz\\.sk - 2 errors$"), mark, WAIT);
-            // The probe script mentions topaz too, so it's reloaded with it.
+            // Exactly the scripts whose items used topaz: the one that names it and the one with it in an option. The
+            // probe script only reads it from text, and another script only mentions it.
+            server.await(Pattern.compile(" option-topaz\\.sk - 1 error$"), mark, WAIT);
             server.await(Pattern.compile(Pattern.quote("[NeoSkript] Reloaded the aliases and 2 scripts with ") + ".* in \\d+"
                     + Pattern.quote(" ms. Scripts with errors keep their last version.") + "$"), mark, WAIT);
+            if (server.lines(mark).stream().anyMatch(each -> each.contains("[aliases] mentions script loaded")
+                    || each.contains("[aliasprobe] done"))) {
+                throw new HarnessFailure("/sk reload aliases reloaded a script that only mentions topaz. See "
+                        + server.logFile());
+            }
             mark = server.mark();
             server.command("topazcheck");
             // Its last version still runs. The gold ingot it makes is called by its own name now, as no alias names it.
@@ -248,8 +274,8 @@ public final class NeoSkriptAliasesScenario implements Scenario {
             if (!text.contains("  load-defaults: true")) {
                 throw new HarnessFailure("config.yml doesn't have aliases.load-defaults:\n" + text);
             }
+            // /sk reload aliases reads the setting from config.yml itself: no /sk reload config first.
             Files.writeString(config, text.replace("  load-defaults: true", "  load-defaults: false"));
-            server.command("sk reload config");
             mark = server.mark();
             server.command("sk reload aliases");
             server.await(neo("Reloading the aliases..."), mark, WAIT);

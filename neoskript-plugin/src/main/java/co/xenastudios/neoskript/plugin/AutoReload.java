@@ -93,6 +93,11 @@ final class AutoReload {
         if (file != null && problem.line() >= 1 && problem.line() <= file.lines().size()) {
             code = file.lines().get(problem.line() - 1).strip();
         }
+        return describe(problem, code);
+    }
+
+    /** {@link #describe(Diagnostic, SourceFile)} with the line of code given. */
+    static String describe(Diagnostic problem, String code) {
         TextComponentParser parser = TextComponentParser.instance();
         boolean error = problem.severity() == Severity.ERROR;
         String lineInfo = error ? "<light red><bold>Line %s:<gray> (%s)<reset>\n" : "<gold><bold>Line %s:<gray> (%s)<reset>\n";

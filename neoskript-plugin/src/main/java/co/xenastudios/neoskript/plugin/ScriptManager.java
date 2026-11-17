@@ -73,6 +73,9 @@ final class ScriptManager {
 
     /** Each loaded script's {@code auto reload}, if it has one. */
     private final Map<String, AutoReload> autoReloads = new HashMap<>();
+    /** The item names each script looked up the last time the scripts were compiled. */
+    private final Map<String, Set<String>> itemNames = new HashMap<>();
+
     /** The scripts that had errors the last time they were compiled, which new aliases may fix. */
     private final Set<String> withErrors = new HashSet<>();
 
@@ -163,26 +166,24 @@ final class ScriptManager {
     }
 
     /**
-     * The scripts that a change to the aliases may change, for {@code /sk reload aliases}: those that mention one of
-     * the {@code changed} names (in lower case), and those that had errors, which the new aliases may fix. With
-     * {@code changed} {@code null}, every script ({@code null}).
+     * The scripts that a change to the aliases may change, for {@code /sk reload aliases}: those whose item names,
+     * as they looked them up when they were compiled (options put in), include one of the {@code changed} names (in
+     * lower case), and those that had errors, which the new aliases may fix. With {@code changed} {@code null},
+     * every script ({@code null}).
      */
-    synchronized Predicate<String> affectedBy(Set<String> changed) throws IOException {
+    synchronized Predicate<String> affectedBy(Set<String> changed) {
         if (changed == null) {
             return null;
         }
         Set<String> affected = new HashSet<>(withErrors);
-        if (!changed.isEmpty()) {
-            for (SourceFile file : read()) {
-                String text = file.text().toLowerCase(java.util.Locale.ENGLISH);
-                for (String name : changed) {
-                    if (text.contains(name)) {
-                        affected.add(file.name());
-                        break;
-                    }
+        itemNames.forEach((script, names) -> {
+            for (String name : names) {
+                if (changed.contains(name)) {
+                    affected.add(script);
+                    return;
                 }
             }
-        }
+        });
         return affected::contains;
     }
 
@@ -262,7 +263,15 @@ final class ScriptManager {
         CompiledScripts compiled;
         try {
             parsed = new ScriptLoader(library.registry()).load(files);
-            compiled = new ScriptCompiler(library, globals, functions).compile(parsed);
+            // Which item names each script looks up, so /sk reload aliases reloads the scripts a change affects.
+            co.xenastudios.neoskript.paper.GlobalAliases.recordUses();
+            try {
+                compiled = new ScriptCompiler(library, globals, functions).compile(parsed);
+            } finally {
+                Map<String, Set<String>> uses = co.xenastudios.neoskript.paper.GlobalAliases.recordedUses();
+                itemNames.clear();
+                uses.forEach((script, names) -> itemNames.put(script, Set.copyOf(names)));
+            }
         } catch (StackOverflowError | LinkageError e) {
             // Nothing has changed yet, so every script keeps running the version it had (D12).
             throw new IllegalStateException("Couldn't compile the scripts: " + e, e);
