@@ -566,6 +566,14 @@ final class SkriptCommand implements TabExecutor {
             }
         }
         line(sender, "Hooks", names(hooks));
+        var databases = plugin.databases();
+        if (databases.isEmpty()) {
+            line(sender, "Variables", Component.text("not loaded (see the console from when the server started)"));
+        }
+        for (var database : databases) {
+            line(sender, databases.size() == 1 ? "Variables" : "Database " + database.name(),
+                    Component.text(database.state()));
+        }
         line(sender, "Updates", updateState(sender));
         if (Messages.chat(sender)) {
             line(sender, "Links", Messages.joined(List.of(

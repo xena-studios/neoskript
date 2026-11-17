@@ -1,0 +1,22 @@
+# Harness: the reference Skript, with SQLibrary, saves these to the SQLite (or MySQL) database, db_ by pattern, and
+# one variable to its default CSV database. NeoSkript must read them from the same database.
+on load:
+	set {db_text} to "hello ✓ 日本"
+	set {db_number} to 42
+	set {db_double} to 2.5
+	set {db_bool} to true
+	set {db_timespan} to 5 minutes
+	set {db_list::1} to "a"
+	set {db_list::2} to "b"
+	set {db_list::10} to "ten"
+	set {db_loc} to location(1.5, 64, -2, world "world", 90, 10)
+	set {db_item} to diamond sword of sharpness 2 named "x"
+	set {db_items::1} to 32 cooked beef
+	set {db_items::2} to stone with lore "a"
+	set {db_vector} to vector(1, 2, 3)
+	set {db_gamemode} to creative
+	set {db_unchanged} to "skript wrote this"
+	set {db_deleted} to "neoskript deletes this"
+	set {plain} to "in the csv"
+	set {-db_memory} to 1
+	broadcast "[harness] sql written"

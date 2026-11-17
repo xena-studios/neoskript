@@ -112,7 +112,8 @@ class SkriptMigrationTest {
     void copiesAliasFilesOnceForAServerThatMovedOverBefore() throws Exception {
         Path skript = skript();
         Path neoskript = plugins.resolve("NeoSkript");
-        SkriptMigration.migrate(skript, neoskript);
+        SkriptMigration.Result first = SkriptMigration.migrate(skript, neoskript);
+        SkriptMigration.finish(neoskript, skript, first.copied());
         assertFalse(Files.exists(neoskript.resolve("aliases")));
 
         // A move from before NeoSkript read alias files left a marker without its alias line.
@@ -151,6 +152,8 @@ class SkriptMigrationTest {
         assertEquals(List.of("Kept plugins/NeoSkript/aliases/gems.sk, which was there already, rather than Skript's"),
                 result.notes());
         assertTrue(result.variablesBackup() != null, "the variables are still backed up");
+        // Once config.yml has the settings, as the plugin does.
+        SkriptMigration.finish(neoskript, skript, result.copied());
         assertTrue(Files.exists(neoskript.resolve(SkriptMigration.MARKER)), "the marker is still written");
         assertEquals(java.util.Map.of("aliases.load-defaults", Boolean.FALSE), result.settings(),
                 "the settings are still copied");
@@ -172,5 +175,135 @@ class SkriptMigrationTest {
         Files.writeString(skript.resolve("aliases/gems.sk"), "gems:\n\truby = minecraft:red_dye\n");
         assertEquals(List.of("aliases"), SkriptMigration.migrate(skript, neoskript).copied());
         assertTrue(Files.exists(neoskript.resolve("aliases/gems.sk")));
+    }
+
+    @Test
+    void copiesTheDatabasesSectionAndTheFilesItNames() throws Exception {
+        // As on a server: paths in config.sk are relative to the server's folder.
+        Path skript = plugins.resolve("plugins/Skript");
+        Files.createDirectories(skript.resolve("scripts"));
+        Files.writeString(skript.resolve("scripts/a.sk"), "on load:\n\tbroadcast \"a\"\n");
+        Files.writeString(skript.resolve("variables.csv"), "# variables\n");
+        Files.writeString(skript.resolve("variables.db"), "sqlite");
+        Files.writeString(skript.resolve("variables.db-journal"), "journal");
+        Files.writeString(skript.resolve("config.sk"), String.join("\n",
+                "language: english",
+                "databases:",
+                "\t# Skript's example.",
+                "\tdatabase 1:",
+                "\t\ttype: SQLite",
+                "\t\tpattern: db_.*",
+                "\t\tmonitor changes: false",
+                "\t\tmonitor interval: 20 seconds",
+                "\t\tfile: ./plugins/Skript/variables",
+                "\t\tbackup interval: 0",
+                "\tshared:",
+                "\t\ttype: CSV",
+                "\t\tpattern: shared_.*",
+                "\t\tfile: /srv/shared/variables.csv",
+                "\tsynced:",
+                "\t\ttype: MySQL",
+                "\t\tpattern: synced_.*",
+                "\t\thost: localhost",
+                "\t\tport: 3306",
+                "\t\tuser: root",
+                "\t\tpassword: pass ## with a hash",
+                "\t\tdatabase: skript",
+                "\tdefault:",
+                "\t\ttype: CSV",
+                "\t\tpattern: .*",
+                "\t\tfile: ./plugins/Skript/variables.csv",
+                "\t\tbackup interval: 2 hours",
+                "\t\tbackups to keep: -1",
+                "",
+                "version: 2.17.0",
+                ""));
+        Path neoskript = plugins.resolve("plugins/NeoSkript");
+        SkriptMigration.Result result = SkriptMigration.migrate(skript, neoskript);
+        assertEquals(List.of("scripts", "variables.db", "variables.csv"), result.copied());
+        assertEquals("sqlite", Files.readString(neoskript.resolve("variables.db")));
+        assertEquals("journal", Files.readString(neoskript.resolve("variables.db-journal")));
+        assertTrue(Files.exists(neoskript.resolve("variables.csv")));
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, java.util.Map<String, Object>> databases =
+                (java.util.Map<String, java.util.Map<String, Object>>) result.settings().get("databases");
+        assertEquals(List.of("database 1", "shared", "synced", "default"), List.copyOf(databases.keySet()));
+        assertEquals("variables.db", databases.get("database 1").get("file"));
+        assertEquals("20 seconds", databases.get("database 1").get("monitor-interval"));
+        assertEquals(Path.of("/srv/shared/variables.csv").toAbsolutePath().toString(), databases.get("shared").get("file"),
+                "a file outside Skript's folder is shared, so it's used where it is");
+        assertEquals("pass # with a hash", databases.get("synced").get("password"));
+        assertEquals("variables.csv", databases.get("default").get("file"));
+        assertEquals("-1", databases.get("default").get("backups-to-keep"));
+        assertTrue(Files.exists(skript.resolve("variables.db")), "Skript's files stay where they were");
+    }
+
+    @Test
+    void backupsAreExactlyWhatConfigSkSays() throws Exception {
+        // Skript's own default config keeps every backup (backups to keep: -1). A server moving over keeps that, and a
+        // database that names no backups gets none: only configs that never had a config.sk get NeoSkript's default.
+        Path skript = plugins.resolve("plugins/Skript");
+        Files.createDirectories(skript.resolve("scripts"));
+        Files.writeString(skript.resolve("variables.csv"), "# variables\n");
+        Files.writeString(skript.resolve("config.sk"), String.join("\n",
+                "databases:",
+                "\tshop:",
+                "\t\ttype: CSV",
+                "\t\tpattern: shop_.*",
+                "\t\tfile: ./plugins/Skript/shop.csv",
+                "\tdefault:",
+                "\t\ttype: CSV",
+                "\t\tpattern: .*",
+                "\t\tfile: ./plugins/Skript/variables.csv",
+                "\t\tbackup interval: 2 hours",
+                "\t\tbackups to keep: -1",
+                ""));
+        Path neoskript = plugins.resolve("plugins/NeoSkript");
+        Files.createDirectories(neoskript);
+        Path config = neoskript.resolve("config.yml");
+        // As the plugin does: the default config first, then Skript's settings set in it.
+        co.xenastudios.neoskript.plugin.config.ConfigLoader.load(NeoSkriptConfig.SPEC, config);
+        SkriptMigration.Result result = SkriptMigration.migrate(skript, neoskript);
+        assertTrue(co.xenastudios.neoskript.plugin.config.ConfigLoader.set(NeoSkriptConfig.SPEC, config,
+                result.settings()).written());
+        List<DatabaseSettings.Database> databases = co.xenastudios.neoskript.plugin.config.ConfigLoader
+                .load(NeoSkriptConfig.SPEC, config).config().databases().enabled();
+        assertEquals(List.of("shop", "default"), databases.stream().map(DatabaseSettings.Database::name).toList());
+        assertEquals(null, databases.get(0).backupInterval(), "no backup interval in config.sk: no backups");
+        assertEquals(-1, databases.get(0).backupsToKeep());
+        assertEquals(2 * 60 * 60 * 1000L, databases.get(1).backupInterval().millis());
+        assertEquals(-1, databases.get(1).backupsToKeep(), "Skript's keep-everything is kept");
+        String text = Files.readString(config);
+        assertTrue(text.matches("(?s).*backups-to-keep: ['\"]?-1['\"]?\n.*"), text);
+        assertFalse(text.contains("backups-to-keep: 12"), text);
+    }
+
+    @Test
+    void theMoveIsOnlyMarkedDoneOnceConfigYmlHasTheSettings() throws Exception {
+        Path skript = skript();
+        Path neoskript = plugins.resolve("NeoSkript");
+        SkriptMigration.migrate(skript, neoskript);
+        assertFalse(Files.exists(neoskript.resolve(SkriptMigration.MARKER)), "not before config.yml is written");
+        // config.yml couldn't be written: the next start copies the settings again, not the files.
+        Files.writeString(neoskript.resolve("scripts/a.sk"), "changed");
+        SkriptMigration.Result again = SkriptMigration.migrate(skript, neoskript);
+        assertEquals(List.of(), again.copied());
+        assertEquals("changed", Files.readString(neoskript.resolve("scripts/a.sk")));
+        SkriptMigration.finish(neoskript, skript, again.copied());
+        assertTrue(Files.exists(neoskript.resolve(SkriptMigration.MARKER)));
+        assertFalse(Files.exists(neoskript.resolve(SkriptMigration.STARTED)));
+    }
+
+    @Test
+    void aServerThatMovedBeforeHearsOnceAboutSkriptsSqlDatabases() throws Exception {
+        Path skript = skript();
+        Files.writeString(skript.resolve("config.sk"), "databases:\n\tsynced:\n\t\ttype: MySQL\n\t\tpattern: s_.*\n"
+                + "\tdefault:\n\t\ttype: CSV\n\t\tpattern: .*\n");
+        Path neoskript = plugins.resolve("NeoSkript");
+        Files.createDirectories(neoskript);
+        Files.writeString(neoskript.resolve(SkriptMigration.MARKER), "moved by an older NeoSkript\n");
+        String notice = SkriptMigration.databasesNotice(skript, neoskript, false);
+        assertTrue(notice != null && notice.contains("synced (mysql)"), notice);
+        assertEquals(null, SkriptMigration.databasesNotice(skript, neoskript, false), "only once");
     }
 }

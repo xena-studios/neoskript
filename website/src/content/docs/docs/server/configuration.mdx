@@ -48,7 +48,7 @@ Script problems at startup and runtime errors keep Skript's look, since tools an
 - the `runtime-errors` limits;
 - `effect-commands`.
 
-`metrics`, `variables.file`, `variables.storage`, `variables.recover` and the `events` settings apply when the server restarts. The reload says so when one of them changed.
+`metrics`, `databases`, `variables.recover` and the `events` settings apply when the server restarts. The reload says so when one of them changed.
 
 `aliases.load-defaults` applies on `/sk reload aliases`, which reads it from `config.yml` itself, on `/sk reload all`, or on restart.
 
@@ -56,7 +56,7 @@ Script problems at startup and runtime errors keep Skript's look, since tools an
 
 | Setting | Default | What it does |
 |---|---|---|
-| `config-version` | `2` | Managed by NeoSkript, to carry your settings forward on updates. Don't edit it. |
+| `config-version` | `3` | Managed by NeoSkript, to carry your settings forward on updates. Don't edit it. |
 
 See [updating NeoSkript](#updating-neoskript).
 
@@ -88,13 +88,39 @@ Moving over from Skript copies Skript's `load default aliases`. See [custom alia
 
 | Setting | Default | What it does |
 |---|---|---|
-| `variables.file` | `variables.csv` | Where global variables are saved, relative to `plugins/NeoSkript`. The file is in Skript's format. Applies on restart. |
-| `variables.storage` | `csv` | `csv` saves to `variables.file` in Skript's format. `native` saves to NeoSkript's own `variables.nsv` beside it: faster to load, saves only what changed, crash-safe. Switching moves the variables over at the next start, after a backup. See [native storage](/docs/server/variables/#native-storage). Applies on restart. |
 | `variables.recover` | `false` | Native storage only: a one-shot recovery of a damaged `variables.nsv` that no snapshot can repair. Loads everything up to the last good save, turns itself off first, keeping the file's comments, then backs the damaged file up and lists what's lost. If config.yml can't be changed (read-only, or from a newer NeoSkript), it isn't used, and the console says so. Works with either storage. Applies on restart, and only does anything when the file is damaged. |
-| `variables.save-interval` | `5 minutes` | How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops. |
+| `variables.save-interval` | `5 minutes` | How often changed variables are saved to `csv` and `native` databases, at least every 10 seconds. They're also saved when the server stops. SQL databases write changes within a second or so. |
 | `variables.player-uuids-in-names` | `true` | Whether a player in a variable's name, as in `{money::%player%}`, is their UUID (`true`) or their name. Skript's `use player UUIDs in variable names`. |
 
 Moving over from Skript copies Skript's `use player UUIDs in variable names` setting into `player-uuids-in-names`, so the variables Skript saved are found. See [variables and storage](/docs/server/variables/).
+
+## databases
+
+Where global variables are saved: Skript's `databases:` section from `config.sk`, with the same options. Each variable is saved in the first database, from the top, whose `pattern` matches its whole name. The default is one CSV database, `default`, for everything, backed up every 2 hours with the newest 12 kept. A server that moved from Skript gets its `config.sk` section instead, copied as is, backups included: with Skript's default config that's every 2 hours, keeping every backup. Applies on restart. See [databases](/docs/server/variables/#databases) for examples, sharing variables between servers, and what happens when a database is down.
+
+```yaml
+databases:
+  default:
+    type: "csv"
+    pattern: ".*"
+    file: "variables.csv"
+    backup-interval: "2 hours"
+    backups-to-keep: 12
+```
+
+| Setting | Default | What it does |
+|---|---|---|
+| `type` | | `csv` (Skript's `variables.csv`), `native` (NeoSkript's own [native storage](/docs/server/variables/#native-storage), in `variables.nsv` beside `file`), `sqlite`, `mysql`, or `disabled`. Skript's `file` and `flatfile` mean `csv`, and `none` means `disabled`. |
+| `pattern` | | A [regular expression](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html) the variable's whole name must match, such as `db_.*`. `.*` matches everything. |
+| `file` | | `csv`, `native` and `sqlite`: the file, relative to `plugins/NeoSkript`, or a full path. An SQLite file always ends in `.db`, as in Skript. |
+| `backup-interval` | `0` | `csv`, `native` and `sqlite`: how often the file is copied to `backups/`. `0` for never. Left out, there are none, as when Skript's `config.sk` doesn't say. |
+| `backups-to-keep` | `-1` | How many of the file's backups to keep, the oldest removed first. `-1` keeps them all; `0` makes none and removes the file's old ones, as in Skript. |
+| `monitor-changes` | `false` | `sqlite` and `mysql`: read other servers' changes from the database every `monitor-interval`, for servers that share it. |
+| `monitor-interval` | `20 seconds` | How often, at least every second. |
+| `host`, `port`, `user`, `password`, `database` | | `mysql`: where the database is. The password is never shown in the console or `/sk info`. |
+| `table` | `variables21` | `sqlite` and `mysql`: the table, Skript's by default. |
+
+Keys can be written as in `config.sk` too (`monitor changes`, `backup interval`), so a section can be pasted from Skript. A database whose settings can't be used, such as a missing `file`, an unknown `type`, or a file or MySQL table another database already uses, isn't used, and the console says why; it still owns its pattern, so its variables aren't saved in another database by mistake.
 
 ## events
 
@@ -134,7 +160,7 @@ These commands can do anything, so give the permission carefully. See [effect co
 
 ## Moving from Skript
 
-The first start copies Skript's settings for effect commands, `use player UUIDs in variable names` and `load default aliases` from `config.sk`. Skript's other `config.sk` settings aren't copied: NeoSkript's behaviour matches Skript's defaults for them. See [moving from Skript](/docs/moving-from-skript/).
+The first start copies Skript's settings for effect commands, `use player UUIDs in variable names`, `load default aliases` and the `databases:` section from `config.sk`, with the files the databases name. Skript's other `config.sk` settings aren't copied: NeoSkript's behaviour matches Skript's defaults for them. See [moving from Skript](/docs/moving-from-skript/).
 
 ## Updating NeoSkript
 
@@ -146,7 +172,7 @@ When the layout changes, `config-version` goes up:
 - The new one keeps every value you set, and any keys that aren't NeoSkript's settings.
 - Your comments on NeoSkript's settings are replaced by its own; the backup has them.
 
-Files without `config-version` or a `theme` are version 1, from NeoSkript 0.1.0-beta.1, and are carried forward the same way, backed up as `config.yml.bak-v1`. Every setting keeps its meaning, with two on purpose: `metrics: "false"` in quotes now turns bStats off, and a negative runtime error limit falls back to its default.
+Files without `config-version` or a `theme` are version 1, from NeoSkript 0.1.0-beta.1, and are carried forward the same way, backed up as `config.yml.bak-v1`. Version 3 moved `variables.file` and `variables.storage` into the `databases` section, as the `default` database's `file` and `type`, backed up every 2 hours with the newest 12 kept. Every setting keeps its meaning, with two on purpose: `metrics: "false"` in quotes now turns bStats off, and a negative runtime error limit falls back to its default.
 
 A file from a newer NeoSkript is never written.
 
@@ -163,7 +189,7 @@ The update checker and bStats can both be turned off: see [updates and bStats](/
 # restart. A bad value falls back to its default, with a warning in the console.
 
 # Managed by NeoSkript, to carry your settings forward on updates. Don't edit it.
-config-version: 2
+config-version: 3
 
 # The look of NeoSkript's messages: /sk, reload reports and update notices. They use these as tags, so
 # changing a colour here restyles them all. Write a style as MiniMessage tags: <gray>, <#FF4D9D>, or
@@ -197,25 +223,31 @@ aliases:
   load-defaults: true
 
 variables:
-  # Where global variables are saved, in Skript's variables.csv format (Skript can read it too).
-  # Relative to plugins/NeoSkript. Variables whose names start with - aren't saved. Applies on restart.
-  file: "variables.csv"
-  # csv saves to the file above, as Skript does. native saves to NeoSkript's own file beside it
-  # (variables.nsv): faster to load, each save writes only what changed, and a crash can't cut a save in
-  # half. Switching moves the variables over at the next start, after a backup in backups/. Switch back to
-  # csv to write variables.csv again, for example before downgrading or going back to Skript. Applies on
-  # restart. Docs: https://neoskript.dev/docs/server/variables/
-  storage: "csv"
   # Native storage only. If variables.nsv is damaged where no snapshot in backups/snapshots can repair it,
   # NeoSkript refuses to load it. Set this to true and restart to load everything up to the last good save
   # instead: this turns itself off first, then the damaged file is backed up and what's lost is logged.
   recover: false
-  # How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops.
+  # How often changed variables are saved to csv and native databases, at least every 10 seconds. They're
+  # also saved when the server stops. SQL databases write changes within a second or so.
   save-interval: "5 minutes"
   # Whether players are their UUIDs in variable names ({money::%player%}) or their names, as Skript's
   # 'use player UUIDs in variable names' (on in Skript's default config). Moving over from Skript copies
   # its setting, so the variables it saved are found.
   player-uuids-in-names: true
+
+# Where global variables are saved, as the databases: section of Skript's config.sk. Each variable is saved
+# in the first database, from the top, whose pattern (a regular expression) matches its whole name, and in no
+# other. Variables whose names start with - are never saved. Types: csv (Skript's variables.csv), native
+# (NeoSkript's own file, variables.nsv beside the file named), sqlite, mysql, or disabled. Files are relative
+# to plugins/NeoSkript. Moving over from Skript copies its section and the files it names. Applies on restart.
+# Every option, and how to share variables between servers: https://neoskript.dev/docs/server/variables/
+databases:
+  default:
+    type: "csv"
+    pattern: ".*"
+    file: "variables.csv"
+    backup-interval: "2 hours"
+    backups-to-keep: 12
 
 events:
   # The priority scripts listen to events at: lowest, low, normal, high, highest or monitor. As in Skript,

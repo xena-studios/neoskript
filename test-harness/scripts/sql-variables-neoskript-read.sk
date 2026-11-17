@@ -1,0 +1,12 @@
+# Harness: NeoSkript reads what the reference Skript saved to the database, then changes some of it.
+on load:
+	send "[harness] sql read: %{db_text}% | %{db_number}% | %{db_double}% | %{db_bool}% | %{db_timespan}% | %{db_list::*}% | %{db_gamemode}% | %{plain}%" to console
+	send "[harness] sql read items: %type of {db_item}% | %name of {db_item}% | %level of sharpness of {db_item}% | %item amount of {db_items::1}% | %lore of {db_items::2}% | %{db_vector}%" to console
+	send "[harness] sql read loc: %{db_loc}%" to console
+	set {db_text} to "from neoskript ✓"
+	add 1 to {db_number}
+	set {db_loc} to location(10, 70, 20, world "world")
+	set {db_new item} to 5 diamonds named "n"
+	delete {db_deleted}
+	set {plain} to "csv from neoskript"
+	send "[harness] sql changed" to console
