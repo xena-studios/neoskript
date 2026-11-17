@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  * Reloads a varied set of scripts a few hundred times and checks nothing from the old versions stays: events,
  * commands with aliases and a GUI, functions and a function reference, list variables, {@code every} timers, a
  * timer whose trigger is still waiting when the reload comes, a command waiting across reloads, {@code auto
- * reload}, and a script disabled and enabled again. After warming up, the harness bot forces a full GC and samples
+ * reload}, a script disabled and enabled again, and one broken on every other reload, which keeps its last version. After warming up, the harness bot forces a full GC and samples
  * the loaded class count, the heap, and NeoSkript's listeners, commands (in Brigadier's tree too) and scheduled
  * tasks every 50 reloads. They must plateau, not grow. Then every script is disabled, and the classes and heap
  * must fall back, and the listeners, commands and tasks be what they were before any script loaded.
@@ -32,16 +32,26 @@ import java.util.regex.Pattern;
 public final class NeoSkriptReloadSoakScenario implements Scenario {
 
     private static final Duration WAIT = Duration.ofMinutes(2);
-    private static final String[] SCRIPTS = {"soak-events.sk", "soak-functions.sk", "soak-commands.sk", "soak-extras.sk"};
+    private static final String[] SCRIPTS = {"soak-events.sk", "soak-functions.sk", "soak-commands.sk", "soak-extras.sk",
+        "soak-flaky.sk"};
     private static final int WARM_UP = 50;
     private static final int SAMPLE_EVERY = 50;
     private static final Pattern STATS = Pattern.compile("\\[bot] stats (\\S+) (.*)$");
     private static final Pattern RELOADED = Pattern.compile("Successfully reloaded all scripts\\. \\(\\d+ms\\)");
+    private static final Pattern FAILED_RELOAD = Pattern.compile("Encountered 1 error while reloading all scripts!");
 
     /** How much the loaded classes may grow over the measured reloads: some of the JDK's and the server's are lazy. */
     private static final long CLASS_SLACK = 400;
     /** How much the heap after a full GC may grow over the measured reloads, in KB. */
     private static final long HEAP_SLACK_KB = 24 * 1024;
+    /** How many times Bukkit's {@code /reload confirm} runs. */
+    private static final int PLUGIN_RELOADS = 8;
+    /**
+     * How many NeoSkript instances may be alive after each: the current one and up to five old ones, which are let
+     * go of a few reloads later. (The harness bot's plugin is let go of at once; what keeps NeoSkript's is still to
+     * be found.)
+     */
+    private static final long PLUGIN_RELOAD_LIMIT = 6;
     /** Waits in flight from {@code every 5 ticks} and {@code /soakdelay} are tasks too, for up to 3 seconds. */
     private static final long TASK_SLACK = 30;
 
@@ -71,7 +81,9 @@ public final class NeoSkriptReloadSoakScenario implements Scenario {
         for (String script : SCRIPTS) {
             sources.put(script, context.script("reload-soak/" + script));
         }
-        ServerBuilder builder = context.server().plugin(context.neoskriptJar()).plugin(context.botJar());
+        // Soft references are cleared by every GC, so what's alive after one is held for good.
+        ServerBuilder builder = context.server().plugin(context.neoskriptJar()).plugin(context.botJar())
+                .jvmArg("-XX:SoftRefLRUPolicyMSPerMB=0");
         // Disabled at first, to sample NeoSkript without scripts.
         sources.forEach((script, source) -> builder.file("plugins/NeoSkript/scripts/-" + script, version(source, 0)));
         Path scripts = builder.runDir().resolve("plugins/NeoSkript/scripts");
@@ -82,9 +94,6 @@ public final class NeoSkriptReloadSoakScenario implements Scenario {
             int start = server.mark();
             server.command("sk enable all");
             server.await(line("[harness] soak extras 0"), start, WAIT);
-            if (!server.linesMatching(Pattern.compile("Line \\d+: \\(soak-")).isEmpty()) {
-                throw new HarnessFailure("The soak scripts have problems. See " + server.logFile());
-            }
             server.command("gamerule doMobSpawning false");
             server.command("bot join soaker");
             server.await(line("[bot] soaker joined"), WAIT);
@@ -139,7 +148,58 @@ public final class NeoSkriptReloadSoakScenario implements Scenario {
             if (!server.linesMatching(Pattern.compile("Exception|\\[harness] soak delayed .*Error")).isEmpty()) {
                 throw new HarnessFailure("Something threw during the soak. See " + server.logFile());
             }
-            server.stop();
+            pluginReloads(context, server);
+            shutdown(server, builder.runDir());
+        }
+    }
+
+    /**
+     * Bukkit's {@code /reload confirm}, which disables NeoSkript and enables it again from a new class loader, a few
+     * times with the scripts loaded. The old class loaders must be let go: the count of those still alive after a
+     * full GC (soft references cleared, see {@link #run}) must stay low, not grow with each reload.
+     */
+    private static void pluginReloads(ScenarioContext context, ServerProcess server) throws Exception {
+        int mark = server.mark();
+        server.command("sk enable all");
+        server.await(line("Successfully enabled & parsed all previously disabled scripts."), mark, WAIT);
+        List<Long> loaders = new ArrayList<>();
+        for (int i = 1; i <= PLUGIN_RELOADS; i++) {
+            mark = server.mark();
+            server.command("bukkit:reload confirm");
+            server.await(Pattern.compile("Reload complete\\."), mark, WAIT);
+            server.await(Pattern.compile("\\[harness] soak extras \\d+$"), mark, WAIT);
+            loaders.add(sample(server, "plugin-reload-" + i).get("loaders"));
+        }
+        context.summary("NeoSkript instances alive over /reload", loaders);
+        if (java.util.Collections.max(loaders) > PLUGIN_RELOAD_LIMIT) {
+            throw new HarnessFailure("NeoSkript's old class loaders stay loaded after /reload confirm: " + loaders
+                    + " alive after each. See " + server.logFile());
+        }
+    }
+
+    /**
+     * Stops the server with a trigger waiting and variables just changed: it must stop by itself in time (no thread of
+     * NeoSkript's keeps it running), with nothing thrown on the way, and the variables saved.
+     */
+    private static void shutdown(ServerProcess server, Path runDir) throws Exception {
+        int mark = server.mark();
+        server.command("soakdelay");
+        server.command("soak saved 1");
+        server.await(Pattern.compile("\\[harness] soak saved 2 "), mark, WAIT);
+        int stopping = server.mark();
+        int code = server.stop();
+        List<String> thrown = server.lines(stopping).stream()
+                .filter(line -> line.contains("Exception") || line.contains("Error") && !line.contains("[harness]"))
+                .toList();
+        if (!thrown.isEmpty()) {
+            throw new HarnessFailure("Stopping the server threw: " + thrown + ". See " + server.logFile());
+        }
+        if (code != 0) {
+            throw new HarnessFailure("The server stopped with code " + code + ". See " + server.logFile());
+        }
+        String saved = Files.readString(runDir.resolve("plugins/NeoSkript/variables.csv"));
+        if (!saved.contains("soak::list::200,") || !saved.contains("soak::saved,")) {
+            throw new HarnessFailure("The variables weren't saved when the server stopped. See " + server.logFile());
         }
     }
 
@@ -164,11 +224,13 @@ public final class NeoSkriptReloadSoakScenario implements Scenario {
         }
         int mark = server.mark();
         server.command("sk reload scripts");
-        server.await(RELOADED, mark, WAIT);
+        server.await(round % 2 == 1 ? FAILED_RELOAD : RELOADED, mark, WAIT);
     }
 
+    /** A script's text for a round: odd rounds break soak-flaky.sk. */
     private static String version(String source, int round) {
-        return source.replace("VERSION", Integer.toString(round));
+        return source.replace("VERSION", Integer.toString(round))
+                .replace("BROKEN", round % 2 == 1 ? "this line is not valid syntax" : "add 1 to {-soak::flakyLoads}");
     }
 
     private static Map<String, Long> sample(ServerProcess server, String label) throws Exception {

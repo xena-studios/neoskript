@@ -28,6 +28,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     /** What stops the runtime error frames. */
     private Runnable runtimeErrorFrames;
     private EffectCommands effectCommands;
+    /** bStats, whose thread must stop with the plugin. */
+    private Metrics metrics;
 
     /** https://bstats.org/plugin/bukkit/NeoSkript/34868 */
     private static final int BSTATS_PLUGIN_ID = 34868;
@@ -47,7 +49,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         Platform platform = Platform.detect();
         // D15: bStats, opt-out with `metrics: false` (or globally in plugins/bStats/config.yml).
         if (getConfig().getBoolean("metrics", true)) {
-            Metrics metrics = new Metrics(this, BSTATS_PLUGIN_ID);
+            metrics = new Metrics(this, BSTATS_PLUGIN_ID);
             metrics.addCustomChart(new SimplePie("platform", platform::displayName));
         }
 
@@ -292,6 +294,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (metrics != null) {
+            // bStats' thread would otherwise outlive the plugin, and keep it in memory, through /reload.
+            metrics.shutdown();
+        }
         if (runtimeErrorFrames != null) {
             runtimeErrorFrames.run();
         }
@@ -301,6 +307,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             StandardLibrary.close();
         }
         getServer().getAsyncScheduler().cancelTasks(this);
+        getServer().getGlobalRegionScheduler().cancelTasks(this);
         co.xenastudios.neoskript.runtime.region.Regions.uninstall();
         if (commands != null) {
             commands.unregister(getServer().getCommandMap());

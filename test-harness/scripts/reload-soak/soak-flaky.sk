@@ -1,0 +1,7 @@
+# The reload soak's script that's broken on every other reload, so it keeps its last good version (D12).
+function soakFlaky() :: text:
+	return "VERSION"
+
+on load:
+	set {-soak::flaky} to soakFlaky()
+	BROKEN

@@ -30,11 +30,33 @@ final class ServerStats {
 
     private ServerStats() {}
 
+    /**
+     * Weak references to each class loader the plugin has had, kept in the system properties, which outlive this
+     * plugin's own class loader across {@code /reload}.
+     */
+    @SuppressWarnings("unchecked")
+    private static java.util.List<java.lang.ref.WeakReference<ClassLoader>> loaders(String key) {
+        return (java.util.List<java.lang.ref.WeakReference<ClassLoader>>) System.getProperties().computeIfAbsent(
+                "neoskript.harness.loaders." + key, k -> java.util.Collections.synchronizedList(new java.util.ArrayList<>()));
+    }
+
+    private static long alive(String key, ClassLoader current) {
+        java.util.List<java.lang.ref.WeakReference<ClassLoader>> loaders = loaders(key);
+        if (current != null && loaders.stream().noneMatch(ref -> ref.get() == current)) {
+            loaders.add(new java.lang.ref.WeakReference<>(current));
+        }
+        return loaders.stream().filter(ref -> ref.get() != null).count();
+    }
+
     static String sample(String pluginName) {
+        Plugin plugin = Bukkit.getPluginManager().getPlugin(pluginName);
+        alive(pluginName, plugin == null ? null : plugin.getClass().getClassLoader());
+        alive("bot", ServerStats.class.getClassLoader());
         for (int i = 0; i < 3; i++) {
             System.gc();
         }
-        Plugin plugin = Bukkit.getPluginManager().getPlugin(pluginName);
+        long loadersAlive = alive(pluginName, null);
+        Bukkit.getLogger().info("[bot] bot loaders alive: " + alive("bot", null));
         var classes = ManagementFactory.getClassLoadingMXBean();
         long heap = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed();
         int listeners = 0;
@@ -73,8 +95,8 @@ final class ServerStats {
             bossBars++;
         }
         return String.format(Locale.ROOT,
-                "classes=%d heapKb=%d listeners=%d commands=%d brigadier=%d tasks=%d threads=%d nonDaemon=%d pluginThreads=%d bossBars=%d",
-                classes.getLoadedClassCount(), heap / 1024, listeners, commands, brigadier, tasks(plugin), threads,
+                "loaders=%d classes=%d heapKb=%d listeners=%d commands=%d brigadier=%d tasks=%d threads=%d nonDaemon=%d pluginThreads=%d bossBars=%d",
+                loadersAlive, classes.getLoadedClassCount(), heap / 1024, listeners, commands, brigadier, tasks(plugin), threads,
                 nonDaemon, pluginThreads, bossBars);
     }
 
@@ -86,7 +108,7 @@ final class ServerStats {
         int count = 0;
         try {
             for (BukkitTask task : Bukkit.getScheduler().getPendingTasks()) {
-                if (task.getOwner() == plugin && !task.isCancelled()) {
+                if (plugin != null && task.getOwner().getName().equals(plugin.getName()) && !task.isCancelled()) {
                     count++;
                 }
             }
@@ -105,7 +127,8 @@ final class ServerStats {
             return;
         }
         if (value instanceof ScheduledTask task) {
-            if (task.getOwningPlugin() == plugin && !task.isCancelled()) {
+            // Any instance of the plugin: an old one's tasks after /reload count too.
+            if (plugin != null && task.getOwningPlugin().getName().equals(plugin.getName()) && !task.isCancelled()) {
                 found.add(task);
             }
             return;

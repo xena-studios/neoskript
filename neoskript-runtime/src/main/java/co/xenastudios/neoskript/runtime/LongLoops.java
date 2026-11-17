@@ -24,8 +24,8 @@ public final class LongLoops {
     /** How long a loop runs without waiting before the console hears of it, in milliseconds: 5 seconds by default. */
     public static final String WARN_AFTER_PROPERTY = "neoskript.longLoopWarningMillis";
 
-    /** Each loop running on this thread, by its script and line, while it runs. */
-    private static final ThreadLocal<Map<String, Run>> RUNS = ThreadLocal.withInitial(HashMap::new);
+    /** Each loop running on each thread, by its script and line, while it runs. */
+    private static final PerThread<Map<String, Run>> RUNS = new PerThread<>();
 
     /** One run of a loop: when it was first checked, how far round it was, and whether it was reported. */
     private static final class Run {
@@ -42,6 +42,10 @@ public final class LongLoops {
      */
     public static void check(String script, int line, int times) {
         Map<String, Run> runs = RUNS.get();
+        if (runs == null) {
+            runs = new HashMap<>();
+            RUNS.set(runs);
+        }
         String key = script + ':' + line;
         Run run = runs.get(key);
         long now = System.nanoTime();

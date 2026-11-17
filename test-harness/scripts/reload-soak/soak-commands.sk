@@ -4,6 +4,7 @@ command /soak <text> [<number=1>]:
 	usage: /soak <text> [number]
 	cooldown: 1 second
 	trigger:
+		set {soak::%arg-1%} to arg-2
 		send "[harness] soak %arg-1% %soakAdd(arg-2, 1)% VERSION" to console
 
 command /soakgui:
