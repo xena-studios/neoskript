@@ -73,10 +73,10 @@ public final class Values {
     @SuppressWarnings("unchecked")
     public static Object parse(Function<?, ?> parser, Object text, String what) {
         Object value = single(text);
-        if (value == null) {
+        // Only text is parsed, as Skript's '%string% parsed as': a variable holding an item gives nothing.
+        if (!(value instanceof String string)) {
             return null;
         }
-        String string = text(value);
         lastParseError = null;
         Object parsed = ((Function<String, ?>) parser).apply(string.strip());
         if (parsed == null) {

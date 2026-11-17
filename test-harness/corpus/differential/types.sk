@@ -14,6 +14,13 @@ function probe_types():
 	show("potions", (speed, potion effect of speed of tier 2 for 10 seconds))
 	show("enchantments", (sharpness 3, diamond sword of sharpness 2))
 	show("parsed", ("stone" parsed as item type, "zombie" parsed as entity type))
+	# Only text is parsed, and an item stack has a parser (issue #77).
+	set {_held} to diamond sword
+	show("parsed item variable", ({_held} parsed as itemstack))
+	show("parsed item stack", ("diamond sword" parsed as item stack))
+	show("parsed several materials", ("any sword" parsed as itemstack))
+	set {_number} to 5
+	show("parsed number variable", ({_number} parsed as integer))
 	# A colon in a script's pattern is text to match: Skript escapes parse tags there (ExprParse.escapeParseTags).
 	show("parsed tag before", "apples 5" parsed as "fruit:apples %number%")
 	show("parsed tag text", "fruit:apples 5" parsed as "fruit:apples %number%")
