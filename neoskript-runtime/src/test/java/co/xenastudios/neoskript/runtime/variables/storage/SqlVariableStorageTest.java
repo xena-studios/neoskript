@@ -1374,4 +1374,76 @@ class SqlVariableStorageTest {
             });
         }
     }
+
+    /**
+     * a's commit is slow rather than lost: left open on its own connection while a carries on as if its answer timed
+     * out. It's committed (or rolled back) from the test while a settles it; then, before a's next round, b adds 3 on
+     * top under its own update_guid. a must count its own 50 once either way: 63, not 113.
+     */
+    private void stalledCommit(boolean commits) throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 10L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            one.addToList("queue", new Object[] {text("x")});
+            a.save();
+            waitFor(() -> two.list("queue").length == 1);
+            java.util.concurrent.CountDownLatch settled = new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.CountDownLatch bWrote = new java.util.concurrent.CountDownLatch(1);
+            a.afterSettle = () -> {
+                a.afterSettle = null;
+                settled.countDown();
+                try {
+                    bWrote.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            };
+            java.util.concurrent.CountDownLatch settling = new java.util.concurrent.CountDownLatch(1);
+            a.beforeSettle = () -> {
+                a.beforeSettle = null;
+                settling.countDown();
+            };
+            a.stallNextCommit = true;
+            one.add("coins", new Object[] {50L});
+            one.addToList("queue", new Object[] {text("alice")});
+            waitFor(() -> a.stalled != null);
+            Connection stalled = a.stalled;
+            // a is back and settling, while the stalled transaction is still open: settling waits for it.
+            assertTrue(settling.await(10, java.util.concurrent.TimeUnit.SECONDS));
+            Thread.sleep(400);
+            assertEquals(1, settled.getCount(), "settled before the stalled commit landed");
+            if (commits) {
+                stalled.commit();
+            } else {
+                stalled.rollback();
+            }
+            stalled.close();
+            assertTrue(settled.await(10, java.util.concurrent.TimeUnit.SECONDS));
+            if (!commits) {
+                // Nothing landed: a writes its 50 and its append again, once, before b's 3.
+                bWrote.countDown();
+                waitFor(() -> Long.valueOf(60).equals(two.get("coins")) && two.list("queue").length == 2);
+            }
+            two.add("coins", new Object[] {3L});
+            b.save();
+            bWrote.countDown();
+            waitFor(() -> Long.valueOf(63).equals(one.get("coins")) && Long.valueOf(63).equals(two.get("coins")));
+            Thread.sleep(1_000);
+            assertEquals(63L, one.get("coins"));
+            assertEquals(63L, saved("coins"));
+            assertEquals(2, one.list("queue").length);
+            assertEquals(2, two.list("queue").length);
+        }
+    }
+
+    @Test
+    void aSlowCommitThatLandsWhileItsSettledIsCountedOnce() throws Exception {
+        stalledCommit(true);
+    }
+
+    @Test
+    void aSlowCommitThatNeverLandsIsWrittenAgainOnce() throws Exception {
+        stalledCommit(false);
+    }
 }

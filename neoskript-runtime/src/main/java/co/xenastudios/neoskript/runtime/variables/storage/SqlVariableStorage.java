@@ -356,6 +356,18 @@ public final class SqlVariableStorage implements VariableBackend {
     /** Whether the last write round wrote everything it found changed, nothing left for the next. */
     private volatile boolean lastRoundWhole = true;
 
+    /**
+     * For tests: the next commit is slow rather than lost: it's left open on a connection of its own
+     * ({@link #stalled}), to be committed by the test, and this server goes on as if its answer timed out.
+     */
+    volatile boolean stallNextCommit;
+    /** For tests: the connection a stalled commit is left open on. */
+    volatile Connection stalled;
+    /** For tests: runs as settling a commit whose answer was lost begins. */
+    volatile Runnable beforeSettle;
+    /** For tests: runs once a commit whose answer was lost is settled, before the round that follows. */
+    volatile Runnable afterSettle;
+
     /** For tests: the next commit's answer is lost, as if the connection dropped just after the database committed. */
     volatile boolean loseNextReply;
     /** For tests: holds a change to {@code key} (a name, or {@code list::*}) under way, or lets it go. */
@@ -1209,6 +1221,10 @@ public final class SqlVariableStorage implements VariableBackend {
         if (uncertain != null) {
             try {
                 settleUncertain();
+                Runnable hook = afterSettle;
+                if (hook != null) {
+                    hook.run();
+                }
             } catch (SQLException e) {
                 rollbackQuietly();
                 closeConnection();
@@ -1354,8 +1370,8 @@ public final class SqlVariableStorage implements VariableBackend {
 
     /**
      * Writes and commits. With merging, the same transaction also writes this server's {@link #MARKER} row with the
-     * transaction's number, so if the database's answer to the commit is lost, reading the marker afterwards says for
-     * sure whether it committed ({@link #settleUncertain}). What was sent is also remembered until the commit is known
+     * transaction's number, so if the database's answer to the commit is lost, reading the marker afterwards, under its
+     * lock, says whether it committed ({@link #settleUncertain}). What was sent is also remembered until the commit is known
      * ({@link #attempts}), in case the marker is gone by then.
      *
      * @param letGoOf what the transaction finishes, let go of once it's known to have committed
@@ -1377,6 +1393,12 @@ public final class SqlVariableStorage implements VariableBackend {
             writeMarker(number);
         }
         try {
+            if (stallNextCommit) {
+                stallNextCommit = false;
+                stalled = connection;
+                connection = connect();
+                throw new SQLException("no answer in time while the commit was still running", "08S01");
+            }
             connection.commit();
             Runnable hook = afterCommit;
             if (hook != null) {
@@ -1419,16 +1441,33 @@ public final class SqlVariableStorage implements VariableBackend {
     }
 
     /**
-     * A transaction whose commit was sent but not answered: once the database is back, its marker row says whether
-     * it committed. If it did, memory catches up with it, before anything else is worked out; if not, its changes are
+     * A transaction whose commit was sent but not answered: once the database is back, its marker row, read under
+     * its lock so a commit still running is waited for, says whether it committed. If it did, memory catches up with it, before anything else is worked out; if not, its changes are
      * simply worked out again. If the marker is gone (a Skript server watching the table tidies away rows without a
      * value), it can't be told: the rows themselves are checked against what was sent instead ({@link #landed}).
      */
     private void settleUncertain() throws SQLException {
+        Runnable hook = beforeSettle;
+        if (hook != null) {
+            hook.run();
+        }
         Uncertain was = uncertain;
         String number;
+        // The marker is read under its lock: a commit that's slow rather than lost (still running on the database
+        // when its answer timed out) holds that lock until it lands, so this waits for it instead of reading the
+        // number before it. On MySQL, FOR UPDATE takes the lock (a gap lock if there's no row yet). SQLite lets a
+        // read go ahead beside a writer, so a write that changes nothing takes the file's write lock first. If the
+        // lock isn't let go of in time (LOCK_WAIT_SECONDS, busy_timeout), this throws: the database counts as down,
+        // and it's settled later. Never guessed.
+        if (settings.dialect() == Dialect.SQLITE) {
+            try (PreparedStatement lock = connection.prepareStatement("UPDATE " + settings.table()
+                    + " SET type = type WHERE name = ?")) {
+                lock.setString(1, markerName());
+                lock.executeUpdate();
+            }
+        }
         try (PreparedStatement read = connection.prepareStatement("SELECT type FROM " + settings.table()
-                + " WHERE name = ?")) {
+                + " WHERE name = ?" + (settings.dialect() == Dialect.MYSQL ? " FOR UPDATE" : ""))) {
             read.setString(1, markerName());
             try (ResultSet result = read.executeQuery()) {
                 number = result.next() ? result.getString(1) : null;
@@ -1436,16 +1475,15 @@ public final class SqlVariableStorage implements VariableBackend {
         }
         connection.commit();
         uncertain = null;
-        if (number == null) {
-            return;
-        }
-        for (Op op : was.resolution().write) {
-            attempts.remove(op.name());
-        }
-        if (number.equals(Long.toString(was.number()))) {
+        if (number != null && number.equals(Long.toString(was.number()))) {
+            for (Op op : was.resolution().write) {
+                attempts.remove(op.name());
+            }
             landedRound(was.resolution(), was.letGoOf());
             tellWritten();
         }
+        // Otherwise it didn't commit, or the marker is gone and it can't be told: what was sent is kept
+        // (attempts), so a row holding it is still known for this server's own.
     }
 
     /**
@@ -2017,7 +2055,44 @@ public final class SqlVariableStorage implements VariableBackend {
         }
     }
 
+    /** How long another server's marker is left untouched before it's taken for a crashed server's, and removed. */
+    static volatile long markerAgeMillis = 24 * 60 * 60_000L;
+
+    /** Each hour's table position (time, rowid), to tell which markers haven't been written for a day. */
+    private final java.util.ArrayDeque<long[]> markerCheckpoints = new java.util.ArrayDeque<>();
+
+    /**
+     * Removes the markers of servers that stopped without removing theirs (a crash): a running server writes its
+     * marker again, at a new rowid, with every write, so one whose rowid is from {@link #markerAgeMillis} ago or more
+     * belongs to a server that hasn't written since. If that server is only down that long with a commit it never
+     * heard back about, it can't tell from the marker whether it committed, and checks the rows instead.
+     */
+    private void removeOldMarkers(long now) {
+        if (!settings.merging()) {
+            return;
+        }
+        long[] newest = markerCheckpoints.peekLast();
+        if (newest == null || now - newest[0] >= Math.min(markerAgeMillis, 60 * 60_000L)) {
+            markerCheckpoints.addLast(new long[] {now, lastRowId});
+        }
+        long[] oldest = markerCheckpoints.peekFirst();
+        if (oldest == null || now - oldest[0] < markerAgeMillis || markerCheckpoints.size() < 2) {
+            return;
+        }
+        markerCheckpoints.removeFirst();
+        try (PreparedStatement clean = connection.prepareStatement("DELETE FROM " + settings.table()
+                + " WHERE name LIKE '" + MARKER + "%' AND name <> ? AND rowid < ?")) {
+            clean.setString(1, markerName());
+            clean.setLong(2, oldest[1]);
+            clean.executeUpdate();
+            connection.commit();
+        } catch (SQLException e) {
+            rollbackQuietly();
+        }
+    }
+
     private void runCleanups(long now) {
+        removeOldMarkers(now);
         while (!cleanups.isEmpty() && cleanups.getFirst()[0] <= now) {
             long below = cleanups.removeFirst()[1];
             if (below < 0) {
