@@ -257,6 +257,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         try {
             VariableBackends.Opened opened = VariableBackends.open(kind, globals, codecs, csv);
             opened.log().forEach(line -> getSLF4JLogger().info(line));
+            opened.warnings().forEach(line -> getSLF4JLogger().warn(line));
             return opened.backend();
         } catch (IOException | RuntimeException e) {
             getSLF4JLogger().error("Couldn't move the variables to {} storage. They're left as they were, and won't "

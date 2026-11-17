@@ -4,13 +4,10 @@
  */
 package co.xenastudios.neoskript.runtime.variables.storage;
 
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -93,30 +90,25 @@ public final class VariableFile {
         return new Contents(entries, problems);
     }
 
-    /** Writes the entries, in the order given, to a temporary file that then replaces {@code file}. */
+    /**
+     * Writes the entries, in the order given, to a temporary file that's synced to disk and then replaces
+     * {@code file}, so a crash or power cut leaves either the old file or the new one.
+     */
     public static void write(Path file, Iterable<Entry> entries) throws IOException {
-        Path parent = file.toAbsolutePath().getParent();
-        Files.createDirectories(parent);
-        Path temp = Files.createTempFile(parent, file.getFileName().toString(), ".tmp");
-        try (BufferedWriter out = Files.newBufferedWriter(temp, StandardCharsets.UTF_8)) {
-            out.write(HEADER);
-            HexFormat hex = HexFormat.of().withUpperCase();
-            for (Entry entry : entries) {
-                out.write(quote(entry.name()));
-                out.write(", ");
-                out.write(entry.type());
-                out.write(", ");
-                out.write(hex.formatHex(entry.bytes()));
-                out.write('\n');
-            }
-            // Skript ends the file with an empty line.
-            out.write('\n');
+        Durable.replace(file, render(entries));
+    }
+
+    /** The file's bytes for {@code entries}, in the order given. */
+    public static byte[] render(Iterable<Entry> entries) {
+        StringBuilder out = new StringBuilder(HEADER);
+        HexFormat hex = HexFormat.of().withUpperCase();
+        for (Entry entry : entries) {
+            out.append(quote(entry.name())).append(", ").append(entry.type()).append(", ")
+                    .append(hex.formatHex(entry.bytes())).append('\n');
         }
-        try {
-            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException e) {
-            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
-        }
+        // Skript ends the file with an empty line.
+        out.append('\n');
+        return out.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     static String quote(String field) {

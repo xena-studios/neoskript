@@ -16,12 +16,13 @@ import java.util.Map;
 import java.util.zip.CRC32C;
 
 /**
- * NeoSkript's own variable file ({@code variables.nsv}): an 8-byte header, then records. Each record is one save,
- * applied whole or not at all:
+ * NeoSkript's own variable file ({@code variables.nsv}): an 8-byte header, then records. Each save is one record,
+ * or several when it's large, applied whole or not at all:
  *
  * <pre>
  *   record  = length (u32) crc32c (u32) payload
- *   payload = kind (u8, 0) types entries
+ *   payload = kind (u8) types entries
+ *   kind    = 0 for a save's last (or only) record, 1 for a record the next one continues
  *   types   = count (varint) then each type name (varint length, UTF-8)
  *   entries = count (varint) then each: shared (varint) suffix (varint length, UTF-8 bytes) type (varint)
  * </pre>
@@ -31,21 +32,33 @@ import java.util.zip.CRC32C;
  * record's types followed by the value (varint length, then the bytes of Skript's binary value format, as in
  * {@code variables.csv}). Later records win over earlier ones.
  *
- * <p>Saves append a record. Compaction writes the whole set to a new file, in Skript's order, and swaps it in. A
- * record whose length runs past the end of the file, or whose checksum doesn't match, is where a save was cut
- * off: everything before it is kept, and the reader says where it stopped.
+ * <p>Saves append their records. Compaction writes the whole set to a new file, in Skript's order, and swaps it
+ * in. The records of a save are only applied once its last record has been read.
+ *
+ * <p>A save cut off by a crash leaves a tail that can't be read: a record that runs past the end of the file or
+ * fails its checksum, with no good record after it, or a save whose last record never came. Everything before that
+ * save is kept and the reader says where it stopped. A bad record with good ones after it is damage, not a crash,
+ * and so is a record whose checksum is right but that can't be read (written by a newer NeoSkript): then reading
+ * fails, and the file must not be written over.
  */
 public final class NativeVariableFile {
 
-    /** {@code NSKV}, then the format version (1) and two zero bytes. */
+    /** {@code NSKV}, then the format version (1) and two bytes reserved for flags, zero in version 1. */
     static final byte[] HEADER = {'N', 'S', 'K', 'V', 0, 1, 0, 0};
+
+    /** The header's length: the first record starts here. */
+    public static final int HEADER_LENGTH = 8;
 
     static final int RECORD_HEADER = 8;
 
     /** Records are split at about this size, so no single one needs a huge buffer. */
     static final int RECORD_TARGET = 1 << 20;
 
+    /** A save's last or only record. */
     private static final byte KIND_ENTRIES = 0;
+
+    /** A record of a save that goes on in the next record. */
+    private static final byte KIND_CONTINUES = 1;
 
     private NativeVariableFile() {}
 
@@ -57,68 +70,127 @@ public final class NativeVariableFile {
         }
     }
 
-    /** What a file holds, in the order last written, and where the records that could be read end. */
+    /**
+     * What a file holds, in the order last written, where its last whole save ends, and how many saves it holds.
+     */
     public record Contents(LinkedHashMap<String, VariableFile.Entry> entries, long validEnd, long length,
             int records) {
 
-        /** Whether bytes after the last good record were ignored: a save that was cut off, or damage. */
+        /** Whether bytes after the last whole save were ignored: a save that was cut off by a crash. */
         public boolean damaged() {
             return validEnd < length;
         }
     }
 
-    /** Reads a whole file. Throws if it isn't one of NeoSkript's variable files. */
+    /**
+     * Reads a whole file. Throws if it isn't one of NeoSkript's variable files, if it's of a newer version, or if
+     * it's damaged anywhere but in a save cut off at its end.
+     */
     public static Contents read(byte[] data) throws IOException {
         if (data.length < HEADER.length || !Arrays.equals(data, 0, 4, HEADER, 0, 4)) {
             throw new IOException("not a NeoSkript variable file (it doesn't start with NSKV)");
         }
-        if (data[4] != HEADER[4] || data[5] != HEADER[5]) {
+        if (data[4] != HEADER[4] || data[5] != HEADER[5] || data[6] != 0 || data[7] != 0) {
             throw new IOException("a NeoSkript variable file of version " + ((data[4] & 0xFF) << 8 | data[5] & 0xFF)
-                    + ", newer than this NeoSkript reads (1)");
+                    + (data[6] != 0 || data[7] != 0 ? " with features" : "") + " newer than this NeoSkript reads");
         }
         LinkedHashMap<String, VariableFile.Entry> entries = new LinkedHashMap<>();
+        List<Op> save = new ArrayList<>();
         int position = HEADER.length;
-        int records = 0;
+        int saveStart = position;
+        int saves = 0;
         CRC32C crc = new CRC32C();
-        while (data.length - position >= RECORD_HEADER) {
-            int length = readInt(data, position);
-            int checksum = readInt(data, position + 4);
-            if (length < 0 || length > data.length - position - RECORD_HEADER) {
-                break;
+        while (position < data.length) {
+            if (data.length - position >= RECORD_HEADER) {
+                int length = readInt(data, position);
+                int checksum = readInt(data, position + 4);
+                if (length >= 0 && length <= data.length - position - RECORD_HEADER) {
+                    crc.reset();
+                    crc.update(data, position + RECORD_HEADER, length);
+                    if ((int) crc.getValue() == checksum) {
+                        Boolean continues = parse(data, position + RECORD_HEADER, length, save);
+                        if (continues == null) {
+                            throw new IOException("the record at byte " + position + " is whole but can't be read, so it"
+                                    + " was written by a newer NeoSkript or damaged");
+                        }
+                        position += RECORD_HEADER + length;
+                        if (!continues) {
+                            apply(save, entries);
+                            save.clear();
+                            saveStart = position;
+                            saves++;
+                        }
+                        continue;
+                    }
+                }
             }
-            crc.reset();
-            crc.update(data, position + RECORD_HEADER, length);
-            if ((int) crc.getValue() != checksum) {
-                break;
+            // A record that can't be read: the end of a save cut off by a crash, unless good records follow.
+            int next = recordAfter(data, position + 1);
+            if (next >= 0) {
+                throw new IOException("the record at byte " + position + " is damaged and the one at byte " + next
+                        + " after it isn't, so this isn't a save cut off by a crash");
             }
-            if (!apply(data, position + RECORD_HEADER, length, entries)) {
-                break;
-            }
-            position += RECORD_HEADER + length;
-            records++;
+            break;
         }
-        return new Contents(entries, position, data.length, records);
+        // A save whose last record never came is dropped too.
+        return new Contents(entries, saveStart, data.length, saves);
     }
 
-    /** Applies one record's entries, or returns false (changing nothing) if it can't be read. */
-    private static boolean apply(byte[] data, int offset, int length, Map<String, VariableFile.Entry> into) {
+    /** Where a whole record with a good checksum starts at or after {@code from}, or -1. */
+    private static int recordAfter(byte[] data, int from) {
+        CRC32C crc = new CRC32C();
+        for (int at = from; at <= data.length - RECORD_HEADER - 1; at++) {
+            int length = readInt(data, at);
+            if (length < 1 || length > data.length - at - RECORD_HEADER) {
+                continue;
+            }
+            int kind = data[at + RECORD_HEADER];
+            if (kind != KIND_ENTRIES && kind != KIND_CONTINUES) {
+                continue;
+            }
+            crc.reset();
+            crc.update(data, at + RECORD_HEADER, length);
+            if ((int) crc.getValue() == readInt(data, at + 4)) {
+                return at;
+            }
+        }
+        return -1;
+    }
+
+    private static void apply(List<Op> ops, Map<String, VariableFile.Entry> into) {
+        // A variable that changes keeps its place, so names stay in the order they were first saved in.
+        for (Op op : ops) {
+            if (op.type() == null) {
+                into.remove(op.name());
+            } else {
+                into.put(op.name(), new VariableFile.Entry(op.name(), op.type(), op.bytes()));
+            }
+        }
+    }
+
+    /**
+     * Adds one record's entries to {@code into}, and returns whether the save goes on in the next record, or
+     * {@code null} (adding nothing) if the record can't be read.
+     */
+    private static Boolean parse(byte[] data, int offset, int length, List<Op> into) {
         Reader in = new Reader(data, offset, offset + length);
         try {
-            if (in.u8() != KIND_ENTRIES) {
-                return false;
+            int kind = in.u8();
+            if (kind != KIND_ENTRIES && kind != KIND_CONTINUES) {
+                return null;
             }
             String[] types = new String[in.count()];
             for (int i = 0; i < types.length; i++) {
                 types[i] = in.string();
             }
             int count = in.count();
-            List<Op> ops = new ArrayList<>(count);
+            List<Op> ops = new ArrayList<>(Math.min(count, length));
             byte[] previous = new byte[0];
             for (int i = 0; i < count; i++) {
                 int shared = in.count();
                 int suffix = in.length();
                 if (shared > previous.length) {
-                    return false;
+                    return null;
                 }
                 byte[] name = Arrays.copyOf(previous, shared + suffix);
                 in.bytes(name, shared, suffix);
@@ -128,7 +200,7 @@ public final class NativeVariableFile {
                 if (type == 0) {
                     ops.add(Op.delete(text));
                 } else if (type > types.length) {
-                    return false;
+                    return null;
                 } else {
                     byte[] value = new byte[in.length()];
                     in.bytes(value, 0, value.length);
@@ -136,25 +208,18 @@ public final class NativeVariableFile {
                 }
             }
             if (!in.atEnd()) {
-                return false;
+                return null;
             }
-            // A variable that changes keeps its place, so names stay in the order they were first saved in.
-            for (Op op : ops) {
-                if (op.type() == null) {
-                    into.remove(op.name());
-                } else {
-                    into.put(op.name(), new VariableFile.Entry(op.name(), op.type(), op.bytes()));
-                }
-            }
-            return true;
+            into.addAll(ops);
+            return kind == KIND_CONTINUES;
         } catch (IndexOutOfBoundsException | IllegalArgumentException e) {
-            return false;
+            return null;
         }
     }
 
     /**
-     * The ops as one or more records, each with its length and checksum. Ops are split into records of about
-     * {@link #RECORD_TARGET} bytes; appending them as one save keeps each record whole.
+     * The ops as one save of one or more records, each with its length and checksum. Ops are split into records of
+     * about {@link #RECORD_TARGET} bytes, and all but the last are marked as going on in the next.
      */
     public static List<byte[]> records(List<Op> ops) {
         List<byte[]> records = new ArrayList<>();
@@ -194,7 +259,8 @@ public final class NativeVariableFile {
                 count++;
             }
             Writer payload = new Writer();
-            payload.write(KIND_ENTRIES);
+            // Every record of the save but its last says the save goes on.
+            payload.write(to < ops.size() ? KIND_CONTINUES : KIND_ENTRIES);
             payload.varint(types.size());
             for (String type : types) {
                 byte[] bytes = type.getBytes(StandardCharsets.UTF_8);

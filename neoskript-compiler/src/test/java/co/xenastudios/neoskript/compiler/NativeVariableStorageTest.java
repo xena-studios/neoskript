@@ -309,19 +309,21 @@ class NativeVariableStorageTest {
                     }
                 });
             }
+            java.util.concurrent.atomic.AtomicReference<Throwable> failed = new java.util.concurrent.atomic.AtomicReference<>();
             Thread saver = Thread.ofPlatform().start(() -> {
-                for (int i = 0; i < 50; i++) {
-                    try {
+                try {
+                    for (int i = 0; i < 50; i++) {
                         storage.save();
-                    } catch (IOException e) {
-                        throw new java.io.UncheckedIOException(e);
                     }
+                } catch (Throwable e) {
+                    failed.set(e);
                 }
             });
             for (Thread writer : writers) {
                 writer.join();
             }
             saver.join();
+            assertNull(failed.get(), "a save while variables changed failed");
             storage.save();
         }
         VariableStore loaded = reload();
@@ -367,9 +369,8 @@ class NativeVariableStorageTest {
         assertArrayEquals(skript, Files.readAllBytes(csv));
     }
 
-    @Test
-    void theNativeFileWinsWhileItsThere() throws Exception {
-        Path csv = skriptFile();
+    /** A native file with one save of {@code only = "native"}. */
+    private Path nativeFile() throws IOException {
         Path nsv = dir.resolve("variables.nsv");
         VariableStore store = new VariableStore();
         try (NativeVariableStorage storage = new NativeVariableStorage(store, codecs, nsv)) {
@@ -377,13 +378,186 @@ class NativeVariableStorageTest {
             store.set("only", "native");
             storage.save();
         }
+        return nsv;
+    }
+
+    private static void olderThan(Path file, Path other) throws IOException {
+        Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.from(
+                Files.getLastModifiedTime(other).toInstant().minusSeconds(60)));
+    }
+
+    @Test
+    void anOlderCsvBesideTheNativeFileIsMovedToBackupsUnread() throws Exception {
+        Path csv = skriptFile();
+        Path nsv = nativeFile();
+        olderThan(csv, nsv);
         VariableStore loaded = new VariableStore();
         VariableBackends.Opened opened = VariableBackends.open(VariableBackends.Kind.NATIVE, loaded, codecs, csv);
-        assertEquals(1, opened.log().size(), "says the csv beside it isn't read");
+        assertTrue(opened.log().getFirst().contains("was last changed"), "says both times: " + opened.log());
+        assertFalse(opened.warnings().isEmpty(), "warns before downgrading");
         opened.backend().load();
         assertEquals("native", loaded.get("only"));
         assertNull(loaded.get("t::big"));
-        assertTrue(Files.exists(csv), "left alone");
+        assertFalse(Files.exists(csv));
+        assertTrue(Files.exists(onlyBackup(".csv")));
+    }
+
+    @Test
+    void aNewerDifferentCsvBesideTheNativeFileStopsBothWays() throws Exception {
+        // As after downgrading: an older NeoSkript saved variables.csv without reading variables.nsv.
+        Path nsv = nativeFile();
+        Path csv = skriptFile();
+        olderThan(nsv, csv);
+        byte[] csvBytes = Files.readAllBytes(csv);
+        byte[] nativeBytes = Files.readAllBytes(nsv);
+        for (VariableBackends.Kind kind : VariableBackends.Kind.values()) {
+            IOException refused = assertThrows(IOException.class,
+                    () -> VariableBackends.open(kind, new VariableStore(), codecs, csv));
+            assertTrue(refused.getMessage().contains("was last changed"), refused.getMessage());
+            assertArrayEquals(csvBytes, Files.readAllBytes(csv), "left alone");
+            assertArrayEquals(nativeBytes, Files.readAllBytes(nsv), "left alone");
+        }
+    }
+
+    @Test
+    void anImportCutOffBeforeItRemovedTheCsvIsFinished() throws Exception {
+        Path csv = skriptFile();
+        byte[] skript = Files.readAllBytes(csv);
+        Path nsv = dir.resolve("variables.nsv");
+        VariableBackends.open(VariableBackends.Kind.NATIVE, new VariableStore(), codecs, csv);
+        // As if the server stopped before removing variables.csv.
+        Files.write(csv, skript);
+        olderThan(csv, nsv);
+        VariableStore loaded = new VariableStore();
+        VariableBackends.Opened opened = VariableBackends.open(VariableBackends.Kind.NATIVE, loaded, codecs, csv);
+        assertTrue(opened.log().getFirst().startsWith("Finished moving to"), opened.log().toString());
+        assertFalse(Files.exists(csv));
+        opened.backend().load();
+        assertEquals(1234567890123L, loaded.get("t::big"));
+    }
+
+    @Test
+    void anExportCutOffBeforeItRemovedTheNativeFileIsFinished() throws Exception {
+        Path nsv = nativeFile();
+        byte[] nativeBytes = Files.readAllBytes(nsv);
+        Path csv = dir.resolve("variables.csv");
+        VariableBackends.open(VariableBackends.Kind.CSV, new VariableStore(), codecs, csv);
+        assertFalse(Files.exists(nsv));
+        // As if the server stopped before removing variables.nsv: variables.csv is the newer, with the same variables.
+        Files.write(nsv, nativeBytes);
+        olderThan(nsv, csv);
+        VariableStore loaded = new VariableStore();
+        VariableBackends.Opened opened = VariableBackends.open(VariableBackends.Kind.CSV, loaded, codecs, csv);
+        assertTrue(opened.log().getFirst().startsWith("Finished moving back"), opened.log().toString());
+        assertFalse(Files.exists(nsv));
+        opened.backend().load();
+        assertEquals("native", loaded.get("only"));
+    }
+
+    @Test
+    void aLargeSaveCutOffBetweenItsRecordsIsntHalfApplied() throws Exception {
+        VariableStore store = new VariableStore();
+        Path file = dir.resolve("variables.nsv");
+        String kilobyte = "k".repeat(1000);
+        Map<String, String> before;
+        long end;
+        byte[] whole;
+        try (NativeVariableStorage storage = open(store)) {
+            for (int i = 1; i <= 3_000; i++) {
+                store.set("x::" + i, kilobyte + i);
+            }
+            storage.save();
+            before = saved(store);
+            end = Files.size(file);
+            // delete {x::*}, set {x::1}, and enough more that the save takes several records.
+            store.deleteList("x");
+            store.set("x::1", "new");
+            for (int i = 1; i <= 3_000; i++) {
+                store.set("y::" + i, kilobyte + i);
+            }
+            storage.save();
+            whole = Files.readAllBytes(file);
+        }
+        int first = java.nio.ByteBuffer.wrap(whole, (int) end, 4).getInt() + 8;
+        assertTrue(end + first < whole.length - 8, "the save took more than one record");
+        for (long cut : new long[] {end + first, end + first + 9, whole.length - 1}) {
+            Files.write(file, Arrays.copyOf(whole, (int) cut));
+            VariableStore loaded = new VariableStore();
+            try (NativeVariableStorage storage = open(loaded)) {
+                assertEquals(before, saved(loaded), "cut at " + cut);
+                assertEquals(cut - end, storage.recoveredBytes());
+            }
+        }
+        Files.write(file, whole);
+        VariableStore loaded = reload();
+        assertEquals("new", loaded.get("x::1"));
+        assertNull(loaded.get("x::2"));
+    }
+
+    @Test
+    void damageInTheMiddleIsRefusedAndNeverWrittenOver() throws Exception {
+        VariableStore store = new VariableStore();
+        Path file = dir.resolve("variables.nsv");
+        try (NativeVariableStorage storage = open(store)) {
+            for (int round = 0; round < 5; round++) {
+                store.set("v::" + round, (long) round);
+                storage.save();
+            }
+        }
+        byte[] bytes = Files.readAllBytes(file);
+        // A flipped bit in the first save's entries, with four good saves after it.
+        bytes[NativeVariableFile.HEADER_LENGTH + 8 + 3] ^= 0x10;
+        Files.write(file, bytes);
+        NativeVariableStorage storage = new NativeVariableStorage(new VariableStore(), codecs, file);
+        IOException refused = assertThrows(IOException.class, storage::load);
+        assertTrue(refused.getMessage().contains("isn't a save cut off by a crash"), refused.getMessage());
+        assertFalse(storage.loaded());
+        assertThrows(IllegalStateException.class, storage::save);
+        assertArrayEquals(bytes, Files.readAllBytes(file));
+        assertFalse(Files.exists(dir.resolve("backups")), "nothing to recover from: it isn't touched");
+    }
+
+    @Test
+    void aWholeRecordThatCantBeReadIsRefused() throws Exception {
+        VariableStore store = new VariableStore();
+        Path file = dir.resolve("variables.nsv");
+        try (NativeVariableStorage storage = open(store)) {
+            store.set("a", 1L);
+            storage.save();
+        }
+        // A record of a kind a newer NeoSkript might write, with a good checksum, at the end of the file.
+        byte[] payload = {7, 0, 0};
+        java.util.zip.CRC32C crc = new java.util.zip.CRC32C();
+        crc.update(payload);
+        java.nio.ByteBuffer record = java.nio.ByteBuffer.allocate(8 + payload.length);
+        record.putInt(payload.length).putInt((int) crc.getValue()).put(payload);
+        byte[] bytes = Files.readAllBytes(file);
+        byte[] newer = Arrays.copyOf(bytes, bytes.length + record.capacity());
+        System.arraycopy(record.array(), 0, newer, bytes.length, record.capacity());
+        Files.write(file, newer);
+        assertThrows(IOException.class, () -> open(new VariableStore()));
+        assertArrayEquals(newer, Files.readAllBytes(file), "not cut off as if it were a crash");
+
+        // Flags in the header's reserved bytes are a newer format too.
+        bytes[6] = 1;
+        Files.write(file, bytes);
+        assertThrows(IOException.class, () -> open(new VariableStore()));
+        assertArrayEquals(bytes, Files.readAllBytes(file));
+    }
+
+    @Test
+    void aCompactionCutOffLeavesTheOldFileWhole() throws Exception {
+        VariableStore store = new VariableStore();
+        Path file = dir.resolve("variables.nsv");
+        try (NativeVariableStorage storage = open(store)) {
+            store.set("a", "kept");
+            storage.save();
+        }
+        // What a compaction leaves when the server stops before the temporary file is moved over the old one.
+        Path temp = dir.resolve("variables.nsv8429.tmp");
+        Files.write(temp, Arrays.copyOf(Files.readAllBytes(file), 11));
+        assertEquals("kept", reload().get("a"));
+        assertFalse(Files.exists(temp), "the leftover is removed");
     }
 
     @Test

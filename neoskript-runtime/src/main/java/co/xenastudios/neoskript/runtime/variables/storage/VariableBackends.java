@@ -8,7 +8,9 @@ import co.xenastudios.neoskript.runtime.variables.VariableStore;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -24,8 +26,10 @@ import java.util.Locale;
  *       backed up first) and {@code variables.nsv} is moved to {@code backups/}. Skript can read the result.
  * </ul>
  *
- * <p>Values are copied as their saved bytes, never decoded, so nothing NeoSkript can't read yet is lost. A step
- * that fails leaves the file it was reading where it was.
+ * <p>Values are copied as their saved bytes, never decoded, so nothing NeoSkript can't read yet is lost. The file
+ * read is only removed once the new file and the backup are synced to disk, and the removal is synced too, so a
+ * power cut at any point leaves the variables in at least one whole file. When both files are found, see
+ * {@link #open}.
  */
 public final class VariableBackends {
 
@@ -47,8 +51,8 @@ public final class VariableBackends {
         }
     }
 
-    /** The storage to load from, and what was done to get there, for the log. */
-    public record Opened(VariableBackend backend, List<String> log) {}
+    /** The storage to load from, what was done to get there, and warnings, for the log. */
+    public record Opened(VariableBackend backend, List<String> log, List<String> warnings) {}
 
     private VariableBackends() {}
 
@@ -59,28 +63,89 @@ public final class VariableBackends {
         return csv.resolveSibling(base + ".nsv");
     }
 
-    /** The storage for {@code kind}, after moving the variables over if they're in the other file. */
+    /**
+     * The storage for {@code kind}, after moving the variables over if they're in the other file. Throws, changing
+     * neither file, if both files exist with different variables and {@code variables.csv} is the newer: something
+     * that doesn't know about {@code variables.nsv} (an older NeoSkript, or Skript) saved it, and only the owner can
+     * say which to keep.
+     */
     public static Opened open(Kind kind, VariableStore store, VariableCodecs codecs, Path csv) throws IOException {
         Path nsv = nativeFile(csv);
         List<String> log = new ArrayList<>();
-        if (kind == Kind.NATIVE) {
-            if (Files.exists(nsv)) {
-                if (Files.exists(csv)) {
-                    log.add("Variables are saved in " + nsv.getFileName() + ", so " + csv.getFileName()
-                            + " beside it isn't read. Remove " + nsv.getFileName() + " to import it instead.");
-                }
-            } else if (Files.exists(csv)) {
-                importCsv(csv, nsv, log);
-            }
-            return new Opened(new NativeVariableStorage(store, codecs, nsv), List.copyOf(log));
-        }
-        if (Files.exists(nsv)) {
+        List<String> warnings = new ArrayList<>();
+        if (Files.exists(nsv) && Files.exists(csv)) {
+            both(kind, nsv, csv, log);
+        } else if (kind == Kind.NATIVE && Files.exists(csv)) {
+            importCsv(csv, nsv, log);
+        } else if (kind == Kind.CSV && Files.exists(nsv)) {
             exportCsv(nsv, csv, log);
         }
-        return new Opened(new VariableStorage(store, codecs, csv), List.copyOf(log));
+        if (kind == Kind.NATIVE) {
+            warnings.add("Variables are saved in " + nsv.getFileName() + " (variables.storage: native), which older "
+                    + "NeoSkript versions and Skript don't read. Before downgrading NeoSkript or going back to Skript, "
+                    + "set variables.storage to csv and restart once, so " + csv.getFileName() + " is written.");
+            return new Opened(new NativeVariableStorage(store, codecs, nsv), List.copyOf(log), List.copyOf(warnings));
+        }
+        return new Opened(new VariableStorage(store, codecs, csv), List.copyOf(log), List.copyOf(warnings));
     }
 
-    /** Copies {@code csv} into a new {@code nsv}, backing it up first, then removes it. */
+    /**
+     * Both files are there. With the same variables, a switch was cut off before it removed the file it read:
+     * that's finished. Otherwise the newer file wins if it's {@code variables.nsv}, and the other is backed up.
+     */
+    private static void both(Kind kind, Path nsv, Path csv, List<String> log) throws IOException {
+        List<NativeVariableFile.Op> fromNative = inOrder(NativeVariableFile.read(Files.readAllBytes(nsv))
+                .entries().values());
+        List<NativeVariableFile.Op> fromCsv = inOrder(VariableFile.load(csv).entries().values());
+        Instant nativeTime = Files.getLastModifiedTime(nsv).toInstant();
+        Instant csvTime = Files.getLastModifiedTime(csv).toInstant();
+        String times = csv.getFileName() + " was last changed " + csvTime + ", " + nsv.getFileName() + " " + nativeTime;
+        if (same(fromNative, fromCsv)) {
+            if (kind == Kind.NATIVE) {
+                Path backup = VariableStorage.backup(csv);
+                Durable.delete(csv);
+                log.add("Finished moving to " + nsv.getFileName() + ": " + csv.getFileName() + " held the same variables"
+                        + " and is now " + relative(csv, backup));
+            } else {
+                Path backup = VariableStorage.backup(nsv);
+                Durable.delete(nsv);
+                log.add("Finished moving back to " + csv.getFileName() + ": " + nsv.getFileName() + " held the same"
+                        + " variables and is now " + relative(csv, backup));
+            }
+            return;
+        }
+        if (csvTime.isAfter(nativeTime)) {
+            throw new IOException(csv.getFileName() + " and " + nsv.getFileName() + " are both there with different "
+                    + "variables, and " + csv.getFileName() + " is newer, so something that doesn't read "
+                    + nsv.getFileName() + " (an older NeoSkript, or Skript) saved it. NeoSkript won't pick one: move "
+                    + "the one you don't want out of the folder and restart. " + times);
+        }
+        if (kind == Kind.NATIVE) {
+            Path backup = VariableStorage.backup(csv);
+            Durable.delete(csv);
+            log.add(csv.getFileName() + " was older than " + nsv.getFileName() + ", which is in use, so it was moved to "
+                    + relative(csv, backup) + " unread. " + times);
+        } else {
+            exportCsv(nsv, csv, log);
+            log.add(times + " before the move.");
+        }
+    }
+
+    private static boolean same(List<NativeVariableFile.Op> a, List<NativeVariableFile.Op> b) {
+        if (a.size() != b.size()) {
+            return false;
+        }
+        for (int i = 0; i < a.size(); i++) {
+            NativeVariableFile.Op x = a.get(i);
+            NativeVariableFile.Op y = b.get(i);
+            if (!x.name().equals(y.name()) || !x.type().equals(y.type()) || !Arrays.equals(x.bytes(), y.bytes())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Copies {@code csv} into a new {@code nsv}, backing it up first, then removes it once both are on disk. */
     static void importCsv(Path csv, Path nsv, List<String> log) throws IOException {
         Path backup = VariableStorage.backup(csv);
         VariableFile.Contents contents = VariableFile.load(csv);
@@ -93,12 +158,15 @@ public final class VariableBackends {
         }
         List<NativeVariableFile.Op> ops = inOrder(contents.entries().values());
         NativeVariableStorage.write(nsv, ops);
-        Files.delete(csv);
+        Durable.delete(csv);
         log.add("Moved " + ops.size() + " variables from " + csv.getFileName() + " to " + nsv.getFileName()
                 + " (backed up as " + relative(csv, backup) + ")");
     }
 
-    /** Writes the variables in {@code nsv} to {@code csv}, backing up both, then moves {@code nsv} to backups. */
+    /**
+     * Writes the variables in {@code nsv} to {@code csv}, backing up both, then removes {@code nsv} once the new
+     * {@code csv} and the backup are on disk.
+     */
     static void exportCsv(Path nsv, Path csv, List<String> log) throws IOException {
         NativeVariableFile.Contents contents = NativeVariableFile.read(Files.readAllBytes(nsv));
         if (Files.exists(csv)) {
@@ -106,7 +174,7 @@ public final class VariableBackends {
         }
         if (contents.damaged()) {
             log.add("The last " + (contents.length() - contents.validEnd()) + " bytes of " + nsv.getFileName()
-                    + " were cut off or damaged and weren't exported; the backup keeps them.");
+                    + " were a save cut off by a crash and weren't exported; the backup keeps them.");
         }
         List<NativeVariableFile.Op> ops = inOrder(contents.entries().values());
         List<VariableFile.Entry> entries = new ArrayList<>(ops.size());
@@ -115,7 +183,7 @@ public final class VariableBackends {
         }
         VariableFile.write(csv, entries);
         Path backup = VariableStorage.backup(nsv);
-        Files.delete(nsv);
+        Durable.delete(nsv);
         log.add("Moved " + ops.size() + " variables from " + nsv.getFileName() + " back to " + csv.getFileName()
                 + ", which Skript can read (" + nsv.getFileName() + " is kept as " + relative(csv, backup) + ")");
     }
