@@ -203,18 +203,33 @@ public final class NeoSkriptWebScenario implements Scenario {
         Path scripts = builder.runDir().resolve("plugins/NeoSkript/scripts");
         Map<String, Map<String, List<String>>> results;
         try (ServerProcess server = builder.start()) {
-            // Paper refuses the originals first; everything waited for comes after both refusals.
-            int after = 0;
+            // Paper refuses the originals first, in whatever order it lists plugins/; everything waited for comes
+            // after both refusals. Paper refuses them for their missing dependency; Folia, first, as they aren't
+            // marked as supporting Folia.
+            Map<String, Pattern> refusals = new LinkedHashMap<>();
             for (PinnedPlugin original : List.of(REQN, SKJSON)) {
-                // Paper refuses it for its missing dependency; Folia, first, as it isn't marked as supporting Folia.
                 String name = original == REQN ? "Reqn" : "SkJson";
-                Pattern refused = Pattern.compile("Could not load 'plugins/(\\.paper-remapped/)?"
-                        + Pattern.quote(original.fileName() + "'") + "|" + Pattern.quote("Could not load plugin '" + name + " v"));
-                server.await(refused, after, WAIT);
+                refusals.put(name, Pattern.compile("Could not load 'plugins/(\\.paper-remapped/)?"
+                        + Pattern.quote(original.fileName() + "'") + "|" + Pattern.quote("Could not load plugin '" + name
+                        + " v")));
+            }
+            Pattern anyRefusal = Pattern.compile(String.join("|", refusals.values().stream().map(Pattern::pattern)
+                    .toList()));
+            java.util.Set<String> refused = new java.util.HashSet<>();
+            int after = 0;
+            while (refused.size() < refusals.size()) {
+                server.await(anyRefusal, after, WAIT);
                 List<String> lines = server.lines(0);
-                for (int i = 0; i < lines.size(); i++) {
-                    if (refused.matcher(lines.get(i)).find()) {
-                        after = Math.max(after, i + 1);
+                for (int i = after; i < lines.size(); i++) {
+                    String line = lines.get(i);
+                    if (anyRefusal.matcher(line).find()) {
+                        refusals.forEach((name, pattern) -> {
+                            if (pattern.matcher(line).find()) {
+                                refused.add(name);
+                            }
+                        });
+                        after = i + 1;
+                        break;
                     }
                 }
             }
