@@ -22,6 +22,22 @@ function event_value_words():
 	broadcast chat message
 	if message is "a":
 		send "6" to console
+	# Only text on the other side can't be compared with the words the line starts with.
+	if message is 1:
+		send "6a" to console
+	if message is {_x}:
+		send "6b" to console
+	if victim is 1:
+		send "6c" to console
+	# An item type is a container to a loop, so it can be looped.
+	loop stone:
+		send "6d" to console
+	loop diamond sword:
+		send "6e" to console
+	loop armor stand:
+		send "6f" to console
+	loop fire:
+		send "6g" to console
 
 on load:
 	if {_x} is time:

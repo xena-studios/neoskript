@@ -1375,6 +1375,11 @@ final class TriggerCompiler {
                     && library.binding(left.syntax().syntax()) instanceof ElementFactory<?> factory
                     && !setsUp(factory, left) && condition.match().values().get(1) instanceof Expr right
                     && !(right instanceof Expr.Unresolved)) {
+                // Only text on the other side: Skript can't compare the words with it. Anything else it reads the
+                // words as, so the first side's own error stands ('if message is 1:').
+                if (!(right instanceof Expr.Text) && !"string".equals(valueType(right))) {
+                    return null;
+                }
                 String other = compared(right);
                 if (other == null || other.startsWith("'")) {
                     return null;
@@ -2371,11 +2376,12 @@ final class TriggerCompiler {
         // read as a value ('loop the block:' in a function has no block; 'loop block and executor:' is the types).
         checkEventValues(looped, true);
         // As Skript's loops, what's certainly one value can't be looped. A variable may hold a queue, which can.
-        // Words are one value of what they're read as ('loop entity:' in a function).
+        // Words are one value of what they're read as ('loop entity:' in a function), unless they're an item type,
+        // which Skript's loop takes as the container it is ('loop stone:' runs once).
         if (!(looped instanceof Expr.Variable) && !"queue".equals(looped.type())
                 && (surelySingle(looped) || looped instanceof Expr.Unresolved words
                         && !words.text().strip().toLowerCase(Locale.ROOT).startsWith("the ")
-                        && unparsedValue(words.text()) != null)) {
+                        && unparsedValue(words.text()) != null && !itemWords(words.text()))) {
             // A list is in brackets, as Skript's ExpressionList writes itself: '("a" or "b")'.
             String written = looped instanceof Expr.ListOf ? "(" + skriptText(looped) + ")" : skriptText(looped);
             throw new CompileException(line, "Can't loop '" + written + "' because it's only a single value");
@@ -2409,14 +2415,20 @@ final class TriggerCompiler {
             // A queue is taken from as the loop goes, so what the loop adds to it is looped too.
             queueSlot = nextSlot++;
             // A loop takes any objects: words for an event value that isn't there are a value ('loop block:').
+            boolean items = looped instanceof Expr.Unresolved words && itemWords(words.text());
             List<String> outerLiteralTypes = literalTypes;
-            literalTypes = List.of(SyntaxRegistry.OBJECT);
+            // An item type's words are the item type to a loop, as Skript's loop takes a container ('loop fire:').
+            literalTypes = items ? List.of("itemtype", SyntaxRegistry.OBJECT) : List.of(SyntaxRegistry.OBJECT);
             try {
                 expression(looped);
             } finally {
                 literalTypes = outerLiteralTypes;
             }
             convert(true);
+            if (items) {
+                // An item type's words are looped as its items, as Skript's loop takes the container it is.
+                method.visitMethodInsn(INVOKESTATIC, VALUES, "containerValues", "(" + OBJECTS + ")" + OBJECTS, false);
+            }
             method.visitInsn(DUP);
             method.visitMethodInsn(INVOKESTATIC, VALUES, "loopedQueue", "(" + OBJECTS + ")Ljava/util/Queue;", false);
             method.visitVarInsn(ASTORE, queueSlot);
@@ -5902,6 +5914,15 @@ final class TriggerCompiler {
         TypeRef type = registry.resolveType(words);
         Class<?> javaClass = type == null || type.plural() ? null : library.javaClass(type.type().id());
         return javaClass == null ? null : new co.xenastudios.neoskript.runtime.TypeValue(type.type().name(), javaClass);
+    }
+
+    /** Whether {@code words} are an item type, as Skript's item type parser reads them ('stone', 'fire'). */
+    private boolean itemWords(String words) {
+        try {
+            return wordsAs(words, List.of("itemtype")) != null;
+        } catch (RuntimeException | LinkageError needsServer) {
+            return false;
+        }
     }
 
     /**

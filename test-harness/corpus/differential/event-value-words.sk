@@ -21,4 +21,13 @@ function probe_event_value_words():
 	set {_w} to weather
 	send "weather: %{_w}%" to console
 	send "weather is weather: %whether {_w} is weather%" to console
+	# An item type is looped as the container it is.
+	loop stone:
+		send "loop stone: %loop-value%" to console
+	loop diamond sword:
+		send "loop diamond sword: %loop-value%" to console
+	loop armor stand:
+		send "loop armor stand: %loop-value%" to console
+	loop fire:
+		send "loop fire: %loop-value%" to console
 	send "end" to console
