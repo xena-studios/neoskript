@@ -238,20 +238,16 @@ final class SkriptCommand implements TabExecutor {
                 ScriptReport report = new ScriptReport(label);
                 Set<String> changed;
                 try {
-                    changed = plugin.aliases().reload(plugin.settings().aliases().loadDefaults(), report.aliases());
-                } catch (RuntimeException e) {
+                    // aliases.load-defaults as config.yml has it now, without needing /sk reload config first.
+                    changed = plugin.aliases().reload(plugin.loadDefaultAliases(), report.aliases());
+                } catch (RuntimeException | StackOverflowError | OutOfMemoryError | LinkageError e) {
                     plugin.getSLF4JLogger().error("Couldn't reload the aliases", e);
                     send(sender, Messages.READ_FAILED, text("reason", String.valueOf(e.getMessage())));
                     return;
                 }
                 // Then the scripts that use the aliases that changed, or that had errors the new aliases may fix.
                 // A script that now has errors keeps running its last version (D12).
-                Predicate<String> affected;
-                try {
-                    affected = scripts.affectedBy(changed);
-                } catch (IOException e) {
-                    affected = null;
-                }
+                Predicate<String> affected = scripts.affectedBy(changed);
                 ScriptManager.Outcome outcome = load(sender, recipients, affected, report);
                 if (outcome != null) {
                     Component what = Component.text("the aliases");
@@ -339,9 +335,9 @@ final class SkriptCommand implements TabExecutor {
     /** Reloads the aliases for {@code /sk reload all}, with their problems in {@code report}. Returns whether it could. */
     private boolean reloadAliases(ScriptReport report) {
         try {
-            plugin.aliases().reload(plugin.settings().aliases().loadDefaults(), report.aliases());
+            plugin.aliases().reload(plugin.loadDefaultAliases(), report.aliases());
             return true;
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | StackOverflowError | OutOfMemoryError | LinkageError e) {
             plugin.getSLF4JLogger().error("Couldn't reload the aliases", e);
             return false;
         }

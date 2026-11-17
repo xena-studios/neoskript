@@ -167,11 +167,17 @@ public final class NeoSkriptCli {
 
     /**
      * The aliases folder that goes with {@code target}, as Skript's {@code plugins/Skript/aliases} goes with
-     * {@code plugins/Skript/scripts}: the {@code aliases} folder beside the scripts folder (the target, or the folder of
-     * a script), or {@code null} if there isn't one.
+     * {@code plugins/Skript/scripts}: beside the {@code scripts} folder the target is in or is (so a script in
+     * {@code scripts/games/} finds it too), else beside the target's folder. {@code null} if there isn't one.
      */
     static Path aliasesNextTo(Path target) {
         Path folder = Files.isDirectory(target) ? target : target.getParent();
+        for (Path each = folder; each != null; each = each.getParent()) {
+            if (each.getFileName() != null && each.getFileName().toString().equals("scripts") && each.getParent() != null
+                    && Files.isDirectory(each.getParent().resolve("aliases"))) {
+                return each.getParent().resolve("aliases");
+            }
+        }
         Path parent = folder == null ? null : folder.getParent();
         Path aliases = parent == null ? null : parent.resolve("aliases");
         return aliases != null && Files.isDirectory(aliases) ? aliases : null;
@@ -263,6 +269,10 @@ public final class NeoSkriptCli {
                     "-Dneoskript.check.defaultAliases=" + defaultAliases));
             if (aliases != null) {
                 command.add("-Dneoskript.check.aliases=" + aliases);
+                // The plugin's folder, where aliases-english.zip replaces Skript's default aliases if it's there.
+                if (aliases.getParent() != null) {
+                    command.add("-Dneoskript.check.dataFolder=" + aliases.getParent());
+                }
             }
             command.addAll(List.of("-jar", serverJar.toString(), "--nogui"));
             Process process = new ProcessBuilder(command).directory(dir.toFile()).redirectErrorStream(true).start();

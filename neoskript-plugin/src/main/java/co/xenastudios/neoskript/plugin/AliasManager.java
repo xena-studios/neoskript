@@ -6,7 +6,6 @@ package co.xenastudios.neoskript.plugin;
 
 import co.xenastudios.neoskript.frontend.source.Diagnostic;
 import co.xenastudios.neoskript.frontend.source.Severity;
-import co.xenastudios.neoskript.frontend.source.SourceFile;
 import co.xenastudios.neoskript.paper.GlobalAliases;
 import java.nio.file.Path;
 import java.util.List;
@@ -37,25 +36,34 @@ final class AliasManager {
         return dataFolder.resolve("aliases");
     }
 
-    /** Reads the aliases when the server starts, with their problems in the console. */
+    /**
+     * Reads the aliases when the server starts, with their problems in the console. Nothing from the alias files can
+     * stop the plugin: if this fails, Skript's default aliases are used.
+     */
     void load(boolean defaults) {
-        long start = System.nanoTime();
-        GlobalAliases.Loaded loaded = GlobalAliases.load(folder(), dataFolder, defaults);
-        loaded.problems(AliasManager::toConsole);
-        GlobalAliases.install(loaded);
-        if (loaded.files() > 0 || !defaults) {
-            logger.info("Loaded {} aliases from {} {}{} in {} ms", loaded.aliases(), loaded.files(),
-                    loaded.files() == 1 ? "alias file" : "alias files", defaults ? " and the defaults" : "",
-                    (System.nanoTime() - start) / 1_000_000);
+        try {
+            long start = System.nanoTime();
+            GlobalAliases.Loaded loaded = GlobalAliases.load(folder(), dataFolder, defaults);
+            loaded.problems(AliasManager::toConsole);
+            GlobalAliases.install(loaded);
+            if (loaded.failed()) {
+                logger.error("Couldn't load the alias files, so only Skript's default aliases are used");
+            } else if (loaded.files() > 0 || !defaults) {
+                logger.info("Loaded {} aliases from {} {}{} in {} ms", loaded.aliases(), loaded.files(),
+                        loaded.files() == 1 ? "alias file" : "alias files", defaults ? " and the defaults" : "",
+                        (System.nanoTime() - start) / 1_000_000);
+            }
+        } catch (RuntimeException | StackOverflowError | OutOfMemoryError | LinkageError e) {
+            logger.error("Couldn't load the alias files, so only Skript's default aliases are used", e);
         }
     }
 
     /**
-     * Reads the aliases again and uses them, with their problems going to {@code problems}. Returns the names whose
-     * meaning changed, for the scripts that use them to be reloaded, or {@code null} if so many changed that every
-     * script should be.
+     * Reads the aliases again and uses them, with their problems going to {@code problems} with their lines of code.
+     * Returns the names whose meaning changed, for the scripts that use them to be reloaded, or {@code null} if so
+     * many changed that every script should be. If loading fails, the aliases in use stay and nothing changed.
      */
-    Set<String> reload(boolean defaults, BiConsumer<Diagnostic, SourceFile> problems) {
+    Set<String> reload(boolean defaults, BiConsumer<Diagnostic, String> problems) {
         GlobalAliases.Loaded before = GlobalAliases.inUse();
         GlobalAliases.Loaded loaded = GlobalAliases.load(folder(), dataFolder, defaults);
         loaded.problems(problems);
@@ -65,9 +73,9 @@ final class AliasManager {
     }
 
     /** A problem as Skript logs one: like a script's, or for a whole file, the message alone. */
-    static void toConsole(Diagnostic problem, SourceFile file) {
+    static void toConsole(Diagnostic problem, String code) {
         if (problem.line() >= 1) {
-            AutoReload.send(List.of(Bukkit.getConsoleSender()), AutoReload.SKRIPT_PREFIX + AutoReload.describe(problem, file));
+            AutoReload.send(List.of(Bukkit.getConsoleSender()), AutoReload.SKRIPT_PREFIX + AutoReload.describe(problem, code));
             return;
         }
         String colour = problem.severity() == Severity.ERROR ? "<light red>" : "<yellow>";

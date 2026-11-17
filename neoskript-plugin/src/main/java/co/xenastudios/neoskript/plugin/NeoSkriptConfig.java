@@ -76,7 +76,7 @@ public record NeoSkriptConfig(
                 "Load Skript's default aliases, as Skript's 'load default aliases' in config.sk. Off, items are only named",
                 "after their Minecraft ids (red dye) and by the alias files in plugins/NeoSkript/aliases, so some, like",
                 "potions of each kind, have no names. Moving over from Skript copies its setting. Applies on",
-                "/sk reload aliases."})
+                "/sk reload aliases (which reads it from this file), /sk reload all or restart."})
             boolean loadDefaults) {}
 
     public record Variables(

@@ -142,7 +142,7 @@ class AliasLoaderTest {
     }
 
     private List<String> messages() {
-        return problems.stream().map(p -> p.file().name() + ":" + p.line() + ": " + p.message()).toList();
+        return problems.stream().map(p -> p.file() + ":" + p.line() + ": " + p.message()).toList();
     }
 
     @Test
@@ -428,5 +428,57 @@ class AliasLoaderTest {
             problems.clear();
             assertNotNull(load("fuzz.sk", text.toString()));
         }
+    }
+
+    @Test
+    void problemsStopAtALimitAndAreCounted() {
+        StringBuilder bad = new StringBuilder("bad:\n");
+        for (int i = 0; i < 5000; i++) {
+            bad.append("\tline ").append(i).append(" = minecraft:nope\n");
+        }
+        AliasLoader loader = new AliasLoader(server);
+        loader.read(new AliasLoader.Input("bad.sk", bad.toString()));
+        assertNotNull(loader.finish());
+        assertEquals(AliasLoader.MAX_PROBLEMS, loader.problems().size());
+        assertEquals(5000 - AliasLoader.MAX_PROBLEMS, loader.moreProblems());
+        assertEquals(new AliasLoader.Problem("bad.sk", 2, true, "Minecraft id minecraft:nope is not valid",
+                "line 0 = minecraft:nope"), loader.problems().getFirst(), "a problem keeps its line, not the file");
+    }
+
+    @Test
+    void filesAreReadOneAtATimeUpToALimit(@org.junit.jupiter.api.io.TempDir java.nio.file.Path folder) throws Exception {
+        java.nio.file.Files.createDirectories(folder.resolve("sub"));
+        java.nio.file.Files.createDirectories(folder.resolve(".hidden"));
+        java.nio.file.Files.writeString(folder.resolve("a.sk"), "a:\n\tfirst = minecraft:flint\n");
+        java.nio.file.Files.writeString(folder.resolve("sub/b.sk"), "b:\n\tsecond = minecraft:apple\n");
+        java.nio.file.Files.writeString(folder.resolve(".hidden/c.sk"), "c:\n\thidden = minecraft:apple\n");
+        java.nio.file.Files.writeString(folder.resolve("z.sk"), "z:\n\t" + "x".repeat(200) + " = minecraft:stone\n");
+        java.nio.file.Files.writeString(folder.resolve("notes.txt"), "not = minecraft:stone\n");
+        AliasLoader loader = new AliasLoader(server);
+        int read = GlobalAliases.readFolder(folder, loader, 0, new int[] {0}, new long[] {0}, 100);
+        AliasTable table = loader.finish();
+        assertEquals(2, read);
+        assertNotNull(table.get("first"));
+        assertNotNull(table.get("second"));
+        assertNull(table.get("hidden"));
+        assertEquals(List.of("z.sk:0: The alias files are more than 0 MB in all, so 'z.sk' isn't read"),
+                loader.problems().stream().map(p -> p.file() + ":" + p.line() + ": " + p.message()).toList());
+    }
+
+    @Test
+    void usesAreRecordedByScriptWhileCompiling() {
+        GlobalAliases.used("ruby");
+        GlobalAliases.recordUses();
+        co.xenastudios.neoskript.runtime.ScriptFeatures.compiling("gems.sk");
+        try {
+            GlobalAliases.used("ruby");
+            GlobalAliases.used("2 rubys");
+        } finally {
+            co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(null);
+        }
+        GlobalAliases.used("not compiling");
+        assertEquals(Map.of("gems.sk", java.util.Set.of("ruby", "2 rubys")), GlobalAliases.recordedUses());
+        GlobalAliases.used("after");
+        assertEquals(Map.of(), GlobalAliases.recordedUses(), "nothing is recorded, or kept, once it stops");
     }
 }

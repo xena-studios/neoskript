@@ -80,8 +80,11 @@ final class AliasLoader {
      */
     record Made(Object value, String key) {}
 
-    /** A problem with a line of an alias file. Line 0 is the file as a whole. */
-    record Problem(SourceFile file, int line, boolean error, String message) {}
+    /**
+     * A problem with a line of an alias file: the file's name, the line (0 for the file as a whole), and that line's
+     * code, so a problem never keeps the file's text.
+     */
+    record Problem(String file, int line, boolean error, String message, String code) {}
 
     /** A file to read: its name as problems give it (Skript gives the file name alone), and its text. */
     record Input(String name, String text) {}
@@ -89,6 +92,11 @@ final class AliasLoader {
     private final Server server;
     private final int[] version;
     private final List<Problem> problems = new ArrayList<>();
+    /** Problems past {@link #MAX_PROBLEMS}, which are counted but not kept. */
+    private int moreProblems;
+
+    /** The most problems kept; the rest are counted, so a file of bad lines can't fill the heap or the chat. */
+    static final int MAX_PROBLEMS = 1000;
 
     /** The current file and line, for problems. */
     private SourceFile file;
@@ -130,9 +138,33 @@ final class AliasLoader {
         return table;
     }
 
+    /** The problems kept so far, in order. */
+    List<Problem> problems() {
+        return problems;
+    }
+
+    /** How many problems there were past {@link #MAX_PROBLEMS}. */
+    int moreProblems() {
+        return moreProblems;
+    }
+
+    /** A problem with a whole file, such as one that can't be read. */
+    void fileProblem(String name, boolean error, String message) {
+        report(new Problem(name, 0, error, message, ""));
+    }
+
+    private void report(Problem problem) {
+        if (problems.size() < MAX_PROBLEMS) {
+            problems.add(problem);
+        } else {
+            moreProblems++;
+        }
+    }
+
     // --- files ---
 
-    private void read(Input input) {
+    /** Reads one file into what's loaded. Its text isn't kept. */
+    void read(Input input) {
         file = new SourceFile(input.name(), input.text());
         line = 0;
         lineProblems.clear();
@@ -153,8 +185,9 @@ final class AliasLoader {
             if (diagnostic.message().startsWith("Empty configuration section!") && sectionWithEquals(nodes, diagnostic.line())) {
                 continue;
             }
-            problems.add(new Problem(file, diagnostic.line(), diagnostic.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR,
-                    diagnostic.message()));
+            report(new Problem(file.name(), diagnostic.line(),
+                    diagnostic.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR, diagnostic.message(),
+                    code(diagnostic.line())));
         }
         notEntries(nodes);
         for (Node node : nodes) {
@@ -927,7 +960,8 @@ final class AliasLoader {
      * name ({@code red dye}), and where a file already has that name, Skript adds the item to that alias. Those
      * items are added here; the names of the rest are NeoSkript's own (see {@link ItemType}).
      */
-    private AliasTable finish() {
+    AliasTable finish() {
+        file = null;
         Set<String> generated = new HashSet<>();
         Set<String> merged = new HashSet<>();
         for (String material : server.materials()) {
@@ -987,7 +1021,15 @@ final class AliasLoader {
 
     private void problem(boolean error, String message) {
         if (lineProblems.merge((error ? "E" : "W") + message, 1, Integer::sum) <= MAX_REPEATS) {
-            problems.add(new Problem(file, line, error, message));
+            report(new Problem(file == null ? "" : file.name(), line, error, message, code(line)));
         }
+    }
+
+    /** The code on line {@code number} of the current file, or "" for none. */
+    private String code(int number) {
+        if (file == null || number < 1 || number > file.lines().size()) {
+            return "";
+        }
+        return file.lines().get(number - 1).strip();
     }
 }

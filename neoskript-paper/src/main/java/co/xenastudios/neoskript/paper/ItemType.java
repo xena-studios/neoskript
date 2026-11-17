@@ -118,7 +118,7 @@ public final class ItemType {
      * ({@code cod} for {@code cooked fish = cod}), or its material's key.
      */
     public String rawName() {
-        AliasTable.Named named = GlobalAliases.named(material(), block != null ? null : stack, blockData);
+        AliasTable.Named named = GlobalAliases.named(material(), block != null ? null : stack, blockData, false);
         return named != null ? named.item().id() : material().getKey().toString();
     }
 
@@ -392,6 +392,7 @@ public final class ItemType {
      * {@code ruby block} are the alias's items that are items, or blocks.
      */
     private static ItemType fileAlias(String name, int amount, boolean amountGiven) {
+        GlobalAliases.used(name);
         AliasTable.Type alias = GlobalAliases.alias(name);
         boolean blocks = false;
         boolean items = false;
@@ -403,6 +404,7 @@ public final class ItemType {
             if (!blocks && !items) {
                 return null;
             }
+            GlobalAliases.used(name.substring(0, space));
             alias = GlobalAliases.alias(name.substring(0, space));
             if (alias == null) {
                 return null;
@@ -533,6 +535,7 @@ public final class ItemType {
             }
             aliases = known;
         }
+        GlobalAliases.used(name);
         Material found = known.get(name);
         // As in Skript, an item an alias file names doesn't have these names ('ruby = minecraft:red_dye' takes
         // 'red dye' away).
@@ -574,7 +577,7 @@ public final class ItemType {
 
     /** How a block reads, with its block data: what an alias file calls it ({@code north anvil}), or its own name. */
     static String name(Material material, org.bukkit.block.data.BlockData data) {
-        AliasTable.Named named = GlobalAliases.named(material, null, data);
+        AliasTable.Named named = GlobalAliases.named(material, null, data, false);
         return named != null ? named.singular() : keyName(material);
     }
 
@@ -594,13 +597,14 @@ public final class ItemType {
      * ItemData, enchantments aren't written.
      */
     static String text(ItemStack stack, boolean withAmount) {
-        return text(stack, null, withAmount);
+        return text(stack, null, withAmount, true);
     }
 
-    private static String text(ItemStack stack, org.bukkit.block.data.BlockData blockData, boolean withAmount) {
+    private static String text(ItemStack stack, org.bukkit.block.data.BlockData blockData, boolean withAmount,
+            boolean itemForm) {
         StringBuilder text = new StringBuilder();
         // As Skript, what the alias files call it, singular or plural, else its own name.
-        AliasTable.Named named = GlobalAliases.named(stack.getType(), stack, blockData);
+        AliasTable.Named named = GlobalAliases.named(stack.getType(), stack, blockData, itemForm);
         String name = named != null ? named.singular() : keyName(stack.getType());
         if (withAmount && stack.getAmount() != 1) {
             text.append(stack.getAmount()).append(' ').append(named != null ? named.plural() : plural(name));
@@ -625,7 +629,7 @@ public final class ItemType {
             return (counted ? amount + " " : "") + String.join(", ", names.subList(0, names.size() - 1)) + " or "
                     + names.getLast();
         }
-        return block != null ? name(block, blockData) : text(stack, blockData, amountGiven);
+        return block != null ? name(block, blockData) : text(stack, blockData, amountGiven, false);
     }
 
     /** How it reads without its amount, in the plural or not: {@code rubys}, {@code fancy swords named Fancy}. */
@@ -633,7 +637,7 @@ public final class ItemType {
         if (block != null) {
             return name(block, blockData);
         }
-        String text = text(stack, blockData, plural);
+        String text = text(stack, blockData, plural, false);
         String prefix = stack.getAmount() + " ";
         return plural && stack.getAmount() != 1 && text.startsWith(prefix) ? text.substring(prefix.length()) : text;
     }

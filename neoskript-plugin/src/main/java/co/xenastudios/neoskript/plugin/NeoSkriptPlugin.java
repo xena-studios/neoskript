@@ -90,6 +90,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                     getSLF4JLogger().info("Copied {} from plugins/Skript. Skript's folder was left as it was.", what);
                 }
             }
+            migration.notes().forEach(note -> getSLF4JLogger().warn(note));
             if (migration.variablesBackup() != null) {
                 getSLF4JLogger().info("Backed up Skript's variables as {} before loading them",
                         getDataPath().toAbsolutePath().relativize(migration.variablesBackup().toAbsolutePath()));
@@ -365,6 +366,28 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     /** The settings from config.yml. */
     NeoSkriptConfig settings() {
         return settings;
+    }
+
+    /**
+     * {@code aliases.load-defaults} as config.yml has it now, for {@code /sk reload aliases}, which reads it again
+     * as Skript reads its setting. If the file can't be read or the value isn't true or false, the running setting.
+     */
+    boolean loadDefaultAliases() {
+        boolean running = settings.aliases().loadDefaults();
+        try {
+            org.bukkit.configuration.file.YamlConfiguration config = new org.bukkit.configuration.file.YamlConfiguration();
+            config.load(configFile().toFile());
+            if (config.isBoolean("aliases.load-defaults")) {
+                return config.getBoolean("aliases.load-defaults");
+            }
+            if (config.contains("aliases.load-defaults")) {
+                getSLF4JLogger().warn("config.yml: aliases.load-defaults isn't true or false, so it stays {}", running);
+            }
+        } catch (IOException | org.bukkit.configuration.InvalidConfigurationException | RuntimeException e) {
+            getSLF4JLogger().warn("Couldn't read aliases.load-defaults from config.yml, so it stays {}: {}", running,
+                    e.getMessage());
+        }
+        return running;
     }
 
     /** The alias files, for {@code /sk reload aliases}. */

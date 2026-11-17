@@ -95,7 +95,7 @@ command /loaditem:
 
 An alias is another name for items. Skript's default aliases add names like `speed potion`, `water bottle` and `flight 1 firework rocket`. A server can add its own in `.sk` files in `plugins/NeoSkript/aliases`, in Skript's format, which NeoSkript reads when it starts and on `/sk reload aliases`. Moving over from Skript copies `plugins/Skript/aliases`.
 
-```skript title="plugins/NeoSkript/aliases/gems.sk"
+```skript nocheck title="plugins/NeoSkript/aliases/gems.sk"
 gems:
 	ruby¦s = minecraft:red_dye
 	shiny gem¦s = minecraft:diamond {minecraft:custom_model_data={floats:[7f]}}
@@ -115,6 +115,6 @@ woods:
 - A `{name}:` section is a variation: `{woods} plank thing` is `oak plank thing` and `birch plank thing`, with `-` in the id filled in.
 - `minecraft version = 1.20.5 or newer` at the top of a section loads it only on those versions.
 
-They work as in Skript. An alias whose name is taken adds its items to that alias, and later files can use variations from earlier ones, Skript's defaults included. An item an alias file names is written with that name (`ruby`), and loses the name it has from its id: with the file above, `red dye` isn't an item, though `red_dye` still is. A line with a problem is reported with Skript's message and left out; the rest still load. [`aliases.load-defaults`](/docs/server/configuration/#aliases) turns Skript's defaults off.
+They work as in Skript. An alias whose name is taken adds its items to that alias, and later files can use variations from earlier ones, Skript's defaults included. An item an alias file names is written with that name (`ruby`), and loses the name it has from its id: with the file above, `red dye` isn't an item, though `red_dye` still is. A line with a problem is reported with Skript's message and left out; the rest still load. The first 1,000 problems are listed, and the rest counted. [`aliases.load-defaults`](/docs/server/configuration/#aliases) turns Skript's defaults off.
 
 For menus made of items, see [menus](/docs/scripts/menus/). Every item expression is in the [expressions reference](/syntax/expressions/).

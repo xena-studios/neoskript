@@ -54,18 +54,19 @@ public final class GlobalAliases {
     /** The entity each material's item relates to, for the current table. */
     private static volatile Map<String, String> related = new ConcurrentHashMap<>();
     private static final String NONE = "";
-    /** Each block's default block data, as text: the same for every table. */
-    private static final Map<Material, String> DEFAULT_BLOCKS = new ConcurrentHashMap<>();
 
     /** What loading alias files found. */
     public static final class Loaded {
+        /** The aliases, or {@code null} if loading failed, which leaves those in use as they are. */
         final AliasTable table;
         private final List<AliasLoader.Problem> problems;
+        private final int moreProblems;
         private final int files;
 
-        Loaded(AliasTable table, List<AliasLoader.Problem> problems, int files) {
+        Loaded(AliasTable table, List<AliasLoader.Problem> problems, int moreProblems, int files) {
             this.table = table;
             this.problems = problems;
+            this.moreProblems = moreProblems;
             this.files = files;
         }
 
@@ -76,7 +77,12 @@ public final class GlobalAliases {
 
         /** How many names the alias files define, default aliases included. */
         public int aliases() {
-            return table.count();
+            return table == null ? 0 : table.count();
+        }
+
+        /** Whether loading failed as a whole, so the aliases in use were kept. */
+        public boolean failed() {
+            return table == null;
         }
 
         public int errors() {
@@ -84,78 +90,100 @@ public final class GlobalAliases {
         }
 
         /**
-         * Gives each problem, in order, as a script problem would be given: line 0 is the file as a whole, like
-         * Skript's {@code 'x.sk' is empty}.
+         * Gives each problem, in order, with the line of code it's on ({@code ""} for none): line 0 is the file as a
+         * whole, like Skript's {@code 'x.sk' is empty}. Past {@link AliasLoader#MAX_PROBLEMS}, one more line says how
+         * many more there were.
          */
-        public void problems(BiConsumer<Diagnostic, SourceFile> into) {
+        public void problems(BiConsumer<Diagnostic, String> into) {
             for (AliasLoader.Problem problem : problems) {
-                into.accept(new Diagnostic(problem.error() ? co.xenastudios.neoskript.frontend.source.Severity.ERROR : co.xenastudios.neoskript.frontend.source.Severity.WARNING,
-                        problem.file().name(), problem.line(), 0, 0, problem.message()), problem.file());
+                into.accept(new Diagnostic(problem.error() ? co.xenastudios.neoskript.frontend.source.Severity.ERROR
+                        : co.xenastudios.neoskript.frontend.source.Severity.WARNING, problem.file(), problem.line(), 0, 0,
+                        problem.message()), problem.code());
+            }
+            if (moreProblems > 0) {
+                into.accept(new Diagnostic(co.xenastudios.neoskript.frontend.source.Severity.ERROR, "aliases", 0, 0, 0,
+                        "... and " + moreProblems + " more " + (moreProblems == 1 ? "problem" : "problems")
+                                + " in the alias files, not listed"), "");
             }
         }
     }
 
+    /** The most bytes of alias files read in all; the rest are left out with an error. */
+    static final long MAX_TOTAL_BYTES = 64L << 20;
+
     /**
      * Reads the aliases: the defaults if {@code defaults}, then the {@code .sk} files in {@code folder} and its
-     * folders (not those starting with {@code .}), as Skript reads {@code plugins/Skript/aliases}. A file that can't
-     * be read is reported and left out; nothing here throws for what's in the files. Call {@link #install} to use them.
+     * folders (not those starting with {@code .}), as Skript reads {@code plugins/Skript/aliases}. Each file is read
+     * and loaded in turn, so only one file's text is held at a time. A file that can't be read is reported and left
+     * out. Nothing here throws: if loading fails as a whole, even for lack of memory, the result says so and
+     * {@link #install} keeps the aliases in use.
      *
      * @param dataFolder the plugin's folder, where {@code aliases-english.zip} replaces the jar's defaults if it's
      *     there, or {@code null}
      */
     public static Loaded load(Path folder, Path dataFolder, boolean defaults) {
-        List<AliasLoader.Input> inputs = new ArrayList<>();
-        List<AliasLoader.Problem> problems = new ArrayList<>();
-        if (defaults) {
-            Path zip = dataFolder == null ? null : dataFolder.resolve("aliases-english.zip");
-            if (zip != null && Files.isRegularFile(zip)) {
-                try (FileSystem zipFs = FileSystems.newFileSystem(zip)) {
-                    readFolder(zipFs.getPath("/"), inputs, problems, 0, new int[] {0});
-                } catch (IOException | RuntimeException e) {
-                    problems.add(new AliasLoader.Problem(new SourceFile("aliases-english.zip", ""), 0, true,
-                            "Couldn't read aliases-english.zip: " + e.getMessage()));
-                }
-            } else {
-                for (String name : DEFAULT_FILES) {
-                    try (InputStream in = GlobalAliases.class.getResourceAsStream("/aliases-english/" + name)) {
-                        if (in != null) {
-                            inputs.add(new AliasLoader.Input(name, text(in.readAllBytes())));
+        AliasLoader loader = null;
+        int[] files = {0};
+        try {
+            AliasLoader current = new AliasLoader(new BukkitServer());
+            loader = current;
+            long[] bytes = {0};
+            if (defaults) {
+                Path zip = dataFolder == null ? null : dataFolder.resolve("aliases-english.zip");
+                if (zip != null && Files.isRegularFile(zip)) {
+                    try (FileSystem zipFs = FileSystems.newFileSystem(zip)) {
+                        readFolder(zipFs.getPath("/"), current, 0, new int[] {0}, bytes, MAX_TOTAL_BYTES);
+                    } catch (IOException | RuntimeException e) {
+                        current.fileProblem("aliases-english.zip", true, "Couldn't read aliases-english.zip: " + e.getMessage());
+                    }
+                } else {
+                    for (String name : DEFAULT_FILES) {
+                        try (InputStream in = GlobalAliases.class.getResourceAsStream("/aliases-english/" + name)) {
+                            if (in != null) {
+                                current.read(new AliasLoader.Input(name, text(in.readAllBytes())));
+                            }
+                        } catch (IOException e) {
+                            // The jar's own files; never missing.
                         }
-                    } catch (IOException e) {
-                        // The jar's own files; never missing.
                     }
                 }
             }
+            if (folder != null && Files.isDirectory(folder)) {
+                files[0] = readFolder(folder, current, 0, new int[] {0}, bytes, MAX_TOTAL_BYTES);
+            }
+            AliasTable table = current.finish();
+            return new Loaded(table, List.copyOf(current.problems()), current.moreProblems(), files[0]);
+        } catch (RuntimeException | StackOverflowError | OutOfMemoryError | LinkageError e) {
+            // Never stops the plugin: the aliases in use stay. What was found before the failure is still reported.
+            List<AliasLoader.Problem> problems = new ArrayList<>();
+            int more = 0;
+            if (loader != null) {
+                problems.addAll(loader.problems());
+                more = loader.moreProblems();
+            }
+            loader = null;
+            problems.add(new AliasLoader.Problem("aliases", 0, true, "Couldn't load the aliases, so the aliases in use"
+                    + " are kept: " + e, ""));
+            return new Loaded(null, problems, more, files[0]);
         }
-        int defaultFiles = inputs.size();
-        if (folder != null && Files.isDirectory(folder)) {
-            readFolder(folder, inputs, problems, 0, new int[] {0});
-        }
-        AliasTable loaded;
-        try {
-            loaded = AliasLoader.load(new BukkitServer(), inputs, problems);
-        } catch (RuntimeException | StackOverflowError | OutOfMemoryError e) {
-            // Never stops the plugin: without aliases, the items' own names still work.
-            problems.add(new AliasLoader.Problem(new SourceFile("aliases", ""), 0, true, "Couldn't load the aliases: " + e));
-            loaded = AliasTable.EMPTY;
-        }
-        return new Loaded(loaded, problems, inputs.size() - defaultFiles);
     }
 
-    /** Skript's {@code Aliases.loadDirectory}: files and folders in the order of their names. */
-    private static void readFolder(Path folder, List<AliasLoader.Input> inputs, List<AliasLoader.Problem> problems,
-            int depth, int[] count) {
+    /**
+     * Skript's {@code Aliases.loadDirectory}: files and folders in the order of their names, each loaded as it's
+     * read. Returns how many files were read.
+     */
+    static int readFolder(Path folder, AliasLoader loader, int depth, int[] count, long[] bytes, long maxTotalBytes) {
         if (depth > MAX_DEPTH) {
-            return;
+            return 0;
         }
         List<Path> entries;
         try (Stream<Path> list = Files.list(folder)) {
             entries = list.sorted().toList();
         } catch (IOException | RuntimeException e) {
-            problems.add(new AliasLoader.Problem(new SourceFile(String.valueOf(folder.getFileName()), ""), 0, true,
-                    "Couldn't read the folder: " + e.getMessage()));
-            return;
+            loader.fileProblem(String.valueOf(folder.getFileName()), true, "Couldn't read the folder: " + e.getMessage());
+            return 0;
         }
+        int read = 0;
         for (Path entry : entries) {
             String name = String.valueOf(entry.getFileName());
             if (name.endsWith("/")) {
@@ -163,7 +191,7 @@ public final class GlobalAliases {
             }
             if (Files.isDirectory(entry)) {
                 if (!name.startsWith(".")) {
-                    readFolder(entry, inputs, problems, depth + 1, count);
+                    read += readFolder(entry, loader, depth + 1, count, bytes, maxTotalBytes);
                 }
                 continue;
             }
@@ -172,25 +200,31 @@ public final class GlobalAliases {
             }
             if (++count[0] > MAX_FILES) {
                 if (count[0] == MAX_FILES + 1) {
-                    problems.add(new AliasLoader.Problem(new SourceFile(name, ""), 0, true,
-                            "There are more than " + MAX_FILES + " alias files, so the rest aren't read"));
+                    loader.fileProblem(name, true, "There are more than " + MAX_FILES + " alias files, so the rest"
+                            + " aren't read");
                 }
-                return;
+                return read;
             }
             try {
                 long size = Files.size(entry);
                 if (size > MAX_FILE_BYTES) {
-                    problems.add(new AliasLoader.Problem(new SourceFile(name, ""), 0, true, "'" + name + "' is "
-                            + size / (1 << 20) + " MB, more than the " + (MAX_FILE_BYTES >> 20) + " MB an alias file may be,"
-                            + " so it isn't read"));
+                    loader.fileProblem(name, true, "'" + name + "' is " + size / (1 << 20) + " MB, more than the "
+                            + (MAX_FILE_BYTES >> 20) + " MB an alias file may be, so it isn't read");
                     continue;
                 }
-                inputs.add(new AliasLoader.Input(name, text(Files.readAllBytes(entry))));
+                if (bytes[0] + size > maxTotalBytes) {
+                    loader.fileProblem(name, true, "The alias files are more than " + (maxTotalBytes >> 20)
+                            + " MB in all, so '" + name + "' isn't read");
+                    continue;
+                }
+                bytes[0] += size;
+                loader.read(new AliasLoader.Input(name, text(Files.readAllBytes(entry))));
+                read++;
             } catch (IOException | RuntimeException e) {
-                problems.add(new AliasLoader.Problem(new SourceFile(name, ""), 0, true,
-                        "Couldn't read '" + name + "': " + e.getMessage()));
+                loader.fileProblem(name, true, "Couldn't read '" + name + "': " + e.getMessage());
             }
         }
+        return read;
     }
 
     /** A file's text as UTF-8, with anything that isn't replaced and a byte order mark left out. */
@@ -207,6 +241,9 @@ public final class GlobalAliases {
 
     /** Uses {@code loaded} from now on: for scripts compiled after, and items written after. */
     public static void install(Loaded loaded) {
+        if (loaded.table == null) {
+            return;
+        }
         table = loaded.table;
         related = new ConcurrentHashMap<>();
     }
@@ -219,11 +256,42 @@ public final class GlobalAliases {
                 known = table;
                 if (known == null) {
                     known = load(null, null, true).table;
+                    known = known == null ? AliasTable.EMPTY : known;
                     table = known;
                 }
             }
         }
         return known;
+    }
+
+    /** The item names each script looked up while it compiled, while {@link #recordUses} records them. */
+    private static volatile Map<String, Set<String>> uses;
+
+    /**
+     * Starts recording the item names the scripts compiled from now on look up, by script: names from alias files,
+     * NeoSkript's own names, and names that didn't resolve, after options are put in.
+     */
+    public static void recordUses() {
+        uses = new ConcurrentHashMap<>();
+    }
+
+    /** Stops recording, and gives what was recorded, by script. */
+    public static Map<String, Set<String>> recordedUses() {
+        Map<String, Set<String>> recorded = uses;
+        uses = null;
+        return recorded == null ? Map.of() : recorded;
+    }
+
+    /** Records that the script being compiled looked up the item name {@code name}. */
+    static void used(String name) {
+        Map<String, Set<String>> recording = uses;
+        if (recording == null) {
+            return;
+        }
+        String script = co.xenastudios.neoskript.runtime.ScriptFeatures.compilingScript();
+        if (script != null) {
+            recording.computeIfAbsent(script, key -> ConcurrentHashMap.newKeySet()).add(name);
+        }
     }
 
     /** The alias called {@code name} (in lower case), or {@code null}. */
@@ -242,12 +310,16 @@ public final class GlobalAliases {
      * more than {@code limit} of them, {@code null}.
      */
     public static Set<String> changes(Loaded before, Loaded after, int limit) {
-        return changes(before == null ? current() : before.table, after.table, limit);
+        if (after.table == null) {
+            // Loading failed, so the aliases in use stay and nothing changed.
+            return Set.of();
+        }
+        return changes(before == null || before.table == null ? current() : before.table, after.table, limit);
     }
 
     /** The table in use, as a {@link Loaded} with no problems, to compare with a reload. */
     public static Loaded inUse() {
-        return new Loaded(current(), List.of(), 0);
+        return new Loaded(current(), List.of(), 0, 0);
     }
 
     static Set<String> changes(AliasTable before, AliasTable after, int limit) {
@@ -282,39 +354,102 @@ public final class GlobalAliases {
 
     // --- names ---
 
+    /** Skript's {@code MatchQuality}, best first. */
+    private static final int EXACT = 0;
+    private static final int SAME_ITEM = 1;
+    private static final int SAME_MATERIAL = 2;
+
     /**
-     * What an alias file calls an item, as Skript's {@code AliasesMap.matchAlias}: the alias for exactly this item,
-     * else the plain item's, else the first of its material's. {@code null} if no alias names its material.
+     * What an alias file calls an item, as Skript's {@code AliasesMap.matchAlias}: the first of its material's aliases
+     * that is the same item or better (an alias's item with a name or enchantments added is still that alias), else
+     * the plain item's alias, else the first that's the same material. {@code null} if no alias names its material.
      *
      * @param stack the item, or {@code null} for a block that has no item
-     * @param blockData its block's data, or {@code null} for the default
+     * @param blockData its block's data, or {@code null} for none
+     * @param itemForm whether it's an item stack, such as one in an inventory, rather than an item type: as in Skript,
+     *     an item stack without block data isn't a block alias with states of its own
      */
-    static AliasTable.Named named(Material material, ItemStack stack, BlockData blockData) {
+    static AliasTable.Named named(Material material, ItemStack stack, BlockData blockData, boolean itemForm) {
         AliasTable.Names names = current().names(material.getKey().toString());
         if (names == null) {
             return null;
         }
-        String blockKey = null;
-        if (material.isBlock()) {
-            try {
-                blockKey = blockData != null ? blockData.getAsString(false)
-                        : DEFAULT_BLOCKS.computeIfAbsent(material, each -> each.createBlockData().getAsString(false));
-            } catch (RuntimeException e) {
-                blockKey = null;
-            }
-        }
+        int best = SAME_MATERIAL + 1;
+        AliasTable.Named bestMatch = null;
         for (AliasTable.Named named : names.items) {
-            AliasTable.Item item = named.item();
-            boolean sameItem = stack == null || !(item.stack() instanceof ItemStack proto) || proto.isSimilar(stack);
-            boolean sameBlock = blockKey == null || item.blockKey() == null || blockKey.equals(item.blockKey());
-            if (sameItem && sameBlock) {
-                return named;
+            int quality = quality(stack, blockData, itemForm, named.item());
+            if (quality < best) {
+                best = quality;
+                bestMatch = named;
             }
         }
-        if (names.defaultItem != null) {
-            return names.defaultItem;
+        if (best < SAME_MATERIAL) {
+            return bestMatch;
         }
-        return names.items.isEmpty() ? null : names.items.getFirst();
+        return names.defaultItem != null ? names.defaultItem : bestMatch;
+    }
+
+    /** Skript's {@code ItemData.matchAlias}: how well an item and its block data match an alias's item. */
+    private static int quality(ItemStack stack, BlockData blockData, boolean itemForm, AliasTable.Item alias) {
+        int quality = EXACT;
+        if (alias.blockData() instanceof BlockData theirs) {
+            if (blockData == null) {
+                // An item stack, which has no block states, isn't an alias with states of its own.
+                if (itemForm && !alias.states().isEmpty()) {
+                    return SAME_MATERIAL;
+                }
+            } else if (!blockData.equals(theirs)) {
+                quality = blockData.matches(theirs) ? SAME_ITEM : SAME_MATERIAL;
+            }
+        }
+        if (stack != null && alias.stack() instanceof ItemStack proto
+                && (quality <= SAME_ITEM && stack.hasItemMeta() || proto.hasItemMeta())) {
+            int meta = compareMetas(stack.getItemMeta(), proto.getItemMeta());
+            if (meta == SAME_MATERIAL && alias.components() == null) {
+                // An alias with nothing applied doesn't care about the item's meta.
+                quality = SAME_ITEM;
+            } else if (quality < meta) {
+                quality = meta;
+            }
+        }
+        return quality;
+    }
+
+    /** Skript's {@code ItemData.compareItemMetas}: ours has more than theirs, or something else. */
+    private static int compareMetas(org.bukkit.inventory.meta.ItemMeta ours, org.bukkit.inventory.meta.ItemMeta theirs) {
+        if (ours == null || theirs == null) {
+            return ours == theirs ? EXACT : SAME_MATERIAL;
+        }
+        int quality = EXACT;
+        quality = Math.max(quality, part(ours.hasDisplayName() ? ours.displayName() : null,
+                theirs.hasDisplayName() ? theirs.displayName() : null));
+        quality = Math.max(quality, part(ours.hasLore() ? ours.lore() : null, theirs.hasLore() ? theirs.lore() : null));
+        Map<org.bukkit.enchantments.Enchantment, Integer> ourEnchants = ours.getEnchants();
+        Map<org.bukkit.enchantments.Enchantment, Integer> theirEnchants = theirs.getEnchants();
+        quality = Math.max(quality, part(ourEnchants.isEmpty() ? null : ourEnchants,
+                theirEnchants.isEmpty() ? null : theirEnchants));
+        Set<org.bukkit.inventory.ItemFlag> ourFlags = ours.getItemFlags();
+        Set<org.bukkit.inventory.ItemFlag> theirFlags = theirs.getItemFlags();
+        quality = Math.max(quality, part(ourFlags.isEmpty() ? null : ourFlags, theirFlags.isEmpty() ? null : theirFlags));
+        org.bukkit.inventory.meta.ItemMeta first = ours.clone();
+        org.bukkit.inventory.meta.ItemMeta second = theirs.clone();
+        for (org.bukkit.inventory.meta.ItemMeta meta : List.of(first, second)) {
+            meta.displayName(null);
+            meta.lore(null);
+            for (org.bukkit.enchantments.Enchantment enchantment : List.copyOf(meta.getEnchants().keySet())) {
+                meta.removeEnchant(enchantment);
+            }
+            meta.removeItemFlags(meta.getItemFlags().toArray(new org.bukkit.inventory.ItemFlag[0]));
+        }
+        return first.equals(second) ? quality : SAME_MATERIAL;
+    }
+
+    /** One part of two metas: the same, ours has it and theirs doesn't, or they differ. */
+    private static int part(Object ours, Object theirs) {
+        if (java.util.Objects.equals(ours, theirs)) {
+            return EXACT;
+        }
+        return ours != null && theirs == null ? SAME_ITEM : SAME_MATERIAL;
     }
 
     /**
@@ -328,7 +463,7 @@ public final class GlobalAliases {
             found = NONE;
             Material material = Material.matchMaterial(key);
             if (material != null) {
-                AliasTable.Named named = named(material, material.isItem() ? new ItemStack(material) : null, null);
+                AliasTable.Named named = named(material, material.isItem() ? new ItemStack(material) : null, null, false);
                 if (named != null && named.item().relatedEntity() != null) {
                     found = named.item().relatedEntity().strip();
                 }

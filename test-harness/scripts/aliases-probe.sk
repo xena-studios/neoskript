@@ -14,7 +14,7 @@ command /aliasprobe <text>:
 
 on load:
 	wait 1 tick
-	loop "ruby", "rubys", "rubies", "red dye", "red_dye", "minecraft:red_dye", "sapphire", "lapis lazuli", "shiny gem", "shiny gems", "fancy sword", "gem", "gems", "stone", "stones", "diamond", "rock", "big rocks", "boulder", "north anvil", "south anvil", "anvil", "potion", "potions", "glass bottle", "cooked fish", "cod", "alpha thing", "beta things", "gamma thing", "apple", "pluralmid thing", "pluralmids thing", "ünïcødé gëm", "ünïcødé gëms", "golemy", "oak plank thing", "birch plank things", "plank thing", "spruce planks", "oak planks", "red gem", "blue gems", "speed brew", "swiftness brews", "brew", "topaz", "gold ingot", "ancient thing", "ok after bad", "bad id", "thing", "outside", "bad state", "trailing", "weird", "ruby item", "ruby block", "rubys item", "water bottle", "speed potion", "potion of swiftness", "tipped arrow", "experience bottle", "arrow", "2 rubys", "3 of shiny gem", and "rock block":
+	loop "ruby", "rubys", "rubies", "red dye", "red_dye", "minecraft:red_dye", "sapphire", "lapis lazuli", "shiny gem", "shiny gems", "fancy sword", "gem", "gems", "stone", "stones", "diamond", "rock", "big rocks", "boulder", "north anvil", "south anvil", "anvil", "potion", "potions", "glass bottle", "cooked fish", "cod", "alpha thing", "beta things", "gamma thing", "apple", "pluralmid thing", "pluralmids thing", "ünïcødé gëm", "ünïcødé gëms", "golemy", "oak plank thing", "birch plank things", "plank thing", "spruce planks", "oak planks", "red gem", "blue gems", "speed brew", "swiftness brews", "brew", "topaz", "gold ingot", "ancient thing", "ok after bad", "bad id", "thing", "outside", "bad state", "trailing", "weird", "ruby item", "ruby block", "rubys item", "water bottle", "speed potion", "potion of swiftness", "tipped arrow", "experience bottle", "arrow", "2 rubys", "3 of shiny gem", "shiny gem of sharpness 1", "fancy sword of sharpness 2", and "rock block":
 		aliasprobe(loop-value)
 	set block at location(0, 120, 0, world "world") to north anvil
 	set {_data} to "%block data of block at location(0, 120, 0, world "world")%"
@@ -22,4 +22,9 @@ on load:
 	set block at location(0, 120, 0, world "world") to south anvil
 	set {_data} to "%block data of block at location(0, 120, 0, world "world")%"
 	send "[aliasprobe] placed south anvil: %whether {_data} contains "facing=south"%, %type of block at location(0, 120, 0, world "world")%" to console
+	# Items made from aliases, then changed: written with the alias that matches them best, as Skript's AliasesMap.
+	set {_items::*} to shiny gem named "Bob", minecraft:diamond named "Bob", fancy sword of sharpness 2, red gem of sharpness 1, minecraft:emerald named "Em" and north anvil named "Anv"
+	set {_items::*} to {_items::*} and (shiny gem with lore "Old")
+	loop {_items::*}:
+		send "[aliasprobe] changed: %loop-value% | raw: %raw name of loop-value%" to console
 	send "[aliasprobe] done" to console

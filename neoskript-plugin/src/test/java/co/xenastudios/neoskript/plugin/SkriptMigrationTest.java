@@ -115,7 +115,9 @@ class SkriptMigrationTest {
         SkriptMigration.migrate(skript, neoskript);
         assertFalse(Files.exists(neoskript.resolve("aliases")));
 
-        // Skript's aliases, from before NeoSkript read alias files.
+        // A move from before NeoSkript read alias files left a marker without its alias line.
+        Path marker = neoskript.resolve(SkriptMigration.MARKER);
+        Files.writeString(marker, Files.readString(marker).replace(SkriptMigration.ALIASES_DONE + "\n", ""));
         Files.createDirectories(skript.resolve("aliases"));
         Files.writeString(skript.resolve("aliases/gems.sk"), "gems:\n\truby = minecraft:red_dye\n");
         Files.writeString(skript.resolve("config.sk"), "load default aliases: false\nenable effect commands: true\n");
@@ -128,5 +130,47 @@ class SkriptMigrationTest {
         Files.delete(neoskript.resolve("aliases/gems.sk"));
         Files.delete(neoskript.resolve("aliases"));
         assertEquals(List.of(), SkriptMigration.migrate(skript, neoskript).copied(), "only once");
+    }
+
+    @Test
+    void anAliasFileNeoSkriptAlreadyHasIsKeptAndTheMoveStillFinishes() throws Exception {
+        Path skript = skript();
+        Files.createDirectories(skript.resolve("aliases"));
+        Files.writeString(skript.resolve("aliases/gems.sk"), "gems:\n\truby = minecraft:red_dye\n");
+        Files.writeString(skript.resolve("aliases/more.sk"), "more:\n\ttopaz = minecraft:gold_ingot\n");
+        Files.writeString(skript.resolve("config.sk"), "load default aliases: false\n");
+        Path neoskript = plugins.resolve("NeoSkript");
+        Files.createDirectories(neoskript.resolve("aliases"));
+        Files.writeString(neoskript.resolve("aliases/gems.sk"), "mine:\n\truby = minecraft:redstone\n");
+
+        SkriptMigration.Result result = SkriptMigration.migrate(skript, neoskript);
+        assertEquals(List.of("scripts", "variables.csv", "aliases"), result.copied());
+        assertEquals("mine:\n\truby = minecraft:redstone\n", Files.readString(neoskript.resolve("aliases/gems.sk")),
+                "the owner's file is kept");
+        assertTrue(Files.exists(neoskript.resolve("aliases/more.sk")));
+        assertEquals(List.of("Kept plugins/NeoSkript/aliases/gems.sk, which was there already, rather than Skript's"),
+                result.notes());
+        assertTrue(result.variablesBackup() != null, "the variables are still backed up");
+        assertTrue(Files.exists(neoskript.resolve(SkriptMigration.MARKER)), "the marker is still written");
+        assertEquals(java.util.Map.of("aliases.load-defaults", Boolean.FALSE), result.settings(),
+                "the settings are still copied");
+        assertEquals(List.of(), SkriptMigration.migrate(skript, neoskript).copied());
+    }
+
+    @Test
+    void aServerPathWithAliasesInItStillGetsTheAliasesLater() throws Exception {
+        Path base = plugins.resolve("my-aliases-server");
+        Path skript = base.resolve("Skript");
+        Files.createDirectories(skript.resolve("scripts"));
+        Files.writeString(skript.resolve("scripts/a.sk"), "on load:\n\tstop\n");
+        Path neoskript = base.resolve("NeoSkript");
+        // A marker from before NeoSkript read alias files, with the server's path in it.
+        Files.createDirectories(neoskript);
+        Files.writeString(neoskript.resolve(SkriptMigration.MARKER), "Copied [scripts] from "
+                + skript.toAbsolutePath() + " at 2026-11-12T00:00:00Z\n");
+        Files.createDirectories(skript.resolve("aliases"));
+        Files.writeString(skript.resolve("aliases/gems.sk"), "gems:\n\truby = minecraft:red_dye\n");
+        assertEquals(List.of("aliases"), SkriptMigration.migrate(skript, neoskript).copied());
+        assertTrue(Files.exists(neoskript.resolve("aliases/gems.sk")));
     }
 }
