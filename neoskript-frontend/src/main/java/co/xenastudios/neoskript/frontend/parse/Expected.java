@@ -122,9 +122,12 @@ final class Expected {
         return types.stream().anyMatch(t -> t.id().equals(id));
     }
 
-    /** What an item of a list of these takes: one item, not a list of them. */
+    /**
+     * What an item of a list of these takes: one item, not a list of them. Which types take several stays known, as
+     * Skript reads each item with the same placeholder: a list variable is no item where only some do.
+     */
     Expected single() {
-        return plural ? new Expected(types, false, literalOnly, changeable, null, true) : this;
+        return plural ? new Expected(types, false, literalOnly, changeable, pluralTypes, true) : this;
     }
 
     /** Whether only one value goes here, so several can't. */

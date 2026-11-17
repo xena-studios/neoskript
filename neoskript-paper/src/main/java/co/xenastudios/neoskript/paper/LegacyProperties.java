@@ -211,12 +211,18 @@ final class LegacyProperties {
                 "offlineplayers/entities/nameds/inventories")));
         patterns.addAll(List.of(Patterns.property("(display|nick|chat|custom)[ ]name[s]",
                 "offlineplayers/entities/nameds/inventories")));
-        registrar.expression("ExprName", "textcomponent", info -> new Name(info.pattern() / 2 + 1),
+        // As Skript writes it in errors: 'name of the current script'.
+        registrar.describe("ExprName", (info, args) -> args.get(0) == null ? null
+                : (info.pattern() / 2 == 0 ? "name of " : "display name of ") + args.get(0));
+        registrar.expression("ExprName", "textcomponent", info -> new Name(info.pattern() / 2 + 1, info.argumentType(0)),
                 patterns.toArray(String[]::new));
     }
 
-    /** Skript's old {@code ExprName}: 1 its name, 2 its display name. */
-    private record Name(int mark) implements Expression, Changeable {
+    /**
+     * Skript's old {@code ExprName}: 1 its name, 2 its display name, of values of {@code ownerType} (its id, or
+     * {@code null} if that's known only when it runs).
+     */
+    private record Name(int mark, String ownerType) implements Expression, Changeable {
         @Override
         public Object get(TriggerContext context, Object[] arguments) {
             List<Object> names = new ArrayList<>();
@@ -257,7 +263,22 @@ final class LegacyProperties {
 
         @Override
         public Class<?>[] acceptChange(Mode mode) {
-            return mode == Mode.SET || mode == Mode.RESET ? new Class<?>[] {String.class, Component.class} : null;
+            if (mode != Mode.SET && mode != Mode.RESET) {
+                return null;
+            }
+            // As Skript, by the type the values are known to be: a player's name is its own, and scripts' and
+            // functions' can't change. (A world is a named thing here, whose name doesn't change when set.)
+            if (mark == 1 && ownerType != null) {
+                switch (ownerType) {
+                    case "player" -> throw new SyntaxError("Can't change the Minecraft name of a player. Change the"
+                            + " 'display name' or 'tab list name' instead.");
+                    case "script", "function" -> {
+                        return null;
+                    }
+                    default -> {}
+                }
+            }
+            return new Class<?>[] {String.class, Component.class};
         }
 
         @Override

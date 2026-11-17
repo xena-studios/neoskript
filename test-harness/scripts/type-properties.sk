@@ -168,3 +168,14 @@ on load:
 	set {_vec} to vector(4, 5, 6)
 	set x component of {_vec} to 9
 	log "tp changed vector: %x component of {_vec}%" to "cfg"
+
+# A player's own name can't be set, nor a script's. A world's can, to no effect, as it's a named thing here.
+on join:
+	set name of player to "Bob"
+
+on load:
+	set name of the script to "other"
+
+on load:
+	set name of world "world" to "other"
+	log "tp renamed world: %name of world "world"%" to "cfg"

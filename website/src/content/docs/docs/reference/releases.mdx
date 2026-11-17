@@ -34,6 +34,10 @@ On main, in the [development build](https://github.com/xena-studios/neoskript/re
 
 - **The family look for `/sk` and `config.yml`:** `/ns` as another name for `/sk`, clickable help, reload reports per script, a `theme` section and `config-version` in `config.yml`, and more settings applied by `/sk reload config`. A 0.1.0-beta.1 `config.yml` is carried forward, with a backup as `config.yml.bak-v1`. See [commands](/docs/server/commands/) and [configuration](/docs/server/configuration/#updating-neoskript).
 
+- **`use type properties: false`:** Skript's syntax from before 2.13, `syntax.type-properties` in `config.yml`, copied from `config.sk`. See [configuration](/docs/server/configuration/#syntax).
+
+- **List variables where only some types take several:** a placeholder that mixes single and plural types, as in `%inventories/strings/numbered%`, now refuses a list variable such as `{_items::*}`, as Skript does. That includes addons' patterns: a script that put a list variable there loads with an error now. Make the placeholder all plural, or all single, to say which it takes.
+
 ## neoskript-cli 0.1.0
 
 The [script checker](/docs/cli/)'s first release: errors, warnings, and Folia and performance hints for a folder of scripts, on a throwaway server. [Release notes](https://github.com/xena-studios/neoskript/releases/tag/cli-v0.1.0).
