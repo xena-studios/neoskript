@@ -130,6 +130,14 @@ public final class VariableStore {
             super(INDEX_ORDER);
         }
 
+        /** The children in {@code sorted}, which are in {@link #INDEX_ORDER} already, linked in one pass. */
+        Children(SortedChildren sorted) {
+            super(sorted);
+            for (Pending child : sorted.children) {
+                byIndex.put(fold(child.key), child.node);
+            }
+        }
+
         /** The key {@link #byIndex} has for {@code index}: lower case, character by character, as the order compares. */
         static String fold(String index) {
             for (int i = 0; i < index.length(); i++) {
@@ -208,6 +216,96 @@ public final class VariableStore {
         }
     }
 
+    /** A node {@link #load} is building, with its children in order. */
+    private static final class Pending {
+        final String key;
+        final Node node = new Node();
+        final List<Pending> children = new ArrayList<>(0);
+
+        Pending(String key) {
+            this.key = key;
+        }
+
+        /** Gives the node its children, and theirs, in one pass each. */
+        void link() {
+            if (children.isEmpty()) {
+                return;
+            }
+            for (Pending child : children) {
+                child.link();
+            }
+            node.children = new Children(new SortedChildren(children));
+        }
+    }
+
+    /** Children already in order, as the sorted map a skip list is built from in one pass. */
+    private static final class SortedChildren extends java.util.AbstractMap<String, Node>
+            implements java.util.SortedMap<String, Node> {
+
+        final List<Pending> children;
+
+        SortedChildren(List<Pending> children) {
+            this.children = children;
+        }
+
+        @Override
+        public Comparator<? super String> comparator() {
+            return INDEX_ORDER;
+        }
+
+        @Override
+        public java.util.Set<Map.Entry<String, Node>> entrySet() {
+            return new java.util.AbstractSet<>() {
+                @Override
+                public java.util.Iterator<Map.Entry<String, Node>> iterator() {
+                    java.util.Iterator<Pending> each = children.iterator();
+                    return new java.util.Iterator<>() {
+                        @Override
+                        public boolean hasNext() {
+                            return each.hasNext();
+                        }
+
+                        @Override
+                        public Map.Entry<String, Node> next() {
+                            Pending child = each.next();
+                            return Map.entry(child.key, child.node);
+                        }
+                    };
+                }
+
+                @Override
+                public int size() {
+                    return children.size();
+                }
+            };
+        }
+
+        @Override
+        public java.util.SortedMap<String, Node> subMap(String from, String to) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public java.util.SortedMap<String, Node> headMap(String to) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public java.util.SortedMap<String, Node> tailMap(String from) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String firstKey() {
+            return children.getFirst().key;
+        }
+
+        @Override
+        public String lastKey() {
+            return children.getLast().key;
+        }
+    }
+
     private static final class Node {
         final AtomicReference<Object> value = new AtomicReference<>();
         volatile ConcurrentSkipListMap<String, Node> children;
@@ -256,6 +354,87 @@ public final class VariableStore {
                 visit(child.getValue(), name == null ? child.getKey() : name + SEPARATOR + child.getKey(), visitor);
             }
         }
+    }
+
+    /**
+     * Sets many variables in a store that has none yet, as loading saved variables does: the same as {@link #set}
+     * for each in turn, but each list is linked in one pass instead of having its indices sorted in one at a time,
+     * which was most of the time loading took. That's fastest for names in the order {@link #forEach} gives them,
+     * the order they're saved in; others are put in their place. If the store isn't empty, each is {@link #set}.
+     * Not for a store other threads are using yet.
+     */
+    public void load(List<String> names, List<Object> values) {
+        ConcurrentSkipListMap<String, Node> existing = root.children;
+        Pending top = existing != null && !existing.isEmpty() ? null : tree(names, values);
+        if (top == null) {
+            for (int i = 0; i < names.size(); i++) {
+                set(names.get(i), values.get(i));
+            }
+            return;
+        }
+        changed();
+        top.link();
+        root.children = top.node.children;
+    }
+
+    /** The tree of {@code names}, or {@code null} if two indices are the same in Skript's order but not equal. */
+    private static Pending tree(List<String> names, List<Object> values) {
+        Pending top = new Pending(null);
+        List<Pending> path = new ArrayList<>();
+        for (int i = 0; i < names.size(); i++) {
+            String name = names.get(i);
+            int depth = 0;
+            int start = 0;
+            while (true) {
+                int end = name.indexOf(SEPARATOR, start);
+                String part = (end < 0 ? name.substring(start) : name.substring(start, end))
+                        .toLowerCase(java.util.Locale.ROOT);
+                if (depth >= path.size() || !path.get(depth).key.equals(part)) {
+                    while (path.size() > depth) {
+                        path.removeLast();
+                    }
+                    Pending child = child((depth == 0 ? top : path.get(depth - 1)).children, part);
+                    if (child == null) {
+                        return null;
+                    }
+                    path.add(child);
+                }
+                depth++;
+                if (end < 0) {
+                    break;
+                }
+                start = end + SEPARATOR.length();
+            }
+            Object value = values.get(i);
+            path.get(depth - 1).node.value.set(value == null ? null : Values.copy(value));
+        }
+        return top;
+    }
+
+    /** The child at {@code key}, added in its place if it's new: at the end, when names come in order. */
+    private static Pending child(List<Pending> siblings, String key) {
+        if (siblings.isEmpty() || INDEX_ORDER.compare(siblings.getLast().key, key) < 0) {
+            Pending child = new Pending(key);
+            siblings.add(child);
+            return child;
+        }
+        int low = 0;
+        int high = siblings.size() - 1;
+        while (low <= high) {
+            int middle = (low + high) >>> 1;
+            int order = INDEX_ORDER.compare(siblings.get(middle).key, key);
+            if (order < 0) {
+                low = middle + 1;
+            } else if (order > 0) {
+                high = middle - 1;
+            } else {
+                Pending found = siblings.get(middle);
+                return found.key.equals(key) ? found : null;
+            }
+        }
+        Pending child = new Pending(key);
+        siblings.add(low, child);
+        return child;
     }
 
     private void changed() {

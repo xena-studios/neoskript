@@ -22,7 +22,9 @@ import java.util.regex.Pattern;
 /**
  * How long loading saved variables takes when the server starts, on Skript and on NeoSkript, from the same
  * {@code variables.csv}. Skript makes {@value #VARIABLES} variables with {@code variables-benchmark.sk} and saves
- * them; then each loads that file {@value #LOADS} times, and the result is the median of what each logs.
+ * them; then each loads that file {@value #LOADS} times, and the result is the median of what each logs. NeoSkript
+ * then imports the file into its native storage ({@code variables.storage: native}) and loads that
+ * {@value #LOADS} times too.
  */
 public final class VariableBenchmark implements Scenario {
 
@@ -30,6 +32,7 @@ public final class VariableBenchmark implements Scenario {
     static final int LOADS = 3;
     private static final Duration WAIT = Duration.ofMinutes(5);
     private static final Pattern SKRIPT_LOADED = Pattern.compile("\\[Skript] Loaded (\\d+) variables? in ([\\d.]+) seconds");
+    private static final String NATIVE_CONFIG = "variables:\n  storage: native\n";
     private static final Pattern NEOSKRIPT_LOADED = Pattern.compile("\\[NeoSkript] Loaded (\\d+) variables? in (\\d+) ms");
 
     @Override
@@ -59,6 +62,11 @@ public final class VariableBenchmark implements Scenario {
             neoskript.add(load(context, runs.resolve("neoskript-" + i), context.neoskriptJar(), "NeoSkript", csv,
                     NEOSKRIPT_LOADED, 1));
         }
+        byte[] nsv = importNative(context, runs.resolve("native-import"), csv);
+        List<Double> nativeLoads = new ArrayList<>();
+        for (int i = 0; i < LOADS; i++) {
+            nativeLoads.add(loadNative(context, runs.resolve("native-" + i), nsv));
+        }
         Map<String, Object> report = new LinkedHashMap<>();
         report.put("environment", context.environment().name());
         report.put("skript", "Skript " + context.referenceSkript().version());
@@ -68,9 +76,13 @@ public final class VariableBenchmark implements Scenario {
         report.put("neoskriptLoadMs", neoskript);
         report.put("skriptMedianMs", EventBenchmark.median(skript));
         report.put("neoskriptMedianMs", EventBenchmark.median(neoskript));
+        report.put("nativeFileBytes", nsv.length);
+        report.put("neoskriptNativeLoadMs", nativeLoads);
+        report.put("neoskriptNativeMedianMs", EventBenchmark.median(nativeLoads));
         context.writeReport(name(), report);
         context.summary("skript", EventBenchmark.median(skript) + " ms");
         context.summary("neoskript", EventBenchmark.median(neoskript) + " ms");
+        context.summary("neoskript native", EventBenchmark.median(nativeLoads) + " ms");
     }
 
     /** Has Skript make and save the variables; its variables.csv. */
@@ -88,6 +100,44 @@ public final class VariableBenchmark implements Scenario {
             throw new HarnessFailure("Skript didn't save " + file);
         }
         return Files.readString(file);
+    }
+
+    /** Has NeoSkript import {@code csv} into its native storage; the {@code variables.nsv} it made. */
+    private static byte[] importNative(ScenarioContext context, Path runDir, String csv) throws Exception {
+        try (ServerProcess server = context.server(runDir)
+                .plugin(context.neoskriptJar())
+                .file("plugins/NeoSkript/config.yml", NATIVE_CONFIG)
+                .file("plugins/NeoSkript/variables.csv", csv)
+                .start()) {
+            Matcher done = server.await(NEOSKRIPT_LOADED, WAIT);
+            server.await(ServerProcess.DONE, WAIT);
+            server.stop();
+            if (Integer.parseInt(done.group(1)) != VARIABLES) {
+                throw new HarnessFailure("NeoSkript imported " + done.group(1) + " variables, not " + VARIABLES);
+            }
+        }
+        Path file = runDir.resolve("plugins/NeoSkript/variables.nsv");
+        if (!Files.exists(file) || Files.exists(runDir.resolve("plugins/NeoSkript/variables.csv"))) {
+            throw new HarnessFailure("NeoSkript didn't move variables.csv to " + file);
+        }
+        return Files.readAllBytes(file);
+    }
+
+    /** Starts NeoSkript with {@code nsv} as its native storage; the milliseconds it logs loading it. */
+    private static double loadNative(ScenarioContext context, Path runDir, byte[] nsv) throws Exception {
+        try (ServerProcess server = context.server(runDir)
+                .plugin(context.neoskriptJar())
+                .file("plugins/NeoSkript/config.yml", NATIVE_CONFIG)
+                .file("plugins/NeoSkript/variables.nsv", nsv)
+                .start()) {
+            Matcher done = server.await(NEOSKRIPT_LOADED, WAIT);
+            server.await(ServerProcess.DONE, WAIT);
+            server.stop();
+            if (Integer.parseInt(done.group(1)) != VARIABLES) {
+                throw new HarnessFailure("NeoSkript loaded " + done.group(1) + " native variables, not " + VARIABLES);
+            }
+            return Double.parseDouble(done.group(2));
+        }
     }
 
     /** Starts a server with {@code csv} as the plugin's saved variables; the milliseconds it logs loading them. */

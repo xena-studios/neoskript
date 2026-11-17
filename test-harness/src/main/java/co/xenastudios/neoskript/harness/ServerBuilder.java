@@ -9,6 +9,7 @@ import java.io.UncheckedIOException;
 import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +24,7 @@ public final class ServerBuilder {
     private final Path runDir;
     private final List<Path> plugins = new ArrayList<>();
     private final Map<String, String> files = new LinkedHashMap<>();
+    private final Map<String, byte[]> binaryFiles = new LinkedHashMap<>();
     private final List<String> jvmArgs = new ArrayList<>();
 
     ServerBuilder(HarnessConfig config, Environment environment, Path serverJar, Path runDir) {
@@ -43,6 +45,20 @@ public final class ServerBuilder {
         return this;
     }
 
+    /** Writes a file of bytes into the server directory before it starts, like a saved {@code variables.nsv}. */
+    public ServerBuilder file(String relativePath, byte[] content) {
+        binaryFiles.put(relativePath, content);
+        return this;
+    }
+
+    /** Deletes a file from the server directory, and stops writing it on the next start. */
+    public ServerBuilder without(String relativePath) throws IOException {
+        files.remove(relativePath);
+        binaryFiles.remove(relativePath);
+        Files.deleteIfExists(runDir.resolve(relativePath));
+        return this;
+    }
+
     public ServerBuilder jvmArg(String arg) {
         jvmArgs.add(arg);
         return this;
@@ -60,12 +76,18 @@ public final class ServerBuilder {
         Files.createDirectories(runDir.resolve("plugins/bStats"));
         Files.writeString(runDir.resolve("plugins/bStats/config.yml"), "enabled: false\n");
         for (Path plugin : plugins) {
-            Files.copy(plugin, runDir.resolve("plugins").resolve(plugin.getFileName()));
+            // Replaced, so a server can be started again in the same directory, as after a restart.
+            Files.copy(plugin, runDir.resolve("plugins").resolve(plugin.getFileName()), StandardCopyOption.REPLACE_EXISTING);
         }
         for (Map.Entry<String, String> file : files.entrySet()) {
             Path target = runDir.resolve(file.getKey());
             Files.createDirectories(target.getParent());
             Files.writeString(target, file.getValue());
+        }
+        for (Map.Entry<String, byte[]> file : binaryFiles.entrySet()) {
+            Path target = runDir.resolve(file.getKey());
+            Files.createDirectories(target.getParent());
+            Files.write(target, file.getValue());
         }
 
         List<String> command = new ArrayList<>();
