@@ -89,4 +89,44 @@ class SkriptMigrationTest {
         assertEquals(java.util.Map.of("effect-commands.enabled", true, "effect-commands.token", "#!",
                 "effect-commands.allow-ops", false), SkriptMigration.settings(config));
     }
+
+    @Test
+    void copiesSkriptsAliasFilesAndTheirSetting() throws Exception {
+        Path skript = skript();
+        Files.createDirectories(skript.resolve("aliases/sub"));
+        Files.writeString(skript.resolve("aliases/gems.sk"), "gems:\n\truby¦s = minecraft:red_dye\n");
+        Files.writeString(skript.resolve("aliases/sub/more.sk"), "more:\n\ttopaz = minecraft:gold_ingot\n");
+        Files.writeString(skript.resolve("config.sk"), "load default aliases: false # our own\n");
+        Path neoskript = plugins.resolve("NeoSkript");
+
+        SkriptMigration.Result result = SkriptMigration.migrate(skript, neoskript);
+        assertEquals(List.of("scripts", "variables.csv", "aliases"), result.copied());
+        assertEquals(2, result.scriptCount(), "alias files aren't scripts");
+        assertEquals("gems:\n\truby¦s = minecraft:red_dye\n", Files.readString(neoskript.resolve("aliases/gems.sk")));
+        assertTrue(Files.exists(neoskript.resolve("aliases/sub/more.sk")));
+        assertTrue(Files.exists(skript.resolve("aliases/gems.sk")), "copied, not moved");
+        assertEquals(java.util.Map.of("aliases.load-defaults", Boolean.FALSE), result.settings());
+    }
+
+    @Test
+    void copiesAliasFilesOnceForAServerThatMovedOverBefore() throws Exception {
+        Path skript = skript();
+        Path neoskript = plugins.resolve("NeoSkript");
+        SkriptMigration.migrate(skript, neoskript);
+        assertFalse(Files.exists(neoskript.resolve("aliases")));
+
+        // Skript's aliases, from before NeoSkript read alias files.
+        Files.createDirectories(skript.resolve("aliases"));
+        Files.writeString(skript.resolve("aliases/gems.sk"), "gems:\n\truby = minecraft:red_dye\n");
+        Files.writeString(skript.resolve("config.sk"), "load default aliases: false\nenable effect commands: true\n");
+        SkriptMigration.Result later = SkriptMigration.migrate(skript, neoskript);
+        assertEquals(List.of("aliases"), later.copied());
+        assertEquals(java.util.Map.of("aliases.load-defaults", Boolean.FALSE), later.settings(),
+                "only the aliases' setting; the others were copied the first time");
+        assertTrue(Files.exists(neoskript.resolve("aliases/gems.sk")));
+
+        Files.delete(neoskript.resolve("aliases/gems.sk"));
+        Files.delete(neoskript.resolve("aliases"));
+        assertEquals(List.of(), SkriptMigration.migrate(skript, neoskript).copied(), "only once");
+    }
 }

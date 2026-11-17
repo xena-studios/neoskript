@@ -5,6 +5,7 @@
 package co.xenastudios.neoskript.harness;
 
 import co.xenastudios.neoskript.harness.scenario.DifferentialScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptAliasesScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptBootScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptCliScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptEventsScenario;
@@ -73,6 +74,7 @@ public final class HarnessMain {
             new NeoSkriptVariablesScenario(),
             new NeoSkriptNativeVariablesScenario(),
             new NeoSkriptMigrationScenario(),
+            new NeoSkriptAliasesScenario(),
             new SkriptConflictScenario(),
             new SkriptSmokeScenario(),
             new SkriptCorpusScenario(),

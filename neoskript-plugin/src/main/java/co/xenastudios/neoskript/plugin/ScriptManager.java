@@ -73,6 +73,9 @@ final class ScriptManager {
 
     /** Each loaded script's {@code auto reload}, if it has one. */
     private final Map<String, AutoReload> autoReloads = new HashMap<>();
+    /** The scripts that had errors the last time they were compiled, which new aliases may fix. */
+    private final Set<String> withErrors = new HashSet<>();
+
     /** When each script's file was last modified, as of the last time the scripts were read. */
     private final Map<String, Long> modified = new HashMap<>();
 
@@ -157,6 +160,30 @@ final class ScriptManager {
      */
     synchronized Outcome reload(Predicate<String> scope, BiConsumer<Diagnostic, SourceFile> problems) throws IOException {
         return load(scope, problem -> {}, true, problems);
+    }
+
+    /**
+     * The scripts that a change to the aliases may change, for {@code /sk reload aliases}: those that mention one of
+     * the {@code changed} names (in lower case), and those that had errors, which the new aliases may fix. With
+     * {@code changed} {@code null}, every script ({@code null}).
+     */
+    synchronized Predicate<String> affectedBy(Set<String> changed) throws IOException {
+        if (changed == null) {
+            return null;
+        }
+        Set<String> affected = new HashSet<>(withErrors);
+        if (!changed.isEmpty()) {
+            for (SourceFile file : read()) {
+                String text = file.text().toLowerCase(java.util.Locale.ENGLISH);
+                for (String name : changed) {
+                    if (text.contains(name)) {
+                        affected.add(file.name());
+                        break;
+                    }
+                }
+            }
+        }
+        return affected::contains;
     }
 
     /**
@@ -278,6 +305,16 @@ final class ScriptManager {
             problems.accept(describe(diagnostic, byName.get(diagnostic.file())));
         }
 
+        for (SourceFile file : files) {
+            if (scope == null || scope.test(file.name())) {
+                if (failed.contains(file.name())) {
+                    withErrors.add(file.name());
+                } else {
+                    withErrors.remove(file.name());
+                }
+            }
+        }
+        withErrors.retainAll(byName.keySet());
         // Scripts that load cleanly, or for the first time, switch to the new version; a script with
         // errors keeps its previous version if it has one.
         // In the files' order, which Skript loads them in: their load events run in it.

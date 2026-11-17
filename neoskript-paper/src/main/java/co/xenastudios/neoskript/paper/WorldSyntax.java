@@ -139,7 +139,7 @@ final class WorldSyntax {
         registrar.subtype("player", "livingentity");
         registrar.text(Entity.class, entity -> entity.customName() != null
                 ? Messages.LEGACY_SECTION.serialize(entity.customName()) : EntityKind.name(entity.getType()));
-        registrar.text(Block.class, block -> ItemType.name(block.getType()));
+        registrar.text(Block.class, block -> ItemType.name(block.getType(), block.getBlockData()));
         // In a variable's name, a block is where it is, as in Skript: '{_types::%loop-block%}'.
         registrar.variableNameText(Block.class, block -> block.getWorld().getName() + ":" + block.getX() + ","
                 + block.getY() + "," + block.getZ());
@@ -167,8 +167,7 @@ final class WorldSyntax {
         // Not Skript's: only for placeholders, so 'event-block' isn't the block at an event's location.
         registrar.converter(Location.class, Block.class, location -> location.getWorld() == null ? null : location.getBlock(),
                 Registrar.PLACEHOLDERS_ONLY);
-        registrar.converter(Block.class, ItemType.class, block -> new ItemType(new org.bukkit.inventory.ItemStack(
-                block.getType().isItem() ? block.getType() : Material.AIR), false), Registrar.NO_LEFT_CHAINING);
+        registrar.converter(Block.class, ItemType.class, ItemType::ofBlock, Registrar.NO_LEFT_CHAINING);
 
         registrar.storage("vector", Vector.class, new VariableCodec<>() {
             @Override
@@ -785,7 +784,13 @@ final class WorldSyntax {
                 Material material = value instanceof ItemType item ? item.material()
                         : value instanceof org.bukkit.inventory.ItemStack stack ? stack.getType() : null;
                 if (material != null && material.isBlock()) {
-                    block.setType(material);
+                    // An alias's block states, like 'north anvil = minecraft:anvil[facing=north]', as in Skript.
+                    org.bukkit.block.data.BlockData aliased = value instanceof ItemType item ? item.blockData() : null;
+                    if (aliased != null && aliased.getMaterial() == material) {
+                        block.setBlockData(aliased);
+                    } else {
+                        block.setType(material);
+                    }
                     if (value instanceof ItemType item) {
                         copyContainer(block, item);
                     }

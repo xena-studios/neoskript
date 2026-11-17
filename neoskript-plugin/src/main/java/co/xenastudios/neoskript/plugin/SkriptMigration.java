@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Brings a Skript install's scripts and variables over to NeoSkript the first time it starts, so
+ * Brings a Skript install's scripts, variables and alias files over to NeoSkript the first time it starts, so
  * replacing Skript.jar with NeoSkript.jar just works.
  *
  * <p>Files are copied, not moved, so Skript's folder is left as it was in case the server switches back.
@@ -28,8 +28,14 @@ import java.util.Map;
 final class SkriptMigration {
 
     static final String MARKER = ".migrated-from-skript";
-    /** What's copied from {@code plugins/Skript}: the scripts and the saved variables. */
-    static final List<String> COPIED = List.of("scripts", "variables.csv");
+    /**
+     * What's copied from {@code plugins/Skript}: the scripts, the saved variables, and the alias files Skript loads
+     * with its default aliases (its own copy of them, {@code aliases-english.zip}, if it has one).
+     */
+    static final List<String> COPIED = List.of("scripts", "variables.csv", "aliases", "aliases-english.zip");
+
+    /** What's copied when NeoSkript moved over before it read alias files: only those. */
+    static final List<String> ALIASES = List.of("aliases", "aliases-english.zip");
 
     /**
      * What was copied, relative to the folders, for the log (empty if nothing was), Skript's
@@ -47,6 +53,7 @@ final class SkriptMigration {
 
     /** Skript's config.sk options that NeoSkript's config.yml has too, by Skript's name, with NeoSkript's path. */
     static final Map<String, String> SETTINGS = Map.of(
+            "load default aliases", "aliases.load-defaults",
             "enable effect commands", "effect-commands.enabled",
             "effect command token", "effect-commands.token",
             "allow ops to use effect commands", "effect-commands.allow-ops",
@@ -55,8 +62,10 @@ final class SkriptMigration {
     private SkriptMigration() {}
 
     static Result migrate(Path skriptDir, Path neoskriptDir) throws IOException {
-        if (!Files.isDirectory(skriptDir) || Files.exists(neoskriptDir.resolve(MARKER))
-                || Files.exists(neoskriptDir.resolve("scripts"))) {
+        if (Files.isDirectory(skriptDir) && Files.exists(neoskriptDir.resolve(MARKER))) {
+            return aliasesLater(skriptDir, neoskriptDir);
+        }
+        if (!Files.isDirectory(skriptDir) || Files.exists(neoskriptDir.resolve("scripts"))) {
             return new Result(List.of(), 0, null);
         }
         Files.createDirectories(neoskriptDir);
@@ -67,7 +76,7 @@ final class SkriptMigration {
             if (!Files.exists(source)) {
                 continue;
             }
-            copy(source, neoskriptDir.resolve(name), scripts);
+            copy(source, neoskriptDir.resolve(name), name.equals("scripts") ? scripts : new int[1]);
             copied.add(name);
         }
         // Before NeoSkript first loads or saves them, the variables Skript saved are backed up as they were.
@@ -77,6 +86,36 @@ final class SkriptMigration {
                 "Copied " + copied + " from " + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n");
         return new Result(copied, scripts[0], playerUuids(skriptDir.resolve("config.sk")),
                 settings(skriptDir.resolve("config.sk")), backup);
+    }
+
+    /**
+     * For a server that moved over before NeoSkript read alias files: Skript's alias files and its
+     * {@code load default aliases}, once, unless NeoSkript has an aliases folder of its own by now. The marker records
+     * it, so deleting them later doesn't bring them back.
+     */
+    private static Result aliasesLater(Path skriptDir, Path neoskriptDir) throws IOException {
+        Path marker = neoskriptDir.resolve(MARKER);
+        String recorded = Files.readString(marker);
+        if (recorded.contains("aliases") || Files.exists(neoskriptDir.resolve("aliases"))
+                || Files.exists(neoskriptDir.resolve("aliases-english.zip"))) {
+            return new Result(List.of(), 0, null);
+        }
+        List<String> copied = new ArrayList<>();
+        for (String name : ALIASES) {
+            Path source = skriptDir.resolve(name);
+            if (Files.exists(source)) {
+                copy(source, neoskriptDir.resolve(name), new int[1]);
+                copied.add(name);
+            }
+        }
+        if (copied.isEmpty()) {
+            return new Result(List.of(), 0, null);
+        }
+        Files.writeString(marker, recorded + "Copied " + copied + " from " + skriptDir.toAbsolutePath() + " at "
+                + Instant.now() + "\n");
+        Map<String, Object> settings = new java.util.LinkedHashMap<>(settings(skriptDir.resolve("config.sk")));
+        settings.keySet().retainAll(List.of("aliases.load-defaults"));
+        return new Result(copied, 0, null, settings, null);
     }
 
     /**
