@@ -576,7 +576,7 @@ final class Syntax {
         if (value == null) {
             return null;
         }
-        String text = NeoSkript.get().text(value).toLowerCase(Locale.ROOT).replace(" inventory", "").strip();
+        String text = NeoSkript.get().values().text(value).toLowerCase(Locale.ROOT).replace(" inventory", "").strip();
         if (text.equals("crafting table") || text.equals("workbench")) {
             return InventoryType.WORKBENCH;
         }

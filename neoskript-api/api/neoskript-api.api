@@ -149,11 +149,11 @@ public interface co.xenastudios.neoskript.api.element.Keyed @Experimental
   public abstract java.lang.String[] keys()
   public abstract java.lang.Object[] values()
 
-public interface co.xenastudios.neoskript.api.element.LoopValue
-  public abstract java.lang.Object get(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[], java.lang.Object)
-
 public interface co.xenastudios.neoskript.api.element.LaterSection
   public abstract void run(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[], co.xenastudios.neoskript.api.element.SectionCode)
+
+public interface co.xenastudios.neoskript.api.element.LoopValue
+  public abstract java.lang.Object get(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[], java.lang.Object)
 
 public interface co.xenastudios.neoskript.api.element.PausingEffect
   public static final java.lang.Object UNCHANGED
