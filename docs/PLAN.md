@@ -111,7 +111,7 @@ Rules on Folia:
 
 ### 3.6 Addon APIs
 
-- **Modern API (stable, [M6 step 9](PROGRESS.md#step-9-the-addon-api-declared-stable)):** registration through a `Registrar` an addon gets from `NeoSkript.get().addon(...)`, script, variable and thread access, explicit thread-affinity declarations, and a Maven publication. What's public is stable unless marked `@Experimental` or `@Internal`, and a committed signature file, checked in the build, keeps changes deliberate. Still to come: typed `Expression<T>` and codegen hooks for addons' intrinsics.
+- **Modern API (stable, [M6 step 9](PROGRESS.md#step-9-the-addon-api-declared-stable)):** registration through a `Registrar` an addon gets from `NeoSkript.get().addon(...)`, script, variable and thread access, explicit thread-affinity declarations, and a Maven Central publication. What's public is stable unless marked `@Experimental` or `@Internal`, and a committed signature file, checked in the build, keeps changes deliberate. Still to come: typed `Expression<T>` and codegen hooks for addons' intrinsics.
 - **Skript compat shim (1.x):** implements `ch.njol.skript.*` (`SyntaxElement.init(Expression[], int, Kleenean, ParseResult)`, `ClassInfo`, `Converters`, `Skript.registerX`), wrapping each addon element as a call-through node. Target order: **SkBee → skript-yaml → SkQuery → skript-reflect**. skript-reflect leans heavily on Skript internals and may need special handling.
 
 ## 4. Quality: corpus, differential testing, benchmarks

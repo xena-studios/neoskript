@@ -15,28 +15,40 @@ import co.xenastudios.neoskript.runtime.ScriptCatalog;
 import co.xenastudios.neoskript.runtime.ScriptRef;
 import co.xenastudios.neoskript.runtime.region.RegionAccess;
 import co.xenastudios.neoskript.runtime.region.Regions;
-import co.xenastudios.neoskript.runtime.scheduler.Scheduler;
 import co.xenastudios.neoskript.runtime.variables.VariableStore;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import org.bukkit.Location;
+import org.bukkit.Server;
+import org.bukkit.block.Block;
+import org.bukkit.entity.Entity;
 import org.bukkit.plugin.Plugin;
+import org.slf4j.Logger;
 
 /** The addon API, as NeoSkript's plugin provides it: {@link NeoSkript#get()}. */
 final class AddonApi implements NeoSkript {
 
+    private static final String NOT_READY = "NeoSkript isn't ready yet: scripts and saved variables load on the"
+            + " server's first tick. Use NeoSkript.get().whenReady(...) to wait for them.";
+
     private final Plugin plugin;
     private final Addons addons;
+    private final Logger logger;
     private final ScriptsView scripts = new ScriptsView();
     private final VariablesView variables;
-    private final ThreadsView threads;
+    private final ThreadsView threads = new ThreadsView();
+    /** Whether NeoSkript is ready, and what waits for it until then. */
+    private boolean ready;
+    private final List<Runnable> waiting = new ArrayList<>();
 
-    AddonApi(Plugin plugin, Addons addons, VariableStore globals, Scheduler scheduler, boolean folia) {
+    AddonApi(Plugin plugin, Addons addons, VariableStore globals, Logger logger) {
         this.plugin = plugin;
         this.addons = addons;
+        this.logger = logger;
         this.variables = new VariablesView(globals);
-        this.threads = new ThreadsView(scheduler, folia);
     }
 
     @Override
@@ -55,6 +67,46 @@ final class AddonApi implements NeoSkript {
     }
 
     @Override
+    public synchronized boolean isReady() {
+        return ready;
+    }
+
+    @Override
+    public void whenReady(Runnable task) {
+        java.util.Objects.requireNonNull(task, "task");
+        synchronized (this) {
+            if (!ready) {
+                waiting.add(task);
+                return;
+            }
+        }
+        task.run();
+    }
+
+    /** Marks NeoSkript ready, once scripts have loaded, and runs what waited for it. */
+    void ready() {
+        List<Runnable> tasks;
+        synchronized (this) {
+            ready = true;
+            tasks = List.copyOf(waiting);
+            waiting.clear();
+        }
+        for (Runnable task : tasks) {
+            try {
+                task.run();
+            } catch (RuntimeException | LinkageError e) {
+                logger.error("A task waiting for NeoSkript to be ready failed", e);
+            }
+        }
+    }
+
+    private void checkReady() {
+        if (!isReady()) {
+            throw new IllegalStateException(NOT_READY);
+        }
+    }
+
+    @Override
     public Scripts scripts() {
         return scripts;
     }
@@ -70,22 +122,25 @@ final class AddonApi implements NeoSkript {
     }
 
     /** The scripts folder, through the catalog the plugin installs for {@code script} syntax. */
-    private static final class ScriptsView implements Scripts {
+    private final class ScriptsView implements Scripts {
 
         @Override
         public List<String> loaded() {
+            checkReady();
             ScriptCatalog catalog = ScriptCatalog.get();
             return catalog.scripts(true, false).stream().filter(catalog::loaded).map(ScriptRef::name).toList();
         }
 
         @Override
         public boolean isLoaded(String name) {
+            checkReady();
             ScriptRef script = ScriptCatalog.get().find(name);
             return script != null && ScriptCatalog.get().loaded(script);
         }
 
         @Override
         public boolean load(String name) {
+            checkReady();
             ScriptCatalog catalog = ScriptCatalog.get();
             ScriptRef script = catalog.find(name);
             ScriptRef loaded = script == null ? null : catalog.load(script);
@@ -94,6 +149,7 @@ final class AddonApi implements NeoSkript {
 
         @Override
         public boolean reload(String name) {
+            checkReady();
             ScriptCatalog catalog = ScriptCatalog.get();
             ScriptRef script = catalog.find(name);
             if (script == null || !catalog.scripts(true, false).contains(script)) {
@@ -105,6 +161,7 @@ final class AddonApi implements NeoSkript {
 
         @Override
         public boolean unload(String name) {
+            checkReady();
             ScriptCatalog catalog = ScriptCatalog.get();
             ScriptRef script = catalog.find(name);
             if (script == null || !catalog.loaded(script)) {
@@ -116,6 +173,7 @@ final class AddonApi implements NeoSkript {
 
         @Override
         public Object call(String name, Object... arguments) {
+            checkReady();
             FunctionRef function = FunctionLookup.find(name, null);
             if (function == null) {
                 throw new IllegalArgumentException("There's no function called " + name);
@@ -125,20 +183,29 @@ final class AddonApi implements NeoSkript {
     }
 
     /** The global variables scripts use. */
-    private record VariablesView(VariableStore globals) implements Variables {
+    private final class VariablesView implements Variables {
+
+        private final VariableStore globals;
+
+        VariablesView(VariableStore globals) {
+            this.globals = globals;
+        }
 
         @Override
         public Object get(String name) {
+            checkReady();
             return globals.get(name);
         }
 
         @Override
         public void set(String name, Object value) {
+            checkReady();
             globals.set(name, value);
         }
 
         @Override
         public Map<String, Object> list(String name) {
+            checkReady();
             co.xenastudios.neoskript.runtime.KeyedValues list = globals.keyedList(name);
             Map<String, Object> values = new LinkedHashMap<>();
             for (int i = 0; i < list.values().length; i++) {
@@ -149,65 +216,107 @@ final class AddonApi implements NeoSkript {
 
         @Override
         public void deleteList(String name) {
+            checkReady();
             globals.deleteList(name);
         }
     }
 
-    /** The scheduler triggers run on, and on Folia, its regions. */
+    /**
+     * Paper's region, entity, global and async schedulers, which Paper runs on its main thread and Folia on each
+     * region's. Tasks belong to the plugin whose class scheduled them, so they end when it disables.
+     */
     private final class ThreadsView implements Threads {
 
-        private final Scheduler scheduler;
-        private final boolean folia;
+        private final StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
 
-        ThreadsView(Scheduler scheduler, boolean folia) {
-            this.scheduler = scheduler;
-            this.folia = folia;
+        /** The plugin whose class called the API, or NeoSkript if it's none's. */
+        private Plugin caller() {
+            ClassLoader loader = walker.walk(frames -> frames.map(StackWalker.StackFrame::getDeclaringClass)
+                    .filter(type -> type != ThreadsView.class).findFirst().map(Class::getClassLoader).orElse(null));
+            for (Plugin candidate : plugin.getServer().getPluginManager().getPlugins()) {
+                if (candidate.getClass().getClassLoader() == loader) {
+                    // A disabled plugin can't schedule: Paper says so, as for its own tasks.
+                    return candidate;
+                }
+            }
+            return plugin;
+        }
+
+        private Server server() {
+            return plugin.getServer();
         }
 
         @Override
         public boolean isFolia() {
-            return folia;
+            return co.xenastudios.neoskript.runtime.platform.Platform.detect()
+                    == co.xenastudios.neoskript.runtime.platform.Platform.FOLIA;
         }
 
         @Override
         public boolean owns(Object owner) {
             RegionAccess access = Regions.access();
-            return access != null ? access.owns(owner) : plugin.getServer().isPrimaryThread();
+            return access != null ? access.owns(owner) : server().isPrimaryThread();
         }
 
         @Override
         public void runGlobal(Runnable task) {
-            scheduler.runGlobal(task);
+            server().getGlobalRegionScheduler().execute(caller(), task);
         }
 
         @Override
         public void runGlobalLater(long ticks, Runnable task) {
-            scheduler.runGlobalLater(Math.max(ticks, 0), task);
+            Plugin owner = caller();
+            if (ticks < 1) {
+                server().getGlobalRegionScheduler().execute(owner, task);
+            } else {
+                server().getGlobalRegionScheduler().runDelayed(owner, scheduled -> task.run(), ticks);
+            }
         }
 
         @Override
         public Runnable runGlobalRepeating(long delay, long period, Runnable task) {
-            return scheduler.runGlobalRepeating(Math.max(delay, 0), Math.max(period, 1), task);
+            return server().getGlobalRegionScheduler().runAtFixedRate(caller(), scheduled -> task.run(),
+                    Math.max(delay, 1), Math.max(period, 1))::cancel;
         }
 
         @Override
         public void run(Object owner, Runnable task) {
-            RegionAccess access = Regions.access();
-            if (access != null) {
-                access.execute(owner, task);
-            } else {
-                scheduler.runGlobal(task);
+            Plugin by = caller();
+            switch (owner) {
+                // Not run for an entity that's gone: the scheduler retires it, and the check covers one that died.
+                case Entity entity -> entity.getScheduler().run(by, scheduled -> {
+                    if (entity.isValid()) {
+                        task.run();
+                    }
+                }, null);
+                case Block block -> server().getRegionScheduler().execute(by, block.getLocation(), task);
+                case Location location when location.getWorld() != null ->
+                        server().getRegionScheduler().execute(by, location, task);
+                case null, default -> server().getGlobalRegionScheduler().execute(by, task);
             }
         }
 
         @Override
         public void runLater(Object owner, long ticks, Runnable task) {
-            scheduler.runLater(owner, Math.max(ticks, 0), task);
+            Plugin by = caller();
+            long delay = Math.max(ticks, 1);
+            switch (owner) {
+                case Entity entity -> entity.getScheduler().runDelayed(by, scheduled -> {
+                    if (entity.isValid()) {
+                        task.run();
+                    }
+                }, null, delay);
+                case Block block -> server().getRegionScheduler().runDelayed(by, block.getLocation(),
+                        scheduled -> task.run(), delay);
+                case Location location when location.getWorld() != null ->
+                        server().getRegionScheduler().runDelayed(by, location, scheduled -> task.run(), delay);
+                case null, default -> server().getGlobalRegionScheduler().runDelayed(by, scheduled -> task.run(), delay);
+            }
         }
 
         @Override
         public void runAsync(Runnable task) {
-            plugin.getServer().getAsyncScheduler().runNow(plugin, scheduled -> task.run());
+            server().getAsyncScheduler().runNow(caller(), scheduled -> task.run());
         }
     }
 }

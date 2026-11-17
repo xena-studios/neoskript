@@ -11,7 +11,7 @@ The [example addon](https://github.com/xena-studios/neoskript/tree/main/examples
 
 ## Getting started
 
-Add the API as a compile-only dependency. NeoSkript's jar has the API in it at run time, so don't shade it.
+Add the API as a compile-only dependency, from Maven Central. NeoSkript's jar has the API in it at run time, so don't shade it.
 
 ```kotlin
 // build.gradle.kts
@@ -33,11 +33,22 @@ dependencies {
 | Version | the NeoSkript version you build against |
 | Java | 21 |
 
+With Maven:
+
+```xml
+<dependency>
+    <groupId>co.xenastudios.neoskript</groupId>
+    <artifactId>neoskript-api</artifactId>
+    <version><!-- version --></version>
+    <scope>provided</scope>
+</dependency>
+```
+
 :::note
-The API isn't on a Maven repository yet. Until it is, build it from [the repository](https://github.com/xena-studios/neoskript) with `./gradlew :neoskript-api:publishToMavenLocal`, and add `mavenLocal()` to your repositories.
+The first release on Maven Central is coming. Until it's there, build the API from [the repository](https://github.com/xena-studios/neoskript) with `./gradlew :neoskript-api:publishToMavenLocal`, and add `mavenLocal()` to your repositories.
 :::
 
-Make NeoSkript a dependency in `plugin.yml`, so your addon enables after it:
+Make NeoSkript a dependency in `plugin.yml`, so your addon enables after it. It has to be `depend`: NeoSkript only waits for the plugins that depend on it, so with `softdepend` alone your syntax may come too late.
 
 ```yaml
 depend: [NeoSkript]
@@ -59,6 +70,17 @@ public final class MyAddon extends JavaPlugin {
 ```
 
 NeoSkript runs that registration once, on the server's first tick: after its own types and syntax, so your patterns can use `%player%`, and before any script loads. `/sk info` lists your addon. Syntax can't be added after scripts have loaded.
+
+In `onEnable`, scripts and saved variables haven't loaded yet, so `scripts()` and `variables()` throw `IllegalStateException`. Wait for NeoSkript to be ready:
+
+```java
+NeoSkript.get().whenReady(() -> {
+    Object last = NeoSkript.get().variables().get("lottery::last");
+    getLogger().info("Last winner: " + last);
+});
+```
+
+`whenReady` runs the task right after scripts load, on the global thread, or straight away if NeoSkript is ready already. `isReady()` says which.
 
 ## How elements work
 
@@ -206,7 +228,9 @@ Object prize = neoskript.scripts().call("lotteryPrize", 3L);         // a script
 neoskript.scripts().reload("quests/main.sk");
 ```
 
-A variable's name is written as in a script, without braces, with `%...%` already filled in. Players are their UUIDs in variable names, as in Skript's default config. Each variable call is atomic and works from any thread; a sequence of them isn't.
+Use them once NeoSkript is ready (see `whenReady` above). A variable's name is written as in a script, without braces, with `%...%` already filled in. Players are their UUIDs in variable names, as in Skript's default config. Each variable call is atomic and works from any thread; a sequence of them isn't.
+
+When your addon disables, values of its types in variables are kept as their saved bytes, so they're still saved, and load again with your codec on the next start.
 
 ## Threads and Folia
 
@@ -217,7 +241,7 @@ Your elements run on the trigger's thread. By default, NeoSkript treats them as 
 - an expression or condition given one that another thread owns is a runtime error naming the line, and gives nothing;
 - an effect given one runs on the owner's thread, soon, while the trigger carries on.
 
-Say so when an element is different:
+Say so when an element is different, by the id of one of your own elements:
 
 ```java
 registrar.affinity("MyAddonCondWinning", ThreadAffinity.ANY);       // only reads what's safe anywhere, or only sends
@@ -235,7 +259,7 @@ threads.runAsync(() -> fetchFromTheWeb());             // off the server's threa
 if (threads.owns(entity)) { /* safe to touch it here */ }
 ```
 
-The same code works on Paper, where all of these run on the main thread.
+The same code works on Paper, where all of these run on the main thread. A task for an entity that isn't valid when it would run (removed, dead, or a player who left) doesn't run. Tasks belong to your plugin, so they're cancelled when it disables.
 
 ## What's stable
 

@@ -11,7 +11,8 @@ package co.xenastudios.neoskript.api;
  * load or an {@code every} period on the global one.
  *
  * <p>An owner is an entity (players too), a block or a location; anything else, or {@code null}, belongs to the
- * global thread. Tasks are run by NeoSkript's plugin: they're cancelled when NeoSkript disables, not the addon.
+ * global thread. Tasks belong to the plugin that scheduled them, found by the calling class: they're cancelled when
+ * that plugin disables, as its own Paper tasks are.
  *
  * <p>Addons call this; they don't implement it.
  */
@@ -51,7 +52,7 @@ public interface Threads {
     /**
      * Runs a task on the global thread every {@code period} ticks, first after {@code delay}.
      *
-     * @param delay how many ticks to wait first
+     * @param delay how many ticks to wait first, at least 1
      * @param period how many ticks between runs, at least 1
      * @param task what to run
      * @return what stops it
@@ -60,7 +61,8 @@ public interface Threads {
 
     /**
      * Runs a task on the thread that owns {@code owner}, soon, without waiting for it. On Paper that's the main
-     * thread, on the next tick. A task for an entity that's gone by then (a player who left) doesn't run.
+     * thread, on the next tick. A task for an entity that isn't valid when it would run (removed, dead, or a player
+     * who left) doesn't run, on Paper and Folia alike.
      *
      * @param owner an entity, block or location; anything else, or {@code null}, for the global thread
      * @param task what to run
@@ -68,11 +70,11 @@ public interface Threads {
     void run(Object owner, Runnable task);
 
     /**
-     * Runs a task on the thread that owns {@code owner} after {@code ticks} server ticks. On Folia, a task for an
-     * entity that's gone by then runs on the global thread instead.
+     * Runs a task on the thread that owns {@code owner} after {@code ticks} server ticks. As with {@link #run}, a
+     * task for an entity that isn't valid by then doesn't run.
      *
      * @param owner an entity, block or location; anything else, or {@code null}, for the global thread
-     * @param ticks how many ticks to wait first
+     * @param ticks how many ticks to wait first, at least 1
      * @param task what to run
      */
     void runLater(Object owner, long ticks, Runnable task);

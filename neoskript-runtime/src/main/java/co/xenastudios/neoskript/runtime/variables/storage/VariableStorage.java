@@ -154,6 +154,32 @@ public final class VariableStorage {
         return loaded && store.modifications() != savedAt;
     }
 
+    /**
+     * Replaces each value of a class {@code loader} loaded with its saved bytes, as a {@link RawValue}, for an addon
+     * that's being disabled: later saves then never run its code, whose classes go with it. Values of its classes
+     * that can't be saved are deleted, as no save would keep them.
+     *
+     * @return the names of the variables changed
+     */
+    public synchronized List<String> detach(ClassLoader loader) {
+        java.util.Map<String, Object> found = new java.util.LinkedHashMap<>();
+        store.forEach((name, value) -> {
+            if (value != null && value.getClass().getClassLoader() == loader) {
+                found.put(name, value);
+            }
+        });
+        for (java.util.Map.Entry<String, Object> entry : found.entrySet()) {
+            VariableCodecs.Encoded encoded;
+            try {
+                encoded = codecs.encode(entry.getValue());
+            } catch (RuntimeException | LinkageError e) {
+                encoded = null;
+            }
+            store.set(entry.getKey(), encoded == null ? null : new RawValue(encoded.type(), encoded.bytes()));
+        }
+        return List.copyOf(found.keySet());
+    }
+
     /** Saves every variable except memory-only ones, once they have loaded. Values whose type can't be saved are skipped. */
     public synchronized Result save() throws IOException {
         if (!loaded) {
@@ -163,11 +189,20 @@ public final class VariableStorage {
         long modifications = store.modifications();
         List<VariableFile.Entry> entries = new ArrayList<>();
         int[] counts = new int[2];
+        List<String> broken = new ArrayList<>();
         store.forEach((name, value) -> {
             if (name.startsWith("-")) {
                 return;
             }
-            VariableCodecs.Encoded encoded = codecs.encode(value);
+            VariableCodecs.Encoded encoded;
+            try {
+                encoded = codecs.encode(value);
+            } catch (LinkageError gone) {
+                // An addon's codec whose classes are gone, as when it was disabled: nothing is written, so the file
+                // keeps what it had rather than losing these variables.
+                broken.add(name);
+                return;
+            }
             if (encoded == null) {
                 counts[1]++;
                 return;
@@ -177,6 +212,10 @@ public final class VariableStorage {
             }
             entries.add(new VariableFile.Entry(name.toLowerCase(Locale.ROOT), encoded.type(), encoded.bytes()));
         });
+        if (!broken.isEmpty()) {
+            throw new IllegalStateException("Couldn't encode " + String.join(", ", broken)
+                    + ": the code that saves their type is gone (its addon was disabled). Nothing was saved.");
+        }
         VariableFile.write(file, entries);
         savedAt = modifications;
         return new Result(entries.size(), counts[0], counts[1]);

@@ -1,18 +1,20 @@
 public interface co.xenastudios.neoskript.api.NeoSkript
-  public abstract void addon(java.lang.String, java.lang.String, java.util.function.Consumer)
-  public abstract java.util.List addons()
+  public abstract void addon(java.lang.String, java.lang.String, java.util.function.Consumer) signature (Ljava/lang/String;Ljava/lang/String;Ljava/util/function/Consumer<-Lco/xenastudios/neoskript/api/registration/Registrar;>;)V
+  public abstract java.util.List addons() signature ()Ljava/util/List<Ljava/lang/String;>;
   public static co.xenastudios.neoskript.api.NeoSkript get()
   public static boolean isEnabled()
+  public abstract boolean isReady()
   public abstract co.xenastudios.neoskript.api.Scripts scripts()
   public abstract co.xenastudios.neoskript.api.Threads threads()
   public abstract co.xenastudios.neoskript.api.Variables variables()
   public abstract java.lang.String version()
+  public abstract void whenReady(java.lang.Runnable)
 
 public interface co.xenastudios.neoskript.api.Scripts
   public abstract java.lang.Object call(java.lang.String, java.lang.Object[])
   public abstract boolean isLoaded(java.lang.String)
   public abstract boolean load(java.lang.String)
-  public abstract java.util.List loaded()
+  public abstract java.util.List loaded() signature ()Ljava/util/List<Ljava/lang/String;>;
   public abstract boolean reload(java.lang.String)
   public abstract boolean unload(java.lang.String)
 
@@ -29,7 +31,7 @@ public interface co.xenastudios.neoskript.api.Threads
 public interface co.xenastudios.neoskript.api.Variables
   public abstract void deleteList(java.lang.String)
   public abstract java.lang.Object get(java.lang.String)
-  public abstract java.util.Map list(java.lang.String)
+  public abstract java.util.Map list(java.lang.String) signature (Ljava/lang/String;)Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;
   public abstract void set(java.lang.String, java.lang.Object)
 
 public @interface co.xenastudios.neoskript.api.annotation.Experimental
@@ -37,12 +39,12 @@ public @interface co.xenastudios.neoskript.api.annotation.Experimental
 public @interface co.xenastudios.neoskript.api.annotation.Internal
 
 public interface co.xenastudios.neoskript.api.element.Changeable
-  public abstract java.lang.Class[] acceptChange(co.xenastudios.neoskript.api.element.Changeable$Mode)
+  public abstract java.lang.Class[] acceptChange(co.xenastudios.neoskript.api.element.Changeable$Mode) signature (Lco/xenastudios/neoskript/api/element/Changeable$Mode;)[Ljava/lang/Class<*>;
   public abstract void change(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[], java.lang.Object[], co.xenastudios.neoskript.api.element.Changeable$Mode)
   public boolean takesOne(co.xenastudios.neoskript.api.element.Changeable$Mode)
   public boolean typeChanges(co.xenastudios.neoskript.api.element.Changeable$Mode)
 
-public enum co.xenastudios.neoskript.api.element.Changeable$Mode
+public enum co.xenastudios.neoskript.api.element.Changeable$Mode signature Ljava/lang/Enum<Lco/xenastudios/neoskript/api/element/Changeable$Mode;>;
   public static final co.xenastudios.neoskript.api.element.Changeable$Mode ADD
   public static final co.xenastudios.neoskript.api.element.Changeable$Mode DELETE
   public static final co.xenastudios.neoskript.api.element.Changeable$Mode REMOVE
@@ -54,28 +56,28 @@ public enum co.xenastudios.neoskript.api.element.Changeable$Mode
 
 public interface co.xenastudios.neoskript.api.element.Condition
   public abstract boolean check(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[])
-  public static boolean check(java.lang.Object[], boolean, java.util.function.Predicate)
+  public static boolean check(java.lang.Object[], boolean, java.util.function.Predicate) signature ([Ljava/lang/Object;ZLjava/util/function/Predicate<Ljava/lang/Object;>;)Z
 
 public interface co.xenastudios.neoskript.api.element.Effect
   public abstract void execute(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[])
 
-public interface co.xenastudios.neoskript.api.element.ElementFactory
-  public abstract java.lang.Object create(co.xenastudios.neoskript.api.element.ElementInfo)
+public interface co.xenastudios.neoskript.api.element.ElementFactory signature <T:Ljava/lang/Object;>Ljava/lang/Object;
+  public abstract java.lang.Object create(co.xenastudios.neoskript.api.element.ElementInfo) signature (Lco/xenastudios/neoskript/api/element/ElementInfo;)TT;
 
 public final record co.xenastudios.neoskript.api.element.ElementInfo
   public boolean and(int)
   public java.lang.String argumentLiteral(int)
-  public java.util.List argumentLiterals()
+  public java.util.List argumentLiterals() signature ()Ljava/util/List<Ljava/lang/String;>;
   public java.lang.String argumentType(int)
-  public java.util.List argumentTypes()
+  public java.util.List argumentTypes() signature ()Ljava/util/List<Ljava/lang/String;>;
   public long defaultArguments()
   public final boolean equals(java.lang.Object)
-  public java.util.List eventClasses()
+  public java.util.List eventClasses() signature ()Ljava/util/List<Ljava/lang/Class<*>;>;
   public java.lang.String eventName()
   public boolean hasTag(java.lang.String)
   public final int hashCode()
   public boolean isDefault(int)
-  public boolean isEvent(java.lang.Class[])
+  public boolean isEvent(java.lang.Class[]) signature ([Ljava/lang/Class<*>;)Z
   public boolean isList(int)
   public boolean isSingle(int)
   public long listArguments()
@@ -84,26 +86,26 @@ public final record co.xenastudios.neoskript.api.element.ElementInfo
   public int pattern()
   public java.lang.String sectionType()
   public long singleArguments()
-  public java.util.Set tags()
+  public java.util.Set tags() signature ()Ljava/util/Set<Ljava/lang/String;>;
   public java.lang.String text()
   public java.lang.String textOr(java.lang.String)
   public int time()
   public final java.lang.String toString()
-  public java.util.List types()
+  public java.util.List types() signature ()Ljava/util/List<Lco/xenastudios/neoskript/api/element/ElementInfo$TypeArgument;>;
 
 public final record co.xenastudios.neoskript.api.element.ElementInfo$TypeArgument
-  public TypeArgument(java.lang.String, java.lang.String, boolean, java.lang.Class)
+  public TypeArgument(java.lang.String, java.lang.String, boolean, java.lang.Class) signature (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/Class<*>;)V
   public final boolean equals(java.lang.Object)
   public final int hashCode()
   public java.lang.String id()
-  public java.lang.Class javaClass()
+  public java.lang.Class javaClass() signature ()Ljava/lang/Class<*>;
   public java.lang.String name()
   public boolean plural()
   public final java.lang.String toString()
 
 public interface co.xenastudios.neoskript.api.element.EventFilter extends co.xenastudios.neoskript.api.element.Condition
-  public abstract java.util.List eventClasses()
-  public static co.xenastudios.neoskript.api.element.EventFilter of(java.util.List, co.xenastudios.neoskript.api.element.Condition)
+  public abstract java.util.List eventClasses() signature ()Ljava/util/List<Ljava/lang/Class<*>;>;
+  public static co.xenastudios.neoskript.api.element.EventFilter of(java.util.List, co.xenastudios.neoskript.api.element.Condition) signature (Ljava/util/List<Ljava/lang/Class<*>;>;Lco/xenastudios/neoskript/api/element/Condition;)Lco/xenastudios/neoskript/api/element/EventFilter;
 
 public interface co.xenastudios.neoskript.api.element.Expression
   public abstract java.lang.Object get(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[])
@@ -129,8 +131,8 @@ public interface co.xenastudios.neoskript.api.element.TriggerContext
 
 public interface co.xenastudios.neoskript.api.element.Update extends co.xenastudios.neoskript.api.element.Effect
   public void execute(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[])
-  public static co.xenastudios.neoskript.api.element.Update inPlace(int, java.util.function.BiFunction)
-  public static co.xenastudios.neoskript.api.element.Update of(int, java.util.function.BiFunction)
+  public static co.xenastudios.neoskript.api.element.Update inPlace(int, java.util.function.BiFunction) signature (ILjava/util/function/BiFunction<Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;Ljava/lang/Object;>;)Lco/xenastudios/neoskript/api/element/Update;
+  public static co.xenastudios.neoskript.api.element.Update of(int, java.util.function.BiFunction) signature (ILjava/util/function/BiFunction<Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;Ljava/lang/Object;>;)Lco/xenastudios/neoskript/api/element/Update;
   public boolean setRequired()
   public abstract int target()
   public abstract java.lang.Object update(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[])
@@ -147,9 +149,9 @@ public final class co.xenastudios.neoskript.api.element.Warnings
 
 public final record co.xenastudios.neoskript.api.registration.Parameter
   public Parameter(java.lang.String, java.lang.String, boolean, boolean)
-  public Parameter(java.lang.String, java.lang.String, boolean, boolean, java.util.function.Supplier)
-  public java.util.function.Supplier defaultValue()
-  public static co.xenastudios.neoskript.api.registration.Parameter defaulting(java.lang.String, java.lang.String, java.util.function.Supplier)
+  public Parameter(java.lang.String, java.lang.String, boolean, boolean, java.util.function.Supplier) signature (Ljava/lang/String;Ljava/lang/String;ZZLjava/util/function/Supplier<*>;)V
+  public java.util.function.Supplier defaultValue() signature ()Ljava/util/function/Supplier<*>;
+  public static co.xenastudios.neoskript.api.registration.Parameter defaulting(java.lang.String, java.lang.String, java.util.function.Supplier) signature (Ljava/lang/String;Ljava/lang/String;Ljava/util/function/Supplier<*>;)Lco/xenastudios/neoskript/api/registration/Parameter;
   public final boolean equals(java.lang.Object)
   public final int hashCode()
   public java.lang.String name()
@@ -165,73 +167,73 @@ public final class co.xenastudios.neoskript.api.registration.Patterns
   public static java.lang.String[] property(java.lang.String, java.lang.String)
 
 public interface co.xenastudios.neoskript.api.registration.Registrar
-  public static final int ALLOW_UNSAFE_CASTS
-  public static final int NO_CHAINING
-  public static final int NO_LEFT_CHAINING
-  public static final int NO_RIGHT_CHAINING
+  public static final int ALLOW_UNSAFE_CASTS = 4
+  public static final int NO_CHAINING = 3
+  public static final int NO_LEFT_CHAINING = 1
+  public static final int NO_RIGHT_CHAINING = 2
   public void affinity(java.lang.String, co.xenastudios.neoskript.api.registration.ThreadAffinity)
   public abstract void alias(java.lang.String, java.lang.String, java.lang.String)
-  public abstract void allValues(java.lang.String, java.util.function.Supplier)
-  public abstract void arithmetic(char, java.lang.Class, java.lang.Class, java.util.function.BiFunction)
-  public abstract void arithmeticDefault(java.lang.Class, java.util.function.Supplier)
-  public abstract void changer(java.lang.Class, co.xenastudios.neoskript.api.element.Changeable$Mode, java.util.function.BiConsumer)
-  public void changerAccepts(java.lang.Class, co.xenastudios.neoskript.api.element.Changeable$Mode, java.lang.Class[]) @Experimental
-  public abstract void cloner(java.lang.Class, java.util.function.UnaryOperator)
-  public abstract void comparison(java.lang.Class, java.lang.Class, java.util.function.BiPredicate)
-  public abstract void condition(java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[])
-  public abstract void converter(java.lang.Class, java.lang.Class, java.util.function.Function)
-  public void converter(java.lang.Class, java.lang.Class, java.util.function.Function, int)
+  public abstract void allValues(java.lang.String, java.util.function.Supplier) signature (Ljava/lang/String;Ljava/util/function/Supplier<+Ljava/lang/Iterable<*>;>;)V
+  public abstract void arithmetic(char, java.lang.Class, java.lang.Class, java.util.function.BiFunction) signature <A:Ljava/lang/Object;B:Ljava/lang/Object;>(CLjava/lang/Class<TA;>;Ljava/lang/Class<TB;>;Ljava/util/function/BiFunction<-TA;-TB;*>;)V
+  public abstract void arithmeticDefault(java.lang.Class, java.util.function.Supplier) signature <T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;Ljava/util/function/Supplier<+TT;>;)V
+  public abstract void changer(java.lang.Class, co.xenastudios.neoskript.api.element.Changeable$Mode, java.util.function.BiConsumer) signature <T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;Lco/xenastudios/neoskript/api/element/Changeable$Mode;Ljava/util/function/BiConsumer<-TT;[Ljava/lang/Object;>;)V
+  public void changerAccepts(java.lang.Class, co.xenastudios.neoskript.api.element.Changeable$Mode, java.lang.Class[]) signature (Ljava/lang/Class<*>;Lco/xenastudios/neoskript/api/element/Changeable$Mode;[Ljava/lang/Class<*>;)V @Experimental
+  public abstract void cloner(java.lang.Class, java.util.function.UnaryOperator) signature <T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;Ljava/util/function/UnaryOperator<TT;>;)V
+  public abstract void comparison(java.lang.Class, java.lang.Class, java.util.function.BiPredicate) signature <A:Ljava/lang/Object;B:Ljava/lang/Object;>(Ljava/lang/Class<TA;>;Ljava/lang/Class<TB;>;Ljava/util/function/BiPredicate<-TA;-TB;>;)V
+  public abstract void condition(java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/Condition;>;[Ljava/lang/String;)V
+  public abstract void converter(java.lang.Class, java.lang.Class, java.util.function.Function) signature <F:Ljava/lang/Object;T:Ljava/lang/Object;>(Ljava/lang/Class<TF;>;Ljava/lang/Class<TT;>;Ljava/util/function/Function<-TF;+TT;>;)V
+  public void converter(java.lang.Class, java.lang.Class, java.util.function.Function, int) signature <F:Ljava/lang/Object;T:Ljava/lang/Object;>(Ljava/lang/Class<TF;>;Ljava/lang/Class<TT;>;Ljava/util/function/Function<-TF;+TT;>;I)V
   public abstract void defaultValue(java.lang.String, java.lang.Object)
   public abstract void deferredSectionExpression(java.lang.String)
   public void describe(java.lang.String, co.xenastudios.neoskript.api.registration.Registrar$Describer) @Experimental
-  public abstract void effect(java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[])
+  public abstract void effect(java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/Effect;>;[Ljava/lang/String;)V
   public abstract void event(java.lang.String, co.xenastudios.neoskript.api.registration.ScriptEvent, java.lang.String[])
-  public abstract void event(java.lang.String, java.util.List, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[])
+  public abstract void event(java.lang.String, java.util.List, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/util/List<Ljava/lang/Class<*>;>;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/Condition;>;[Ljava/lang/String;)V
   public abstract void eventDefault(java.lang.String)
-  public void eventDefault(java.lang.String, java.lang.Class) @Experimental
-  public abstract void eventValue(java.lang.Class, java.lang.String, int, java.util.function.Function)
-  public abstract void eventValue(java.lang.Class, java.lang.String, java.lang.Class, int, java.util.function.Function) @Experimental
-  public abstract void eventValue(java.lang.Class, java.lang.String, java.util.function.Function)
-  public abstract void eventValueExcluded(java.lang.Class, java.lang.String, java.lang.String) @Experimental
+  public void eventDefault(java.lang.String, java.lang.Class) signature (Ljava/lang/String;Ljava/lang/Class<*>;)V @Experimental
+  public abstract void eventValue(java.lang.Class, java.lang.String, int, java.util.function.Function) signature <E:Ljava/lang/Object;>(Ljava/lang/Class<TE;>;Ljava/lang/String;ILjava/util/function/Function<-TE;*>;)V
+  public abstract void eventValue(java.lang.Class, java.lang.String, java.lang.Class, int, java.util.function.Function) signature <E:Ljava/lang/Object;>(Ljava/lang/Class<TE;>;Ljava/lang/String;Ljava/lang/Class<*>;ILjava/util/function/Function<-TE;*>;)V @Experimental
+  public abstract void eventValue(java.lang.Class, java.lang.String, java.util.function.Function) signature <E:Ljava/lang/Object;>(Ljava/lang/Class<TE;>;Ljava/lang/String;Ljava/util/function/Function<-TE;*>;)V
+  public abstract void eventValueExcluded(java.lang.Class, java.lang.String, java.lang.String) signature (Ljava/lang/Class<*>;Ljava/lang/String;Ljava/lang/String;)V @Experimental
   public void eventValueExpression(java.lang.String) @Experimental
   public void experimental(java.lang.String, java.lang.String)
   public void experimental(java.lang.String, java.lang.String, boolean)
-  public abstract void expression(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[])
-  public abstract void function(java.lang.String, java.util.List, java.lang.String, boolean, co.xenastudios.neoskript.api.element.Function)
-  public abstract void kindClass(java.lang.String, java.util.function.Function) @Experimental
-  public abstract void literalError(java.util.function.Function) @Experimental
-  public abstract void literalParser(java.lang.String, java.util.function.Function)
-  public abstract void namedType(java.lang.String, java.lang.String, java.lang.Class, java.util.Map)
-  public abstract void parser(java.lang.String, java.util.function.Function)
-  public void property(java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Function)
-  public void propertyCondition(java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Predicate)
-  public void propertySyntax(java.lang.String, int, java.util.function.Function, boolean) @Experimental
-  public void returnType(java.lang.String, java.util.function.Function) @Experimental
-  public abstract void section(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[])
+  public abstract void expression(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/Expression;>;[Ljava/lang/String;)V
+  public abstract void function(java.lang.String, java.util.List, java.lang.String, boolean, co.xenastudios.neoskript.api.element.Function) signature (Ljava/lang/String;Ljava/util/List<Lco/xenastudios/neoskript/api/registration/Parameter;>;Ljava/lang/String;ZLco/xenastudios/neoskript/api/element/Function;)V
+  public abstract void kindClass(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/Object;Ljava/lang/Class<*>;>;)V @Experimental
+  public abstract void literalError(java.util.function.Function) signature (Ljava/util/function/Function<Ljava/lang/String;Ljava/lang/String;>;)V @Experimental
+  public abstract void literalParser(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/String;*>;)V
+  public abstract void namedType(java.lang.String, java.lang.String, java.lang.Class, java.util.Map) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/Map<Ljava/lang/String;+TT;>;)V
+  public abstract void parser(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Ljava/lang/String;*>;)V
+  public void property(java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Function) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/function/Function<-TT;*>;)V
+  public void propertyCondition(java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Predicate) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/function/Predicate<-TT;>;)V
+  public void propertySyntax(java.lang.String, int, java.util.function.Function, boolean) signature (Ljava/lang/String;ILjava/util/function/Function<Ljava/util/Set<Ljava/lang/String;>;Ljava/lang/String;>;Z)V @Experimental
+  public void returnType(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Lco/xenastudios/neoskript/api/element/ElementInfo;Ljava/lang/String;>;)V @Experimental
+  public abstract void section(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/Section;>;[Ljava/lang/String;)V
   public void sectionEvent(java.lang.String, java.lang.String) @Experimental
   public abstract void sectionExpression(java.lang.String, java.lang.String)
-  public abstract void storage(java.lang.String, java.lang.Class, co.xenastudios.neoskript.api.storage.VariableCodec)
+  public abstract void storage(java.lang.String, java.lang.Class, co.xenastudios.neoskript.api.storage.VariableCodec) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/Class<TT;>;Lco/xenastudios/neoskript/api/storage/VariableCodec<TT;>;)V
   public abstract void subtype(java.lang.String, java.lang.String)
-  public abstract void text(java.lang.Class, java.util.function.Function)
-  public void timeStates(java.lang.String, int, java.lang.Class[])
-  public abstract void timeStates(java.lang.String, java.util.function.Predicate)
-  public abstract void type(java.lang.String, java.lang.String, java.lang.Class)
+  public abstract void text(java.lang.Class, java.util.function.Function) signature <T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;Ljava/util/function/Function<-TT;Ljava/lang/String;>;)V
+  public void timeStates(java.lang.String, int, java.lang.Class[]) signature (Ljava/lang/String;I[Ljava/lang/Class<*>;)V
+  public abstract void timeStates(java.lang.String, java.util.function.Predicate) signature (Ljava/lang/String;Ljava/util/function/Predicate<Lco/xenastudios/neoskript/api/element/ElementInfo;>;)V
+  public abstract void type(java.lang.String, java.lang.String, java.lang.Class) signature (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<*>;)V
   public void typeProperty(java.lang.String, java.lang.String[]) @Experimental
-  public abstract void typedExpression(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[])
-  public void unsavable(java.lang.Class) @Experimental
+  public abstract void typedExpression(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/Expression;>;[Ljava/lang/String;)V
+  public void unsavable(java.lang.Class) signature (Ljava/lang/Class<*>;)V @Experimental
   public void unsavable(java.lang.String, java.lang.String) @Experimental
-  public abstract void variableNameText(java.lang.Class, java.util.function.Function)
+  public abstract void variableNameText(java.lang.Class, java.util.function.Function) signature <T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;Ljava/util/function/Function<-TT;Ljava/lang/String;>;)V
 
 public interface co.xenastudios.neoskript.api.registration.Registrar$Describer @Experimental
-  public abstract java.lang.String describe(co.xenastudios.neoskript.api.element.ElementInfo, java.util.List)
+  public abstract java.lang.String describe(co.xenastudios.neoskript.api.element.ElementInfo, java.util.List) signature (Lco/xenastudios/neoskript/api/element/ElementInfo;Ljava/util/List<Ljava/lang/String;>;)Ljava/lang/String;
 
-public enum co.xenastudios.neoskript.api.registration.ScriptEvent
+public enum co.xenastudios.neoskript.api.registration.ScriptEvent signature Ljava/lang/Enum<Lco/xenastudios/neoskript/api/registration/ScriptEvent;>;
   public static final co.xenastudios.neoskript.api.registration.ScriptEvent LOAD
   public static final co.xenastudios.neoskript.api.registration.ScriptEvent UNLOAD
   public static co.xenastudios.neoskript.api.registration.ScriptEvent valueOf(java.lang.String)
   public static co.xenastudios.neoskript.api.registration.ScriptEvent[] values()
 
-public enum co.xenastudios.neoskript.api.registration.ThreadAffinity
+public enum co.xenastudios.neoskript.api.registration.ThreadAffinity signature Ljava/lang/Enum<Lco/xenastudios/neoskript/api/registration/ThreadAffinity;>;
   public static final co.xenastudios.neoskript.api.registration.ThreadAffinity ANY
   public static final co.xenastudios.neoskript.api.registration.ThreadAffinity GLOBAL
   public static final co.xenastudios.neoskript.api.registration.ThreadAffinity OWNER
@@ -287,6 +289,6 @@ public interface co.xenastudios.neoskript.api.storage.BinaryWriter
   public abstract void rawString(java.lang.String)
   public abstract void stringField(java.lang.String, java.lang.String)
 
-public interface co.xenastudios.neoskript.api.storage.VariableCodec
-  public abstract java.lang.Object decode(co.xenastudios.neoskript.api.storage.BinaryReader)
-  public abstract void encode(java.lang.Object, co.xenastudios.neoskript.api.storage.BinaryWriter)
+public interface co.xenastudios.neoskript.api.storage.VariableCodec signature <T:Ljava/lang/Object;>Ljava/lang/Object;
+  public abstract java.lang.Object decode(co.xenastudios.neoskript.api.storage.BinaryReader) signature (Lco/xenastudios/neoskript/api/storage/BinaryReader;)TT;
+  public abstract void encode(java.lang.Object, co.xenastudios.neoskript.api.storage.BinaryWriter) signature (TT;Lco/xenastudios/neoskript/api/storage/BinaryWriter;)V

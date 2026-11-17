@@ -104,6 +104,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         boolean hooks = co.xenastudios.neoskript.paper.Hooks.anyInstalled();
         addons = new Addons(getSLF4JLogger());
         addons.frozenWhen(library::frozen);
+        addons.knownWhen(library::known);
         // With addons, which enable after NeoSkript, the syntax is registered on the first tick, theirs with it, and
         // variables load after that, so the addons' types load too. Without them, nothing waits.
         boolean deferSyntax = Addons.anyInstalled(this) && !co.xenastudios.neoskript.plugin.check.CheckMode.requested();
@@ -174,15 +175,21 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (!deferSyntax) {
             loadVariables();
         }
-        co.xenastudios.neoskript.api.NeoSkript.install(
-                new AddonApi(this, addons, scripts.globals(), scheduler, platform == Platform.FOLIA));
-        // An addon disables before NeoSkript when the server stops, and its classes go with it: save variables while
-        // its codecs can still write its types.
+        AddonApi api = new AddonApi(this, addons, scripts.globals(), getSLF4JLogger());
+        co.xenastudios.neoskript.api.Installed.install(api);
+        // An addon disables before NeoSkript when the server stops, and its classes go with it. Its values in
+        // variables become their saved bytes now, so later saves, after unload events, never need its code.
         getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler
             public void onAddonDisable(org.bukkit.event.server.PluginDisableEvent event) {
-                if (Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin())) {
-                    saveVariables(false);
+                VariableStorage current = storage;
+                if (current != null && current.loaded() && Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin())) {
+                    java.util.List<String> detached = current.detach(event.getPlugin().getClass().getClassLoader());
+                    if (!detached.isEmpty()) {
+                        getSLF4JLogger().info("Kept {} {} of {}'s types as saved, since it was disabled",
+                                detached.size(), detached.size() == 1 ? "variable" : "variables",
+                                event.getPlugin().getName());
+                    }
                 }
             }
         }, this);
@@ -206,6 +213,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             // Events NeoSkript fires itself: experience spawning, times of day, starting and stopping.
             co.xenastudios.neoskript.paper.EventBridges.start(this, eventPriority());
             co.xenastudios.neoskript.paper.Hooks.start(this, eventPriority());
+            // Scripts and variables are there now: addons waiting for them carry on.
+            api.ready();
         };
         if (hooks || deferSyntax) {
             // As Skript: with plugins to hook into, taking Vault's services and then loading scripts wait for the
@@ -323,14 +332,15 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             if (saved.unsaved() > 0) {
                 getSLF4JLogger().warn("{} variables have values that can't be saved yet, so they weren't", saved.unsaved());
             }
-        } catch (IOException | RuntimeException e) {
-            getSLF4JLogger().error("Couldn't save variables to {}", current.file(), e);
+        } catch (IOException | RuntimeException | LinkageError e) {
+            // A LinkageError is an addon's codec whose classes are gone; the message names the variables.
+            getSLF4JLogger().error("Couldn't save variables to {}: {}", current.file(), e.getMessage(), e);
         }
     }
 
     @Override
     public void onDisable() {
-        co.xenastudios.neoskript.api.NeoSkript.install(null);
+        co.xenastudios.neoskript.api.Installed.install(null);
         if (runtimeErrorFrames != null) {
             runtimeErrorFrames.run();
         }

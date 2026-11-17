@@ -19,8 +19,18 @@ public final class ExampleAddon extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        NeoSkript neoskript = NeoSkript.get();
         // Runs on the first tick, after NeoSkript's own syntax and before scripts load.
-        NeoSkript.get().addon(getName(), getPluginMeta().getVersion(), LotterySyntax::register);
+        neoskript.addon(getName(), getPluginMeta().getVersion(), LotterySyntax::register);
+        // Scripts and saved variables aren't there yet: using them now is refused.
+        try {
+            neoskript.variables().get("lottery::last");
+        } catch (IllegalStateException notYet) {
+            getLogger().info("Variables before NeoSkript is ready: refused");
+        }
+        // They are once NeoSkript is ready, after scripts load.
+        neoskript.whenReady(() -> getLogger().info("NeoSkript is ready: " + neoskript.scripts().loaded().size()
+                + " script(s) loaded, saved winner " + neoskript.variables().get("lottery::last")));
     }
 
     @Override

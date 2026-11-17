@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import co.xenastudios.neoskript.api.registration.Registrar;
+import co.xenastudios.neoskript.api.registration.ThreadAffinity;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,5 +57,27 @@ class AddonsTest {
         assertThrows(IllegalStateException.class, () -> addons.add("lottery", "2.0", registrar -> {}));
         frozen.set(true);
         assertThrows(IllegalStateException.class, () -> addons.add("Late", "1.0", registrar -> {}));
+    }
+
+    @Test
+    void anAddonSetsTheAffinityOfItsOwnElementsOnly() {
+        Addons addons = new Addons(NOPLogger.NOP_LOGGER);
+        // NeoSkript's own: EffMessage, and its variants.
+        addons.knownWhen(id -> id.equals("EffMessage"));
+        List<String> errors = new ArrayList<>();
+        addons.add("Lottery", "1.0", registrar -> {
+            registrar.effect("LotteryEffDraw", info -> null, "draw");
+            registrar.affinity("LotteryEffDraw", ThreadAffinity.ANY);
+            registrar.condition("EffMessage", info -> null, "x");
+            for (String id : List.of("Lottery-Eff", "LotteryEffOther", "EffMessage")) {
+                try {
+                    registrar.affinity(id, ThreadAffinity.ANY);
+                } catch (IllegalArgumentException refused) {
+                    errors.add(id);
+                }
+            }
+        });
+        addons.registerAll(REGISTRAR);
+        assertEquals(List.of("Lottery-Eff", "LotteryEffOther", "EffMessage"), errors);
     }
 }

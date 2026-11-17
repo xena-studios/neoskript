@@ -17,3 +17,7 @@ on load:
 on lottery draw:
 	set {lottery::last} to event-ticket
 	send "{@prefix} event: %event-ticket% won" to console
+
+# Set while the server stops, after the addon has disabled: it's saved with the ticket.
+on unload:
+	set {lottery::stopped} to "yes"

@@ -705,8 +705,10 @@ public interface Registrar {
      * Which thread element {@code id} has to run on, on Folia. Without this, it's {@link ThreadAffinity#OWNER}.
      * On Paper everything runs on the main thread, and this changes nothing.
      *
-     * @param id the element's id
+     * @param id the element's id: one this addon registered, without {@code -}
      * @param affinity which thread it needs
+     * @throws IllegalArgumentException if the id has a {@code -}, or isn't one of this addon's elements, or is also
+     *     the id of one of NeoSkript's elements or another addon's
      */
     default void affinity(String id, ThreadAffinity affinity) {}
 }

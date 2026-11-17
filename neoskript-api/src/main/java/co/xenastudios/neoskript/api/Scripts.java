@@ -9,7 +9,8 @@ import java.util.List;
 /**
  * The script files in {@code plugins/NeoSkript/scripts}, by name: a script's path relative to that folder
  * ({@code quests/main.sk}), with or without {@code .sk}. Loading, reloading and unloading run their load and unload
- * events, as {@code /sk reload} does; call them from the global thread ({@link Threads#runGlobal}).
+ * events, as {@code /sk reload} does; call them from the global thread ({@link Threads#runGlobal}). Until NeoSkript
+ * is ready ({@link NeoSkript#whenReady}), every method throws {@link IllegalStateException}.
  *
  * <p>Addons call this; they don't implement it.
  */

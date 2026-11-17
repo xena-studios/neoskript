@@ -4,7 +4,6 @@
  */
 package co.xenastudios.neoskript.api;
 
-import co.xenastudios.neoskript.api.annotation.Internal;
 import co.xenastudios.neoskript.api.registration.Registrar;
 import java.util.List;
 import java.util.function.Consumer;
@@ -13,12 +12,15 @@ import java.util.function.Consumer;
  * NeoSkript, as an addon sees it: where addons register their syntax, and how they reach scripts, variables and
  * the server's threads.
  *
- * <p>An addon is a plugin with {@code depend: [NeoSkript]} in its {@code plugin.yml}. In {@code onEnable} it calls
- * {@link #addon} once, and NeoSkript runs the registration when it sets up its syntax, before it loads any script:
+ * <p>An addon is a plugin with {@code depend: [NeoSkript]} in its {@code plugin.yml} (a soft dependency isn't enough:
+ * NeoSkript only waits for the plugins that depend on it). In {@code onEnable} it calls {@link #addon} once, and
+ * NeoSkript runs the registration when it sets up its syntax, before it loads any script. Scripts and variables are
+ * there once NeoSkript is ready, which {@link #whenReady} waits for:
  * <pre>{@code
  * NeoSkript.get().addon("MyAddon", getPluginMeta().getVersion(), registrar -> {
  *     registrar.effect("MyAddonEffWave", info -> (context, arguments) -> wave(arguments[0]), "wave at %players%");
  * });
+ * NeoSkript.get().whenReady(() -> getLogger().info("Scripts loaded: " + NeoSkript.get().scripts().loaded()));
  * }</pre>
  *
  * <p><b>Stability.</b> Everything public in {@code co.xenastudios.neoskript.api} is stable unless it's marked
@@ -61,16 +63,6 @@ public interface NeoSkript {
     }
 
     /**
-     * Makes {@code instance} what {@link #get()} returns, or none with {@code null}. Called by NeoSkript's plugin.
-     *
-     * @param instance the running NeoSkript, or {@code null} when it disables
-     */
-    @Internal
-    static void install(NeoSkript instance) {
-        Installed.instance = instance;
-    }
-
-    /**
      * NeoSkript's version, as in its {@code plugin.yml}: {@code 1.0.0}, {@code 0.1.0-beta.1}.
      *
      * @return the version
@@ -101,14 +93,35 @@ public interface NeoSkript {
     List<String> addons();
 
     /**
-     * The script files and their functions.
+     * Whether NeoSkript is ready: its syntax and every addon's is registered, saved variables have loaded, and scripts
+     * have loaded. Until then, {@link #scripts()} and {@link #variables()} throw {@link IllegalStateException}. With
+     * addons installed, that's on the server's first tick, after every plugin has enabled.
+     *
+     * @return whether it's ready
+     */
+    boolean isReady();
+
+    /**
+     * Runs {@code task} once NeoSkript is ready ({@link #isReady()}): now, on this thread, if it is; else on the
+     * global thread, right after scripts load. Their {@code on load} triggers run after that, so what they set in
+     * variables isn't there yet; saved variables are. An addon's {@code onEnable} is too
+     * early to use scripts or variables, so it does that here.
+     *
+     * @param task what to run
+     */
+    void whenReady(Runnable task);
+
+    /**
+     * The script files and their functions. Their methods throw {@link IllegalStateException} until NeoSkript is
+     * ready ({@link #whenReady}).
      *
      * @return the scripts
      */
     Scripts scripts();
 
     /**
-     * Scripts' global variables, as {@code {name}} in a script.
+     * Scripts' global variables, as {@code {name}} in a script. Their methods throw {@link IllegalStateException}
+     * until NeoSkript is ready ({@link #whenReady}), as saved variables haven't loaded.
      *
      * @return the variables
      */

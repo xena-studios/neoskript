@@ -62,12 +62,17 @@ public final class NeoSkriptAddonScenario implements Scenario {
                 .file("plugins/NeoSkript/scripts/addon.sk", context.script("neoskript-addon.sk"));
         Path variables;
         try (ServerProcess server = first.start()) {
+            server.await(Pattern.compile(Pattern.quote("Variables before NeoSkript is ready: refused")),
+                    Duration.ofMinutes(5));
             server.await(Pattern.compile(Pattern.quote("Registered the syntax of NeoSkriptExampleAddon")),
                     Duration.ofMinutes(5));
             loadedCleanly(server);
             for (String expected : EXPECTED) {
                 server.await(Pattern.compile(Pattern.quote(expected) + "$"), Duration.ofMinutes(5));
             }
+            // Nothing saved yet: the script's on load trigger sets it after NeoSkript is ready.
+            server.await(Pattern.compile(Pattern.quote("NeoSkript is ready: 1 script(s) loaded, saved winner null")),
+                    Duration.ofMinutes(5));
             server.await(ServerProcess.DONE, Duration.ofMinutes(5));
             server.command("lottery");
             for (String expected : COMMAND) {
@@ -83,6 +88,11 @@ public final class NeoSkriptAddonScenario implements Scenario {
         if (!saved.contains("lottery::last, neoskriptexample:ticket, ")) {
             throw new HarnessFailure("The ticket wasn't saved in variables.csv with the addon's codec: " + variables);
         }
+        // The unload trigger runs after the addon has disabled; its change is saved too.
+        if (!saved.contains("lottery::stopped, string, ")) {
+            throw new HarnessFailure("A change made while the server stopped, after the addon disabled, wasn't saved: "
+                    + variables);
+        }
 
         // The next start loads the ticket back, with the addon's codec, before scripts use it.
         try (ServerProcess server = context.server()
@@ -92,6 +102,9 @@ public final class NeoSkriptAddonScenario implements Scenario {
                 .file("plugins/NeoSkript/scripts/saved.sk", context.script("neoskript-addon-saved.sk"))
                 .start()) {
             loadedCleanly(server);
+            // Saved variables have loaded when NeoSkript is ready.
+            server.await(Pattern.compile(Pattern.quote(
+                    "NeoSkript is ready: 1 script(s) loaded, saved winner ticket #2 of Alex")), Duration.ofMinutes(5));
             server.await(Pattern.compile(Pattern.quote("[harness] addon saved: ticket #2 of Alex") + "$"),
                     Duration.ofMinutes(5));
             server.await(ServerProcess.DONE, Duration.ofMinutes(5));

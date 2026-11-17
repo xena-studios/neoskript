@@ -13,7 +13,8 @@ import java.util.Map;
  * them: a {@code Long} or {@code Double} for a number, a {@code String} for a text.
  *
  * <p>Each call is atomic and can be made from any thread, as each operation in a script is; a sequence of calls
- * isn't. Variables changed here are saved with the rest.
+ * isn't. Variables changed here are saved with the rest. Until NeoSkript is ready ({@link NeoSkript#whenReady}), when
+ * saved variables have loaded, every method throws {@link IllegalStateException}.
  *
  * <p>Addons call this; they don't implement it.
  */

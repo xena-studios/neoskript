@@ -1,17 +1,12 @@
-import co.xenastudios.neoskript.build.ApiCheck
-import co.xenastudios.neoskript.build.ApiDump
+import co.xenastudios.neoskript.gradle.ApiCheck
+import co.xenastudios.neoskript.gradle.ApiDump
 
 plugins {
     id("neoskript.java-conventions")
-    `maven-publish`
+    alias(libs.plugins.maven.publish)
 }
 
 description = "NeoSkript's addon API: registering types and syntax, and reaching scripts, variables and threads."
-
-java {
-    withSourcesJar()
-    withJavadocJar()
-}
 
 tasks.javadoc {
     // Every public type and member of the API has its doc, checked here: the build fails on a missing one.
@@ -47,59 +42,64 @@ val apiCheck = tasks.register<ApiCheck>("apiCheck") {
 
 tasks.check {
     dependsOn(apiCheck)
+    // The javadoc is checked in every build, not only when it's published.
+    dependsOn(tasks.javadoc)
 }
 
-// Ready to publish, as co.xenastudios.neoskript:neoskript-api, with its sources and javadoc. Nothing publishes it
-// yet: `./gradlew :neoskript-api:publishToMavenLocal` puts it in ~/.m2, and a repository given with
-// -Pneoskript.publish.url (and .username, .password) is where `publish` sends it.
-publishing {
-    publications {
-        create<MavenPublication>("api") {
-            artifactId = "neoskript-api"
-            from(components["java"])
-            pom {
-                name = "NeoSkript API"
-                description = project.description
-                url = "https://neoskript.dev/docs/addon-api/"
-                licenses {
-                    license {
-                        name = "GPL-3.0-only"
-                        url = "https://www.gnu.org/licenses/gpl-3.0.txt"
-                    }
-                }
-                organization {
-                    name = "Xena Studios"
-                    url = "https://xenastudios.co"
-                }
-                developers {
-                    developer {
-                        name = "Xena Studios"
-                        organization = "Xena Studios"
-                    }
-                }
-                scm {
-                    url = "https://github.com/xena-studios/neoskript"
-                    connection = "scm:git:https://github.com/xena-studios/neoskript.git"
-                    developerConnection = "scm:git:ssh://git@github.com/xena-studios/neoskript.git"
-                }
-                issueManagement {
-                    system = "GitHub"
-                    url = "https://github.com/xena-studios/neoskript/issues"
-                }
+// The signature check reads class files with code in build-logic, which has tests of its own: they run with this
+// module's checks.
+tasks.check {
+    dependsOn(gradle.includedBuild("build-logic").task(":test"))
+}
+
+// Published to Maven Central, through the Central Portal, as co.xenastudios.neoskript:neoskript-api with its sources
+// and javadoc. The version is the plugin's: -Pversion=1.0.0. Signing and the Portal's credentials come from Gradle
+// properties or ORG_GRADLE_PROJECT_* variables (signingInMemoryKey, signingInMemoryKeyPassword, mavenCentralUsername,
+// mavenCentralPassword); without a key nothing is signed, so local builds and CI don't need them. To publish:
+// ./gradlew :neoskript-api:publishToMavenCentral -Pversion=<version>, then release it in the Portal.
+mavenPublishing {
+    configure(
+        com.vanniktech.maven.publish.JavaLibrary(
+            javadocJar = com.vanniktech.maven.publish.JavadocJar.Javadoc(),
+            sourcesJar = true,
+        )
+    )
+    publishToMavenCentral()
+    if (providers.gradleProperty("signingInMemoryKey").isPresent) {
+        signAllPublications()
+    }
+    coordinates("co.xenastudios.neoskript", "neoskript-api", project.version.toString())
+    pom {
+        name = "NeoSkript API"
+        description = project.description
+        inceptionYear = "2026"
+        url = "https://neoskript.dev"
+        licenses {
+            license {
+                name = "GPL-3.0-only"
+                url = "https://www.gnu.org/licenses/gpl-3.0.txt"
+                distribution = "repo"
             }
         }
-    }
-    repositories {
-        val url = providers.gradleProperty("neoskript.publish.url")
-        if (url.isPresent) {
-            maven {
-                name = "neoskript"
-                setUrl(url.get())
-                credentials {
-                    username = providers.gradleProperty("neoskript.publish.username").orNull
-                    password = providers.gradleProperty("neoskript.publish.password").orNull
-                }
+        developers {
+            developer {
+                id = "xena-studios"
+                name = "Xena Studios"
+                url = "https://xenastudios.co"
             }
+        }
+        organization {
+            name = "Xena Studios"
+            url = "https://xenastudios.co"
+        }
+        scm {
+            url = "https://github.com/xena-studios/neoskript"
+            connection = "scm:git:https://github.com/xena-studios/neoskript.git"
+            developerConnection = "scm:git:ssh://git@github.com/xena-studios/neoskript.git"
+        }
+        issueManagement {
+            system = "GitHub"
+            url = "https://github.com/xena-studios/neoskript/issues"
         }
     }
 }
