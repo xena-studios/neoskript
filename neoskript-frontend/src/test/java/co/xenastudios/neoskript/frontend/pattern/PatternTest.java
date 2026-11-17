@@ -141,6 +141,11 @@ class PatternTest {
         assertEquals(Set.of("down"), match("look :[up|down] now", "look down now").tags());
         assertEquals(Set.of(), match("look :[up|down] now", "look now").tags());
         assertEquals(Set.of("foo bar"), match("[:foo bar [baz]]", "foo bar baz").tags());
+        // ':text' in the middle of a pattern tags the text after it, up to the next group or placeholder.
+        assertEquals(Set.of("values"), match("[json] :values [%string%] of %object%", "json values \"a\" of b").tags());
+        assertEquals(Set.of("value"), match("[json] :value [%string%] of %object%", "value of b").tags());
+        assertEquals(Set.of("all of"), match("x :all of %object%", "x all of b").tags());
+        assertNull(match("[json] :value [%string%] of %object%", ":value of b"));
     }
 
     @Test
