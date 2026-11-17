@@ -12,7 +12,7 @@ NeoSkript is a fast, modern drop-in replacement for [Skript](https://github.com/
 
 1. Download the jar from [Modrinth](https://modrinth.com/plugin/neoskript), [GitHub Releases](https://github.com/xena-studios/neoskript/releases) or [neoskript.dev](https://neoskript.dev/download/).
 2. Take `Skript.jar` out of `plugins/` (NeoSkript won't start next to it) and put NeoSkript's jar in.
-3. Start the server. Your scripts and variables are copied from `plugins/Skript`, which is never changed.
+3. Start the server. Your scripts, variables and alias files are copied from `plugins/Skript`, which is never changed.
 
 Paper or Folia, Minecraft 1.21.4 to 26.3, Java 21 or newer. It's a beta: try it on a test server first. [Moving from Skript](https://neoskript.dev/docs/moving-from-skript/) has the details.
 
@@ -40,7 +40,7 @@ java -jar neoskript-cli-0.1.0.jar check plugins/Skript/scripts
 
 To build it yourself: `./gradlew :neoskript-cli:shadowJar`, and the jar is in `neoskript-cli/build/libs/`.
 
-It starts a throwaway headless Paper server (downloaded once into `~/.neoskript/cache` and checked against its SHA-256), loads the scripts there without running them, and lists each line NeoSkript won't load, Skript's warnings, and hints on what may behave differently on Folia or cost a lot of server time. Options: `--json <file>`, `--hints-only`, `--quiet`, `--minecraft 26.3|1.21.4`, `--verbose`. It exits with 0 when every script loads, 1 when some don't, and 2 when the check couldn't run.
+It starts a throwaway headless Paper server (downloaded once into `~/.neoskript/cache` and checked against its SHA-256), loads the scripts there without running them, and lists each line NeoSkript won't load, Skript's warnings, and hints on what may behave differently on Folia or cost a lot of server time. It reads the alias files in the `aliases` folder beside the scripts folder, as Skript does. Options: `--json <file>`, `--hints-only`, `--quiet`, `--minecraft 26.3|1.21.4`, `--aliases <folder>`, `--verbose`. It exits with 0 when every script loads, 1 when some don't, and 2 when the check couldn't run.
 
 ## What's here
 

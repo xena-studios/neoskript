@@ -1,0 +1,25 @@
+# What items the alias files make: each name parsed as an item type, its raw names, two of it, and its
+# components. /aliasprobe <name> probes one name later.
+function aliasprobe(n: text):
+	set {_t} to {_n} parsed as item type
+	if {_t} is not set:
+		send "[aliasprobe] %{_n}% => <none>" to console
+		stop
+	set {_s} to 1 of {_t}
+	send "[aliasprobe] %{_n}% => %{_t}% | raw: %raw names of {_t}% | two: %2 of {_t}% | model: %custom model data of {_s}% | name: %name of {_s}%" to console
+
+command /aliasprobe <text>:
+	trigger:
+		aliasprobe(arg-1)
+
+on load:
+	wait 1 tick
+	loop "ruby", "rubys", "rubies", "red dye", "red_dye", "minecraft:red_dye", "sapphire", "lapis lazuli", "shiny gem", "shiny gems", "fancy sword", "gem", "gems", "stone", "stones", "diamond", "rock", "big rocks", "boulder", "north anvil", "south anvil", "anvil", "potion", "potions", "glass bottle", "cooked fish", "cod", "alpha thing", "beta things", "gamma thing", "apple", "pluralmid thing", "pluralmids thing", "ünïcødé gëm", "ünïcødé gëms", "golemy", "oak plank thing", "birch plank things", "plank thing", "spruce planks", "oak planks", "red gem", "blue gems", "speed brew", "swiftness brews", "brew", "topaz", "gold ingot", "ancient thing", "ok after bad", "bad id", "thing", "outside", "bad state", "trailing", "weird", "ruby item", "ruby block", "rubys item", "water bottle", "speed potion", "potion of swiftness", "tipped arrow", "experience bottle", "arrow", "2 rubys", "3 of shiny gem", and "rock block":
+		aliasprobe(loop-value)
+	set block at location(0, 120, 0, world "world") to north anvil
+	set {_data} to "%block data of block at location(0, 120, 0, world "world")%"
+	send "[aliasprobe] placed north anvil: %whether {_data} contains "facing=north"%, %type of block at location(0, 120, 0, world "world")%" to console
+	set block at location(0, 120, 0, world "world") to south anvil
+	set {_data} to "%block data of block at location(0, 120, 0, world "world")%"
+	send "[aliasprobe] placed south anvil: %whether {_data} contains "facing=south"%, %type of block at location(0, 120, 0, world "world")%" to console
+	send "[aliasprobe] done" to console

@@ -33,7 +33,7 @@ A fast, modern, **clean-room** replacement for Skript. Existing `.sk` scripts ru
 | D16 | Licence header | `GPL-3.0-only` (SPDX header on every source file, checked by Spotless) | Version 3 of the GPL only. Skript is GPL-3.0-or-later, so its data we reuse (D3) can be used under version 3. |
 | D17 | Test servers | Pinned to exact Paper/Folia builds and SHA-256 hashes, bumped on purpose | Paper ships daily, and build 211 of 26.3 broke Skript 2.17.0 the day it came out. |
 | D18 | Where the Skript baseline runs | Paper 26.x only. Skript doesn't support Folia, and Skript 2.17.0 needs 1.21.5 or newer. NeoSkript-only checks run on all four servers. | |
-| D19 | Moving over from Skript | NeoSkript uses `plugins/NeoSkript`. On its first start it copies `scripts/` and `variables.csv` from `plugins/Skript`, then leaves a marker so it never copies again. It copies rather than moves, so Skript's folder stays as it was. Skript's `config.sk` isn't copied. | Swapping the jar just works, and switching back is safe. |
+| D19 | Moving over from Skript | NeoSkript uses `plugins/NeoSkript`. On its first start it copies `scripts/`, `variables.csv` and `aliases/` from `plugins/Skript`, then leaves a marker so it never copies again. It copies rather than moves, so Skript's folder stays as it was. Skript's `config.sk` isn't copied. | Swapping the jar just works, and switching back is safe. |
 | D20 | Database storage | Deferred to 1.x. Skript 2.17 itself only supports `CSV` and `disabled` out of the box (its SQLite and MySQL storage needs the abandoned SQLibrary plugin), so `variables.csv` is what servers actually use. | M3 matches Skript's CSV byte for byte instead of spreading thin. |
 
 ## 3. Architecture

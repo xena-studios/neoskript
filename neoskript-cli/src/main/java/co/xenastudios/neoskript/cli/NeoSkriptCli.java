@@ -52,10 +52,14 @@ public final class NeoSkriptCli {
                 --quiet              only print the summary
                 --minecraft <26.3|1.21.4>
                                      the server version to check against (by default the newest your Java runs)
+                --aliases <folder>   alias files to read, as Skript reads plugins/Skript/aliases (by default the
+                                     aliases folder next to the scripts folder, if there is one)
                 --cache <folder>     where the server is downloaded to (default ~/.neoskript/cache)
                 --verbose            show the server's console
 
               Files and folders whose names start with '-' or '.' are skipped, as Skript skips them.
+              Skript's default aliases are read unless the config.sk next to the aliases folder says
+              'load default aliases: false'.
             """;
 
     /** The servers the check can run on, newest first: Minecraft version, the Java version it needs, its pin. */
@@ -83,9 +87,11 @@ public final class NeoSkriptCli {
         boolean quiet = false;
         boolean hintsOnly = false;
         boolean verbose = false;
+        Path aliases = null;
         for (int i = 2; i < args.length; i++) {
             String option = args[i];
-            boolean takesValue = option.equals("--json") || option.equals("--minecraft") || option.equals("--cache");
+            boolean takesValue = option.equals("--json") || option.equals("--minecraft") || option.equals("--cache")
+                    || option.equals("--aliases");
             if (takesValue && i + 1 == args.length) {
                 err.print(USAGE);
                 return 2;
@@ -94,6 +100,7 @@ public final class NeoSkriptCli {
                 case "--json" -> json = Path.of(args[++i]);
                 case "--minecraft" -> minecraft = args[++i];
                 case "--cache" -> cache = Path.of(args[++i]);
+                case "--aliases" -> aliases = Path.of(args[++i]).toAbsolutePath().normalize();
                 case "--quiet" -> quiet = true;
                 case "--hints-only" -> hintsOnly = true;
                 case "--verbose" -> verbose = true;
@@ -108,6 +115,14 @@ public final class NeoSkriptCli {
             err.println("No such file or folder: " + target);
             return 2;
         }
+        if (aliases != null && !Files.isDirectory(aliases)) {
+            err.println("No such folder: " + aliases);
+            return 2;
+        }
+        if (aliases == null) {
+            aliases = aliasesNextTo(target);
+        }
+        boolean defaultAliases = aliases == null || defaultAliases(aliases.resolveSibling("config.sk"));
 
         JsonObject report;
         try {
@@ -121,7 +136,10 @@ public final class NeoSkriptCli {
                 return 2;
             }
             err.println("Checking against NeoSkript on Paper " + server.minecraft() + "...");
-            report = check(target, server, cache, verbose ? err : null);
+            if (aliases != null) {
+                err.println("Reading the alias files in " + aliases + (defaultAliases ? "" : ", without Skript's defaults"));
+            }
+            report = check(target, aliases, defaultAliases, server, cache, verbose ? err : null);
         } catch (IOException | InterruptedException e) {
             err.println("Couldn't run the check: " + e.getMessage());
             return 2;
@@ -145,6 +163,39 @@ public final class NeoSkriptCli {
             }
         }
         return 0;
+    }
+
+    /**
+     * The aliases folder that goes with {@code target}, as Skript's {@code plugins/Skript/aliases} goes with
+     * {@code plugins/Skript/scripts}: the {@code aliases} folder beside the scripts folder (the target, or the folder of
+     * a script), or {@code null} if there isn't one.
+     */
+    static Path aliasesNextTo(Path target) {
+        Path folder = Files.isDirectory(target) ? target : target.getParent();
+        Path parent = folder == null ? null : folder.getParent();
+        Path aliases = parent == null ? null : parent.resolve("aliases");
+        return aliases != null && Files.isDirectory(aliases) ? aliases : null;
+    }
+
+    /** Skript's {@code load default aliases} from a config.sk, true if it doesn't say. */
+    static boolean defaultAliases(Path configSk) {
+        if (!Files.isRegularFile(configSk)) {
+            return true;
+        }
+        try {
+            for (String line : Files.readAllLines(configSk, StandardCharsets.UTF_8)) {
+                String option = line.strip();
+                if (option.startsWith("load default aliases:")) {
+                    String value = option.substring(option.indexOf(':') + 1);
+                    int comment = value.indexOf('#');
+                    value = (comment >= 0 ? value.substring(0, comment) : value).strip().toLowerCase(Locale.ROOT);
+                    return !(value.equals("false") || value.equals("no") || value.equals("off"));
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            return true;
+        }
+        return true;
     }
 
     /** This CLI's version, from its jar's manifest ({@code dev} when run from the build's classes). */
@@ -180,8 +231,8 @@ public final class NeoSkriptCli {
     }
 
     /** Runs the check on a server in a folder of its own, which is deleted after. */
-    private static JsonObject check(Path scripts, Server server, Path cache, PrintStream console)
-            throws IOException, InterruptedException {
+    private static JsonObject check(Path scripts, Path aliases, boolean defaultAliases, Server server, Path cache,
+            PrintStream console) throws IOException, InterruptedException {
         Path serverJar = download(server, cache);
         Path dir = Files.createTempDirectory("neoskript-check");
         try {
@@ -206,10 +257,14 @@ public final class NeoSkriptCli {
             }
             Path report = dir.resolve("report.json");
             String java = ProcessHandle.current().info().command().orElse("java");
-            List<String> command = List.of(java, "-Xmx2G", "-Ddisable.watchdog=true",
+            List<String> command = new ArrayList<>(List.of(java, "-Xmx2G", "-Ddisable.watchdog=true",
                     "-DbundlerRepoDir=" + cache.resolve("bundler").resolve(server.minecraft()),
                     "-Dneoskript.check=" + scripts, "-Dneoskript.check.report=" + report,
-                    "-jar", serverJar.toString(), "--nogui");
+                    "-Dneoskript.check.defaultAliases=" + defaultAliases));
+            if (aliases != null) {
+                command.add("-Dneoskript.check.aliases=" + aliases);
+            }
+            command.addAll(List.of("-jar", serverJar.toString(), "--nogui"));
             Process process = new ProcessBuilder(command).directory(dir.toFile()).redirectErrorStream(true).start();
             process.getOutputStream().close();
             try (InputStream output = process.getInputStream()) {
@@ -280,6 +335,14 @@ public final class NeoSkriptCli {
         }
     }
 
+    private static int countFiles(JsonArray problems) {
+        java.util.Set<String> files = new java.util.HashSet<>();
+        for (JsonElement problem : problems) {
+            files.add(problem.getAsJsonObject().get("file").getAsString());
+        }
+        return files.size();
+    }
+
     static void print(Path target, JsonObject report, PrintStream out, boolean quiet, boolean hintsOnly) {
         JsonArray scripts = report.getAsJsonArray("scripts");
         int loading = 0;
@@ -295,8 +358,32 @@ public final class NeoSkriptCli {
         out.printf("NeoSkript check of %s: %d script%s, %d load%s cleanly, %d with errors, %d hint%s%n", target,
                 scripts.size(), scripts.size() == 1 ? "" : "s", loading, loading == 1 ? "s" : "",
                 scripts.size() - loading, hints, hints == 1 ? "" : "s");
+        JsonObject aliases = report.has("aliases") ? report.getAsJsonObject("aliases") : null;
+        JsonArray aliasProblems = aliases == null ? new JsonArray() : aliases.getAsJsonArray("problems");
+        if (aliases != null && aliases.get("files").getAsInt() > 0) {
+            int errors = 0;
+            for (JsonElement problem : aliasProblems) {
+                errors += problem.getAsJsonObject().get("kind").getAsString().equals("error") ? 1 : 0;
+            }
+            out.printf("Alias files: %d read, %d with problems (%d error%s)%n", aliases.get("files").getAsInt(),
+                    countFiles(aliasProblems), errors, errors == 1 ? "" : "s");
+        }
         if (quiet) {
             return;
+        }
+        if (!hintsOnly && !aliasProblems.isEmpty()) {
+            String file = null;
+            for (JsonElement element : aliasProblems) {
+                JsonObject problem = element.getAsJsonObject();
+                if (!problem.get("file").getAsString().equals(file)) {
+                    file = problem.get("file").getAsString();
+                    out.println();
+                    out.println("aliases/" + file);
+                }
+                int line = problem.get("line").getAsInt();
+                out.printf(Locale.ROOT, "  %-11s %s%s%n", problem.get("kind").getAsString(),
+                        line > 0 ? "line " + line + ": " : "", problem.get("message").getAsString());
+            }
         }
         for (JsonElement element : scripts) {
             JsonObject script = element.getAsJsonObject();

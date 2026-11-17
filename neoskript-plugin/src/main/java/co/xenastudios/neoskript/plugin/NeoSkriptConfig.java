@@ -37,6 +37,7 @@ public record NeoSkriptConfig(
             "Check Modrinth for newer NeoSkript versions when the server starts and once a day. A newer version is",
             "logged to the console and shown to players with skript.admin when they join. Development builds never check."})
         boolean updateChecker,
+        Aliases aliases,
         Variables variables,
         Events events,
         RuntimeErrors runtimeErrors,
@@ -48,6 +49,7 @@ public record NeoSkriptConfig(
             Theme.DEFAULTS,
             true,
             true,
+            new Aliases(true),
             new Variables("variables.csv", "csv", false, Interval.parse("5 minutes"), true),
             new Events(Priority.HIGH, false),
             new RuntimeErrors(Interval.parse("1 second"), 8, 2, 4, 10, 8, 2, 4, 10),
@@ -68,6 +70,14 @@ public record NeoSkriptConfig(
             .codec(TextStyle.class, TextStyle.CODEC)
             .codec(Interval.class, Interval.CODEC)
             .build();
+
+    public record Aliases(
+            @Comment({
+                "Load Skript's default aliases, as Skript's 'load default aliases' in config.sk. Off, items are only named",
+                "after their Minecraft ids (red dye) and by the alias files in plugins/NeoSkript/aliases, so some, like",
+                "potions of each kind, have no names. Moving over from Skript copies its setting. Applies on",
+                "/sk reload aliases."})
+            boolean loadDefaults) {}
 
     public record Variables(
             @Comment({

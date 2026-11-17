@@ -1,0 +1,34 @@
+# Custom aliases, as a server writes them: names, plurals, variations, components, block states, other aliases.
+gems:
+	ruby¦s = minecraft:red_dye
+	sapphire¦s = minecraft:lapis_lazuli
+	shiny gem¦s = minecraft:diamond {minecraft:custom_model_data={floats:[7f]}}
+	fancy sword¦s = minecraft:diamond_sword {minecraft:custom_name="Fancy", minecraft:max_damage=99}
+	gem¦s = ruby, sapphire
+	stone = minecraft:diamond
+	[big] (rock|boulder)¦s = minecraft:cobblestone
+	north anvil = minecraft:anvil[facing=north]
+	south anvil = minecraft:anvil[facing=south]
+	potion¦s = minecraft:glass_bottle
+	cooked fish = cod, minecraft:cooked_salmon
+	(alpha|beta) thing¦s = minecraft:apple
+	gamma thing = minecraft:apple
+	pluralmid¦s thing = minecraft:bowl
+	ünïcødé gëm¦s = minecraft:amethyst_shard
+	golemy = minecraft:iron_block[relatedEntity=iron golem]
+woody:
+	{woods}:
+		oak = minecraft:oak_-
+		birch = minecraft:birch_-
+		{default} = minecraft:spruce_-
+	{woods} plank thing¦s = -planks
+colours:
+	{tint}:
+		red = - {minecraft:custom_model_data={floats:[1f]}}
+		blue = - {minecraft:custom_model_data={floats:[2f]}}
+	{tint} gem¦s = minecraft:emerald
+	# A variation from the default aliases.
+	{potion types} brew¦s = minecraft:potion
+old:
+	minecraft version = 1.12 or older
+	ancient thing = minecraft:stone

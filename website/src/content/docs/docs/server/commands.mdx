@@ -16,9 +16,9 @@ In chat, click a command in `/sk help` to type it. Script names in reports and l
 | `/sk reload <script>` | Reloads a script. `.sk` can be left off. A folder ends with `/`: `/sk reload games/`. |
 | `/sk reload scripts` | Reloads every script. |
 | `/sk reload config` | Reads `config.yml` again. See [configuration](/docs/server/configuration/#what-applies-when) for what applies at once. |
-| `/sk reload all` | Both. |
+| `/sk reload all` | The config, the aliases and every script. |
 | `/sk reload last` | Reloads the script you reloaded last. |
-| `/sk reload aliases` | Nothing to reload: NeoSkript's aliases are built in. |
+| `/sk reload aliases` | Reads the [alias files](/docs/scripts/items/#custom-aliases) again, then reloads the scripts that use the names that changed, and those that had errors. A script that now has errors keeps running its last version. |
 | `/sk enable <script>` | Enables a disabled script or folder and loads it. `all` enables every disabled script. |
 | `/sk disable <script>` | Unloads a script or folder and disables it. `all` disables every script. |
 | `/sk list` | The enabled and disabled scripts, grouped by folder. Also `/sk show`. |

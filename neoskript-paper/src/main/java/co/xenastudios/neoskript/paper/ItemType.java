@@ -54,10 +54,25 @@ public final class ItemType {
      * then air. {@code null} for anything else.
      */
     private Material block;
+    /**
+     * The block data an alias gives its block, like {@code north anvil = minecraft:anvil[facing=north]}, which the
+     * block gets when it's placed. {@code null} for the block's default, and for items that aren't blocks.
+     */
+    private org.bukkit.block.data.BlockData blockData;
 
     public ItemType(ItemStack stack, boolean amountGiven) {
         this.stack = stack.clone();
         this.amountGiven = amountGiven;
+    }
+
+    /**
+     * A block's item, with the block's data, as Skript's item type of a block: it's written as the alias for that
+     * block data ({@code south anvil}), and placing it places the same block data.
+     */
+    static ItemType ofBlock(org.bukkit.block.Block block) {
+        ItemType type = new ItemType(new ItemStack(block.getType().isItem() ? block.getType() : Material.AIR), false);
+        type.blockData = block.getBlockData();
+        return type;
     }
 
     /** An item that may be any of {@code items}, as an alias of several stands for. */
@@ -69,6 +84,9 @@ public final class ItemType {
             }
         }
         ItemType type = new ItemType(all.getFirst().stack, all.getFirst().amountGiven);
+        // A block with no item, or an alias's block states, as the first item has them.
+        type.block = all.getFirst().block;
+        type.blockData = all.getFirst().blockData;
         if (all.size() > 1) {
             type.alternatives = all;
         }
@@ -93,6 +111,20 @@ public final class ItemType {
 
     public Material material() {
         return block != null ? block : stack.getType();
+    }
+
+    /**
+     * Its Minecraft id, as Skript's {@code Aliases.getMinecraftId}: as the alias file that names it wrote it
+     * ({@code cod} for {@code cooked fish = cod}), or its material's key.
+     */
+    public String rawName() {
+        AliasTable.Named named = GlobalAliases.named(material(), block != null ? null : stack, blockData);
+        return named != null ? named.item().id() : material().getKey().toString();
+    }
+
+    /** The block data an alias gives the block (see {@link #blockData}), or {@code null}. */
+    public org.bukkit.block.data.BlockData blockData() {
+        return blockData == null ? null : blockData.clone();
     }
 
     public int amount() {
@@ -183,6 +215,7 @@ public final class ItemType {
         copy.plain = plain;
         copy.meta = meta == null ? null : meta.clone();
         copy.block = block;
+        copy.blockData = blockData;
         if (alternatives != null) {
             copy.alternatives = new ArrayList<>(alternatives.stream().map(ItemType::copy).toList());
         }
@@ -226,7 +259,7 @@ public final class ItemType {
         }
         ItemType aliased = scriptAlias(words, amount, amountGiven);
         if (aliased == null) {
-            aliased = defaultAlias(words, amount, amountGiven);
+            aliased = fileAlias(words, amount, amountGiven);
         }
         if (aliased != null) {
             return aliased;
@@ -247,6 +280,22 @@ public final class ItemType {
         Material material = alias(words);
         Map<Enchantment, Integer> enchantments = Map.of();
         if (material == null) {
+            // 'fancy sword of sharpness 2', with an alias from the alias files before the ' of '.
+            for (int of = words.indexOf(" of "); of >= 0; of = words.indexOf(" of ", of + 1)) {
+                ItemType named = fileAlias(words.substring(0, of), amount, amountGiven);
+                if (named == null) {
+                    continue;
+                }
+                Map<Enchantment, Integer> given = enchantments(words.substring(of + 4));
+                if (given == null) {
+                    continue;
+                }
+                if (!given.isEmpty()) {
+                    named.editStacks(each -> each.editMeta(meta -> given.forEach((enchantment, level) ->
+                            meta.addEnchant(enchantment, level, true))));
+                }
+                return named;
+            }
             // 'diamond sword of sharpness 2': the alias is before an ' of ', and enchantments after it.
             int of = words.indexOf(" of ");
             while (material == null && of >= 0) {
@@ -263,8 +312,9 @@ public final class ItemType {
         org.bukkit.block.data.BlockData state = null;
         if (material == null) {
             // 'minecraft:birch_door[open=false]', 'oak_stairs': a Minecraft id, with block states.
+            // As Skript, only with a namespace or an underscore: 'diamond' is a name, which an alias file can take.
             Matcher id = MINECRAFT_ID.matcher(words);
-            if (id.matches()) {
+            if (id.matches() && (id.group(1).contains(":") || id.group(1).contains("_"))) {
                 material = Material.matchMaterial(id.group(1));
                 if (material != null && id.group(2) != null) {
                     if (!material.isBlock()) {
@@ -336,34 +386,57 @@ public final class ItemType {
         }
     }
 
-    /** The item one of Skript's default aliases calls {@code name}, like {@code speed potion}, or {@code null}. */
-    private static ItemType defaultAlias(String name, int amount, boolean amountGiven) {
-        AliasFiles.Definition definition = AliasFiles.get(name);
-        if (definition == null || !RESOLVING.get().add(name)) {
-            return null;
-        }
-        try {
-            List<ItemType> items = new ArrayList<>();
-            for (String item : definition.items()) {
-                // A Minecraft id with components, or another alias.
-                ItemStack stack = item.startsWith("minecraft:") ? AliasFiles.item(item) : null;
-                ItemType type = stack != null ? new ItemType(stack, false) : parse(item);
-                if (type == null) {
-                    return null;
-                }
-                items.add(type);
-            }
-            if (items.isEmpty()) {
+    /**
+     * The item an alias file calls {@code name}, like {@code speed potion} from Skript's default aliases or
+     * {@code ruby} from {@code plugins/NeoSkript/aliases}, or {@code null}. As in Skript, {@code ruby item} and
+     * {@code ruby block} are the alias's items that are items, or blocks.
+     */
+    private static ItemType fileAlias(String name, int amount, boolean amountGiven) {
+        AliasTable.Type alias = GlobalAliases.alias(name);
+        boolean blocks = false;
+        boolean items = false;
+        if (alias == null) {
+            int space = name.lastIndexOf(' ');
+            String last = space < 0 ? "" : name.substring(space + 1);
+            blocks = last.equals("block") || last.equals("blocks");
+            items = last.equals("item") || last.equals("items");
+            if (!blocks && !items) {
                 return null;
             }
-            ItemType type = anyOf(items);
-            if (amountGiven) {
-                type.setAmount(amount);
+            alias = GlobalAliases.alias(name.substring(0, space));
+            if (alias == null) {
+                return null;
             }
-            return type;
-        } finally {
-            RESOLVING.get().remove(name);
         }
+        List<ItemType> types = new ArrayList<>();
+        for (AliasTable.Item item : alias.items) {
+            Material material = Material.matchMaterial(item.material());
+            if (material == null || blocks && (!material.isBlock() || material.getKey().getKey().endsWith("block"))
+                    || items && !material.isItem()) {
+                continue;
+            }
+            ItemType type;
+            if (item.stack() instanceof ItemStack stack) {
+                type = new ItemType(stack, false);
+            } else if (material.isBlock()) {
+                type = new ItemType(new ItemStack(Material.AIR), false);
+                type.block = material;
+            } else {
+                continue;
+            }
+            if (!item.states().isEmpty() && item.blockData() instanceof org.bukkit.block.data.BlockData data) {
+                type.blockData = data.clone();
+            }
+            types.add(type);
+        }
+        if (types.isEmpty()) {
+            return null;
+        }
+        ItemType type = anyOf(types);
+        if (amountGiven) {
+            type.setAmount(amount);
+        }
+        return type;
     }
 
     /** What an alias stands for, item by item: {@code diamond boots, iron boots and golden boots}. */
@@ -427,7 +500,8 @@ public final class ItemType {
     /** An item's name or its Minecraft id ({@code minecraft:diamond_axe}, {@code oak_stairs}), or {@code null}. */
     private static Material named(String name) {
         Material material = alias(name);
-        if (material == null && MINECRAFT_ID.matcher(name).matches() && !name.contains("[")) {
+        if (material == null && MINECRAFT_ID.matcher(name).matches() && !name.contains("[")
+                && (name.contains(":") || name.contains("_"))) {
             material = Material.matchMaterial(name);
         }
         return material;
@@ -448,7 +522,7 @@ public final class ItemType {
                                     : material.isItem() || !material.isBlock())) {
                         continue;
                     }
-                    String singular = name(material);
+                    String singular = keyName(material);
                     known.putIfAbsent(singular, material);
                     known.putIfAbsent(plural(singular), material);
                     // Items named in the plural, like stone bricks, can be written in the singular too.
@@ -460,19 +534,48 @@ public final class ItemType {
             aliases = known;
         }
         Material found = known.get(name);
+        // As in Skript, an item an alias file names doesn't have these names ('ruby = minecraft:red_dye' takes
+        // 'red dye' away).
+        if (found != null && GlobalAliases.namedByFiles(found)) {
+            found = null;
+        }
         // 'dirt block' is dirt, as Skript names blocks.
         if (found == null && name.endsWith(" block")) {
             Material block = known.get(name.substring(0, name.length() - 6));
-            if (block != null && block.isBlock()) {
+            if (block != null && block.isBlock() && !GlobalAliases.namedByFiles(block)) {
                 return block;
             }
         }
         return found;
     }
 
-    /** How an item reads: its material's name in lower case, with spaces. */
-    static String name(Material material) {
+    /** NeoSkript's own names for {@code material}, which it has unless an alias file names it. */
+    static List<String> ownNames(Material material) {
+        alias("");
+        List<String> names = new ArrayList<>();
+        aliases.forEach((name, each) -> {
+            if (each == material) {
+                names.add(name);
+                names.add(name + " block");
+            }
+        });
+        return names;
+    }
+
+    /** A material's own name: its key in lower case, with spaces. */
+    static String keyName(Material material) {
         return material.getKey().getKey().replace('_', ' ');
+    }
+
+    /** How an item reads: what an alias file calls it ({@code ruby}), or its material's own name. */
+    static String name(Material material) {
+        return name(material, null);
+    }
+
+    /** How a block reads, with its block data: what an alias file calls it ({@code north anvil}), or its own name. */
+    static String name(Material material, org.bukkit.block.data.BlockData data) {
+        AliasTable.Named named = GlobalAliases.named(material, null, data);
+        return named != null ? named.singular() : keyName(material);
     }
 
     private static String plural(String name) {
@@ -491,10 +594,16 @@ public final class ItemType {
      * ItemData, enchantments aren't written.
      */
     static String text(ItemStack stack, boolean withAmount) {
+        return text(stack, null, withAmount);
+    }
+
+    private static String text(ItemStack stack, org.bukkit.block.data.BlockData blockData, boolean withAmount) {
         StringBuilder text = new StringBuilder();
-        String name = name(stack.getType());
+        // As Skript, what the alias files call it, singular or plural, else its own name.
+        AliasTable.Named named = GlobalAliases.named(stack.getType(), stack, blockData);
+        String name = named != null ? named.singular() : keyName(stack.getType());
         if (withAmount && stack.getAmount() != 1) {
-            text.append(stack.getAmount()).append(' ').append(plural(name));
+            text.append(stack.getAmount()).append(' ').append(named != null ? named.plural() : plural(name));
         } else {
             text.append(name);
         }
@@ -508,10 +617,25 @@ public final class ItemType {
     @Override
     public String toString() {
         if (alternatives != null) {
-            List<String> names = alternatives.stream().map(ItemType::toString).toList();
-            return String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.getLast();
+            // As Skript: the amount once, then each item, in the plural if there are several.
+            int amount = amount();
+            boolean counted = alternatives.getFirst().amountGiven && amount != 1;
+            List<String> names = alternatives.stream().map(each -> counted ? each.withoutAmount(true)
+                    : each.toString()).toList();
+            return (counted ? amount + " " : "") + String.join(", ", names.subList(0, names.size() - 1)) + " or "
+                    + names.getLast();
         }
-        return block != null ? name(block) : text(stack, amountGiven);
+        return block != null ? name(block, blockData) : text(stack, blockData, amountGiven);
+    }
+
+    /** How it reads without its amount, in the plural or not: {@code rubys}, {@code fancy swords named Fancy}. */
+    private String withoutAmount(boolean plural) {
+        if (block != null) {
+            return name(block, blockData);
+        }
+        String text = text(stack, blockData, plural);
+        String prefix = stack.getAmount() + " ";
+        return plural && stack.getAmount() != 1 && text.startsWith(prefix) ? text.substring(prefix.length()) : text;
     }
 
     /** Items are equal if they're the same item with the same amount, name, enchantments and so on. */
