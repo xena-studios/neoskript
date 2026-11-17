@@ -297,17 +297,67 @@ public final class Pauses {
         return result == FAILED ? null : result;
     }
 
-    /** Whether the pause failed or timed out, so a pausing effect stores nothing. */
+    /**
+     * Whether the pause failed, timed out, or its stage said to leave the target as it is
+     * ({@link co.xenastudios.neoskript.api.element.PausingEffect#UNCHANGED}), so a pausing effect stores nothing.
+     */
     public static boolean failed(Frame frame) {
-        return frame.result == FAILED;
+        return frame.result == FAILED || frame.result == co.xenastudios.neoskript.api.element.PausingEffect.UNCHANGED
+                || frame.result == co.xenastudios.neoskript.api.element.PausingSection.LEAVE;
+    }
+
+    /**
+     * Whether a pausing effect's stage said to leave the pausing section it's in
+     * ({@link co.xenastudios.neoskript.api.element.PausingSection#LEAVE}).
+     */
+    public static boolean leaves(Frame frame) {
+        boolean leaves = frame.result == co.xenastudios.neoskript.api.element.PausingSection.LEAVE;
+        if (leaves) {
+            frame.result = null;
+        }
+        return leaves;
+    }
+
+    /**
+     * Whether a pausing section's code runs after its start: not if the start failed, timed out, or gave
+     * {@code false} or {@link co.xenastudios.neoskript.api.element.PausingEffect#UNCHANGED}.
+     */
+    public static boolean proceeds(Frame frame) {
+        Object result = frame.result;
+        frame.result = null;
+        return result != FAILED && result != co.xenastudios.neoskript.api.element.PausingEffect.UNCHANGED
+                && result != co.xenastudios.neoskript.api.element.PausingSection.LEAVE && !Boolean.FALSE.equals(result);
     }
 
     /**
      * A stage's value as scripts have values: a map is keyed values (a nested map or list makes a list under its
-     * key), a collection or an array is several values, and anything else is itself.
+     * key), a collection or an array is several values, an {@link java.time.Instant} is a date, a
+     * {@link java.time.Duration} a timespan, and anything else is itself.
      */
     static Object converted(Object value) {
-        return KeyedValues.result(value);
+        Object result = KeyedValues.result(value);
+        return switch (result) {
+            case KeyedValues keyed -> new KeyedValues(scriptValues(keyed.values()), keyed.keys());
+            case Object[] array -> scriptValues(array);
+            case null, default -> scriptValue(result);
+        };
+    }
+
+    private static Object[] scriptValues(Object[] values) {
+        Object[] converted = new Object[values.length];
+        for (int i = 0; i < values.length; i++) {
+            converted[i] = scriptValue(values[i]);
+        }
+        return converted;
+    }
+
+    /** One value as scripts have it: Java's dates and durations as Skript's, which addons can't make. */
+    private static Object scriptValue(Object value) {
+        return switch (value) {
+            case java.time.Instant instant -> new Date(instant.toEpochMilli());
+            case java.time.Duration duration -> new Timespan(duration.toMillis());
+            case null, default -> value;
+        };
     }
 
     /** Reports a stage's failure on the pausing element's line. */
