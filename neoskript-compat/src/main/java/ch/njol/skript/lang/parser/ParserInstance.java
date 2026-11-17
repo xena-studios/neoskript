@@ -21,6 +21,12 @@ public final class ParserInstance {
     private ch.njol.skript.config.Node node;
     private String indentation = "";
 
+    private final ParsingStack parsingStack = new ParsingStack();
+
+    public ParsingStack getParsingStack() {
+        return parsingStack;
+    }
+
     public static ParserInstance get() {
         return CURRENT.get();
     }

@@ -171,7 +171,15 @@ final class CompatRegistration {
         if (info.getCloner() != null) {
             registrar.cloner(type, info::clone);
         }
-        registrar.unsavable(type);
+        @SuppressWarnings("unchecked")
+        ch.njol.skript.classes.Serializer<? super T> serializer =
+                (ch.njol.skript.classes.Serializer<? super T>) info.getSerializer();
+        if (serializer != null && !(serializer instanceof ch.njol.skript.classes.EnumSerializer)) {
+            // Saved under its code name, with its fields, as Skript saves it in variables.csv.
+            registrar.storage(id, type, new CompatStorage<>(info, serializer));
+        } else {
+            registrar.unsavable(type);
+        }
         count("types");
     }
 
