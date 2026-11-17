@@ -451,6 +451,7 @@ final class TriggerCompiler {
                 source = key;
                 ParsedSyntax syntax = event.event();
                 Condition filter;
+                eventHeader = syntax;
                 try {
                     filter = binding.filter().create(info(syntax));
                 } catch (co.xenastudios.neoskript.api.element.SyntaxError error) {
@@ -1366,7 +1367,13 @@ final class TriggerCompiler {
      * {@code target} as written in the statement being compiled, as Skript's errors quote an element: the whole
      * statement for its effect or condition, else the part it was matched from; {@code null} if not known.
      */
+    /** The event of the trigger being compiled, whose text is its header's: {@code on EntityDamageEvent}. */
+    private ParsedSyntax eventHeader;
+
     private String textOf(ParsedSyntax target) {
+        if (target != null && target == eventHeader && source != null) {
+            return source.strip();
+        }
         if (currentStatement == null || source == null) {
             return null;
         }
@@ -1396,7 +1403,15 @@ final class TriggerCompiler {
                 return found;
             }
         }
-        for (Object value : in.match().regexValues()) {
+        List<Object> regexValues = in.match().regexValues();
+        for (int i = 0; i < regexValues.size(); i++) {
+            Object value = regexValues.get(i);
+            if (value == target && i < in.match().regexSpans().size()) {
+                // The condition of an 'if' header, which its regex holds.
+                int[] span = in.match().regexSpans().get(i);
+                return span != null && span[0] >= 0 && span[1] <= source.length() && span[0] <= span[1]
+                        ? source.substring(span[0], span[1]).strip() : null;
+            }
             String found = value instanceof ParsedSyntax inner ? textIn(inner, target) : textIn(value, target);
             if (found != null) {
                 return found;

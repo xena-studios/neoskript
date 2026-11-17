@@ -133,6 +133,23 @@ class AddonsTest {
     }
 
     @Test
+    void anAddonMakesOnlyItsOwnTypesStrict() {
+        Addons addons = new Addons(NOPLogger.NOP_LOGGER);
+        List<String> errors = new ArrayList<>();
+        addons.add("Lottery", "1.0", registrar -> {
+            registrar.type("lotteryticket", "lottery ticket", Long.class);
+            registrar.strictType("lotteryticket");
+            try {
+                registrar.strictType("location");
+            } catch (IllegalArgumentException refused) {
+                errors.add("location");
+            }
+        });
+        addons.registerAll(REGISTRAR);
+        assertEquals(List.of("location"), errors);
+    }
+
+    @Test
     void anAddonsEntryGoesWhenItsPluginDisables() {
         Addons addons = new Addons(NOPLogger.NOP_LOGGER);
         addons.add("Lottery", "1.0", registrar -> {}, "LotteryPlugin");

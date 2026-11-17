@@ -126,6 +126,21 @@ final class AddonApi implements NeoSkript {
     }
 
     @Override
+    public String scriptBeingLoaded() {
+        return co.xenastudios.neoskript.frontend.parse.LoadingScript.current();
+    }
+
+    @Override
+    public void runtimeWarning(String message) {
+        co.xenastudios.neoskript.runtime.RuntimeErrors.warning(message);
+    }
+
+    @Override
+    public void runtimeError(String message) {
+        co.xenastudios.neoskript.runtime.RuntimeErrors.report(message);
+    }
+
+    @Override
     public co.xenastudios.neoskript.api.Values values() {
         return values;
     }

@@ -105,9 +105,12 @@ public final class ScriptCompiler {
             co.xenastudios.neoskript.runtime.ScriptAliases.set(script.file().name(), aliases);
             co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(null);
         }
+        String loadingBefore = co.xenastudios.neoskript.frontend.parse.LoadingScript.current();
+        try {
         for (ParsedScript script : scripts) {
             String name = script.file().name();
             co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(name);
+            co.xenastudios.neoskript.frontend.parse.LoadingScript.set(name);
             Map<Integer, String> parseProblems = new HashMap<>();
             script.diagnostics().forEach(d -> parseProblems.putIfAbsent(d.line(), d.message()));
             for (ParsedStructure structure : script.structures()) {
@@ -197,6 +200,9 @@ public final class ScriptCompiler {
                     }
                 }
             }
+        }
+        } finally {
+            co.xenastudios.neoskript.frontend.parse.LoadingScript.set(loadingBefore);
         }
         co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(null);
         // An unreachable warning after a statement that failed to compile isn't one: that statement doesn't stop

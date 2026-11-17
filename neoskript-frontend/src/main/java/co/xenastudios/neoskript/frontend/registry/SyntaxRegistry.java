@@ -41,6 +41,8 @@ public final class SyntaxRegistry {
     private final Map<String, List<FunctionInfo>> functions;
     private final Map<String, Set<String>> supertypes;
     private final Set<String> strictTypes;
+    /** Addon types made strict, whose words count where any value goes: see {@link Builder#addonStrict}. */
+    private final List<TypeInfo> addonStrictTypes;
     /** Types whose values can all be listed, though they aren't a closed set of words: {@code all biomes}. */
     private final Set<String> enumerableTypes;
     private final Map<String, java.util.function.Predicate<String>> literalChecks;
@@ -57,6 +59,10 @@ public final class SyntaxRegistry {
     /** The names of addons' {@code loop-<name>} values, as {@code node}. */
     private final Set<String> loopValueNames;
     private final Map<String, ParseCheck> checks;
+    /** Syntax whose arguments' lists aren't warned about, as Skript's function calls. */
+    private final java.util.Set<String> quietLists;
+    /** Addons' structures ({@code import:}), by syntax id: what to do with each use while a script is parsed. */
+    private final Map<String, co.xenastudios.neoskript.api.registration.StructureHandler> structureHandlers;
     /** The experiments syntax elements need, by element id. */
     private final Map<String, Experimental> experimental;
     /** The experiment a script's {@code using X} turns on, by its code name. */
@@ -98,6 +104,8 @@ public final class SyntaxRegistry {
         this.functions = Frozen.map(functions);
         this.supertypes = closure(builder.supertypes);
         this.strictTypes = Frozen.set(builder.strictTypes);
+        this.addonStrictTypes = builder.addonStrictTypes.stream().map(id -> builder.typesById.get(Text.lower(id)))
+                .filter(java.util.Objects::nonNull).toList();
         this.skriptTypes = Frozen.set(builder.skriptTypes);
         Map<String, Set<String>> skriptConversions = new HashMap<>();
         builder.skriptConversions.forEach((from, to) -> skriptConversions.put(from, Frozen.set(to)));
@@ -121,6 +129,8 @@ public final class SyntaxRegistry {
         this.sectionOnly = Frozen.set(builder.sectionOnly);
         this.loopValueNames = Frozen.set(builder.loopValueNames);
         this.checks = Frozen.map(builder.checks);
+        this.structureHandlers = Frozen.map(builder.structureHandlers);
+        this.quietLists = java.util.Set.copyOf(builder.quietLists);
         this.experimental = Frozen.map(builder.experimental);
         this.experimentNames = builder.experimentNames;
         Map<String, Set<String>> propertyTypes = new HashMap<>();
@@ -233,6 +243,21 @@ public final class SyntaxRegistry {
     }
 
     /** The check the syntax element makes while it's parsed, or {@code null} if it makes none. */
+    /** Whether syntax {@code id}'s arguments are parsed as a function's, with no warnings about their lists. */
+    public boolean quietLists(String id) {
+        return quietLists.contains(id);
+    }
+
+    /** The addon's handler for structure {@code id}, or {@code null} if it isn't an addon's. */
+    public co.xenastudios.neoskript.api.registration.StructureHandler structureHandler(String id) {
+        return structureHandlers.get(id);
+    }
+
+    /** Every addon structure's handler. */
+    public java.util.Collection<co.xenastudios.neoskript.api.registration.StructureHandler> structureHandlers() {
+        return structureHandlers.values();
+    }
+
     public ParseCheck check(SyntaxInfo syntax) {
         return checks.get(syntax.kind() + ":" + syntax.id());
     }
@@ -335,6 +360,19 @@ public final class SyntaxRegistry {
     /** Whether type {@code id} only takes itself, its subtypes and conversions: see {@link Builder#strict}. */
     public boolean isStrict(String id) {
         return strictTypes.contains(id);
+    }
+
+    /**
+     * Whether an addon's strict type certainly takes {@code words} as a literal, so they're known words where any
+     * value goes: {@code ArrayList} imported in skript-reflect's syntax.
+     */
+    public boolean isAddonStrictLiteral(String words) {
+        for (TypeInfo type : addonStrictTypes) {
+            if (isLiteral(type, words)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Every direct conversion, as {@code from -> {to...}}: see {@link Builder#convertible}. */
@@ -582,6 +620,9 @@ public final class SyntaxRegistry {
         private final Set<String> sectionOnly = new HashSet<>();
         private final Set<String> loopValueNames = new HashSet<>();
         private final Map<String, ParseCheck> checks = new HashMap<>();
+        private final Map<String, co.xenastudios.neoskript.api.registration.StructureHandler> structureHandlers =
+                new java.util.LinkedHashMap<>();
+        private final java.util.Set<String> quietLists = new java.util.HashSet<>();
         private final Map<String, Experimental> experimental = new HashMap<>();
         private java.util.function.UnaryOperator<String> experimentNames =
                 name -> Text.lower(name.strip());
@@ -714,6 +755,18 @@ public final class SyntaxRegistry {
         /** Marks an expression as only usable with a section under it. */
         public Builder sectionOnly(String id) {
             sectionOnly.add(id);
+            return this;
+        }
+
+        /** Says syntax {@code id}'s arguments are parsed as a function's: their lists aren't warned about. */
+        public Builder quietLists(String id) {
+            quietLists.add(id);
+            return this;
+        }
+
+        /** Makes structure {@code id} an addon's, given each use while a script is parsed. */
+        public Builder structureHandler(String id, co.xenastudios.neoskript.api.registration.StructureHandler handler) {
+            structureHandlers.put(id, handler);
             return this;
         }
 
@@ -907,6 +960,18 @@ public final class SyntaxRegistry {
             strictTypes.addAll(List.of(types));
             return this;
         }
+
+        /**
+         * An addon's type made strict ({@code Registrar.strictType}): as {@link #strict}, and words its literal check
+         * certainly takes are known words where any value goes, as they're no other type's.
+         */
+        public Builder addonStrict(String type) {
+            strictTypes.add(type);
+            addonStrictTypes.add(type);
+            return this;
+        }
+
+        private final List<String> addonStrictTypes = new ArrayList<>();
 
         /** Names of kinds of entity, singular and plural, e.g. {@code zombie} and {@code zombies}. */
         public Builder entityNames(Iterable<String> names) {
