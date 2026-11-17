@@ -753,4 +753,26 @@ class LanguageTest {
                 \tsay location 2 meters above and 3 meters to the right of {_l}
                 """));
     }
+
+    @Test
+    void aLoopOverValuesExceptSomeLeavesThemOut() {
+        // Fixed, not copied: Skript 2.17.0's ExprExcept overrides get but not iterator, so a loop over it goes over
+        // every value, the excluded ones too (its WrapperExpression says both must be overridden).
+        assertEquals(List.of("a", "c"), run("""
+                on load:
+                \tset {_l::*} to "a", "b" and "c"
+                \tloop {_l::*} except "b":
+                \t\tsay loop-value
+                """));
+    }
+
+    @Test
+    void theWorldWithNothingGivenIsNotSet() {
+        // As Skript 2.17.0: in 'on load', 'world' is its world expression with nothing given, which is nothing.
+        assertEquals(List.of("false"), run("""
+                on load:
+                \tset {_w} to world
+                \tsay whether {_w} is set
+                """));
+    }
 }

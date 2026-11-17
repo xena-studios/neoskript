@@ -1,0 +1,12 @@
+# Checks: an aliases section's problems come with the other headers', before the events' (issue #37).
+
+on load:
+	frob one
+
+aliases:
+	message order thing = stone
+	this line is bad
+	message order other = notarealitemzzz
+
+on chat:
+	frob two
