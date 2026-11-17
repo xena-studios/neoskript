@@ -47,6 +47,18 @@ final class ScriptValues {
         if (value == null || !value.getClass().getName().equals(className)) {
             return Long.MIN_VALUE;
         }
+        try {
+            // Through the API where NeoSkript is running: a date as an Instant, a timespan as a Duration.
+            Object java = co.xenastudios.neoskript.api.NeoSkript.get().values().toJava(value);
+            if (java instanceof java.time.Instant instant) {
+                return instant.toEpochMilli();
+            }
+            if (java instanceof java.time.Duration duration) {
+                return duration.toMillis();
+            }
+        } catch (RuntimeException | LinkageError notRunning) {
+            // Unit tests, without NeoSkript: the accessor below.
+        }
         Object millis = call(value, "millis");
         return millis instanceof Long number ? number : Long.MIN_VALUE;
     }
