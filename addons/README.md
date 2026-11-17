@@ -2,6 +2,14 @@
 
 NeoSkript's own addons, built on [`neoskript-api`](../neoskript-api) and released with NeoSkript at the same version. Each replaces a community Skript addon (skript-db, skript-reflect...) and takes its syntax, so scripts written for it run unchanged. Which addons are planned, and why, is in [issue #12](https://github.com/xena-studios/neoskript/issues/12). This page is how they're laid out and built.
 
+## The addons
+
+| Addon | Folder | Replaces | Docs |
+|---|---|---|---|
+| NeoSkript Placeholders | `placeholders/` | skript-placeholders 1.7.1 | [neoskript.dev/docs/addons/placeholders](https://neoskript.dev/docs/addons/placeholders/) |
+| NeoSkript YAML | `yaml/` | skript-yaml 1.7.2 | [neoskript.dev/docs/addons/yaml](https://neoskript.dev/docs/addons/yaml/) |
+| NeoSkriptWeb | `web/` | Reqn 1.2.3; skJson 6.0.0's requests and JSON | [neoskript.dev/docs/addons/web](https://neoskript.dev/docs/addons/web/) |
+
 ## Layout
 
 ```
@@ -99,3 +107,9 @@ Each addon gets its own Modrinth project, which only the owner can create. For e
 - icon, licence GPL-3.0-only, source link to this repository (`addons/yaml`), loaders Paper and Folia, NeoSkript's Minecraft versions;
 - a required dependency on NeoSkript (`FuVeJ2X5`); skript-yaml isn't on Modrinth (it's on GitHub and SpigotMC), so there's no incompatible dependency to add;
 - the jar to upload is `addons/yaml/build/libs/NeoSkriptYaml-<version>.jar`, and the project id goes into the release steps next to NeoSkript's.
+
+### NeoSkriptWeb on Modrinth
+
+- **Project:** name `NeoSkript Web`, slug `neoskript-web`, summary "HTTP requests, webhooks and JSON for NeoSkript scripts. Runs scripts written for Reqn and skJson unchanged." The description says it replaces Reqn and skJson's requests and JSON (with what of skJson isn't in it yet, from the docs page), that requests never block the server, and that it needs NeoSkript at the same version. Categories: utility, library. Licence GPL-3.0-only, source `https://github.com/xena-studios/neoskript/tree/main/addons/web`, Paper and Folia, NeoSkript's Minecraft versions.
+- **Dependencies:** NeoSkript (`FuVeJ2X5`) required. Neither Reqn nor skJson is on Modrinth (checked 2026-11-17), so there's no incompatible project to mark; add skJson's if it ever appears.
+- **Release:** the jar from `./gradlew :addons:web:build` (`addons/web/build/libs/NeoSkriptWeb-<version>.jar`), with NeoSkript's version and changelog.
