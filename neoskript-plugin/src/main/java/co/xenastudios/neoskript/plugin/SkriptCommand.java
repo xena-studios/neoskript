@@ -546,12 +546,17 @@ final class SkriptCommand implements TabExecutor {
         return Component.text(names.isEmpty() ? "none" : String.join(", ", names));
     }
 
-    /** The plugins that depend on NeoSkript: its addons. */
-    private static List<String> addons() {
-        List<String> addons = new ArrayList<>();
+    /**
+     * NeoSkript's addons: those registered through its API, as {@code name version}, then the other plugins that
+     * depend on NeoSkript.
+     */
+    private List<String> addons() {
+        List<String> addons = new ArrayList<>(plugin.registeredAddons());
         for (Plugin other : Bukkit.getPluginManager().getPlugins()) {
             var meta = other.getPluginMeta();
-            if (meta.getPluginDependencies().contains("NeoSkript") || meta.getPluginSoftDependencies().contains("NeoSkript")) {
+            if ((meta.getPluginDependencies().contains("NeoSkript") || meta.getPluginSoftDependencies().contains("NeoSkript"))
+                    && addons.stream().noneMatch(addon -> addon.equalsIgnoreCase(meta.getName())
+                            || addon.toLowerCase(java.util.Locale.ROOT).startsWith(meta.getName().toLowerCase(java.util.Locale.ROOT) + " "))) {
                 addons.add(meta.getDisplayName());
             }
         }

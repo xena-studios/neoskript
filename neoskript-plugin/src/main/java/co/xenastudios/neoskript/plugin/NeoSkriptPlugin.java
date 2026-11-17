@@ -223,6 +223,11 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         getCommand("skript").setExecutor(new SkriptCommand(this, scripts));
     }
 
+    /** The addons registered through NeoSkript's API, as {@code name version}, for {@code /sk info}. */
+    java.util.List<String> registeredAddons() {
+        return addons == null ? java.util.List.of() : addons.names();
+    }
+
     /**
      * With {@code -Dneoskript.syntaxExport=<file>}, writes every registered syntax element, type and function to
      * that file as JSON, for neoskript.dev's syntax reference and in-browser parser. The harness's {@code syntax-export}
