@@ -1,0 +1,297 @@
+{
+  "elements": {
+    "NeoSkriptProxyEffSend": {
+      "name": "Send Network Message",
+      "description": [
+        "Sends a message on a channel to every other server, or to the servers named: over Redis where it's on, else through the proxy. With nobody online to carry it through the proxy, it waits for the next player."
+      ],
+      "examples": [
+        "send network message \"restart in 5 minutes\" on channel \"alerts\" to all servers"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyEvtNetwork": {
+      "name": "On Network Message",
+      "description": [
+        "A message from another server arrived, on any channel or those named. Runs on the server's main thread (the global thread on Folia)."
+      ],
+      "examples": [
+        "on network message on channel \"alerts\":",
+        "\tbroadcast network message"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprNetworkMessage": {
+      "name": "Network Message",
+      "description": [
+        "The message in an <code>on network message</code> trigger."
+      ],
+      "examples": [
+        "broadcast network message"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprNetworkChannel": {
+      "name": "Network Channel",
+      "description": [
+        "The channel of the message in an <code>on network message</code> trigger."
+      ],
+      "examples": [
+        "send \"%network channel%\" to console"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprNetworkSender": {
+      "name": "Network Sender",
+      "description": [
+        "The name of the server a network message came from, if it's known."
+      ],
+      "examples": [
+        "send \"from %network sender%\" to console"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprServers": {
+      "name": "Network Servers",
+      "description": [
+        "The servers behind the proxy. Waits for the proxy's answer."
+      ],
+      "examples": [
+        "set {_servers::*} to the network servers"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprPlayerCount": {
+      "name": "Network Player Count",
+      "description": [
+        "How many players are on the network, or on one server. Waits for the proxy's answer; nothing if it doesn't know the server."
+      ],
+      "examples": [
+        "set {_count} to the network player count of server \"lobby\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprPlayers": {
+      "name": "Network Players",
+      "description": [
+        "The names of the players on the network, or on one server. Waits for the proxy's answer."
+      ],
+      "examples": [
+        "set {_names::*} to the network players on server \"lobby\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprPlayerServer": {
+      "name": "Network Server of Player",
+      "description": [
+        "The server a player is on, or nothing if they're not online. Waits for the proxy's answer."
+      ],
+      "examples": [
+        "set {_server} to the network server of arg-1"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprServerName": {
+      "name": "This Server's Network Name",
+      "description": [
+        "This server's name on the proxy. Waits for the proxy's answer."
+      ],
+      "examples": [
+        "set {_me} to this server's network name"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprSkProxyPlayerCount": {
+      "name": "Player Count of Server",
+      "description": [
+        "SkProxy's and Skelocity's: how many players are on a server, 0 if the proxy doesn't know it. Waits for the proxy's answer, where they answer from what they heard last."
+      ],
+      "examples": [
+        "set {_count} to player count of \"lobby\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprSkProxyStatus": {
+      "name": "Server Status",
+      "description": [
+        "SkProxy's: <code>Online</code> if the proxy knows the server, else <code>Offline</code>."
+      ],
+      "examples": [
+        "send \"Lobby is %status of \"lobby\"%\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprSkProxyTotal": {
+      "name": "Proxy Player Count",
+      "description": [
+        "SkProxy's and Skelocity's: how many players are on the network."
+      ],
+      "examples": [
+        "send \"%proxy player count% online\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprSkelocityPlayers": {
+      "name": "Proxy Players",
+      "description": [
+        "Skelocity's: the names of the players on the network, or on one server."
+      ],
+      "examples": [
+        "set {_names::*} to all proxy players on server \"lobby\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprSkelocityServer": {
+      "name": "Server of Player",
+      "description": [
+        "Skelocity's: the server a player here is on, as the proxy names it."
+      ],
+      "examples": [
+        "send \"You're on %server of player%\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyEffBroadcast": {
+      "name": "Network Broadcast",
+      "description": [
+        "Skelocity's: a message to every player on the network, through the proxy. MiniMessage and legacy colour codes work."
+      ],
+      "examples": [
+        "network broadcast \"<green>Event starting!\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyEffKick": {
+      "name": "Proxy Kick",
+      "description": [
+        "Skelocity's: kicks a player from the whole network, through the proxy."
+      ],
+      "examples": [
+        "proxy kick player due to \"Cheating\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyEffSendRedis": {
+      "name": "Send Redis Message",
+      "description": [
+        "SkRedis's: publishes a message on a Redis channel, in SkRedis's format, so servers with SkRedis hear it."
+      ],
+      "examples": [
+        "send redis message \"hello\" to channel \"chat\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyEffSendCustomRedis": {
+      "name": "Send Custom Redis Message",
+      "description": [
+        "SkRedis's: publishes a JSON object on a Redis channel, as it is."
+      ],
+      "examples": [
+        "send custom redis message \"{\"\"kind\"\":\"\"ping\"\"}\" to channel \"chat\""
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyEvtRedis": {
+      "name": "On Redis Message",
+      "description": [
+        "SkRedis's: a message sent with <code>send redis message</code> arrived, on any channel. Runs on the server's main thread (the global thread on Folia)."
+      ],
+      "examples": [
+        "on redis message:",
+        "\tbroadcast redis message"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyEvtCustomRedis": {
+      "name": "On Custom Redis Message",
+      "description": [
+        "SkRedis's: a JSON object with no SkRedis action arrived."
+      ],
+      "examples": [
+        "on custom redis message:",
+        "\tsend redis message to console"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprRedisMessage": {
+      "name": "Redis Message",
+      "description": [
+        "SkRedis's: the message in <code>on redis message</code> or <code>on custom redis message</code>."
+      ],
+      "examples": [
+        "broadcast redis message"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprRedisChannel": {
+      "name": "Redis Channel",
+      "description": [
+        "SkRedis's: the channel of the Redis message."
+      ],
+      "examples": [
+        "send redis channel to console"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    },
+    "NeoSkriptProxyExprRedisDate": {
+      "name": "Redis Message Date",
+      "description": [
+        "SkRedis's: when the message was sent, as text."
+      ],
+      "examples": [
+        "send redis message date to console"
+      ],
+      "since": [
+        "1.0.0"
+      ]
+    }
+  },
+  "types": {},
+  "functions": {}
+}
