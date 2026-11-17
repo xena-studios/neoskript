@@ -459,6 +459,44 @@ class LanguageTest {
     }
 
     @Test
+    void timesOutsideALoopHasALimitInsteadOfRunningOutOfMemory() {
+        List<String> errors = new ArrayList<>();
+        co.xenastudios.neoskript.runtime.RuntimeErrors.install(new co.xenastudios.neoskript.runtime.RuntimeErrors.Consumer() {
+            @Override
+            public void printError(co.xenastudios.neoskript.runtime.errors.RuntimeError error) {
+                errors.add(error.source().lineNumber() + ": " + error.error());
+            }
+
+            @Override
+            public void printFrameOutput(co.xenastudios.neoskript.runtime.errors.ErrorFrame.Output output,
+                    co.xenastudios.neoskript.runtime.errors.RuntimeError.Level level) {}
+
+            @Override
+            public void logError(String message) {
+                errors.add(message);
+            }
+        }, co.xenastudios.neoskript.runtime.errors.ErrorFrame.Limits.DEFAULT,
+                co.xenastudios.neoskript.runtime.errors.ErrorFrame.Limits.DEFAULT);
+        try {
+            assertEquals(List.of("0", "3", "1000000"), run("""
+                    on load:
+                    \tset {_x::*} to 1000000000 times
+                    \tsay size of {_x::*}
+                    \tset {_y::*} to 3 times
+                    \tsay size of {_y::*}
+                    \tset {_z::*} to 1000000 times
+                    \tsay size of {_z::*}
+                    """));
+            assertEquals(List.of("2: '1000000000 times' would make a list of 1000000000 numbers, more than the 1000000"
+                    + " allowed. Loop it ('loop 1000000000 times:') to count that far"), errors);
+        } finally {
+            co.xenastudios.neoskript.runtime.RuntimeErrors.install(null,
+                    co.xenastudios.neoskript.runtime.errors.ErrorFrame.Limits.DEFAULT,
+                    co.xenastudios.neoskript.runtime.errors.ErrorFrame.Limits.DEFAULT);
+        }
+    }
+
+    @Test
     void timesLoopsCarryOnAfterAWait() {
         java.util.ArrayDeque<Runnable> later = new java.util.ArrayDeque<>();
         co.xenastudios.neoskript.runtime.Waits.install(new co.xenastudios.neoskript.runtime.scheduler.Scheduler() {

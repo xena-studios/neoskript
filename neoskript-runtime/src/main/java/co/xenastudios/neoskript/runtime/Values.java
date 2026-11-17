@@ -113,6 +113,28 @@ public final class Values {
     }
 
     /**
+     * The most numbers {@code N times} makes when it isn't looped: a list of them all at once, as Skript's
+     * {@code get()} makes, which for a billion runs out of memory in Skript. Past this it's a runtime error and nothing,
+     * a deliberate difference. {@code loop N times} and {@code for} count as they go and have no such limit.
+     */
+    public static final int TIMES_LIST_LIMIT = 1_000_000;
+
+    /** The numbers 1 to {@code count} for {@code N times} outside a loop, or none, with a runtime error, past the limit. */
+    public static Object[] timesList(int count) {
+        if (count > TIMES_LIST_LIMIT) {
+            RuntimeErrors.report("'" + count + " times' would make a list of " + count
+                    + " numbers, more than the " + TIMES_LIST_LIMIT + " allowed. Loop it ('loop " + count
+                    + " times:') to count that far");
+            return new Object[0];
+        }
+        Object[] numbers = new Object[count];
+        for (int i = 0; i < count; i++) {
+            numbers[i] = (long) i + 1;
+        }
+        return numbers;
+    }
+
+    /**
      * The value of a {@code loop N times} at {@code index + offset}, worked out instead of kept in an array: that
      * number plus one, or {@code null} outside the loop's {@code count}, as {@link #element}.
      */
