@@ -256,6 +256,8 @@ final class TriggerCompiler {
      * used in it, nor a returnable section's from around it.
      */
     private int detachedAt = -1;
+    /** The slots keeping the trigger's context while a section's code runs in an event of its own. */
+    private final Deque<Integer> outerContexts = new ArrayDeque<>();
     /** As {@link #detachedAt}, but counting the section block the code is of, whose values it has; or -1. */
     private int valuesAt = -1;
     /** The text expression positions refer to: the current line, a section header's key, or a default value. */
@@ -984,7 +986,10 @@ final class TriggerCompiler {
     private WaitPoint saveFrame() {
         String frame = Type.getInternalName(Frame.class);
         List<int[]> saved = new ArrayList<>();
-        for (Block block : loops()) {
+        // Every live block's slots, the ones code loaded apart can't see too: they're still in use once it's done.
+        List<Block> live = new ArrayList<>(blocks);
+        java.util.Collections.reverse(live);
+        for (Block block : live) {
             if (block.kind() == BlockKind.LOOP || block.kind() == BlockKind.SECTION) {
                 saved.add(new int[] {block.valuesSlot(), SAVED_VALUES});
                 if (block.indicesSlot() >= 0) {
@@ -1009,6 +1014,9 @@ final class TriggerCompiler {
         }
         for (int paused : pausedValues) {
             saved.add(new int[] {paused, SAVED_OBJECT});
+        }
+        for (int context : outerContexts) {
+            saved.add(new int[] {context, SAVED_OBJECT});
         }
         WaitPoint wait = new WaitPoint(new Label(), line, saved);
         int state = waits.size();
@@ -2526,10 +2534,22 @@ final class TriggerCompiler {
         }
         blocks.push(new Block(BlockKind.SECTION, end, next, valuesSlot, -1, indexSlot,
                 library.sectionType(header.syntax().id())));
+        if (own != null) {
+            outerContexts.push(outerContextSlot);
+        }
         try {
-            detached(section.body(), true);
+            // Only a section in an event of its own is loaded apart, as Skript's spawn and shoot sections are: an
+            // addon's section is code in the trigger, which sees the loops around it.
+            if (own != null) {
+                detached(section.body(), true);
+            } else {
+                statements(section.body());
+            }
         } finally {
             blocks.pop();
+            if (own != null) {
+                outerContexts.pop();
+            }
             eventClasses = outerClasses;
             eventLabel = outerLabel;
             if (place >= 0) {
@@ -2618,7 +2638,12 @@ final class TriggerCompiler {
             eventLabel = sectionEvent;
         }
         try {
-            detached(section.body(), true);
+            // As for a library section: only one in an event of its own is loaded apart.
+            if (sectionEvent != null) {
+                detached(section.body(), true);
+            } else {
+                statements(section.body());
+            }
         } finally {
             eventClasses = outerClasses;
             eventLabel = outerLabel;
