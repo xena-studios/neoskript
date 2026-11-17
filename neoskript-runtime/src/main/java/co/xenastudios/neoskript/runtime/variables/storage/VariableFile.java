@@ -110,9 +110,28 @@ public final class VariableFile {
      * held in memory whole.
      */
     public static void write(Path file, Iterable<Entry> entries) throws IOException {
+        write(file, entries, List.of());
+    }
+
+    /**
+     * As {@link #write(Path, Iterable)}, with {@code comments} as {@code #} lines after Skript's header, for files of
+     * NeoSkript's own in this format. An entry with an empty type is written as a deletion.
+     */
+    static void write(Path file, Iterable<Entry> entries, List<String> comments) throws IOException {
         Durable.replace(file, stream -> {
             BufferedWriter out = new BufferedWriter(new OutputStreamWriter(stream, StandardCharsets.UTF_8), 1 << 16);
-            out.write(HEADER);
+            if (comments.isEmpty()) {
+                out.write(HEADER);
+            } else {
+                out.write(HEADER.stripTrailing());
+                out.write('\n');
+                for (String comment : comments) {
+                    out.write("# ");
+                    out.write(comment.replace('\n', ' '));
+                    out.write('\n');
+                }
+                out.write('\n');
+            }
             HexFormat hex = HexFormat.of().withUpperCase();
             for (Entry entry : entries) {
                 out.write(quote(entry.name()));

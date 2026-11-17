@@ -26,8 +26,11 @@ final class Writer {
 
     private static void write(ConfigSpec<?> spec, ConfigurationSection target, String key, RecordComponent component,
             Object value, int depth) {
-        boolean section = spec.isSection(component.getType());
-        if (section) {
+        SectionCodec<?> owned = spec.sectionCodec(component.getType());
+        boolean section = spec.isSection(component.getType()) || owned != null;
+        if (owned != null) {
+            target.set(key, plain(owned, value));
+        } else if (section) {
             ConfigurationSection child = target.createSection(key);
             for (RecordComponent nested : value.getClass().getRecordComponents()) {
                 write(spec, child, Names.key(nested), nested, get(nested, (Record) value), depth + 1);
@@ -49,6 +52,11 @@ final class Writer {
         if (!lines.isEmpty()) {
             target.setComments(key, lines);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object plain(SectionCodec<?> codec, Object value) {
+        return ((SectionCodec<Object>) codec).plain(value);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

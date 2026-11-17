@@ -63,7 +63,8 @@ final class Emitter {
             Object child = get(component, value);
             String key = Names.key(component);
             String at = path.isEmpty() ? key : path + "." + key;
-            boolean section = spec.isSection(component.getType());
+            SectionCodec<?> owned = spec.sectionCodec(component.getType());
+            boolean section = spec.isSection(component.getType()) || owned != null;
             Comment comment = component.getAnnotation(Comment.class);
             // A blank line above each top-level setting and each commented section.
             if (depth == 0 || (section && comment != null)) {
@@ -73,6 +74,21 @@ final class Emitter {
                 for (String line : comment.value()) {
                     comment(depth, line);
                 }
+            }
+            if (owned != null) {
+                indent(depth).append(key(key)).append(":\n");
+                ConfigurationSection nested = existing == null ? null : existing.getConfigurationSection(key);
+                if (nested != null && !nested.getKeys(false).isEmpty()) {
+                    // As the owner wrote it.
+                    for (String name : nested.getKeys(false)) {
+                        unknown(nested, name, depth + 1);
+                    }
+                } else {
+                    for (String line : render(owned, child)) {
+                        indent(depth + 1).append(line).append('\n');
+                    }
+                }
+                continue;
             }
             if (section) {
                 indent(depth).append(key(key)).append(":\n");
@@ -104,6 +120,11 @@ final class Emitter {
                 unknown(existing, key, depth);
             }
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> render(SectionCodec<?> codec, Object value) {
+        return ((SectionCodec<Object>) codec).render(value);
     }
 
     /** A key that isn't a setting, with its comments, as it was. */

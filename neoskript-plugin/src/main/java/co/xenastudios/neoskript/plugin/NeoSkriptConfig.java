@@ -21,7 +21,9 @@ import org.bukkit.event.EventPriority;
  * the default file, reads and checks the live one, and carries old files forward.
  *
  * <p>Version 1 is the file from before config.yml had a version, the theme and this layout: the same settings,
- * with the same meanings. Carrying it forward keeps every value and adds the theme.
+ * with the same meanings. Carrying it forward keeps every value and adds the theme. Version 3 moved
+ * {@code variables.file} and {@code variables.storage} into the {@code databases} section, as its {@code default}
+ * database.
  */
 public record NeoSkriptConfig(
         @Comment({
@@ -39,18 +41,27 @@ public record NeoSkriptConfig(
         boolean updateChecker,
         Aliases aliases,
         Variables variables,
+        @Comment({
+            "Where global variables are saved, as the databases: section of Skript's config.sk. Each variable is saved",
+            "in the first database, from the top, whose pattern (a regular expression) matches its whole name, and in no",
+            "other. Variables whose names start with - are never saved. Types: csv (Skript's variables.csv), native",
+            "(NeoSkript's own file, variables.nsv beside the file named), sqlite, mysql, or disabled. Files are relative",
+            "to plugins/NeoSkript. Moving over from Skript copies its section and the files it names. Applies on restart.",
+            "Every option, and how to share variables between servers: https://neoskript.dev/docs/server/variables/"})
+        DatabaseSettings databases,
         Events events,
         RuntimeErrors runtimeErrors,
         EffectCommands effectCommands) {
 
-    static final int VERSION = 2;
+    static final int VERSION = 3;
 
     static final NeoSkriptConfig DEFAULTS = new NeoSkriptConfig(
             Theme.DEFAULTS,
             true,
             true,
             new Aliases(true),
-            new Variables("variables.csv", "csv", false, Interval.parse("5 minutes"), true),
+            new Variables(false, Interval.parse("5 minutes"), true),
+            DatabaseSettings.DEFAULTS,
             new Events(Priority.HIGH, false),
             new RuntimeErrors(Interval.parse("1 second"), 8, 2, 4, 10, 8, 2, 4, 10),
             new EffectCommands(false, "!", false, false));
@@ -63,10 +74,24 @@ public record NeoSkriptConfig(
                     "restart. A bad value falls back to its default, with a warning in the console.")
             .version(VERSION)
             .unversioned(1)
-            // A file with a theme is current even without config-version, such as one an owner wrote by hand.
-            .currentWith("theme")
+            // A file with databases is current even without config-version, such as one an owner wrote by hand. One
+            // with only a theme is version 2, carried forward as version 1 is.
+            .currentWith("databases")
             // Version 1 had the same settings, without the theme, which loading adds with its defaults.
             .migrate(1, root -> {})
+            // Version 2 had variables.file and variables.storage: they're the default database now.
+            .migrate(2, new co.xenastudios.neoskript.plugin.config.Migration() {
+                @Override
+                public void apply(org.bukkit.configuration.ConfigurationSection root) {
+                    moveToDatabases(root, new ArrayList<>());
+                }
+
+                @Override
+                public void apply(org.bukkit.configuration.ConfigurationSection root, List<String> warnings) {
+                    moveToDatabases(root, warnings);
+                }
+            })
+            .section(DatabaseSettings.class, DatabaseSettings.CODEC)
             .codec(TextStyle.class, TextStyle.CODEC)
             .codec(Interval.class, Interval.CODEC)
             .build();
@@ -81,22 +106,13 @@ public record NeoSkriptConfig(
 
     public record Variables(
             @Comment({
-                "Where global variables are saved, in Skript's variables.csv format (Skript can read it too).",
-                "Relative to plugins/NeoSkript. Variables whose names start with - aren't saved. Applies on restart."})
-            String file,
-            @Comment({
-                "csv saves to the file above, as Skript does. native saves to NeoSkript's own file beside it",
-                "(variables.nsv): faster to load, each save writes only what changed, and a crash can't cut a save in",
-                "half. Switching moves the variables over at the next start, after a backup in backups/. Switch back to",
-                "csv to write variables.csv again, for example before downgrading or going back to Skript. Applies on",
-                "restart. Docs: https://neoskript.dev/docs/server/variables/"})
-            String storage,
-            @Comment({
                 "Native storage only. If variables.nsv is damaged where no snapshot in backups/snapshots can repair it,",
                 "NeoSkript refuses to load it. Set this to true and restart to load everything up to the last good save",
                 "instead: this turns itself off first, then the damaged file is backed up and what's lost is logged."})
             boolean recover,
-            @Comment("How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops.")
+            @Comment({
+                "How often changed variables are saved to csv and native databases, at least every 10 seconds. They're",
+                "also saved when the server stops. SQL databases write changes within a second or so."})
             Interval saveInterval,
             @Comment({
                 "Whether players are their UUIDs in variable names ({money::%player%}) or their names, as Skript's",
@@ -210,6 +226,48 @@ public record NeoSkriptConfig(
     }
 
     /**
+     * Version 2 to 3: {@code variables.file} and {@code variables.storage} become the {@code default} database, with
+     * the same file and type.
+     */
+    /**
+     * Whether NeoSkript's own file is in use beside a variables file, by its path in config.yml: set by the plugin
+     * before config.yml is read, so carrying an unknown {@code variables.storage} forward keeps the file in use, as
+     * version 2 did.
+     */
+    static volatile java.util.function.Predicate<String> nativeInUse = file -> false;
+
+    private static void moveToDatabases(org.bukkit.configuration.ConfigurationSection root, List<String> warnings) {
+        Object file = root.get("variables.file");
+        Object storage = root.get("variables.storage");
+        root.set("variables.file", null);
+        root.set("variables.storage", null);
+        if (root.contains("databases")) {
+            return;
+        }
+        java.util.Map<String, Object> database = new java.util.LinkedHashMap<>(
+                DatabaseSettings.settings(DatabaseSettings.DEFAULTS.all().getFirst()));
+        if (!ConfigLoader.isBlank(file) && !String.valueOf(file).isBlank()) {
+            database.put("file", String.valueOf(file).strip());
+        }
+        if (!ConfigLoader.isBlank(storage) && !String.valueOf(storage).isBlank()) {
+            String text = String.valueOf(storage).strip();
+            String type = switch (text.toLowerCase(java.util.Locale.ROOT)) {
+                case "csv", "native" -> text.toLowerCase(java.util.Locale.ROOT);
+                default -> null;
+            };
+            if (type == null) {
+                // As version 2 did with an unknown storage: keep whichever file is in use, rather than move the
+                // variables because of a typo.
+                type = nativeInUse.test(String.valueOf(database.get("file"))) ? "native" : "csv";
+                warnings.add("Unknown variables.storage '" + text + "' in config.yml (csv or native); the default "
+                        + "database's type is " + type + ", the file in use.");
+            }
+            database.put("type", type);
+        }
+        root.createSection("databases").createSection("default", database);
+    }
+
+    /**
      * Sets {@code variables.recover} back to false once a recovery has run: through the loader, so the file keeps its
      * comments and other keys, and a file from a newer NeoSkript is left as it is.
      */
@@ -228,11 +286,8 @@ public record NeoSkriptConfig(
         if (metrics != before.metrics) {
             changed.add("metrics");
         }
-        if (!variables.file.equals(before.variables.file)) {
-            changed.add("variables.file");
-        }
-        if (!variables.storage.equals(before.variables.storage)) {
-            changed.add("variables.storage");
+        if (!databases.equals(before.databases)) {
+            changed.add("databases");
         }
         if (variables.recover != before.variables.recover) {
             changed.add("variables.recover");

@@ -115,9 +115,9 @@ class SettingsReloaderTest {
 
     @Test
     void variableStorageAndRecoveryWaitForARestart() throws Exception {
-        edit("storage: \"csv\"", "storage: \"native\"");
+        edit("type: \"csv\"", "type: \"native\"");
         edit("recover: false", "recover: true");
-        assertEquals(List.of("variables.storage", "variables.recover"), reloader.reload().restartOnly());
+        assertEquals(List.of("databases", "variables.recover"), reloader.reload().restartOnly());
     }
 
     @Test

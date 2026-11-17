@@ -1,17 +1,17 @@
 ---
 title: Variables and storage
-description: Where global variables are saved, how often, Skript's variables.csv format, NeoSkript's optional native storage, backups, and player UUIDs in names.
+description: Where global variables are saved, how often, Skript's variables.csv format, NeoSkript's optional native storage, SQLite and MySQL databases, sharing variables between servers, backups, and player UUIDs in names.
 ---
 
 import { Aside, FileTree } from "@astrojs/starlight/components";
 
-Global variables (`{name}`, not `{_name}` or `{-name}`) are saved to `plugins/NeoSkript/variables.csv`, or with [native storage](#native-storage) on, to `variables.nsv`. For how scripts use variables, see [variables](/docs/scripts/variables/).
+Global variables (`{name}`, not `{_name}` or `{-name}`) are saved to `plugins/NeoSkript/variables.csv` by default. With [native storage](#native-storage) on, they're in `variables.nsv`, and [databases](#databases) can put some or all of them in SQLite or MySQL, as Skript's `databases:` section does. For how scripts use variables, see [variables](/docs/scripts/variables/).
 
 <FileTree>
 - plugins/NeoSkript/
   - variables.csv saved variables
   - backups/
-    - variables_2026-11-12_16-03-07.csv a backup, made when needed
+    - variables_2026-11-12_16-03-07.csv a backup, made on a schedule and when needed
   - .migrated-from-skript written by the first start after Skript
 </FileTree>
 
@@ -35,25 +35,29 @@ If the server crashes, only the changes since the last save are lost.
 
 NeoSkript backs up `variables.csv` to `backups/` beside it, named as Skript names its backups:
 
+- **Every `backup-interval`**, keeping the newest `backups-to-keep`, as Skript's `backup interval` and `backups to keep`. A server that moved from Skript has exactly what its `config.sk` says, copied as is: with Skript's default config, every 2 hours, keeping every backup (`-1`), and a database that names no backup interval makes none. A new install, or a NeoSkript config from before the `databases` section, gets every 2 hours, keeping 12 (a day's worth). Scheduled backups are named `variables_<time>_scheduled.csv`. Unlike Skript, which counts and removes every file in `backups/`, only that database's scheduled backups are counted and removed: the backups below, made to keep something safe, are never removed automatically. SQLite files are backed up the same way, as a whole, consistent copy even while they're written to. See [databases](/docs/server/configuration/#databases).
 - **The first start after moving from Skript** backs up the copied file before loading it.
 - **When some lines can't be read**, for example the last line cut short by a crash under Skript, the file is backed up first. The lines that can't be read are skipped and the rest load, as in Skript. The console lists them with Skript's summary (`1 variable could not be loaded!`, `Affected variables: ...`), and the next save leaves them out; the backup keeps them.
 
 If the file can't be read at all, NeoSkript says so in the console and doesn't save variables until it's fixed, so it never writes an empty file over yours.
 
 <Aside type="caution">
-These backups aren't scheduled. Back up `plugins/NeoSkript` with the rest of your server.
+These backups sit beside the file, on the same disk. Back up `plugins/NeoSkript` with the rest of your server too.
 </Aside>
 
 ## Native storage
 
-For servers with many variables, NeoSkript has its own storage. Turn it on in `config.yml` and restart:
+For servers with many variables, NeoSkript has its own storage. Turn it on in `config.yml` by setting the `default` database's type to `native`, and restart:
 
 ```yaml
-variables:
-  storage: native
+databases:
+  default:
+    type: "native"
+    pattern: ".*"
+    file: "variables.csv"
 ```
 
-The variables are then saved in `variables.nsv`, next to where `variables.csv` was.
+The variables are then saved in `variables.nsv`, next to where `variables.csv` was (the `file` it names).
 
 - **Faster to load.** 140,000 variables load in under 300 ms, against about 450 to 550 from `variables.csv` (see below), and the file is a third the size. Lists whose names were first saved in any order, like `{firstjoin::%uuid%}`, are sorted once while loading: 600,000 random player UUIDs load in about 1.3 s, where setting them one by one takes 2.4.
 - **A save writes only what changed.** Each save adds the variables that changed since the last one to the end of the file, instead of writing every variable again. Now and then, when the file has grown to more than twice what its variables need, a save writes it afresh.
@@ -72,16 +76,15 @@ Committed saves were already on disk, so anything wrong with them is damage, fro
 
   ```yaml
   variables:
-    storage: native
     recover: true
   ```
 
-  NeoSkript first sets `recover` back to `false` in `config.yml`, so it only ever recovers when you ask. If it can't (a read-only or newer `config.yml`), it says so and doesn't recover. Then it backs up the damaged file, loads the saves before the damage, writes a new file, and lists what's lost: the saves from the damage on, and the variables changed by every part of them that can still be read. This works whether `storage` is `native` or `csv`, so a damaged `variables.nsv` can also be recovered while switching back. Or restore the file from your own backups instead.
+  NeoSkript first sets `recover` back to `false` in `config.yml`, so it only ever recovers when you ask. If it can't (a read-only or newer `config.yml`), it says so and doesn't recover. Then it backs up the damaged file, loads the saves before the damage, writes a new file, and lists what's lost: the saves from the damage on, and the variables changed by every part of them that can still be read. This works whether the database's `type` is `native` or `csv`, so a damaged `variables.nsv` can also be recovered while switching back. Or restore the file from your own backups instead.
 
 ### Switching, and going back
 
-- **To native:** when the server starts with `storage: native` and there's no `variables.nsv` yet, NeoSkript copies `variables.csv` to `backups/`, moves its variables into `variables.nsv`, and removes `variables.csv`, so only one file ever holds your variables.
-- **Back to CSV:** set `storage: csv` and restart. NeoSkript writes `variables.csv` again, from `variables.nsv`, and moves `variables.nsv` to `backups/`. That `variables.csv` is what Skript reads, so this is also the way back to Skript.
+- **To native:** when the server starts with `type: native` and there's no `variables.nsv` yet, NeoSkript copies `variables.csv` to `backups/`, moves its variables into `variables.nsv`, and removes `variables.csv`, so only one file ever holds your variables.
+- **Back to CSV:** set `type: csv` and restart. NeoSkript writes `variables.csv` again, from `variables.nsv`, and moves `variables.nsv` to `backups/`. That `variables.csv` is what Skript reads, so this is also the way back to Skript.
 
 Each file is only removed once the new one and the backup are synced to disk, so a power cut during a switch leaves your variables in at least one whole file. While `variables.nsv` exists, it's the file in use. If a `variables.csv` is next to it:
 
@@ -91,7 +94,7 @@ Each file is only removed once the new one and the backup are synced to disk, so
 
 ### Before downgrading
 
-NeoSkript versions without native storage, and Skript, only read `variables.csv`. With native storage on, there's no `variables.csv`, so they'd start with no variables. NeoSkript reminds you of this in the console on every start. Before downgrading, or going back to Skript, set `storage: csv` and restart once. If you downgrade anyway and the older version saves a `variables.csv`, upgrading again stops at the case above instead of losing either file.
+NeoSkript versions without native storage, and Skript, only read `variables.csv`. With native storage on, there's no `variables.csv`, so they'd start with no variables. NeoSkript reminds you of this in the console on every start. Before downgrading, or going back to Skript, set `type: csv` and restart once. If you downgrade anyway and the older version saves a `variables.csv`, upgrading again stops at the case above instead of losing either file.
 
 ### How fast
 
@@ -119,7 +122,66 @@ Some values can't go in a file, such as entities. A script that puts one in a gl
 
 ## Databases
 
-NeoSkript saves to `variables.csv`, or to its own [native storage](#native-storage). Skript 2.17 itself only saves to CSV out of the box: its SQLite and MySQL storage needs a plugin that's no longer maintained. Database storage is planned after 1.0.
+The `databases` section of `config.yml` is Skript's `databases:` section from `config.sk`, with the same options, so variables can live in several files and databases. Each variable is saved in the first database, from the top, whose `pattern` matches its whole name, and in no other:
+
+```yaml
+databases:
+  # Shared with the other servers on the network.
+  network:
+    type: "mysql"
+    pattern: "synced_.*"
+    monitor-changes: true
+    monitor-interval: "20 seconds"
+    host: "db.example.net"
+    port: 3306
+    user: "minecraft"
+    password: "..."
+    database: "skript"
+    table: "variables21"
+  # Everything else, in variables.csv.
+  default:
+    type: "csv"
+    pattern: ".*"
+    file: "variables.csv"
+    backup-interval: "2 hours"
+    backups-to-keep: 12
+```
+
+Every option is in [configuration](/docs/server/configuration/#databases). As in Skript:
+
+- `{-name}` variables are never saved, whatever the patterns say. A variable no pattern matches isn't saved in a file; an SQL database keeps the row it has.
+- A variable found in two databases at startup is kept from the lower one, with Skript's warning.
+- A variable found in a database it no longer belongs to, after a pattern changed, moves to the one it belongs to. The old database lets go of it only once the new one has saved it.
+
+### SQLite and MySQL
+
+The table is Skript's: `variables21`, with `name`, `type`, `value` and `update_guid`, and on MySQL a `rowid` and Skript's `ucs2` character set. Values are in the same binary format as `variables.csv`. So Skript and NeoSkript can take turns on the same `.db` file or MySQL database, in either direction; the test harness checks this against Skript 2.17.0, items and locations included. A row NeoSkript can't read, such as an addon's type, is kept and written back unchanged.
+
+NeoSkript talks to the database itself, with the SQLite and MySQL drivers Paper and Folia include. Skript needs the [SQLibrary](https://www.curseforge.com/minecraft/bukkit-plugins/sqlibrary) plugin for this, last updated in 2014, and its MySQL support asks for a driver class (`com.mysql.jdbc.jdbc2.optional.MysqlDataSource`) that Paper's MySQL driver no longer has, so on current Paper, Skript's MySQL storage doesn't start. NeoSkript needs neither.
+
+Changes are written within a second or so, on a thread of their own, never the server's: only what changed since the last write, in one transaction.
+
+### Sharing variables between servers
+
+With `monitor-changes: true`, each server reads the others' changes from the database every `monitor-interval`, through Skript's `update_guid`. Use the same `pattern`, `monitor-changes` and `monitor-interval` on every server that shares a database, as Skript says.
+
+Each server writes its own changes before it reads the others', and a change it hasn't been able to write yet is never replaced by another server's: it's written over theirs, as Skript writes each change at once. Changes are read by rowid, and the last check's rows are read again, so a write that commits a little late is still seen. A write held up for longer than one `monitor-interval`, on a busy database, can still be missed by the other servers until the next restart, as in Skript.
+
+Unlike Skript, a variable deleted on one server is deleted on the others: with `monitor-changes` on, a deletion is written as a row without a value, which Skript ignores when it reads, and such rows are removed a while later, as Skript removes them. Skript servers on the same database see NeoSkript's changes, but not its deletions.
+
+### When a database is down
+
+NeoSkript never stalls the server waiting for a database, never writes to one it didn't load, and doesn't lose changes while the server runs:
+
+- **Down when the server starts:** NeoSkript waits at most 10 seconds for each database. Then the other databases load and scripts run, but this database's variables aren't loaded, and nothing is written to it. Its pattern still owns its variables, so they aren't saved anywhere else by mistake. NeoSkript keeps trying in the background, and when the database answers, it loads its variables: only the ones its pattern owns, and never one another database loaded when the server started, so the order rule above still holds. Until then, scripts find that database's variables empty, which never happens in Skript, since it waits for every database before scripts load. When the database loads, its saved values replace what scripts set meanwhile for names it has, and the console lists them; names it doesn't have keep what scripts set. While it's never been reached, what scripts set for it is kept in `pending/` every 30 seconds, so even a crash doesn't lose it, and the next start puts it back in memory before scripts run.
+- **Drops out later:** writes stop, and the console says so once, then every 5 minutes with how many changes are waiting. Nothing is queued: NeoSkript works out what changed again each time it tries, so an outage of any length costs no extra memory. When the database is back, everything that changed is written and the console says so.
+- **Down when the server stops:** the changes that couldn't be written are kept in `plugins/NeoSkript/pending/<database>-<id>.pending.csv`, in Skript's CSV format, and written at the next start. They're also kept every 30 seconds while it's down. If the database was never reached at all, the variables scripts set for it are kept in `<database>-<id>.unloaded.csv`, and the next start adds the ones the database doesn't have. The id comes from the database's type, where it is and its table, which the file also records: a file kept for a database that has since moved, or for another table, isn't applied, but set aside with a warning. A kept change is only applied if the database's row for it is as this server last saw it: if anything wrote the row since, another server or an earlier start, the database's value is kept, and the console says how many were left out.
+- **The server stops:** every database closes at once, and the server waits for them together, about 20 seconds at most. One that doesn't answer in time keeps what it couldn't write in `pending/`, and the console says so.
+- **No driver:** if the server doesn't have the SQLite or MySQL driver (Paper and Folia do), the console says so once, and it isn't tried again.
+- **A row the database refuses** (a name longer than MySQL's 380 characters, a character `ucs2` can't hold) doesn't hold up the rest: the console names it, and it keeps its value until the server stops.
+- **A locked SQLite file**, held by another program, waits 5 seconds, then is tried again later like a database that's down. So does a full disk.
+
+`/sk info` shows each database: connected and how many variables it has, down since when, why, and how many changes are waiting, or not reached yet. A password is never shown, in the console or `/sk info`.
 
 <Aside type="note">
 The variable store and backups changed after 0.1.0-beta.1: backups, skipping lines that can't be read, and never saving over a file that didn't load are in the [development build](https://github.com/xena-studios/neoskript/releases/tag/dev) and the next release.

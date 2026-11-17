@@ -52,7 +52,7 @@ class NeoSkriptConfigTest {
         assertEquals(ConfigLoader.defaultText(NeoSkriptConfig.SPEC), text);
         assertTrue(text.startsWith("# NeoSkript's config. Docs: https://neoskript.dev/docs/configuration/\n"), text);
         // The version and then the theme come first, as in Xena Studios' other plugins.
-        int version = text.indexOf("\nconfig-version: 2\n");
+        int version = text.indexOf("\nconfig-version: 3\n");
         int theme = text.indexOf("\ntheme:\n");
         assertTrue(version > 0 && theme > version && theme < text.indexOf("\nmetrics:"), text);
         assertTrue(text.contains("  highlight: \"<#FF4D9D>\"\n"), text);
@@ -89,14 +89,14 @@ class NeoSkriptConfigTest {
         assertEquals(1, result.carriedFrom());
         assertEquals(List.of(), result.warnings());
         assertEquals(List.of(
-                "Carried config.yml forward from config version 1 to 2, keeping your settings. The old file is config.yml.bak-v1.",
-                "Added 4 new settings with their defaults: theme, aliases, variables.storage, variables.recover."), result.notices());
+                "Carried config.yml forward from config version 1 to 3, keeping your settings. The old file is config.yml.bak-v1.",
+                "Added 3 new settings with their defaults: theme, aliases, variables.recover."), result.notices());
         assertEquals(old, Files.readString(folder.resolve("config.yml.bak-v1")));
 
         NeoSkriptConfig config = result.config();
         assertFalse(config.metrics());
         assertTrue(config.updateChecker());
-        assertEquals("data/vars.csv", config.variables().file());
+        assertEquals("data/vars.csv", defaultFile(config));
         assertEquals(30_000, config.variables().saveInterval().millis());
         assertFalse(config.variables().playerUuidsInNames());
         assertEquals(NeoSkriptConfig.Priority.LOWEST, config.events().priority());
@@ -108,7 +108,9 @@ class NeoSkriptConfigTest {
 
         // The new file is in the current layout, with the values as the owner wrote them.
         String text = Files.readString(file());
-        assertTrue(text.contains("\nconfig-version: 2\n"), text);
+        assertTrue(text.contains("\nconfig-version: 3\n"), text);
+        assertTrue(text.contains("\ndatabases:\n  default:\n    type: \"csv\"\n    pattern: \".*\"\n    file: \"data/vars.csv\"\n"),
+                text);
         assertTrue(text.indexOf("\ntheme:\n") < text.indexOf("\nmetrics: false\n"), text);
         assertTrue(text.contains("  save-interval: \"30 seconds\"\n"), text);
         assertTrue(text.contains("  token: \"#!\"\n"), text);
@@ -235,7 +237,7 @@ class NeoSkriptConfigTest {
         readOnly(() -> {
             ConfigLoader.Result<NeoSkriptConfig> result = load();
             assertFalse(result.config().variables().playerUuidsInNames());
-            assertEquals("data/vars.csv", result.config().variables().file());
+            assertEquals("data/vars.csv", defaultFile(result.config()));
             assertTrue(result.config().effectCommands().enabled());
             assertEquals(1, result.warnings().size(), result.warnings().toString());
             assertTrue(result.warnings().getFirst().startsWith("Couldn't update config.yml: "), result.warnings().toString());
@@ -275,11 +277,11 @@ class NeoSkriptConfigTest {
 
     @Test
     void aFileFromANewerNeoSkriptIsNeverWritten() throws Exception {
-        String newer = "# Mine.\nconfig-version: 3\nmetrics: false\nsomething-new: 4\n";
+        String newer = "# Mine.\nconfig-version: 4\nmetrics: false\nsomething-new: 4\n";
         Files.writeString(file(), newer);
         ConfigLoader.Result<NeoSkriptConfig> result = load();
         assertFalse(result.config().metrics());
-        assertTrue(result.warnings().getFirst().startsWith("config.yml is from a newer NeoSkript (config version 3;"));
+        assertTrue(result.warnings().getFirst().startsWith("config.yml is from a newer NeoSkript (config version 4;"));
         assertEquals(newer, Files.readString(file()));
 
         ConfigLoader.Change change = ConfigLoader.set(NeoSkriptConfig.SPEC, file(), Map.of("effect-commands.enabled", true));
@@ -299,7 +301,7 @@ class NeoSkriptConfigTest {
     void aCurrentFileWithoutConfigVersionIsNotCarriedForward() throws Exception {
         load();
         String text = Files.readString(file())
-                .replaceFirst("# Managed by NeoSkript.*\nconfig-version: 2\n", "")
+                .replaceFirst("# Managed by NeoSkript.*\nconfig-version: 3\n", "")
                 .replace("metrics: true\n", "# Mine.\nmetrics: false\nmine: 1\n");
         Files.writeString(file(), text);
         ConfigLoader.Result<NeoSkriptConfig> result = load();
@@ -307,7 +309,7 @@ class NeoSkriptConfigTest {
         assertFalse(result.config().metrics());
         assertEquals(List.of("config.yml"), names());
         String after = Files.readString(file());
-        assertTrue(after.contains("config-version: 2\n"), after);
+        assertTrue(after.contains("config-version: 3\n"), after);
         assertTrue(after.contains("# Mine.\nmetrics: false\nmine: 1\n"), after);
     }
 
@@ -345,16 +347,13 @@ class NeoSkriptConfigTest {
     void onlyThePrefixMayBeLeftEmpty() throws Exception {
         load();
         Files.writeString(file(), Files.readString(file())
-                .replace("  file: \"variables.csv\"", "  file:")
                 .replace("  token: \"!\"", "  token: \"\"")
                 .replace("  base: \"<gray>\"", "  base:"));
         ConfigLoader.Result<NeoSkriptConfig> result = load();
-        assertEquals("variables.csv", result.config().variables().file());
         assertEquals("!", result.config().effectCommands().token());
         assertEquals(NeoSkriptConfig.DEFAULTS.theme().base(), result.config().theme().base());
         assertEquals(List.of(
                 "theme.base is empty; quote values that start with #; using the default.",
-                "variables.file is empty; quote values that start with #; using the default.",
                 "effect-commands.token (\"\") is empty; using the default."), result.warnings());
     }
 
@@ -362,7 +361,7 @@ class NeoSkriptConfigTest {
     void anEmptyFileIsNotCarriedForward() throws Exception {
         Files.writeString(file(), version1().replace("  file: variables.csv", "  file:"));
         ConfigLoader.Result<NeoSkriptConfig> result = load();
-        assertEquals("variables.csv", result.config().variables().file());
+        assertEquals("variables.csv", defaultFile(result.config()));
         assertTrue(Files.readString(file()).contains("  file: \"variables.csv\"\n"));
     }
 
@@ -387,6 +386,11 @@ class NeoSkriptConfigTest {
     }
 
     public record Renamed(@AllowBlank String title, int count) {}
+
+    /** The file of the first database. */
+    private static String defaultFile(NeoSkriptConfig config) {
+        return config.databases().all().getFirst().file();
+    }
 
     // --- Setting values copied from Skript ---
 
@@ -546,7 +550,7 @@ class NeoSkriptConfigTest {
         assertFalse(config.variables().recover());
         assertFalse(config.metrics(), "the other settings are kept");
 
-        String newer = "config-version: 3\nvariables:\n  recover: true\n";
+        String newer = "config-version: 4\nvariables:\n  recover: true\n";
         Files.writeString(file(), newer);
         assertFalse(NeoSkriptConfig.turnOffRecover(file()).written());
         assertEquals(newer, Files.readString(file()));
