@@ -340,6 +340,11 @@ final class LineParser {
                     && holders.syntax().syntax().id().equals("ExprItemsIn")) {
                 continue;
             }
+            // 'transformed' only of what may be several values, as Skript's init refuses one, with no error of its own.
+            if (syntax.id().equals("ExprTransform") && parsed.match().values().getFirst() instanceof Expr source
+                    && !(source instanceof Expr.ListOf) && Plurality.single(source, registry)) {
+                continue;
+            }
             // 'recursive X' only for what can give nested lists, as Skript's init refuses the rest: 'recursive size of
             // {_l::*}' is the list's recursive size.
             if (syntax.id().equals("ExprRecursive") && parsed.match().values().getFirst() instanceof Expr nested
@@ -1413,8 +1418,9 @@ final class LineParser {
             // As Skript's parseExpressionList reads what's in brackets again on its own and returns without printing
             // its log, the errors of what's in brackets are dropped when it isn't of a type wanted: '(the equippable
             // component of {_item})' says nothing where an item component goes. Where any value goes, it's an
-            // unparsed literal that keeps them.
-            Problems before = expected.anything() ? null : problems();
+            // unparsed literal that keeps them, unless no words may go there ('%~objects%'): then there's no unparsed
+            // literal, and 'indices of (recursive {_t})' says nothing either (issue #79).
+            Problems before = expected.anything() && !expected.changeable() ? null : problems();
             Expr inner = expression(start + 1, end - 1, expected);
             if (inner instanceof Expr.ListOf list) {
                 // A copy, so only this reading of the list is the bracketed one: see bracketedLists.
@@ -1548,8 +1554,24 @@ final class LineParser {
         return specifiedLiteral(start, end, text, expected);
     }
 
+    /**
+     * Skript's pattern for a literal with its type given ({@code SkriptParser.LITERAL_SPECIFICATION_PATTERN}): when the
+     * type isn't one, that's its error.
+     */
+    private static final java.util.regex.Pattern SKRIPT_SPECIFIED =
+            java.util.regex.Pattern.compile("[^,():/\"\\[\\]}{]+ \\(([\\w\\p{L} ]+)\\)");
+
     /** A literal with its type given in parentheses, like {@code black (wolf variant)}. */
     private Expr specifiedLiteral(int start, int end, String text, Expected expected) {
+        java.util.regex.Matcher skript = SKRIPT_SPECIFIED.matcher(text);
+        if (skript.matches()) {
+            // As Skript's parseSpecifiedLiteral: 'indices of (5)' is the words 'indices of' of a type '5'.
+            String named = skript.group(1).replaceFirst("(?i)^the ", "");
+            if (registry.resolveType(Literals.normalize(named)) == null) {
+                problem("A " + named + " is not a valid type.");
+                return null;
+            }
+        }
         java.util.regex.Matcher matcher = Literals.SPECIFIED.matcher(text);
         if (!matcher.matches()) {
             return null;
