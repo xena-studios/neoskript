@@ -286,6 +286,12 @@ A setting `config.sk` doesn't have keeps NeoSkript's default, which is the value
 | `version` | Skript's own record of its config's version. NeoSkript's is `config-version`. |
 | `case-insensitive variables` | Not here: NeoSkript's variable names always ignore case, as Skript's do by default. If `config.sk` turned it off, moving over says so, and names, as errors, the saved variables that differ only by case (`{coins::Bob}` and `{coins::bob}`), as NeoSkript keeps only one of each. Skript's `variables.csv` is left as it was. |
 | `variable changes until save` | Skript writes each change to `variables.csv` as it happens, and rewrites the whole file once this many changes pile up. NeoSkript writes the changed variables every `variables.save-interval` instead (native storage appends only what changed), so there are no piled-up changes to count. Moving over says so when it isn't Skript's 1000. |
+| `execute functions with missing parameters` | Not here: NeoSkript always runs a function whose argument has no value, as Skript does by default (`true`). With it off, Skript skips such a call and gives nothing. Moving over says so when `config.sk` turned it off. |
+| `simplify syntax on parse` | Not here: NeoSkript always works out what it can while a script loads (`1 + 1` is `2`), as Skript does by default (`true`); Skript's own config doesn't list it. Moving over says so when `config.sk` turned it off. |
+| `keep configs loaded` | It keeps each script's parsed file in memory for Skript addons that read it; NeoSkript doesn't load Skript addons. |
+| `allow unsafe platforms` | It lets Skript start on a server platform it doesn't support. NeoSkript is built on Paper's API, for Paper and Folia only; there's no other platform to allow. |
+| `updater download tries` | For Skript's own updater; NeoSkript's `update-checker` doesn't download. |
+| `allow function calls before definations`, `enable script caching`, `addon safety checks`, `case-insensitive commands`, `keep command last usage dates` | They do nothing in Skript 2.17: deprecated or no longer read. |
 
 ## Updating NeoSkript
 

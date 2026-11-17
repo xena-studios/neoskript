@@ -35,7 +35,9 @@ class CompressedBackupsTest {
         Path file = folder.resolve("variables.csv");
         Files.writeString(file, "# variables\nx, long, 0000000000000001\n");
         Path backup = VariableStorage.backup(file, VariableStorage.SCHEDULED);
-        Path gzipped = VariableStorage.compress(backup, () -> false);
+        VariableStorage.Compressed done = VariableStorage.compress(backup, () -> false);
+        assertEquals(null, done.copyLeft());
+        Path gzipped = done.file();
         assertEquals(backup.getFileName() + ".gz", gzipped.getFileName().toString());
         assertFalse(Files.exists(backup), "the uncompressed copy is removed");
         try (InputStream in = new GZIPInputStream(Files.newInputStream(gzipped))) {
@@ -57,6 +59,20 @@ class CompressedBackupsTest {
         assertEquals(2, VariableStorage.purgeBackups(file, 1));
         assertEquals(List.of("variables_2025-01-01_00-00-00.csv.gz", "variables_2026-01-03_00-00-00_scheduled.csv.gz"),
                 backups());
+    }
+
+    @Test
+    void aCopyLeftBesideItsCompressedBackupCountsAsOneBackup() throws Exception {
+        Path file = folder.resolve("variables.csv");
+        Files.writeString(file, "x\n");
+        Path dir = Files.createDirectories(folder.resolve("backups"));
+        // The copy couldn't be removed after compressing: the two are one backup.
+        Files.writeString(dir.resolve("variables_2026-01-01_00-00-00_scheduled.csv"), "a");
+        Files.writeString(dir.resolve("variables_2026-01-01_00-00-00_scheduled.csv.gz"), "a");
+        Files.writeString(dir.resolve("variables_2026-01-02_00-00-00_scheduled.csv.gz"), "b");
+        assertEquals(0, VariableStorage.purgeBackups(file, 2));
+        assertEquals(1, VariableStorage.purgeBackups(file, 1));
+        assertEquals(List.of("variables_2026-01-02_00-00-00_scheduled.csv.gz"), backups());
     }
 
     @Test

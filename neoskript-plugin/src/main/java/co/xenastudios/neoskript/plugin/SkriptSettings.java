@@ -124,7 +124,11 @@ final class SkriptSettings {
                     + " types. NeoSkript names every Minecraft item after its id whatever the alias files have, and"
                     + " doesn't load Skript addons"},
             new String[] {"disable hooks.regions.precious stones", "true", "NeoSkript doesn't hook into PreciousStones"},
-            new String[] {"disable hooks.regions.residence", "true", "NeoSkript doesn't hook into Residence"});
+            new String[] {"disable hooks.regions.residence", "true", "NeoSkript doesn't hook into Residence"},
+            new String[] {"execute functions with missing parameters", "false", "NeoSkript always runs a function whose"
+                    + " argument has no value, as Skript does by default"},
+            new String[] {"simplify syntax on parse", "false", "NeoSkript always works out what it can while a script"
+                    + " loads, as Skript does by default"});
 
     private SkriptSettings() {}
 
