@@ -26,9 +26,10 @@ import java.util.function.UnaryOperator;
  * <p>Safe to use from several threads. Each single operation is atomic, including {@link #update} (so
  * {@code add 1 to {x}} never loses an increment); sequences of operations aren't.
  *
- * <p>A variable that's deleted is taken out of the tree, and so is each list above it left with nothing in it, as
- * Skript takes them out of its maps: a script that sets and deletes {@code {temp::%uuid%::x}} for every event uses
- * no more memory after a million of them than after one. Values change without locks. Adding a node to a node's
+ * <p>A variable that's deleted is taken out of the tree, and so is each list above it left with nothing in it: a
+ * script that sets and deletes {@code {temp::%uuid%::x}} for every event uses no more memory after a million of them
+ * than after one. Skript keeps an emptied list's map, which only {@code add} can tell, by skipping its index, so an
+ * emptied list at a positive integer index is kept as Skript keeps it ({@link Node#freeable}). Values change without locks. Adding a node to a node's
  * children, or taking one out, holds that node's lock, and taking one out holds its own too (always the parent's
  * first). A node that's taken out is marked {@link #DEAD} first, under both locks and only if it has no value and
  * nothing under it, so a change that found it just before then sees the mark and starts again from the top.
@@ -125,9 +126,9 @@ public final class VariableStore {
      * A node's children, in Skript's order of indices ({@link #INDEX_ORDER}) for going through them, with a hash
      * index beside it for finding one: comparing long indices like UUIDs in that order made a lookup most of what a
      * trigger using variables cost. Two indices are the same in that order when they're the same ignoring case, so
-     * the index is keyed by the lower-case index. Children are added ({@link Node#child}), taken out when they're
-     * empty ({@link #removeChild}) and cleared ({@link #clear}), all of which keep the index, and all with the lock of
-     * the node they're the children of held.
+     * the index is keyed by the lower-case index. Children are added ({@link Node#child}) and taken out when they're
+     * empty ({@link #removeChild}), both of which keep the index, with the lock of the node they're the children of
+     * held. {@code delete {x::*}} drops the whole map.
      */
     private static final class Children extends ConcurrentSkipListMap<String, Node> {
 
@@ -432,10 +433,20 @@ public final class VariableStore {
             return value.get() == DEAD;
         }
 
-        /** Whether it has no value and nothing under it, so it can be taken out. */
-        boolean empty() {
+        /**
+         * Whether it can be taken out from under {@code key}: it's {@link #empty}, and it isn't an emptied list at a
+         * positive integer index. Skript keeps such a list's map when what's in it is deleted one by one, and
+         * {@code add} skips its index, so NeoSkript keeps the node, which is what Skript's map is (its
+         * {@code children} map is made when it first gets a child). {@code delete {x::1::*}} drops it, as Skript
+         * drops the map ({@link #deleteList}). Lists at other indices, like {@code {temp::%uuid%}}, are taken out:
+         * nothing can tell.
+         */
+        boolean freeable(String key) {
             Children map = children;
-            return value.get() == null && (map == null || map.isEmpty());
+            if (value.get() != null) {
+                return false;
+            }
+            return map == null || map.isEmpty() && Children.positiveIndex(key) < 0;
         }
 
         /**
@@ -603,10 +614,11 @@ public final class VariableStore {
     public void set(String name, Object value) {
         changed();
         if (value == null) {
-            Node node = find(name);
-            if (node != null && node.value() != null) {
-                node.set(null);
-                prune(name);
+            // One walk down the name, whose nodes are then taken out bottom up if they're left empty.
+            Path path = walk(name);
+            if (path != null && path.last().value() != null) {
+                path.last().set(null);
+                path.prune();
             }
             return;
         }
@@ -931,17 +943,21 @@ public final class VariableStore {
     /** Removes {@code values} from {@code {prefix::*}}: the first match of each, or every match if {@code all}. */
     public void removeFromList(String prefix, Object[] values, boolean all) {
         changed();
-        Node node = find(prefix);
+        Path path = walk(prefix);
+        Node node = path == null ? null : path.last();
         if (node == null || node.children == null) {
             return;
         }
         boolean removed = false;
         for (Object value : values) {
-            for (Node child : node.children.values()) {
+            for (Map.Entry<String, Node> entry : node.children.entrySet()) {
+                Node child = entry.getValue();
                 Object current = child.value.get();
                 if (current != null && current != DEAD
                         && co.xenastudios.neoskript.runtime.Comparison.equal(current, value)
                         && child.value.compareAndSet(current, null)) {
+                    // Taken out as it's emptied, so the list isn't gone through again.
+                    removeIfEmpty(node, entry.getKey(), child);
                     removed = true;
                     if (!all) {
                         break;
@@ -950,7 +966,7 @@ public final class VariableStore {
             }
         }
         if (removed) {
-            pruneChildren(prefix, node);
+            path.prune();
         }
     }
 
@@ -1046,34 +1062,41 @@ public final class VariableStore {
     private static void copy(Node from, Node to) {
         for (Map.Entry<String, Node> entry : from.children.entrySet()) {
             Node source = entry.getValue();
-            Object value = source.value();
-            Children below = source.children;
-            boolean hasBelow = below != null && !below.isEmpty();
-            if (value == null && !hasBelow) {
+            if (source.freeable(entry.getKey())) {
                 continue;
             }
+            Object value = source.value();
+            Children below = source.children;
             Node target = to.lockedChild(entry.getKey());
             target.value.set(Values.copy(value));
-            if (hasBelow) {
+            if (below != null) {
                 synchronized (target) {
+                    if (target.children == null) {
+                        // An emptied list Skript keeps the map of (Node#freeable): kept in the copy too.
+                        target.children = new Children();
+                    }
                     copy(source, target);
                 }
             }
         }
     }
 
+    /**
+     * Deletes everything under {@code {prefix::*}}. The list's map goes too, as Skript drops it: an index that's no
+     * longer a list is free for {@code add} again once it has no value ({@link Node#freeable}).
+     */
     public void deleteList(String prefix) {
         changed();
-        Node node = find(prefix);
-        if (node == null || node.children == null) {
+        Path path = walk(prefix);
+        if (path == null || path.last().children == null) {
             return;
         }
+        Node node = path.last();
         synchronized (node) {
-            if (node.children != null) {
-                node.children.clear();
-            }
+            // Changes that found a child before this still change it, out of the tree, as a clear did.
+            node.children = null;
         }
-        prune(prefix);
+        path.prune();
     }
 
     private Iterable<Node> children(String prefix) {
@@ -1128,14 +1151,42 @@ public final class VariableStore {
         return null;
     }
 
-    /**
-     * Takes {@code {name}} out of the tree if it has no value and nothing under it, then each list above it left
-     * with nothing in it, bottom up, so deleted variables don't keep using memory.
-     */
-    private void prune(String name) {
-        Node[] path = new Node[4];
+    /** The nodes along a name, from the top one's child down to the name's own. */
+    private final class Path {
+        Node[] nodes = new Node[4];
         String[] keys = new String[4];
-        int depth = 0;
+        int depth;
+
+        Node last() {
+            return nodes[depth - 1];
+        }
+
+        void add(Node node, String key) {
+            if (depth == nodes.length) {
+                nodes = java.util.Arrays.copyOf(nodes, depth * 2);
+                keys = java.util.Arrays.copyOf(keys, depth * 2);
+            }
+            nodes[depth] = node;
+            keys[depth] = key;
+            depth++;
+        }
+
+        /**
+         * Takes the name's node out of the tree if it has no value and nothing under it, then each list above it
+         * left with nothing in it, bottom up, so deleted variables don't keep using memory.
+         */
+        void prune() {
+            for (int i = depth - 1; i >= 0; i--) {
+                if (!removeIfEmpty(i == 0 ? root : nodes[i - 1], keys[i], nodes[i])) {
+                    return;
+                }
+            }
+        }
+    }
+
+    /** The nodes along {@code name}, as {@link #find} goes down it, or {@code null} if it isn't there. */
+    private Path walk(String name) {
+        Path path = new Path();
         Node node = root;
         int start = 0;
         while (true) {
@@ -1144,39 +1195,22 @@ public final class VariableStore {
             Children children = node.children;
             node = children == null ? null : children.get(part);
             if (node == null) {
-                return;
+                return null;
             }
-            if (depth == path.length) {
-                path = java.util.Arrays.copyOf(path, depth * 2);
-                keys = java.util.Arrays.copyOf(keys, depth * 2);
-            }
-            path[depth] = node;
-            keys[depth] = part;
-            depth++;
+            path.add(node, part);
             if (end < 0) {
-                break;
+                return path;
             }
             start = end + SEPARATOR.length();
         }
-        for (int i = depth - 1; i >= 0; i--) {
-            if (!removeIfEmpty(i == 0 ? root : path[i - 1], keys[i], path[i])) {
-                return;
-            }
-        }
     }
 
-    /** Takes the children of {@code node} (at {@code name}) that are empty out, then {@code node} and up if empty. */
-    private void pruneChildren(String name, Node node) {
-        Children children = node.children;
-        if (children == null) {
-            return;
+    /** {@link Path#prune} for {@code name}. */
+    private void prune(String name) {
+        Path path = walk(name);
+        if (path != null) {
+            path.prune();
         }
-        for (Map.Entry<String, Node> entry : children.entrySet()) {
-            if (entry.getValue().empty()) {
-                removeIfEmpty(node, entry.getKey(), entry.getValue());
-            }
-        }
-        prune(name);
     }
 
     /**
@@ -1184,7 +1218,7 @@ public final class VariableStore {
      * nothing under it: marked {@link #DEAD} first, with both locks held. Whether it was taken out.
      */
     private static boolean removeIfEmpty(Node parent, String key, Node child) {
-        if (!child.empty()) {
+        if (!child.freeable(key)) {
             return false;
         }
         synchronized (parent) {
@@ -1193,7 +1227,7 @@ public final class VariableStore {
                 return false;
             }
             synchronized (child) {
-                if (!child.empty() || !child.value.compareAndSet(null, DEAD)) {
+                if (!child.freeable(key) || !child.value.compareAndSet(null, DEAD)) {
                     return false;
                 }
             }

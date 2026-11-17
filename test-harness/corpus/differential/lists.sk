@@ -77,3 +77,16 @@ function probe_lists():
 	delete {difftmp::x::*}
 	show("global emptied", (size of {difftmp::*}, {difftmp::x::z}))
 	set {difftmp::kept} to "kept"
+	# A list at a number, emptied one by one, keeps its index from add, as Skript keeps its map.
+	set {_n::1::y} to 1
+	set {_n::2} to "b"
+	delete {_n::1::y}
+	add "c" to {_n::*}
+	show("add after emptied sublist", indices of {_n::*})
+	set {_r::1::*} to "p" and "q"
+	remove "p" and "q" from {_r::1::*}
+	add "z" to {_r::*}
+	show("add after sublist removed from", indices of {_r::*})
+	delete {_r::1::*}
+	add "y" to {_r::*}
+	show("add after sublist deleted", indices of {_r::*})

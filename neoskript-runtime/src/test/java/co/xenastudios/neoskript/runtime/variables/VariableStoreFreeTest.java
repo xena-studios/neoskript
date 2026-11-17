@@ -129,6 +129,38 @@ class VariableStoreFreeTest {
     }
 
     @Test
+    void anEmptiedListAtANumberKeepsItsIndexAsInSkript() {
+        VariableStore store = new VariableStore();
+        // Checked on Skript 2.17: its map for {_n::1} stays when what's in it is deleted, and add skips 1.
+        store.set("n::1::y", 1L);
+        store.set("n::2", "b");
+        store.set("n::1::y", null);
+        store.addToList("n", new Object[] {"c"});
+        assertArrayEquals(new String[] {"2", "3"}, store.indices("n"));
+        assertEquals(2, store.list("n").length);
+        store.setList("r::1", new Object[] {"p", "q"});
+        store.removeFromList("r::1", new Object[] {"p", "q"}, false);
+        store.addToList("r", new Object[] {"z"});
+        assertArrayEquals(new String[] {"2"}, store.indices("r"));
+        // A copy, as a delayed section's locals, keeps it too.
+        VariableStore copy = store.copy();
+        copy.addToList("r", new Object[] {"w"});
+        assertArrayEquals(new String[] {"2", "3"}, copy.indices("r"));
+        // delete {r::1::*} drops it, as Skript drops the map: 1 is free again.
+        store.deleteList("r::1");
+        store.addToList("r", new Object[] {"y"});
+        assertArrayEquals(new String[] {"1", "2"}, store.indices("r"));
+        // So does deleting the list above.
+        store.deleteList("n");
+        store.deleteList("r");
+        assertEquals(0, store.nodes());
+        // Lists at other indices are taken out.
+        store.set("temp::abc::x", 1L);
+        store.set("temp::abc::x", null);
+        assertEquals(0, store.nodes());
+    }
+
+    @Test
     void loopingWhileDeletingSeesWhatWasThere() {
         VariableStore store = new VariableStore();
         store.setList("l", new Object[] {"a", "b", "c"});
@@ -173,15 +205,15 @@ class VariableStoreFreeTest {
                     start.await();
                     for (int i = 0; i < rounds; i++) {
                         // The list above is shared, and goes empty and is taken out all the time.
-                        String name = "shared::" + id + "::" + (i & 7);
+                        String name = "shared::t" + id + "::" + (i & 7);
                         store.set(name, (long) i);
                         Object read = store.get(name);
                         if (!Long.valueOf(i).equals(read)) {
                             throw new AssertionError(name + " was " + read + ", not " + i);
                         }
                         store.add("counter::" + (id & 1) + "::n", new Object[] {1L});
-                        store.addToList("shared::" + id + "::list", new Object[] {"x"});
-                        store.deleteList("shared::" + id + "::list");
+                        store.addToList("shared::t" + id + "::list", new Object[] {"x"});
+                        store.deleteList("shared::t" + id + "::list");
                         store.set(name, null);
                     }
                 } catch (Throwable e) {
