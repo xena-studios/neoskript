@@ -39,8 +39,8 @@ import java.util.regex.Pattern;
  */
 public final class NeoSkriptProxyScenario implements Scenario {
 
-    private static final Duration WAIT = Duration.ofMinutes(3);
-    private static final String REDIS_IMAGE =
+    static final Duration WAIT = Duration.ofMinutes(3);
+    static final String REDIS_IMAGE =
             "redis@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952";
     private static final List<String[]> ORIGINALS = List.of(
             new String[] {"https://cdn.modrinth.com/data/HaSv4ey2/versions/awO490UD/SkProxy-2.4.jar",
@@ -228,7 +228,7 @@ public final class NeoSkriptProxyScenario implements Scenario {
     }
 
     /** Starts a server and waits until it's up, closing it if it doesn't come up. */
-    private static ServerProcess started(ServerBuilder builder, Pattern allowedFailure) throws Exception {
+    static ServerProcess started(ServerBuilder builder, Pattern allowedFailure) throws Exception {
         ServerProcess server = builder.start();
         try {
             if (allowedFailure != null) {
@@ -242,7 +242,7 @@ public final class NeoSkriptProxyScenario implements Scenario {
         }
     }
 
-    private static boolean dockerAvailable() {
+    static boolean dockerAvailable() {
         try {
             Process process = new ProcessBuilder("docker", "info").redirectErrorStream(true).start();
             process.getInputStream().readAllBytes();
@@ -253,7 +253,7 @@ public final class NeoSkriptProxyScenario implements Scenario {
     }
 
     /** A bot joins through the proxy from server {@code via}'s bot plugin, for {@code server}'s forced host. */
-    private static void join(ServerProcess via, ServerProcess server, String name, int proxyPort, String serverName)
+    static void join(ServerProcess via, ServerProcess server, String name, int proxyPort, String serverName)
             throws Exception {
         int mark = server.mark();
         via.command("bot connect " + name + " " + proxyPort + " " + serverName + ".test");
@@ -335,7 +335,7 @@ public final class NeoSkriptProxyScenario implements Scenario {
                 """.formatted(redisPort);
     }
 
-    private static void awaitRedis(String container) throws Exception {
+    static void awaitRedis(String container) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
         while (System.nanoTime() < deadline) {
             if (docker("logs", container).contains("Ready to accept connections")) {
@@ -346,7 +346,7 @@ public final class NeoSkriptProxyScenario implements Scenario {
         throw new HarnessFailure("Redis didn't start in Docker");
     }
 
-    private static String docker(String... arguments) throws IOException, InterruptedException {
+    static String docker(String... arguments) throws IOException, InterruptedException {
         List<String> command = new ArrayList<>(List.of("docker"));
         command.addAll(List.of(arguments));
         Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
@@ -360,7 +360,7 @@ public final class NeoSkriptProxyScenario implements Scenario {
         return output;
     }
 
-    private static Pattern line(String text) {
+    static Pattern line(String text) {
         return Pattern.compile(Pattern.quote(text) + "$");
     }
 }
