@@ -2,6 +2,10 @@
 on network message on channel "events":
 	send "[neotest] got %network message% from %network sender% on %network channel%" to console
 
+# A last message as the server stops: it still reaches Redis.
+on unload:
+	send redis message "bye" to channel "net"
+
 command /neotest:
 	trigger:
 		set {_servers::*} to the network servers
