@@ -308,6 +308,11 @@ public final class SqlVariableStorage implements VariableBackend {
     private final Console console;
     private final Path pendingFile;
     private final Path unloadedFile;
+    /**
+     * With merging: this run's update_guid, kept so the next start of this server removes this run's marker row if
+     * it didn't (a crash). Only a marker's own server removes it: another may still need it to settle a commit.
+     */
+    private final Path runFile;
     /** Which database this is, for the pending files: never the password. */
     private final String identity;
     /** Skript's {@code update_guid}: which server wrote a row. One per start. */
@@ -351,7 +356,15 @@ public final class SqlVariableStorage implements VariableBackend {
     /** A transaction whose commit wasn't answered, until the marker row says whether it committed. */
     private Uncertain uncertain;
 
-    private record Uncertain(long number, Resolution resolution, List<Op> letGoOf) {}
+    /** @param connection on MySQL, the server's id for the connection the commit was sent on, or 0 */
+    private record Uncertain(long number, Resolution resolution, List<Op> letGoOf, long connection) {}
+
+    /** On MySQL, the connection {@link #connectionId} is for, and its id. Only touched on the database's thread. */
+    private Connection idFor;
+    private long connectionId;
+
+    /** For tests: connecting fails, as if the database couldn't be reached. */
+    volatile boolean unreachable;
 
     /** Whether the last write round wrote everything it found changed, nothing left for the next. */
     private volatile boolean lastRoundWhole = true;
@@ -449,6 +462,7 @@ public final class SqlVariableStorage implements VariableBackend {
         String base = settings.name().replaceAll("[^A-Za-z0-9_-]", "_") + "-" + hash(identity);
         this.pendingFile = pendingDir.resolve(base + ".pending.csv");
         this.unloadedFile = pendingDir.resolve(base + ".unloaded.csv");
+        this.runFile = pendingDir.resolve(base + ".run");
         this.console = console;
         ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(1, task -> {
             Thread t = new Thread(task, "NeoSkript database '" + settings.name() + "'");
@@ -737,6 +751,9 @@ public final class SqlVariableStorage implements VariableBackend {
                                 .replace(",", ", ").replaceAll("\\s+", " "), e.getSQLState(), e.getErrorCode(), e);
             }
             c.commit();
+            if (settings.merging()) {
+                forgetPreviousRun(c);
+            }
             try (Statement select = c.createStatement();
                     ResultSet rows = select.executeQuery("SELECT name, type, value, rowid, update_guid FROM "
                             + settings.table())) {
@@ -1379,6 +1396,7 @@ public final class SqlVariableStorage implements VariableBackend {
     private void commit(Resolution resolution, List<Op> letGoOf) throws SQLException {
         List<Op> write = resolution.write;
         long number = ++transactions;
+        long id = settings.merging() ? connectionId() : 0;
         if (settings.merging()) {
             for (Op op : write) {
                 List<Op> sent = attempts.computeIfAbsent(op.name(), k -> new ArrayList<>(1));
@@ -1410,13 +1428,68 @@ public final class SqlVariableStorage implements VariableBackend {
             }
         } catch (SQLException lost) {
             if (settings.merging()) {
-                uncertain = new Uncertain(number, resolution, letGoOf);
+                uncertain = new Uncertain(number, resolution, letGoOf, id);
             }
             throw lost;
         }
         for (Op op : write) {
             attempts.remove(op.name());
         }
+    }
+
+    /**
+     * Removes the marker row an earlier run of this server left (it crashed, or stopped with a commit unsettled):
+     * that run is gone, so nothing will settle with it. Then records this run's update_guid in {@link #runFile}, before
+     * this run writes anything, so the next start does the same for this one. A server that never starts again leaves
+     * its one small row.
+     */
+    private void forgetPreviousRun(Connection c) throws SQLException {
+        String previous = null;
+        try {
+            if (Files.exists(runFile)) {
+                previous = Files.readString(runFile, java.nio.charset.StandardCharsets.UTF_8).strip();
+            }
+        } catch (IOException e) {
+            console.warn("Couldn't read " + runFile + ": " + e.getMessage());
+        }
+        if (previous != null && !previous.isEmpty() && !previous.equals(guid)) {
+            try (PreparedStatement drop = c.prepareStatement("DELETE FROM " + settings.table() + " WHERE name = ?")) {
+                drop.setString(1, MARKER + previous);
+                drop.executeUpdate();
+            }
+            c.commit();
+        }
+        try {
+            Files.createDirectories(runFile.toAbsolutePath().getParent());
+            Files.writeString(runFile, guid, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            console.warn("Couldn't write " + runFile + ": " + e.getMessage() + ". If the server crashes, its marker row"
+                    + " in " + describe() + " stays.");
+        }
+    }
+
+    /** For tests: where this run's update_guid is kept. */
+    Path runFile() {
+        return runFile;
+    }
+
+    /** On MySQL, the server's id for the current connection (CONNECTION_ID()), or 0 if it can't be had. */
+    private long connectionId() {
+        if (settings.dialect() != Dialect.MYSQL || connection == null) {
+            return 0;
+        }
+        if (idFor != connection) {
+            long id = 0;
+            try (Statement query = connection.createStatement();
+                    ResultSet result = query.executeQuery("SELECT CONNECTION_ID()")) {
+                id = result.next() ? result.getLong(1) : 0;
+            } catch (SQLException e) {
+                // Unknown: a stalled commit is waited for instead of killed.
+            }
+            idFor = connection;
+            connectionId = id;
+        }
+        return connectionId;
     }
 
     /**
@@ -1453,6 +1526,17 @@ public final class SqlVariableStorage implements VariableBackend {
         }
         Uncertain was = uncertain;
         String number;
+        if (settings.dialect() == Dialect.MYSQL && was.connection() > 0 && was.connection() != connectionId()) {
+            // The commit's connection may be half-open, its transaction holding the marker's lock until the server
+            // notices, hours later. Killed, a transaction not yet committing is rolled back and lets go at once; a
+            // COMMIT already running still finishes, and the locked read below waits for it, so the answer stays
+            // exact. If killing isn't allowed (or it's gone already), the read just waits, as before.
+            try (Statement kill = connection.createStatement()) {
+                kill.execute("KILL " + was.connection());
+            } catch (SQLException notAllowed) {
+                // Waited for instead.
+            }
+        }
         // The marker is read under its lock: a commit that's slow rather than lost (still running on the database
         // when its answer timed out) holds that lock until it lands, so this waits for it instead of reading the
         // number before it. On MySQL, FOR UPDATE takes the lock (a gap lock if there's no row yet). SQLite lets a
@@ -2055,44 +2139,7 @@ public final class SqlVariableStorage implements VariableBackend {
         }
     }
 
-    /** How long another server's marker is left untouched before it's taken for a crashed server's, and removed. */
-    static volatile long markerAgeMillis = 24 * 60 * 60_000L;
-
-    /** Each hour's table position (time, rowid), to tell which markers haven't been written for a day. */
-    private final java.util.ArrayDeque<long[]> markerCheckpoints = new java.util.ArrayDeque<>();
-
-    /**
-     * Removes the markers of servers that stopped without removing theirs (a crash): a running server writes its
-     * marker again, at a new rowid, with every write, so one whose rowid is from {@link #markerAgeMillis} ago or more
-     * belongs to a server that hasn't written since. If that server is only down that long with a commit it never
-     * heard back about, it can't tell from the marker whether it committed, and checks the rows instead.
-     */
-    private void removeOldMarkers(long now) {
-        if (!settings.merging()) {
-            return;
-        }
-        long[] newest = markerCheckpoints.peekLast();
-        if (newest == null || now - newest[0] >= Math.min(markerAgeMillis, 60 * 60_000L)) {
-            markerCheckpoints.addLast(new long[] {now, lastRowId});
-        }
-        long[] oldest = markerCheckpoints.peekFirst();
-        if (oldest == null || now - oldest[0] < markerAgeMillis || markerCheckpoints.size() < 2) {
-            return;
-        }
-        markerCheckpoints.removeFirst();
-        try (PreparedStatement clean = connection.prepareStatement("DELETE FROM " + settings.table()
-                + " WHERE name LIKE '" + MARKER + "%' AND name <> ? AND rowid < ?")) {
-            clean.setString(1, markerName());
-            clean.setLong(2, oldest[1]);
-            clean.executeUpdate();
-            connection.commit();
-        } catch (SQLException e) {
-            rollbackQuietly();
-        }
-    }
-
     private void runCleanups(long now) {
-        removeOldMarkers(now);
         while (!cleanups.isEmpty() && cleanups.getFirst()[0] <= now) {
             long below = cleanups.removeFirst()[1];
             if (below < 0) {
@@ -2594,6 +2641,9 @@ public final class SqlVariableStorage implements VariableBackend {
     // ---- Connections ---------------------------------------------------------------------------------------------
 
     private Connection connect() throws SQLException {
+        if (unreachable) {
+            throw new SQLException("unreachable, for a test", "08001");
+        }
         Driver driver = driver(settings.dialect());
         Properties properties = new Properties();
         String url;

@@ -1446,4 +1446,74 @@ class SqlVariableStorageTest {
     void aSlowCommitThatNeverLandsIsWrittenAgainOnce() throws Exception {
         stalledCommit(false);
     }
+
+    @Test
+    void aServerCutOffWithACommitUnsettledFindsItsMarkerWhenBack() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 10L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            // b's commit (60, and an append) lands but the answer is lost, and b can't reach the database for a while.
+            b.loseNextReply = true;
+            two.add("coins", new Object[] {50L});
+            two.addToList("queue", new Object[] {text("alice")});
+            waitFor(() -> !b.loseNextReply);
+            b.unreachable = true;
+            waitFor(() -> Long.valueOf(60).equals(one.get("coins")));
+            // Meanwhile a adds 5 on top and keeps watching the table: b's marker is b's alone to remove.
+            one.add("coins", new Object[] {5L});
+            a.save();
+            Thread.sleep(1_000);
+            assertTrue(rows().containsKey(SqlVariableStorage.MARKER + guidOf(b)), "b's marker is still there");
+            b.unreachable = false;
+            waitFor(() -> b.status().state() == SqlVariableStorage.State.CONNECTED);
+            waitFor(() -> Long.valueOf(65).equals(two.get("coins")));
+            Thread.sleep(1_000);
+            assertEquals(65L, one.get("coins"));
+            assertEquals(65L, two.get("coins"));
+            assertEquals(65L, saved("coins"));
+            assertEquals(1, one.list("queue").length);
+            assertEquals(1, two.list("queue").length);
+        }
+    }
+
+    /** A storage's update_guid, as its run file keeps it. */
+    private String guidOf(SqlVariableStorage storage) throws SQLException {
+        String run;
+        try {
+            run = Files.readString(storage.runFile()).strip();
+        } catch (IOException e) {
+            throw new SQLException(e);
+        }
+        return run;
+    }
+
+    @Test
+    void aCrashedRunsMarkerIsRemovedWhenTheServerNextStarts() throws Exception {
+        VariableStore store = new VariableStore();
+        Path runFile;
+        try (SqlVariableStorage storage = storage(store, true)) {
+            storage.load();
+            runFile = storage.runFile();
+        }
+        // A run that crashed: its update_guid kept, its marker row left behind.
+        Files.writeString(runFile, "crashed-run");
+        try (Connection c = open(); PreparedStatement p = c.prepareStatement(
+                "INSERT INTO variables21 (name, type, value, update_guid) VALUES (?, '7', NULL, 'crashed-run')")) {
+            p.setString(1, SqlVariableStorage.MARKER + "crashed-run");
+            p.executeUpdate();
+        }
+        // Another server's marker is never touched.
+        try (Connection c = open(); PreparedStatement p = c.prepareStatement(
+                "INSERT INTO variables21 (name, type, value, update_guid) VALUES (?, '3', NULL, 'other')")) {
+            p.setString(1, SqlVariableStorage.MARKER + "other");
+            p.executeUpdate();
+        }
+        try (SqlVariableStorage storage = storage(new VariableStore(), true)) {
+            storage.load();
+            assertFalse(rows().containsKey(SqlVariableStorage.MARKER + "crashed-run"));
+            assertTrue(rows().containsKey(SqlVariableStorage.MARKER + "other"));
+            assertFalse(Files.readString(runFile).strip().equals("crashed-run"), "this run's own is kept now");
+        }
+    }
 }
