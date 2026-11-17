@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # A newer push supersedes an older run, on main too: only the newest commit's results matter.
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -41,7 +42,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [paper-1.21.4, paper-26.3, folia-1.21.4, folia-26.3]
+        # Pull requests check the newest Paper and Folia; main checks all four after the merge.
+        env: ${{ fromJSON(github.event_name == 'pull_request' && '["paper-26.3","folia-26.3"]' || '["paper-1.21.4","paper-26.3","folia-1.21.4","folia-26.3"]') }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
