@@ -1,0 +1,12 @@
+# Checks: which error a line keeps when what's in brackets fails (issue #79). Where no words may go ('%~objects%'),
+# Skript throws away what parsing the brackets logged; a literal with its type given names a type that isn't one.
+
+function bracketed_errors():
+	set {_t} to "x"
+	set {_i::*} to indices of ({_t} transformed using [input, input])
+	set {_i::*} to indices of (recursive {_t})
+	set {_i::*} to indices of (5)
+	set {_i::*} to {_t} transformed using [input]
+	set {_i::*} to ({_t} transformed using [input])
+	set {_i::*} to stone (not a type)
+	set {_i::*} to indices of (the 5)
