@@ -6,5 +6,6 @@ folia: probes/world # The console runs on Folia's global thread, which can't rea
 # Varies in Skript: the differential counts these as identical, as NeoSkript gives one of Skript's results.
 examples/ExprLocationAt-1 # 'the world arg-4' in 16 of 29 runs of Skript, 'arg-4' in 13; NeoSkript gives 'arg-4'. Which error Skript keeps depends on its order of syntax tied on priority and complexity (by identity hash code: ExprLocation's 'location %directions% [%location%]' before ExprLocationAt gives 'the world arg-4', through 'X of %itemtypes...%' reading 'the world arg-4' first) and on its expression parse cache
 examples/ExprLowestHighestSolidBlock-2 # An error for 'set the highest solid block at the player's location to the lowest solid block at the player's location' in 4 of 6 runs of Skript, none in 2; NeoSkript gives none. Which reading of the value Skript tries first changes from run to run
+examples/ExprPassenger-1 # 'vehicle of the passenger of the player can only be set to one class ...EntityData, not more' in 3 of 6 runs of Skript, not in the others; NeoSkript doesn't give it. Which reading Skript tries first changes from run to run
 
 # Not matched yet: still to do, not impossible.

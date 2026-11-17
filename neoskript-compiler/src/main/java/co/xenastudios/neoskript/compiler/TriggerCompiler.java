@@ -1411,6 +1411,15 @@ final class TriggerCompiler {
             case Statement.Conditions conditions -> conditions.conditions();
             default -> List.of();
         };
+        if (currentStatement instanceof Statement.Call call) {
+            // A function called on its own line: what's in its arguments.
+            for (Expr argument : call.call().arguments()) {
+                String found = argument == null ? null : textIn(argument, target);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
         for (ParsedSyntax root : roots) {
             if (root == target) {
                 return source.strip();
@@ -3092,6 +3101,12 @@ final class TriggerCompiler {
             // isn't there is the line's error first, the last written first ('set ... of player's tool to 10').
             List<Object> values = effect.match().values();
             for (int i = values.size() - 1; i >= 0; i--) {
+                if (i == mode.value && values.get(mode.target) instanceof Expr.Variable
+                        && values.get(i) instanceof Expr.Syntax words && eventLiteral(words) != null) {
+                    // Words a variable is set to, naming an event value that isn't there: Skript's unparsed literal
+                    // reads them as a value instead ('set {_b} to block' in a function is the type).
+                    continue;
+                }
                 checkEventValues(values.get(i));
             }
             changeAll(effect, mode);
@@ -3197,7 +3212,14 @@ final class TriggerCompiler {
             return;
         }
         if (mode != CoreSyntax.ChangeMode.DELETE) {
-            expression((Expr) effect.match().values().get(mode.value));
+            // A variable takes any value: words an element that isn't there is written with are read as a value.
+            List<String> outerLiteralTypes = literalTypes;
+            literalTypes = List.of(SyntaxRegistry.OBJECT);
+            try {
+                expression((Expr) effect.match().values().get(mode.value));
+            } finally {
+                literalTypes = outerLiteralTypes;
+            }
         }
         String nameValue = "(" + STRING_DESC + OBJECT_DESC + ")V";
         String nameValues = "(" + STRING_DESC + OBJECTS + ")V";
@@ -3525,6 +3547,15 @@ final class TriggerCompiler {
             throws CompileException {
         Changeable.Mode changeMode = changeMode(effect, mode);
         TypeChange typed = typeChange(target, changeMode);
+        if (typed == null && (changeMode == Changeable.Mode.DELETE || changeMode == Changeable.Mode.RESET)
+                && target instanceof Expr.Syntax value && isCore(value.syntax(), CoreSyntax.EVENT_VALUE)
+                && valueType(target) != null && !valueType(target).equals(SyntaxRegistry.OBJECT)) {
+            // Skript's event value is changed by the event's changer for it, else by its type's: with neither, it
+            // can't be, named as Skript's event value names itself ('event-item stack can't be deleted').
+            TypeRef ref = registry.resolveType(valueType(target));
+            String name = ref == null ? valueType(target) : ref.type().name();
+            throw new CompileException(line, cannotChange("event-" + name, changeMode));
+        }
         if (typed == null) {
             // No type says what its values take: they're checked when it runs, if anything might change them.
             if (!lax || !Values.hasChanger(changeMode)) {
@@ -4804,7 +4835,10 @@ final class TriggerCompiler {
                 continue;
             }
             List<String> outerLiteralTypes = literalTypes;
+            boolean outerWordsRefused = wordsRefused;
             literalTypes = literalTypesFor(syntax, values, i, specs[i]);
+            // Where only what changes goes ('%~objects% is set'), Skript takes no words as they are.
+            wordsRefused = specs[i].changeableOnly();
             try {
                 if (specs[i].time() != 0) {
                     timedArgument(expr, specs[i].time());
@@ -4813,6 +4847,7 @@ final class TriggerCompiler {
                 }
             } finally {
                 literalTypes = outerLiteralTypes;
+                wordsRefused = outerWordsRefused;
             }
             Class<?> target = conversionTarget(specs[i]);
             if (target != null) {
@@ -5170,8 +5205,16 @@ final class TriggerCompiler {
         eventValue(getter);
     }
 
+    /** Whether the placeholder being compiled is one only what changes goes in, which takes no words. */
+    private boolean wordsRefused;
+
     /** Whether the value being compiled is for a placeholder that takes any object, like a comparison's. */
     private boolean objectsPlaceholder() {
+        // A text's %...% takes no words as they are, as Skript's: there the element's error stands. Nor does a
+        // placeholder for what changes.
+        if (textPart != null || wordsRefused) {
+            return false;
+        }
         return literalTypes.stream().map(registry::resolveType)
                 .anyMatch(ref -> ref != null && ref.type().id().equals(SyntaxRegistry.OBJECT));
     }
@@ -5217,10 +5260,10 @@ final class TriggerCompiler {
         if (value != null) {
             return value;
         }
-        // A type's name alone is the type, as Skript's type literals.
+        // A type's name alone is the type, as Skript's type literals, shown by its name as Skript shows it.
         TypeRef type = registry.resolveType(words);
         Class<?> javaClass = type == null || type.plural() ? null : library.javaClass(type.type().id());
-        return javaClass == null ? null : new co.xenastudios.neoskript.runtime.TypeValue(type.type().id(), javaClass);
+        return javaClass == null ? null : new co.xenastudios.neoskript.runtime.TypeValue(type.type().name(), javaClass);
     }
 
     /** Whether {@code factory} sets {@code syntax}'s element up where it is, its warnings dropped. */
@@ -6322,6 +6365,10 @@ final class TriggerCompiler {
         if (!co.xenastudios.neoskript.frontend.parse.Plurality.single(expr, registry)) {
             return false;
         }
+        if (co.xenastudios.neoskript.frontend.parse.Plurality.alwaysSingle(expr)) {
+            // One value whatever it's given: 'join {_l::*}'.
+            return true;
+        }
         if (expr instanceof Expr.Syntax syntax) {
             for (Object argument : syntax.syntax().match().values()) {
                 if (argument instanceof Expr inner && !surelySingle(inner)) {
@@ -6937,9 +6984,16 @@ final class TriggerCompiler {
 
     /** Whether the expression's element keeps its values' indices ({@link KeyAware}). */
     private boolean keyAware(Expr.Syntax syntax) {
-        return !(library.binding(syntax.syntax().syntax()) instanceof Library.Core)
-                && library.binding(syntax.syntax().syntax()) instanceof ElementFactory<?> factory
-                && factory.create(info(syntax.syntax())) instanceof KeyAware;
+        if (library.binding(syntax.syntax().syntax()) instanceof Library.Core
+                || !(library.binding(syntax.syntax().syntax()) instanceof ElementFactory<?> factory)) {
+            return false;
+        }
+        try {
+            return factory.create(info(syntax.syntax())) instanceof KeyAware;
+        } catch (co.xenastudios.neoskript.api.element.SyntaxError notHere) {
+            // It can't be set up here: that's for compiling it to say, or to read its words instead.
+            return false;
+        }
     }
 
     private void keyed(Expr expr) throws CompileException {

@@ -1,0 +1,16 @@
+# Checks: deleting an event value with no changer for it, as Skript refuses it (issue #37).
+
+on consume:
+	delete event-item
+
+on drop:
+	delete event-item
+
+on pick up:
+	delete event-item
+
+on load:
+	delete event-item
+
+on inventory click:
+	delete event-item

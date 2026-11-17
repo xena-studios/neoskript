@@ -1,0 +1,20 @@
+# Checks: words for event values that aren't there (issue #37), in events and a command. Where words are taken as
+# they are, they're the type they name, with no error; in a text's %...% the error stands.
+
+on chat:
+	set {_c} to block
+	set {_d} to damage cause
+	send "%damage cause%" to player
+	loop blocks in radius 2 of block:
+		broadcast "z"
+
+on join:
+	set {_e} to executor
+	teleport player to block
+
+command /barewordsa:
+	trigger:
+		set {_b} to block
+		set {_d} to damage cause
+		send "%{_b}% %{_d}%" to console
+		send "%damage cause%" to console

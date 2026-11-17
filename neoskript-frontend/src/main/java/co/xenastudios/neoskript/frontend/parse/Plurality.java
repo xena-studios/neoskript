@@ -29,6 +29,9 @@ public final class Plurality {
     /** Element id to {@code S} (always one value), {@code P} (always several) or {@code A} (as its arguments). */
     private static final Map<String, Character> KNOWN = load();
 
+    /** Skript's join and split: a join is one text whatever it joins, a split several. */
+    private static final String JOIN_SPLIT = "ExprJoinSplit";
+
     private Plurality() {}
 
     public static boolean plural(Expr expr, SyntaxRegistry registry) {
@@ -60,6 +63,10 @@ public final class Plurality {
                 }
             }
             return count > 1;
+        }
+        if (id.equals(JOIN_SPLIT)) {
+            // Skript's isSingle(): a join is one text, a split several.
+            return syntax.pattern() != 0;
         }
         int dash = id.indexOf('-');
         Character known = KNOWN.get(dash < 0 ? id : id.substring(0, dash));
@@ -106,6 +113,9 @@ public final class Plurality {
             case Expr.FunctionCall call -> call.function() != null && !call.function().returnsPlural();
             case Expr.Syntax syntax -> {
                 String id = syntax.syntax().syntax().id();
+                if (id.equals(JOIN_SPLIT)) {
+                    yield syntax.syntax().pattern() == 0;
+                }
                 int dash = id.indexOf('-');
                 Character known = KNOWN.get(dash < 0 ? id : id.substring(0, dash));
                 yield known != null && (known == 'S' || known == 'A' && !plural(syntax.syntax(), registry))
@@ -113,6 +123,23 @@ public final class Plurality {
             }
             case null, default -> false;
         };
+    }
+
+    /**
+     * Whether {@code expr} is an element that's always one value whatever its arguments are, as Skript's
+     * {@code isSingle()} has it: a join of a list is one text.
+     */
+    public static boolean alwaysSingle(Expr expr) {
+        if (!(expr instanceof Expr.Syntax syntax)) {
+            return false;
+        }
+        String id = syntax.syntax().syntax().id();
+        if (id.equals(JOIN_SPLIT)) {
+            return syntax.syntax().pattern() == 0;
+        }
+        int dash = id.indexOf('-');
+        Character known = KNOWN.get(dash < 0 ? id : id.substring(0, dash));
+        return known != null && known == 'S';
     }
 
     private static boolean pluralSpec(PlaceholderSpec spec, SyntaxRegistry registry) {
