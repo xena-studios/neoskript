@@ -486,7 +486,10 @@ public final class ScriptLoader {
      */
     private String knownTypes(String pattern, int line, List<Pending> problems) {
         Matcher placeholder = PLACEHOLDER.matcher(pattern);
+        // A loop of find() and append(), not appendReplacement(): TeaVM, which builds the browser parser, has no
+        // appendReplacement or appendTail.
         StringBuilder known = new StringBuilder();
+        int copied = 0;
         while (placeholder.find()) {
             StringBuilder types = new StringBuilder();
             for (String type : placeholder.group(2).split("/", -1)) {
@@ -501,9 +504,11 @@ public final class ScriptLoader {
                     types.append(type);
                 }
             }
-            placeholder.appendReplacement(known, Matcher.quoteReplacement("%" + placeholder.group(1) + types + "%"));
+            known.append(pattern, copied, placeholder.start()).append('%').append(placeholder.group(1)).append(types)
+                    .append('%');
+            copied = placeholder.end();
         }
-        placeholder.appendTail(known);
+        known.append(pattern, copied, pattern.length());
         return known.toString();
     }
 
