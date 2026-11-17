@@ -113,6 +113,7 @@ public final class SyntaxRegistry {
         this.skriptConversions = Frozen.map(skriptConversions);
         this.timed = Frozen.set(builder.timed);
         this.anyTyped = Frozen.set(builder.anyTyped);
+        this.pluralAsArguments = Frozen.set(builder.pluralAsArguments);
         this.describer = builder.describer;
         this.typer = builder.typer;
         this.enumerableTypes = Frozen.set(builder.enumerableTypes);
@@ -186,6 +187,7 @@ public final class SyntaxRegistry {
 
     private final Set<String> timed;
     private final Set<String> anyTyped;
+    private final Set<String> pluralAsArguments;
     private final Describer describer;
     private final Typer typer;
 
@@ -231,6 +233,14 @@ public final class SyntaxRegistry {
     /** Whether Skript registers expression {@code id} as returning any type ({@link Builder#anyType}). */
     public boolean isAnyTyped(String id) {
         return anyTyped.contains(id);
+    }
+
+    /**
+     * Whether expression {@code id} is several values when a plural argument of it is, as Skript's property
+     * expressions are ({@link Builder#pluralAsArguments}).
+     */
+    public boolean isPluralAsArguments(String id) {
+        return pluralAsArguments.contains(id);
     }
     /** Skript's types, by NeoSkript's ids, between which {@link #skriptConversions} says what's taken as what. */
     private final Set<String> skriptTypes;
@@ -980,6 +990,17 @@ public final class SyntaxRegistry {
         }
 
         private final Set<String> anyTyped = new HashSet<>();
+
+        /**
+         * Marks expression {@code id} as several values when a plural argument of it is several values, as Skript's
+         * property expressions ({@code names of {_players::*}}); without it, syntax Skript doesn't have is one value.
+         */
+        public Builder pluralAsArguments(String id) {
+            pluralAsArguments.add(id);
+            return this;
+        }
+
+        private final Set<String> pluralAsArguments = new HashSet<>();
 
         /**
          * How syntax writes itself in errors, as Skript's {@code toString}: given a syntax element, how it was

@@ -342,6 +342,14 @@ final class LineParser {
                 problem(input.substring(nested.start(), nested.end()).strip() + " does not support nested structures.");
                 continue;
             }
+            // Indices and a recursive size only of a list variable, as Skript's init refuses anything else, so the
+            // parser tries the next way to read the line: '(indices of {_n::*}, size of {_n::*})' is two values, the
+            // indices and the size, not the indices of a list of both (issue #33).
+            String listOnly = listOnlyProblem(syntax.id(), parsed);
+            if (listOnly != null) {
+                problem(listOnly);
+                continue;
+            }
             // 'all colours' only for types whose values can be listed; 'all players' is something else's.
             if (syntax.id().equals("ExprSets") && !parsed.match().regexValues().isEmpty()
                     && !(parsed.match().regexValues().getFirst() instanceof TypeRef ref && registry.isEnumerable(ref.type().id())
@@ -692,18 +700,36 @@ final class LineParser {
 
     /** Skript's warnings about the lists in what was parsed of this line, added to the line's warnings. */
     void listWarnings(Object parsed) {
-        listWarnings(input, parsed, warnings, registry);
+        listWarnings(input, parsed, warnings, registry, bracketedLists);
+    }
+
+    /** Skript's warnings about the lists in what was parsed of this line, added to {@code into}. */
+    void listWarnings(Object parsed, java.util.Set<String> into) {
+        listWarnings(input, parsed, into, registry, bracketedLists);
     }
 
     static void listWarnings(String input, Object parsed, java.util.Set<String> into) {
-        listWarnings(input, parsed, into, null);
+        listWarnings(input, parsed, into, null, java.util.Set.of());
     }
+
+    /**
+     * Lists read as all that's in a pair of brackets ('(1, 2)'), by identity. Skript's parser reads those again on
+     * their own and throws that parse's warnings away, so they don't warn; a list that is the argument of syntax in
+     * brackets ('(size of {_a::*}, 2)'), or in a pattern's own brackets, still does.
+     */
+    private final java.util.Set<Expr.ListOf> bracketedLists =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 
     /**
      * Skript's warnings about the lists in {@code parsed}, whose positions are in {@code input}: a list of more
      * than one value joined only by commas, which is an 'and' list, and one with both 'and' and 'or'.
      */
     static void listWarnings(String input, Object parsed, java.util.Set<String> into, SyntaxRegistry registry) {
+        listWarnings(input, parsed, into, registry, java.util.Set.of());
+    }
+
+    private static void listWarnings(String input, Object parsed, java.util.Set<String> into, SyntaxRegistry registry,
+            java.util.Set<Expr.ListOf> bracketed) {
         switch (parsed) {
             case ParsedSyntax syntax -> {
                 // An addon's call whose arguments Skript parses as a function's (skript-reflect's Java calls): its
@@ -711,22 +737,25 @@ final class LineParser {
                 boolean quiet = registry != null && registry.quietLists(syntax.syntax().id());
                 for (Object value : syntax.match().values()) {
                     if (quiet && value instanceof Expr.ListOf list) {
-                        list.items().forEach(item -> listWarnings(input, item, into, registry));
+                        list.items().forEach(item -> listWarnings(input, item, into, registry, bracketed));
                     } else {
-                        listWarnings(input, value, into, registry);
+                        listWarnings(input, value, into, registry, bracketed);
                     }
                 }
-                syntax.match().regexValues().forEach(value -> listWarnings(input, value, into, registry));
+                syntax.match().regexValues().forEach(value -> listWarnings(input, value, into, registry, bracketed));
             }
-            case Expr.Syntax syntax -> listWarnings(input, syntax.syntax(), into, registry);
+            case Expr.Syntax syntax -> listWarnings(input, syntax.syntax(), into, registry, bracketed);
             case Expr.ListOf list -> {
-                listWarning(input, list, into, registry);
-                list.items().forEach(item -> listWarnings(input, item, into, registry));
+                if (!bracketed.contains(list)) {
+                    listWarning(input, list, into, registry);
+                }
+                list.items().forEach(item -> listWarnings(input, item, into, registry, bracketed));
             }
             // Skript throws away the warnings parsing function arguments gives.
             case Expr.FunctionCall call -> {}
-            case Expr.Text text -> text.embedded().forEach(part -> listWarnings(input, part, into, registry));
-            case Expr.Variable variable -> variable.embedded().forEach(part -> listWarnings(input, part, into, registry));
+            case Expr.Text text -> text.embedded().forEach(part -> listWarnings(input, part, into, registry, bracketed));
+            case Expr.Variable variable ->
+                    variable.embedded().forEach(part -> listWarnings(input, part, into, registry, bracketed));
             case null, default -> {}
         }
     }
@@ -1156,6 +1185,50 @@ final class LineParser {
         return result instanceof Expr expr ? expr : null;
     }
 
+    /**
+     * Skript's error for indices or a recursive size of something that isn't a list variable, or {@code null} if it
+     * is one: NeoSkript's compiler only works on list variables there, and Skript's init refuses most else.
+     */
+    private String listOnlyProblem(String id, ParsedSyntax parsed) {
+        boolean indices = id.equals("ExprIndices");
+        if (!indices && !id.equals("ExprAmount-recursive")) {
+            return null;
+        }
+        Object value = parsed.match().values().isEmpty() ? null : parsed.match().values().getFirst();
+        if (value instanceof Expr argument && listVariable(argument)) {
+            return null;
+        }
+        if (indices) {
+            return "The indices expression may only be used with keyed expressions";
+        }
+        if (!(value instanceof Expr argument)) {
+            return null;
+        }
+        String written = input.substring(argument.start(), argument.end()).strip();
+        if (Plurality.single(argument, registry)) {
+            return "'" + written + "' can only ever have one value at most, thus the 'recursive size of ...' expression"
+                    + " is useless. Use '... exists' instead to find out whether the expression has a value.";
+        }
+        List<Expr> items = argument instanceof Expr.ListOf list ? list.items() : List.of(argument);
+        for (Expr item : items) {
+            if (!(item instanceof Expr.Variable)) {
+                return "Getting the recursive size of a list only applies to variables, thus the '"
+                        + input.substring(item.start(), item.end()).strip() + "' expression is useless.";
+            }
+        }
+        return null;
+    }
+
+    /** Whether {@code expr} is a list variable, or {@code keyed} of one. */
+    private static boolean listVariable(Expr expr) {
+        if (expr instanceof Expr.Syntax keyed && keyed.syntax().syntax().id().equals("ExprKeyed")
+                && !keyed.syntax().match().values().isEmpty()
+                && keyed.syntax().match().values().getFirst() instanceof Expr inner) {
+            expr = inner;
+        }
+        return expr instanceof Expr.Variable variable && variable.list();
+    }
+
     private Expr parseExpression(int start, int end, Expected expected) {
         if (start >= end) {
             return null;
@@ -1319,6 +1392,12 @@ final class LineParser {
             // unparsed literal that keeps them.
             Problems before = expected.anything() ? null : problems();
             Expr inner = expression(start + 1, end - 1, expected);
+            if (inner instanceof Expr.ListOf list) {
+                // A copy, so only this reading of the list is the bracketed one: see bracketedLists.
+                Expr.ListOf copy = new Expr.ListOf(list.start(), list.end(), list.items(), list.and(), list.type());
+                bracketedLists.add(copy);
+                return copy;
+            }
             if (inner != null) {
                 return inner;
             }
