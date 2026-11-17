@@ -113,6 +113,7 @@ A trigger waiting on a request while its script is reloaded carries on with its 
 | `timeout-seconds` | 30 | How long a request may take, redirects and the whole answer included. After it, the trigger carries on with an error. |
 | `connect-timeout-seconds` | 10 | How long connecting may take. |
 | `max-response-kilobytes` | 8192 | The largest answer kept (8 MB), after unpacking a compressed one. A bigger one is cut off, with an error. |
+| `max-response-memory-megabytes` | 128 | The memory all answers being read may take between them. A request whose answer would go past it fails, so many big answers at once can't fill the server's memory. |
 | `max-redirects` | 5 | How many redirects a request follows. |
 | `max-requests-in-flight` | 64 | How many requests can wait for an answer at once, from all scripts. Past it, a request fails at once. |
 | `max-requests-per-minute` | 1200 | How many requests scripts can start in a minute, all together. Past it, a request fails at once. |
@@ -120,12 +121,12 @@ A trigger waiting on a request while its script is reloaded carries on with its 
 
 ## Security
 
-- **Answers can't take the server down.** One bigger than `max-response-kilobytes`, packed or unpacked (a "gzip bomb"), is cut off as it arrives, and its connection closed. One that never ends, or trickles in, stops at `timeout-seconds`. Neither Reqn nor skJson had a limit on either, so a hostile or broken server could fill the server's memory or hold a trigger forever.
+- **Answers can't take the server down.** One bigger than `max-response-kilobytes`, packed or unpacked (a "gzip bomb"), is cut off as it arrives, and its connection closed. Each answer is read into one buffer, sized from its `Content-Length` when it has one, and all answers being read share `max-response-memory-megabytes`. One that never ends, or trickles in, stops at `timeout-seconds`. Neither Reqn nor skJson had a limit on either, so a hostile or broken server could fill the server's memory or hold a trigger forever.
 - **Hostile JSON:** JSON nested more than 255 deep isn't parsed; it's left as text. Mapping JSON into variables stops 60 levels down.
 - **Floods:** `max-requests-in-flight` and `max-requests-per-minute` stop a loop from hammering an API or the server's network. The console gets at most 10 of the addon's warnings every 10 seconds, then a count of the ones left out.
-- **Requests to private addresses (SSRF)** are allowed by default. Scripts are written by the server's staff, and often talk to services on the same machine or network. If scripts send requests to addresses players choose, turn on `block-private-addresses`. Then requests to `localhost`, `10.x`, `172.16-31.x`, `192.168.x`, link-local addresses (`169.254.x`, where cloud servers keep their metadata), carrier-grade NAT and their IPv6 equivalents are refused. Every address a host name has is checked, at every redirect. The check is made before connecting, so a host whose DNS answer changes in between could still get through. If players choose the addresses, keep them on a list of allowed hosts too.
+- **Requests to private addresses (SSRF)** are allowed by default. Scripts are written by the server's staff, and often talk to services on the same machine or network. If scripts send requests to addresses players choose, turn on `block-private-addresses`. Then requests to `localhost`, `10.x`, `172.16-31.x`, `192.168.x`, link-local addresses (`169.254.x`, where cloud servers keep their metadata), carrier-grade NAT and their IPv6 equivalents are refused, as are private IPv4 addresses inside IPv6 ones (`::ffff:`, NAT64's `64:ff9b::`, 6to4's `2002::`). Every address a host name has is checked, at every redirect, on threads of their own, so a slow DNS server doesn't hold up other requests. The check is made before connecting, so a host whose DNS answer changes in between could still get through. If players choose the addresses, keep them on a list of allowed hosts too.
 - **Only `http://` and `https://`.** Any other address is a runtime error.
-- **Redirects** never go from https to http, and `Authorization`, `Cookie` and `Proxy-Authorization` headers aren't sent on to another host.
+- **Redirects** never go from https to http, and `Authorization`, `Cookie` and `Proxy-Authorization` headers aren't sent on to another scheme, host or port, as curl decides since CVE-2022-27776.
 - **TLS:** HTTPS certificates are checked against Java's trusted certificates, and there's no setting to turn that off. A certificate that doesn't check out, or any other TLS failure, is a runtime error saying why.
 
 ## Where it differs from the originals

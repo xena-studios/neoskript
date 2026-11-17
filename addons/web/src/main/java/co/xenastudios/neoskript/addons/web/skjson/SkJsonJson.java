@@ -255,7 +255,7 @@ public final class SkJsonJson {
             if (response.status() > 400) {
                 return null;
             }
-            return Json.parseOrText(new String(response.body(), response.charset()));
+            return Json.parseOrText(response.text(response.charset()));
         });
     }
 

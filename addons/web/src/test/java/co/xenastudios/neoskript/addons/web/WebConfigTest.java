@@ -43,8 +43,10 @@ class WebConfigTest {
                 max-requests-in-flight: 1
                 max-requests-per-minute: 10
                 block-private-addresses: true
+                max-response-memory-megabytes: 16
                 """, warnings);
-        assertEquals(new WebConfig(Duration.ofSeconds(5), Duration.ofSeconds(2), 64 * 1024, 0, 1, 10, true), config);
+        assertEquals(new WebConfig(Duration.ofSeconds(5), Duration.ofSeconds(2), 64 * 1024, 0, 1, 10, true,
+                16L * 1024 * 1024), config);
         assertEquals(List.of(), warnings);
     }
 
@@ -59,9 +61,10 @@ class WebConfigTest {
                 max-requests-in-flight: [1, 2]
                 max-requests-per-minute: 0
                 block-private-addresses: maybe
+                max-response-memory-megabytes: none
                 """, warnings);
         assertEquals(WebConfig.DEFAULTS, config);
-        assertEquals(7, warnings.size(), warnings.toString());
+        assertEquals(8, warnings.size(), warnings.toString());
         assertTrue(warnings.getFirst().startsWith("config.yml: timeout-seconds must be a whole number from 1 to 600"),
                 warnings.getFirst());
     }

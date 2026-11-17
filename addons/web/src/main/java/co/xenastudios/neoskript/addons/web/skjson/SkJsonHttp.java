@@ -235,7 +235,7 @@ public final class SkJsonHttp {
 
     /** What skJson keeps of an answer: the body as JSON where it parses, and the headers as JSON. */
     private static SkResponse response(WebResponse response) {
-        String text = new String(response.body(), response.charset());
+        String text = response.text(response.charset());
         JsonElement parsed = Json.parse(text);
         JsonObject headers = new JsonObject();
         response.headers().forEach((name, values) -> {

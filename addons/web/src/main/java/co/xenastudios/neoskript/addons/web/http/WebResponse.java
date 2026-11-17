@@ -19,9 +19,21 @@ import java.util.Map;
  * @param status the status code
  * @param uri where it came from, after redirects
  * @param headers its headers, names in lower case, sorted by name, each with its values in the order sent
- * @param body its body, unpacked if it was compressed
+ * @param body its body, unpacked if it was compressed, in the first {@code length} bytes; not copied, so not to be
+ *     changed
+ * @param length how many bytes of {@code body} are the body
  */
-public record WebResponse(int status, URI uri, Map<String, List<String>> headers, byte[] body) {
+public record WebResponse(int status, URI uri, Map<String, List<String>> headers, byte[] body, int length) {
+
+    /**
+     * The body as text.
+     *
+     * @param charset its charset
+     * @return the text
+     */
+    public String text(Charset charset) {
+        return new String(body, 0, length, charset);
+    }
 
     /**
      * The first value of a header.

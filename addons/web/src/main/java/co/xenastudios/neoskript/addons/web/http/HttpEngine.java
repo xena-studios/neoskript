@@ -6,7 +6,6 @@ package co.xenastudios.neoskript.addons.web.http;
 
 import co.xenastudios.neoskript.addons.web.WebConfig;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
@@ -37,6 +36,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -72,7 +73,12 @@ public final class HttpEngine implements AutoCloseable {
 
     private final WebConfig config;
     private final ThreadPoolExecutor executor;
+    /** Looks host names up for block-private-addresses, so a slow DNS server holds these threads, not the client's. */
+    private final ThreadPoolExecutor resolver;
+    /** Gives up on requests that take too long; its tasks go with the engine. */
+    private final ScheduledThreadPoolExecutor timer;
     private final HttpClient client;
+    private final AnswerBuffer.Budget budget;
     private final AtomicInteger inFlight = new AtomicInteger();
     private final Set<Exchange> running = ConcurrentHashMap.newKeySet();
     private final Object bucketLock = new Object();
@@ -95,6 +101,19 @@ public final class HttpEngine implements AutoCloseable {
             return thread;
         });
         executor.allowCoreThreadTimeOut(true);
+        this.resolver = new ThreadPoolExecutor(4, 4, 30, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), runnable -> {
+            Thread thread = new Thread(runnable, "NeoSkriptWeb-dns-" + threads.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        });
+        resolver.allowCoreThreadTimeOut(true);
+        this.timer = new ScheduledThreadPoolExecutor(1, runnable -> {
+            Thread thread = new Thread(runnable, "NeoSkriptWeb-timeouts");
+            thread.setDaemon(true);
+            return thread;
+        });
+        timer.setRemoveOnCancelPolicy(true);
+        this.budget = new AnswerBuffer.Budget(config.maxResponseMemoryBytes());
         this.client = HttpClient.newBuilder()
                 .executor(executor)
                 .connectTimeout(config.connectTimeout())
@@ -130,28 +149,35 @@ public final class HttpEngine implements AutoCloseable {
         } catch (WebException invalid) {
             return CompletableFuture.failedFuture(invalid);
         }
-        if (!takeToken()) {
-            return CompletableFuture.failedFuture(new WebException("More than " + config.maxPerMinute()
-                    + " requests were started in the last minute (max-requests-per-minute in NeoSkriptWeb's config.yml),"
-                    + " so the request to " + request.url() + " wasn't sent"));
-        }
+        // The in-flight limit first: a request it refuses doesn't use up the minute's allowance.
         if (inFlight.incrementAndGet() > config.maxInFlight()) {
             inFlight.decrementAndGet();
             return CompletableFuture.failedFuture(new WebException(config.maxInFlight() + " requests are already"
                     + " waiting for an answer (max-requests-in-flight in NeoSkriptWeb's config.yml), so the request to "
                     + request.url() + " wasn't sent"));
         }
+        if (!takeToken()) {
+            inFlight.decrementAndGet();
+            return CompletableFuture.failedFuture(new WebException("More than " + config.maxPerMinute()
+                    + " requests were started in the last minute (max-requests-per-minute in NeoSkriptWeb's config.yml),"
+                    + " so the request to " + request.url() + " wasn't sent"));
+        }
         Exchange exchange = new Exchange(request.url());
         running.add(exchange);
         exchange.result.whenComplete((response, failure) -> {
             inFlight.decrementAndGet();
             running.remove(exchange);
-            exchange.cancelCurrent();
+            exchange.finish();
         });
         long seconds = config.timeout().toSeconds();
-        CompletableFuture.delayedExecutor(config.timeout().toMillis(), TimeUnit.MILLISECONDS).execute(() ->
-                exchange.fail(new WebException("The request to " + request.url() + " took longer than " + seconds
-                        + " seconds (timeout-seconds in NeoSkriptWeb's config.yml)")));
+        try {
+            exchange.timeout = timer.schedule(() -> exchange.fail(new WebException("The request to " + request.url()
+                    + " took longer than " + seconds + " seconds (timeout-seconds in NeoSkriptWeb's config.yml)")),
+                    config.timeout().toMillis(), TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException stopped) {
+            exchange.fail(new WebException("NeoSkriptWeb has stopped, so the request to " + request.url()
+                    + " wasn't sent"));
+        }
         if (closed) {
             exchange.fail(new WebException("NeoSkriptWeb has stopped, so the request to " + request.url()
                     + " wasn't sent"));
@@ -199,6 +225,10 @@ public final class HttpEngine implements AutoCloseable {
         final String url;
         final CompletableFuture<WebResponse> result = new CompletableFuture<>();
         volatile CompletableFuture<?> current;
+        volatile ScheduledFuture<?> timeout;
+        /** The buffers its answers are read into, released from the budget when it's over. */
+        private final List<AnswerBuffer> buffers = new ArrayList<>();
+        private boolean finished;
 
         Exchange(String url) {
             this.url = url;
@@ -217,55 +247,112 @@ public final class HttpEngine implements AutoCloseable {
                 hop.cancel(true);
             }
         }
+
+        /** A buffer for an answer, released with the exchange. */
+        AnswerBuffer buffer(String what, long expected) {
+            AnswerBuffer buffer = new AnswerBuffer(config.maxResponseBytes(), budget, what, expected);
+            synchronized (this) {
+                if (!finished) {
+                    buffers.add(buffer);
+                    return buffer;
+                }
+            }
+            buffer.release();
+            throw new WebException("The request to " + url + " was stopped");
+        }
+
+        /** It's over: what it read is released from the budget, and its timeout cancelled. */
+        void finish() {
+            cancelCurrent();
+            ScheduledFuture<?> pending = timeout;
+            if (pending != null) {
+                pending.cancel(false);
+            }
+            List<AnswerBuffer> held;
+            synchronized (this) {
+                finished = true;
+                held = new ArrayList<>(buffers);
+                buffers.clear();
+            }
+            held.forEach(AnswerBuffer::release);
+        }
     }
 
     private void hop(Exchange exchange, String method, URI uri, List<Map.Entry<String, String>> headers, byte[] body,
             int redirects) {
+        if (!config.blockPrivateAddresses()) {
+            send(exchange, method, uri, headers, body, redirects);
+            return;
+        }
         try {
-            executor.execute(() -> {
+            // A host name is looked up on threads of its own, so a slow DNS server holds them, not the client's.
+            resolver.execute(() -> {
                 try {
-                    if (config.blockPrivateAddresses()) {
-                        checkPublic(uri);
-                    }
-                    if (exchange.result.isDone()) {
-                        return;
-                    }
-                    HttpRequest built = build(method, uri, headers, body);
-                    CompletableFuture<HttpResponse<byte[]>> sent = client.sendAsync(built,
-                            info -> new CappedBody(config.maxResponseBytes(), uri));
-                    exchange.current = sent;
-                    if (exchange.result.isDone()) {
-                        sent.cancel(true);
-                        return;
-                    }
-                    sent.whenComplete((response, failure) -> {
-                        if (failure != null) {
-                            exchange.fail(describe(failure, uri));
-                            return;
-                        }
-                        try {
-                            answered(exchange, method, uri, headers, body, redirects, response);
-                        } catch (WebException e) {
-                            exchange.fail(e);
-                        } catch (RuntimeException e) {
-                            exchange.fail(new WebException("The request to " + uri + " failed: " + e));
-                        }
-                    });
+                    checkPublic(uri);
                 } catch (WebException e) {
                     exchange.fail(e);
-                } catch (IllegalArgumentException e) {
-                    exchange.fail(new WebException("The request to " + uri + " couldn't be sent: " + e.getMessage()));
+                    return;
                 } catch (RuntimeException e) {
                     exchange.fail(new WebException("The request to " + uri + " failed: " + e));
+                    return;
                 }
+                send(exchange, method, uri, headers, body, redirects);
             });
         } catch (RejectedExecutionException stopped) {
             exchange.fail(new WebException("NeoSkriptWeb has stopped, so the request to " + uri + " wasn't sent"));
         }
     }
 
+    private void send(Exchange exchange, String method, URI uri, List<Map.Entry<String, String>> headers, byte[] body,
+            int redirects) {
+        if (exchange.result.isDone()) {
+            return;
+        }
+        try {
+            HttpRequest built = build(method, uri, headers, body);
+            CompletableFuture<HttpResponse<AnswerBuffer>> sent = client.sendAsync(built, info -> {
+                long expected = info.headers().firstValueAsLong("content-length").orElse(-1);
+                return new CappedBody(exchange.buffer(uri.toString(), expected));
+            });
+            exchange.current = sent;
+            if (exchange.result.isDone()) {
+                sent.cancel(true);
+                return;
+            }
+            sent.whenComplete((response, failure) -> {
+                if (failure != null) {
+                    exchange.fail(describe(failure, uri));
+                    return;
+                }
+                try {
+                    answered(exchange, method, uri, headers, body, redirects, response);
+                } catch (WebException e) {
+                    exchange.fail(e);
+                } catch (RuntimeException e) {
+                    exchange.fail(new WebException("The request to " + uri + " failed: " + e));
+                }
+            });
+        } catch (WebException e) {
+            exchange.fail(e);
+        } catch (IllegalArgumentException e) {
+            exchange.fail(new WebException("The request to " + uri + " couldn't be sent: " + e.getMessage()));
+        } catch (RuntimeException e) {
+            exchange.fail(new WebException("The request to " + uri + " failed: " + e));
+        }
+    }
+
+    /** Whether two addresses are the same origin: scheme, host and port, as curl decides where credentials go. */
+    static boolean sameOrigin(URI a, URI b) {
+        return a.getScheme().equalsIgnoreCase(b.getScheme()) && a.getHost().equalsIgnoreCase(b.getHost())
+                && port(a) == port(b);
+    }
+
+    private static int port(URI uri) {
+        return uri.getPort() >= 0 ? uri.getPort() : uri.getScheme().equalsIgnoreCase("https") ? 443 : 80;
+    }
+
     private void answered(Exchange exchange, String method, URI uri, List<Map.Entry<String, String>> headers,
-            byte[] body, int redirects, HttpResponse<byte[]> response) {
+            byte[] body, int redirects, HttpResponse<AnswerBuffer> response) {
         int status = response.statusCode();
         String location = response.headers().firstValue("location").orElse(null);
         if (location != null && (status == 301 || status == 302 || status == 303 || status == 307 || status == 308)) {
@@ -288,7 +375,8 @@ public final class HttpEngine implements AutoCloseable {
                     nextHeaders = nextHeaders.stream()
                             .filter(h -> !h.getKey().equalsIgnoreCase("content-type")).toList();
                 }
-                if (!next.getHost().equalsIgnoreCase(uri.getHost())) {
+                if (!sameOrigin(next, uri)) {
+                    // Another scheme, host or port: credentials aren't sent on (as curl, after CVE-2022-27776).
                     nextHeaders = nextHeaders.stream()
                             .filter(h -> !CREDENTIALS.contains(h.getKey().toLowerCase(Locale.ROOT))).toList();
                 }
@@ -298,8 +386,10 @@ public final class HttpEngine implements AutoCloseable {
         }
         Map<String, List<String>> names = new TreeMap<>();
         response.headers().map().forEach((name, values) -> names.put(name.toLowerCase(Locale.ROOT), List.copyOf(values)));
-        byte[] content = unpack(response.body(), response.headers().firstValue("content-encoding").orElse(null), uri);
-        exchange.result.complete(new WebResponse(status, response.uri(), Collections.unmodifiableMap(names), content));
+        AnswerBuffer content = unpack(exchange, response.body(),
+                response.headers().firstValue("content-encoding").orElse(null), uri);
+        exchange.result.complete(new WebResponse(status, response.uri(), Collections.unmodifiableMap(names),
+                content.array(), content.size()));
     }
 
     private static void checkPublic(URI uri) {
@@ -330,41 +420,43 @@ public final class HttpEngine implements AutoCloseable {
         return builder.build();
     }
 
-    /** Unpacks a gzip or deflate body, no bigger than the limit, as Reqn did. */
-    private byte[] unpack(byte[] body, String encoding, URI uri) {
-        if (encoding == null || body.length == 0) {
-            return body;
+    /**
+     * Unpacks a gzip or deflate body, as Reqn did, into a buffer of its own that's held to the limit and the budget;
+     * the packed one is released at once.
+     */
+    private AnswerBuffer unpack(Exchange exchange, AnswerBuffer packed, String encoding, URI uri) {
+        if (encoding == null || packed.size() == 0) {
+            return packed;
         }
         String coding = encoding.strip().toLowerCase(Locale.ROOT);
         try {
+            InputStream source = new ByteArrayInputStream(packed.array(), 0, packed.size());
             InputStream in;
             if (coding.equals("gzip") || coding.equals("x-gzip")) {
-                in = new GZIPInputStream(new ByteArrayInputStream(body));
+                in = new GZIPInputStream(source);
             } else if (coding.equals("deflate")) {
-                in = new InflaterInputStream(new ByteArrayInputStream(body), new Inflater(true));
+                in = new InflaterInputStream(source, new Inflater(true));
             } else {
-                return body;
+                return packed;
             }
+            AnswerBuffer unpacked = exchange.buffer(uri.toString(), -1);
             try (in) {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] buffer = new byte[8192];
+                byte[] chunk = new byte[8192];
                 int read;
-                while ((read = in.read(buffer)) > 0) {
-                    if (out.size() + (long) read > config.maxResponseBytes()) {
-                        throw tooBig(config.maxResponseBytes(), uri);
-                    }
-                    out.write(buffer, 0, read);
+                while ((read = in.read(chunk)) > 0) {
+                    unpacked.write(chunk, 0, read);
                 }
-                return out.toByteArray();
             }
+            packed.release();
+            return unpacked;
         } catch (IOException broken) {
             throw new WebException("The answer from " + uri + " says it's " + coding + "-compressed, but it isn't: "
                     + broken.getMessage());
         }
     }
 
-    static WebException tooBig(long max, URI uri) {
-        return new WebException("The answer from " + uri + " is bigger than " + size(max)
+    static WebException tooBig(long max, Object what) {
+        return new WebException("The answer from " + what + " is bigger than " + size(max)
                 + " (max-response-kilobytes in NeoSkriptWeb's config.yml), so it was cut off");
     }
 
@@ -395,7 +487,7 @@ public final class HttpEngine implements AutoCloseable {
                 return new WebException("Unknown host: " + uri.getHost());
             }
             if (each instanceof ConnectException) {
-                return new WebException("Couldn't connect to " + uri.getHost() + port(uri) + ": the connection was"
+                return new WebException("Couldn't connect to " + uri.getHost() + portText(uri) + ": the connection was"
                         + " refused");
             }
             if (each instanceof SSLException ssl) {
@@ -411,43 +503,52 @@ public final class HttpEngine implements AutoCloseable {
                 + (message == null || message.isBlank() ? cause.getClass().getSimpleName() : message));
     }
 
-    private static String port(URI uri) {
+    private static String portText(URI uri) {
         return uri.getPort() < 0 ? "" : ":" + uri.getPort();
     }
 
-    /** Stops every request still running, and the engine's threads. */
+    /** Stops every request still running, and the engine's threads, its timeouts included. */
     @Override
     public void close() {
         closed = true;
         for (Exchange exchange : new ArrayList<>(running)) {
             exchange.fail(new WebException("NeoSkriptWeb stopped before " + exchange.url + " answered"));
         }
+        timer.shutdownNow();
         client.shutdownNow();
         executor.shutdownNow();
+        resolver.shutdownNow();
         try {
             client.awaitTermination(Duration.ofSeconds(2));
             executor.awaitTermination(2, TimeUnit.SECONDS);
+            resolver.awaitTermination(2, TimeUnit.SECONDS);
+            timer.awaitTermination(2, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
     }
 
-    /** Reads an answer's body into memory, up to a limit, past which it stops reading and fails. */
-    static final class CappedBody implements HttpResponse.BodySubscriber<byte[]> {
-        private final long max;
-        private final URI uri;
-        private final CompletableFuture<byte[]> body = new CompletableFuture<>();
-        private final List<byte[]> parts = new ArrayList<>();
-        private long size;
+    /**
+     * How many bytes the answers in flight hold.
+     *
+     * @return the bytes
+     */
+    public long bufferedBytes() {
+        return budget.used();
+    }
+
+    /** Reads an answer's body into one buffer, which stops it at the limit or the budget. */
+    static final class CappedBody implements HttpResponse.BodySubscriber<AnswerBuffer> {
+        private final AnswerBuffer buffer;
+        private final CompletableFuture<AnswerBuffer> body = new CompletableFuture<>();
         private Flow.Subscription subscription;
 
-        CappedBody(long max, URI uri) {
-            this.max = max;
-            this.uri = uri;
+        CappedBody(AnswerBuffer buffer) {
+            this.buffer = buffer;
         }
 
         @Override
-        public CompletionStage<byte[]> getBody() {
+        public CompletionStage<AnswerBuffer> getBody() {
             return body;
         }
 
@@ -462,38 +563,26 @@ public final class HttpEngine implements AutoCloseable {
             if (body.isDone()) {
                 return;
             }
-            for (ByteBuffer buffer : buffers) {
-                size += buffer.remaining();
-                if (size > max) {
-                    parts.clear();
-                    subscription.cancel();
-                    body.completeExceptionally(tooBig(max, uri));
-                    return;
+            try {
+                for (ByteBuffer each : buffers) {
+                    buffer.write(each);
                 }
-                byte[] part = new byte[buffer.remaining()];
-                buffer.get(part);
-                parts.add(part);
+            } catch (WebException tooMuch) {
+                subscription.cancel();
+                buffer.release();
+                body.completeExceptionally(tooMuch);
             }
         }
 
         @Override
         public void onError(Throwable failure) {
+            buffer.release();
             body.completeExceptionally(failure);
         }
 
         @Override
         public void onComplete() {
-            if (body.isDone()) {
-                return;
-            }
-            byte[] all = new byte[(int) size];
-            int at = 0;
-            for (byte[] part : parts) {
-                System.arraycopy(part, 0, all, at, part.length);
-                at += part.length;
-            }
-            parts.clear();
-            body.complete(all);
+            body.complete(buffer);
         }
     }
 }

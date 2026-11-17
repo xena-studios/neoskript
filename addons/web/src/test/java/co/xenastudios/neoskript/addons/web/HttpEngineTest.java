@@ -101,8 +101,13 @@ class HttpEngineTest {
     }
 
     private static WebConfig config(int timeoutSeconds, long maxBytes, int inFlight, int perMinute, boolean block) {
+        return config(timeoutSeconds, maxBytes, inFlight, perMinute, block, 64L * 1024 * 1024);
+    }
+
+    private static WebConfig config(int timeoutSeconds, long maxBytes, int inFlight, int perMinute, boolean block,
+            long memory) {
         return new WebConfig(Duration.ofSeconds(timeoutSeconds), Duration.ofSeconds(2), maxBytes, 5, inFlight, perMinute,
-                block);
+                block, memory);
     }
 
     private static WebRequest get(String url) {
@@ -125,7 +130,7 @@ class HttpEngineTest {
     void answersAreReadInFull() {
         WebResponse response = engine(WebConfig.DEFAULTS).send(get(base + "/ok")).join();
         assertEquals(200, response.status());
-        assertEquals("ok", new String(response.body(), StandardCharsets.UTF_8));
+        assertEquals("ok", response.text(StandardCharsets.UTF_8));
     }
 
     @Test
@@ -152,10 +157,12 @@ class HttpEngineTest {
     @Test
     void privateRangesAreRecognised() throws IOException {
         for (String address : List.of("10.1.2.3", "172.16.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1",
-                "0.0.0.0", "::1", "fd00::1", "fe80::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1")) {
+                "0.0.0.0", "::1", "fd00::1", "fe80::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1", "64:ff9b::a00:1",
+                "64:ff9b::7f00:1", "64:ff9b:1::808:808", "2002:a00:1::", "2002:7f00:1::1", "2002:a9fe:a9fe::")) {
             assertTrue(Addresses.isPrivate(InetAddress.getByName(address)), address);
         }
-        for (String address : List.of("1.1.1.1", "8.8.8.8", "172.32.0.1", "2606:4700:4700::1111")) {
+        for (String address : List.of("1.1.1.1", "8.8.8.8", "172.32.0.1", "2606:4700:4700::1111", "64:ff9b::808:808",
+                "2002:808:808::")) {
             assertFalse(Addresses.isPrivate(InetAddress.getByName(address)), address);
         }
     }
@@ -211,7 +218,52 @@ class HttpEngineTest {
         assertTrue(failure(engine.send(get(base + "/ok"))).contains("has stopped"));
         Thread.sleep(500);
         assertTrue(Thread.getAllStackTraces().keySet().stream()
-                .noneMatch(t -> t.isAlive() && t.getName().startsWith("NeoSkriptWeb-http")),
-                "the engine's threads stopped");
+                .noneMatch(t -> t.isAlive() && t.getName().startsWith("NeoSkriptWeb-")),
+                "the engine's threads, its timeouts' included, stopped");
+    }
+
+    @Test
+    void answersInFlightShareABudget() {
+        HttpEngine engine = engine(config(5, 8192, 8, 100, false, 2048));
+        String message = failure(engine.send(get(base + "/big")));
+        assertTrue(message.contains("max-response-memory-megabytes"), message);
+        assertEquals(0, engine.bufferedBytes(), "what it held is released");
+        HttpEngine roomy = engine(config(5, 8192, 8, 100, false, 1024 * 1024));
+        assertEquals(4096, roomy.send(get(base + "/big")).join().length());
+        assertEquals(0, roomy.bufferedBytes(), "what it held is released once it's handed over");
+    }
+
+    @Test
+    void credentialsArentSentOnToAnotherPort() throws IOException {
+        HttpServer other = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        AtomicReference<String> seen = new AtomicReference<>("unset");
+        other.createContext("/auth", exchange -> {
+            seen.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            answer(exchange, 200, "seen");
+        });
+        other.start();
+        server.createContext("/to-other-port", exchange -> {
+            exchange.getResponseHeaders().set("Location", "http://127.0.0.1:" + other.getAddress().getPort() + "/auth");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        try {
+            engine(WebConfig.DEFAULTS).send(new WebRequest("GET", base + "/to-other-port",
+                    List.of(Map.entry("Authorization", "secret")), null)).join();
+            assertEquals(null, seen.get());
+        } finally {
+            other.stop(0);
+        }
+    }
+
+    @Test
+    void aRequestTheInFlightLimitRefusesDoesntUseUpTheMinute() {
+        HttpEngine engine = engine(config(5, 1024, 1, 2, false));
+        CompletableFuture<WebResponse> hanging = engine.send(get(base + "/hang"));
+        for (int i = 0; i < 5; i++) {
+            assertTrue(failure(engine.send(get(base + "/ok"))).contains("max-requests-in-flight"));
+        }
+        hanging.cancel(true);
+        assertEquals(200, engine.send(get(base + "/ok")).join().status());
     }
 }

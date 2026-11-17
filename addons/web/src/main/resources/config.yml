@@ -14,6 +14,10 @@ connect-timeout-seconds: 10
 # script can't make the server run out of memory. 1 to 262144 (256 MB).
 max-response-kilobytes: 8192
 
+# The memory, in megabytes, all answers being read may take between them. A request whose answer would go past it
+# fails, so many big answers at once can't make the server run out of memory. 1 to 8192.
+max-response-memory-megabytes: 128
+
 # How many redirects a request follows. A redirect from https to http is never followed. 0 to 20.
 max-redirects: 5
 

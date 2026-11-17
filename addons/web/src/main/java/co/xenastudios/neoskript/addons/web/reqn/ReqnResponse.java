@@ -45,7 +45,7 @@ public record ReqnResponse(int code, String message, String statusLine, Map<Stri
                 headers.put(capitalised(name), values.getFirst());
             }
         });
-        return new ReqnResponse(response.status(), phrase, statusLine, headers, lines(response.body()));
+        return new ReqnResponse(response.status(), phrase, statusLine, headers, lines(response.text(StandardCharsets.UTF_8)));
     }
 
     /** {@code content-type} as {@code Content-Type}. */
@@ -59,9 +59,9 @@ public record ReqnResponse(int code, String message, String statusLine, Map<Stri
         return out.toString();
     }
 
-    private static String lines(byte[] body) {
+    private static String lines(String body) {
         StringBuilder out = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new StringReader(new String(body, StandardCharsets.UTF_8)))) {
+        try (BufferedReader reader = new BufferedReader(new StringReader(body))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 out.append(line).append('\n');

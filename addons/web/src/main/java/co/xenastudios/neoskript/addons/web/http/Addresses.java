@@ -16,7 +16,8 @@ public final class Addresses {
     /**
      * Whether a request to {@code address} stays inside this machine or a private network: loopback, unspecified,
      * private (RFC 1918), carrier-grade NAT, link-local (cloud metadata lives at 169.254.169.254), multicast, IPv6
-     * unique-local, and IPv4 addresses written as IPv6.
+     * unique-local, and private IPv4 addresses inside IPv6 ones: written as IPv6, through NAT64 (64:ff9b::/96, and all
+     * of the local 64:ff9b:1::/48) and 6to4 (2002::/16).
      *
      * @param address the address
      * @return whether it's private
@@ -47,14 +48,37 @@ public final class Addresses {
                 zeros &= bytes[i] == 0;
             }
             if (zeros && ((bytes[10] == (byte) 0xff && bytes[11] == (byte) 0xff) || (bytes[10] == 0 && bytes[11] == 0))) {
-                try {
-                    byte[] v4 = {bytes[12], bytes[13], bytes[14], bytes[15]};
-                    return isPrivate(InetAddress.getByAddress(v4));
-                } catch (java.net.UnknownHostException impossible) {
-                    return true;
-                }
+                return embedded(bytes, 12);
+            }
+            // 64:ff9b::/96, NAT64's well-known prefix, and 64:ff9b:1::/48, its local one: the IPv4 address is in the
+            // last four bytes.
+            if (bytes[0] == 0 && bytes[1] == 0x64 && bytes[2] == (byte) 0xff && bytes[3] == (byte) 0x9b
+                    && (allZero(bytes, 4, 12) || (bytes[4] == 0 && bytes[5] == 1))) {
+                return bytes[5] == 1 || embedded(bytes, 12);
+            }
+            // 2002::/16, 6to4: the IPv4 address is the next four bytes.
+            if (bytes[0] == 0x20 && bytes[1] == 0x02) {
+                return embedded(bytes, 2);
             }
         }
         return false;
+    }
+
+    private static boolean allZero(byte[] bytes, int from, int to) {
+        for (int i = from; i < to; i++) {
+            if (bytes[i] != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Whether the IPv4 address at {@code at} in an IPv6 address is private. */
+    private static boolean embedded(byte[] bytes, int at) {
+        try {
+            return isPrivate(InetAddress.getByAddress(new byte[] {bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]}));
+        } catch (java.net.UnknownHostException impossible) {
+            return true;
+        }
     }
 }
