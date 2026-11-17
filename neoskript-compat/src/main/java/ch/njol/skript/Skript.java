@@ -74,8 +74,11 @@ public final class Skript extends JavaPlugin implements Listener {
             Path skript = found.get("Skript");
             if (skript != null) {
                 getLogger().warning("Skript's own jar is in the plugins folder too (" + skript.getFileName() + ")."
-                        + " Paper loads only one plugin called Skript, and this time it's NeoSkriptCompat. Remove one"
-                        + " of the two.");
+                        + " NeoSkriptCompat stands in for Skript, so Paper loads only one of the two: this time it"
+                        + " loaded NeoSkriptCompat and left Skript out. That's the 'Ambiguous plugin name' and"
+                        + " 'Could not load plugin' errors above; NeoSkript runs the scripts. To use Skript instead,"
+                        + " remove NeoSkript and NeoSkriptCompat; to use NeoSkript, remove " + skript.getFileName()
+                        + ".");
             }
         } catch (RuntimeException ignored) {
             // Only a warning: nothing to warn about if the folder can't be read.

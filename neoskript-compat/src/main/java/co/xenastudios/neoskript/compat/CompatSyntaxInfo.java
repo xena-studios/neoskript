@@ -30,8 +30,37 @@ public class CompatSyntaxInfo<E extends SyntaxElement> implements SyntaxInfo<E> 
         this.type = builder.type;
         this.supplier = builder.supplier;
         this.patterns = List.copyOf(builder.patterns);
-        this.priority = builder.priority;
+        this.priority = builder.priority != null ? builder.priority : estimate(this.patterns);
         this.origin = builder.origin;
+    }
+
+    /**
+     * The priority Skript gives syntax whose addon didn't give one ({@code SyntaxInfoImpl.estimatePriority}): matching
+     * almost anything if a placeholder follows another ({@code %a% %b%}, {@code %a% [%b%]}) or there's a regex,
+     * combined if there's a placeholder, else simple.
+     */
+    static Priority estimate(java.util.Collection<String> patterns) {
+        Priority priority = SyntaxInfo.SIMPLE;
+        for (String pattern : patterns) {
+            char[] chars = pattern.toCharArray();
+            for (int i = 0; i < chars.length; i++) {
+                if (chars[i] == '%') {
+                    if (i > 0 && chars[i - 1] == '\\') {
+                        continue;
+                    }
+                    if ((i > 1 && chars[i - 2] == '%') || (i > 2 && chars[i - 3] == '%')) {
+                        return SyntaxInfo.PATTERN_MATCHES_EVERYTHING;
+                    }
+                    priority = SyntaxInfo.COMBINED;
+                } else if (chars[i] == '<') {
+                    if (i > 0 && chars[i - 1] == '\\') {
+                        continue;
+                    }
+                    return SyntaxInfo.PATTERN_MATCHES_EVERYTHING;
+                }
+            }
+        }
+        return priority;
     }
 
     @Override
@@ -85,7 +114,8 @@ public class CompatSyntaxInfo<E extends SyntaxElement> implements SyntaxInfo<E> 
         final Class<E> type;
         Supplier<E> supplier;
         final List<String> patterns = new ArrayList<>();
-        Priority priority = SyntaxInfo.SIMPLE;
+        /** Null until given: then it's worked out from the patterns, as Skript does. */
+        Priority priority;
         org.skriptlang.skript.docs.Origin origin;
 
         public Builder(Class<E> type, Supplier<E> supplier) {
@@ -131,7 +161,7 @@ public class CompatSyntaxInfo<E extends SyntaxElement> implements SyntaxInfo<E> 
 
         @Override
         public B priority(Priority priority) {
-            this.priority = priority == null ? SyntaxInfo.SIMPLE : priority;
+            this.priority = priority;
             return (B) this;
         }
 

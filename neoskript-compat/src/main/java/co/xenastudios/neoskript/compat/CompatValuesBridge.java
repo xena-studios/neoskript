@@ -32,6 +32,11 @@ final class CompatValuesBridge {
         return NeoSkript.get().values().fromJava(CompatAdapters.toNeoSkript(value));
     }
 
+    /** {@code type}, boxed if it's primitive. */
+    static Class<?> boxed(Class<?> type) {
+        return MethodType.methodType(type).wrap().returnType();
+    }
+
     /** {@code value} as a {@code type}, or null if it isn't one and can't be made one. */
     static Object as(Object value, Class<?> type) {
         if (value == null) {

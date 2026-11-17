@@ -206,15 +206,35 @@ about.
 - **`init` runs when the line is compiled, not while it's parsed.** NeoSkript picks the syntax with its own parser,
   then sets the addon's element up. An element whose `init` returns `false` makes that line an error (with the
   addon's `Skript.error`, if it gave one), where Skript would go on to try other syntax. The element's return type is
-  the one it registered, not the one `init` settles on.
+  the one it registered, except for an expression registered as giving anything: that one is also
+  set up while the line is parsed, quietly, and gives the type its `getReturnType` says (`damage type of x` gives a
+  damage type, so `is magic` reads `magic` as one).
 - **Arguments are worked out before the element runs.** NeoSkript evaluates each argument as it does for its own
   syntax and the element's argument expressions give it those values (as the classes the addon asks for). An addon
   that evaluates an argument twice gets the same values; one that changes an argument (`set`, `add` on it) isn't
-  supported.
+  supported. An element that keeps an argument and reads it later, outside its own `get`, `check`, `execute` or
+  `change` (from a task it schedules, say), gets whatever element is running on that thread then, or an error: the
+  values are only there while NeoSkript is running the element.
+- **An argument is a `Literal` only when it's one written value** (`5`, `"text"`, `zombie`), read when the line is
+  set up. A list of written values (`zombies and skeletons`) isn't one, so an element that needs a literal there
+  (SkBee's `entities in range of beacon`, which takes a list of entity types) fails to set up and the line is an
+  error.
 
-The rest is as designed: what an addon registers goes to NeoSkript, at the place NeoSkript's own addons' syntax goes
-(the standard library marks it, so syntax is tried in the same order as if registered with it), through one
-`Registrar` per addon. Element ids are the addon's name and the element's class (`SkBee:ExprWorldHeight`).
+The rest is as designed: what an addon registers goes to NeoSkript through one `Registrar` per addon. Element ids are
+the addon's name and the element's class (`SkBee:ExprWorldHeight`).
+
+- **Order:** each element is given its priority level as Skript has it (`SyntaxInfo.priority()`, or, as on Skript,
+  the level its patterns give when the addon gave none: simple, combined, or matching almost anything), and NeoSkript
+  tries it after its own syntax of that level (`Registrar.priority`), as Skript tries an addon's after its own. So a
+  line reads as it does on Skript with the same addon installed. That isn't always as Skript alone reads it: SkBee
+  gives none of its syntax a priority, so Skript gives it the level of its patterns, and some of it (`item model of
+  %itemstacks/itemtypes/slots%`, combined) comes before Skript's own (a property). `neoskript-skript-suite-skbee`
+  runs Skript's whole suite with NeoSkriptCompat and SkBee installed, and Skript's own runner on Skript 2.17 with the
+  same SkBee: every test that passes there must pass on NeoSkript. 857 of 862 pass; the other 5 don't pass on Skript
+  with SkBee either (SkBee's damage source, item model and book pages syntax takes those lines there too), one of
+  them because SkBee's own code throws on both (`add fire aspect 0 to stored enchantments`). Addons' syntax and types
+  are inserted at the place the standard library marks for them, as before; their literal parsers, named types,
+  event values and event names now go after the standard library's, where before they went at that place too.
 
 - **Skript's API** is in NeoSkriptCompat's jar: the classes addons use are written by hand where they need to work,
   and the rest of Skript 2.17.0's API that SkBee and skript-yaml reach (`src/stubs/skript-2.17.0.api`, a listing of

@@ -242,8 +242,9 @@ final class CompatRegistration {
 
     private void syntax(List<Map.Entry<SyntaxRegistry.Key<?>, SyntaxInfo<?>>> entries) {
         List<Map.Entry<SyntaxRegistry.Key<?>, SyntaxInfo<?>>> sorted = new ArrayList<>(entries);
-        // Within each kind, Skript tries syntax in priority order; registration order breaks ties.
-        sorted.sort(Comparator.comparing(entry -> entry.getValue().priority()));
+        // Registered by priority level, registration order breaking ties; NeoSkript places each after Skript's own
+        // syntax of its level (CompatElements.priority).
+        sorted.sort(Comparator.comparing(entry -> CompatPriority.level(entry.getValue().priority())));
         for (Map.Entry<SyntaxRegistry.Key<?>, SyntaxInfo<?>> entry : sorted) {
             String kind = entry.getKey() instanceof CompatSyntaxRegistry.Named<?> named ? named.name() : "unknown";
             SyntaxInfo<?> info = entry.getValue();

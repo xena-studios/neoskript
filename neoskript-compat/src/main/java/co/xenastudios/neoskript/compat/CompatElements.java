@@ -48,29 +48,52 @@ final class CompatElements {
         Class<?> returns = info instanceof DefaultSyntaxInfos.Expression<?, ?> expression ? expression.returnType()
                 : Object.class;
         List<List<Placeholder>> placeholders = placeholders(compat, info);
-        registrar.expression(id(addon, info), compat.typeId(returns), element -> {
+        String id = id(addon, info);
+        registrar.expression(id, compat.typeId(returns), element -> {
             ch.njol.skript.lang.Expression<?> expression = setup(compat, addon, info, placeholders, element,
                     "expression");
             return new ExpressionAdapter(expression, changes(expression));
         }, patterns(info));
+        priority(registrar, id, info);
+        if (returns == Object.class) {
+            // What it gives as Skript types it, once set up ('damage type of x' gives a damage type), where it's
+            // registered as giving anything: so a word after it ('is magic') is read as that type.
+            registrar.returnType(id, element -> {
+                ch.njol.skript.lang.Expression<?> expression = quietly(compat, addon, info, placeholders, element);
+                String type = expression == null ? null : compat.typeId(expression.getReturnType());
+                return "object".equals(type) ? null : type;
+            });
+        }
     }
 
     static void effect(Compat compat, Registrar registrar, String addon, SyntaxInfo<?> info) {
         List<List<Placeholder>> placeholders = placeholders(compat, info);
-        registrar.effect(id(addon, info), element -> {
+        String id = id(addon, info);
+        registrar.effect(id, element -> {
             ch.njol.skript.lang.Effect effect = setup(compat, addon, info, placeholders, element, "effect");
             return (Effect) (context, arguments) -> CompatArgument.with(arguments,
                     () -> effect.run(CompatEvent.of(context.event())));
         }, patterns(info));
+        priority(registrar, id, info);
     }
 
     static void condition(Compat compat, Registrar registrar, String addon, SyntaxInfo<?> info) {
         List<List<Placeholder>> placeholders = placeholders(compat, info);
-        registrar.condition(id(addon, info), element -> {
+        String id = id(addon, info);
+        registrar.condition(id, element -> {
             ch.njol.skript.lang.Condition condition = setup(compat, addon, info, placeholders, element, "condition");
             return (Condition) (context, arguments) -> CompatArgument.with(arguments,
                     () -> condition.check(CompatEvent.of(context.event())));
         }, patterns(info));
+        priority(registrar, id, info);
+    }
+
+    /**
+     * Where Skript tries the element: after Skript's own syntax of its priority level, as Skript places an addon's
+     * syntax, so a line Skript's own syntax reads stays Skript's with the addon installed.
+     */
+    private static void priority(Registrar registrar, String id, SyntaxInfo<?> info) {
+        registrar.priority(id, CompatPriority.level(info.priority()));
     }
 
     /** The element's id: the addon's name and the element's class, as {@code SkBee:ExprWorldHeight}. */
@@ -87,16 +110,39 @@ final class CompatElements {
         return info.patterns().toArray(String[]::new);
     }
 
+    /** The element set up for a line as it's parsed, or null if it won't be: nothing is logged. */
+    private static <E extends SyntaxElement> E quietly(Compat compat, String addon, SyntaxInfo<?> info,
+            List<List<Placeholder>> placeholders, ElementInfo element) {
+        try {
+            return setup(compat, addon, info, placeholders, element, "expression", true);
+        } catch (VirtualMachineError e) {
+            throw e;
+        } catch (Throwable notNow) {
+            return null;
+        }
+    }
+
+    private static <E extends SyntaxElement> E setup(Compat compat, String addon, SyntaxInfo<?> info,
+            List<List<Placeholder>> placeholders, ElementInfo element, String kind) {
+        return setup(compat, addon, info, placeholders, element, kind, false);
+    }
+
     /** A new element for a line, set up for it: a syntax error if it won't be, as Skript gives. */
     @SuppressWarnings("unchecked")
     private static <E extends SyntaxElement> E setup(Compat compat, String addon, SyntaxInfo<?> info,
-            List<List<Placeholder>> placeholders, ElementInfo element, String kind) {
+            List<List<Placeholder>> placeholders, ElementInfo element, String kind, boolean quiet) {
         String text = element.textOr("");
         E instance;
         try {
             instance = (E) info.instance();
-        } catch (RuntimeException | LinkageError e) {
-            compat.logger().log(Level.WARNING, addon + " couldn't make its " + kind + " " + info.type().getName(), e);
+        } catch (VirtualMachineError e) {
+            throw e;
+        } catch (Throwable e) {
+            // Anything else an addon throws (an AssertionError, a checked exception it sneaks out) fails the line,
+            // not NeoSkript.
+            if (!quiet) {
+                compat.logger().log(Level.WARNING, addon + " couldn't make its " + kind + " " + info.type().getName(), e);
+            }
             throw new SyntaxError(addon + "'s " + kind + " couldn't be used: " + e);
         }
         List<Placeholder> pattern = element.pattern() < placeholders.size() ? placeholders.get(element.pattern())
@@ -117,7 +163,7 @@ final class CompatElements {
             arguments[i] = argument(i, type, element);
         }
         ParseResult result = new ParseResult(text, arguments);
-        result.mark = element.mark();
+        result.mark = mark(element);
         result.tags.addAll(element.tags());
         ParserInstance parser = ParserInstance.get();
         Class<? extends Event>[] events = parser.getCurrentEvents();
@@ -128,8 +174,12 @@ final class CompatElements {
         try {
             error = Compat.withSetupErrors(() -> ok[0] = instance.preInit()
                     && instance.init(arguments, element.pattern(), Kleenean.FALSE, result));
-        } catch (RuntimeException | LinkageError e) {
-            compat.logger().log(Level.WARNING, addon + "'s " + kind + " failed to set up for '" + text + "'", e);
+        } catch (VirtualMachineError e) {
+            throw e;
+        } catch (Throwable e) {
+            if (!quiet) {
+                compat.logger().log(Level.WARNING, addon + "'s " + kind + " failed to set up for '" + text + "'", e);
+            }
             throw new SyntaxError(addon + "'s " + kind + " failed to set up for '" + text + "': " + e);
         } finally {
             parser.setCurrentEvent(eventName, events);
@@ -143,14 +193,33 @@ final class CompatElements {
         return instance;
     }
 
+    /**
+     * The parse mark Skript gives: NeoSkript's ({@code 1¦}), and each numeric tag ({@code 1:}) too, which Skript
+     * also counts as a mark ({@code ParseTagPatternElement}).
+     */
+    static int mark(ElementInfo element) {
+        int mark = element.mark();
+        for (String tag : element.tags()) {
+            if (!tag.isEmpty() && tag.length() < 10 && tag.chars().allMatch(Character::isDigit)) {
+                mark ^= Integer.parseInt(tag);
+            }
+        }
+        return mark;
+    }
+
     /** Whether an optional placeholder was left out: Skript gives null for it. */
     private static boolean omitted(ElementInfo element, int index) {
         return element.isDefault(index) && element.argumentType(index) == null && element.argumentLiteral(index) == null;
     }
 
     private static <T> CompatArgument<T> argument(int index, Class<T> type, ElementInfo element) {
+        String written = element.argumentLiteral(index);
+        if (written != null) {
+            return new CompatArgument.Written<>(index, type, element.isSingle(index), element.and(index),
+                    element.isDefault(index), written);
+        }
         return new CompatArgument<>(index, type, element.isSingle(index), element.and(index), element.isDefault(index),
-                element.argumentLiteral(index));
+                null);
     }
 
     @SuppressWarnings("unchecked")
@@ -274,9 +343,11 @@ final class CompatElements {
             if (accepted == null) {
                 return null;
             }
+            // As NeoSkript's classes: what it gives is made the addon's own again in change (Skript's ItemType, ...).
             Class<?>[] classes = new Class<?>[accepted.length];
             for (int i = 0; i < accepted.length; i++) {
-                classes[i] = accepted[i].isArray() ? accepted[i].getComponentType() : accepted[i];
+                classes[i] = CompatAdapters.neoskriptClass(accepted[i].isArray() ? accepted[i].getComponentType()
+                        : accepted[i]);
             }
             return classes;
         }
@@ -299,6 +370,16 @@ final class CompatElements {
         public void change(TriggerContext context, Object[] arguments, Object[] delta, Mode mode) {
             ChangeMode skriptMode = ChangeMode.valueOf(mode.name());
             Object[] given = delta == null ? null : convert(delta, changes.getOrDefault(skriptMode, new Class<?>[0]));
+            if (given != null && given.length == 0 && skriptMode != ChangeMode.DELETE && skriptMode != ChangeMode.RESET) {
+                // Setting to nothing deletes, where the expression can be deleted; else nothing happens (EffChange).
+                if (skriptMode == ChangeMode.SET && changes.containsKey(ChangeMode.DELETE)) {
+                    CompatArgument.with(arguments, () -> {
+                        expression.change(CompatEvent.of(context.event()), null, ChangeMode.DELETE);
+                        return null;
+                    });
+                }
+                return;
+            }
             CompatArgument.with(arguments, () -> {
                 expression.change(CompatEvent.of(context.event()), given, skriptMode);
                 return null;
@@ -315,12 +396,18 @@ final class CompatElements {
             int count = 0;
             for (Object value : delta) {
                 Object result = null;
-                for (Class<?> type : accepted) {
-                    Class<?> component = type.isArray() ? type.getComponentType() : type;
-                    result = CompatValuesBridge.as(value, component);
-                    if (result != null) {
-                        shared = shared == null ? component : commonSuper(shared, component);
-                        break;
+                // A value that already is one of the classes (once it's the addon's own) stays as it is; only then
+                // is it converted, as Skript does: 'efficiency 7' stays an enchantment type, not an enchantment.
+                for (int pass = 0; pass < 2 && result == null; pass++) {
+                    for (Class<?> type : accepted) {
+                        Class<?> component = CompatValuesBridge.boxed(type.isArray() ? type.getComponentType() : type);
+                        Object adapted = CompatAdapters.toSkript(value, component);
+                        result = pass == 0 ? (component.isInstance(adapted) ? adapted : null)
+                                : CompatValuesBridge.as(value, component);
+                        if (result != null) {
+                            shared = shared == null ? component : commonSuper(shared, component);
+                            break;
+                        }
                     }
                 }
                 if (result != null) {

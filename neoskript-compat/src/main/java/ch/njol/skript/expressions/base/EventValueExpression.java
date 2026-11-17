@@ -22,7 +22,7 @@ import org.skriptlang.skript.util.Priority;
  */
 public class EventValueExpression<T> extends SimpleExpression<T> implements DefaultExpression<T> {
 
-    public static final Priority DEFAULT_PRIORITY = Priority.before(SyntaxInfo.PATTERN_MATCHES_EVERYTHING);
+    public static final Priority DEFAULT_PRIORITY = Priority.before(SyntaxInfo.COMBINED);
 
     private final Class<? extends T> type;
     private final boolean single;

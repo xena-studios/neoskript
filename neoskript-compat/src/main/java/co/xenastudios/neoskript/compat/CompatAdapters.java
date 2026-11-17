@@ -23,7 +23,18 @@ final class CompatAdapters {
                     value -> ((ch.njol.skript.aliases.ItemType) value).neoskript()),
             new Adapter(ch.njol.skript.entity.EntityData.class, co.xenastudios.neoskript.paper.EntityKind.class,
                     value -> ch.njol.skript.entity.EntityData.of((co.xenastudios.neoskript.paper.EntityKind) value),
-                    value -> ((ch.njol.skript.entity.EntityData<?>) value).neoskript()));
+                    value -> ((ch.njol.skript.entity.EntityData<?>) value).neoskript()),
+            new Adapter(ch.njol.skript.util.EnchantmentType.class,
+                    co.xenastudios.neoskript.paper.CompatBridge.enchantmentTypeClass(),
+                    ch.njol.skript.util.EnchantmentType::of,
+                    value -> ((ch.njol.skript.util.EnchantmentType) value).neoskript()),
+            new Adapter(ch.njol.skript.util.slot.Slot.class, co.xenastudios.neoskript.paper.CompatBridge.slotClass(),
+                    ch.njol.skript.util.slot.Slot::of,
+                    // A slot an addon made itself stays the addon's.
+                    value -> {
+                        Object slot = ((ch.njol.skript.util.slot.Slot) value).neoskript();
+                        return slot != null ? slot : value;
+                    }));
 
     private CompatAdapters() {}
 

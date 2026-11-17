@@ -111,7 +111,8 @@ public final class HarnessMain {
             new NeoSkriptDbScenario(),
             new NeoSkriptProxyScenario(),
             new NeoSkriptReflectScenario(),
-            new SkBeeDifferentialScenario());
+            new SkBeeDifferentialScenario(),
+            new NeoSkriptSkriptSuiteScenario(true));
 
     record Result(String environment, String scenario, boolean passed, Duration duration, String message,
             Map<String, Object> summary) {}

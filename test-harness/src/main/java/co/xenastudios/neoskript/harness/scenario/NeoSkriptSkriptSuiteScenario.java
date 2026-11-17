@@ -25,12 +25,27 @@ import java.util.stream.Stream;
  * M4's progress measure: every one of Skript's own tests, run by NeoSkript in test mode. It reports how
  * many pass, fail, and can't run yet (their code doesn't compile on NeoSkript), and only fails if no
  * results come back. M4 is done when they all pass.
+ *
+ * <p>{@code neoskript-skript-suite-skbee} runs the same suite with NeoSkriptCompat and SkBee 3.26.0 installed, and
+ * Skript's own runner on Skript 2.17 with the same SkBee: every test that passes on Skript with SkBee must pass on
+ * NeoSkript with SkBee. A Skript addon's syntax is tried as Skript tries it, so where it changes how a line of Skript's
+ * own reads, it does on Skript too, and those tests fail on both. Paper 26.x only, as SkBee needs Minecraft 26.1.
  */
 public final class NeoSkriptSkriptSuiteScenario implements Scenario {
 
+    private final boolean withSkBee;
+
+    public NeoSkriptSkriptSuiteScenario() {
+        this(false);
+    }
+
+    public NeoSkriptSkriptSuiteScenario(boolean withSkBee) {
+        this.withSkBee = withSkBee;
+    }
+
     @Override
     public String name() {
-        return "neoskript-skript-suite";
+        return withSkBee ? "neoskript-skript-suite-skbee" : "neoskript-skript-suite";
     }
 
     @Override
@@ -40,7 +55,22 @@ public final class NeoSkriptSkriptSuiteScenario implements Scenario {
 
     @Override
     public boolean supports(Environment environment) {
-        return true;
+        return !withSkBee || (environment.platform() == Environment.Platform.PAPER
+                && environment.minecraftVersion().startsWith("26."));
+    }
+
+    /** The tests that threw on Skript: its log names the trigger of each severe error. */
+    private static java.util.Set<String> threw(Path log) throws java.io.IOException {
+        java.util.Set<String> tests = new java.util.TreeSet<>();
+        if (!Files.isRegularFile(log)) {
+            return tests;
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("#!#! Current trigger: test \"(.+?)\"")
+                .matcher(Files.readString(log));
+        while (matcher.find()) {
+            tests.add(matcher.group(1));
+        }
+        return tests;
     }
 
     @Override
@@ -52,6 +82,10 @@ public final class NeoSkriptSkriptSuiteScenario implements Scenario {
                 .jvmArg("-Dneoskript.testing.results=test_results.json")
                 // Script names as Skript's test runner has them: it loads the tests from its source folder.
                 .jvmArg("-Dneoskript.testing.scriptsRoot=../../../../../../src/test/skript/tests");
+        if (withSkBee) {
+            NeoSkriptHooksScenario.PinnedPlugin skbee = SkBeeDifferentialScenario.SKBEE;
+            builder.plugin(context.compatJar()).plugin(context.download(skbee.url(), skbee.sha256(), skbee.fileName()));
+        }
         int files = 0;
         try (Stream<Path> paths = Files.walk(tests)) {
             for (Path file : paths.filter(p -> p.toString().endsWith(".sk")).sorted().toList()) {
@@ -60,8 +94,10 @@ public final class NeoSkriptSkriptSuiteScenario implements Scenario {
                 files++;
             }
         }
+        boolean skbeeEnabled;
         try (ServerProcess server = builder.start()) {
             server.awaitExit(Duration.ofMinutes(15));
+            skbeeEnabled = server.lines(0).stream().anyMatch(line -> line.contains("[SkBee] Successfully enabled"));
         }
         Path resultsFile = builder.runDir().resolve("test_results.json");
         if (!Files.exists(resultsFile)) {
@@ -86,5 +122,44 @@ public final class NeoSkriptSkriptSuiteScenario implements Scenario {
         context.summary("passed", passed.size());
         context.summary("failed", failed.size());
         context.summary("cantRunYet", unrunnable.size());
+        if (withSkBee) {
+            if (!skbeeEnabled) {
+                throw new HarnessFailure("SkBee didn't enable on NeoSkript. See " + builder.runDir());
+            }
+            NeoSkriptHooksScenario.PinnedPlugin skbee = SkBeeDifferentialScenario.SKBEE;
+            JsonObject skript = SkriptTestSuiteScenario.results(context, context.environment().name() + "-skbee",
+                    List.of(context.download(skbee.url(), skbee.sha256(), skbee.fileName())));
+            // Passing on Skript: in its succeeded list. A test whose file doesn't load there is in neither list.
+            java.util.Set<String> passOnSkript = new java.util.TreeSet<>();
+            skript.getAsJsonArray("succeeded").forEach(test -> passOnSkript.add(test.getAsString()));
+            // Skript's runner counts a test that throws as passed; NeoSkript's reports the error. A test failing here
+            // only with errors, which threw on Skript too (SkBee's own code throwing the same), is the same on both.
+            java.util.Set<String> threwOnSkript = threw(context.config().skriptCorpus()
+                    .resolve("build/test_runners").resolve(context.environment().name() + "-skbee/logs/latest.log"));
+            java.util.Set<String> onlyOurs = new java.util.TreeSet<>();
+            java.util.Set<String> threwOnBoth = new java.util.TreeSet<>();
+            failed.forEach((test, messages) -> {
+                if (!passOnSkript.contains(test)) {
+                    return;
+                }
+                if (threwOnSkript.contains(test) && String.valueOf(messages).matches("\\[(\"Error: [^\"]*\",?)+]")) {
+                    threwOnBoth.add(test);
+                } else {
+                    onlyOurs.add(test);
+                }
+            });
+            unrunnable.keySet().stream().filter(passOnSkript::contains).forEach(onlyOurs::add);
+            java.util.Set<String> notOnSkript = new java.util.TreeSet<>(failed.keySet());
+            notOnSkript.removeAll(passOnSkript);
+            report.put("notPassingOnSkriptWithSkBee", notOnSkript);
+            report.put("threwOnBoth", threwOnBoth);
+            context.writeReport(name(), report);
+            context.summary("notPassingOnSkriptWithSkBee", notOnSkript.size());
+            context.summary("threwOnBoth", threwOnBoth.size());
+            if (!onlyOurs.isEmpty()) {
+                throw new HarnessFailure(onlyOurs.size() + " of Skript's tests fail with NeoSkriptCompat and SkBee"
+                        + " installed but pass on Skript 2.17 with SkBee: " + onlyOurs + " " + failed);
+            }
+        }
     }
 }

@@ -6,6 +6,8 @@ package co.xenastudios.neoskript.compat;
 
 import java.util.Collection;
 import java.util.Set;
+import co.xenastudios.neoskript.api.registration.SyntaxPriority;
+import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.util.Priority;
 
 /** Skript's priorities: base, or just before or after another. */
@@ -35,22 +37,34 @@ public record CompatPriority(Collection<Priority> before, Collection<Priority> a
         return before;
     }
 
-    /** Lower is tried first: one before another comes before it, one after it after. */
-    public int rank() {
-        if (this == BASE) {
-            return 0;
+    /**
+     * Skript's level for a priority, as NeoSkript orders addon syntax ({@code Registrar.priority}): simple, event
+     * values (just before combined), combined, properties (just before matching almost anything), and matching almost
+     * anything. One just before or after another level is that level's neighbour.
+     */
+    public static SyntaxPriority level(Priority priority) {
+        if (priority == null || priority.equals(SyntaxInfo.SIMPLE)) {
+            return SyntaxPriority.SIMPLE;
         }
-        for (Priority other : before) {
-            return (other instanceof CompatPriority p ? p.rank() : 0) - 1;
+        if (priority.equals(SyntaxInfo.COMBINED)) {
+            return SyntaxPriority.COMBINED;
         }
-        for (Priority other : after) {
-            return (other instanceof CompatPriority p ? p.rank() : 0) + 1;
+        if (priority.equals(SyntaxInfo.PATTERN_MATCHES_EVERYTHING)) {
+            return SyntaxPriority.PATTERN_MATCHES_EVERYTHING;
         }
-        return 0;
+        SyntaxPriority[] levels = SyntaxPriority.values();
+        for (Priority other : priority.before()) {
+            return levels[Math.max(0, level(other).ordinal() - 1)];
+        }
+        for (Priority other : priority.after()) {
+            return levels[Math.min(levels.length - 1, level(other).ordinal() + 1)];
+        }
+        return SyntaxPriority.SIMPLE;
     }
 
     @Override
     public int compareTo(Priority other) {
-        return Integer.compare(rank(), other instanceof CompatPriority p ? p.rank() : 0);
+        int byLevel = Integer.compare(level(this).ordinal(), level(other).ordinal());
+        return byLevel != 0 || equals(other) ? byLevel : Integer.compare(hashCode(), other.hashCode());
     }
 }

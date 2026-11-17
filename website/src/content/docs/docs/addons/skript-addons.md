@@ -11,7 +11,8 @@ Skript addons are built against Skript's own code (`ch.njol.skript`), which NeoS
 
 Put `NeoSkriptCompat.jar` in `plugins/`, next to NeoSkript and the addon. It comes with NeoSkript's releases, at the same version.
 
-- **Don't install Skript as well.** NeoSkriptCompat tells the server it's Skript, so the server loads only one of the two. If Skript's jar is there too, NeoSkriptCompat says so in the console.
+- **Don't install Skript as well.** NeoSkriptCompat tells the server it's Skript, so the server loads only one of the two, with an "Ambiguous plugin name" error. If it loads NeoSkriptCompat, NeoSkriptCompat says so in the console and NeoSkript runs the scripts; if it loads Skript, NeoSkript stands down.
+- An addon's syntax is tried where Skript tries it, so a line reads as it does on Skript with the same addon. On Skript, some of SkBee's syntax comes before Skript's own (`item model of`, `stored enchantments of`, damage sources), and it does on NeoSkript too.
 - NeoSkriptCompat is opt-in. Without it, nothing about NeoSkript changes, and addons that need Skript don't load.
 
 ## What works
@@ -29,7 +30,7 @@ What's compared with Skript 2.17.0 + SkBee 3.26.0, by NeoSkript's test harness o
 | Keys: `minecraft key of %objects%` (items, worlds, text), `translation key of %objects%` | Same as on Skript |
 | `server is paused` | Same as on Skript |
 
-The rest of SkBee's registered syntax may work, but isn't checked yet. Syntax that reaches a part of Skript NeoSkriptCompat doesn't have yet fails when the line runs, with an error that names what's missing.
+The rest of SkBee's registered syntax may work, but isn't checked yet. Syntax that reaches a part of Skript NeoSkriptCompat doesn't have yet fails with an error that names what's missing: when the script loads if it reaches it while the line is set up, otherwise when the line runs.
 
 ## What doesn't work yet
 
@@ -38,6 +39,7 @@ The rest of SkBee's registered syntax may work, but isn't checked yet. Syntax th
 - An addon's **type properties** (Skript 2.17's `name of`, `amount of` for an addon's types).
 - An addon element that **changes its argument** (`set`, `add` on what it was given).
 - An element that turns down a line (its setup returns false) makes that line an error; on Skript, other syntax would be tried.
+- An element that needs a written value for an argument works only with one value there, not a list (`entities in range of beacon` with `zombies and skeletons`).
 - Folia: SkBee doesn't support Folia.
 
-SkBee is the first addon worked on. SkQuery and skript-reflect come after it; skript-reflect reaches deepest into Skript and may never work fully. Progress is tracked on [GitHub](https://github.com/xena-studios/neoskript/issues/45).
+SkBee is the first addon worked on; SkQuery comes after it. skript-reflect reaches deepest into Skript, so it has an official replacement instead, [NeoSkript Reflect](/docs/addons/reflect/). Progress is tracked on [GitHub](https://github.com/xena-studios/neoskript/issues/45).

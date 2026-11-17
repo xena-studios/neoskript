@@ -106,6 +106,37 @@ class SkriptApiTest {
     }
 
     @Test
+    void prioritiesAreSkriptsLevels() {
+        assertEquals(co.xenastudios.neoskript.api.registration.SyntaxPriority.SIMPLE,
+                CompatPriority.level(SyntaxInfo.SIMPLE));
+        assertEquals(co.xenastudios.neoskript.api.registration.SyntaxPriority.EVENT_VALUE,
+                CompatPriority.level(ch.njol.skript.expressions.base.EventValueExpression.DEFAULT_PRIORITY));
+        assertEquals(co.xenastudios.neoskript.api.registration.SyntaxPriority.COMBINED,
+                CompatPriority.level(SyntaxInfo.COMBINED));
+        assertEquals(co.xenastudios.neoskript.api.registration.SyntaxPriority.PROPERTY,
+                CompatPriority.level(PropertyExpression.DEFAULT_PRIORITY));
+        assertEquals(co.xenastudios.neoskript.api.registration.SyntaxPriority.PROPERTY,
+                CompatPriority.level(PropertyCondition.DEFAULT_PRIORITY));
+        assertEquals(co.xenastudios.neoskript.api.registration.SyntaxPriority.PATTERN_MATCHES_EVERYTHING,
+                CompatPriority.level(SyntaxInfo.PATTERN_MATCHES_EVERYTHING));
+    }
+
+    @Test
+    void priorityFromPatternsAsSkripts() {
+        assertEquals(SyntaxInfo.SIMPLE, CompatSyntaxInfo.estimate(List.of("server is paused")));
+        assertEquals(SyntaxInfo.COMBINED, CompatSyntaxInfo.estimate(List.of("chunk (:x|z) of %chunk%")));
+        assertEquals(SyntaxInfo.PATTERN_MATCHES_EVERYTHING,
+                CompatSyntaxInfo.estimate(List.of("make %entity% damage %entity%", "%number% %number%")));
+        assertEquals(SyntaxInfo.PATTERN_MATCHES_EVERYTHING, CompatSyntaxInfo.estimate(List.of("%a% [%b%]")));
+        assertEquals(SyntaxInfo.PATTERN_MATCHES_EVERYTHING, CompatSyntaxInfo.estimate(List.of("<.+> x")));
+        assertEquals(SyntaxInfo.SIMPLE, CompatSyntaxInfo.estimate(List.of("100\\% sure")));
+        assertEquals(SyntaxInfo.COMBINED, SyntaxInfo.builder(ch.njol.skript.lang.Effect.class)
+                .addPattern("kill %entities%").build().priority());
+        assertEquals(SyntaxInfo.SIMPLE, SyntaxInfo.builder(ch.njol.skript.lang.Effect.class)
+                .addPattern("kill %entities%").priority(SyntaxInfo.SIMPLE).build().priority());
+    }
+
+    @Test
     void configHasSkriptsDefaults() {
         assertEquals(100, SkriptConfig.maxTargetBlockDistance.value());
         assertEquals(false, SkriptConfig.caseSensitive.value());

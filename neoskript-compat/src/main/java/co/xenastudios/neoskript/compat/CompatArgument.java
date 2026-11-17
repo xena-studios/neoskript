@@ -17,17 +17,17 @@ import org.bukkit.event.Event;
  * An argument of an addon's element, as Skript gives it one: an expression. NeoSkript works the argument out before
  * the element runs; this gives the element that value, as the class it asked for.
  */
-final class CompatArgument<T> implements Expression<T> {
+class CompatArgument<T> implements Expression<T> {
 
     /** The arguments of the elements running on this thread, innermost last. */
     private static final ThreadLocal<ArrayDeque<Object[]>> FRAMES = ThreadLocal.withInitial(ArrayDeque::new);
 
-    private final int index;
-    private final Class<T> type;
-    private final boolean single;
-    private final boolean and;
-    private final boolean isDefault;
-    private final String written;
+    final int index;
+    final Class<T> type;
+    final boolean single;
+    final boolean and;
+    final boolean isDefault;
+    final String written;
 
     CompatArgument(int index, Class<T> type, boolean single, boolean and, boolean isDefault, String written) {
         this.index = index;
@@ -52,7 +52,7 @@ final class CompatArgument<T> implements Expression<T> {
         }
     }
 
-    private Object argument() {
+    Object argument() {
         Object[] arguments = FRAMES.get().peek();
         if (arguments == null) {
             throw new IllegalStateException("An argument was read outside its element: " + this);
@@ -100,9 +100,8 @@ final class CompatArgument<T> implements Expression<T> {
     }
 
     @Override
-    @SafeVarargs
-    @SuppressWarnings("unchecked")
-    public final <R> Expression<? extends R> getConvertedExpression(Class<R>... to) {
+    @SuppressWarnings({"unchecked", "varargs"})
+    public <R> Expression<? extends R> getConvertedExpression(Class<R>... to) {
         for (Class<R> target : to) {
             if (target.isAssignableFrom(type)) {
                 return (Expression<? extends R>) this;
@@ -167,5 +166,61 @@ final class CompatArgument<T> implements Expression<T> {
     @Override
     public String toString() {
         return toString(null, false);
+    }
+
+    /**
+     * An argument written as one value ({@code 5}, {@code "text"}, {@code zombie}), which Skript gives an addon as a
+     * literal: its value is known when the line is set up, read from what's written as the class the addon asks for.
+     */
+    static final class Written<T> extends CompatArgument<T> implements ch.njol.skript.lang.Literal<T> {
+
+        private final T[] value;
+
+        @SuppressWarnings("unchecked")
+        Written(int index, Class<T> type, boolean single, boolean and, boolean isDefault, String written) {
+            super(index, type, single, and, isDefault, written);
+            Object parsed;
+            try {
+                parsed = Compat.get().types().parse(written, CompatValuesBridge.boxed(type),
+                        ch.njol.skript.lang.ParseContext.DEFAULT);
+                if (parsed == null) {
+                    parsed = CompatValuesBridge.as(written, type);
+                }
+            } catch (RuntimeException unparsed) {
+                // An addon's parser that throws: the literal has no value, as one that doesn't parse.
+                parsed = null;
+            }
+            value = (T[]) java.lang.reflect.Array.newInstance(CompatValuesBridge.boxed(type), parsed == null ? 0 : 1);
+            if (parsed != null) {
+                value[0] = (T) parsed;
+            }
+        }
+
+        @Override
+        public T[] getArray() {
+            return value.clone();
+        }
+
+        @Override
+        public T getSingle() {
+            return value.length == 0 ? null : value[0];
+        }
+
+        @Override
+        public T[] getAll() {
+            return value.clone();
+        }
+
+        @Override
+        @SafeVarargs
+        @SuppressWarnings("unchecked")
+        public final <R> ch.njol.skript.lang.Literal<? extends R> getConvertedExpression(Class<R>... to) {
+            for (Class<R> target : to) {
+                if (target.isAssignableFrom(type)) {
+                    return (ch.njol.skript.lang.Literal<? extends R>) this;
+                }
+            }
+            return to.length == 0 ? null : new Written<>(index, to[0], single, and, isDefault, written);
+        }
     }
 }
