@@ -4584,6 +4584,12 @@ final class TriggerCompiler {
                     literal = written.text();
                     one = true;
                 }
+                // Words a type's literal parser read, as an addon element through NeoSkriptCompat gets them: as
+                // Skript gives them, a literal (SkBee's 'int list tag'). NeoSkript's own elements don't get these.
+                case Expr.Unresolved words when library.hasWordsAsLiterals(syntax.syntax().id()) -> {
+                    literal = words.text();
+                    one = true;
+                }
                 case Expr.Text text -> {
                     one = true;
                     if (text.embedded().isEmpty() && text.end() <= source.length()) {

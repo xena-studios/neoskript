@@ -68,6 +68,17 @@ public final class VariableCodecs {
                 && registration.codec().getClass().getClassLoader() == loader;
     }
 
+    /** Whether a codec, or the class it saves, is {@code loader}'s: whether its plugin's values need saving first. */
+    public synchronized boolean owns(ClassLoader loader) {
+        for (Registration registration : byName.values()) {
+            if (registration.type().getClassLoader() == loader
+                    || (registration.codec() != null && registration.codec().getClass().getClassLoader() == loader)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Drops the codecs {@code loader} loaded, and those for its classes, as when their addon is disabled, so it can be
      * freed. Values they saved stay as their bytes ({@link RawValue}).

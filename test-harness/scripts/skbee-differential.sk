@@ -166,3 +166,46 @@ command /skbeetest-player-events:
 		clear {-skbee::chunk}
 		clear {-skbee::cactus}
 		send "[skbee] end player-events" to console
+
+command /skbeetest-nbt:
+	trigger:
+		set {_n} to nbt compound from "{a:1,b:""x"",c:[1,2,3],nested:{deep:2.5d}}"
+		skbee("compound", {_n})
+		set {_a} to int tag "a" of {_n}
+		skbee("int tag", {_a})
+		set {_b} to string tag "b" of {_n}
+		skbee("string tag", {_b})
+		set {_c::*} to int list tag "c" of {_n}
+		skbee("int list tag", {_c::*})
+		set {_d} to double tag "nested;deep" of {_n}
+		skbee("nested tag", {_d})
+		set int tag "d" of {_n} to 42
+		set string tag "e" of {_n} to "hello"
+		skbee("after set", {_n})
+		delete tag "a" of {_n}
+		skbee("after delete", {_n})
+		if {_n} has tag "b":
+			skbee("has tag b", "yes")
+		if {_n} doesn't have tag "a":
+			skbee("has no tag a", "yes")
+		set {_type} to tag type of tag "c" of {_n}
+		skbee("tag type", {_type})
+		set {_i} to diamond sword
+		set int tag "custom" of custom nbt of {_i} to 7
+		set {_v} to int tag "custom" of custom nbt of {_i}
+		skbee("item custom tag", {_v})
+		set {_i2} to stone with custom nbt from "{x:5}"
+		set {_v} to int tag "x" of custom nbt of {_i2}
+		skbee("item with custom nbt", {_v})
+		set {_e} to nbt compound from "{}"
+		if {_e} is an empty nbt compound:
+			skbee("empty compound", "yes")
+		set {skbee::saved-nbt} to {_n}
+		skbee("saved", {skbee::saved-nbt})
+		send "[skbee] end nbt" to console
+
+command /skbeetest-after-restart-nbt:
+	trigger:
+		skbee("loaded", {skbee::saved-nbt})
+		delete {skbee::saved-nbt}
+		send "[skbee] end after-restart-nbt" to console

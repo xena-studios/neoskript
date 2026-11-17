@@ -215,10 +215,15 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler
             public void onAddonDisable(org.bukkit.event.server.PluginDisableEvent event) {
-                if (!Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin())) {
+                // An addon, or a plugin whose classes a codec saves: a Skript addon's types through NeoSkriptCompat
+                // (SkBee disables before NeoSkriptCompat, and its classes can't be loaded after).
+                boolean addon = Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin());
+                if (!addon && !library.hasCodecsFrom(event.getPlugin().getClass().getClassLoader())) {
                     return;
                 }
-                addons.remove(event.getPlugin().getName());
+                if (addon) {
+                    addons.remove(event.getPlugin().getName());
+                }
                 VariableBackend current = storage;
                 if (current != null && current.loaded()) {
                     VariableStorage.Detached detached = current.detach(event.getPlugin().getClass().getClassLoader());

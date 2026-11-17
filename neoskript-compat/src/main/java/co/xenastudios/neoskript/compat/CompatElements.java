@@ -188,6 +188,8 @@ final class CompatElements {
      */
     private static void priority(Registrar registrar, String id, SyntaxInfo<?> info) {
         registrar.priority(id, CompatPriority.level(info.priority()));
+        // Words a type reads as a literal are literals for an addon, as Skript gives them.
+        Compat.get().library().wordsAsLiterals(id);
     }
 
     /**
@@ -518,8 +520,12 @@ final class CompatElements {
             // As NeoSkript's classes: what it gives is made the addon's own again in change (Skript's ItemType, ...).
             Class<?>[] classes = new Class<?>[accepted.length];
             for (int i = 0; i < accepted.length; i++) {
-                classes[i] = CompatAdapters.neoskriptClass(accepted[i].isArray() ? accepted[i].getComponentType()
+                Class<?> type = CompatAdapters.neoskriptClass(accepted[i].isArray() ? accepted[i].getComponentType()
                         : accepted[i]);
+                // Any number, made the class asked for when the change runs, as Skript converts numbers: NeoSkript's
+                // whole numbers are longs, which it wouldn't give for an Integer.
+                classes[i] = type != Number.class && Number.class.isAssignableFrom(
+                        CompatValuesBridge.boxed(type)) ? Number.class : type;
             }
             return classes;
         }
