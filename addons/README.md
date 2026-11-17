@@ -9,6 +9,7 @@ NeoSkript's own addons, built on [`neoskript-api`](../neoskript-api) and release
 | NeoSkript Placeholders | `placeholders/` | skript-placeholders 1.7.1 | [neoskript.dev/docs/addons/placeholders](https://neoskript.dev/docs/addons/placeholders/) |
 | NeoSkript YAML | `yaml/` | skript-yaml 1.7.2 | [neoskript.dev/docs/addons/yaml](https://neoskript.dev/docs/addons/yaml/) |
 | NeoSkriptWeb | `web/` | Reqn 1.2.3; skJson 6.0.0's requests and JSON | [neoskript.dev/docs/addons/web](https://neoskript.dev/docs/addons/web/) |
+| NeoSkript Reflect | `reflect/` | skript-reflect 2.6.3 (once skript-mirror) | [neoskript.dev/docs/addons/reflect](https://neoskript.dev/docs/addons/reflect/) |
 
 ## Layout
 
@@ -113,3 +114,12 @@ Each addon gets its own Modrinth project, which only the owner can create. For e
 - **Project:** name `NeoSkript Web`, slug `neoskript-web`, summary "HTTP requests, webhooks and JSON for NeoSkript scripts. Runs scripts written for Reqn and skJson unchanged." The description says it replaces Reqn and skJson's requests and JSON (with what of skJson isn't in it yet, from the docs page), that requests never block the server, and that it needs NeoSkript at the same version. Categories: utility, library. Licence GPL-3.0-only, source `https://github.com/xena-studios/neoskript/tree/main/addons/web`, Paper and Folia, NeoSkript's Minecraft versions.
 - **Dependencies:** NeoSkript (`FuVeJ2X5`) required. Neither Reqn nor skJson is on Modrinth (checked 2026-11-17), so there's no incompatible project to mark; add skJson's if it ever appears.
 - **Release:** the jar from `./gradlew :addons:web:build` (`addons/web/build/libs/NeoSkriptWeb-<version>.jar`), with NeoSkript's version and changelog.
+
+### NeoSkript Reflect (`addons/reflect`)
+
+- name `NeoSkript Reflect`, slug `neoskript-reflect`;
+- summary: "Java from scripts, with skript-reflect's syntax: imports, Java calls and Bukkit events from skript-reflect scripts work unchanged on NeoSkript.";
+- description: what it replaces (skript-reflect, once called skript-mirror), what works so far and that custom syntax comes next (with a link to [the docs](https://neoskript.dev/docs/addons/reflect/), which list what's not in yet and the differences), that calls are compiled to method handles rather than looked up each time, that it runs on Folia with a warning that Java calls can break region rules, and, plainly, that it gives scripts full Java access, so it's only for servers where everyone who writes scripts is trusted;
+- icon, licence GPL-3.0-only, source link to this repository (`addons/reflect`), loaders Paper and Folia, NeoSkript's Minecraft versions;
+- a required dependency on NeoSkript (`FuVeJ2X5`); skript-reflect isn't on Modrinth (it's on GitHub and SpigotMC), so there's no incompatible dependency to add;
+- the jar to upload is `addons/reflect/build/libs/NeoSkriptReflect-<version>.jar`, and the project id goes into the release steps next to NeoSkript's.

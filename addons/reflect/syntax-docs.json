@@ -1,0 +1,295 @@
+{
+  "elements": {
+    "NeoSkriptReflectStructImport": {
+      "name": "Import (skript-reflect)",
+      "description": [
+        "Makes Java classes known to the script by their simple names, as skript-reflect's <code>import:</code> does. Each line is a class's full name, optionally followed by <code>as</code> and another name to use for it.",
+        "Imports are each script's own: a class imported in one script isn't known in another. A line naming a class that doesn't exist is an error, with skript-reflect's message."
+      ],
+      "examples": [
+        "import:\n\tjava.lang.Math\n\torg.bukkit.Bukkit\n\tjava.lang.String as JavaString"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprJavaCall": {
+      "name": "Java Call (skript-reflect)",
+      "description": [
+        "Calls a Java method, reads a field, or makes a new object, as skript-reflect does: <code>target.method(arguments)</code>, <code>target.field</code> and <code>new Class(arguments)</code>, where the target is an imported class (for static members) or any value.",
+        "The member is chosen from the arguments' classes once per call site and kept, so a call costs a direct method handle call, not a reflective lookup. Where several overloads take the arguments, the closest one is chosen: <code>Math.max(3, 7)</code> is the <code>long</code> one.",
+        "A method that's missing, arguments no overload takes, or a method that throws give no value and skript-reflect's warning, naming the line; <code>try</code> before the call leaves the warning out. The error is kept for <code>last java error</code>.",
+        "Calls run on the trigger's thread. On Folia, a Java call that reads or changes something another region owns breaks Folia's rules, and NeoSkript can't check what Java code does: see the addon's docs."
+      ],
+      "examples": [
+        "set {_max} to Math.max(3, 7)",
+        "send \"%{_list}.size()%\" to player",
+        "set {_point} to new Point(1, 2)\nset {_point}.x to 5",
+        "try {_list}.get(9)"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectEffJavaCall": {
+      "name": "Java Call Effect (skript-reflect)",
+      "description": [
+        "A Java call on its own line, for what it does rather than what it gives: <code>{_list}.add(\"a\")</code>."
+      ],
+      "examples": [
+        "{_list}.add(\"a\")",
+        "Bukkit.broadcastMessage(\"Hello\")"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectCondJavaCall": {
+      "name": "Java Call Condition (skript-reflect)",
+      "description": [
+        "A Java call as a condition: it passes if the call gives <code>true</code>, as skript-reflect's does."
+      ],
+      "examples": [
+        "if {_list}.contains(\"a\"):\n\tsend \"yes\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprNull": {
+      "name": "Null (skript-reflect)",
+      "description": [
+        "Java's <code>null</code>, to pass to a method or set a field to: unlike <code>none</code>, it's a value."
+      ],
+      "examples": [
+        "{_map}.put(\"key\", null)"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprJavaType": {
+      "name": "Java Class by Name (skript-reflect)",
+      "description": [
+        "A class from its full name, as text, without importing it. No value if there's no such class."
+      ],
+      "examples": [
+        "set {_class} to class \"java.lang.Thread\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprJavaTypeOf": {
+      "name": "Class Of (skript-reflect)",
+      "description": [
+        "The Java class of a value."
+      ],
+      "examples": [
+        "send \"%{_list}'s class%\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprClassReference": {
+      "name": "Class Object (skript-reflect)",
+      "description": [
+        "<code>Class.class</code>: the <code>java.lang.Class</code> of an imported class, or of a primitive (<code>int.class</code>), to pass to a method that takes one."
+      ],
+      "examples": [
+        "set {_class} to ArrayList.class",
+        "set {_int} to int.class"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprNewArray": {
+      "name": "New Array (skript-reflect)",
+      "description": [
+        "A new Java array of the given size, of a primitive or an imported class."
+      ],
+      "examples": [
+        "set {_array} to new int[3]",
+        "set {_names} to new String[10]"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprArrayAccess": {
+      "name": "Array Element (skript-reflect)",
+      "description": [
+        "An element of a Java array, counted from 0, which can be set."
+      ],
+      "examples": [
+        "set {_array}[1] to 7",
+        "send \"%{_array}[1]%\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprCollect": {
+      "name": "Collect (skript-reflect)",
+      "description": [
+        "Values as one Java array: <code>[1, 2, 3]</code> is an <code>Object[]</code>. With <code>as</code> and an imported class, the array is of that class."
+      ],
+      "examples": [
+        "set {_array} to [1, 2, 3]",
+        "set {_texts} to [\"a\", \"b\" as JavaString]"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprSpread": {
+      "name": "Spread (skript-reflect)",
+      "description": [
+        "The elements of a Java array, collection, iterator or stream as separate values."
+      ],
+      "examples": [
+        "loop ...{_list}:\n\tsend loop-value"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectCondIsInstanceOf": {
+      "name": "Is Instance Of (skript-reflect)",
+      "description": [
+        "Whether values are instances of a Java class, as Java's <code>instanceof</code>."
+      ],
+      "examples": [
+        "if {_list} is an instance of List:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprMembers": {
+      "name": "Members (skript-reflect)",
+      "description": [
+        "The fields, methods or constructors of a class or of a value's class, as text, as skript-reflect lists them."
+      ],
+      "examples": [
+        "send fields of ArrayList"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprMemberNames": {
+      "name": "Member Names (skript-reflect)",
+      "description": [
+        "The names of the fields or methods of a class or of a value's class."
+      ],
+      "examples": [
+        "send method names of {_list}"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprPlugin": {
+      "name": "Plugin Instance (skript-reflect)",
+      "description": [
+        "The running instance of a plugin, by its imported main class or by its name."
+      ],
+      "examples": [
+        "set {_plugin} to instance of plugin \"NeoSkript\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprEvent": {
+      "name": "Event (skript-reflect)",
+      "description": [
+        "The Bukkit event the trigger is running for, to call its methods."
+      ],
+      "examples": [
+        "send \"%event.getCommand()%\" to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprJavaError": {
+      "name": "Last Java Error (skript-reflect)",
+      "description": [
+        "What the last Java call on this thread threw, or none if it didn't. Each thread has its own, so a Folia region's calls don't see another's."
+      ],
+      "examples": [
+        "try {_list}.get(9)\nsend \"%last java error%\" to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectEvtByReflection": {
+      "name": "Any Bukkit Event (skript-reflect)",
+      "description": [
+        "A trigger for any Bukkit event, by its imported class, including ones Skript has no syntax for and other plugins' events. Several can be listed with <code>or</code>."
+      ],
+      "examples": [
+        "import:\n\torg.bukkit.event.server.ServerCommandEvent\n\non ServerCommandEvent:\n\tsend \"%event.getCommand()%\" to console"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    }
+  },
+  "types": {
+    "javatype": {
+      "name": "Java Type (skript-reflect)",
+      "description": [
+        "A Java class, imported or found by name. Written as its imported name in a script."
+      ],
+      "examples": [
+        "import:\n\tjava.util.ArrayList"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "null": {
+      "name": "Null (skript-reflect)",
+      "description": [
+        "Java's <code>null</code> as a value scripts can pass."
+      ],
+      "examples": [
+        "{_map}.put(\"k\", null)"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "event": {
+      "name": "Event (skript-reflect)",
+      "description": [
+        "A Bukkit event."
+      ],
+      "examples": [
+        "set {_event} to event"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "javaobject": {
+      "name": "Java Object (skript-reflect)",
+      "description": [
+        "A Java array, kept as one value."
+      ],
+      "examples": [
+        "set {_array} to new int[3]"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    }
+  },
+  "functions": {}
+}

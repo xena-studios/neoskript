@@ -190,8 +190,8 @@ NeoSkriptCompat.
    NeoSkript + NeoSkriptCompat + SkBee 3.26.0 (both pinned by SHA-256), comparing the output.
 3. **Slice by slice:** text components, NBT, scoreboards, item components, recipes, bounds, structures and the rest,
    most used first, each compared with Skript + SkBee, until SkBee's commonly used syntax works. Then skript-yaml's
-   addons that aren't replaced by an official addon: SkQuery, then skript-reflect (which reaches deepest into Skript
-   and may never work fully).
+   addons that aren't replaced by an official addon: SkQuery first. skript-reflect, which reaches deepest into Skript
+   and may never work fully, is replaced by NeoSkriptReflect (issue #13) instead.
 
 The docs for server owners say what works, by addon and by slice, and nothing more.
 
