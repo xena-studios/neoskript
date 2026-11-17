@@ -84,6 +84,15 @@ public final class ServerProcess implements AutoCloseable {
         }
     }
 
+    /** Plugin failures a scenario expects, which waiting doesn't stop at. */
+    private final List<Pattern> allowed = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Waiting doesn't stop at a plugin failure matching {@code failure}: one the scenario expects. */
+    public ServerProcess allowFailure(Pattern failure) {
+        allowed.add(failure);
+        return this;
+    }
+
     public Matcher await(Pattern pattern, Duration timeout) throws InterruptedException {
         return await(pattern, 0, timeout);
     }
@@ -104,7 +113,7 @@ public final class ServerProcess implements AutoCloseable {
                     if (matcher.find()) {
                         return matcher;
                     }
-                    if (PLUGIN_FAILED.matcher(line).find()) {
+                    if (PLUGIN_FAILED.matcher(line).find() && allowed.stream().noneMatch(a -> a.matcher(line).find())) {
                         throw new HarnessFailure("A plugin failed while waiting for /" + pattern + "/: " + line
                                 + ". See " + logFile);
                     }

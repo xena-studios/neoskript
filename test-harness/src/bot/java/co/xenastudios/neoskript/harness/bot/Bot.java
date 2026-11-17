@@ -90,8 +90,32 @@ final class Bot extends SimpleChannelInboundHandler<Packet<?>> {
 
     private static final Logger LOG = Bukkit.getLogger();
 
+    /**
+     * Where the bot's packets go: as objects in memory (the server's own connection), or encoded over a socket
+     * ({@link NetworkWire}), whose codecs change with each phase of the protocol.
+     */
+    interface Wire {
+        /** The packets read are of this phase from now on. */
+        default void inbound(Phase phase) {}
+
+        /** The packets written are of this phase from now on. */
+        default void outbound(Phase phase) {}
+
+        /** Packets are compressed from now on, past {@code threshold} bytes. */
+        default void compress(int threshold) {}
+    }
+
+    /** A phase of the protocol. */
+    enum Phase {
+        LOGIN,
+        CONFIGURATION,
+        PLAY
+    }
+
     private final String name;
     private final int port;
+    private final String host;
+    private final Wire wire;
     private final Consumer<Bot> onClose;
     private volatile Channel channel;
     private State state = State.LOGIN;
@@ -103,9 +127,16 @@ final class Bot extends SimpleChannelInboundHandler<Packet<?>> {
     private int sequence;
 
     Bot(String name, int port, Consumer<Bot> onClose) {
+        this(name, "localhost", port, new Wire() {}, onClose);
+    }
+
+    /** A bot for {@code host}, which a proxy's forced hosts may send to a server of its own. */
+    Bot(String name, String host, int port, Wire wire, Consumer<Bot> onClose) {
         super(false);
         this.name = name;
+        this.host = host;
         this.port = port;
+        this.wire = wire;
         this.onClose = onClose;
     }
 
@@ -128,7 +159,8 @@ final class Bot extends SimpleChannelInboundHandler<Packet<?>> {
     public void channelActive(ChannelHandlerContext ctx) {
         // The channel can be active before Bots attaches it.
         channel = ctx.channel();
-        send(new ClientIntentionPacket(SharedConstants.getProtocolVersion(), "localhost", port, ClientIntent.LOGIN));
+        send(new ClientIntentionPacket(SharedConstants.getProtocolVersion(), host, port, ClientIntent.LOGIN));
+        wire.outbound(Phase.LOGIN);
         send(new ServerboundHelloPacket(name, offlineUuid(name)));
     }
 
@@ -152,8 +184,12 @@ final class Bot extends SimpleChannelInboundHandler<Packet<?>> {
     private void handle(Packet<?> packet) {
         switch (packet) {
             // Login
+            case net.minecraft.network.protocol.login.ClientboundLoginCompressionPacket compression ->
+                    wire.compress(compression.getCompressionThreshold());
             case ClientboundLoginFinishedPacket ignored -> {
+                wire.inbound(Phase.CONFIGURATION);
                 send(ServerboundLoginAcknowledgedPacket.INSTANCE);
+                wire.outbound(Phase.CONFIGURATION);
                 state = State.CONFIGURATION;
                 send(new ServerboundClientInformationPacket(ClientInformation.createDefault()));
             }
@@ -161,7 +197,11 @@ final class Bot extends SimpleChannelInboundHandler<Packet<?>> {
             // Configuration
             case ClientboundSelectKnownPacks packs -> send(new ServerboundSelectKnownPacks(packs.knownPacks()));
             case ClientboundCodeOfConductPacket ignored -> send(new ServerboundAcceptCodeOfConductPacket());
-            case ClientboundFinishConfigurationPacket ignored -> send(ServerboundFinishConfigurationPacket.INSTANCE);
+            case ClientboundFinishConfigurationPacket ignored -> {
+                wire.inbound(Phase.PLAY);
+                send(ServerboundFinishConfigurationPacket.INSTANCE);
+                wire.outbound(Phase.PLAY);
+            }
             case ClientboundLoginPacket ignored -> {
                 state = State.PLAY;
                 Packet<?> waiting;
@@ -171,7 +211,9 @@ final class Bot extends SimpleChannelInboundHandler<Packet<?>> {
             }
             case ClientboundStartConfigurationPacket ignored -> {
                 state = State.CONFIGURATION;
+                wire.inbound(Phase.CONFIGURATION);
                 send(ServerboundConfigurationAcknowledgedPacket.INSTANCE);
+                wire.outbound(Phase.CONFIGURATION);
             }
             // Any phase after login
             case ClientboundKeepAlivePacket keepAlive -> send(new ServerboundKeepAlivePacket(keepAlive.getId()));
