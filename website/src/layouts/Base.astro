@@ -22,7 +22,17 @@ const og = new URL("/og.png", Astro.site).href;
     <link rel="canonical" href={url} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="sitemap" href="/sitemap-index.xml" />
-    <meta name="theme-color" content="#110B13" />
+    <meta name="theme-color" content="#110B13" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#FBF8FA" media="(prefers-color-scheme: light)" />
+    <!-- The theme the guides' picker chose, else the system's, before the first paint (tokens.css). -->
+    <script is:inline>
+      (() => {
+        let pick = null;
+        try { pick = localStorage.getItem("starlight-theme"); } catch {}
+        const light = pick === "light" || (pick !== "dark" && matchMedia("(prefers-color-scheme: light)").matches);
+        document.documentElement.dataset.theme = light ? "light" : "dark";
+      })();
+    </script>
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="NeoSkript" />
     <meta property="og:title" content={title} />
@@ -36,7 +46,7 @@ const og = new URL("/og.png", Astro.site).href;
     <a class="skip" href="#main">Skip to content</a>
     <header class="site-header">
       <div class="wrap bar">
-        <a class="home" href="/" aria-label="NeoSkript home"><Logo name="neoskript" label="NeoSkript" class="wordmark" /><Logo name="icon" label="NeoSkript" class="tile" /></a>
+        <a class="home" href="/" aria-label="NeoSkript home"><Logo name="neoskript" label="NeoSkript" class="wordmark on-dark" /><Logo name="neoskript-light" label="NeoSkript" class="wordmark on-light" /><Logo name="icon" label="NeoSkript" class="tile" /></a>
         <nav aria-label="Main">
           <ul>
             {nav.map((item) => (
@@ -60,16 +70,29 @@ const og = new URL("/og.png", Astro.site).href;
     top: -4rem;
     padding: 0.5rem 1rem;
     border-radius: 999px;
-    background: var(--magenta);
-    color: var(--night);
+    background: var(--accent-fill);
+    color: var(--on-accent);
     text-decoration: none;
-    z-index: 10;
+    z-index: 30;
   }
   .skip:focus {
     top: 1rem;
   }
+  /* The bar stays at the top while the page scrolls under it (not on the parser, which fills the window). */
   .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
     border-bottom: 1px solid var(--rule);
+    background: color-mix(in srgb, var(--ground) 88%, transparent);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+  }
+  :global(body.app) .site-header {
+    position: static;
+    background: var(--ground);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
   .bar {
     display: flex;
@@ -77,6 +100,13 @@ const og = new URL("/og.png", Astro.site).href;
     justify-content: space-between;
     gap: 1.5rem;
     min-height: 4.5rem;
+  }
+  .home :global(.on-light),
+  :global([data-theme="light"]) .home :global(.on-dark) {
+    display: none;
+  }
+  :global([data-theme="light"]) .home :global(.on-light) {
+    display: block;
   }
   .home {
     display: inline-flex;
@@ -103,6 +133,13 @@ const og = new URL("/og.png", Astro.site).href;
   nav a[aria-current="page"] {
     color: var(--text);
   }
+  /* The section you're in: text colour and a magenta underline. */
+  nav a[aria-current="page"] {
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.55em;
+  }
   .home :global(.tile) {
     display: none;
   }
@@ -120,8 +157,8 @@ const og = new URL("/og.png", Astro.site).href;
     nav a {
       font-size: 0.875rem;
     }
-    /* The wordmark and three links fit on a phone. Docs, Addons and GitHub are
-       in the footer, and the landing links the guides too. */
+    /* The wordmark and three links fit on a phone: Docs, Syntax, Download.
+       Parser (a tool for a bigger screen), Addons and GitHub are in the footer. */
     nav .gh,
     nav .wide {
       display: none;
@@ -129,7 +166,8 @@ const og = new URL("/og.png", Astro.site).href;
   }
   /* Narrower than any current phone: the .sk tile stands in for the wordmark. */
   @media (max-width: 22rem) {
-    .home :global(.wordmark) {
+    .home :global(.wordmark),
+    :global([data-theme="light"]) .home :global(.on-light) {
       display: none;
     }
     .home :global(.tile) {

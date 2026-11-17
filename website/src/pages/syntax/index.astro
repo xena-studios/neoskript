@@ -86,15 +86,15 @@ const versions = sinceOptions([...syntax.elements, ...syntax.types, ...syntax.fu
     gap: 0.25rem 1rem;
     padding: 0.7rem 1rem;
     border: 1px solid var(--rule);
-    border-left: 3px solid var(--magenta);
-    border-radius: 4px;
+    border-radius: var(--pane-radius);
     background: var(--raised);
     text-decoration: none;
     transition: background-color 180ms var(--ease);
   }
   .results :global(a:hover),
   .results :global(a:focus-visible) {
-    background: color-mix(in srgb, var(--magenta) 10%, var(--raised));
+    background: color-mix(in srgb, var(--magenta) 6%, var(--raised));
+    border-color: color-mix(in srgb, var(--magenta) 60%, var(--rule));
   }
   .results :global(.r-name) {
     font-weight: 700;
@@ -107,8 +107,9 @@ const versions = sinceOptions([...syntax.elements, ...syntax.types, ...syntax.fu
   }
   .results :global(.r-badges span) {
     padding: 0.1rem 0.55rem;
+    border: 1px solid var(--rule);
     border-radius: 999px;
-    background: var(--night);
+    background: var(--ground);
     color: var(--muted);
     font-family: var(--label);
     font-size: 0.6875rem;
@@ -139,7 +140,7 @@ const versions = sinceOptions([...syntax.elements, ...syntax.types, ...syntax.fu
     height: 100%;
     padding: 1rem 1.1rem;
     border: 1px solid var(--rule);
-    border-radius: 4px;
+    border-radius: var(--pane-radius);
     background: var(--raised);
     text-decoration: none;
     transition: border-color 180ms var(--ease);

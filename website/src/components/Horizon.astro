@@ -16,4 +16,12 @@ const inner = raw.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "").replace(
     pointer-events: none;
     mask-image: linear-gradient(to bottom, black 55%, transparent);
   }
+  /* In the light theme the planet is paper, not night: its limb runs from the raised tone to the ground,
+     and the magenta rim stays. */
+  :global([data-theme="light"]) .horizon :global(stop:first-child) {
+    stop-color: var(--raised);
+  }
+  :global([data-theme="light"]) .horizon :global(stop:last-child) {
+    stop-color: var(--ground);
+  }
 </style>

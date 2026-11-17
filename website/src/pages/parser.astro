@@ -369,13 +369,13 @@ const counts = [
     margin-left: 0.5rem;
     padding: 0 0.9rem;
     border-radius: 999px;
-    background: var(--magenta);
-    color: var(--night);
+    background: var(--accent-fill);
+    color: var(--on-accent);
     font-size: 0.875rem;
     font-weight: 600;
   }
   .parse-btn:hover {
-    background: color-mix(in srgb, var(--magenta) 85%, white);
+    background: color-mix(in srgb, var(--accent-fill) 86%, var(--text));
   }
   .parse-btn .icon {
     fill: currentColor;
@@ -510,20 +510,18 @@ const counts = [
   .cards[hidden] {
     display: none;
   }
+  /* Each problem is a pane framed in its level's colour (a dashed frame for a warning), and it says its
+     level in words too. */
   .cards :global(.card) {
     border: 1px solid var(--rule);
-    border-left: 3px solid var(--muted);
-    border-radius: 4px;
+    border-radius: 10px;
     background: var(--raised);
   }
   .cards :global(.card.error) {
-    border-left-color: var(--magenta);
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--rule));
   }
   .cards :global(.card.warning) {
-    border-left: 3px dashed var(--string);
-  }
-  .cards :global(.card.ok) {
-    border-left-color: var(--text);
+    border: 1px dashed color-mix(in srgb, var(--string) 70%, var(--rule));
   }
   .cards :global(.card-head) {
     display: flex;
@@ -684,10 +682,9 @@ const counts = [
     z-index: 30;
     max-width: min(24rem, calc(100vw - 2rem));
     padding: 0.75rem 1rem;
-    border: 1px solid var(--rule);
-    border-left: 3px solid var(--magenta);
-    border-radius: 4px;
-    background: var(--night);
+    border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--rule));
+    border-radius: 10px;
+    background: var(--ground);
     font-size: 0.875rem;
     opacity: 0;
     translate: 0 0.5rem;
@@ -702,8 +699,8 @@ const counts = [
     width: min(28rem, calc(100vw - 2rem));
     padding: 1.5rem;
     border: 1px solid var(--rule);
-    border-radius: 4px;
-    background: var(--night);
+    border-radius: var(--pane-radius);
+    background: var(--ground);
     color: var(--text);
   }
   .dialog::backdrop {

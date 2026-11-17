@@ -44,7 +44,7 @@ const builtIn = [
 >
   <section class="page">
     <div class="wrap">
-      <h1>Addons</h1>
+      <h1 class="page-title">Addons</h1>
       <p class="lead">
         Official addons are made and maintained by Xena Studios, next to NeoSkript itself: each is released and tested
         with every NeoSkript version, so updating one never breaks the other.
@@ -88,7 +88,7 @@ const builtIn = [
             <dt>{b.plugin}</dt>
             <dd>
               <p>{b.gives}</p>
-              <p><Code line={b.example} /></p>
+              <p class="example-line"><Code line={b.example} /></p>
             </dd>
           </div>
         ))}
@@ -120,17 +120,20 @@ const builtIn = [
   .page {
     padding-block: clamp(3.5rem, 2rem + 5vw, 6rem) clamp(4rem, 2.5rem + 5vw, 7rem);
   }
-  h1 {
-    font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
-    letter-spacing: -0.035em;
+  .page > .wrap {
+    max-width: 64rem;
+    margin-inline: 0;
+    margin-left: max(0px, calc((100% - var(--max)) / 2));
   }
   .lead {
     margin-top: 1.25rem;
   }
   h2 {
-    margin-top: clamp(3rem, 2rem + 3vw, 4.5rem);
-    font-size: clamp(1.375rem, 1.1rem + 1vw, 1.75rem);
-    letter-spacing: -0.02em;
+    margin-top: clamp(3.5rem, 2.5rem + 3vw, 5rem);
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--rule);
+    font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
+    letter-spacing: -0.03em;
   }
   .section-lead,
   .empty {
@@ -143,8 +146,9 @@ const builtIn = [
     color: var(--text);
   }
   .empty {
-    padding-block: 1.25rem;
-    border-block: 1px solid var(--rule);
+    padding: 1rem 1.25rem;
+    border: 1px dashed var(--rule);
+    border-radius: var(--pane-radius);
   }
 
   /* Official addons, one hairline row each. */
@@ -180,8 +184,9 @@ const builtIn = [
   }
   .example {
     padding: 0.9rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--pane-radius);
     background: var(--raised);
-    border-left: 1px solid var(--magenta);
     overflow-x: auto;
     font-size: 0.875rem;
   }
@@ -212,6 +217,16 @@ const builtIn = [
     gap: 0.5rem;
     color: var(--muted);
     max-width: 66ch;
+  }
+  .example-line {
+    justify-self: start;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--raised);
+    color: var(--text);
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
   }
   @media (max-width: 44rem) {
     .rows > div {

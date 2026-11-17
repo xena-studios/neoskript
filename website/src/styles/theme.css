@@ -1,148 +1,115 @@
-/* The guides' Starlight theme in NeoSkript's colours (xena-studios/brand,
-   tokens/neoskript.*, synced into src/brand/): Neo Magenta on night in the
-   dark, ink and magenta-daylight in the light. Geist for words, Geist Mono for
-   code, JetBrains Mono for the uppercase labels, as across Xena. Neutrals are
-   mixed from the brand's text and night in sRGB (xenastudios.co's rule:
-   oklch mixing drifts the hue). */
-@import "../brand/neoskript.css";
+/* The guides (Starlight) in the site's world: the tokens the custom pages
+   use (tokens.css), in both themes; Geist set for long reading; code in the
+   brand's colours (src/lib/code-themes.mjs), the console's frames and level
+   tags where they mean something: asides are INFO, TIP, WARN and ERROR notes,
+   terminal blocks are console panes. Hairlines and tone, no shadows. */
+@import "./tokens.css";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 @import "@fontsource-variable/jetbrains-mono";
 
 :root {
-  --sl-font: "Geist Variable", system-ui, sans-serif;
-  --sl-font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --sl-font: var(--sans);
+  --sl-font-mono: var(--mono);
 
-  --night: var(--neoskript-night);
-  --raised: var(--neoskript-night-raised);
-  --rule: var(--neoskript-night-rule);
-  --text: var(--neoskript-text);
-  --muted: var(--neoskript-muted);
-  --magenta: var(--neoskript-magenta);
-  --string: var(--neoskript-string);
-}
+  /* Long reading: a slightly larger body on a 44rem measure (about 72
+     characters of Geist), headings tight and bold. */
+  --sl-text-body: 1.0625rem;
+  --sl-line-height: 1.72;
+  --sl-line-height-headings: 1.15;
+  --sl-content-width: 44rem;
+  --sl-text-h1: clamp(2.25rem, 1.7rem + 2.2vw, 3.25rem);
+  --sl-text-h2: clamp(1.5rem, 1.3rem + 0.8vw, 1.875rem);
+  --sl-text-h3: 1.3125rem;
+  --sl-text-h4: 1.0625rem;
+  --sl-text-h5: 1rem;
 
-/* Dark: night. */
-:root,
-::backdrop {
-  --sl-color-white: var(--text);
-  --sl-color-gray-1: color-mix(in srgb, var(--text) 92%, var(--night));
-  --sl-color-gray-2: color-mix(in srgb, var(--text) 80%, var(--night));
-  --sl-color-gray-3: var(--muted);
-  --sl-color-gray-4: color-mix(in srgb, var(--muted) 55%, var(--night));
-  --sl-color-gray-5: var(--rule);
-  --sl-color-gray-6: var(--raised);
-  --sl-color-black: var(--night);
-  --sl-color-bg-sidebar: var(--night);
-  --sl-color-bg-nav: var(--night);
-  --sl-color-hairline: var(--rule);
-  --sl-color-hairline-light: var(--rule);
-  /* Starlight draws the header's, the sidebar's and the mobile contents' rules in this shade: a hairline,
-     as every rule on the site, not night on night. */
-  --sl-color-hairline-shade: var(--rule);
-
-  --sl-color-accent-low: color-mix(in srgb, var(--magenta) 18%, var(--night));
-  --sl-color-accent: var(--magenta);
-  --sl-color-accent-high: var(--string);
-  --on-accent: var(--night);
-}
-
-/* Light: ink on a pale night tint, magenta-daylight for contrast. */
-:root[data-theme="light"],
-[data-theme="light"] ::backdrop {
-  --sl-color-white: var(--neoskript-ink);
-  --sl-color-gray-1: color-mix(in srgb, var(--neoskript-ink) 90%, white);
-  --sl-color-gray-2: color-mix(in srgb, var(--neoskript-ink) 78%, white);
-  --sl-color-gray-3: color-mix(in srgb, var(--neoskript-ink) 66%, white);
-  --sl-color-gray-4: color-mix(in srgb, var(--neoskript-ink) 42%, white);
-  --sl-color-gray-5: color-mix(in srgb, var(--neoskript-ink) 14%, white);
-  --sl-color-gray-6: color-mix(in srgb, var(--neoskript-ink) 5%, white);
-  --sl-color-gray-7: color-mix(in srgb, var(--neoskript-ink) 3%, white);
-  --sl-color-black: white;
-  --sl-color-bg-sidebar: color-mix(in srgb, var(--neoskript-ink) 3%, white);
-  --sl-color-bg-nav: color-mix(in srgb, var(--neoskript-ink) 3%, white);
-  --sl-color-hairline: var(--sl-color-gray-5);
-  --sl-color-hairline-light: var(--sl-color-gray-5);
-  --sl-color-hairline-shade: var(--sl-color-gray-5);
-
-  --sl-color-accent-low: color-mix(in srgb, var(--neoskript-magenta-daylight) 12%, white);
-  --sl-color-accent: var(--neoskript-magenta-daylight);
-  --sl-color-accent-high: color-mix(in srgb, var(--neoskript-magenta-daylight) 80%, var(--neoskript-ink));
-  --on-accent: white;
-  /* Links and the current contents entry in the deeper accent, as the dark theme uses its accent-high: plain
-     magenta-daylight is 4.85:1 on white but 4.4:1 on inline code's tint. */
-  --sl-color-text-accent: var(--sl-color-accent-high);
-}
-
-/* Flat: depth from tone and hairlines, no shadows. */
-:root {
   --sl-shadow-sm: none;
   --sl-shadow-md: none;
   --sl-shadow-lg: none;
-}
 
-/* Headings as the brand sets them: Geist Bold, tight tracking, balanced. */
-.sl-markdown-content :is(h1, h2, h3, h4),
-h1#_top {
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  text-wrap: balance;
-}
-.sl-markdown-content p,
-.sl-markdown-content li {
-  text-wrap: pretty;
-}
-
-/* The browser's own surfaces, themed like xenastudios.co's. */
-::selection {
-  background: color-mix(in srgb, var(--sl-color-accent) 35%, transparent);
-}
-:focus-visible {
-  outline: 2px solid var(--sl-color-accent);
-  outline-offset: 3px;
-}
-
-/* Asides as hairline-ruled notes, as the custom pages set notes: no coloured
-   side stripe or fill. The icon and title keep the text colour. */
-.starlight-aside {
-  --sl-color-asides-text-accent: var(--sl-color-white);
-  --sl-color-asides-border: var(--sl-color-hairline);
-  border-inline-start: 0;
-  border-block: 1px solid var(--sl-color-hairline);
-  background: transparent;
-  padding-inline: 0;
-}
-.starlight-aside :is(.starlight-aside__title, .starlight-aside__icon) {
-  color: var(--sl-color-white);
-}
-
-/* The current guide: text colour and a 1px magenta rail, as the custom nav
-   marks the current page with colour alone. String pink is for strings. */
-.sidebar-content .top-level a[aria-current="page"],
-.sidebar-content .top-level a[aria-current="page"]:hover,
-.sidebar-content .top-level a[aria-current="page"]:focus {
-  background: transparent;
-  color: var(--sl-color-white);
-  font-weight: 600;
-  box-shadow: inset 1px 0 var(--sl-color-accent);
-}
-
-/* Previous and next as a hairline row, not boxes. */
-.pagination-links a {
-  border: 0;
-  border-top: 1px solid var(--sl-color-hairline);
-  border-radius: 0;
-  box-shadow: none;
-}
-
-/* The header as the custom pages' (Base.astro): a 4.5rem bar over a hairline, the site's gutter, and the
-   wordmark at the same 1.75rem, its exported clear space (50 of 250 units on every side) cropped by a
-   negative margin as Logo.astro crops it with the viewBox. */
-:root {
-  --gutter: clamp(1rem, 0.4rem + 3vw, 4rem);
+  /* The header, as the custom pages' (Base.astro): 4.5rem over a hairline, the site's gutter. */
   --sl-nav-height: calc(4.5rem + 1px);
   --sl-nav-pad-x: var(--gutter);
 }
+
+/* Starlight's palette, from the tokens. Both themes read the same names, so
+   only the tokens change between them. Starlight's hues map onto the brand:
+   notes neutral, tips and successes magenta, cautions string pink, dangers
+   magenta. */
+:root,
+::backdrop,
+:root[data-theme="light"],
+[data-theme="light"] ::backdrop {
+  --sl-color-white: var(--text);
+  --sl-color-gray-1: color-mix(in srgb, var(--text) 90%, var(--ground));
+  --sl-color-gray-2: color-mix(in srgb, var(--text) 76%, var(--ground));
+  --sl-color-gray-3: var(--muted);
+  --sl-color-gray-4: color-mix(in srgb, var(--muted) 55%, var(--ground));
+  --sl-color-gray-5: var(--rule);
+  --sl-color-gray-6: var(--raised);
+  --sl-color-gray-7: color-mix(in srgb, var(--raised) 50%, var(--ground));
+  --sl-color-black: var(--ground);
+  --sl-color-bg: var(--ground);
+  --sl-color-bg-nav: color-mix(in srgb, var(--ground) 88%, transparent);
+  --sl-color-bg-sidebar: var(--ground);
+  --sl-color-bg-inline-code: var(--raised);
+  --sl-color-hairline: var(--rule);
+  --sl-color-hairline-light: var(--rule);
+  --sl-color-hairline-shade: var(--rule);
+
+  --sl-color-accent-low: color-mix(in srgb, var(--accent) 14%, var(--ground));
+  --sl-color-accent: var(--accent);
+  --sl-color-accent-high: var(--accent);
+  --sl-color-text-accent: var(--accent);
+  --sl-color-text-invert: var(--on-accent);
+
+  --sl-color-blue: var(--muted);
+  --sl-color-blue-low: var(--raised);
+  --sl-color-blue-high: var(--text);
+  --sl-color-purple: var(--accent);
+  --sl-color-purple-low: color-mix(in srgb, var(--accent) 12%, var(--ground));
+  --sl-color-purple-high: var(--accent);
+  --sl-color-green: var(--accent);
+  --sl-color-green-low: color-mix(in srgb, var(--accent) 12%, var(--ground));
+  --sl-color-green-high: var(--accent);
+  --sl-color-red: var(--accent);
+  --sl-color-red-low: color-mix(in srgb, var(--accent) 12%, var(--ground));
+  --sl-color-red-high: var(--accent);
+  --sl-color-orange: var(--string);
+  --sl-color-orange-low: color-mix(in srgb, var(--string) 12%, var(--ground));
+  --sl-color-orange-high: var(--string);
+}
+
+body {
+  background: var(--ground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* The browser's own surfaces. */
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--text);
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+html {
+  scrollbar-color: var(--rule) var(--ground);
+}
+
+/* ---- Header ---------------------------------------------------------- */
+
+/* A frosted bar over a hairline, as the custom pages'. */
+.header {
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+/* The wordmark at the custom pages' 1.75rem, its exported clear space (50 of 250 units on every side) cropped
+   by a negative margin, as Logo.astro crops it with the viewBox. */
 .site-title img {
   height: calc(1.75rem * 250 / 150);
   max-width: none;
@@ -153,4 +120,628 @@ h1#_top {
     height: calc(1.375rem * 250 / 150);
     margin-inline: calc(-1.375rem * 50 / 150);
   }
+}
+/* Search: a pill, as the site's controls. */
+site-search > button[data-open-modal] {
+  border-radius: 999px;
+  border-color: var(--rule);
+  background: var(--raised);
+  color: var(--muted);
+  padding-inline: 1rem 0.5rem;
+  transition: border-color 180ms var(--ease);
+}
+site-search > button[data-open-modal]:hover {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--rule));
+  color: var(--text);
+}
+site-search > button[data-open-modal] kbd {
+  border-radius: 999px;
+  background: var(--ground);
+  font-family: var(--label);
+  font-size: 0.6875rem;
+}
+/* No divider between the site's links and the theme select. */
+.social-icons::after {
+  display: none;
+}
+starlight-theme-select select {
+  color: var(--muted);
+}
+/* The phone menu button and search: quiet round controls on the raised tone. */
+.sl-menu-button {
+  background: var(--raised) !important;
+  border: 1px solid var(--rule) !important;
+  color: var(--text) !important;
+  box-shadow: none !important;
+}
+
+/* ---- Sidebar --------------------------------------------------------- */
+
+/* Groups named in the label face; links muted; the current guide in text
+   colour on a faint magenta wash, with a 1px magenta rail where the tree line
+   runs. */
+.sidebar-content {
+  --sl-sidebar-item-padding-inline: 0.75rem;
+}
+.sidebar-content .group-label .large {
+  font-family: var(--label);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sidebar-content summary {
+  padding-block: 0.5rem 0.25rem;
+}
+.sidebar-content details + details,
+.sidebar-content li + li > details {
+  margin-top: 0.75rem;
+}
+.sidebar-content ul ul {
+  border-inline-start: 1px solid var(--rule);
+  margin-inline-start: 0.25rem;
+  padding-inline-start: 0;
+}
+.sidebar-content ul ul li {
+  border: 0;
+  margin-inline-start: 0;
+  padding-inline-start: 0;
+}
+.sidebar-content a {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  border-radius: 0 6px 6px 0;
+  padding-block: 0.3rem;
+  transition: color 160ms var(--ease), background-color 160ms var(--ease);
+}
+.sidebar-content a:hover {
+  color: var(--text);
+}
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 1px 0 var(--accent);
+  margin-inline-start: -1px;
+}
+
+/* ---- Page title and the reading column ------------------------------- */
+
+.content-panel {
+  padding-block: 2rem;
+}
+.content-panel + .content-panel {
+  border-top-color: var(--rule);
+}
+h1#_top {
+  margin-top: 0.5rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.sl-markdown-content {
+  color: color-mix(in srgb, var(--text) 88%, var(--muted));
+}
+.sl-markdown-content p,
+.sl-markdown-content li {
+  text-wrap: pretty;
+}
+.sl-markdown-content :is(strong, b) {
+  color: var(--text);
+  font-weight: 600;
+}
+.sl-markdown-content :is(h2, h3, h4, h5, h6):not(:where(.not-content *)) {
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.sl-markdown-content h2:not(:where(.not-content *)) {
+  letter-spacing: -0.03em;
+}
+/* Each h2 opens a section: a hairline above it and more space above than below. */
+.sl-markdown-content :is(h2:not(:where(.not-content *)), .sl-heading-wrapper.level-h2) {
+  margin-top: 3.25rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--rule);
+}
+.sl-markdown-content .sl-heading-wrapper.level-h2 > h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.sl-markdown-content :is(h3:not(:where(.not-content *)), .sl-heading-wrapper.level-h3) {
+  margin-top: 2.25rem;
+}
+.sl-markdown-content .sl-heading-wrapper.level-h3 > h3 {
+  margin: 0;
+}
+.sl-markdown-content :is(h2, h3, h4) + :is(p, ul, ol),
+.sl-markdown-content .sl-heading-wrapper + :is(p, ul, ol) {
+  margin-top: 0.75rem;
+}
+.sl-markdown-content .sl-anchor-link {
+  color: var(--muted);
+}
+.sl-markdown-content .sl-anchor-link:hover {
+  color: var(--accent);
+}
+
+/* Links: inherit, underlined in a 35% text mix that turns magenta. */
+.sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--text);
+  text-decoration-color: color-mix(in srgb, var(--text) 35%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  transition: text-decoration-color 160ms var(--ease), color 160ms var(--ease);
+}
+.sl-markdown-content a:not(:where(.not-content *)):hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+/* Inline code and keys. */
+.sl-markdown-content :not(pre) > code:not(:where(.not-content *)) {
+  padding: 0.12em 0.38em;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--text);
+  font-size: 0.86em;
+  overflow-wrap: anywhere;
+}
+.sl-markdown-content kbd:not(:where(.not-content *)) {
+  display: inline-block;
+  min-width: 1.75em;
+  padding: 0.05em 0.45em;
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--raised);
+  font-family: var(--label);
+  font-size: 0.78em;
+  text-align: center;
+}
+
+/* Lists: muted markers. */
+.sl-markdown-content :is(ul, ol) > li::marker {
+  color: var(--muted);
+}
+.sl-markdown-content ol > li::marker {
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+.sl-markdown-content li + li {
+  margin-top: 0.35rem;
+}
+
+/* Tables: hairline rows, the head in the label face. */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+.sl-markdown-content :is(th, td):not(:where(.not-content *)) {
+  padding: 0.65rem 1rem 0.65rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  text-align: start;
+  vertical-align: top;
+}
+.sl-markdown-content th:not(:where(.not-content *)) {
+  border-top: 1px solid var(--rule);
+  font-family: var(--label);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sl-markdown-content tr:nth-child(2n):not(:where(.not-content *)) {
+  background: transparent;
+}
+
+/* Quotes and rules. */
+.sl-markdown-content blockquote:not(:where(.not-content *)) {
+  border-inline-start: 1px solid var(--accent);
+  padding-inline-start: 1.25rem;
+  color: var(--muted);
+  font-style: normal;
+}
+.sl-markdown-content hr:not(:where(.not-content *)) {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin-block: 2.5rem;
+}
+
+/* ---- Code blocks (Expressive Code) ----------------------------------- */
+
+/* An editor frame's tab is the file's name, in mono. A terminal frame is a
+   console pane: no window dots, its title (or "Terminal") in the label face. */
+.expressive-code .frame.has-title:not(.is-terminal) .header .title {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.expressive-code .frame.is-terminal .header::before {
+  display: none;
+}
+.expressive-code .frame.is-terminal .header .title,
+.expressive-code .frame.is-terminal:not(.has-title) .header::after {
+  font-family: var(--label);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.expressive-code .frame.is-terminal .header {
+  justify-content: flex-start;
+  padding-inline: 1.25rem;
+}
+.expressive-code .frame.is-terminal:not(.has-title) .header::after {
+  content: "Terminal";
+  position: static;
+  border: 0;
+  background: none;
+}
+.expressive-code .copy button {
+  border-radius: 6px;
+}
+.expressive-code {
+  margin-block: 1.5rem;
+}
+
+/* ---- Asides: log-level notes ----------------------------------------- */
+
+/* A raised note in a hairline frame, led by its level as the console prints
+   it (INFO, TIP, WARN, ERROR) and then its title. The level carries the
+   meaning in words, the colour backs it up. */
+.starlight-aside {
+  --level-color: var(--muted);
+  --sl-color-asides-text-accent: var(--text);
+  --sl-color-asides-border: var(--rule);
+  position: relative;
+  border: 1px solid var(--rule);
+  border-radius: var(--pane-radius);
+  background: var(--raised);
+  padding: 1rem 1.25rem 1.1rem;
+  font-size: 0.9875rem;
+}
+.starlight-aside--tip {
+  --level-color: var(--accent);
+}
+.starlight-aside--caution {
+  --level-color: var(--string);
+  border-color: color-mix(in srgb, var(--string) 40%, var(--rule));
+}
+.starlight-aside--danger {
+  --level-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--rule));
+}
+.starlight-aside__title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.starlight-aside__title::before {
+  flex: none;
+  font-family: var(--label);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--level-color);
+}
+.starlight-aside--note .starlight-aside__title::before {
+  content: "INFO";
+}
+.starlight-aside--tip .starlight-aside__title::before {
+  content: "TIP";
+}
+.starlight-aside--caution .starlight-aside__title::before {
+  content: "WARN";
+}
+.starlight-aside--danger .starlight-aside__title::before {
+  content: "ERROR";
+}
+.starlight-aside__icon {
+  display: none;
+}
+.starlight-aside__content {
+  color: color-mix(in srgb, var(--text) 86%, var(--muted));
+}
+.starlight-aside__content a {
+  color: var(--text);
+}
+
+/* ---- Starlight's components ------------------------------------------ */
+
+/* Tabs: labels in Geist, the chosen one in text over a magenta underline. */
+starlight-tabs [role="tablist"] {
+  border-bottom: 1px solid var(--rule);
+  gap: 0.25rem;
+}
+starlight-tabs .tab > [role="tab"] {
+  box-shadow: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 0.55rem 1rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  transition: color 160ms var(--ease), border-color 160ms var(--ease);
+}
+starlight-tabs .tab > [role="tab"]:hover {
+  color: var(--text);
+}
+starlight-tabs .tab [role="tab"][aria-selected="true"] {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* Cards: raised panes in a hairline frame, the icon in magenta with no tile. */
+.sl-markdown-content .card {
+  border: 1px solid var(--rule);
+  border-radius: var(--pane-radius);
+  background: var(--raised);
+  padding: 1.25rem 1.375rem;
+  gap: 0.5rem;
+}
+.sl-markdown-content .card .title {
+  font-size: 1.0625rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  gap: 0.75rem;
+}
+.sl-markdown-content .card .icon {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--accent);
+  width: 1.25em;
+  height: 1.25em;
+}
+.sl-markdown-content .card .body {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+.sl-markdown-content .card-grid {
+  gap: 0.75rem;
+}
+
+/* Link cards: the same pane; the arrow turns magenta and nudges on hover. */
+.sl-link-card {
+  border: 1px solid var(--rule) !important;
+  border-radius: var(--pane-radius) !important;
+  background: var(--raised);
+  padding: 1.1rem 1.25rem !important;
+  transition: border-color 180ms var(--ease);
+}
+.sl-link-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--rule)) !important;
+  background: var(--raised) !important;
+}
+.sl-link-card .title {
+  font-size: 1.0625rem !important;
+  letter-spacing: -0.01em;
+}
+.sl-link-card .description {
+  color: var(--muted) !important;
+  font-size: 0.9375rem;
+}
+.sl-link-card .icon {
+  color: var(--muted) !important;
+  transition: transform 180ms var(--ease), color 180ms var(--ease);
+}
+.sl-link-card:hover .icon {
+  color: var(--accent) !important;
+  transform: translateX(3px);
+}
+
+/* Steps: magenta mono numerals on the ground, joined by a hairline. */
+.sl-steps > li::before {
+  background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.sl-steps > li::after {
+  background-color: var(--rule);
+}
+.sl-steps > li {
+  padding-bottom: 1rem;
+}
+
+/* Badges: small labels in the label face, outlined. */
+.sl-badge {
+  border-radius: 999px;
+  border-color: var(--sl-color-border-badge) !important;
+  background: color-mix(in srgb, var(--sl-color-border-badge) 12%, transparent) !important;
+  color: var(--sl-color-border-badge) !important;
+  font-family: var(--label);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.55rem;
+  vertical-align: 0.15em;
+}
+.sl-badge.default,
+.sl-badge.note {
+  --sl-color-border-badge: var(--muted);
+}
+.sl-badge.note {
+  color: var(--text) !important;
+}
+.sl-badge.default {
+  --sl-color-border-badge: var(--accent);
+}
+.sl-badge.large {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.7rem;
+}
+.sidebar-content .sl-badge {
+  font-size: 0.625rem;
+  padding: 0.05rem 0.4rem;
+}
+
+/* Link buttons: the site's 44px pills. */
+.sl-link-button {
+  min-height: 44px;
+  border-radius: 999px !important;
+  padding: 0 1.375rem !important;
+  font-size: 0.9375rem !important;
+  font-weight: 600;
+  align-items: center;
+}
+.sl-link-button.primary {
+  background: var(--accent-fill) !important;
+  border-color: var(--accent-fill) !important;
+  color: var(--on-accent) !important;
+}
+.sl-link-button.secondary {
+  border-color: var(--rule) !important;
+  color: var(--text) !important;
+}
+
+/* File trees: a raised pane, mono, hairline guides, highlighted names in magenta. */
+starlight-file-tree {
+  border: 1px solid var(--rule) !important;
+  border-radius: var(--pane-radius);
+  background: var(--raised) !important;
+  padding: 1rem 1.25rem !important;
+  font-family: var(--mono) !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.7;
+}
+starlight-file-tree .tree-icon {
+  color: var(--muted);
+}
+starlight-file-tree ul {
+  border-inline-start-color: var(--rule) !important;
+}
+starlight-file-tree .highlight {
+  background: transparent !important;
+  color: var(--accent) !important;
+  font-weight: 600;
+  padding-inline: 0 !important;
+}
+starlight-file-tree .highlight .tree-icon {
+  color: var(--accent) !important;
+}
+starlight-file-tree .comment {
+  color: var(--muted) !important;
+}
+
+/* ---- Contents, footer, search ---------------------------------------- */
+
+/* On this page: the label face for its title, muted links, the current one in text with a magenta rail. */
+starlight-toc nav h2,
+mobile-starlight-toc nav .toggle {
+  font-family: var(--label);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+starlight-toc nav ul {
+  border-inline-start: 1px solid var(--rule);
+}
+starlight-toc nav a {
+  color: var(--muted);
+  font-size: 0.875rem;
+  padding-inline-start: calc(0.75rem + var(--depth, 0) * 0.75rem) !important;
+  margin-inline-start: -1px;
+}
+starlight-toc nav a:hover {
+  color: var(--text);
+}
+starlight-toc nav a[aria-current="true"] {
+  color: var(--text);
+  box-shadow: inset 1px 0 var(--accent);
+}
+starlight-toc nav ul ul {
+  border: 0;
+}
+
+/* Previous and next as a hairline row, the direction in the label face. */
+.pagination-links {
+  gap: 1rem;
+}
+.pagination-links a {
+  border: 1px solid var(--rule);
+  border-radius: var(--pane-radius);
+  box-shadow: none;
+  padding: 1rem 1.25rem;
+  transition: border-color 180ms var(--ease);
+}
+.pagination-links a:hover {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--rule));
+}
+.pagination-links a > span {
+  font-family: var(--label);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pagination-links .link-title {
+  margin-top: 0.25rem;
+  font-family: var(--sans);
+  font-size: 1.125rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  text-transform: none;
+  color: var(--text);
+}
+.pagination-links svg {
+  color: var(--accent);
+}
+.meta {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* The search dialog (Pagefind): a pane on the ground, a pill input. */
+site-search dialog {
+  border: 1px solid var(--rule);
+  border-radius: var(--pane-radius);
+  background: var(--ground);
+}
+site-search dialog::backdrop {
+  background: color-mix(in srgb, var(--ground) 70%, transparent);
+  backdrop-filter: blur(4px);
+}
+#starlight__search {
+  --pagefind-ui-primary: var(--accent);
+  --pagefind-ui-text: var(--text);
+  --pagefind-ui-background: var(--ground);
+  --pagefind-ui-border: var(--rule);
+  --pagefind-ui-tag: var(--raised);
+  --pagefind-ui-font: var(--sans);
+}
+#starlight__search .pagefind-ui__search-input {
+  border-radius: 999px;
+}
+#starlight__search .pagefind-ui__result-link {
+  color: var(--text);
+}
+#starlight__search mark {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text);
 }

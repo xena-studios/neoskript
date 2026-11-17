@@ -1,30 +1,12 @@
-/* The custom pages (landing, download): NeoSkript's brand on night, laid out
-   with xenastudios.co's grammar: hairlines, pills, one column of ideas, no
-   cards. Colours come from src/brand/neoskript.css (synced from the brand
-   repo); translucent mixes are in sRGB. */
-@import "../brand/neoskript.css";
+/* The custom pages (landing, download, addons, the syntax reference and the
+   parser). The site reads like a server's console where that means
+   something: panes with a title strip, log lines over a timestamp gutter,
+   level tags. Everything else is Geist on the ground, hairline rows and pills,
+   as across Xena. Colours are tokens (tokens.css), in both themes. */
+@import "./tokens.css";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 @import "@fontsource-variable/jetbrains-mono";
-
-:root {
-  --night: var(--neoskript-night);
-  --raised: var(--neoskript-night-raised);
-  --rule: var(--neoskript-night-rule);
-  --text: var(--neoskript-text);
-  --muted: var(--neoskript-muted);
-  --magenta: var(--neoskript-magenta);
-  --string: var(--neoskript-string);
-
-  --sans: "Geist Variable", system-ui, sans-serif;
-  --mono: "Geist Mono Variable", ui-monospace, monospace;
-  --label: "JetBrains Mono Variable", ui-monospace, monospace;
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --gutter: clamp(1rem, 0.4rem + 3vw, 4rem);
-  --max: 90rem;
-
-  color-scheme: dark;
-}
 
 *,
 *::before,
@@ -32,19 +14,22 @@
   box-sizing: border-box;
 }
 html {
-  background: var(--night);
+  background: var(--ground);
   color: var(--text);
   font-family: var(--sans);
   font-size: 100%;
   line-height: 1.6;
   -webkit-text-size-adjust: 100%;
-  scrollbar-color: var(--rule) var(--night);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scrollbar-color: var(--rule) var(--ground);
 }
 body {
   margin: 0;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  background: var(--ground);
 }
 main {
   flex: 1;
@@ -73,17 +58,19 @@ p {
 a {
   color: inherit;
   text-decoration-color: color-mix(in srgb, var(--text) 35%, transparent);
+  text-decoration-thickness: 1px;
   text-underline-offset: 0.25em;
   transition: text-decoration-color 180ms var(--ease), color 180ms var(--ease);
 }
 a:hover {
-  text-decoration-color: var(--magenta);
+  text-decoration-color: var(--accent);
 }
 ::selection {
-  background: color-mix(in srgb, var(--magenta) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--text);
 }
 :focus-visible {
-  outline: 2px solid var(--magenta);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
   border-radius: 4px;
 }
@@ -92,6 +79,9 @@ pre,
 kbd {
   font-family: var(--mono);
   font-variant-ligatures: none;
+}
+:not(pre) > code {
+  font-size: 0.9em;
 }
 
 .wrap {
@@ -110,9 +100,31 @@ kbd {
 }
 .lead {
   font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
-  line-height: 1.7;
+  line-height: 1.65;
   color: var(--muted);
-  max-width: 62ch;
+  max-width: 60ch;
+}
+.lead code {
+  color: var(--text);
+}
+
+/* Section rhythm: a hairline, then generous space, more above a heading than below it. */
+.section {
+  padding-block: clamp(4rem, 2.5rem + 5vw, 7.5rem);
+  border-top: 1px solid var(--rule);
+}
+.section-title {
+  font-size: clamp(1.875rem, 1.3rem + 2.2vw, 3rem);
+  line-height: 1.05;
+  max-width: 20ch;
+}
+.section-title + .lead {
+  margin-top: 1.25rem;
+}
+.page-title {
+  font-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
 }
 
 /* Pills, 44px, as on xenastudios.co. */
@@ -124,6 +136,7 @@ kbd {
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5em;
   min-height: 44px;
   padding: 0 1.375rem;
@@ -135,18 +148,84 @@ kbd {
   transition: background-color 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease);
 }
 .btn-primary {
-  background: var(--magenta);
-  color: var(--night);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 600;
 }
 .btn-primary:hover {
-  background: color-mix(in srgb, var(--magenta) 85%, white);
+  background: color-mix(in srgb, var(--accent-fill) 86%, var(--text));
 }
 .btn-secondary {
   border: 1px solid var(--rule);
   color: var(--text);
 }
 .btn-secondary:hover {
-  border-color: color-mix(in srgb, var(--magenta) 60%, var(--rule));
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--rule));
+}
+
+/* The console pane: a hairline frame, a title strip naming what runs in it,
+   and a body of log lines or code. The landing's replay, the output check,
+   the download page's commands and the guides' terminal frames share it. */
+.pane {
+  border: 1px solid var(--rule);
+  border-radius: var(--pane-radius);
+  background: var(--raised);
+  overflow: hidden;
+  min-width: 0;
+}
+.pane-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--ground);
+}
+.pane-bar .label {
+  font-size: 0.6875rem;
+}
+.pane-body {
+  padding: 0.875rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  overflow-x: auto;
+}
+
+/* One log line: an elapsed-time stamp, a level, the message. */
+.log {
+  display: grid;
+  grid-template-columns: 4.75rem 3.25rem minmax(0, 1fr);
+  column-gap: 0.75rem;
+  align-items: baseline;
+}
+.log .at {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.log .msg {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.log.cmd .msg {
+  color: var(--muted);
+}
+
+/* Level tags: the metadata of a log line, in JetBrains Mono caps. */
+.lvl {
+  font-family: var(--label);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lvl.done {
+  color: var(--accent);
 }
 
 /* The tools' icons (src/lib/icons.ts): strokes in currentColor, as the External arrow. */
@@ -195,12 +274,13 @@ kbd {
 
 /* Script syntax, as the brand sets code: keywords magenta, strings pale. */
 .kw {
-  color: var(--magenta);
+  color: var(--accent);
 }
 .str {
   color: var(--string);
 }
-.punct {
+.punct,
+.comment {
   color: var(--muted);
 }
 

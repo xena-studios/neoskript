@@ -1,8 +1,9 @@
 ---
-// neoskript.dev, the landing page. In order: the promise and three headline
-// numbers (src/data/benchmark.json); Skript and NeoSkript side by side, as a
-// table of what changes and what doesn't; every benchmark as a staff whose
-// bars share a scale per group; a real run of the differential harness
+// neoskript.dev, the landing page. In order: the promise, over two server
+// consoles replaying the benchmark's startup and /sk reload at the speed each
+// server took (src/data/benchmark.json, src/scripts/replay.ts); Skript and
+// NeoSkript side by side, as a table of what changes and what doesn't; every
+// benchmark on one time axis per group; a real run of the differential harness
 // (src/data/differential.json), what each server printed for one probe, row
 // for row, with the test results; the switch in three steps; questions people
 // ask before switching; and the call to try it.
@@ -27,6 +28,16 @@ const file = run.file.split("/").pop();
 const secs = (ms: number) => `${(ms / 1000).toFixed(2)} s`;
 const ratio = (a: number, b: number) => (a / b).toFixed(1);
 const times = (a: number, b: number) => `${ratio(a, b)}× faster`;
+
+// The hero's two consoles: each server loads the benchmark's scripts, then
+// reloads them, at the speed it measured. Times are seconds from the start of
+// the replay; the command comes a beat after each server finishes loading.
+const beat = 0.6;
+const consoles = [
+  { id: "skript", name: bench.skript, load: bench.startup.skriptMs / 1000, reload: bench.reload.skriptMs / 1000, tick: bench.ticks.skriptScriptMs },
+  { id: "neoskript", name: release ? `NeoSkript ${release.version}` : "NeoSkript", load: bench.startup.neoskriptMs / 1000, reload: bench.reload.neoskriptMs / 1000, tick: bench.ticks.neoskriptScriptMs },
+].map((c) => ({ ...c, issued: c.load + beat, end: c.load + beat + c.reload }));
+const stamp = (s: number) => `${s.toFixed(3)}s`;
 
 // The three numbers the hero leads with.
 const headline = [
@@ -111,7 +122,12 @@ const scaled = (group: typeof measures) => {
   const longest = Math.max(...group.map((m) => m.skript));
   return group.map((m) => ({ ...m, width: (v: number) => Math.max(1.5, (v / longest) * 100) }));
 };
-const rows = [...scaled(measures), ...scaled(ticks), ...scaled(triggers)];
+// Each group has its own scale, named in its head row with the longest time on it.
+const groups = [
+  { name: "Loading", unit: secs(Math.max(...measures.map((m) => m.skript))), rows: scaled(measures) },
+  { name: "Every tick", unit: `${bench.ticks.skriptScriptMs.toFixed(2)} ms`, rows: scaled(ticks) },
+  { name: "Each time a trigger fires", unit: `${Math.max(...triggers.map((t) => t.skript)).toFixed(2)} µs`, rows: scaled(triggers) },
+];
 
 const faq = [
   {
@@ -148,39 +164,66 @@ const faq = [
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap hero-copy">
       <h1 id="hero-title">Keep your scripts. <span class="accent">Lose the lag.</span></h1>
-      <p class="lead">
-        NeoSkript is a drop-in replacement for Skript. Swap the jar and your <code>.sk</code> scripts run unchanged,
-        compiled for speed, on Paper and Folia.
-      </p>
-      <div class="actions">
-        <a class="btn btn-primary" href="/download/">Download the beta</a>
-        <a class="btn btn-secondary" href="#compare-title">See how it compares</a>
+      <div class="hero-side">
+        <p class="lead">
+          NeoSkript is a drop-in replacement for Skript. Swap the jar and your <code>.sk</code> scripts run unchanged,
+          compiled for speed, on Paper and Folia.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/download/">Download the beta</a>
+          <a class="btn btn-secondary" href="#compare-title">See how it compares</a>
+        </div>
+        <p class="meta">
+          {release ? `Public beta ${release.version}` : "Public beta"} · Free and open source · Paper and Folia, 1.21.4 to 26.3
+        </p>
       </div>
-      <p class="meta">
-        {release ? `Public beta ${release.version}` : "Public beta"} · Free and open source · Paper and Folia, 1.21.4 to 26.3
-      </p>
     </div>
 
-    <div class="wrap">
-      <ul class="headline" aria-label="NeoSkript against Skript">
-        {headline.map((h) => (
-          <li>
-            <strong><span class="figure">{h.figure}</span> {h.name}</strong>
-            <span>{h.text}</span>
-          </li>
+    <figure class="wrap replay" data-replay aria-labelledby="replay-caption">
+      <div class="consoles">
+        {consoles.map((c, i) => (
+          <div class:list={["pane", "console", c.id]} data-end={c.end}>
+            <div class="pane-bar">
+              <span class="label server">{c.name} · {serverName}</span>
+              <span class="clock" data-clock aria-hidden="true">{c.end.toFixed(2)} s</span>
+            </div>
+            <div class="pane-body">
+              <p class="log"><span class="at">{stamp(0)}</span><span class="lvl">Info</span><span class="msg">Loading {bench.scripts} scripts, {fmt(bench.lines)} lines</span></p>
+              <p class="log" data-at={c.load}>
+                <span class="at">{stamp(c.load)}</span><span class:list={["lvl", { done: i === 1 }]}>Info</span>
+                <span class="msg">Loaded in {secs(c.load * 1000)}{i === 1 && <span class="mark">{headline[0].figure} faster</span>}</span>
+              </p>
+              <p class="log cmd" data-at={c.issued}><span class="at">{stamp(c.issued)}</span><span class="lvl">&gt;</span><span class="msg">sk reload scripts</span></p>
+              <p class="log" data-at={c.end}>
+                <span class="at">{stamp(c.end)}</span><span class:list={["lvl", { done: i === 1 }]}>Info</span>
+                <span class="msg">Reloaded in {fmt(Math.round(c.reload * 1000))} ms{i === 1 && <span class="mark">{headline[1].figure} faster</span>}</span>
+              </p>
+            </div>
+            <p class="pane-foot">
+              <span class="label">{bench.ticks.players} players online</span>
+              <span class="tick">Scripts take <strong>{c.tick.toFixed(2)} ms</strong> of each tick{i === 1 && <span class="mark">{headline[2].figure} less</span>}</span>
+            </p>
+          </div>
         ))}
-      </ul>
-      <p class="headline-note">
-        Against Skript {skriptVersion}, with the same scripts on the same {serverName} server.{" "}
-        <a href="#numbers-title">All the numbers</a>
-      </p>
-    </div>
+      </div>
+      <figcaption id="replay-caption">
+        <span>
+          The benchmark's {bench.scripts} scripts loading and reloading on each server, replayed at the speed it took.
+          Same scripts, same {serverName} server, {bench.machine.replace(/^an? /, "")}, {day(bench.date)}.{" "}
+          <a href="#numbers-title">All the numbers</a>
+        </span>
+        <button class="replay-btn" type="button" data-replay-button hidden>
+          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9" /><path d="M2.5 2.5v2.5H5" /></svg>
+          Replay
+        </button>
+      </figcaption>
+    </figure>
   </section>
 
   <section class="section" aria-labelledby="compare-title">
     <div class="wrap">
-      <h2 id="compare-title">Everything your scripts do on Skript, without the lag</h2>
-      <p class="lead section-lead">
+      <h2 class="section-title" id="compare-title">Everything your scripts do on Skript, without the lag</h2>
+      <p class="lead">
         Same language, same files, same results. What changes is underneath: NeoSkript compiles your scripts instead
         of interpreting them, and it was built for Folia from the start.
       </p>
@@ -194,10 +237,13 @@ const faq = [
         </thead>
         <tbody>
           {compare.map((c) => (
-            <tr class={c.same ? "is-same" : undefined}>
+            <tr>
               <th scope="row">{c.what}</th>
               <td class="c-skript"><span class="who" aria-hidden="true">Skript</span>{c.skript}</td>
-              <td class="c-neo"><span class="who" aria-hidden="true">NeoSkript</span>{c.neo}</td>
+              <td class="c-neo">
+                <span class="who" aria-hidden="true">NeoSkript</span>
+                <span>{c.neo}{c.same && <span class="lvl same-tag">Same</span>}</span>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -207,99 +253,107 @@ const faq = [
 
   <section class="section" aria-labelledby="numbers-title">
     <div class="wrap">
-      <h2 id="numbers-title">The numbers</h2>
-      <p class="lead section-lead">
+      <h2 class="section-title" id="numbers-title">The numbers</h2>
+      <p class="lead">
         The same scripts on the same server, measured by our test harness. Each bar is as long as the time it took, so
         shorter is better.
       </p>
-    </div>
-    <figure class="staff-figure wrap">
-      <div class="staff perf" role="table" aria-label="Load, reload, variable and tick times, and what triggers cost, Skript and NeoSkript">
-        <div class="row head" role="row">
-          <span class="label skript" role="columnheader">{bench.skript} · {serverName}</span>
-          <span class="label script" role="columnheader">The same scripts</span>
-          <span class="label neo" role="columnheader">NeoSkript · {serverName}</span>
+      <figure class="numbers">
+        <div class="bench" role="table" aria-label="Load, reload, variable and tick times, and what triggers cost, Skript and NeoSkript">
+          {groups.map((g) => (
+            <div role="rowgroup" class="bench-group">
+              <div class="bench-row bench-head" role="row">
+                <span class="label" role="columnheader">{g.name}</span>
+                <span class="scale" role="columnheader">Bars from 0 to {g.unit}, on {serverName}</span>
+              </div>
+              {g.rows.map((m) => (
+                <div class="bench-row" role="row">
+                  <span class="measure" role="rowheader"><strong>{m.name}</strong><span class="what">{m.what}</span></span>
+                  <span class="runs" role="cell">
+                    <span class="run skript">
+                      <span class="who">Skript</span>
+                      <svg class="track" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect class="bg" width="100" height="10" /><rect class="fill" width={m.width(m.skript)} height="10" /></svg>
+                      <span class="time">{m.show(m.skript)}</span>
+                    </span>
+                    <span class="run neo">
+                      <span class="who">NeoSkript</span>
+                      <svg class="track" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect class="bg" width="100" height="10" /><rect class="fill" width={m.width(m.neo)} height="10" /></svg>
+                      <span class="time">{m.show(m.neo)}<span class="mark">{times(m.skript, m.neo)}</span></span>
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
-        {rows.map((m) => (
-          <div class="row line" role="row">
-            <span class="skript out" role="cell">
-              <span class="who" aria-hidden="true">Skript</span>
-              <span class="reading"><span class="time">{m.show(m.skript)}</span></span>
-              <svg class="bar" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect class="track" width="100" height="10" /><rect class="fill" width={m.width(m.skript)} height="10" /></svg>
-            </span>
-            <span class="script" role="cell"><strong>{m.name}</strong><span class="what">{m.what}</span></span>
-            <span class="neo out" role="cell">
-              <span class="who" aria-hidden="true">NeoSkript</span>
-              <span class="reading">
-                <span class="time">{m.show(m.neo)}</span>
-                <span class="same label">{times(m.skript, m.neo)}</span>
-              </span>
-              <svg class="bar" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><rect class="track" width="100" height="10" /><rect class="fill" width={m.width(m.neo)} height="10" /></svg>
-            </span>
-          </div>
-        ))}
-      </div>
-      <figcaption>
-        {bench.scripts} generated scripts on {serverName}; a busy server's per-player script with {bench.ticks.players} bots online,
-        over the same server with no scripts ({bench.ticks.noScriptsMs.toFixed(1)} ms a tick); each trigger fired
-        {" "}{fmt(bench.events.count)} times in a row, {bench.events.rounds} rounds. Load, ticks and triggers each have their own
-        scale. {bench.machine.replace(/^an? /, "").replace(/^./, (c) => c.toUpperCase())}, {day(bench.date)}.
-        Measured by the <a href={`${repo}/tree/main/test-harness`}>test harness<External /></a>.
-      </figcaption>
-    </figure>
+        <figcaption>
+          {bench.scripts} generated scripts on {serverName}; a busy server's per-player script with {bench.ticks.players} bots online,
+          over the same server with no scripts ({bench.ticks.noScriptsMs.toFixed(1)} ms a tick); each trigger fired
+          {" "}{fmt(bench.events.count)} times in a row, {bench.events.rounds} rounds. Load, ticks and triggers each have their own
+          scale. {bench.machine.replace(/^an? /, "").replace(/^./, (c) => c.toUpperCase())}, {day(bench.date)}.
+          Measured by the <a href={`${repo}/tree/main/test-harness`}>test harness<External /></a>.
+        </figcaption>
+      </figure>
+    </div>
   </section>
 
-  <section class="section same-section" aria-labelledby="same-title">
+  <section class="section" aria-labelledby="same-title">
     <div class="wrap">
-      <h2 id="same-title">Same scripts, same output</h2>
-      <p class="lead section-lead">
+      <h2 class="section-title" id="same-title">Same scripts, same output</h2>
+      <p class="lead">
         Faster only counts if nothing changes. We run the same scripts on real Skript and on NeoSkript, and compare
         what each one prints and saves, line by line.
       </p>
-    </div>
-    <figure class="staff-figure wrap">
-      <div class="staff" role="table" aria-label={`${file} on Skript and on NeoSkript`}>
-        <div class="row head" role="row">
-          <span class="label skript" role="columnheader">Skript {skriptVersion} · {serverName}</span>
-          <span class="label script" role="columnheader">{file}</span>
-          <span class="label neo" role="columnheader">NeoSkript · {serverName}</span>
-        </div>
-        <div class="row setup" role="row">
-          <span class="skript" role="cell"></span>
-          <span class="script" role="cell"><Code line={run.setup} /></span>
-          <span class="neo" role="cell"></span>
-        </div>
-        {run.rows.map((row) => (
-          <div class="row line" role="row">
-            <span class="skript out" role="cell"><span class="who" aria-hidden="true">Skript</span>{row.output}</span>
-            <span class="script" role="cell"><Code line={row.line} /></span>
-            <span class="neo out" role="cell"><span class="who" aria-hidden="true">NeoSkript</span>{row.output}<span class="same label">Same</span></span>
+      <figure class="output">
+        <div class="pane">
+          <div class="pane-bar">
+            <span class="label">{file}</span>
+            <span class="label">Run on both servers, {date}</span>
           </div>
-        ))}
+          <div class="diff" role="table" aria-label={`${file} on Skript and on NeoSkript`}>
+            <div class="diff-row diff-head" role="row">
+              <span class="label" role="columnheader">Script</span>
+              <span class="label" role="columnheader">Skript {skriptVersion} printed</span>
+              <span class="label neo-head" role="columnheader">NeoSkript printed</span>
+            </div>
+            <div class="diff-row setup" role="row">
+              <span class="line" role="cell"><Code line={run.setup} /></span>
+              <span role="cell"></span>
+              <span role="cell"></span>
+            </div>
+            {run.rows.map((row) => (
+              <div class="diff-row" role="row">
+                <span class="line" role="cell"><Code line={row.line} /></span>
+                <span class="out skript" role="cell"><span class="who" aria-hidden="true">Skript</span>{row.output}</span>
+                <span class="out neo" role="cell"><span class="who" aria-hidden="true">NeoSkript</span><span>{row.output}</span><span class="lvl done">Same</span></span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <figcaption>
+          From <a href={`${repo}/blob/main/${run.file}`}>{file}<External /></a>. Point at a line to see it on both servers.
+        </figcaption>
+      </figure>
+      <div class="facts">
+        <p>
+          <strong>{suite.passed} of {suite.total}</strong> of Skript {suite.skript}'s own tests pass on NeoSkript.
+          <a href={`${repo}/blob/main/docs/PROGRESS.md`}>Progress<External /></a>
+        </p>
+        <p>
+          <strong>{run.percent}%</strong> of {fmt(run.units)} side-by-side checks print and save exactly what Skript does.
+          <a href={`${repo}/blob/main/test-harness/src/main/java/co/xenastudios/neoskript/harness/scenario/DifferentialScenario.java`}>The checks<External /></a>
+        </p>
+        <p>
+          <strong>Folia</strong> runs NeoSkript, with each region's rules kept for you. Skript doesn't run there.
+          <a href="/docs/">Requirements</a>
+        </p>
       </div>
-      <figcaption>
-        From <a href={`${repo}/blob/main/${run.file}`}>{file}<External /></a>, run on both servers on {date}.
-      </figcaption>
-    </figure>
-    <div class="wrap facts">
-      <p>
-        <strong>{suite.passed} of {suite.total}</strong> of Skript {suite.skript}'s own tests pass on NeoSkript.
-        <a href={`${repo}/blob/main/docs/PROGRESS.md`}>Progress<External /></a>
-      </p>
-      <p>
-        <strong>{run.percent}%</strong> of {fmt(run.units)} side-by-side checks print and save exactly what Skript does.
-        <a href={`${repo}/blob/main/test-harness/src/main/java/co/xenastudios/neoskript/harness/scenario/DifferentialScenario.java`}>The checks<External /></a>
-      </p>
-      <p>
-        <strong>Folia</strong> runs NeoSkript, with each region's rules kept for you. Skript doesn't run there.
-        <a href="/docs/">Requirements</a>
-      </p>
     </div>
   </section>
 
   <section class="section" aria-labelledby="switch-title">
     <div class="wrap">
-      <h2 id="switch-title">Switching takes a minute</h2>
+      <h2 class="section-title" id="switch-title">Switching takes a minute</h2>
       <ol class="steps">
         <li><strong>Take out Skript.jar.</strong> Leave its folder where it is.</li>
         <li><strong>Put in NeoSkript.jar.</strong> Paper or Folia, Minecraft 1.21.4+, Java 21.</li>
@@ -314,7 +368,7 @@ const faq = [
 
   <section class="section" aria-labelledby="faq-title">
     <div class="wrap faq-wrap">
-      <h2 id="faq-title">Before you switch</h2>
+      <h2 class="section-title" id="faq-title">Before you switch</h2>
       <div class="faq">
         {faq.map((f) => (
           <details>
@@ -328,7 +382,7 @@ const faq = [
 
   <section class="close" aria-labelledby="close-title">
     <div class="wrap close-copy">
-      <h2 id="close-title">Try it on a test server</h2>
+      <h2 class="section-title" id="close-title">Try it on a test server</h2>
       <p class="lead">NeoSkript is in public beta. Swap the jar on a test server and watch your scripts run.</p>
       <div class="actions">
         <a class="btn btn-primary" href="/download/">Download the beta</a>
@@ -339,103 +393,181 @@ const faq = [
   </section>
 </Base>
 
+<script>
+  import "../scripts/replay";
+</script>
+
 <style>
+  /* The hero: the promise at display size on the left, the case and the
+     actions on the right, both on one baseline; the two consoles below. */
   .hero {
-    padding-block: clamp(3.5rem, 2rem + 5vw, 6.5rem) clamp(3rem, 2rem + 3vw, 5rem);
+    padding-block: clamp(3rem, 1.5rem + 5vw, 6rem) clamp(4rem, 2.5rem + 5vw, 7rem);
   }
   .hero-copy {
     display: grid;
-    justify-items: center;
-    text-align: center;
-    gap: 1.25rem;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: end;
+    gap: 2rem clamp(2rem, 1rem + 4vw, 6rem);
   }
   h1 {
-    font-size: clamp(2.5rem, 1.2rem + 5.2vw, 5.25rem);
-    line-height: 1;
-    letter-spacing: -0.035em;
-    max-width: 16ch;
+    font-size: clamp(2.75rem, 1.2rem + 5.6vw, 6rem);
+    line-height: 0.98;
+    letter-spacing: -0.04em;
+    max-width: 11ch;
   }
   .accent {
-    color: var(--magenta);
+    color: var(--accent);
   }
-  .hero-copy .lead {
-    max-width: 52ch;
-  }
-  .lead code {
-    color: var(--text);
-    font-size: 0.92em;
-  }
-  .hero-copy .actions {
-    justify-content: center;
-    margin-top: 0.75rem;
+  .hero-side {
+    display: grid;
+    gap: 1.5rem;
+    padding-bottom: 0.4rem;
   }
   .meta {
     color: var(--muted);
     font-size: 0.875rem;
-    text-wrap: balance;
   }
-
-  /* Three headline numbers on one hairline row. */
-  .headline {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1.5rem clamp(1.5rem, 1rem + 3vw, 4rem);
-    margin: clamp(3rem, 2rem + 3vw, 4.5rem) 0 0;
-    padding: clamp(1.75rem, 1.25rem + 1.5vw, 2.5rem) 0 0;
-    list-style: none;
-    border-top: 1px solid var(--rule);
-  }
-  .headline li {
-    display: grid;
-    align-content: start;
-    gap: 0.5rem;
-    color: var(--muted);
-    max-width: 34ch;
-  }
-  .headline strong {
-    color: var(--text);
-    font-size: clamp(1.25rem, 1rem + 0.8vw, 1.625rem);
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-  }
-  .figure {
-    display: block;
-    color: var(--magenta);
-    font-size: clamp(2.75rem, 2rem + 3vw, 4.25rem);
-    font-weight: 700;
-    letter-spacing: -0.04em;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    margin-bottom: 0.25rem;
-  }
-  .headline-note {
-    margin-top: clamp(1.5rem, 1rem + 1vw, 2rem);
-    color: var(--muted);
-    font-size: 0.875rem;
-  }
-  @media (max-width: 52rem) {
-    .headline {
+  @media (max-width: 60rem) {
+    .hero-copy {
       grid-template-columns: minmax(0, 1fr);
     }
   }
 
-  .section {
-    padding-block: clamp(4rem, 2.5rem + 5vw, 7.5rem);
+  /* The two consoles: the same job on each server, side by side. */
+  .replay {
+    margin-top: clamp(2.5rem, 1.5rem + 3vw, 4.5rem);
+  }
+  .consoles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(0.75rem, 0.5rem + 1vw, 1.5rem);
+  }
+  .console {
+    display: flex;
+    flex-direction: column;
+  }
+  .console.neoskript {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--rule));
+  }
+  .console.neoskript .server {
+    color: var(--accent);
+  }
+  .console .pane-bar {
+    flex-wrap: nowrap;
+  }
+  .console .server {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .clock {
+    flex: none;
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+  .console .pane-body {
+    flex: 1;
+  }
+  .log .mark,
+  .tick .mark,
+  .time .mark {
+    margin-left: 0.75em;
+    font-family: var(--label);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .neoskript .log:not(.cmd) .msg {
+    color: var(--text);
+  }
+  .pane-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.25rem 1rem;
+    padding: 0.75rem 1rem;
     border-top: 1px solid var(--rule);
+    background: var(--ground);
+    font-size: 0.875rem;
+    color: var(--muted);
   }
-  h2 {
-    font-size: clamp(1.75rem, 1.3rem + 1.9vw, 2.75rem);
-    line-height: 1.1;
-    max-width: 22ch;
-    text-wrap: balance;
+  .pane-foot .label {
+    font-size: 0.6875rem;
   }
-  .section-lead {
-    margin-top: 1.25rem;
+  .tick strong {
+    color: var(--text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  /* While a replay runs, lines that haven't happened yet keep their place. */
+  .log.pending {
+    visibility: hidden;
+  }
+  .log.arrived {
+    animation: arrive 420ms var(--ease);
+  }
+  @keyframes arrive {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  .replay figcaption {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    gap: 1rem 2rem;
+    margin-top: 1rem;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+  .replay figcaption > span {
+    max-width: 78ch;
+  }
+  .replay-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 36px;
+    padding: 0 0.9rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 180ms var(--ease);
+  }
+  .replay-btn:hover {
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--rule));
+  }
+  @media (max-width: 52rem) {
+    .consoles {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .console .pane-body {
+      min-height: 0;
+    }
+  }
+  @media (max-width: 30rem) {
+    .console .log {
+      grid-template-columns: 4.25rem minmax(0, 1fr);
+    }
+    .console .log .lvl {
+      display: none;
+    }
   }
 
-  /* Skript and NeoSkript side by side: one hairline row per point, Skript's
-     answer muted, NeoSkript's in text on a raised column (as the staffs'
-     centre), every cell padded alike. */
+  /* Skript and NeoSkript side by side: one hairline row per point. */
   .compare {
     width: 100%;
     margin-top: clamp(2rem, 1.5rem + 2vw, 3rem);
@@ -453,40 +585,35 @@ const faq = [
     padding-left: 0;
   }
   .compare thead th {
-    padding-block: 0.9rem;
-    border-top: 1px solid var(--rule);
+    padding-block: 0.75rem;
   }
   .compare thead th:first-child {
-    width: 26%;
+    width: 28%;
   }
   .compare .neo-head {
-    color: var(--magenta);
+    color: var(--accent);
   }
   .compare tbody th {
-    color: var(--text);
     font-weight: 600;
   }
   .c-skript {
     color: var(--muted);
   }
-  .c-neo,
-  .compare .neo-head {
-    background: var(--raised);
-  }
   .c-neo {
-    color: var(--text);
+    border-left: 1px solid var(--rule);
+  }
+  .same-tag {
+    margin-left: 0.6em;
+    color: var(--accent);
   }
   .compare .who {
     display: none;
   }
-  .compare tbody tr {
+  .compare tbody tr > * {
     transition: background-color 180ms var(--ease);
   }
   .compare tbody tr:hover > * {
-    background-color: color-mix(in srgb, var(--magenta) 5%, transparent);
-  }
-  .compare tbody tr:hover > .c-neo {
-    background-color: color-mix(in srgb, var(--magenta) 8%, var(--raised));
+    background-color: color-mix(in srgb, var(--accent) 5%, transparent);
   }
   @media (max-width: 44rem) {
     .compare,
@@ -518,10 +645,6 @@ const faq = [
       gap: 0.75rem;
       padding-block: 0.2rem;
     }
-    .c-neo,
-    .compare tbody tr:hover > .c-neo {
-      background: none;
-    }
     .compare .who {
       display: block;
       padding-top: 0.2rem;
@@ -532,236 +655,234 @@ const faq = [
       color: var(--muted);
     }
     .c-neo .who {
-      color: var(--magenta);
+      color: var(--accent);
     }
   }
 
-  /* The staff: the script down the middle between magenta rails, Skript's
-     output mirrored on its left, NeoSkript's on its right, every row one
-     grid row so the two outputs always line up with their line. */
-  .staff-figure {
+  /* The numbers: every time on one left-to-right axis per group, Skript's
+     bar over NeoSkript's, so a bar's length is the time it took. */
+  .numbers {
     margin-top: clamp(2rem, 1.5rem + 2vw, 3rem);
   }
-  .staff {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 32rem) minmax(0, 1fr);
-    border-top: 1px solid var(--rule);
-    font-family: var(--mono);
-    font-size: 0.875rem;
+  .bench-group + .bench-group {
+    margin-top: clamp(1.5rem, 1rem + 1.5vw, 2.5rem);
   }
-  .row {
+  .bench-row {
     display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: subgrid;
-    transition: background-color 180ms var(--ease);
-  }
-  .row > * {
-    padding: 0.7rem 1.25rem;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 0.75rem clamp(1.5rem, 1rem + 2vw, 3rem);
+    padding-block: 1.25rem;
     border-bottom: 1px solid var(--rule);
-    min-width: 0;
-    overflow-wrap: anywhere;
   }
-  .row .script {
-    background: var(--raised);
-    border-inline: 1px solid var(--magenta);
+  .bench-head {
+    padding-block: 0.75rem;
+    border-top: 1px solid var(--rule);
   }
-  .row .skript {
-    text-align: right;
+  .bench-head .label:first-child {
+    color: var(--text);
   }
-  .head > * {
-    padding-block: 0.9rem;
-  }
-  .setup .script {
+  /* The scale in words, not caps: an uppercase µs would read as MS. */
+  .bench-head .scale {
     color: var(--muted);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
   }
-  .neo {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 1rem;
-  }
-  .same {
-    color: var(--magenta);
-    flex: none;
-  }
-  .who {
-    display: none;
-  }
-  /* Pointing at a line lights its row across both servers. */
-  .line:hover > * {
-    background-color: color-mix(in srgb, var(--magenta) 7%, transparent);
-  }
-  .line:hover > .script {
-    background-color: color-mix(in srgb, var(--magenta) 10%, var(--raised));
-  }
-  /* The rows settle in once, top to bottom. */
-  .line {
-    animation: settle 700ms var(--ease) both;
-  }
-  .line:nth-child(3) { animation-delay: 120ms; }
-  .line:nth-child(4) { animation-delay: 180ms; }
-  .line:nth-child(5) { animation-delay: 240ms; }
-  .line:nth-child(6) { animation-delay: 300ms; }
-  .line:nth-child(7) { animation-delay: 360ms; }
-  .line:nth-child(8) { animation-delay: 420ms; }
-  @keyframes settle {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-  }
-  /* The performance staff: what was measured down the middle, each server's
-     time over a bar that grows away from it, Skript's to the left. The bar
-     fills its cell, and both sides' cells are the same width, so lengths
-     compare across the staff as well as down it. */
-  .perf .script {
+  .measure {
     display: grid;
-    gap: 0.15rem;
     align-content: center;
-    font-family: var(--sans);
+    gap: 0.2rem;
   }
-  .perf .script strong {
+  .measure strong {
     font-size: 1.0625rem;
     letter-spacing: -0.01em;
   }
   .what {
     color: var(--muted);
-    font-size: 0.8125rem;
-    font-family: var(--mono);
+    font-size: 0.875rem;
   }
-  .perf .row > * {
-    padding-block: 1.1rem;
-  }
-  .perf .out {
+  .runs {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    justify-content: stretch;
-    align-content: center;
-    gap: 0.6rem;
+    gap: 0.5rem;
   }
-  .perf .skript .reading {
-    justify-content: end;
+  .run {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr) 13rem;
+    align-items: center;
+    gap: 1rem;
   }
-  .bar {
+  .run .who {
+    font-family: var(--label);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .run.neo .who {
+    color: var(--accent);
+  }
+  .track {
     display: block;
     width: 100%;
-    height: 0.75rem;
+    height: 0.625rem;
   }
-  /* Skript's bar grows leftward, away from the staff. */
-  .skript .bar {
-    transform: scaleX(-1);
+  .track .bg {
+    fill: color-mix(in srgb, var(--rule) 70%, transparent);
   }
-  .bar .track {
-    fill: var(--rule);
-  }
-  .skript .bar .fill {
+  .track .fill {
     fill: var(--muted);
-  }
-  .neo .bar .fill {
-    fill: var(--magenta);
-  }
-  /* The one authored moment: each bar draws out from the staff, as long as
-     the time it took. */
-  .bar .fill {
     transform-box: fill-box;
     transform-origin: left center;
+  }
+  .neo .track .fill {
+    fill: var(--accent);
+  }
+  /* The one time the bars move: they draw out along the axis as the numbers
+     come into view (src/scripts/replay.ts), as long as the time it took. */
+  .numbers.drawing .fill {
     animation: draw 1100ms var(--ease) both;
   }
-  .perf .line {
-    animation: none;
+  .numbers.drawing .neo .fill {
+    animation-delay: 120ms;
   }
   @keyframes draw {
     from {
       transform: scaleX(0);
     }
   }
-  .reading {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 0.25rem 0.75rem;
-  }
   .time {
-    font-size: clamp(1.125rem, 0.95rem + 0.6vw, 1.5rem);
-    font-weight: 500;
-    font-family: var(--sans);
+    font-size: 1.0625rem;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
-    color: var(--text);
+    letter-spacing: -0.01em;
     white-space: nowrap;
   }
   .skript .time {
     color: var(--muted);
+    font-weight: 500;
   }
-  figcaption {
-    text-wrap: balance;
+  .numbers figcaption,
+  .output figcaption {
     margin-top: 1rem;
-    max-width: 72ch;
-    margin-inline: auto;
-    text-align: center;
+    max-width: 78ch;
     color: var(--muted);
     font-size: 0.875rem;
   }
-
-  /* Under 60rem the staff becomes one column: each line, then what each
-     server printed under it. */
   @media (max-width: 60rem) {
-    .row .out {
-      display: grid;
-      grid-template-columns: 6rem minmax(0, 1fr) 3.25rem;
-      column-gap: 0.75rem;
-      align-items: baseline;
-    }
-    .perf .out {
-      grid-template-columns: 6rem 6.5rem minmax(0, 1fr);
-      align-items: center;
-    }
-    .perf .skript .reading {
-      justify-content: start;
-    }
-    .perf .skript .bar {
-      transform: none;
-    }
-    .perf .bar {
-      max-width: 8rem;
-    }
-    .perf .time {
-      font-size: 1.125rem;
-    }
-    .staff {
-      grid-template-columns: minmax(0, 1fr);
-      border-inline: 1px solid var(--magenta);
-    }
-    .row {
+    .bench-row {
       grid-template-columns: minmax(0, 1fr);
     }
-    .row > * {
-      border-bottom: 0;
-      padding-block: 0.45rem;
+    .bench-head {
+      gap: 0.15rem;
     }
-    .perf .row > * {
-      padding-block: 0.45rem;
+    .run {
+      grid-template-columns: 5.5rem minmax(0, 1fr) auto;
     }
-    .row .script {
-      order: -1;
-      border-inline: 0;
-      padding-block: 0.75rem;
+    .time .mark {
+      display: block;
+      margin: 0.1rem 0 0;
+      text-align: right;
     }
-    .row .skript {
-      text-align: left;
+  }
+  @media (max-width: 30rem) {
+    .run {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.25rem 0.75rem;
     }
-    .row {
+    .run .track {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
+
+  /* The output check: the script's lines, and what each server printed for
+     them. Pointing at a line lights it on both servers. */
+  .output {
+    margin-top: clamp(2rem, 1.5rem + 2vw, 3rem);
+  }
+  .diff {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+  }
+  .diff-row {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+  }
+  .diff-row > * {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--rule);
+    min-width: 0;
+    overflow-wrap: anywhere;
+    transition: background-color 180ms var(--ease);
+  }
+  .diff-row:last-child > * {
+    border-bottom: 0;
+  }
+  .diff-row > * + * {
+    border-left: 1px solid var(--rule);
+  }
+  .diff-head > * {
+    padding-block: 0.6rem;
+    background: var(--ground);
+  }
+  .diff-head .label {
+    font-size: 0.6875rem;
+  }
+  .diff .neo-head {
+    color: var(--accent);
+  }
+  .setup .line {
+    color: var(--muted);
+  }
+  .out.skript {
+    color: var(--muted);
+  }
+  .out.neo {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .out .who {
+    display: none;
+  }
+  .diff-row:not(.diff-head):hover > * {
+    background-color: color-mix(in srgb, var(--accent) 9%, transparent);
+  }
+  @media (max-width: 52rem) {
+    .diff {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .diff-row {
+      grid-template-columns: minmax(0, 1fr);
+      padding-block: 0.5rem;
       border-bottom: 1px solid var(--rule);
-      padding-bottom: 0.4rem;
     }
-    .head {
+    .diff-row:last-child {
+      border-bottom: 0;
+    }
+    .diff-row > * {
+      border: 0;
+      padding-block: 0.25rem;
+    }
+    .diff-row > * + * {
+      border: 0;
+    }
+    .diff-head,
+    .setup > :not(.line) {
       display: none;
     }
-    .setup .skript,
-    .setup .neo {
-      display: none;
+    .out {
+      display: grid;
+      grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+      gap: 0.75rem;
     }
-    .who {
+    .out.neo {
+      display: grid;
+    }
+    .out .who {
       display: block;
       font-family: var(--label);
       font-size: 0.6875rem;
@@ -769,9 +890,12 @@ const faq = [
       text-transform: uppercase;
       color: var(--muted);
     }
+    .out.neo .who {
+      color: var(--accent);
+    }
   }
 
-  /* Three facts on one hairline row, under the output staff. */
+  /* Three facts, each with its source. */
   .facts {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -791,8 +915,9 @@ const faq = [
     display: block;
     margin-bottom: 0.25rem;
     color: var(--text);
-    font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem);
-    letter-spacing: -0.03em;
+    font-size: clamp(1.75rem, 1.3rem + 1.5vw, 2.5rem);
+    letter-spacing: -0.035em;
+    line-height: 1.1;
     font-variant-numeric: tabular-nums;
   }
   @media (max-width: 52rem) {
@@ -809,21 +934,23 @@ const faq = [
     counter-reset: step;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    border-top: 1px solid var(--rule);
+    gap: 0 clamp(1rem, 0.5rem + 2vw, 2.5rem);
   }
   .steps li {
     counter-increment: step;
-    padding: 1.5rem clamp(1rem, 0.5rem + 2vw, 2.5rem) 0 0;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
     color: var(--muted);
-    max-width: 34ch;
   }
   .steps li::before {
     content: counter(step);
     display: block;
     margin-bottom: 0.75rem;
-    font-family: var(--label);
-    font-size: 0.75rem;
-    color: var(--magenta);
+    font-family: var(--mono);
+    font-size: 2rem;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--accent);
   }
   .steps strong {
     display: block;
@@ -839,13 +966,14 @@ const faq = [
   @media (max-width: 52rem) {
     .steps {
       grid-template-columns: minmax(0, 1fr);
+      gap: 1.5rem;
     }
   }
 
   /* Questions, as hairline rows that open. */
   .faq-wrap {
     display: grid;
-    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
     gap: 2rem clamp(2rem, 1rem + 4vw, 6rem);
     align-items: start;
   }
@@ -864,7 +992,6 @@ const faq = [
     padding-block: 1.1rem;
     cursor: pointer;
     list-style: none;
-    color: var(--text);
     font-weight: 600;
     font-size: 1.0625rem;
   }
@@ -872,7 +999,7 @@ const faq = [
     display: none;
   }
   .faq summary:hover .chev {
-    stroke: var(--magenta);
+    stroke: var(--accent);
   }
   .chev {
     flex: none;
@@ -911,6 +1038,9 @@ const faq = [
     justify-items: center;
     text-align: center;
     gap: 1.25rem;
+  }
+  .close-copy .section-title {
+    max-width: none;
   }
   .close-copy .actions {
     justify-content: center;

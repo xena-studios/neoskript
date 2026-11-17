@@ -31,9 +31,8 @@ const path = Astro.url.pathname;
       gap: 1rem;
     }
   }
-  /* Where the header is narrowest beside the search (the mobile menu takes over under 50rem), Docs, Addons and GitHub
-     leave it, as they leave the custom pages' header on a phone: a guide is already in the docs, and GitHub is
-     in the footer. */
+  /* Where the header is narrowest beside the search (the mobile menu takes over under 50rem), Parser, Addons
+     and GitHub leave it, as they leave the custom pages' header on a phone; all three are in the footer. */
   @media (min-width: 50rem) and (max-width: 60rem) {
     .wide,
     .gh {

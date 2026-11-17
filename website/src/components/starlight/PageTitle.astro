@@ -1,0 +1,20 @@
+---
+// Starlight's page title, with the page's description under it as the lead,
+// so every guide opens with a sentence on what it covers.
+import Default from "@astrojs/starlight/components/PageTitle.astro";
+
+const { description } = Astro.locals.starlightRoute.entry.data;
+---
+<Default />
+{description && <p class="page-lead">{description}</p>}
+
+<style>
+  .page-lead {
+    margin: 0.875rem 0 0;
+    max-width: 60ch;
+    color: var(--sl-color-gray-3);
+    font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+    line-height: 1.6;
+    text-wrap: pretty;
+  }
+</style>
