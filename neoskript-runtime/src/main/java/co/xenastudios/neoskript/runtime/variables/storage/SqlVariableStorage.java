@@ -4,6 +4,7 @@
  */
 package co.xenastudios.neoskript.runtime.variables.storage;
 
+import co.xenastudios.neoskript.runtime.Arithmetic;
 import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.variables.VariableStore;
 import java.io.IOException;
@@ -54,6 +55,14 @@ import java.util.regex.Pattern;
  * through Skript's {@code update_guid}. Unlike Skript, a variable deleted on one server is deleted on the others: a
  * deletion is written as a row without a value (which Skript ignores when it reads), and such rows are removed a
  * while later, as Skript removes them.
+ *
+ * <p>Also with {@code monitor changes}, a write checks each row against what this server last saw of it, in the same
+ * transaction (locking the rows, on MySQL). If another server wrote it since, the two changes are merged where they
+ * can be, so neither is lost: numbers that were only added to or taken from here have this server's additions added
+ * to the other server's value, and a value added to a list at an index another server filled first moves to the
+ * list's next free index. Anything else is the last write's, as in Skript. An addon can hear of each write
+ * ({@link #whenWritten}) and ask for other servers' changes at once ({@link #checkForChanges}), as neoskript-proxy
+ * does to share variables across a network faster than {@code monitor interval}.
  */
 public final class SqlVariableStorage implements VariableBackend {
 
@@ -92,6 +101,9 @@ public final class SqlVariableStorage implements VariableBackend {
 
     /** How often the pending changes are written to {@link #pendingFile} while the database is down. */
     static volatile long pendingEveryMillis = 30_000;
+
+    /** The least time between two checks for other servers' changes that {@link #checkForChanges} asks for. */
+    static volatile long checkGapMillis = 200;
 
     /** The kind of database. */
     public enum Dialect {
@@ -209,8 +221,28 @@ public final class SqlVariableStorage implements VariableBackend {
         }
     }
 
-    /** One change to write: a value, or a deletion ({@code type} {@code null}). */
-    private record Op(String name, String type, byte[] bytes, Saved saved) {}
+    /**
+     * One change to write: a value, or a deletion ({@code type} {@code null}).
+     *
+     * @param base what this server last saw of the row, which the change was made from, or {@code null}
+     * @param value the value written, as it was in memory
+     * @param added with monitor changes, what scripts had added to the number since {@code base} as this round
+     *     found it, or {@code null}
+     * @param additive whether the change was only {@code added}, so it can be merged with another server's
+     * @param appended with monitor changes, the mark of the variable having been made by adding to its list, or
+     *     {@code null}
+     */
+    private record Op(String name, String type, byte[] bytes, Saved saved, Saved base, Object value, Object added,
+            boolean additive, Long appended) {
+
+        static Op deletion(String name, Saved base, Object added, Long appended) {
+            return new Op(name, null, null, null, base, null, added, false, appended);
+        }
+
+        Op writing(String type, byte[] bytes, Saved saved, Object value) {
+            return new Op(name, type, bytes, saved, base, value, added, additive, appended);
+        }
+    }
 
     private final VariableStore store;
     private final VariableStore loadInto;
@@ -229,6 +261,27 @@ public final class SqlVariableStorage implements VariableBackend {
     private final Map<String, byte[]> refused = new ConcurrentHashMap<>();
     private final ScheduledExecutorService thread;
     private final List<String> notes = new ArrayList<>();
+    /**
+     * With monitor changes: what scripts added to each number since it was last written, by name, so a write can
+     * merge it with another server's change. As many names at most as changed since the last write.
+     */
+    private final Map<String, Object> added = new ConcurrentHashMap<>();
+    /** With monitor changes: additions under way, by name, so a write never reads one half done. */
+    private final Map<String, Integer> adding = new ConcurrentHashMap<>();
+    /**
+     * With monitor changes: the variables made by adding to their list since they were last written, with when, so
+     * a mark whose variable is gone again can be let go of.
+     */
+    private final Map<String, Long> appended = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicLong marks = new java.util.concurrent.atomic.AtomicLong();
+    private final Runnable unwatch;
+    private final List<Runnable> writeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final java.util.concurrent.atomic.AtomicBoolean checkQueued = new java.util.concurrent.atomic.AtomicBoolean();
+    private volatile long lastCheckAt;
+    /** Writes that met another server's change since this start, merged or not: for /sk info and tests. */
+    private final java.util.concurrent.atomic.AtomicLong conflicts = new java.util.concurrent.atomic.AtomicLong();
+    /** Changes merged with another server's since this start. */
+    private final java.util.concurrent.atomic.AtomicLong merges = new java.util.concurrent.atomic.AtomicLong();
 
     // Only touched on the database's thread, or before it starts.
     private Connection connection;
@@ -289,6 +342,37 @@ public final class SqlVariableStorage implements VariableBackend {
         });
         executor.setRemoveOnCancelPolicy(true);
         this.thread = executor;
+        this.unwatch = settings.monitor() ? store.watchAdditions(new VariableStore.Additions() {
+            @Override
+            public void adding(String name) {
+                String key = name.toLowerCase(Locale.ROOT);
+                if (!key.startsWith("-") && routing.owns().test(key)) {
+                    SqlVariableStorage.this.adding.merge(key, 1, Integer::sum);
+                }
+            }
+
+            @Override
+            public void added(String name, Number amount) {
+                String key = name.toLowerCase(Locale.ROOT);
+                if (key.startsWith("-") || !routing.owns().test(key)) {
+                    return;
+                }
+                if (amount != null) {
+                    SqlVariableStorage.this.added.merge(key, amount, Arithmetic::add);
+                }
+                SqlVariableStorage.this.adding.computeIfPresent(key, (k, count) -> count <= 1 ? null : count - 1);
+            }
+
+            @Override
+            public void appending(String name) {
+                String key = name.toLowerCase(Locale.ROOT);
+                if (!key.startsWith("-") && routing.owns().test(key)) {
+                    // A new mark each time, so letting go of an older one never takes a newer one with it.
+                    SqlVariableStorage.this.appended.put(key, (System.currentTimeMillis() << 20)
+                            | (marks.incrementAndGet() & 0xFFFFF));
+                }
+            }
+        }) : () -> {};
     }
 
     public Settings settings() {
@@ -348,6 +432,60 @@ public final class SqlVariableStorage implements VariableBackend {
 
     public Status status() {
         return new Status(state, saved.size(), waiting, problem, since);
+    }
+
+    /**
+     * Which database this is, the same on every server that uses it: a hash of its type, where it is and its table,
+     * never the user or password. Servers sharing variables tell each other about writes by it.
+     */
+    public String id() {
+        return hash(identity);
+    }
+
+    /** How many of this start's writes met a row another server had written since, and how many of those merged. */
+    public long[] conflicts() {
+        return new long[] {conflicts.get(), merges.get()};
+    }
+
+    /**
+     * Runs {@code listener} after each write that changed rows, on the database's thread: it must be quick.
+     *
+     * @return what stops it
+     */
+    public Runnable whenWritten(Runnable listener) {
+        writeListeners.add(listener);
+        return () -> writeListeners.remove(listener);
+    }
+
+    /**
+     * With monitor changes, reads other servers' changes as soon as it can, instead of at the next
+     * {@code monitor interval}: when another server says it wrote. Calls close together are one check, and checks are
+     * at least {@link #checkGapMillis} apart. Does nothing without monitor changes, or while the database is down: it's
+     * read when it's back.
+     */
+    public void checkForChanges() {
+        if (!settings.monitor() || closed || !checkQueued.compareAndSet(false, true)) {
+            return;
+        }
+        long wait = Math.max(0, lastCheckAt + checkGapMillis - System.currentTimeMillis());
+        try {
+            thread.schedule(() -> {
+                checkQueued.set(false);
+                if (closed || !loaded || connection == null) {
+                    return;
+                }
+                try {
+                    monitor();
+                    lastCheckAt = System.currentTimeMillis();
+                    nextMonitorAt = lastCheckAt + settings.monitorMillis();
+                } catch (RuntimeException | LinkageError e) {
+                    console.error("Unexpected problem with " + describe() + ": " + e);
+                }
+            }, wait, TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            // Closed meanwhile.
+            checkQueued.set(false);
+        }
     }
 
     @Override
@@ -605,7 +743,8 @@ public final class SqlVariableStorage implements VariableBackend {
             }
             if (connection != null && settings.monitor() && now >= nextMonitorAt) {
                 monitor();
-                nextMonitorAt = System.currentTimeMillis() + settings.monitorMillis();
+                lastCheckAt = System.currentTimeMillis();
+                nextMonitorAt = lastCheckAt + settings.monitorMillis();
             }
             if (connection != null) {
                 runCleanups(now);
@@ -629,6 +768,8 @@ public final class SqlVariableStorage implements VariableBackend {
             problem = null;
             since = Instant.now();
             retryMillis = 1_000;
+            // What other servers wrote meanwhile is read at once: their notices (checkForChanges) went unheard.
+            nextMonitorAt = 0;
             if (!write()) {
                 return;
             }
@@ -690,14 +831,51 @@ public final class SqlVariableStorage implements VariableBackend {
 
     /** The changes since the last write: each variable this database saves whose value differs from what it has. */
     private List<Op> changes(long current, List<String> kept, List<String> notSaved, int[] counts) {
+        return changes(current, kept, notSaved, counts, new Object[3]);
+    }
+
+    /**
+     * {@link #changes}, and in {@code marks} what a write needs to let go of the additions and appends it's done with
+     * ({@link #letGo}).
+     */
+    private List<Op> changes(long current, List<String> kept, List<String> notSaved, int[] counts, Object[] marks) {
         List<Op> ops = new ArrayList<>();
         java.util.Set<String> upserted = new java.util.HashSet<>();
-        store.forEach((variable, value) -> {
+        boolean watching = settings.monitor();
+        // Names whose additions this round read whole but had nothing to write for, with what they'd added; names left
+        // for the next round because an addition was under way.
+        Map<String, Object> unwritten = new java.util.HashMap<>();
+        java.util.Set<String> deferred = new java.util.HashSet<>();
+        java.util.Set<String> visited = watching ? new java.util.HashSet<>() : null;
+        marks[0] = unwritten;
+        marks[1] = deferred;
+        marks[2] = visited;
+        store.forEach((variable, read) -> {
             if (variable.startsWith("-")) {
                 return;
             }
             String name = variable.toLowerCase(Locale.ROOT);
             Saved last = saved.get(name);
+            Object value = read;
+            Object sum = null;
+            if (watching) {
+                visited.add(name);
+                // What was added and the value, read so they agree: no addition under way before or after, and the
+                // sum the same both sides of reading the value. Otherwise it waits for the next round.
+                if (adding.containsKey(name)) {
+                    defer(name, last, current, deferred);
+                    return;
+                }
+                sum = added.get(name);
+                if (sum != null) {
+                    value = store.get(variable);
+                    if (value == null || adding.containsKey(name) || !sum.equals(added.get(name))) {
+                        defer(name, last, current, deferred);
+                        return;
+                    }
+                    unwritten.put(name, sum);
+                }
+            }
             if (!routing.owns().test(name)) {
                 // Another database's, or none's. Skript keeps such rows, so this does too, unless the database that
                 // owns it has saved it.
@@ -753,14 +931,63 @@ public final class SqlVariableStorage implements VariableBackend {
             Saved next = new Saved(value, encoded.type(), encoded.bytes(), guid);
             next.seen = current;
             upserted.add(name);
-            ops.add(new Op(name, encoded.type(), encoded.bytes(), next));
+            unwritten.remove(name);
+            // Read after the value: an append is marked before its value is there.
+            Long mark = watching ? appended.get(name) : null;
+            ops.add(new Op(name, encoded.type(), encoded.bytes(), next, last, value, sum,
+                    sum != null && onlyAdded(last, value, sum), mark));
         });
         for (Map.Entry<String, Saved> entry : saved.entrySet()) {
             if (entry.getValue().seen != current && !upserted.contains(entry.getKey())) {
-                ops.add(new Op(entry.getKey(), null, null, null));
+                String name = entry.getKey();
+                Object sum = watching ? added.get(name) : null;
+                ops.add(Op.deletion(name, entry.getValue(), sum, watching ? appended.get(name) : null));
+                unwritten.remove(name);
             }
         }
         return ops;
+    }
+
+    /** Leaves {@code name} for the next round: unchanged as far as this one goes, so not deleted either. */
+    private static void defer(String name, Saved last, long current, java.util.Set<String> deferred) {
+        if (last != null) {
+            last.seen = current;
+        }
+        deferred.add(name);
+    }
+
+    /**
+     * Whether {@code value} is {@code base}'s value with {@code sum} added and nothing else: so the change was only
+     * additions, and can be added to another server's value instead of replacing it. A change that also set the
+     * variable almost never comes out to exactly that, and is the last write's like any other.
+     */
+    private static boolean onlyAdded(Saved base, Object value, Object sum) {
+        if (!plainNumber(value) || !plainNumber(sum)) {
+            return false;
+        }
+        Object difference;
+        if (base == null) {
+            difference = value;
+        } else if (plainNumber(base.value)) {
+            difference = Arithmetic.subtract(value, base.value);
+        } else {
+            return false;
+        }
+        return difference != null && sameNumber(difference, sum);
+    }
+
+    static boolean plainNumber(Object value) {
+        return value instanceof Long || value instanceof Double;
+    }
+
+    /** Equal numbers: exactly, for whole ones, or to within a rounding error for decimals. */
+    static boolean sameNumber(Object a, Object b) {
+        if (a instanceof Long x && b instanceof Long y) {
+            return x.longValue() == y.longValue();
+        }
+        double x = ((Number) a).doubleValue();
+        double y = ((Number) b).doubleValue();
+        return Math.abs(x - y) <= 1e-9 * Math.max(1, Math.max(Math.abs(x), Math.abs(y)));
     }
 
     private void refuse(String name, byte[] bytes, String why) {
@@ -771,7 +998,9 @@ public final class SqlVariableStorage implements VariableBackend {
 
     /**
      * Writes what changed in one transaction. Returns whether it went through; if not, the database is marked down
-     * and the same changes are worked out again next time.
+     * and the same changes are worked out again next time. With monitor changes, rows another server wrote since this
+     * one last saw them are merged where they can be ({@link #resolve}); a write that deadlocks with another server's
+     * is tried again at once, a few times, and then next time, without counting as the database being down.
      */
     private boolean write() {
         if (!loaded || connection == null) {
@@ -783,50 +1012,246 @@ public final class SqlVariableStorage implements VariableBackend {
         List<String> kept = new ArrayList<>();
         List<String> notSaved = new ArrayList<>();
         int[] counts = new int[2];
-        List<Op> ops = changes(current, kept, notSaved, counts);
+        Object[] found = new Object[3];
+        List<Op> ops = changes(current, kept, notSaved, counts, found);
         lastResult = new VariableStorage.Result(counts[0], 0, counts[1], List.of(), null, 0, List.copyOf(kept),
                 List.copyOf(notSaved));
         if (ops.isEmpty()) {
+            letGo(ops, found);
             finishWrite(modifications, start);
             return true;
         }
         waiting = ops.size();
+        List<Runnable> after = new ArrayList<>();
+        List<Op> done = null;
         try {
-            try {
-                apply(ops);
-                connection.commit();
-            } catch (SQLException e) {
-                rollbackQuietly();
-                if (!isBadRow(e)) {
-                    throw e;
-                }
-                // One of the rows: write them one by one, and leave out the ones the database refuses.
-                for (Op op : ops) {
-                    try {
-                        apply(List.of(op));
-                        connection.commit();
-                    } catch (SQLException one) {
-                        rollbackQuietly();
-                        if (!isBadRow(one)) {
-                            throw one;
+            for (int attempt = 1; done == null; attempt++) {
+                after.clear();
+                try {
+                    List<Op> resolved = settings.monitor() ? resolve(ops, after) : ops;
+                    apply(resolved);
+                    connection.commit();
+                    done = resolved;
+                } catch (SQLException e) {
+                    rollbackQuietly();
+                    if (settings.monitor() && busy(e)) {
+                        if (attempt < 3) {
+                            continue;
                         }
-                        refuse(op.name(), op.bytes() == null ? new byte[0] : op.bytes(), message(one));
-                        continue;
+                        // Another server's write holds the rows: next time, a little later.
+                        nextWriteAt = System.currentTimeMillis() + 100 + java.util.concurrent.ThreadLocalRandom
+                                .current().nextLong(400);
+                        return false;
                     }
-                    record(op);
+                    if (!isBadRow(e)) {
+                        throw e;
+                    }
+                    // One of the rows: write them one by one, and leave out the ones the database refuses.
+                    for (Op op : ops) {
+                        List<Runnable> afterOne = new ArrayList<>();
+                        List<Op> one;
+                        try {
+                            one = settings.monitor() ? resolve(List.of(op), afterOne) : List.of(op);
+                            apply(one);
+                            connection.commit();
+                        } catch (SQLException failed) {
+                            rollbackQuietly();
+                            if (!isBadRow(failed)) {
+                                throw failed;
+                            }
+                            refuse(op.name(), op.bytes() == null ? new byte[0] : op.bytes(), message(failed));
+                            continue;
+                        }
+                        one.forEach(this::record);
+                        after.addAll(afterOne);
+                    }
+                    done = List.of();
                 }
-                ops = List.of();
             }
         } catch (SQLException e) {
             closeConnection();
             down(e, false);
             return false;
         }
-        for (Op op : ops) {
+        for (Op op : done) {
             record(op);
         }
+        for (Runnable change : after) {
+            change.run();
+        }
+        letGo(ops, found);
         finishWrite(modifications, start);
+        for (Runnable listener : writeListeners) {
+            try {
+                listener.run();
+            } catch (RuntimeException | LinkageError e) {
+                console.error("A listener for writes to " + describe() + " failed: " + e);
+            }
+        }
         return true;
+    }
+
+    /**
+     * Whether the database turned a write away because another server's held the same rows (a deadlock, or a lock
+     * that wasn't let go of in time), so it's worth trying again at once rather than counting as down. On SQLite, a
+     * write reads its rows first ({@link #resolve}), and two connections that each read and then want to write stop
+     * each other: one is told the file is busy straight away.
+     */
+    static boolean busy(SQLException e) {
+        if ("40001".equals(e.getSQLState())) {
+            return true;
+        }
+        String driver = e.getClass().getName();
+        if (driver.startsWith("com.mysql")) {
+            return e.getErrorCode() == 1213 || e.getErrorCode() == 1205;
+        }
+        return driver.startsWith("org.sqlite") && (e.getErrorCode() & 0xFF) == 5;
+    }
+
+    /**
+     * With monitor changes, in the write's transaction: each row as it is now (locked, on MySQL, until the write
+     * commits), against what this server last saw of it. A row another server wrote since is merged with if it can
+     * be: a number only added to here gets this server's additions added to the other's value, and a value added to a
+     * list at an index the other server filled first leaves it theirs and is added to the list again, at the next free
+     * index, by the next write. Otherwise this server's change is written over it, as in Skript. Returns what to
+     * write; {@code after} gets what to change in memory once that has committed.
+     */
+    private List<Op> resolve(List<Op> ops, List<Runnable> after) throws SQLException {
+        Map<String, Object[]> rows = currentRows(ops);
+        List<Op> out = new ArrayList<>(ops.size());
+        for (Op op : ops) {
+            Object[] row = rows.get(op.name());
+            if (sameRow(op.base(), row)) {
+                out.add(op);
+                continue;
+            }
+            conflicts.incrementAndGet();
+            Object theirs = row == null ? null : codecs.decode((String) row[0], (byte[]) row[1]);
+            String name = op.name();
+            if (op.additive() && (theirs == null || plainNumber(theirs))) {
+                Object merged = theirs == null ? op.added() : Arithmetic.add(theirs, op.added());
+                VariableCodecs.Encoded encoded = encodeQuietly(merged);
+                Object shift = merged == null ? null : Arithmetic.subtract(merged, op.value());
+                if (encoded != null && shift != null) {
+                    Saved next = new Saved(merged, encoded.type(), encoded.bytes(), guid);
+                    next.seen = op.saved().seen;
+                    out.add(op.writing(encoded.type(), encoded.bytes(), next, merged));
+                    // What scripts added since this write's round stays added on top.
+                    after.add(() -> store.update(name, now -> plainNumber(now) ? Arithmetic.add(now, shift) : now));
+                    merges.incrementAndGet();
+                    continue;
+                }
+            }
+            if (op.appended() != null && op.base() == null && op.type() != null && row != null
+                    && name.contains("::")) {
+                Saved kept = new Saved(theirs, (String) row[0], (byte[]) row[1], (String) row[2]);
+                kept.seen = op.saved().seen;
+                Object mine = op.value();
+                after.add(() -> {
+                    saved.put(name, kept);
+                    if (store.get(name) == mine) {
+                        store.set(name, theirs);
+                        store.addToList(name.substring(0, name.lastIndexOf("::")), new Object[] {mine});
+                    }
+                });
+                merges.incrementAndGet();
+                continue;
+            }
+            out.add(op);
+        }
+        return out;
+    }
+
+    private VariableCodecs.Encoded encodeQuietly(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return codecs.encode(value);
+        } catch (RuntimeException | LinkageError e) {
+            return null;
+        }
+    }
+
+    /** Whether a row, as {@link #currentRows} gives it, is still what {@code base} says this server last saw. */
+    private static boolean sameRow(Saved base, Object[] row) {
+        if (base == null || row == null) {
+            return base == null && row == null;
+        }
+        return base.type.equals(row[0]) && Arrays.equals(base.bytes, (byte[]) row[1]);
+    }
+
+    /**
+     * The rows of {@code ops}' variables as they are now, by name in lower case: {type, bytes, update_guid}, with no
+     * entry for a name without a row or with a deletion's. On MySQL they're locked until the transaction ends, a name
+     * without a row included, so two servers can't both write a variable each thinks is new.
+     */
+    private Map<String, Object[]> currentRows(List<Op> ops) throws SQLException {
+        Map<String, Object[]> rows = new java.util.HashMap<>();
+        for (int from = 0; from < ops.size(); from += BATCH) {
+            List<Op> part = ops.subList(from, Math.min(ops.size(), from + BATCH));
+            String query = "SELECT name, type, value, update_guid FROM " + settings.table() + " WHERE name IN ("
+                    + String.join(", ", java.util.Collections.nCopies(part.size(), "?")) + ")"
+                    + (settings.dialect() == Dialect.MYSQL ? " FOR UPDATE" : "");
+            try (PreparedStatement select = connection.prepareStatement(query)) {
+                for (int i = 0; i < part.size(); i++) {
+                    select.setString(i + 1, part.get(i).name());
+                }
+                try (ResultSet result = select.executeQuery()) {
+                    while (result.next()) {
+                        String name = result.getString(1);
+                        String type = result.getString(2);
+                        byte[] bytes = result.getBytes(3);
+                        if (name != null && type != null && bytes != null) {
+                            rows.put(name.toLowerCase(Locale.ROOT), new Object[] {type, bytes, result.getString(4)});
+                        }
+                    }
+                }
+            }
+        }
+        return rows;
+    }
+
+    /**
+     * After a write: lets go of the additions and appends it took in. Additions it read whole for a variable that had
+     * nothing to write are let go of too, unless more came since, and so are additions and marks for variables that
+     * are gone (marks a while after: an append is marked just before its value is there).
+     */
+    @SuppressWarnings("unchecked")
+    private void letGo(List<Op> ops, Object[] found) {
+        if (!settings.monitor() || found[0] == null) {
+            return;
+        }
+        Map<String, Object> unwritten = (Map<String, Object>) found[0];
+        java.util.Set<String> deferred = (java.util.Set<String>) found[1];
+        java.util.Set<String> visited = (java.util.Set<String>) found[2];
+        java.util.Set<String> written = new java.util.HashSet<>();
+        for (Op op : ops) {
+            written.add(op.name());
+            if (op.added() != null) {
+                Object taken = op.added();
+                added.computeIfPresent(op.name(), (name, now) -> {
+                    Object rest = Arithmetic.subtract(now, taken);
+                    return rest == null || sameNumber(rest, 0L) ? null : rest;
+                });
+            }
+            if (op.appended() != null) {
+                appended.remove(op.name(), op.appended());
+            }
+        }
+        unwritten.forEach(added::remove);
+        for (String name : List.copyOf(added.keySet())) {
+            if (!visited.contains(name) && !written.contains(name) && !deferred.contains(name)
+                    && !adding.containsKey(name) && store.get(name) == null) {
+                Object sum = added.get(name);
+                if (sum != null && !adding.containsKey(name)) {
+                    added.remove(name, sum);
+                }
+            }
+        }
+        long old = (System.currentTimeMillis() - 60_000) << 20;
+        appended.entrySet().removeIf(entry -> entry.getValue() < old && !written.contains(entry.getKey())
+                && store.get(entry.getKey()) == null);
     }
 
     private volatile VariableStorage.Result lastResult = new VariableStorage.Result(0, 0, 0);
@@ -1436,6 +1861,7 @@ public final class SqlVariableStorage implements VariableBackend {
         if (closed) {
             return;
         }
+        unwatch.run();
         // A backup running on the database's thread would hold up the last write behind it.
         cancelBackup();
         // A load still running (a late one, or one abandoned at startup) is cut off and never applied: what's in
