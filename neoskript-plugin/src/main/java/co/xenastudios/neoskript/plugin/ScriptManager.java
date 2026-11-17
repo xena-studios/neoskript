@@ -421,11 +421,13 @@ final class ScriptManager {
         autoReload.lastReload(lastModified);
         long start = System.nanoTime();
         List<org.bukkit.command.CommandSender> audience = autoReload.audience();
-        AutoReload.send(audience, autoReload.reloading());
+        net.kyori.adventure.text.Component what = Messages.highlight(name);
+        Messages.send(audience, Messages.RELOADING, Messages.text("doing", "Automatically reloading"),
+                Messages.component("what", what));
+        ScriptReport report = new ScriptReport("sk");
         try {
-            Outcome outcome = load(name::equals, problem -> {}, false,
-                    (problem, file) -> AutoReload.send(audience, AutoReload.describe(problem, file)));
-            AutoReload.send(audience, autoReload.reloaded(outcome.errors(), (System.nanoTime() - start) / 1_000_000));
+            load(name::equals, problem -> {}, false, report);
+            report.send(audience, "Automatically reloaded", what, (System.nanoTime() - start) / 1_000_000);
         } catch (IOException | RuntimeException e) {
             logger.error("Exception occurred while automatically reloading a script ({})", name, e);
         }
@@ -665,7 +667,7 @@ final class ScriptManager {
 
     /** Sends a problem to the console as Skript's log does: through the console, with its colors. */
     private static void toConsole(Diagnostic problem, SourceFile file) {
-        AutoReload.send(List.of(Bukkit.getConsoleSender()), SkriptCommandMessages.PREFIX + AutoReload.describe(problem, file));
+        AutoReload.send(List.of(Bukkit.getConsoleSender()), AutoReload.SKRIPT_PREFIX + AutoReload.describe(problem, file));
     }
 
     /** Whether a problem is with the file's layout, which Skript reports as it reads the file, before the code. */

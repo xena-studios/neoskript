@@ -5,13 +5,15 @@
 package co.xenastudios.neoskript.plugin;
 
 import co.xenastudios.neoskript.compiler.Library;
+import co.xenastudios.neoskript.plugin.config.ConfigException;
+import co.xenastudios.neoskript.plugin.config.ConfigLoader;
+import co.xenastudios.neoskript.plugin.text.Message;
 import co.xenastudios.neoskript.paper.StandardLibrary;
 import co.xenastudios.neoskript.runtime.Waits;
 import co.xenastudios.neoskript.runtime.platform.Platform;
 import co.xenastudios.neoskript.runtime.scheduler.FoliaScheduler;
 import co.xenastudios.neoskript.runtime.scheduler.PaperScheduler;
 import co.xenastudios.neoskript.runtime.scheduler.Scheduler;
-import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.variables.storage.VariableStorage;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +30,12 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     /** What stops the runtime error frames. */
     private Runnable runtimeErrorFrames;
     private EffectCommands effectCommands;
+    /** The settings from config.yml, swapped whole on {@code /sk reload config}. */
+    private volatile NeoSkriptConfig settings = NeoSkriptConfig.DEFAULTS;
+    private UpdateNotices updates;
+    private Scheduler scheduler;
+    private io.papermc.paper.threadedregions.scheduler.ScheduledTask saveTask;
+    private SettingsReloader settingsReloader;
 
     /** https://bstats.org/plugin/bukkit/NeoSkript/34868 */
     private static final int BSTATS_PLUGIN_ID = 34868;
@@ -43,10 +51,10 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             return;
         }
 
-        saveDefaultConfig();
+        loadSettings();
         Platform platform = Platform.detect();
         // D15: bStats, opt-out with `metrics: false` (or globally in plugins/bStats/config.yml).
-        if (getConfig().getBoolean("metrics", true)) {
+        if (settings.metrics()) {
             Metrics metrics = new Metrics(this, BSTATS_PLUGIN_ID);
             metrics.addCustomChart(new SimplePie("platform", platform::displayName));
         }
@@ -70,26 +78,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 getSLF4JLogger().info("Backed up Skript's variables as {} before loading them",
                         getDataPath().toAbsolutePath().relativize(migration.variablesBackup().toAbsolutePath()));
             }
-            // The variables copied are keyed as Skript's config said, so keep reading them that way.
-            if (migration.playerUuids() != null
-                    && migration.playerUuids() != getConfig().getBoolean("variables.player-uuids-in-names", true)) {
-                getConfig().set("variables.player-uuids-in-names", migration.playerUuids());
-                saveConfig();
-                getSLF4JLogger().info("Players are their {} in variable names, as in Skript's config.sk.",
-                        migration.playerUuids() ? "UUIDs" : "names");
-            }
-            // Effect commands work as they did in Skript.
-            boolean changed = false;
-            for (java.util.Map.Entry<String, Object> setting : migration.settings().entrySet()) {
-                if (!setting.getValue().equals(getConfig().get(setting.getKey()))) {
-                    getConfig().set(setting.getKey(), setting.getValue());
-                    changed = true;
-                }
-            }
-            if (changed) {
-                saveConfig();
-                getSLF4JLogger().info("Effect commands are set up as in Skript's config.sk.");
-            }
+            copySkriptSettings(migration);
         } catch (IOException e) {
             getSLF4JLogger().error("Couldn't copy Skript's scripts and variables", e);
         }
@@ -105,7 +94,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 co.xenastudios.neoskript.paper.Hooks.register(registrar, getPluginMeta().getVersion(), getSLF4JLogger());
             }
         });
-        StandardLibrary.usePlayerUuidsInVariableNames(getConfig().getBoolean("variables.player-uuids-in-names", true));
+        StandardLibrary.usePlayerUuidsInVariableNames(settings.variables().playerUuidsInNames());
         if (co.xenastudios.neoskript.plugin.check.CheckMode.requested()) {
             // Started by NeoSkript's CLI to check scripts: check them, write the report, and stop.
             try {
@@ -128,9 +117,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 getSLF4JLogger().warn("Couldn't keep the test chunks loaded: {}", notHere.toString());
             }
         }
-        Scheduler scheduler = platform == Platform.FOLIA ? new FoliaScheduler(this) : new PaperScheduler(this);
+        scheduler = platform == Platform.FOLIA ? new FoliaScheduler(this) : new PaperScheduler(this);
         // Runtime errors go to the console as Skript prints them, limited per frame by config.yml.
-        runtimeErrorFrames = RuntimeErrorConsole.start(getConfig().getConfigurationSection("runtime-errors"), scheduler);
+        runtimeErrorFrames = RuntimeErrorConsole.start(settings.runtimeErrors(), scheduler);
         java.util.function.Consumer<co.xenastudios.neoskript.runtime.ScriptRuntimeException> laterErrors = e -> {
             // A command failed after a wait just stops, as there's no one left to tell.
             if (!(e.getCause() instanceof co.xenastudios.neoskript.runtime.command.CommandEvent.Failed)) {
@@ -145,16 +134,16 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                     new co.xenastudios.neoskript.runtime.region.FoliaRegionAccess(this), laterErrors);
         }
         EventDispatcher events = new EventDispatcher(this, getSLF4JLogger(), eventPriority(),
-                getConfig().getBoolean("events.listen-to-cancelled", false));
+                settings.events().listenToCancelled());
         commands = new ScriptCommands(this, getSLF4JLogger(), scheduler);
         scripts = new ScriptManager(getDataPath().resolve("scripts"), library, scheduler, events,
                 commands, getSLF4JLogger(), TestRunner.enabled() ? () -> getServer().shutdown() : null);
         co.xenastudios.neoskript.runtime.ScriptCatalog.install(scripts.catalog());
         effectCommands = new EffectCommands(scripts, scheduler, getSLF4JLogger(), TestRunner.enabled(),
-                EffectCommands.Settings.read(getConfig().getConfigurationSection("effect-commands")));
+                EffectCommands.Settings.of(settings.effectCommands()));
         getServer().getPluginManager().registerEvents(effectCommands, this);
         storage = new VariableStorage(scripts.globals(), library.codecs(),
-                getDataPath().resolve(getConfig().getString("variables.file", "variables.csv")));
+                getDataPath().resolve(settings.variables().file()));
         loadVariables();
         Runnable start = () -> {
             if (hooks) {
@@ -177,12 +166,15 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         } else {
             start.run();
         }
-        // D15: tell admins about newer versions on Modrinth, opt-out with `update-checker: false`.
-        if (!TestRunner.enabled() && getConfig().getBoolean("update-checker", true)) {
-            UpdateNotices.start(this, getSLF4JLogger());
+        // D15: tell admins about newer versions on Modrinth, opt-out with `update-checker: false`. Test servers
+        // never check.
+        if (!TestRunner.enabled()) {
+            updates = UpdateNotices.start(this, getSLF4JLogger(), settings.updateChecker());
         }
-        // D10: NeoSkript takes over /skript and /sk, with /neoskript as an alias.
-        getCommand("skript").setExecutor(new SkriptCommand(this, scripts, this::reloadSettings));
+        // D10: NeoSkript takes over /skript and /sk, with /neoskript and /ns as aliases.
+        // What /sk reload config compares with: the settings the server started with.
+        settingsReloader = new SettingsReloader(configFile(), settings, reloadEffects());
+        getCommand("skript").setExecutor(new SkriptCommand(this, scripts));
     }
 
     /**
@@ -208,29 +200,157 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
     }
 
+    private java.nio.file.Path configFile() {
+        return getDataPath().resolve("config.yml");
+    }
+
     /**
-     * {@code /skript reload config}: reads config.yml again and applies what can change while the server
-     * runs. The other settings (metrics, the update checker, event priority, cancelled events and where variables are saved)
-     * take effect when the server restarts.
+     * Reads config.yml at startup, writing the defaults if there's none and carrying an old one forward. A file
+     * that isn't valid YAML is left as it is, and NeoSkript runs on the defaults until it's fixed.
      */
-    private void reloadSettings() {
-        saveDefaultConfig();
-        reloadConfig();
-        StandardLibrary.usePlayerUuidsInVariableNames(getConfig().getBoolean("variables.player-uuids-in-names", true));
-        if (effectCommands != null) {
-            effectCommands.settings(EffectCommands.Settings.read(getConfig().getConfigurationSection("effect-commands")));
+    private void loadSettings() {
+        try {
+            accept(ConfigLoader.load(NeoSkriptConfig.SPEC, configFile()));
+        } catch (ConfigException e) {
+            getSLF4JLogger().error("{} Running on the default settings until it's fixed and reloaded with /sk reload config.",
+                    e.getMessage());
+            Message.theme(NeoSkriptConfig.DEFAULTS.theme());
+            settings = NeoSkriptConfig.DEFAULTS;
+        } catch (RuntimeException | StackOverflowError e) {
+            getSLF4JLogger().error("Couldn't read config.yml. Running on the default settings until it's fixed and reloaded"
+                    + " with /sk reload config.", e);
+            Message.theme(NeoSkriptConfig.DEFAULTS.theme());
+            settings = NeoSkriptConfig.DEFAULTS;
         }
+    }
+
+    /** Uses what loading config.yml found, and logs what it changed and what it couldn't use. */
+    private void accept(ConfigLoader.Result<NeoSkriptConfig> result) {
+        // The theme first: if it fails, the settings stay as they were.
+        Message.theme(result.config().theme());
+        settings = result.config();
+        result.notices().forEach(notice -> getSLF4JLogger().info(notice));
+        result.warnings().forEach(warning -> getSLF4JLogger().warn("config.yml: {}", warning));
+    }
+
+    /**
+     * Copies the settings Skript's config.sk had to config.yml, so variables are found and effect commands work
+     * as they did in Skript.
+     */
+    private void copySkriptSettings(SkriptMigration.Result migration) {
+        java.util.Map<String, Object> copied = new java.util.LinkedHashMap<>();
+        if (migration.playerUuids() != null) {
+            copied.put("variables.player-uuids-in-names", migration.playerUuids());
+        }
+        copied.putAll(migration.settings());
+        org.bukkit.configuration.file.YamlConfiguration current =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile().toFile());
+        copied.entrySet().removeIf(setting -> setting.getValue().equals(current.get(setting.getKey())));
+        if (copied.isEmpty()) {
+            return;
+        }
+        try {
+            ConfigLoader.Change change = ConfigLoader.set(NeoSkriptConfig.SPEC, configFile(), copied);
+            change.notices().forEach(notice -> getSLF4JLogger().info(notice));
+            change.warnings().forEach(warning -> getSLF4JLogger().warn("config.yml: {}", warning));
+            if (!change.written()) {
+                getSLF4JLogger().warn("Skript's settings weren't copied to config.yml: {}. Set them there by hand.",
+                        String.join(", ", copied.keySet()));
+                return;
+            }
+            accept(ConfigLoader.load(NeoSkriptConfig.SPEC, configFile()));
+        } catch (ConfigException e) {
+            getSLF4JLogger().error("Couldn't copy Skript's settings to config.yml: {}", e.getMessage());
+            return;
+        } catch (RuntimeException | StackOverflowError e) {
+            getSLF4JLogger().error("Couldn't copy Skript's settings to config.yml", e);
+            return;
+        }
+        if (copied.containsKey("variables.player-uuids-in-names")) {
+            getSLF4JLogger().info("Players are their {} in variable names, as in Skript's config.sk.",
+                    settings.variables().playerUuidsInNames() ? "UUIDs" : "names");
+        }
+        if (copied.keySet().stream().anyMatch(path -> path.startsWith("effect-commands."))) {
+            getSLF4JLogger().info("Effect commands are set up as in Skript's config.sk.");
+        }
+    }
+
+    /** The settings from config.yml. */
+    NeoSkriptConfig settings() {
+        return settings;
+    }
+
+    /** The update checker, or {@code null} on test servers and development builds, which never check. */
+    UpdateNotices updates() {
+        return updates;
+    }
+
+    /** {@code /sk reload config}. */
+    SettingsReloader.Outcome reloadSettings() {
+        return settingsReloader.reload();
+    }
+
+    /** What applying settings on {@code /sk reload config} does to the running server. */
+    private SettingsReloader.Effects reloadEffects() {
+        return new SettingsReloader.Effects() {
+            @Override
+            public void accept(ConfigLoader.Result<NeoSkriptConfig> result) {
+                NeoSkriptPlugin.this.accept(result);
+            }
+
+            @Override
+            public void playerUuids(boolean uuids) {
+                StandardLibrary.usePlayerUuidsInVariableNames(uuids);
+            }
+
+            @Override
+            public void effectCommands(EffectCommands.Settings settings) {
+                effectCommands.settings(settings);
+            }
+
+            @Override
+            public void runtimeErrors(NeoSkriptConfig.RuntimeErrors limits) {
+                runtimeErrorFrames.run();
+                runtimeErrorFrames = RuntimeErrorConsole.start(limits, scheduler);
+            }
+
+            @Override
+            public void saveInterval(NeoSkriptConfig.Interval interval) {
+                if (saveTask != null) {
+                    saveTask.cancel();
+                    scheduleSaves();
+                }
+            }
+
+            @Override
+            public void updateChecker(boolean enabled, boolean turnedOn) {
+                if (updates == null) {
+                    return;
+                }
+                updates.enabled(enabled);
+                if (turnedOn) {
+                    getServer().getAsyncScheduler().runNow(NeoSkriptPlugin.this, task -> {
+                        try {
+                            updates.checkNow();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        } catch (Exception e) {
+                            getSLF4JLogger().debug("Couldn't check Modrinth for a newer NeoSkript: {}", e.toString());
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void failed(String message) {
+                getSLF4JLogger().error("{} The running settings are kept.", message);
+            }
+        };
     }
 
     /** The priority triggers listen to events at, {@code high} by default as in Skript. */
     private EventPriority eventPriority() {
-        String name = getConfig().getString("events.priority", "high");
-        try {
-            return EventPriority.valueOf(name.strip().toUpperCase(java.util.Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            getSLF4JLogger().warn("Unknown event priority '{}' in config.yml; using high", name);
-            return EventPriority.HIGH;
-        }
+        return settings.events().priority().bukkit();
     }
 
     /** Loads saved variables, then saves changed ones every {@code variables.save-interval}. */
@@ -269,9 +389,13 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             storage = null;
             return;
         }
-        Timespan interval = Timespan.parse(getConfig().getString("variables.save-interval", "5 minutes"));
-        long seconds = Math.max(interval == null ? 300 : interval.millis() / 1000, 10);
-        getServer().getAsyncScheduler().runAtFixedRate(this, task -> saveVariables(false), seconds, seconds,
+        scheduleSaves();
+    }
+
+    /** Saves changed variables every {@code variables.save-interval}, at least every 10 seconds. */
+    private void scheduleSaves() {
+        long seconds = Math.max(settings.variables().saveInterval().millis() / 1000, 10);
+        saveTask = getServer().getAsyncScheduler().runAtFixedRate(this, task -> saveVariables(false), seconds, seconds,
                 TimeUnit.SECONDS);
     }
 

@@ -12,6 +12,8 @@ dependencies {
     // Paper ships Gson; the update checker reads Modrinth's answers with it.
     compileOnly(libs.gson)
     testImplementation(libs.gson)
+    // The config and message tests read YAML and MiniMessage as the server does.
+    testImplementation(libs.paper.api)
 }
 
 tasks.processResources {

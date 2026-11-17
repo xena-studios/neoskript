@@ -21,6 +21,8 @@ On its first start, NeoSkript copies `scripts/` and `variables.csv` from `plugin
 
 A few of Skript's `config.sk` settings carry over to NeoSkript's `config.yml` in that first start: whether players are saved by UUID in variable names, and the effect command settings. The rest of `config.sk` isn't copied; NeoSkript's defaults match Skript's.
 
+`/skript` and `/sk` keep Skript's subcommands and arguments, so what you type and any console automation still work. Its messages are NeoSkript's own: see [commands](/docs/commands/).
+
 ## What's different
 
-NeoSkript aims to behave exactly as Skript does, messages included. Where it doesn't yet, the difference is written down in the [progress log](https://github.com/xena-studios/neoskript/blob/main/docs/PROGRESS.md), under each batch's known differences.
+NeoSkript aims to behave exactly as Skript does, scripts' messages included. Where it doesn't yet, the difference is written down in the [progress log](https://github.com/xena-studios/neoskript/blob/main/docs/PROGRESS.md), under each batch's known differences.

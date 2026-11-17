@@ -15,7 +15,6 @@ import java.util.List;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -46,15 +45,11 @@ final class EffectCommands implements Listener {
 
         static final Settings DEFAULT = new Settings(false, "!", false, false);
 
-        /** The {@code effect-commands} section of config.yml, or the defaults if there's none. */
-        static Settings read(ConfigurationSection config) {
-            if (config == null) {
-                return DEFAULT;
-            }
-            String token = config.getString("token", DEFAULT.token());
-            return new Settings(config.getBoolean("enabled", DEFAULT.enabled()),
-                    token == null || token.isEmpty() ? DEFAULT.token() : token,
-                    config.getBoolean("allow-ops", DEFAULT.allowOps()), config.getBoolean("log", DEFAULT.log()));
+        /** The {@code effect-commands} section of config.yml. An empty token is Skript's {@code !}. */
+        static Settings of(NeoSkriptConfig.EffectCommands config) {
+            String token = config.token();
+            return new Settings(config.enabled(), token == null || token.isEmpty() ? DEFAULT.token() : token,
+                    config.allowOps(), config.log());
         }
     }
 

@@ -6,7 +6,6 @@ package co.xenastudios.neoskript.plugin;
 
 import co.xenastudios.neoskript.paper.TextComponentParser;
 import co.xenastudios.neoskript.runtime.RuntimeErrors;
-import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.errors.ErrorFrame;
 import co.xenastudios.neoskript.runtime.errors.ErrorSource;
 import co.xenastudios.neoskript.runtime.errors.RuntimeError;
@@ -16,7 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
 /**
@@ -32,32 +30,20 @@ final class RuntimeErrorConsole implements RuntimeErrors.Consumer {
     private RuntimeErrorConsole() {}
 
     /** Installs the console as where runtime errors go, and starts the frames. Returns what stops them. */
-    static Runnable start(ConfigurationSection config, Scheduler scheduler) {
-        ErrorFrame.Limits errors = limits(config, "error", ErrorFrame.Limits.DEFAULT);
-        ErrorFrame.Limits warnings = limits(config, "warning", ErrorFrame.Limits.DEFAULT);
+    static Runnable start(NeoSkriptConfig.RuntimeErrors config, Scheduler scheduler) {
+        ErrorFrame.Limits errors = new ErrorFrame.Limits(config.totalErrorsPerFrame(), config.errorsFromOneLinePerFrame(),
+                // As Skript, a timeout lasts at least a frame.
+                config.errorSpamTimeoutLimit(), Math.max(config.errorTimeoutLength(), 1));
+        ErrorFrame.Limits warnings = new ErrorFrame.Limits(config.totalWarningsPerFrame(),
+                config.warningsFromOneLinePerFrame(), config.warningSpamTimeoutLimit(),
+                Math.max(config.warningTimeoutLength(), 1));
         RuntimeErrors.install(new RuntimeErrorConsole(), errors, warnings);
         return scheduler.runGlobalRepeating(frameTicks(config), RuntimeErrors::nextFrame);
     }
 
-    /** {@code frame duration}, in ticks: Skript's 1 second by default. */
-    static long frameTicks(ConfigurationSection config) {
-        String text = config == null ? null : config.getString("frame-duration");
-        Timespan duration = text == null ? null : Timespan.parse(text);
-        long ticks = duration == null ? 20 : duration.millis() / 50;
-        return Math.max(ticks, 1);
-    }
-
-    /** One level's limits: {@code total errors per frame}, {@code errors from one line per frame}, and so on. */
-    static ErrorFrame.Limits limits(ConfigurationSection config, String level, ErrorFrame.Limits defaults) {
-        if (config == null) {
-            return defaults;
-        }
-        return new ErrorFrame.Limits(
-                config.getInt("total-" + level + "s-per-frame", defaults.totalLimit()),
-                config.getInt(level + "s-from-one-line-per-frame", defaults.lineLimit()),
-                config.getInt(level + "-spam-timeout-limit", defaults.lineTimeoutLimit()),
-                // As Skript, a timeout lasts at least a frame.
-                Math.max(config.getInt(level + "-timeout-length", defaults.timeoutDuration()), 1));
+    /** {@code frame-duration}, in ticks: Skript's 1 second by default. */
+    static long frameTicks(NeoSkriptConfig.RuntimeErrors config) {
+        return Math.max(config.frameDuration().millis() / 50, 1);
     }
 
     @Override
@@ -68,7 +54,7 @@ final class RuntimeErrorConsole implements RuntimeErrors.Consumer {
     @Override
     public void logError(String message) {
         // Skript's log entry without a line: its prefix, then the message in its error color.
-        AutoReload.send(List.of(Bukkit.getConsoleSender()), SkriptCommandMessages.PREFIX + "<light red>"
+        AutoReload.send(List.of(Bukkit.getConsoleSender()), AutoReload.SKRIPT_PREFIX + "<light red>"
                 + TextComponentParser.instance().escape(message) + "<reset>");
     }
 
