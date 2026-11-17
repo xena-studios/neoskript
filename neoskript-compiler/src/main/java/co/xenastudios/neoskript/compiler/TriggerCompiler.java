@@ -1449,6 +1449,19 @@ final class TriggerCompiler {
         if (!(library.binding(syntax.syntax()) instanceof ElementFactory<?> factory)) {
             throw unsupported(syntax.syntax().id());
         }
+        Object element = factory.create(info(syntax));
+        if (!type.isInstance(element)) {
+            throw unsupported(syntax.syntax().id());
+        }
+        return pause(syntax, type, element, true);
+    }
+
+    /**
+     * {@link #pause(ParsedSyntax, Class)} for {@code element}, made for {@code syntax}; without {@code withArguments},
+     * it's started with none.
+     */
+    private int pause(ParsedSyntax syntax, Class<?> type, Object element, boolean withArguments)
+            throws CompileException {
         // It carries on on the trigger's own thread, so it doesn't start on the global one.
         leaveGlobal();
         int frameSlot = nextSlot++;
@@ -1457,15 +1470,16 @@ final class TriggerCompiler {
         WaitPoint wait = saveFrame();
         method.visitInsn(DUP);
         method.visitVarInsn(ASTORE, frameSlot);
-        Object element = factory.create(info(syntax));
-        if (!type.isInstance(element)) {
-            throw unsupported(syntax.syntax().id());
-        }
         co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site = site(syntax, element.getClass());
         // Its start throwing is a failed stage, as a stage completing exceptionally is.
         constant(co.xenastudios.neoskript.runtime.Pauses.guard(regional(element, type, syntax, site), type), type);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
-        arguments(syntax);
+        if (withArguments) {
+            arguments(syntax);
+        } else {
+            pushInt(0);
+            method.visitTypeInsn(ANEWARRAY, OBJECT);
+        }
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(type), "start",
                 "(" + CONTEXT + OBJECTS + ")Ljava/util/concurrent/CompletionStage;", true);
         constant(new co.xenastudios.neoskript.runtime.Pauses.Point(site, library.timeoutMillis(baseId(syntax))),
@@ -1513,6 +1527,7 @@ final class TriggerCompiler {
         }
         int frame = pause(effect, PausingEffect.class);
         if (stored == null) {
+            leaveIfAsked(frame);
             return;
         }
         Label skip = new Label();
@@ -1533,6 +1548,66 @@ final class TriggerCompiler {
             });
         }
         method.visitLabel(skip);
+        leaveIfAsked(frame);
+    }
+
+    /** The code of the pausing sections being compiled, innermost first, for {@link #leaveIfAsked}. */
+    private final java.util.Deque<Block> pausingSections = new java.util.ArrayDeque<>();
+
+    /**
+     * After a pausing effect in a pausing section: leaves the section if its stage said to
+     * ({@link co.xenastudios.neoskript.api.element.PausingSection#LEAVE}), unless that would leave a {@code run on}
+     * section.
+     */
+    private void leaveIfAsked(int frame) {
+        Block section = pausingSections.peek();
+        if (section == null) {
+            return;
+        }
+        // A 'run on' inside the section (innermost first) would be left without going back to the trigger's thread.
+        for (RunOn runOn : runOns) {
+            if (!runOn.outside().contains(section)) {
+                break;
+            }
+            return;
+        }
+        Label stay = new Label();
+        method.visitVarInsn(ALOAD, frame);
+        method.visitMethodInsn(INVOKESTATIC, PAUSES, "leaves", "(" + FRAME_DESC + ")Z", false);
+        method.visitJumpInsn(IFEQ, stay);
+        method.visitJumpInsn(GOTO, section.end());
+        method.visitLabel(stay);
+    }
+
+    /**
+     * A pausing section ({@code transaction on {db}:}): waits for its start, runs its code once unless that failed
+     * or gave {@code false}, then waits for its end.
+     */
+    private void pausingSection(Statement.Section section) throws CompileException {
+        ParsedSyntax header = section.header();
+        if (!(library.binding(header.syntax()) instanceof ElementFactory<?> factory)
+                || !(factory.create(info(header)) instanceof co.xenastudios.neoskript.api.element.PausingSection element)) {
+            throw unsupported(header.syntax().id());
+        }
+        // Each pause is a pausing effect's, so it's guarded, timed and checked for regions as one.
+        PausingEffect start = element::start;
+        int frame = pause(header, PausingEffect.class, start, true);
+        Label end = new Label();
+        method.visitVarInsn(ALOAD, frame);
+        method.visitMethodInsn(INVOKESTATIC, PAUSES, "proceeds", "(" + FRAME_DESC + ")Z", false);
+        method.visitJumpInsn(IFEQ, end);
+        Block code = new Block(BlockKind.CONDITIONAL, end, null, -1, -1, -1);
+        blocks.push(code);
+        pausingSections.push(code);
+        try {
+            statements(section.body());
+        } finally {
+            pausingSections.pop();
+            blocks.pop();
+        }
+        method.visitLabel(end);
+        PausingEffect finish = (context, arguments) -> element.end(context);
+        pause(header, PausingEffect.class, finish, false);
     }
 
     private void statementHere(Statement statement) throws CompileException {
@@ -1594,6 +1669,8 @@ final class TriggerCompiler {
                 block(BlockKind.CONDITIONAL, end, section.body());
                 method.visitLabel(end);
             }
+            case Statement.Section section when section.header() != null
+                    && library.isPausingSection(section.header().syntax().id()) -> pausingSection(section);
             case Statement.Section section when library.sectionType(section.header() == null ? null
                     : section.header().syntax().id()) != null -> librarySection(section);
             case Statement.Section section when sectionExpression(section) != null -> expressionSection(section);
@@ -4056,10 +4133,73 @@ final class TriggerCompiler {
                 break;
             }
         }
+        List<co.xenastudios.neoskript.api.element.TextTemplate> texts = new ArrayList<>(values.size());
+        List<String> elements = new ArrayList<>(values.size());
+        for (Object value : values) {
+            texts.add(value instanceof Expr.Text text ? templateShape(text) : null);
+            elements.add(value instanceof Expr.Syntax inner ? baseId(inner.syntax()) : null);
+        }
         return new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags(), or, lists, types,
                 argumentTypes, single, literals, eventLabel != null ? eventLabel : "function",
                 eventClasses == null ? List.of() : eventClasses,
-                sectionType, defaults, syntax == timedSyntax ? timedTime : 0, textOf(syntax));
+                sectionType, defaults, syntax == timedSyntax ? timedTime : 0, textOf(syntax), texts, elements);
+    }
+
+    /**
+     * A text in quotes as a template: the text around its expressions, and each expression's element and how it's
+     * written, without values. {@code null} if the text isn't on this line's source (a default).
+     */
+    private co.xenastudios.neoskript.api.element.TextTemplate templateShape(Expr.Text text) {
+        if (text.end() > source.length() || text.start() < 0) {
+            return null;
+        }
+        List<String> pieces = new ArrayList<>();
+        List<co.xenastudios.neoskript.api.element.TextTemplate.Hole> holes = new ArrayList<>();
+        int pos = text.start() + 1;
+        for (Expr part : text.embedded()) {
+            pieces.add(unescape(source.substring(pos, part.start() - 1)));
+            holes.add(new co.xenastudios.neoskript.api.element.TextTemplate.Hole(
+                    part instanceof Expr.Syntax inner ? baseId(inner.syntax()) : null,
+                    source.substring(part.start(), part.end()).strip(), List.of(), List.of()));
+            pos = part.end() + 1;
+        }
+        pieces.add(unescape(source.substring(pos, text.end() - 1)));
+        return new co.xenastudios.neoskript.api.element.TextTemplate(pieces, holes);
+    }
+
+    /**
+     * Whether argument {@code index} of {@code syntax} goes to its element as a template
+     * ({@link co.xenastudios.neoskript.api.element.TemplateAware}).
+     */
+    private boolean templateArgument(ParsedSyntax syntax, int index) {
+        return !(library.binding(syntax.syntax()) instanceof Library.Core)
+                && library.binding(syntax.syntax()) instanceof ElementFactory<?> factory
+                && factory.create(info(syntax)) instanceof co.xenastudios.neoskript.api.element.TemplateAware aware
+                && aware.template(index);
+    }
+
+    /** Pushes text {@code text} as a template, with its expressions' values ({@link Values#template}). */
+    private void template(Expr.Text text) throws CompileException {
+        co.xenastudios.neoskript.api.element.TextTemplate shape = templateShape(text);
+        constant(shape, co.xenastudios.neoskript.api.element.TextTemplate.class);
+        pushInt(text.embedded().size());
+        method.visitTypeInsn(ANEWARRAY, OBJECT);
+        for (int i = 0; i < text.embedded().size(); i++) {
+            Expr part = text.embedded().get(i);
+            method.visitInsn(DUP);
+            pushInt(i);
+            String outerTextPart = textPart;
+            textPart = source.substring(part.start(), part.end());
+            try {
+                expression(part);
+            } finally {
+                textPart = outerTextPart;
+            }
+            method.visitInsn(AASTORE);
+        }
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "template", "("
+                + Type.getDescriptor(co.xenastudios.neoskript.api.element.TextTemplate.class) + "[" + OBJECT_DESC + ")"
+                + Type.getDescriptor(co.xenastudios.neoskript.api.element.TextTemplate.class), false);
     }
 
     /** What a change's errors quote instead of its target: the time state around it ({@code past level of player}). */
@@ -4379,6 +4519,12 @@ final class TriggerCompiler {
             pushInt(i);
             if (keyed && isKeyed(expr, implicit)) {
                 keyed(expr, implicit);
+                method.visitInsn(AASTORE);
+                continue;
+            }
+            if (expr instanceof Expr.Text text && templateShape(text) != null && templateArgument(syntax, i)) {
+                // The element wants the text's expressions apart: skript-db binds each as a query parameter.
+                template(text);
                 method.visitInsn(AASTORE);
                 continue;
             }

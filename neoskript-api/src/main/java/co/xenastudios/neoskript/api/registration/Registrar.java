@@ -188,13 +188,28 @@ public interface Registrar {
             ElementFactory<co.xenastudios.neoskript.api.element.PausingExpression> factory, String... patterns);
 
     /**
+     * A section that pauses the trigger before its code and after it, as a database transaction does: the work
+     * before opens something, the code under it runs, the work after closes it. Each pause is as
+     * {@link #pausingEffect} describes, the section is a delay for Skript's rules from its line on, and it must be
+     * written with a {@code :}. See {@link co.xenastudios.neoskript.api.element.PausingSection}.
+     *
+     * @param id the section's id
+     * @param factory makes the section for each place it's used
+     * @param patterns its patterns
+     */
+    default void pausingSection(String id, ElementFactory<co.xenastudios.neoskript.api.element.PausingSection> factory,
+            String... patterns) {
+        throw new UnsupportedOperationException("This NeoSkript doesn't have pausing sections");
+    }
+
+    /**
      * How long a trigger waits for pausing effect or expression {@code id} before it gives up: a runtime error on
      * the line, after which the trigger carries on without the result, and NeoSkript tries to cancel the stage.
      * Without this, it's one minute. An element whose work has a time limit of its own (a query, a request) should
      * set this to match it, so scripts see the addon's error rather than NeoSkript's.
      *
-     * @param id the element's id: one this addon registered with {@link #pausingEffect} or
-     *     {@link #pausingExpression}
+     * @param id the element's id: one this addon registered with {@link #pausingEffect},
+     *     {@link #pausingExpression} or {@link #pausingSection} (whose two pauses each get this long)
      * @param timeout how long, more than zero
      * @throws IllegalArgumentException if the timeout isn't more than zero, or the id isn't one of this addon's
      *     pausing elements

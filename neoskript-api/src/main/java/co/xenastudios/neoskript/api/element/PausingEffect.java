@@ -31,6 +31,18 @@ import java.util.function.BiFunction;
 public interface PausingEffect {
 
     /**
+     * What a stage completes with when the work went wrong in a way the addon reports itself, as skript-db keeps
+     * the last error for {@code the last sql error}: nothing is stored in the target, which keeps its value, and
+     * there's no runtime error. The trigger carries on.
+     */
+    Object UNCHANGED = new Object() {
+        @Override
+        public String toString() {
+            return "unchanged";
+        }
+    };
+
+    /**
      * Starts the work.
      *
      * @param context the running trigger
