@@ -1,20 +1,18 @@
 ---
 title: Reloading scripts
-description: How /sk reload works, why a script with errors keeps its old version running, and auto reload.
+description: How /sk reload works, what happens to a script with errors, and auto reload.
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
 `/sk reload <script>` reads a script again and swaps the new version in, without restarting the server. `/sk reload scripts` does every script.
 
-## A failed reload keeps the old scripts
+## A script with errors
 
-NeoSkript reads and compiles everything first, then switches over together. If a script has errors, the errors are reported and **the version that's already running keeps running**, with its commands, events and functions as they were. Fix the errors and reload again.
-
-A script that wasn't loaded before, such as a new file, loads the lines that are fine, as on Skript, and reports the rest.
+NeoSkript reads and compiles everything first, then switches over together. If a script has errors, they're reported and **the new version loads without what has them**, as on Skript: a line that fails is left out and the code around it runs, and a section, trigger or function whose header fails is left out whole. [Reading errors](/docs/scripts/errors/#where-errors-appear) has what's left out for each kind of line. Fix the errors and reload again.
 
 <Aside type="note">
-This is a deliberate difference from Skript, which unloads a script before loading it again. A typo in a live server's script shouldn't take that script down.
+NeoSkript used to keep the old version of a script whose new version had errors. That isn't what Skript does, and scripts written for Skript expect the rest of the script to run, so a reload now matches Skript. If NeoSkript itself fails to compile the scripts (a bug, not a mistake in a script), nothing changes and the scripts that were running keep running.
 </Aside>
 
 Functions keep working across reloads too: a trigger that calls a function from another script calls its new version once that script reloads.
@@ -37,14 +35,14 @@ The player who reloads gets a report: what was reloaded, how many scripts, how l
  shop.sk - 1 error
    Line 14: Can't understand this condition/effect: sned "hi" to player
      sned "hi" to player
-[NeoSkript] Reloaded shop.sk with 1 error in 3 ms. Scripts with errors keep their last version.
+[NeoSkript] Reloaded shop.sk with 1 error in 3 ms. What has errors is left out.
 ```
 
 In chat, hovering over a problem shows the line of code, and clicking copies it. The look comes from the [theme](/docs/server/configuration/#make-it-look-like-your-server) in `config.yml`. See [reload reports](/docs/server/commands/#reload-reports).
 
 ## auto reload
 
-A script with an `auto reload` structure reloads itself when its file changes, checked every 2 seconds. A version with errors keeps the old one running, as with `/sk reload`.
+A script with an `auto reload` structure reloads itself when its file changes, checked every 2 seconds. A version with errors loads without what has them, as with `/sk reload`.
 
 ```skript
 auto reload:

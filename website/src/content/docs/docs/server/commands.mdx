@@ -18,7 +18,7 @@ In chat, click a command in `/sk help` to type it. Script names in reports and l
 | `/sk reload config` | Reads `config.yml` again. See [configuration](/docs/server/configuration/#what-applies-when) for what applies at once. |
 | `/sk reload all` | The config, the aliases and every script. |
 | `/sk reload last` | Reloads the script you reloaded last. |
-| `/sk reload aliases` | Reads the [alias files](/docs/scripts/items/#custom-aliases) again, then reloads the scripts whose items use a name that changed, and those that had errors. A script that now has errors keeps running its last version. |
+| `/sk reload aliases` | Reads the [alias files](/docs/scripts/items/#custom-aliases) again, then reloads the scripts whose items use a name that changed, and those that had errors. A script that now has errors loads without what has them, as on Skript. |
 | `/sk enable <script>` | Enables a disabled script or folder and loads it. `all` enables every disabled script. |
 | `/sk disable <script>` | Unloads a script or folder and disables it. `all` disables every script. |
 | `/sk list` | The enabled and disabled scripts, grouped by folder. Also `/sk show`. |
@@ -49,10 +49,10 @@ When scripts have problems, each script's are listed first, with their line numb
  shop.sk - 1 error
    Line 14: Can't understand this condition/effect: sned "hi" to player
      sned "hi" to player
-[NeoSkript] Reloaded 12 scripts with 1 error in 52 ms. Scripts with errors keep their last version.
+[NeoSkript] Reloaded 12 scripts with 1 error in 52 ms. What has errors is left out.
 ```
 
-A script with errors keeps running the version it had, so a typo doesn't take it down. A script that wasn't loaded before loads what it can. See [reloading](/docs/server/reloading/).
+As on Skript, a script with errors still switches to its new version, without what has them, and the rest of it runs. See [reloading](/docs/server/reloading/).
 
 The player who reloads gets the report. Players with `skript.reloadnotify` see who's reloading what, and the same report. A script with `auto reload` reports its reloads the same way.
 
@@ -72,7 +72,7 @@ These are Skript's, so permission setups made for Skript keep working.
 
 ## How it differs from Skript
 
-- A reload never unloads first. A script with errors keeps its last version.
+- A reload compiles the new versions before the old ones unload, so the switch happens at once. If NeoSkript itself can't compile the scripts, nothing changes.
 - `reload config` reads `config.yml`; NeoSkript has no `config.sk`.
 - `update` uses NeoSkript's [update checker](/docs/server/updates-and-metrics/). Development builds don't check.
 - `gen-docs` points to the [syntax reference](/syntax/) instead of writing docs files.

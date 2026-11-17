@@ -36,10 +36,10 @@ import org.bukkit.plugin.Plugin;
  * and gen-docs and test), so habits and console automation keep working, with NeoSkript's own messages in the
  * theme of config.yml.
  *
- * <p>Where NeoSkript differs: a script with errors keeps running its last version when reloaded (D12), so a
- * reload never unloads first; {@code reload config} reloads {@code config.yml} (NeoSkript has no
- * {@code config.sk}); {@code reload aliases} also reloads the scripts the changed aliases may change, which keep
- * their last version if they now have errors; and {@code gen-docs} points to the syntax reference on neoskript.dev.
+ * <p>Where NeoSkript differs: a reload compiles the new versions before the old ones unload, so the switch is all
+ * at once (a script with errors still loads without what has them, as in Skript: D12); {@code reload config}
+ * reloads {@code config.yml} (NeoSkript has no {@code config.sk}); {@code reload aliases} also reloads the scripts
+ * the changed aliases may change; and {@code gen-docs} points to the syntax reference on neoskript.dev.
  */
 final class SkriptCommand implements TabExecutor {
 
@@ -246,7 +246,7 @@ final class SkriptCommand implements TabExecutor {
                     return;
                 }
                 // Then the scripts that use the aliases that changed, or that had errors the new aliases may fix.
-                // A script that now has errors keeps running its last version (D12).
+                // A script that now has errors loads without what has them, as in Skript (D12).
                 Predicate<String> affected = scripts.affectedBy(changed);
                 ScriptManager.Outcome outcome = load(sender, recipients, affected, report);
                 if (outcome != null) {

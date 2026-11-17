@@ -17,8 +17,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * {@code /sk reload}: changed scripts switch to their new version, and a script with errors keeps running
- * its last version (D12), so other scripts calling its functions are unaffected. Then Skript's other
+ * {@code /sk reload}: changed scripts switch to their new version, and a script with errors switches too,
+ * without the lines that have them, as in Skript (D12): the rest of its trigger runs, and other scripts call its
+ * new functions. Then Skript's other
  * subcommands, with Skript's messages: disable, list, enable, reloading one script and a folder, and the
  * errors for missing and disabled scripts.
  */
@@ -76,8 +77,10 @@ public final class NeoSkriptReloadScenario implements Scenario {
             server.await(line("[harness] reload b sees: 2"), mark, WAIT);
             context.summary("reloadMs", Integer.parseInt(reloaded.group(1)));
 
-            // A reload with an error: a.sk keeps version 2, which b.sk still calls.
-            Files.writeString(scripts.resolve("a.sk"), a("3", "\tthis is not valid syntax\n"));
+            // A reload with an error: as in Skript, a.sk switches to version 3 without the line, and the rest of its
+            // trigger runs. b.sk calls the new version.
+            Files.writeString(scripts.resolve("a.sk"), a("3",
+                    "\tthis is not valid syntax\n\tsend \"[harness] reload a after the error\" to console\n"));
             mark = server.mark();
             server.command("sk reload scripts");
             // The report: the script, its error with the line number and the code, then what was done.
@@ -85,18 +88,17 @@ public final class NeoSkriptReloadScenario implements Scenario {
             server.await(Pattern.compile("   Line 5: .*this is not valid syntax.*$"), mark, WAIT);
             server.await(line("     this is not valid syntax"), mark, WAIT);
             server.await(Pattern.compile(Pattern.quote("[NeoSkript] Reloaded 4 scripts with 1 error in ") + "\\d+"
-                    + Pattern.quote(" ms. Scripts with errors keep their last version.") + "$"), mark, WAIT);
-            server.await(line("[harness] reload b sees: 2"), mark, WAIT);
-            if (!server.linesMatching(line("[harness] reload a: 3")).isEmpty()) {
-                throw new HarnessFailure("The script with an error was reloaded anyway. See " + server.logFile());
-            }
+                    + Pattern.quote(" ms. What has errors is left out.") + "$"), mark, WAIT);
+            server.await(line("[harness] reload a: 3"), mark, WAIT);
+            server.await(line("[harness] reload a after the error"), mark, WAIT);
+            server.await(line("[harness] reload b sees: 3"), mark, WAIT);
 
             // Reloading one script.
             Files.writeString(scripts.resolve("b.sk"), B.replace("b sees", "b2 sees"));
             mark = server.mark();
             server.command("sk reload b");
             server.await(timed("Reloaded b.sk"), mark, WAIT);
-            server.await(line("[harness] reload b2 sees: 2"), mark, WAIT);
+            server.await(line("[harness] reload b2 sees: 3"), mark, WAIT);
 
             subcommands(server, scripts);
             server.stop();

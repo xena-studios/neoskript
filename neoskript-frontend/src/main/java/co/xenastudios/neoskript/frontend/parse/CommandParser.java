@@ -122,7 +122,29 @@ final class CommandParser {
         List<Statement> suggestions = null;
         Line suggestionsLine = null;
         List<Node.Section> children = new ArrayList<>();
+        // As Skript's entry validator: entries it doesn't know are each reported, then the command isn't loaded,
+        // and nothing else in it is read.
         boolean unexpected = false;
+        for (Node child : section.children()) {
+            String key = Text.lower(child.line().key().strip());
+            if (child instanceof Node.Section && (key.equals("trigger") || key.equals("subcommands")
+                    || SUGGESTIONS.contains(key) || SUBCOMMAND.matcher(key).matches())) {
+                continue;
+            }
+            Line entry = child.line();
+            int separator = entry.text().indexOf(':');
+            String name = separator <= 0 ? "" : Text.lower(entry.text().substring(0, separator).strip());
+            if (!(ENTRIES.contains(name) && !(group && name.equals("aliases"))) && !MESSAGES.contains(name)) {
+                report(entry, "Unexpected entry '" + entry.key().strip() + "'. Check whether it's spelled correctly or"
+                        + " remove it");
+                unexpected = true;
+            }
+        }
+        if (unexpected) {
+            return null;
+        }
+        Line executableBy = null;
+        Map<String, Line> entryLines = new java.util.HashMap<>();
         for (Node child : section.children()) {
             Line entry = child.line();
             String key = Text.lower(entry.key().strip());
@@ -142,28 +164,40 @@ final class CommandParser {
             int separator = entry.text().indexOf(':');
             String name = separator <= 0 ? "" : Text.lower(entry.text().substring(0, separator).strip());
             String value = separator <= 0 ? "" : entry.text().substring(separator + 1).strip();
-            if (ENTRIES.contains(name) && !(group && name.equals("aliases"))) {
+            entryLines.put(name, entry);
+            if (ENTRIES.contains(name)) {
                 entries.put(name, value);
-            } else if (MESSAGES.contains(name)) {
+                if (name.equals("executable by")) {
+                    executableBy = entry;
+                } else if (name.equals("usage")) {
+                    // Skript's usage is text with code, whose errors it reports; the command still loads. (NeoSkript
+                    // shows it as written: the code is only checked.)
+                    Expr usage = statements.text(entry, value);
+                    if (usage != null) {
+                        messages.put(name, usage);
+                    }
+                }
+            } else if (name.equals("permission message")) {
+                // Deprecated, and Skript doesn't read it as code: what doesn't parse is just text, with no error.
                 entries.put(name, value);
-                Expr message = statements.expression(entry, '"' + value.replace("\"", "\"\"") + '"', "string", false);
+                int mark = diagnostics.mark();
+                Expr message = statements.text(entry, value);
+                diagnostics.takeSince(mark);
                 if (message != null) {
                     messages.put(name, message);
                 }
             } else {
-                // As Skript's entry validator: each is reported, then the command isn't loaded.
-                report(entry, "Unexpected entry '" + entry.key().strip() + "'. Check whether it's spelled correctly or"
-                        + " remove it");
-                unexpected = true;
+                entries.put(name, value);
+                Expr message = statements.text(entry, value);
+                if (message != null) {
+                    messages.put(name, message);
+                }
             }
-        }
-        if (unexpected) {
-            return null;
         }
 
         Set<Executor> own = executors;
         if (entries.containsKey("executable by")) {
-            own = executors(section.line(), entries.get("executable by"), executors);
+            own = executors(section.line(), executableBy, entries.get("executable by"), executors);
             if (own == null) {
                 return null;
             }
@@ -206,7 +240,7 @@ final class CommandParser {
         if (group) {
             return subcommands.isEmpty() ? null
                     : new ParsedStructure.CommandNode(section.line(), true, pattern, entries, messages, null,
-                            subcommands, suggestions, suggestionsLine);
+                            subcommands, suggestions, suggestionsLine, entryLines);
         }
         List<ParsedStructure.CommandNode> level = new ArrayList<>();
         flatten(subcommands, level);
@@ -224,7 +258,7 @@ final class CommandParser {
             return null;
         }
         return new ParsedStructure.CommandNode(section.line(), false, pattern, entries, messages, trigger, subcommands,
-                suggestions, suggestionsLine);
+                suggestions, suggestionsLine, entryLines);
     }
 
     /** The subcommands at one level: groups' subcommands count as their parent's. */
@@ -239,10 +273,10 @@ final class CommandParser {
     }
 
     /** An {@code executable by} entry, checked against what the parent allows. */
-    private Set<Executor> executors(Line line, String value, Set<Executor> parent) {
+    private Set<Executor> executors(Line line, Line entry, String value, Set<Executor> parent) {
         Set<Executor> executors = EnumSet.noneOf(Executor.class);
-        for (String word : LIST_SEPARATOR.split(Text.lower(value.strip()))) {
-            Executor executor = switch (word.strip()) {
+        for (String word : LIST_SEPARATOR.split(value.strip())) {
+            Executor executor = switch (Text.lower(word.strip())) {
                 case "player", "players" -> Executor.PLAYERS;
                 case "console", "the console" -> Executor.CONSOLE;
                 case "op", "ops", "operator", "operators" -> Executor.OPERATORS;
@@ -251,7 +285,8 @@ final class CommandParser {
                 default -> null;
             };
             if (executor == null) {
-                report(line, "'" + word.strip() + "' is not something that can execute commands");
+                // Skript's error, at the entry, with the word as written.
+                report(entry, "Invalid command sender type: " + word.strip());
                 return null;
             }
             executors.add(executor);

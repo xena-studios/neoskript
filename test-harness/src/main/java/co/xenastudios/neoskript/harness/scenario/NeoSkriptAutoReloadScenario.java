@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 
 /**
  * Skript's {@code auto reload} structure: a script reloads itself, with Skript's messages, when its file
- * changes. A version with errors keeps the old one running (and watching); a version without the
+ * changes. A version with errors loads without the lines that have them, as in Skript, and watches; a version without the
  * structure stops watching, and {@code /sk reload} doesn't leave a second watcher behind.
  */
 public final class NeoSkriptAutoReloadScenario implements Scenario {
@@ -76,18 +76,19 @@ public final class NeoSkriptAutoReloadScenario implements Scenario {
                 throw new HarnessFailure("An edit after /sk reload reloaded the script more than once. See " + server.logFile());
             }
 
-            // An edit with an error: the script's errors, the summary, and version 3 keeps running.
+            // An edit with an error: the script's errors, the summary, and version 4 runs without the line, as in
+            // Skript.
             mark = server.mark();
-            Files.writeString(file, script("4", AUTO, "\tthis is not valid syntax\n"));
+            Files.writeString(file, script("4", AUTO,
+                    "\tthis is not valid syntax\n\tsend \"[harness] auto: 4 after the error\" to console\n"));
             server.await(Pattern.compile(" auto\\.sk - 1 error$"), mark, WAIT);
             server.await(Pattern.compile("   Line 5: .+$"), mark, WAIT);
-            server.await(Pattern.compile("\\[NeoSkript] Automatically reloaded auto\\.sk with 1 error in \\d+ ms\\. Scripts"
-                    + " with errors keep their last version\\.$"), mark, WAIT);
-            if (!server.linesMatching(line("[harness] auto: 4")).isEmpty()) {
-                throw new HarnessFailure("The version with an error was loaded anyway. See " + server.logFile());
-            }
+            server.await(line("[harness] auto: 4"), mark, WAIT);
+            server.await(line("[harness] auto: 4 after the error"), mark, WAIT);
+            server.await(Pattern.compile("\\[NeoSkript] Automatically reloaded auto\\.sk with 1 error in \\d+ ms\\. What"
+                    + " has errors is left out\\.$"), mark, WAIT);
 
-            // Version 3 still watches its file.
+            // Version 4 watches its file.
             mark = server.mark();
             Files.writeString(file, script("5", "", ""));
             server.await(line("[harness] auto: 5"), mark, WAIT);

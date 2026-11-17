@@ -1,0 +1,39 @@
+# Checks: command entries that fail (issue #38). An unexpected entry stops the command before anything else in it
+# is read; a bad 'executable by' is reported at its entry; a usage or cooldown message whose code fails is reported
+# and the command still loads; the deprecated permission message isn't read as code.
+
+command /badcommandsa:
+	cooldown: frob seconds
+	executable by: frobs
+	wibble: yes
+	trigger:
+		nonsense in the command
+
+command /badcommandsb:
+	executable by: frobs
+	trigger:
+		send "b" to console
+
+command /badcommandsc:
+	permission: x.y
+	permission message: "%frob nonsense%"
+	usage: "%frob nonsense%"
+	trigger:
+		send "c" to console
+
+command /badcommandsd:
+	cooldown: frob seconds
+	cooldown message: "%frob nonsense%"
+	trigger:
+		send "d" to console
+		frob it
+		send "d after" to console
+
+command /badcommandse <frobtype>:
+	trigger:
+		send "e" to console
+
+command /badcommandsf:
+	cooldown storage: {x}
+	trigger:
+		send "f" to console

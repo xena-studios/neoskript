@@ -27,9 +27,9 @@ Read the errors: `/sk reload <script>` sends them to you, and the console has th
 - **Check before you switch:** [`neoskript-cli`](/docs/cli/) lists every line NeoSkript won't load, on a throwaway server.
 - **One line at a time:** paste the script into [the parser](/parser/).
 
-## I reloaded and nothing changed
+## Part of a script doesn't run
 
-If the new version has errors, the old one keeps running: fix the errors and reload again. See [reloading](/docs/server/reloading/).
+A line with an error is left out, as on Skript, and a section, trigger or function whose first line has one is left out whole, so the rest of the script runs without it. The reload report and the console list each one: fix them and reload again. See [reading errors](/docs/scripts/errors/).
 
 ## Variables are missing
 

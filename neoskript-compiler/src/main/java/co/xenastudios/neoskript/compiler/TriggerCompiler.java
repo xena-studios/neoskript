@@ -290,6 +290,21 @@ final class TriggerCompiler {
     /** The errors found in the statements so far, and how deep in statements compiling is. */
     private final List<CompileException> errors = new ArrayList<>();
     private int depth;
+    /** The statements that failed: each one whose own line (or a section's header) had an error. */
+    private final List<Statement> failedStatements = new ArrayList<>();
+    /** Statements to leave out, which failed when the code was compiled before: by identity. */
+    private java.util.Set<Statement> leaveOut = java.util.Set.of();
+
+    /** Leaves {@code statements} (by identity) out of the code compiled, as if they weren't there. */
+    TriggerCompiler leaveOut(java.util.Set<Statement> statements) {
+        this.leaveOut = statements;
+        return this;
+    }
+
+    /** The statements that failed in the last code compiled: each the innermost one whose line failed. */
+    List<Statement> failedStatements() {
+        return failedStatements;
+    }
 
     /** Where warnings found while compiling go: the line and the message. */
     private java.util.function.BiConsumer<Integer, String> warnings = (line, message) -> {};
@@ -1128,16 +1143,22 @@ final class TriggerCompiler {
     /**
      * Compiles each statement. As in Skript, one that fails is reported and left out and the rest are still
      * compiled, so every error is found; once the outermost statements are done, the errors are thrown, the
-     * first with the others suppressed in it.
+     * first with the others suppressed in it, and {@link #failedStatements()} has the statements that failed.
+     * Compiled again {@linkplain #leaveOut leaving those out}, the trigger runs without them, as Skript's does.
      */
     private void statements(List<Statement> statements) throws CompileException {
         depth++;
         if (depth == 1) {
             onGlobal = false;
         }
+        if (!leaveOut.isEmpty()) {
+            // Left out entirely, so nothing compiled refers to them: a local only they set is just unset.
+            statements = statements.stream().filter(s -> !leaveOut.contains(s)).toList();
+        }
         try {
             for (int i = 0; i < statements.size(); i++) {
                 Statement statement = statements.get(i);
+                Statement culprit = statement;
                 int open = blocks.size();
                 try {
                     if (onGlobal && !globalSafe(statement)) {
@@ -1147,8 +1168,11 @@ final class TriggerCompiler {
                         try {
                             i = conditional(statements, i) - 1;
                         } catch (CompileException | RuntimeException e) {
-                            // A branch failed: carry on after it, not with it again as a statement of its own.
-                            i = chainAt;
+                            culprit = statements.get(chainAt);
+                            // The 'if' failed: carry on after it, so what follows is read without it, as Skript
+                            // reads it. An 'else if' or 'else' failed: the chain goes on without it, as in Skript,
+                            // so its other branches are compiled when the trigger is compiled again without it.
+                            i = chainAt == i ? i : chainEnd(statements, i) - 1;
                             throw e;
                         }
                     } else {
@@ -1157,30 +1181,35 @@ final class TriggerCompiler {
                 } catch (co.xenastudios.neoskript.api.element.SyntaxError error) {
                     // An element that matched but can't be used as written.
                     String message = error.getMessage();
-                    if (statement instanceof Statement.Section section && section.body() != null
+                    // (The statement that failed: in an 'if' chain, the branch.)
+                    if (culprit instanceof Statement.Section section && section.body() != null
                             && line == section.line().number()) {
                         unparsed(section.body());
-                        // Skript then reads the line as a statement, whose error it keeps if it has one.
-                        message = script.statementError(section.line()) != null ? script.statementError(section.line()) : message;
+                        // Skript then reads the line as a statement, whose error it keeps if it has one. (Not for an
+                        // 'else if', whose element's own error, such as an addon's, says more than Skript's would.)
+                        if (culprit == statement && script.statementError(section.line()) != null) {
+                            message = script.statementError(section.line());
+                        }
                     }
-                    failed(new CompileException(line, message), open);
+                    failed(new CompileException(line, message), open, culprit);
                 } catch (CompileException e) {
                     // A section whose header fails isn't one: as in Skript, what's in it isn't read.
-                    if (statement instanceof Statement.Section section && section.body() != null
+                    if (culprit instanceof Statement.Section section && section.body() != null
                             && e.line() == section.line().number()) {
                         unparsed(section.body());
-                        if (script.statementError(section.line()) != null && !e.alreadyReported()) {
+                        if (script.statementError(section.line()) != null && !e.alreadyReported()
+                                && !(culprit != statement && neoskriptOnly(e.getMessage()))) {
                             // Skript then reads the line as a statement, whose error it keeps if it has one.
                             e = new CompileException(e.line(), script.statementError(section.line()));
                         }
                     }
-                    failed(e, open);
+                    failed(e, open, culprit);
                 } catch (RuntimeException e) {
                     if (errors.isEmpty()) {
                         throw e;
                     }
                     // What's left after an earlier error may be half-built: the error is the problem.
-                    failed(null, open);
+                    failed(null, open, null);
                 }
             }
             // Code after the block runs on the trigger's thread, whichever way it gets there.
@@ -1198,10 +1227,21 @@ final class TriggerCompiler {
         }
     }
 
+    /**
+     * Whether an error is one only NeoSkript gives (what it can't run yet, or an addon's pausing expression where it
+     * can't pause), which says more than the error Skript would keep for an 'else if', so it's kept.
+     */
+    private static boolean neoskriptOnly(String message) {
+        return message.startsWith("NeoSkript can't") || message.contains("' waits for its value, so it can only be");
+    }
+
     /** Notes {@code error} (if any) and closes the blocks the failed statement left open. */
-    private void failed(CompileException error, int open) {
+    private void failed(CompileException error, int open, Statement statement) {
         if (error != null) {
             errors.add(error);
+            if (statement != null) {
+                failedStatements.add(statement);
+            }
         }
         while (blocks.size() > open) {
             blocks.pop();
@@ -1681,6 +1721,19 @@ final class TriggerCompiler {
     private int conditionalChain(List<Statement> statements, int i, Label chainEnd, int[] at) throws CompileException {
         boolean first = true;
         while (i < statements.size()) {
+            if (!first && statements.get(i) instanceof Statement.Invalid) {
+                // As in Skript, lines that failed aren't there: an 'else' after them goes on with this chain.
+                int after = i;
+                while (after < statements.size() && statements.get(after) instanceof Statement.Invalid) {
+                    after++;
+                }
+                if (after < statements.size() && isElse(statements.get(after).line().key())
+                        && !(statements.get(after) instanceof Statement.Invalid)) {
+                    i = after;
+                } else {
+                    break;
+                }
+            }
             at[0] = i;
             Statement statement = statements.get(i);
             String key = statement.line().key().strip().toLowerCase(Locale.ROOT);
@@ -1750,6 +1803,27 @@ final class TriggerCompiler {
 
     /** The statement of the {@code if} chain being compiled, so a failure in it carries on after it. */
     private int chainAt;
+
+    /** The index of the first statement after the {@code if} chain starting at {@code i}. */
+    private static int chainEnd(List<Statement> statements, int i) {
+        int end = i + 1;
+        while (end < statements.size()) {
+            // Lines that failed aren't there, as in Skript: an 'else' after them is still the chain's.
+            int after = end;
+            while (after < statements.size() && statements.get(after) instanceof Statement.Invalid) {
+                after++;
+            }
+            if (after == statements.size()) {
+                break;
+            }
+            String key = statements.get(after).line().key().strip().toLowerCase(Locale.ROOT);
+            if (!isElse(key) && !key.startsWith("then")) {
+                break;
+            }
+            end = after + 1;
+        }
+        return end;
+    }
 
     /** Whether {@code statements} compile on their own, as {@code parse if} code has to for its condition to hold. */
     private boolean compilesApart(List<Statement> statements) {
@@ -3716,11 +3790,12 @@ final class TriggerCompiler {
                 if (typed || values.size() > 2) {
                     // Words nothing reads compared with something of a type: Skript's comparison says so.
                     String first = compared(values.get(0));
-                    java.util.regex.Matcher conditional = java.util.regex.Pattern.compile("(?i)^((?:else )?if )")
-                            .matcher(source.strip());
-                    if (values.get(0) instanceof Expr.Unresolved && first.startsWith("'") && inSectionHeader()
-                            && conditional.lookingAt()) {
-                        // Skript then reads the whole line as a condition, whose words start with the 'if'.
+                    java.util.regex.Matcher conditional = java.util.regex.Pattern
+                            .compile("(?i)^((?:else )?if |(?:do )?while )").matcher(source.strip());
+                    if ((values.get(0) instanceof Expr.Unresolved || values.get(0) instanceof Expr.Text)
+                            && first.startsWith("'") && inSectionHeader() && conditional.lookingAt()) {
+                        // Skript then reads the whole line as a condition, whose words start with the 'if' (or
+                        // 'while').
                         first = "'" + conditional.group(1) + first.substring(1);
                     }
                     StringBuilder message = new StringBuilder("Can't compare ").append(first)
@@ -3733,8 +3808,13 @@ final class TriggerCompiler {
                 // Otherwise Skript's comparison quietly fails to initialise, so the line isn't understood.
                 String text = source.strip();
                 java.util.regex.Matcher header = java.util.regex.Pattern.compile("(?i)^(?:else )?if (.+?):?$").matcher(text);
+                java.util.regex.Matcher whileHeader = java.util.regex.Pattern.compile("(?i)^(?:do )?while (.+?):?$")
+                        .matcher(text);
                 throw new CompileException(line, header.matches() && inSectionHeader()
                         ? "Can't understand this condition: '" + header.group(1) + "'"
+                        : whileHeader.matches() && inSectionHeader()
+                        // Skript's while loop's error, without the quotes.
+                        ? "Can't understand this condition: " + whileHeader.group(1)
                         : "Can't understand this condition/effect: " + text);
             }
             return;
@@ -3759,7 +3839,10 @@ final class TriggerCompiler {
      */
     private String unknownWords(Expr.Unresolved unresolved) {
         if (textPart != null) {
-            return "Can't understand this expression: " + textPart;
+            // A call to a function that doesn't exist says so, as Skript's function call does.
+            return unresolved.problem() != null && unresolved.problem().startsWith("The function ")
+                    && unresolved.text().strip().equals(textPart.strip())
+                    ? unresolved.problem() : "Can't understand this expression: " + textPart;
         }
         if (unresolved.problem() != null && (textPart == null)) {
             // Skript's unparsed literal gives the error it kept from reading its words when nothing can use them.

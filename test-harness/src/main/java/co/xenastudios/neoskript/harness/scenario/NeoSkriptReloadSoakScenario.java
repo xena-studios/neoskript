@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  * Reloads a varied set of scripts a few hundred times and checks nothing from the old versions stays: events,
  * commands with aliases and a GUI, functions and a function reference, list variables, {@code every} timers, a
  * timer whose trigger is still waiting when the reload comes, a command waiting across reloads, {@code auto
- * reload}, a script disabled and enabled again, and one broken on every other reload, which keeps its last version. After warming up, the harness bot forces a full GC and samples
+ * reload}, a script disabled and enabled again, and one broken on every other reload, which loads without the broken line. After warming up, the harness bot forces a full GC and samples
  * the loaded class count, the heap, and NeoSkript's listeners, commands (in Brigadier's tree too) and scheduled
  * tasks every 50 reloads. They must plateau, not grow. Then every script is disabled, and the classes and heap
  * must fall back, and the listeners, commands and tasks be what they were before any script loaded.

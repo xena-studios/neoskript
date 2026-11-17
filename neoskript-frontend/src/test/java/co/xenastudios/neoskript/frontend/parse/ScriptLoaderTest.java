@@ -221,4 +221,58 @@ class ScriptLoaderTest {
                 "using queues\nusing the experiment catch runtime errors\n" + code))).getFirst();
         assertEquals(List.of(), errors(with));
     }
+
+    // What the reference Skript 2.17.0 reports for lines that fail, from probes on a real server (issue #38). The
+    // parser's part: what the compiler finds (the comparisons here) is checked by the differential scenario.
+
+    @Test
+    void aFailedElseIfIsSkippedAndTheChainGoesOn() {
+        ParsedScript script = load("""
+                on load:
+                \tif 1 is 2:
+                \t\tbroadcast "a"
+                \telse if frobnicate the wibble:
+                \t\tbroadcast "b"
+                \telse if 1 is 1:
+                \t\tbroadcast "d"
+                \telse:
+                \t\tbroadcast "e"
+                """);
+        assertEquals(List.of("4: Can't understand this effect: else"), errors(script));
+        ParsedStructure.Event event = assertInstanceOf(ParsedStructure.Event.class, script.structures().getFirst());
+        assertInstanceOf(Statement.Invalid.class, event.body().get(1));
+        assertInstanceOf(Statement.Section.class, event.body().get(2));
+        assertInstanceOf(Statement.Section.class, event.body().get(3));
+    }
+
+    @Test
+    void aLineThatFailsIsntWhatAnElseComesAfter() {
+        ParsedScript script = load("""
+                on load:
+                \tif frobnicate the wibble:
+                \t\tbroadcast "a"
+                \telse:
+                \t\tbroadcast "b"
+                \tif 1 is 2:
+                \t\tbroadcast "c"
+                \tnonsense here
+                \telse:
+                \t\tbroadcast "d"
+                """);
+        assertEquals(List.of("2: Can't understand this condition: 'frobnicate the wibble'",
+                "4: 'else' has to be placed just after another 'if' or 'else if' section",
+                "8: Can't understand this condition/effect: nonsense here"), errors(script));
+    }
+
+    @Test
+    void aFailedWhileHeader() {
+        assertEquals(List.of("2: Can't understand this condition: frobnicate the wibble"),
+                errors(load("on load:\n\twhile frobnicate the wibble:\n\t\tbroadcast \"a\"\n")));
+    }
+
+    @Test
+    void anUnreachableLineThatFailsHasOnlyItsError() {
+        assertEquals(List.of("3: Can't understand this condition/effect: nonsense here"),
+                errors(load("on load:\n\tstop\n\tnonsense here\n")));
+    }
 }

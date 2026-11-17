@@ -1,4 +1,4 @@
-# The reload soak's script that's broken on every other reload, so it keeps its last good version (D12).
+# The reload soak's script that's broken on every other reload, so it loads without that line (D12).
 function soakFlaky() :: text:
 	return "VERSION"
 

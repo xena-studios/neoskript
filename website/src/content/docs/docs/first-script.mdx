@@ -64,17 +64,17 @@ command /hello:
 
 ## Fix an error
 
-Change `send` to `sned` on the third line, save, and reload. The new version doesn't load, and NeoSkript says why:
+Change `send` to `sned` on the third line, save, and reload. NeoSkript says which line it can't load, and why:
 
 ```text
 [NeoSkript] Reloading hello.sk...
  hello.sk - 1 error
    Line 3: Can't understand this condition/effect: sned "<gold>Welcome, %player%! That's visit number %{joins::%player's uuid%}%." to player
      sned "<gold>Welcome, %player%! That's visit number %{joins::%player's uuid%}%." to player
-[NeoSkript] Reloaded hello.sk with 1 error in 3 ms. Scripts with errors keep their last version.
+[NeoSkript] Reloaded hello.sk with 1 error in 3 ms. What has errors is left out.
 ```
 
-The version that was running keeps running until the new one loads without errors. Change it back and reload.
+As on Skript, the rest of the script still loads: the trigger runs without that line, so the visit is still counted but the welcome isn't sent. Change it back and reload.
 
 <Aside type="tip">
 You don't need a server to find errors: paste a script into [the parser](/parser/), or install the [editor extension](/docs/editors/), and errors show as you type.

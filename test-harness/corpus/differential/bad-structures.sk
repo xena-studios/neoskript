@@ -1,0 +1,44 @@
+# Probe: structures with lines that fail (issue #38). Options and default variables keep their other entries, an
+# event or a function whose header fails is left out, and calls to that function don't load. In the order Skript
+# reports them, so the messages compare line by line.
+
+options:
+	good: yes
+	this option line has no colon
+	other: 5
+
+variables:
+	{bad_structures::one} = 1
+	this is not a variable line
+	{bad_structures::three}: 3
+	{bad_structures::two} = this is nonsense blah
+	{bad_structures::%frob%} = 2
+	{bad_structures::four} = "four"
+
+on frobnicate the wibble:
+	send "a bad event's code" to console
+
+every frob seconds:
+	send "a bad periodical event's code" to console
+
+function bad_structures_type(x: frobtype) :: number:
+	return 1
+
+function bad_structures_return(x: number) :: frobtype:
+	return 1
+
+function bad_structures_header(x number):
+	return 1
+
+function bad_structures_body(x: number) :: number:
+	send "in the function" to console
+	frobnicate the thing
+	return {_x} + 1
+
+function probe_bad_structures():
+	send "options {@good} {@other} {@nope}" to console
+	send "variables %{bad_structures::one}% %{bad_structures::two}% %{bad_structures::three}% %{bad_structures::four}%" to console
+	send "body %bad_structures_body(1)%" to console
+	send "type %bad_structures_type(1)%" to console
+	bad_structures_header(1)
+	send "end" to console

@@ -178,9 +178,25 @@ class ScriptParserTest {
 
     @Test
     void reportsUndefinedOptions() {
-        ScriptParser.Result result = parse("on join:\n\tsend \"{@missing}\"\n");
-        assertEquals(List.of("2: undefined option {@missing}"), errors(result));
+        ScriptParser.Result result = parse("options:\n\ta: 1\non join:\n\tsend \"{@missing}\"\n");
+        assertEquals(List.of("4: undefined option {@missing}"), errors(result));
         assertEquals(7, result.diagnostics().getFirst().column());
+    }
+
+    @Test
+    void leavesOptionsAsWrittenInAScriptWithNoOptionsSection() {
+        // As in Skript: with no options section there's nothing to replace them with, and no error.
+        ScriptParser.Result result = parse("on join:\n\tsend \"{@missing}\"\n");
+        assertEquals(List.of(), result.diagnostics());
+        Node send = result.structures().getFirst().section().children().getFirst();
+        assertEquals("send \"{@missing}\"", send.line().text());
+    }
+
+    @Test
+    void reportsAnOptionLineThatIsNotAnEntry() {
+        ScriptParser.Result result = parse("options:\n\ta: 1\n\tno colon here\n\tb: 2\n");
+        assertEquals(List.of("3: 'no colon here' is not an entry (like 'name : value')"), errors(result));
+        assertEquals(Map.of("a", "1", "b", "2"), result.options());
     }
 
     @Test

@@ -87,6 +87,21 @@ final class StatementParser {
      * particles:', read as words compared, says 'particles' isn't an item type. The compiler may yet fail the header.
      */
     private void statementError(Line line, String key) {
+        String error = statementProblem(line, key);
+        if (error != null) {
+            statementErrors.put(line, error);
+        }
+    }
+
+    /**
+     * The error reading a section header as a statement gives, if it's one Skript keeps over the section's: not
+     * that the statement isn't understood. Nothing is reported.
+     */
+    private String statementProblem(Line line, String key) {
+        if (ELSE_IF_HEADER.matcher(key).matches()) {
+            // Read as a statement, an 'else if' says it doesn't understand the 'else' (or 'else parse').
+            return Statement.orphanElse(Text.lower(key.strip()));
+        }
         int mark = diagnostics.mark();
         DelayState before = delay;
         try {
@@ -96,11 +111,11 @@ final class StatementParser {
                 for (Diagnostic diagnostic : found) {
                     if (diagnostic.severity() == Severity.ERROR
                             && !diagnostic.message().startsWith("Can't understand this condition/effect:")) {
-                        statementErrors.put(line, diagnostic.message());
-                        return;
+                        return diagnostic.message();
                     }
                 }
             }
+            return null;
         } finally {
             delay = before;
         }
@@ -139,13 +154,11 @@ final class StatementParser {
         Chain chain = null;
         boolean ended = false;
         for (Node node : nodes) {
-            if (ended && !suppressed.contains("unreachable")) {
-                diagnostics.warning(node.line().number(), node.line().column(), node.line().text().length(),
-                        "Unreachable code. The previous statement stops further execution.");
-            }
             String key = Text.lower(node.line().key().strip());
             boolean section = node instanceof Node.Section;
             boolean continuesChain = section && (key.startsWith("else") || key.startsWith("then"));
+            Chain chainBefore = chain;
+            DelayState delayBefore = delay;
             if (chain != null && !continuesChain) {
                 delay = endChain(chain);
                 chain = null;
@@ -157,6 +170,19 @@ final class StatementParser {
                     ? branch((Node.Section) node, previous, chain)
                     : line(node, previous);
             statements.add(statement);
+            if (statement instanceof Statement.Invalid) {
+                // As in Skript, a line that fails isn't there: an 'if' before it goes on, so an 'else' after it
+                // belongs to that 'if' (Skript's ScriptLoader.loadItems leaves it out of the items an 'else' looks
+                // back at).
+                chain = chainBefore;
+                delay = delayBefore;
+                continue;
+            }
+            if (ended && !suppressed.contains("unreachable")) {
+                // After the line's own problems, and only for a line that loads, as in Skript.
+                diagnostics.warning(node.line().number(), node.line().column(), node.line().text().length(),
+                        "Unreachable code. The previous statement stops further execution.");
+            }
             previous = statement;
             ended = statement instanceof Statement.Effect effect && context.registry().ends(effect.effect().syntax());
             if (statement instanceof Statement.Effect effect) {
@@ -255,11 +281,12 @@ final class StatementParser {
             delay = chain.before;
         }
         Statement statement = line(section, previous);
-        if (key.equals("else")) {
+        if (key.equals("else") && !(statement instanceof Statement.Invalid)) {
             chain.hasElse = true;
         }
-        // A multi-line condition's code is in the 'then' that follows, so its branch ends there.
-        if (!(statement instanceof Statement.Conditions)) {
+        // A multi-line condition's code is in the 'then' that follows, so its branch ends there. A branch that
+        // fails isn't one.
+        if (!(statement instanceof Statement.Conditions) && !(statement instanceof Statement.Invalid)) {
             chain.ends.add(delay);
         }
         return statement;
@@ -417,6 +444,9 @@ final class StatementParser {
 
     /** A one-line conditional's header, with its condition. */
     private static final Pattern IF_HEADER = Pattern.compile("(?i)(?:else )?(?:parse )?if (.+)");
+    private static final Pattern ELSE_IF_HEADER = Pattern.compile("(?i)else (?:parse )?if\\b.*");
+    /** Skript's while loop's header: {@code [do] while <.+>}. */
+    private static final Pattern WHILE_HEADER = Pattern.compile("(?i)(?:do )?while (.+)");
 
     /** Skript's change effect's shapes, with what's changed and what it's changed by. */
     private static final Pattern CHANGE = Pattern.compile(
@@ -669,11 +699,24 @@ final class StatementParser {
                 return new Statement.Invalid(line);
             }
             Matcher conditional = IF_HEADER.matcher(key);
+            Matcher whileLoop = WHILE_HEADER.matcher(key);
+            String lowerKey = Text.lower(key);
             if (parser.experimentProblem() != null) {
                 error(line, parser.experimentProblem());
+            } else if (ELSE_IF_HEADER.matcher(key).matches()) {
+                // Skript then reads the line as a statement, which says it doesn't understand the 'else' (or
+                // 'else parse'), and keeps that error.
+                error(line, Statement.orphanElse(lowerKey));
             } else if (conditional.matches()) {
-                String problem = compareProblem(conditional.group(1));
+                String problem = statementProblem(line, key);
+                if (problem == null) {
+                    problem = compareProblem(conditional.group(1));
+                }
                 error(line, problem != null ? problem : "Can't understand this condition: '" + conditional.group(1) + "'");
+            } else if (whileLoop.matches()) {
+                // Skript's while section's error, unless reading the line as a statement gives one it keeps.
+                String problem = statementProblem(line, key);
+                error(line, problem != null ? problem : "Can't understand this condition: " + whileLoop.group(1));
             } else if (key.regionMatches(true, 0, "loop ", 0, 5)) {
                 error(line, "Can't understand this loop: '" + key.substring(5) + "'");
             } else {
@@ -1256,6 +1299,29 @@ final class StatementParser {
         }
         if (expr == null) {
             error(line, "Can't understand this expression: '" + text + "'");
+        }
+        return expr;
+    }
+
+    /**
+     * Parses an entry's value as text that may have code in {@code %...%}, as Skript's variable string entries are,
+     * reporting Skript's error at {@code line} if it doesn't parse (its code's, if that's what fails).
+     */
+    Expr text(Line line, String value) {
+        String text = '"' + value.replace("\"", "\"\"") + '"';
+        TypeInfo info = context.registry().type("string");
+        Expected expected = info == null ? Expected.OBJECTS : context.expected(new TypeRef(info, false));
+        EventValues.Scope scope = context.eventScope(null);
+        LineParser parser = new LineParser(context, text);
+        Expr expr;
+        try {
+            expr = parser.expression(0, text.length(), expected);
+        } finally {
+            context.eventScope(scope);
+        }
+        if (expr == null) {
+            String problem = parser.functionProblem();
+            error(line, problem != null ? problem : "Can't understand this expression: '" + text + "'");
         }
         return expr;
     }

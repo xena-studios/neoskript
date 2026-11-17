@@ -35,14 +35,14 @@ public interface Scripts {
      * Loads a script that isn't loaded, enabling its file first if it's disabled ({@code -name.sk}).
      *
      * @param name the script's name
-     * @return whether it was loaded now: not if there's no such file, it was loaded already, or it has errors,
-     *     which are logged as {@code /sk reload} logs them
+     * @return whether it was loaded now: not if there's no such file or it was loaded already. Its errors are
+     *     logged as {@code /sk reload} logs them, and it loads without what has them, as in Skript
      */
     boolean load(String name);
 
     /**
-     * Loads a script again from its file. If the new version has errors, the old one keeps running, as with
-     * {@code /sk reload}.
+     * Loads a script again from its file, as {@code /sk reload} does: if the new version has errors, they're
+     * logged and it loads without what has them, as in Skript.
      *
      * @param name the script's name
      * @return whether there's such a script, enabled
