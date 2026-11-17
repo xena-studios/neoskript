@@ -9,6 +9,7 @@ import static org.objectweb.asm.Opcodes.AASTORE;
 import static org.objectweb.asm.Opcodes.IADD;
 import static org.objectweb.asm.Opcodes.IAND;
 import static org.objectweb.asm.Opcodes.IFNULL;
+import static org.objectweb.asm.Opcodes.IF_ACMPEQ;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
@@ -801,6 +802,7 @@ final class TriggerCompiler {
             body.emit();
         } finally {
             co.xenastudios.neoskript.api.element.Warnings.install(outer);
+            library.settingUpVariables(null);
         }
         exitTrigger();
         method.visitLabel(end);
@@ -3034,6 +3036,10 @@ final class TriggerCompiler {
         }
         if (!(library.binding(effect.syntax()) instanceof Library.Core core)) {
             callThrough(effect, Effect.class);
+            if (library.hasWriteBack(effect.syntax().id())) {
+                writeBackArguments(effect);
+                return;
+            }
             method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(Effect.class), "execute",
                     "(" + CONTEXT + OBJECTS + ")V", true);
             return;
@@ -4786,6 +4792,22 @@ final class TriggerCompiler {
                 single |= 1L << i;
             }
         }
+        // Only the element this is for gets them: every element set up after it gets its own, or none.
+        long[] variableMasks = null;
+        if (library.hasWriteBack(syntax.syntax().id())) {
+            long variables = 0;
+            long listVariables = 0;
+            for (int i = 0; i < values.size() && i < 64; i++) {
+                if (values.get(i) instanceof Expr.Variable variable) {
+                    variables |= 1L << i;
+                    if (variable.list()) {
+                        listVariables |= 1L << i;
+                    }
+                }
+            }
+            variableMasks = new long[] {variables, listVariables};
+        }
+        library.settingUpVariables(variableMasks);
         long defaults = 0;
         for (int i = 0; i < values.size() && i < 64; i++) {
             Object value = values.get(i);
@@ -5834,6 +5856,7 @@ final class TriggerCompiler {
             return false;
         } finally {
             co.xenastudios.neoskript.api.element.Warnings.install(outer);
+            library.settingUpVariables(null);
             settingUp = outerSettingUp;
             settingUpSource = outerSource;
         }
@@ -7024,6 +7047,57 @@ final class TriggerCompiler {
     }
 
     // ---------------------------------------------------------------- variables
+
+    /**
+     * Runs an addon's effect, its element and arguments pushed, and writes what it set its variable arguments to back
+     * to them, as Skript's addons change their arguments: each variable argument's change
+     * ({@link co.xenastudios.neoskript.runtime.ArgumentChanges}), if it has one, set (or deleted, for null). The
+     * changes are recorded on this thread, the caller's, and written even if the effect throws, which is then thrown.
+     */
+    private void writeBackArguments(ParsedSyntax effect) throws CompileException {
+        String changes = "co/xenastudios/neoskript/runtime/ArgumentChanges";
+        List<Object> values = effect.match().values();
+        pushInt(values.size());
+        method.visitMethodInsn(INVOKESTATIC, changes, "execute", "(" + Type.getDescriptor(Effect.class) + CONTEXT
+                + OBJECTS + "I)" + OBJECTS, false);
+        int all = nextSlot++;
+        method.visitVarInsn(ASTORE, all);
+        for (int i = 0; i < values.size(); i++) {
+            if (!(values.get(i) instanceof Expr.Variable variable)) {
+                continue;
+            }
+            int slot = nextSlot++;
+            method.visitVarInsn(ALOAD, all);
+            pushInt(i);
+            method.visitInsn(AALOAD);
+            method.visitVarInsn(ASTORE, slot);
+            Label unchanged = new Label();
+            method.visitVarInsn(ALOAD, slot);
+            method.visitFieldInsn(GETSTATIC, changes, "NONE", OBJECT_DESC);
+            method.visitJumpInsn(IF_ACMPEQ, unchanged);
+            variableStore(variable);
+            variableName(variable);
+            if (variable.list()) {
+                Label delete = new Label();
+                Label done = new Label();
+                method.visitVarInsn(ALOAD, slot);
+                method.visitJumpInsn(IFNULL, delete);
+                method.visitVarInsn(ALOAD, slot);
+                method.visitTypeInsn(CHECKCAST, "[" + OBJECT_DESC);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "setList", "(" + STRING_DESC + OBJECTS + ")V", false);
+                method.visitJumpInsn(GOTO, done);
+                method.visitLabel(delete);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "deleteList", "(" + STRING_DESC + ")V", false);
+                method.visitLabel(done);
+            } else {
+                method.visitVarInsn(ALOAD, slot);
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "set", "(" + STRING_DESC + OBJECT_DESC + ")V", false);
+            }
+            method.visitLabel(unchanged);
+        }
+        method.visitVarInsn(ALOAD, all);
+        method.visitMethodInsn(INVOKESTATIC, changes, "rethrow", "(" + OBJECTS + ")V", false);
+    }
 
     private void variableStore(Expr.Variable variable) {
         if (variable.local()) {

@@ -29,6 +29,7 @@ What's compared with Skript 2.17.0 + SkBee 3.26.0, by NeoSkript's test harness o
 | Chunks: `chunk x/z of %chunk%`, `chunk key of %chunk%`, `chunk key at %location%`, `chunk key at %number%, %number%` | Same as on Skript |
 | Keys: `minecraft key of %objects%` (items, worlds, text), `translation key of %objects%` | Same as on Skript |
 | `server is paused` | Same as on Skript |
+| Text components: `text component from %strings%`, `mini message from %string%`, `serialized json string of`, `merge components ... joined with`, `component children of`, hover and click events (making and setting them), `bold format of`, `component item name` and `component item lore` (get and set), `component replace` (and `first`) in a variable, `send component ... to console`, a chest inventory with a component name, an entity's component custom name, a player's component tab list name, and a component saved in a variable across a restart | Same as on Skript |
 | Events: `on entity removed from world`, `on server tick start`, `on async chat` (with `async chat message`), `on unknown command` (with `event-string`), `on player chunk send`, `on tab complete of "/a" and "/b"`, `on damage of zombie by cactus or magma block` | Same as on Skript |
 | NBT: `nbt compound from %string%`, `%nbttype% %string% of %nbtcompound%` (int, string, double, int list, nested with `;`), setting and deleting tags, `has tag`, `tag type of tag`, `custom nbt of %itemtype%`, `%itemtype% with custom nbt %nbtcompound%`, `is an empty nbt compound`, and saving an NBT compound in a variable across a restart | Same as on Skript |
 
@@ -40,7 +41,7 @@ The rest of SkBee's registered syntax may work, but isn't checked yet. Syntax th
 - **Saving** an addon's own types that are enums in variables. Its other types are saved (SkBee's NBT compounds, text components, keys...), in Skript's format.
 - An addon's **type properties** (Skript 2.17's `name of`, `amount of` for an addon's types).
 - An addon's effects that **wait** and run the rest of the trigger themselves (SkBee's `load chunk`, `load world`).
-- An addon element that **changes its argument** (`set`, `add` on what it was given).
+- An addon element that **changes its argument**, other than an effect setting or deleting a variable it was given (`component replace "a" with "b" in {_text}` works).
 - An element that turns down a line (its setup returns false) makes that line an error; on Skript, other syntax would be tried.
 - An element that needs a written value for an argument works only with one value there, not a list (`entities in range of beacon` with `zombies and skeletons`).
 - Folia: SkBee doesn't support Folia.

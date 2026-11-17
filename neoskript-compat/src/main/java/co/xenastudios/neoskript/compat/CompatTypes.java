@@ -58,6 +58,19 @@ public final class CompatTypes {
         return List.copyOf(registered);
     }
 
+    /** Whether {@code type}'s values are of a type an addon registered (not one NeoSkript has itself). */
+    boolean isAddons(Class<?> type) {
+        return addonClasses.contains(type);
+    }
+
+    /** The classes of the types an addon registered with NeoSkript: those NeoSkript didn't have already. */
+    private final java.util.Set<Class<?>> addonClasses = ConcurrentHashMap.newKeySet();
+
+    /** {@code type} is now NeoSkript's through an addon: see {@link #isAddons}. */
+    void registeredWithNeoSkript(Class<?> type) {
+        addonClasses.add(type);
+    }
+
     /** Whether NeoSkript has a type for this code name or class already, so an addon's goes unused. */
     boolean neoskriptHas(ClassInfo<?> info) {
         return library.hasType(info.getCodeName())
