@@ -1,0 +1,19 @@
+# The reload soak's functions and list variables.
+function soakAdd(a: number, b: number) :: number:
+	return {_a} + {_b}
+
+function soakDepth(n: number) :: number:
+	if {_n} <= 0:
+		return 0
+	return soakDepth({_n} - 1) + 1
+
+function soakFill(n: number):
+	delete {soak::list::*}
+	loop {_n} times:
+		add loop-number to {soak::list::*}
+	set {soak::map::%{_n}%} to "VERSION"
+
+on load:
+	soakFill(200)
+	set {-soak::depth} to soakDepth(100)
+	set {-soak::sum} to soakAdd(2, 3)

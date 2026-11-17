@@ -134,8 +134,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         java.util.function.Consumer<co.xenastudios.neoskript.runtime.ScriptRuntimeException> laterErrors = e -> {
             // A command failed after a wait just stops, as there's no one left to tell.
             if (!(e.getCause() instanceof co.xenastudios.neoskript.runtime.command.CommandEvent.Failed)) {
-                getSLF4JLogger().error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(),
-                        e.getCause());
+                TriggerErrors.report(getSLF4JLogger(), e);
             }
         };
         Waits.install(scheduler, laterErrors);
@@ -163,8 +162,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             exportSyntax(library);
             try {
                 scripts.loadAll();
-            } catch (IOException e) {
-                getSLF4JLogger().error("Couldn't read the scripts folder", e);
+            } catch (IOException | RuntimeException e) {
+                // NeoSkript stays enabled, so /sk reload can load them once they're fixed.
+                getSLF4JLogger().error("Couldn't load the scripts", e);
             }
             // Events NeoSkript fires itself: experience spawning, times of day, starting and stopping.
             co.xenastudios.neoskript.paper.EventBridges.start(this, eventPriority());
@@ -298,6 +298,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (scripts != null) {
             co.xenastudios.neoskript.paper.EventBridges.stop();
             scripts.unloadAll();
+            StandardLibrary.close();
         }
         getServer().getAsyncScheduler().cancelTasks(this);
         co.xenastudios.neoskript.runtime.region.Regions.uninstall();

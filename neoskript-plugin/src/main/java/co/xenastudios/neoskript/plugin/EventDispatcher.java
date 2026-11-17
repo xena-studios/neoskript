@@ -5,7 +5,6 @@
 package co.xenastudios.neoskript.plugin;
 
 import co.xenastudios.neoskript.compiler.CompiledScripts;
-import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
 import co.xenastudios.neoskript.runtime.SimpleTriggerContext;
 import co.xenastudios.neoskript.runtime.Trigger;
 import java.util.ArrayList;
@@ -70,13 +69,14 @@ final class EventDispatcher implements Listener {
         }
     }
 
-    private void fire(Trigger[] triggers, Event event) {
+    void fire(Trigger[] triggers, Event event) {
         SimpleTriggerContext context = new SimpleTriggerContext(event, owner(event));
         for (Trigger trigger : triggers) {
             try {
                 trigger.execute(context);
-            } catch (ScriptRuntimeException e) {
-                logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
+            } catch (Throwable e) {
+                // One trigger's failure doesn't stop the event's others, nor reach Bukkit.
+                TriggerErrors.report(logger, e);
             }
         }
     }

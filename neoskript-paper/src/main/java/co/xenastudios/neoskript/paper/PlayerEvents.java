@@ -86,22 +86,36 @@ final class PlayerEvents {
     private static final int LEFT = 2;
     private static final int ANY = RIGHT | LEFT;
 
+    /** A player's first click event in a tick. */
+    private record Click(long tick, Event event) {}
+
     /** The first click event each player had this tick, so a click with both hands runs once, as in Skript. */
-    private static final Map<UUID, long[]> FIRST_CLICKS = new ConcurrentHashMap<>();
-    private static final Map<UUID, Event> FIRST_CLICK_EVENTS = new ConcurrentHashMap<>();
+    private static final Map<UUID, Click> FIRST_CLICKS = new ConcurrentHashMap<>();
+    /** The tick old clicks were last removed in. */
+    private static volatile long prunedAt;
 
     /** Whether {@code event} is the first click {@code player} made this tick, or the same one again. */
-    private static boolean firstClick(Player player, Event event) {
-        long tick = Bukkit.getCurrentTick();
-        UUID id = player.getUniqueId();
-        long[] last = FIRST_CLICKS.get(id);
-        Event first = FIRST_CLICK_EVENTS.get(id);
-        if (last != null && last[0] == tick && first != null && first != event) {
+    static boolean firstClick(Player player, Event event) {
+        return firstClick(player.getUniqueId(), event, Bukkit.getCurrentTick());
+    }
+
+    static boolean firstClick(UUID id, Event event, long tick) {
+        Click last = FIRST_CLICKS.get(id);
+        if (last != null && last.tick() == tick && last.event() != event) {
             return false;
         }
-        FIRST_CLICKS.put(id, new long[] {tick});
-        FIRST_CLICK_EVENTS.put(id, event);
+        if (tick != prunedAt) {
+            // Only this tick's clicks count. Older ones would keep the events, and with them players who left.
+            prunedAt = tick;
+            FIRST_CLICKS.values().removeIf(click -> click.tick() < tick - 20);
+        }
+        FIRST_CLICKS.put(id, new Click(tick, event));
         return true;
+    }
+
+    /** How many players' clicks are kept, for tests. */
+    static int clicksKept() {
+        return FIRST_CLICKS.size();
     }
 
     /**

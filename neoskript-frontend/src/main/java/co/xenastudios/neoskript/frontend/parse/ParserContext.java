@@ -24,6 +24,56 @@ import java.util.concurrent.ConcurrentHashMap;
 final class ParserContext {
 
     private final SyntaxRegistry registry;
+
+    /**
+     * How long reading one statement or structure header may take. Real lines, even lists of a thousand values, take
+     * well under a second; past this the parser's search grows much faster than the line (thousands of statements
+     * run together, with quotes that pair up any number of ways), and the line is an error rather than minutes of
+     * work on the thread that loads scripts.
+     */
+    static final long LINE_TIME_LIMIT_MILLIS = Long.getLong("neoskript.parse.lineTimeLimitMillis", 10_000L);
+
+    /**
+     * How long reading one script's lines may take in all: a script of thousands of lines takes well under a second,
+     * so this only stops a script made of many lines that each take nearly {@link #LINE_TIME_LIMIT_MILLIS}.
+     */
+    static final long SCRIPT_TIME_LIMIT_MILLIS = 3 * LINE_TIME_LIMIT_MILLIS;
+
+    /** When the line being read runs out of time, or 0 outside a line. */
+    private long deadline;
+
+    /** When this script runs out of time, from when its first line started. */
+    private long scriptDeadline;
+
+    /** Starts the time for reading one line, returning the previous line's deadline to restore after it. */
+    long startLine() {
+        long previous = deadline;
+        deadline = lineDeadline();
+        return previous;
+    }
+
+    /**
+     * Ends a line {@link #startLine} started. The line around it, a section's header, gets its time again, as what's
+     * in the section isn't its own.
+     */
+    void endLine(long previous) {
+        deadline = previous == 0 ? 0 : lineDeadline();
+    }
+
+    private long lineDeadline() {
+        long now = System.currentTimeMillis();
+        if (scriptDeadline == 0) {
+            scriptDeadline = now + SCRIPT_TIME_LIMIT_MILLIS;
+        }
+        return Math.min(now + LINE_TIME_LIMIT_MILLIS, scriptDeadline);
+    }
+
+    /** Throws {@link LineParser.TooComplex} if the line being read has run out of time. */
+    void checkTime() {
+        if (deadline != 0 && System.currentTimeMillis() > deadline) {
+            throw new LineParser.TooComplex();
+        }
+    }
     private final Map<String, List<FunctionInfo>> scriptFunctions;
     /** The current script's local functions, which take precedence over global ones with the same name. */
     private final Map<String, List<FunctionInfo>> localFunctions;

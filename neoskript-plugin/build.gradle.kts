@@ -12,6 +12,8 @@ dependencies {
     // Paper ships Gson; the update checker reads Modrinth's answers with it.
     compileOnly(libs.gson)
     testImplementation(libs.gson)
+    // Tests of what runs triggers for Bukkit, without a server.
+    testImplementation(libs.paper.api)
 }
 
 tasks.processResources {

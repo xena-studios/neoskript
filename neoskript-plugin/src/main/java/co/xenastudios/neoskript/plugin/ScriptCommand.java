@@ -8,7 +8,6 @@ import co.xenastudios.neoskript.compiler.CommandCompletion;
 import co.xenastudios.neoskript.compiler.CompiledCommand;
 import co.xenastudios.neoskript.frontend.parse.CommandPattern;
 import co.xenastudios.neoskript.paper.Messages;
-import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
 import co.xenastudios.neoskript.runtime.SimpleTriggerContext;
 import co.xenastudios.neoskript.runtime.Timespan;
 import co.xenastudios.neoskript.runtime.Trigger;
@@ -154,9 +153,9 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
         }
         try {
             route.trigger().execute(new SimpleTriggerContext(event, sender instanceof Player ? sender : null));
-        } catch (ScriptRuntimeException e) {
+        } catch (Throwable e) {
             if (!(e.getCause() instanceof CommandEvent.Failed)) {
-                logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
+                TriggerErrors.report(logger, e);
             }
         }
         if (event.failure() instanceof net.kyori.adventure.text.Component failure) {
@@ -228,8 +227,8 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
         try {
             message.execute(new SimpleTriggerContext(event));
             return Values.text(event.result());
-        } catch (ScriptRuntimeException e) {
-            logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
+        } catch (Throwable e) {
+            TriggerErrors.report(logger, e);
             return null;
         }
     }
@@ -280,8 +279,8 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
                     args, route -> canExecute(route.executors(), sender)
                             && (route.permission() == null || sender.hasPermission(route.permission())),
                     ScriptCommand::suggestions);
-        } catch (ScriptRuntimeException e) {
-            logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
+        } catch (Throwable e) {
+            TriggerErrors.report(logger, e);
             return List.of();
         }
         Map<String, net.kyori.adventure.text.Component> tooltips = new java.util.HashMap<>();

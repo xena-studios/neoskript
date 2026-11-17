@@ -7,7 +7,6 @@ package co.xenastudios.neoskript.plugin;
 import co.xenastudios.neoskript.compiler.ScriptCompiler;
 import co.xenastudios.neoskript.paper.EffectCommandEvent;
 import co.xenastudios.neoskript.paper.TextComponentParser;
-import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
 import co.xenastudios.neoskript.runtime.SimpleTriggerContext;
 import co.xenastudios.neoskript.runtime.scheduler.Scheduler;
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -158,10 +157,10 @@ final class EffectCommands implements Listener {
             // A wait carries on on the sender's thread.
             try {
                 effect.trigger().execute(new SimpleTriggerContext(event, sender instanceof Entity entity ? entity : null));
-            } catch (ScriptRuntimeException e) {
-                logger.error("Error in {}, line {}: {}", e.script(), e.line(), e.getCause().toString(), e.getCause());
+            } catch (Throwable e) {
+                TriggerErrors.report(logger, e);
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError | StackOverflowError e) {
             logger.error("Unexpected error while executing effect command '{}' by '{}'", command,
                     sender.getName(), e);
             sender.sendRichMessage("<red>An internal error occurred while executing this effect. "

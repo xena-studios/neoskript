@@ -183,19 +183,31 @@ public final class ScriptLoader {
             default -> null;
         });
         statements.note(structure.node().line());
+        long outer = context.startLine();
         try {
-            return switch (structure.kind()) {
-                case OPTIONS, VARIABLES, ALIASES, USING -> new ParsedStructure.Data(structure);
-                case AUTO_RELOAD -> autoReload(structure, context, diagnostics);
-                case FUNCTION -> function(structure, statements, diagnostics, diagnostics.file().name());
-                case COMMAND -> new CommandParser(registry, statements, diagnostics).parse(structure);
-                case EVENT -> structure.section().line().key().equalsIgnoreCase(PARSE_STRUCTURE)
-                        ? parseBlock(structure, context, statements, diagnostics)
-                        : event(structure, context, statements, diagnostics);
-            };
+            return parseStructure(structure, context, statements, diagnostics);
+        } catch (StackOverflowError | LineParser.TooComplex failed) {
+            Line line = structure.node().line();
+            diagnostics.error(line.number(), line.column(), line.text().length(),
+                    failed instanceof StackOverflowError ? StatementParser.TOO_DEEP : LineParser.TOO_COMPLEX);
+            return null;
         } finally {
+            context.endLine(outer);
             context.eventScope(before);
         }
+    }
+
+    private ParsedStructure parseStructure(Structure structure, ParserContext context, StatementParser statements,
+            Diagnostics diagnostics) {
+        return switch (structure.kind()) {
+            case OPTIONS, VARIABLES, ALIASES, USING -> new ParsedStructure.Data(structure);
+            case AUTO_RELOAD -> autoReload(structure, context, diagnostics);
+            case FUNCTION -> function(structure, statements, diagnostics, diagnostics.file().name());
+            case COMMAND -> new CommandParser(registry, statements, diagnostics).parse(structure);
+            case EVENT -> structure.section().line().key().equalsIgnoreCase(PARSE_STRUCTURE)
+                    ? parseBlock(structure, context, statements, diagnostics)
+                    : event(structure, context, statements, diagnostics);
+        };
     }
 
     /** Skript's default for {@code auto reload}'s {@code permission:} entry. */

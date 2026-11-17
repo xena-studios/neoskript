@@ -7,6 +7,7 @@ package co.xenastudios.neoskript.compiler;
 import static org.objectweb.asm.Opcodes.AALOAD;
 import static org.objectweb.asm.Opcodes.AASTORE;
 import static org.objectweb.asm.Opcodes.IADD;
+import static org.objectweb.asm.Opcodes.IAND;
 import static org.objectweb.asm.Opcodes.IFNULL;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
@@ -83,6 +84,7 @@ import co.xenastudios.neoskript.runtime.region.RegionAccess;
 import co.xenastudios.neoskript.runtime.region.RegionalElements;
 import co.xenastudios.neoskript.runtime.region.Regions;
 import co.xenastudios.neoskript.runtime.ScriptRuntimeException;
+import co.xenastudios.neoskript.runtime.LongLoops;
 import co.xenastudios.neoskript.runtime.Trigger;
 import co.xenastudios.neoskript.runtime.Values;
 import co.xenastudios.neoskript.runtime.command.CommandEvent;
@@ -1693,8 +1695,29 @@ final class TriggerCompiler {
         blocks.pop();
         method.visitLabel(next);
         method.visitIincInsn(indexSlot, 1);
+        checkLongLoop(indexSlot, section.line().number());
         method.visitJumpInsn(GOTO, top);
         method.visitLabel(end);
+    }
+
+    /**
+     * Every {@link LongLoops#EVERY} times round a loop, whose count is in {@code counterSlot}, tells
+     * {@link LongLoops#check} where it is, so a loop that runs for seconds without waiting can be named.
+     */
+    private void checkLongLoop(int counterSlot, int loopLine) {
+        Label skip = new Label();
+        method.visitVarInsn(ILOAD, counterSlot);
+        method.visitJumpInsn(IFEQ, skip);
+        method.visitVarInsn(ILOAD, counterSlot);
+        pushInt(LongLoops.EVERY - 1);
+        method.visitInsn(IAND);
+        method.visitJumpInsn(IFNE, skip);
+        method.visitLdcInsn(constantsScript);
+        pushInt(loopLine);
+        method.visitVarInsn(ILOAD, counterSlot);
+        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(LongLoops.class), "check",
+                "(" + STRING_DESC + "II)V", false);
+        method.visitLabel(skip);
     }
 
     /**
@@ -2060,6 +2083,7 @@ final class TriggerCompiler {
         }
         method.visitLabel(top);
         method.visitIincInsn(counterSlot, 1);
+        checkLongLoop(counterSlot, section.line().number());
         blocks.push(new Block(BlockKind.WHILE, end, next, -1, -1, counterSlot));
         statements(section.body());
         blocks.pop();

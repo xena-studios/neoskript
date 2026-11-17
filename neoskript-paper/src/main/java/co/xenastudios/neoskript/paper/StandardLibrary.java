@@ -15,6 +15,11 @@ public final class StandardLibrary {
         register(registrar, hooks -> {});
     }
 
+    /** Lets go of what the standard library holds open, as the plugin is disabled: the log files scripts wrote to. */
+    public static void close() {
+        ServerSyntax.closeLogs();
+    }
+
     /**
      * Registers the standard library with the syntax of plugin hooks ({@link Hooks#register}), which goes before
      * comparisons and {@code contains}, as Skript tries those last: {@code player is the owner of region X} is the
