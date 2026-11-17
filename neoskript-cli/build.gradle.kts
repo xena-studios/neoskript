@@ -10,6 +10,9 @@ val neoskriptPlugin = configurations.create("neoskriptPlugin") {
 
 dependencies {
     implementation(libs.gson)
+    // For 'addon': reading an addon jar's bytecode.
+    implementation(libs.asm)
+    implementation(libs.asm.tree)
     // The plugin the check server runs, inside the CLI's jar.
     neoskriptPlugin(project(path = ":neoskript-plugin", configuration = "shadowRuntimeElements"))
 }

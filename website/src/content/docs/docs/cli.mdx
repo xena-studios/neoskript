@@ -90,6 +90,26 @@ That makes it usable in CI: check a repository of scripts on every pull request,
 For one script, without Java, paste it into [the parser](/parser/). It's the same parser, in your browser, though it can't check item and entity names as the CLI can.
 </Aside>
 
+## What a Skript addon uses
+
+`addon` reads a Skript addon's jar, without running it, and lists every class of Skript's it uses, most used first:
+
+```sh
+java -jar neoskript-cli.jar addon SkBee-3.26.0.jar
+java -jar neoskript-cli.jar addon SkBee-3.26.0.jar --members --json skbee.json
+```
+
+```text
+SkBee-3.26.0.jar: 677 of 1029 classes use 156 of Skript's classes
+  420  ch.njol.skript.lang.Expression  [call, cast, signature]
+  398  ch.njol.skript.lang.SkriptParser$ParseResult  [call, field, signature]
+  ...
+```
+
+Each line is how many of the addon's classes use the class, and how: what it extends and implements, calls, reads, creates, casts to, and names in signatures and annotations. `--members` lists each method and field, and `--json` writes it all with the addon's classes that use each.
+
+Skript addons don't run on NeoSkript yet: a compatibility layer is being built, SkBee first, and this is how it finds what an addon needs. The list for SkBee is in the repository's [docs/compat](https://github.com/xena-studios/neoskript/tree/main/docs/compat).
+
 ## Building it
 
 From a copy of [the repository](https://github.com/xena-studios/neoskript), with JDK 21:

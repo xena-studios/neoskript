@@ -38,6 +38,7 @@ public final class NeoSkriptCli {
 
     private static final String USAGE = """
             Usage: neoskript-cli check <scripts folder or .sk file> [options]
+                   neoskript-cli addon <addon jar> [--members] [--json <file>]
                    neoskript-cli --version
 
               Checks the scripts as NeoSkript loads them, without running them, and reports:
@@ -57,6 +58,10 @@ public final class NeoSkriptCli {
                 --cache <folder>     where the server is downloaded to (default ~/.neoskript/cache)
                 --verbose            show the server's console
 
+              'addon' lists what a Skript addon's jar uses of Skript's classes (ch.njol.skript and
+              org.skriptlang.skript), most used first: what it extends, calls and reads, and with --members,
+              each method and field. It reads the jar's bytecode; nothing in it runs.
+
               Files and folders whose names start with '-' or '.' are skipped, as Skript skips them.
               Skript's default aliases are read unless the config.sk next to the aliases folder says
               'load default aliases: false'.
@@ -75,6 +80,9 @@ public final class NeoSkriptCli {
         if (args.length == 1 && (args[0].equals("--version") || args[0].equals("version"))) {
             out.println("neoskript-cli " + version());
             return 0;
+        }
+        if (args.length >= 2 && args[0].equals("addon")) {
+            return addon(args, out, err);
         }
         if (args.length < 2 || !args[0].equals("check")) {
             err.print(USAGE);
@@ -328,6 +336,41 @@ public final class NeoSkriptCli {
             return HexFormat.of().formatHex(digest.digest());
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
+        }
+    }
+
+    /** {@code addon <jar> [--members] [--json <file>]}: what an addon's jar uses of Skript. */
+    private static int addon(String[] args, PrintStream out, PrintStream err) {
+        Path jar = Path.of(args[1]);
+        boolean members = false;
+        Path json = null;
+        for (int i = 2; i < args.length; i++) {
+            switch (args[i]) {
+                case "--members" -> members = true;
+                case "--json" -> {
+                    if (i + 1 == args.length) {
+                        err.print(USAGE);
+                        return 2;
+                    }
+                    json = Path.of(args[++i]);
+                }
+                default -> {
+                    err.print(USAGE);
+                    return 2;
+                }
+            }
+        }
+        try {
+            AddonScan.Result result = AddonScan.scan(jar);
+            out.print(AddonScan.report(result, members));
+            if (json != null) {
+                java.nio.file.Files.writeString(json, new com.google.gson.GsonBuilder().setPrettyPrinting().create()
+                        .toJson(AddonScan.json(result)) + "\n");
+            }
+            return 0;
+        } catch (IOException e) {
+            err.println("Couldn't read " + jar + ": " + e.getMessage());
+            return 2;
         }
     }
 
