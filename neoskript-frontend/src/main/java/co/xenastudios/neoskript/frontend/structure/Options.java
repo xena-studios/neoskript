@@ -47,8 +47,9 @@ public final class Options {
                 case Node.Simple simple -> {
                     int separator = line.text().indexOf(ENTRY_SEPARATOR);
                     if (separator <= 0) {
+                        // Skript's error for a line that isn't an entry.
                         diagnostics.error(line.number(), line.column(), line.text().length(),
-                                "Invalid option: options are written as 'name: value'");
+                                "'" + line.text().strip() + "' is not an entry (like 'name : value')");
                         continue;
                     }
                     String name = line.text().substring(0, separator).strip();
@@ -59,8 +60,16 @@ public final class Options {
         }
     }
 
-    /** Returns {@code nodes} with options replaced in every line outside {@code options:} sections. */
+    /**
+     * Returns {@code nodes} with options replaced in every line outside {@code options:} sections. As in Skript, a
+     * script with no {@code options:} section has no options to replace, so {@code {@name}} stays as written, and
+     * only a script with one gets an error for an option it doesn't define (the line still loads, with
+     * {@code {@name}} as written).
+     */
     public static List<Node> apply(List<Node> nodes, Map<String, String> options, Diagnostics diagnostics) {
+        if (nodes.stream().noneMatch(node -> node instanceof Node.Section section && isOptionsSection(section))) {
+            return nodes;
+        }
         List<Node> result = new ArrayList<>(nodes.size());
         for (Node node : nodes) {
             if (node instanceof Node.Section section && isOptionsSection(section)) {

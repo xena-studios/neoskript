@@ -18,14 +18,19 @@ import java.util.List;
  * @param functions the compiled functions. Calls only reach them once they're linked: {@link #linkFunctions}
  * @param diagnostics errors for the code that couldn't be compiled. Those triggers are left out.
  * @param unrunnableTests in test mode, the tests that couldn't be compiled, by name, with the reason
+ * @param crashed the scripts NeoSkript itself failed to compile something in (a bug, not the script's mistake):
+ *     a reload keeps the version of them that was running
+ * @param unreachableAfterFailure the lines, as {@code file:line}, warned to be unreachable after a statement that then
+ *     failed to compile: that doesn't stop the code, so as in Skript there's no warning
  */
 public record CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunctionBody> functions,
         List<Diagnostic> diagnostics, java.util.Map<String, String> unrunnableTests, List<CompiledCommand> commands,
-        java.util.Set<String> unparsedLines) {
+        java.util.Set<String> unparsedLines, java.util.Set<String> crashed, java.util.Set<String> unreachableAfterFailure) {
 
     public CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunctionBody> functions,
             List<Diagnostic> diagnostics, java.util.Map<String, String> unrunnableTests, List<CompiledCommand> commands) {
-        this(triggers, functions, diagnostics, unrunnableTests, commands, java.util.Set.of());
+        this(triggers, functions, diagnostics, unrunnableTests, commands, java.util.Set.of(), java.util.Set.of(),
+                java.util.Set.of());
     }
 
     /**
@@ -33,11 +38,17 @@ public record CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunct
      * such a section, so it isn't reported.
      */
     public boolean unparsed(Diagnostic parsed) {
-        return unparsedLines.contains(parsed.file() + ":" + parsed.line());
+        return unparsedLines.contains(parsed.file() + ":" + parsed.line())
+                || parsed.message().startsWith(UNREACHABLE) && unreachableAfterFailure.contains(parsed.file() + ":"
+                        + parsed.line());
     }
+
+    private static final String UNREACHABLE = "Unreachable code.";
 
     public CompiledScripts {
         unparsedLines = java.util.Set.copyOf(unparsedLines);
+        crashed = java.util.Set.copyOf(crashed);
+        unreachableAfterFailure = java.util.Set.copyOf(unreachableAfterFailure);
         commands = List.copyOf(commands);
         triggers = List.copyOf(triggers);
         functions = List.copyOf(functions);

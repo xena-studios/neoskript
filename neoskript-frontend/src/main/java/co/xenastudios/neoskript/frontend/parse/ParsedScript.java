@@ -22,13 +22,21 @@ import java.util.Set;
  *     (compared by identity)
  * @param suppressions the tags of the warnings the script suppresses at each statement's or structure's line
  *     ({@code deprecated}), compared by identity
+ * @param unreachableAfter for each line warned to be unreachable, by number, the line of the statement that stops
+ *     the code before it: if that fails to compile, it doesn't stop anything, and the warning isn't given
  */
 public record ParsedScript(SourceFile file, List<ParsedStructure> structures, List<Diagnostic> diagnostics,
-        Map<Line, DelayState> delays, Map<Line, Set<String>> suppressions, Map<Line, String> statementErrors) {
+        Map<Line, DelayState> delays, Map<Line, Set<String>> suppressions, Map<Line, String> statementErrors,
+        Map<Integer, Integer> unreachableAfter) {
 
     public ParsedScript(SourceFile file, List<ParsedStructure> structures, List<Diagnostic> diagnostics,
             Map<Line, DelayState> delays, Map<Line, Set<String>> suppressions) {
-        this(file, structures, diagnostics, delays, suppressions, Map.of());
+        this(file, structures, diagnostics, delays, suppressions, Map.of(), Map.of());
+    }
+
+    public ParsedScript(SourceFile file, List<ParsedStructure> structures, List<Diagnostic> diagnostics,
+            Map<Line, DelayState> delays, Map<Line, Set<String>> suppressions, Map<Line, String> statementErrors) {
+        this(file, structures, diagnostics, delays, suppressions, statementErrors, Map.of());
     }
 
     /**
@@ -41,6 +49,7 @@ public record ParsedScript(SourceFile file, List<ParsedStructure> structures, Li
 
     public ParsedScript {
         statementErrors = Collections.unmodifiableMap(new IdentityHashMap<>(statementErrors));
+        unreachableAfter = Map.copyOf(unreachableAfter);
         structures = List.copyOf(structures);
         diagnostics = List.copyOf(diagnostics);
         delays = Collections.unmodifiableMap(new IdentityHashMap<>(delays));

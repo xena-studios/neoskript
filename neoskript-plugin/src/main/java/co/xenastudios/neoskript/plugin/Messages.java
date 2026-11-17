@@ -54,7 +54,7 @@ final class Messages {
     static final Message DONE_WITH_WARNINGS = Message.of(
             "<prefix><success><done></success> <what> in <highlight><ms> ms</highlight>, with <problems>.");
     static final Message DONE_WITH_ERRORS = Message.of(
-            "<prefix><error><done> <what> with <problems></error> in <highlight><ms> ms</highlight>. Scripts with errors keep their last version.");
+            "<prefix><error><done> <what> with <problems></error> in <highlight><ms> ms</highlight>. What has errors is left out.");
     static final Message REPORT_SCRIPT = Message.of(" <highlight><script></highlight> <dark_gray>-</dark_gray> <problems>");
     static final Message REPORT_ERROR = Message.of("   <error>Line <line>:</error> <message>");
     static final Message REPORT_WARNING = Message.of("   <highlight>Line <line>:</highlight> <message> <dark_gray>(warning)");

@@ -87,7 +87,7 @@ final class CommandParser {
         if (pattern == null) {
             return null;
         }
-        ParsedStructure.CommandNode root = node(section, false, pattern, names, null);
+        ParsedStructure.CommandNode root = node(section, false, pattern, names, null, true);
         return root == null ? null : new ParsedStructure.Command(structure, header.group(1), root);
     }
 
@@ -115,43 +115,26 @@ final class CommandParser {
      * @param executors who its parent can be run by, or {@code null} for anyone
      */
     private ParsedStructure.CommandNode node(Node.Section section, boolean group, List<CommandPattern.Part> pattern,
-            Set<String> names, Set<Executor> executors) {
+            Set<String> names, Set<Executor> executors, boolean root) {
         Map<String, String> entries = new LinkedHashMap<>();
         Map<String, Expr> messages = new LinkedHashMap<>();
         List<Statement> trigger = null;
         List<Statement> suggestions = null;
         Line suggestionsLine = null;
         List<Node.Section> children = new ArrayList<>();
+        // As Skript's entry validator: entries it doesn't know are each reported, then the command isn't loaded,
+        // and nothing else in it is read.
         boolean unexpected = false;
         for (Node child : section.children()) {
-            Line entry = child.line();
-            String key = Text.lower(entry.key().strip());
-            if (child instanceof Node.Section s && (key.equals("trigger") || key.equals("subcommands")
+            String key = Text.lower(child.line().key().strip());
+            if (child instanceof Node.Section && (key.equals("trigger") || key.equals("subcommands")
                     || SUGGESTIONS.contains(key) || SUBCOMMAND.matcher(key).matches())) {
-                if (SUGGESTIONS.contains(key)) {
-                    // Its code runs while the command is typed: named arguments aren't local variables there.
-                    suggestions = statements.body(s.children());
-                    suggestionsLine = entry;
-                } else if (key.equals("trigger")) {
-                    trigger = statements.body(s.children(), hints(pattern));
-                } else {
-                    children.add(s);
-                }
                 continue;
             }
+            Line entry = child.line();
             int separator = entry.text().indexOf(':');
             String name = separator <= 0 ? "" : Text.lower(entry.text().substring(0, separator).strip());
-            String value = separator <= 0 ? "" : entry.text().substring(separator + 1).strip();
-            if (ENTRIES.contains(name) && !(group && name.equals("aliases"))) {
-                entries.put(name, value);
-            } else if (MESSAGES.contains(name)) {
-                entries.put(name, value);
-                Expr message = statements.expression(entry, '"' + value.replace("\"", "\"\"") + '"', "string", false);
-                if (message != null) {
-                    messages.put(name, message);
-                }
-            } else {
-                // As Skript's entry validator: each is reported, then the command isn't loaded.
+            if (!(ENTRIES.contains(name) && !(group && name.equals("aliases"))) && !MESSAGES.contains(name)) {
                 report(entry, "Unexpected entry '" + entry.key().strip() + "'. Check whether it's spelled correctly or"
                         + " remove it");
                 unexpected = true;
@@ -160,18 +143,53 @@ final class CommandParser {
         if (unexpected) {
             return null;
         }
+        // The entries as written, and the code sections, read below in the order Skript's SubCommandEntryData reads
+        // them: one that fails stops the command before what comes after it is read.
+        Map<String, Line> entryLines = new java.util.HashMap<>();
+        Node.Section triggerSection = null;
+        Node.Section suggestionsSection = null;
+        for (Node child : section.children()) {
+            Line entry = child.line();
+            String key = Text.lower(entry.key().strip());
+            if (child instanceof Node.Section s && (key.equals("trigger") || key.equals("subcommands")
+                    || SUGGESTIONS.contains(key) || SUBCOMMAND.matcher(key).matches())) {
+                if (SUGGESTIONS.contains(key)) {
+                    suggestionsSection = s;
+                    suggestionsLine = entry;
+                } else if (key.equals("trigger")) {
+                    triggerSection = s;
+                } else {
+                    children.add(s);
+                }
+                continue;
+            }
+            int separator = entry.text().indexOf(':');
+            String name = separator <= 0 ? "" : Text.lower(entry.text().substring(0, separator).strip());
+            entryLines.put(name, entry);
+            entries.put(name, separator <= 0 ? "" : entry.text().substring(separator + 1).strip());
+        }
 
         Set<Executor> own = executors;
         if (entries.containsKey("executable by")) {
-            own = executors(section.line(), entries.get("executable by"), executors);
+            own = executors(section.line(), entryLines.get("executable by"), entries.get("executable by"), executors);
             if (own == null) {
                 return null;
             }
         }
 
-        // Skript's warnings about the entries, as its SubCommandEntryData gives them.
+        // The cooldown's messages are text with code, whose errors Skript reports; the command still loads.
+        for (String name : List.of("cooldown message", "cooldown storage")) {
+            if (entries.containsKey(name)) {
+                Expr message = statements.text(entryLines.get(name), entries.get(name));
+                if (message != null) {
+                    messages.put(name, message);
+                }
+            }
+        }
+        // Skript's warnings about the entries, as its SubCommandEntryData gives them. A command's own are the
+        // compiler's, which knows whether its cooldown and messages compile.
         java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
-        if (!entries.containsKey("cooldown")) {
+        if (!root && !entries.containsKey("cooldown")) {
             for (String unused : List.of("message", "bypass", "storage")) {
                 if (entries.containsKey("cooldown " + unused)) {
                     warnings.add(":There is a cooldown " + unused + " set, but not a cooldown");
@@ -182,21 +200,44 @@ final class CommandParser {
             warnings.add("deprecated:[Deprecated] The 'permission message' entry has been deprecated for removal in a"
                     + " future release. Commands that a player does not have permission to execute are no longer sent"
                     + " to their client.");
+            // Deprecated, and Skript doesn't read it as code: what doesn't parse is just text, with no error.
+            int mark = diagnostics.mark();
+            Expr message = statements.text(entryLines.get("permission message"), entries.get("permission message"));
+            diagnostics.takeSince(mark);
+            if (message != null) {
+                messages.put("permission message", message);
+            }
         }
         statements.warn(section.line(), warnings);
+
+        if (triggerSection != null) {
+            trigger = statements.body(triggerSection.children(), hints(pattern));
+        }
+        if (entries.containsKey("usage")) {
+            // Skript's usage is text with code, whose errors it reports; the command still loads. (NeoSkript shows it
+            // as written: the code is only checked.)
+            Expr usage = statements.text(entryLines.get("usage"), entries.get("usage"));
+            if (usage != null) {
+                messages.put("usage", usage);
+            }
+        }
+        if (suggestionsSection != null) {
+            // Its code runs while the command is typed: named arguments aren't local variables there.
+            suggestions = statements.body(suggestionsSection.children());
+        }
 
         List<ParsedStructure.CommandNode> subcommands = new ArrayList<>();
         for (Node.Section child : children) {
             String key = child.line().key().strip();
             ParsedStructure.CommandNode node;
             if (key.equalsIgnoreCase("subcommands")) {
-                node = node(child, true, List.of(), names, own);
+                node = node(child, true, List.of(), names, own, false);
             } else {
                 Matcher m = SUBCOMMAND.matcher(key);
                 m.matches();
                 Set<String> scope = new HashSet<>(names);
                 List<CommandPattern.Part> parts = pattern(child.line(), m.group(1) == null ? "" : m.group(1), scope);
-                node = parts == null ? null : node(child, false, parts, scope, own);
+                node = parts == null ? null : node(child, false, parts, scope, own, false);
             }
             if (node != null) {
                 subcommands.add(node);
@@ -206,7 +247,7 @@ final class CommandParser {
         if (group) {
             return subcommands.isEmpty() ? null
                     : new ParsedStructure.CommandNode(section.line(), true, pattern, entries, messages, null,
-                            subcommands, suggestions, suggestionsLine);
+                            subcommands, suggestions, suggestionsLine, entryLines);
         }
         List<ParsedStructure.CommandNode> level = new ArrayList<>();
         flatten(subcommands, level);
@@ -224,7 +265,7 @@ final class CommandParser {
             return null;
         }
         return new ParsedStructure.CommandNode(section.line(), false, pattern, entries, messages, trigger, subcommands,
-                suggestions, suggestionsLine);
+                suggestions, suggestionsLine, entryLines);
     }
 
     /** The subcommands at one level: groups' subcommands count as their parent's. */
@@ -239,10 +280,10 @@ final class CommandParser {
     }
 
     /** An {@code executable by} entry, checked against what the parent allows. */
-    private Set<Executor> executors(Line line, String value, Set<Executor> parent) {
+    private Set<Executor> executors(Line line, Line entry, String value, Set<Executor> parent) {
         Set<Executor> executors = EnumSet.noneOf(Executor.class);
-        for (String word : LIST_SEPARATOR.split(Text.lower(value.strip()))) {
-            Executor executor = switch (word.strip()) {
+        for (String word : LIST_SEPARATOR.split(value.strip())) {
+            Executor executor = switch (Text.lower(word.strip())) {
                 case "player", "players" -> Executor.PLAYERS;
                 case "console", "the console" -> Executor.CONSOLE;
                 case "op", "ops", "operator", "operators" -> Executor.OPERATORS;
@@ -251,7 +292,8 @@ final class CommandParser {
                 default -> null;
             };
             if (executor == null) {
-                report(line, "'" + word.strip() + "' is not something that can execute commands");
+                // Skript's error, at the entry, with the word as written.
+                report(entry, "Invalid command sender type: " + word.strip());
                 return null;
             }
             executors.add(executor);

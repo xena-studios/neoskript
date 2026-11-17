@@ -39,6 +39,9 @@ class ScriptCompilerTest {
         library.effect("Fail", info -> (context, args) -> {
             throw new IllegalStateException("boom");
         }, "fail");
+        library.effect("Crash", info -> {
+            throw new IllegalStateException("a bug");
+        }, "crash");
         library.condition("Truth", info -> (context, args) -> info.hasTag("yes"), "(yes:always|never)");
         library.expression("Double", "number", info -> (context, args) -> ((Number) args[0]).doubleValue() * 2,
                 "double %number%");
@@ -90,11 +93,71 @@ class ScriptCompilerTest {
 
     @Test
     void reportsWordsItCantUnderstand() {
-        CompiledScripts compiled = compile("on load:\n\tsay \"a\"\n\tsay diamond sword\n");
-        assertEquals(List.of(), compiled.triggers());
+        CompiledScripts compiled = compile("on load:\n\tsay \"a\"\n\tsay diamond sword\n\tsay \"b\"\n");
         assertEquals(1, compiled.diagnostics().size());
         assertTrue(compiled.diagnostics().getFirst().message().equals("Can't understand this condition/effect: say diamond sword"),
                 compiled.diagnostics().toString());
+        // As in Skript, the trigger loads without the line.
+        compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
+        assertEquals(List.of("[a]", "[b]"), said);
+    }
+
+    @Test
+    void leavesOutLinesThatFailAndRunsTheRest() {
+        CompiledScripts compiled = compile("""
+                on load:
+                	set {_x} to 1
+                	if always:
+                		say "a"
+                		say diamond sword
+                		set {_y} to 2
+                		say "b"
+                	set {_z} to 3
+                	say {_z} to diamond sword
+                	say "c", {_x}, {_y} and {_z}
+                	loop 1 and 2:
+                		say sword
+                		say loop-value
+                	say "d"
+                """);
+        assertEquals(3, compiled.diagnostics().size(), compiled.diagnostics().toString());
+        assertEquals(List.of(5, 9, 12), compiled.diagnostics().stream().map(d -> d.line()).toList());
+        compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
+        assertEquals(List.of("[a]", "[b]", "[c, 1, 2, 3]", "[1]", "[2]", "[d]"), said);
+    }
+
+    @Test
+    void whatNeoSkriptFailsToCompileIsACrashNotTheScriptsError() {
+        // A reload keeps the version of such a script that was running (D12).
+        CompiledScripts compiled = compile("on load:\n\tsay \"a\"\n\tcrash\n");
+        assertEquals(java.util.Set.of("test.sk"), compiled.crashed());
+        assertTrue(compiled.diagnostics().getFirst().message().startsWith("NeoSkript couldn't compile this ("),
+                compiled.diagnostics().toString());
+        assertEquals(java.util.Set.of(), compile("on load:\n\tsay \"a\"\n\tsay diamond sword\n").crashed());
+    }
+
+    @Test
+    void aLocalSetOnlyInALineThatFailsIsUnset() {
+        CompiledScripts compiled = compile("on load:\n\tset {_y} to diamond sword\n\tsay \"y\" and {_y}\n");
+        assertEquals(1, compiled.diagnostics().size(), compiled.diagnostics().toString());
+        compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
+        assertEquals(List.of("[y]"), said);
+    }
+
+    @Test
+    void aFunctionLoadsWithoutItsLinesThatFail() {
+        CompiledScripts compiled = compile("""
+                function f(n: number) :: number:
+                	say diamond sword
+                	return {_n} + 1
+
+                on load:
+                	say f(1)
+                """);
+        assertEquals(1, compiled.diagnostics().size(), compiled.diagnostics().toString());
+        compiled.linkFunctions(java.util.Set.of("test.sk"));
+        compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
+        assertEquals(List.of("[2]"), said);
     }
 
     @Test

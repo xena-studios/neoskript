@@ -26,7 +26,7 @@ A fast, modern, **clean-room** replacement for Skript. Existing `.sk` scripts ru
 | D9 | Reference Skript | Pin the latest **stable** Skript release at M0, then track stable minor releases | The spec has to be a fixed target. |
 | D10 | Commands | Take over `/skript` and `/sk`, with `/neoskript` as an alias. **Refuse to load** if Skript is also installed, and log a clear error. | A true drop-in, and no fights between two plugins over the same scripts and commands. |
 | D11 | Folia cross-region reads | An error, always. The escape hatch is the explicit `run on` section, not a blocking hop. | Decided 2026-11-11. A blocking hop can deadlock (two regions each waiting on the other). Even from the global thread, where it can't, each read waits for the other region's next tick: `loop all players` with 100 players would stall the global thread for seconds. `run on` gets the same result without blocking, and the CLI's hints point to it. |
-| D12 | Failed reload | **Keep the old scripts running.** Report the errors, swap nothing. | A typo shouldn't take a live server's scripts down. |
+| D12 | Reload with errors | **As Skript: load the new version without what has errors.** Report them; a line that fails is left out, a section, trigger or function whose header fails is left out whole. If NeoSkript itself fails to compile part of a script (its bug, not a mistake in the script), that script keeps the version that was running, and the error says so. | Scripts written for Skript expect the rest of a script to run (#38). The first choice, keeping the old version, made a reload behave differently from Skript and from a restart. |
 | D13 | Team / timeline | Solo, no fixed dates | Milestones are ordered by dependency, not dated. |
 | D14 | Distribution | Modrinth + GitHub Releases. Docs are a separate Starlight site, outside this plan. | |
 | D15 | Telemetry & updates | bStats, with `metrics: false` in config to turn it off. A Modrinth update checker, with `update-checker: false` to turn it off. | Usage data and update notices, both opt-out. |
@@ -80,7 +80,7 @@ Skript loads slowly because it tries each line against every registered pattern.
   2. *Call-through:* the compiler emits a direct call to the element's `get`/`run`/`check`. These call sites are monomorphic, so the JIT inlines them anyway. **All addon syntax uses this path, so it always works.**
 - **Waits:** a trigger that contains `wait` compiles into a **state machine**, like Kotlin coroutines. Locals spill into a frame object and the trigger resumes through the scheduler abstraction. Triggers without waits pay none of this cost.
 - **Functions:** compiled to static methods. Calls to functions whose signature is known are direct invocations. Calls across scripts link through a `MethodHandle`/`MutableCallSite` so reloading one script doesn't recompile the others.
-- **Reload:** compile everything new first, then swap atomically. The old hidden classes are released for GC. If a script fails to compile, its old version keeps running and the errors are reported (D12).
+- **Reload:** compile everything new first, then swap atomically. The old hidden classes are released for GC. A script with errors loads without what has them, as in Skript, and the errors are reported; a script NeoSkript itself fails to compile part of keeps the version that was running (D12).
 
 ### 3.3 Runtime & threading (Paper + Folia)
 

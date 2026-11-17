@@ -145,8 +145,8 @@ class MessagesTest {
                 "     this is not valid syntax",
                 " sub/b.sk - 1 warning",
                 "   Line 1: A warning (warning)"), lines);
-        assertEquals("[NeoSkript] Reloaded 4 scripts with 1 error and 1 warning in 12 ms. Scripts with errors keep their"
-                + " last version.", plain(report.summary("Reloaded", Component.text("4 scripts"), 12)));
+        assertEquals("[NeoSkript] Reloaded 4 scripts with 1 error and 1 warning in 12 ms. What has errors is left"
+                + " out.", plain(report.summary("Reloaded", Component.text("4 scripts"), 12)));
     }
 
     @Test

@@ -115,4 +115,33 @@ class CommandParserTest {
         assertInstanceOf(Expr.Text.class, command.root().messages().get("cooldown message"));
         assertNull(command.root().messages().get("permission message"));
     }
+
+    // From probes of the reference Skript 2.17.0 (issue #38).
+
+    @Test
+    void anUnexpectedEntryStopsTheCommandBeforeAnythingElseIsRead() {
+        assertEquals(List.of("Unexpected entry 'wibble: yes'. Check whether it's spelled correctly or remove it"),
+                errors("command /a:\n\texecutable by: frobs\n\twibble: yes\n\ttrigger:\n\t\tnonsense here\n"));
+    }
+
+    @Test
+    void entriesThatFail() {
+        ParsedScript script = load("command /a:\n\texecutable by: Frobs\n\ttrigger:\n\t\tstop\n"
+                + "command /b:\n\tusage: \"%frob nonsense%\"\n\ttrigger:\n\t\tstop\n"
+                + "command /c:\n\tpermission message: \"%frob nonsense%\"\n\ttrigger:\n\t\tstop\n"
+                + "command /d:\n\tcooldown: 1 second\n\tcooldown message: \"%frob nonsense%\"\n\ttrigger:\n\t\tstop\n");
+        // The code in the texts is the compiler's to check.
+        assertEquals(List.of("2: Invalid command sender type: Frobs"), script.diagnostics().stream()
+                .filter(d -> d.severity() == co.xenastudios.neoskript.frontend.source.Severity.ERROR)
+                .map(d -> d.line() + ": " + d.message()).toList());
+        // The usage and cooldown message don't stop their commands loading; nor does a permission message, which
+        // isn't read as code.
+        assertEquals(3, script.structures().size());
+    }
+
+    @Test
+    void aBadExecutableByStopsTheCommandBeforeItsCodeIsRead() {
+        assertEquals(List.of("Invalid command sender type: frobs"), errors("command /a:\n\texecutable by: frobs\n"
+                + "\tusage: \"%frob nonsense%\"\n\tcooldown message: \"%frob nonsense%\"\n\ttrigger:\n\t\tnonsense here\n"));
+    }
 }
