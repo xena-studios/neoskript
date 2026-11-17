@@ -30,7 +30,12 @@ public record SimpleTriggerContext(Object event, Object owner, TriggerContext ca
     /** The run that called this, through every function between, or this itself for a trigger's run. */
     @Override
     public TriggerContext outermostRun() {
-        return caller == null ? this : caller.outermostRun();
+        // A loop, not recursion: a deeply recursive script function asking for this mustn't need a frame per call.
+        TriggerContext context = this;
+        while (context instanceof SimpleTriggerContext simple && simple.caller != null) {
+            context = simple.caller;
+        }
+        return context instanceof SimpleTriggerContext ? context : context.outermostRun();
     }
 
     /**
