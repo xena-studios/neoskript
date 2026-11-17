@@ -62,7 +62,7 @@ public final class Plurality {
             return count > 1;
         }
         int dash = id.indexOf('-');
-        Character known = KNOWN.get(dash < 0 ? id : id.substring(0, dash));
+        Character known = known(id, dash, registry);
         if (known == null || known != 'A') {
             // Elements Skript has no fixed answer for are taken as one value, so nothing is wrongly refused.
             return known != null && known == 'P';
@@ -77,6 +77,12 @@ public final class Plurality {
             }
         }
         return false;
+    }
+
+    /** What's known of element {@code id}'s plurality: Skript's table, or what a script declared for its own syntax. */
+    private static Character known(String id, int dash, SyntaxRegistry registry) {
+        Character known = KNOWN.get(dash < 0 ? id : id.substring(0, dash));
+        return known != null || registry == null ? known : registry.scriptPlurality(id);
     }
 
     /** For each placeholder of a pattern, whether it takes several values. */
@@ -107,7 +113,7 @@ public final class Plurality {
             case Expr.Syntax syntax -> {
                 String id = syntax.syntax().syntax().id();
                 int dash = id.indexOf('-');
-                Character known = KNOWN.get(dash < 0 ? id : id.substring(0, dash));
+                Character known = known(id, dash, registry);
                 yield known != null && (known == 'S' || known == 'A' && !plural(syntax.syntax(), registry))
                         || id.equals("ExprParse-pattern") && !plural(syntax.syntax(), registry);
             }

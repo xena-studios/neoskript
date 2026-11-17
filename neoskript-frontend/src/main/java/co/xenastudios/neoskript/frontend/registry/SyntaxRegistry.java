@@ -64,6 +64,10 @@ public final class SyntaxRegistry {
     private final boolean missingAndOrOff;
     /** Addons' structures ({@code import:}), by syntax id: what to do with each use while a script is parsed. */
     private final Map<String, co.xenastudios.neoskript.api.registration.StructureHandler> structureHandlers;
+    /** Addons' structures scripts declare syntax with, by syntax id: see {@link Builder#scriptSyntaxHandler}. */
+    private final Map<String, co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler> scriptSyntaxHandlers;
+    /** For syntax scripts declared, whether each expression is one value ({@code S}), several ({@code P}) or as its arguments ({@code A}). */
+    private final Map<String, Character> scriptPlurality;
     /** The experiments syntax elements need, by element id. */
     private final Map<String, Experimental> experimental;
     /** The experiment a script's {@code using X} turns on, by its code name. */
@@ -131,6 +135,8 @@ public final class SyntaxRegistry {
         this.loopValueNames = Frozen.set(builder.loopValueNames);
         this.checks = Frozen.map(builder.checks);
         this.structureHandlers = Frozen.map(builder.structureHandlers);
+        this.scriptSyntaxHandlers = Frozen.map(builder.scriptSyntaxHandlers);
+        this.scriptPlurality = Map.of();
         this.quietLists = java.util.Set.copyOf(builder.quietLists);
         this.missingAndOrOff = builder.missingAndOrOff;
         this.experimental = Frozen.map(builder.experimental);
@@ -141,6 +147,105 @@ public final class SyntaxRegistry {
         this.propertySyntaxes = Frozen.map(builder.propertySyntaxes);
         this.placeholderConversions = Frozen.set(builder.placeholderConversions);
         this.eventValues = builder.eventValues;
+    }
+
+    /**
+     * This registry with syntax scripts declared added ({@link ScriptSyntaxDecl}), for one load: everything else is
+     * this one's. Each declared syntax is tried after the registered syntax of its kind.
+     */
+    private SyntaxRegistry(SyntaxRegistry base, List<SyntaxInfo> added) {
+        this.typesById = base.typesById;
+        this.typeOrders = base.typeOrders;
+        this.typeNames = base.typeNames;
+        this.functions = base.functions;
+        this.supertypes = base.supertypes;
+        this.strictTypes = base.strictTypes;
+        this.addonStrictTypes = base.addonStrictTypes;
+        this.enumerableTypes = base.enumerableTypes;
+        this.literalChecks = base.literalChecks;
+        this.parseChecks = base.parseChecks;
+        this.conversions = base.conversions;
+        this.entityNames = base.entityNames;
+        this.delaying = base.delaying;
+        this.delayingExpressions = base.delayingExpressions;
+        this.stopping = base.stopping;
+        this.ending = base.ending;
+        this.suppressing = base.suppressing;
+        this.sectionOnly = base.sectionOnly;
+        this.loopValueNames = base.loopValueNames;
+        this.checks = base.checks;
+        this.quietLists = base.quietLists;
+        this.missingAndOrOff = base.missingAndOrOff;
+        this.structureHandlers = base.structureHandlers;
+        this.scriptSyntaxHandlers = base.scriptSyntaxHandlers;
+        this.experimental = base.experimental;
+        this.experimentNames = base.experimentNames;
+        this.propertyTypes = base.propertyTypes;
+        this.propertySyntaxes = base.propertySyntaxes;
+        this.placeholderConversions = base.placeholderConversions;
+        this.eventValues = base.eventValues;
+        this.timed = base.timed;
+        this.anyTyped = base.anyTyped;
+        this.describer = base.describer;
+        this.typer = base.typer;
+        this.skriptTypes = base.skriptTypes;
+        this.skriptConversions = base.skriptConversions;
+        Map<SyntaxKind, List<SyntaxInfo>> syntaxes = new EnumMap<>(SyntaxKind.class);
+        Map<SyntaxKind, PatternIndex<Candidate>> indexes = new EnumMap<>(SyntaxKind.class);
+        Map<String, Character> plurality = new HashMap<>(base.scriptPlurality);
+        for (SyntaxKind kind : SyntaxKind.values()) {
+            List<SyntaxInfo> extra = added.stream().filter(syntax -> syntax.kind() == kind).toList();
+            if (extra.isEmpty()) {
+                syntaxes.put(kind, base.syntaxes.get(kind));
+                indexes.put(kind, base.indexes.get(kind));
+                continue;
+            }
+            List<SyntaxInfo> list = new ArrayList<>(base.syntaxes.get(kind));
+            list.addAll(extra);
+            syntaxes.put(kind, List.copyOf(list));
+            PatternIndex<Candidate> index = new PatternIndex<>();
+            for (SyntaxInfo syntax : list) {
+                for (int i = 0; i < syntax.patterns().size(); i++) {
+                    index.add(syntax.patterns().get(i), new Candidate(syntax, i));
+                }
+            }
+            indexes.put(kind, index);
+        }
+        for (SyntaxInfo syntax : added) {
+            if (syntax.script() != null && syntax.kind() == SyntaxKind.EXPRESSION) {
+                plurality.put(syntax.id(), switch (syntax.script().declared().plurality()) {
+                    case SINGLE -> 'S';
+                    case PLURAL -> 'P';
+                    case AS_ARGUMENTS -> 'A';
+                });
+            }
+        }
+        this.syntaxes = Collections.unmodifiableMap(syntaxes);
+        this.indexes = Collections.unmodifiableMap(indexes);
+        this.scriptPlurality = Frozen.map(plurality);
+    }
+
+    /**
+     * This registry with {@code added}, syntax scripts declared, for one load; this one itself if there's none, so
+     * scripts are parsed exactly as without the feature where no script declares syntax.
+     */
+    public SyntaxRegistry withScriptSyntax(List<SyntaxInfo> added) {
+        return added.isEmpty() ? this : new SyntaxRegistry(this, added);
+    }
+
+    /** For an expression a script declared, {@code S}, {@code P} or {@code A} (as Plurality's table); else {@code null}. */
+    public Character scriptPlurality(String id) {
+        return scriptPlurality.get(id);
+    }
+
+    /** The addon structure that declares syntax, by syntax id, or {@code null}. */
+    public co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler scriptSyntaxHandler(String id) {
+        return scriptSyntaxHandlers.get(id);
+    }
+
+    /** Whether any addon has a structure that declares syntax. */
+    public boolean hasScriptSyntax() {
+        return !scriptSyntaxHandlers.isEmpty();
     }
 
     /** Which event values code can use, or {@code null} if this registry can't tell. */
@@ -627,6 +732,15 @@ public final class SyntaxRegistry {
         private final Set<String> sectionOnly = new HashSet<>();
         private final Set<String> loopValueNames = new HashSet<>();
         private final Map<String, ParseCheck> checks = new HashMap<>();
+        private final Map<String, co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler> scriptSyntaxHandlers =
+                new HashMap<>();
+
+        /** The structure with syntax id {@code id} declares syntax: see {@code Registrar.scriptSyntax}. */
+        public Builder scriptSyntaxHandler(String id, co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler handler) {
+            scriptSyntaxHandlers.put(id, handler);
+            return this;
+        }
+
         private final Map<String, co.xenastudios.neoskript.api.registration.StructureHandler> structureHandlers =
                 new java.util.LinkedHashMap<>();
         private final java.util.Set<String> quietLists = new java.util.HashSet<>();

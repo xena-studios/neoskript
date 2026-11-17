@@ -34,4 +34,15 @@ public interface TriggerContext {
     default TriggerContext outermostRun() {
         return this;
     }
+
+    /**
+     * The use of script-declared syntax whose code this is, if it is: its arguments, pattern and mark. {@code null}
+     * elsewhere, including in a function that code calls.
+     *
+     * @return the use, or {@code null}
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default ScriptSyntaxCall scriptSyntaxCall() {
+        return null;
+    }
 }

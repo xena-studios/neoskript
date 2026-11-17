@@ -57,6 +57,41 @@ public final class ScriptCompiler {
     }
 
     public CompiledScripts compile(List<ParsedScript> scripts) {
+        // Syntax scripts declared is bound, for this load, to its declaring structure's code.
+        java.util.function.Function<co.xenastudios.neoskript.frontend.registry.SyntaxInfo, Object> before =
+                Library.SCRIPT_SYNTAX.get();
+        Library.SCRIPT_SYNTAX.set(syntax -> ScriptSyntaxBindings.factory(syntax, handles));
+        try {
+            CompiledScripts compiled = compileScripts(scripts);
+            forgetUndeclaredSyntax(scripts);
+            return compiled;
+        } finally {
+            if (before == null) {
+                Library.SCRIPT_SYNTAX.remove();
+            } else {
+                Library.SCRIPT_SYNTAX.set(before);
+            }
+        }
+    }
+
+    /**
+     * Drops the handles of declared syntax's code that no script declares any more, as every script is loaded each
+     * time: a script's syntax goes with it. A trigger still running from before keeps the handle it holds.
+     */
+    private void forgetUndeclaredSyntax(List<ParsedScript> scripts) {
+        java.util.Set<FunctionInfo> declared = new java.util.HashSet<>();
+        for (ParsedScript script : scripts) {
+            for (ParsedStructure structure : script.structures()) {
+                if (structure instanceof ParsedStructure.Function function && function.declaredSyntax()) {
+                    declared.add(function.signature());
+                }
+            }
+        }
+        handles.keySet().removeIf(info -> info.name().startsWith(
+                co.xenastudios.neoskript.frontend.registry.ScriptSyntaxDecl.FUNCTION_PREFIX) && !declared.contains(info));
+    }
+
+    private CompiledScripts compileScripts(List<ParsedScript> scripts) {
         // Used by compiled functions when the stack runs out, when there's no stack left to load it with.
         co.xenastudios.neoskript.runtime.Overflows.ready();
         List<CompiledScripts.CompiledTrigger> triggers = new ArrayList<>();

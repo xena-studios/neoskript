@@ -886,4 +886,20 @@ public interface Registrar {
      */
     @co.xenastudios.neoskript.api.annotation.Experimental
     default void strictType(String typeId) {}
+
+    /**
+     * A structure scripts declare syntax with, as skript-reflect's {@code effect <pattern>:}: {@code handler} reads
+     * each use before any script's code is parsed, and the syntax it declares is added to what every script (or, for
+     * local syntax, the declaring script) is parsed with, for that load. The code in the structure's body section is
+     * compiled as what runs where the syntax is used; it's given the use's arguments through
+     * {@link co.xenastudios.neoskript.api.element.TriggerContext#scriptSyntaxCall()}. Each load starts from nothing, so a
+     * script's syntax goes when it changes or unloads. Scripts on a server where no script declares syntax are parsed
+     * exactly as without this.
+     *
+     * @param id the structure's id: one this addon registers, without {@code -}
+     * @param handler reads what each use declares
+     * @param patterns the structure's header patterns
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void scriptSyntax(String id, ScriptSyntaxHandler handler, String... patterns) {}
 }
