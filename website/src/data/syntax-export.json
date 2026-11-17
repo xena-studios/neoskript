@@ -5502,6 +5502,48 @@
       }
     },
     {
+      "kind": "event",
+      "id": "NeoSkriptWebEvtSkJsonResponse",
+      "patterns": [
+        "received [http] response",
+        "http response received"
+      ],
+      "eventValues": [
+        {
+          "type": "response",
+          "time": 0
+        }
+      ],
+      "parser": {
+        "scope": 178
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "event",
+      "id": "NeoSkriptPlaceholdersEvtPlaceholder",
+      "patterns": [
+        "(placeholder[ ]api|papi) [:relational] placeholder (with|for) [the] prefix %*string%",
+        "(mvdw[ ]placeholder[ ]api|mvdw) placeholder [with [the] name|named] %*string%",
+        "(placeholder[ ]api|papi) [placeholder] request (for|with) [the] prefix[es] %*strings%",
+        "(mvdw[ ]placeholder[ ]api|mvdw) [placeholder] request (for|with) [the] placeholder[s] %*strings%"
+      ],
+      "eventValues": [
+        {
+          "type": "player",
+          "time": 0
+        },
+        {
+          "type": "offlineplayer",
+          "time": 0
+        }
+      ],
+      "parser": {
+        "scope": 179
+      },
+      "addon": "NeoSkriptPlaceholders"
+    },
+    {
       "kind": "section",
       "id": "SecCatchErrors",
       "patterns": [
@@ -5581,6 +5623,17 @@
         "shoot %entitytypes% [from %livingentities/locations%] [(at|with) (speed|velocity) %-number%] [%-direction%]",
         "(make|let) %livingentities/locations% shoot %entitytypes% [(at|with) (speed|velocity) %-number%] [%-direction%]"
       ]
+    },
+    {
+      "kind": "section",
+      "id": "NeoSkriptDbSecTransaction",
+      "patterns": [
+        "[(sql|database)] transaction (on|in) %datasource%"
+      ],
+      "parser": {
+        "delays": true
+      },
+      "addon": "NeoSkriptDb"
     },
     {
       "kind": "section",
@@ -6364,6 +6417,82 @@
     },
     {
       "kind": "effect",
+      "id": "NeoSkriptDbEffExecute",
+      "patterns": [
+        "[(quickly|synchronously)] execute %string% (in|on) %datasource% [with [batch:batch] arg[ument][s] %-objects%] [and store [the] [keys:generated keys] [(output|result)[s]] (to|in) [the] [var[iable]] %-objects%]"
+      ],
+      "parser": {
+        "delays": true
+      },
+      "addon": "NeoSkriptDb"
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptYamlEffLoad",
+      "patterns": [
+        "[re]load [(1¦non[(-| )]relative)] y[a]ml %strings%",
+        "[re]load [(1¦non[(-| )]relative)] y[a]ml %string% as %string%",
+        "[re]load [(1¦non[(-| )]relative)] y[a]ml %strings% using [the] [file] path[s] as [the] id[s]"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptYamlEffLoadDirectory",
+      "patterns": [
+        "[re]load all y[a]ml from [(1¦non[(-| )]relative)] director(y|ies) %strings%",
+        "[re]load all y[a]ml from [(1¦non[(-| )]relative)] director(y|ies) %strings% using [the] filename as [the] id"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptYamlEffUnload",
+      "patterns": [
+        "unload y[a]ml [(1¦director(y|ies))] %strings%"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptYamlEffSave",
+      "patterns": [
+        "save y[a]ml %strings% [with an indentation of %-number%] [(1¦[and] with(out| no) extra lines between nodes)]",
+        "save y[a]ml %strings% (to|as) [(1¦non[(-| )]relative)] [file] %string% [with an indentation of %-number%] [(2¦[and] with(out| no) extra lines between nodes)]"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptYamlEffDelete",
+      "patterns": [
+        "delete y[a]ml %strings% [keep:and keep loaded in memory]"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptYamlEffDeleteDirectory",
+      "patterns": [
+        "delete (all|any) [loaded] y[a]ml from [(1¦non[(-| )]relative)] director(y|ies) %strings%",
+        "delete (all|any) [loaded] y[a]ml from [(1¦non[(-| )]relative)] director(y|ies) %strings% using [the] filename as [the] id"
+      ],
+      "parser": {
+        "delays": true
+      },
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptYamlEffChangeId",
+      "patterns": [
+        "(change|rename|update) y[a]ml id [from] %string% to %string%",
+        "(change|rename|update) y[a]ml %string% file path to [(1¦non[(-| )]relative)] %string%"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "effect",
       "id": "EffToggle",
       "patterns": [
         "(open:open|close:close|toggle) %~objects%"
@@ -6780,6 +6909,40 @@
         "play sound[s] %strings% [[with] seed %-number%] [(in|from) %-soundcategory%] [(at|with) volume %-number%] [(and|at|with) pitch %-number%] (at|on|from) %locations/entities% [(to|for) %-players%]",
         "play sound[s] %strings% [[with] seed %-number%] [(in|from) %-soundcategory%] [(at|with) volume %-number%] [(and|at|with) pitch %-number%] [(to|for) %players%] [(at|on|from) %-locations/entities%]"
       ]
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptWebEffSkJsonExecute",
+      "patterns": [
+        "execute %request% [as [(:non|:not)(-| )blocking]]",
+        "send %request% [as [(:non|:not)(-| )blocking]]",
+        "run %request% [as [(:non|:not)(-| )blocking]]"
+      ],
+      "parser": {
+        "delays": true
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptWebEffSkJsonMap",
+      "patterns": [
+        "[:async] (map|copy) %jsonelement% to %objects%",
+        "[:async] store json %jsonelement% in %objects%",
+        "[:async] copy json %jsonelement% to %objects%"
+      ],
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "effect",
+      "id": "NeoSkriptWebEffReqnRequest",
+      "patterns": [
+        "send [a[n]] [http] [%-string%] [web] request to [the] [url] %string% [with (0¦[the] header[s] %-strings% [and [the] body %-strings%]|1¦[the] body %-strings% [and [the] header[s] %-strings%])]"
+      ],
+      "parser": {
+        "delays": true
+      },
+      "addon": "NeoSkriptWeb"
     },
     {
       "kind": "effect",
@@ -7460,6 +7623,39 @@
         "%chunks/worlds% (is|are)[not:(n't| not)] loaded",
         "world[s] %worlds% (is|are)[not:(n't| not)] loaded"
       ]
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptWebCondSkJsonType",
+      "patterns": [
+        "json type of %jsonelement% is (json[ ](:object)|json[ ](:array)|json[ ](:primitive)|json[ ](:null))",
+        "json type of %jsonelement% (is(n't| not)) (json[ ](:object)|json[ ](:array)|json[ ](:primitive)|json[ ](:null))",
+        "%jsonelement% is [a] json[ ](:object|:array|:primitive|:null)",
+        "%jsonelement% is(n't| not) [a] json[ ](:object|:array|:primitive|:null)"
+      ],
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptWebCondSkJsonEmpty",
+      "patterns": [
+        "json %jsonelement% is empty",
+        "json %jsonelement% is(n't| not) empty",
+        "%jsonelement% is empty json",
+        "%jsonelement% is(n't| not) empty json"
+      ],
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptWebCondSkJsonHas",
+      "patterns": [
+        "[json] %jsonelement% has [:all] (:value[s]|:key[s]) %objects%",
+        "[json] %jsonelement% does(n't| not) have [:all] (:value[s]|:key[s]) %objects%",
+        "%jsonelement% contains [:all] (:value[s]|:key[s]) %objects%",
+        "%jsonelement% does(n't| not) contain [:all] (:value[s]|:key[s]) %objects%"
+      ],
+      "addon": "NeoSkriptWeb"
     },
     {
       "kind": "condition",
@@ -8285,6 +8481,78 @@
           "otherwise": "empty"
         }
       }
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptYamlCondHasList",
+      "patterns": [
+        "[skript-]y[a]ml [(node|path)[s]] %string% (of|in|from) %string% has [a] list",
+        "[skript-]y[a]ml [(node|path)[s]] %string% (of|in|from) %string% does(n't| not) have [a] list"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptYamlCondHasValue",
+      "patterns": [
+        "[skript-]y[a]ml [(node|path)[s]] %strings% (of|in|from) %string% has [a] value[s]",
+        "[skript-]y[a]ml [(node|path)[s]] %strings% (of|in|from) %string% does(n't| not) have [a] value[s]"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptYamlCondFileExists",
+      "patterns": [
+        "[(1¦non[(-| )]relative)] y[a]ml file %string% exists",
+        "[(1¦non[(-| )]relative)] y[a]ml file %string% does(n't| not) exist"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptYamlCondIsEmpty",
+      "patterns": [
+        "[skript-]y[a]ml %string% is empty",
+        "[skript-]y[a]ml %string% is(n't| not) empty"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptYamlCondIsLoaded",
+      "patterns": [
+        "y[a]ml[s] %strings% (is|are) loaded",
+        "y[a]ml[s] %strings% ((are|is) not|(is|are)n[']t) loaded"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptYamlCondIsModified",
+      "patterns": [
+        "y[a]ml %string% is (modified|unsaved)",
+        "y[a]ml %string% is not (modified|unsaved)"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptYamlCondNodeIsType",
+      "patterns": [
+        "y[a]ml (node|path) %string% (of|in|from) %string% is [a] (1¦list|2¦node|3¦value)",
+        "y[a]ml (node|path) %string% (of|in|from) %string% is(n't| not) [a] (1¦list|2¦node|3¦value)"
+      ],
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptYamlCondPathExists",
+      "patterns": [
+        "[skript-]y[a]ml [(node|path)[s]] %strings% (of|in|from) %string% exists",
+        "[skript-]y[a]ml [(node|path)[s]] %strings% (of|in|from) %string% does(n't| not) exist"
+      ],
+      "addon": "NeoSkriptYaml"
     },
     {
       "kind": "condition",
@@ -9415,6 +9683,94 @@
     },
     {
       "kind": "expression",
+      "id": "NeoSkriptWebExprReqnLastResponse",
+      "patterns": [
+        "[the] [last[ly]] [received] [http] [web] response"
+      ],
+      "returnType": "httpresponse",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnUrlEncode",
+      "patterns": [
+        "(http|ur(i|l)) (safe|encoded|escaped) %strings%"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnJsonEncode",
+      "patterns": [
+        "json (safe|encoded|escaped) %strings%"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonFromUrl",
+      "patterns": [
+        "json from [the] (website|url) %strings%",
+        "json from url %strings%",
+        "fetch json from [url] %strings%"
+      ],
+      "returnType": "jsonelement",
+      "parser": {
+        "delays": true
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonNew",
+      "patterns": [
+        "json (from|of) %objects%",
+        "parse %objects% as json",
+        "json (parsed|created) from %objects%"
+      ],
+      "returnType": "jsonelement",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonPretty",
+      "patterns": [
+        "%jsonelement% as pretty[ printed]",
+        "%jsonelement% as (pretty[ printed]|formatted) json",
+        "%jsonelement% as uncolo[u]red pretty[ printed]",
+        "%jsonelement% as unformatted pretty[ printed]",
+        "%jsonelement% as (compact|minified) json",
+        "%jsonelement% as compact json"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonRequest",
+      "patterns": [
+        "prepare %requestmethod% request on %string%",
+        "prepare [a] %requestmethod% request [to [url]] %string%",
+        "create [a] %requestmethod% request [for [url]] %string%"
+      ],
+      "returnType": "request",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonKeys",
+      "patterns": [
+        "[all] keys [%-string%] of %jsonelement%",
+        "[every|all] key[s] (at|in) [path] [%-string%] (of|in) %jsonelement%",
+        "keys (at|in) [path] [%-string%] (of|in) %jsonelement%"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
       "id": "ExprCommandSender",
       "patterns": [
         "[the] [command['s]] sender"
@@ -10483,6 +10839,27 @@
         "%number%(\\%| percent) of %numbers%"
       ],
       "returnType": "number"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonValues",
+      "patterns": [
+        "[json] :values [%-string%] of %jsonelement%",
+        "[json] values [of] %jsonelement%",
+        "[json] :value [%-string%] of %jsonelement%",
+        ":values at path [%-string%] in %jsonelement%",
+        "values at path [%-string%] in %jsonelement%",
+        "value at path [%-string%] in %jsonelement%",
+        ":values of path [%-string%] in %jsonelement%",
+        "values of path [%-string%] in %jsonelement%",
+        "value of path [%-string%] in %jsonelement%",
+        "path %string% of %jsonelement%",
+        "the path %string% in %jsonelement%",
+        "%jsonelement%'s path %string%",
+        "%jsonelement%'s value at path %string%"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptWeb"
     },
     {
       "kind": "expression",
@@ -12854,6 +13231,121 @@
     },
     {
       "kind": "expression",
+      "id": "NeoSkriptDbExprDatabase",
+      "patterns": [
+        "[the] data(base|[ ]source) [(of|at)] %string% [with [a] [max[imum]] [connection] life[ ]time of %-timespan%] [[(using|with)] [a] driver %-string%]"
+      ],
+      "returnType": "datasource",
+      "addon": "NeoSkriptDb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptDbExprLastError",
+      "patterns": [
+        "[the] [last] (sql|db|data(base|[ ]source)) error"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptDb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptDbExprUnsafe",
+      "patterns": [
+        "unsafe %string%"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptDb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptYamlExprYaml",
+      "patterns": [
+        "[skript-]y[a]ml (1¦value|2¦(node|path) list|3¦(node|path)[s with] key[s]|4¦list) %string% (of|in|from) %string% [nochecks:without string checks]"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptYamlExprListValue",
+      "patterns": [
+        "(index|value) %number% (of|in|from) [skript-]y[a]ml list %string% (of|in|from) %string% [nochecks:without string checks]"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptYamlExprComments",
+      "patterns": [
+        "[the] comment[s] (of|from) y[a]ml node[s] %strings% (of|in|from) %string% [(1¦with [an] extra line)]",
+        "[the] (comment[s] (at|on) [the] top of|header (of|from)) %string% [(1¦with [an] extra line)]"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptYamlExprAllNodes",
+      "patterns": [
+        "[all] [skript-]y[a]ml (node|path)[s] (of|in|from) %string%"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptYamlExprAllLoaded",
+      "patterns": [
+        "[(the|all [(of the|the)])] [currently] loaded y[a]ml [files] [from (director(y|ies) %-strings%|all directories)]",
+        "[(the|all [(of the|the)])] [currently] unloaded y[a]ml [files] from director(y|ies) %strings%",
+        "[(the|all [(of the|the)])] [currently] loaded y[a]ml directories"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptYaml"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptPlaceholdersExprPlaceholder",
+      "patterns": [
+        "[the] placeholder",
+        "[the] [placeholder] (1:prefix|2:identifier)"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptPlaceholders"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptPlaceholdersExprResult",
+      "patterns": [
+        "[the] [placeholder] result"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptPlaceholders"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptPlaceholdersExprRelationalPlayers",
+      "patterns": [
+        "[the] first player",
+        "[the] second player"
+      ],
+      "returnType": "player",
+      "addon": "NeoSkriptPlaceholders"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptPlaceholdersExprValue",
+      "patterns": [
+        "[the] [value[s] of [the]] [:relational] placeholder[s] [in] %strings% [(for|from|of) %-players/offlineplayers%]",
+        "[:relational] placeholder[s] %strings%'[s] value[s] [(for|from|of) %-players/offlineplayers%]",
+        "parse placeholder[s] %strings% [(for|as) %-players/offlineplayers%]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptPlaceholders"
+    },
+    {
+      "kind": "expression",
       "id": "ExprAmount",
       "patterns": [
         "[the] (amount|number:number|size:size)[s:s] of %objects%",
@@ -13198,6 +13690,126 @@
         "[(1¦sky|1¦sun|2¦block)[ ]]light[ ]level [(of|%direction%) %location%]"
       ],
       "returnType": "integer"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonLastResponse",
+      "patterns": [
+        "[the] [last] response of %requests%",
+        "%requests%'[s] [last] response"
+      ],
+      "returnType": "response",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonQueryParams",
+      "patterns": [
+        "[the] query param(s|meters) of %requests%",
+        "%requests%'[s] query param(s|meters)"
+      ],
+      "returnType": "jsonelement",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonFormatted",
+      "patterns": [
+        "[the] form[atted [json]] of %objects%",
+        "%objects%'[s] form[atted [json]]"
+      ],
+      "returnType": "jsonelement",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprSkJsonSize",
+      "patterns": [
+        "[the] json size of %jsonelements%",
+        "%jsonelements%'[s] json size"
+      ],
+      "returnType": "integer",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprBody",
+      "patterns": [
+        "[the] [response] bod(y|ies) of %httpresponses/requests/responses%",
+        "%httpresponses/requests/responses%'[s] [response] bod(y|ies)"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprStatusCode",
+      "patterns": [
+        "[the] [response] [status] code[s] of %httpresponses/responses%",
+        "%httpresponses/responses%'[s] [response] [status] code[s]"
+      ],
+      "returnType": "integer",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprHeaders",
+      "patterns": [
+        "[the] [response] header[s] of %httpresponses/requests/responses%",
+        "%httpresponses/requests/responses%'[s] [response] header[s]"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprStatus",
+      "patterns": [
+        "[the] [response] status[(es| line[s])] of %httpresponses/responses%",
+        "%httpresponses/responses%'[s] [response] status[(es| line[s])]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnHeaderKeys",
+      "patterns": [
+        "[the] [response] header key[s] of %httpresponses%",
+        "%httpresponses%'[s] [response] header key[s]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnHeaderValues",
+      "patterns": [
+        "[the] [response] header value[s] of %httpresponses%",
+        "%httpresponses%'[s] [response] header value[s]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnMessage",
+      "patterns": [
+        "[the] [response] [status] (message|reason)[s] of %httpresponses%",
+        "%httpresponses%'[s] [response] [status] (message|reason)[s]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptWebExprReqnHeader",
+      "patterns": [
+        "[the] %string% [response] header[ value][s] of %httpresponses%",
+        "%httpresponses%'[s] %string% [response] header[ value][s]"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptWeb"
     },
     {
       "kind": "expression",
@@ -17589,6 +18201,108 @@
       }
     },
     {
+      "id": "httpresponse",
+      "name": "http response",
+      "plural": "http responses",
+      "parser": {
+        "names": [
+          "http response",
+          "httpresponse"
+        ],
+        "pluralNames": [
+          "http responses",
+          "httpresponses"
+        ]
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "id": "request",
+      "name": "request",
+      "plural": "requests",
+      "parser": {
+        "names": [
+          "request"
+        ],
+        "pluralNames": [
+          "requests"
+        ]
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "id": "response",
+      "name": "response",
+      "plural": "responses",
+      "parser": {
+        "names": [
+          "response"
+        ],
+        "pluralNames": [
+          "responses"
+        ]
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "id": "requestmethod",
+      "name": "request method",
+      "plural": "request methods",
+      "literals": [
+        "delete",
+        "get",
+        "head",
+        "mock",
+        "patch",
+        "post",
+        "put"
+      ],
+      "parser": {
+        "names": [
+          "request method",
+          "requestmethod"
+        ],
+        "pluralNames": [
+          "request methods",
+          "requestmethods"
+        ],
+        "enumerable": true
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "id": "jsonelement",
+      "name": "json element",
+      "plural": "json elements",
+      "parser": {
+        "names": [
+          "json element",
+          "jsonelement"
+        ],
+        "pluralNames": [
+          "json elements",
+          "jsonelements"
+        ]
+      },
+      "addon": "NeoSkriptWeb"
+    },
+    {
+      "id": "datasource",
+      "name": "data source",
+      "plural": "data sources",
+      "parser": {
+        "names": [
+          "data source",
+          "datasource"
+        ],
+        "pluralNames": [
+          "data sources",
+          "datasources"
+        ]
+      },
+      "addon": "NeoSkriptDb"
+    },
+    {
       "id": "bannerpatterntype",
       "name": "banner pattern type",
       "plural": "banner pattern types",
@@ -18022,6 +18736,32 @@
       ],
       "returnType": "number",
       "returnsPlural": false
+    },
+    {
+      "name": "loadYaml",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "plural": false,
+          "optional": false
+        },
+        {
+          "name": "file",
+          "type": "string",
+          "plural": false,
+          "optional": false
+        },
+        {
+          "name": "isNonRelative",
+          "type": "boolean",
+          "plural": false,
+          "optional": true
+        }
+      ],
+      "returnType": "boolean",
+      "returnsPlural": false,
+      "addon": "NeoSkriptYaml"
     },
     {
       "name": "location",
@@ -24915,6 +25655,47 @@
       {
         "values": [
           "object",
+          "response"
+        ],
+        "plurals": [],
+        "defaults": []
+      },
+      {
+        "values": [
+          "audience",
+          "commandsender",
+          "offlineplayer",
+          "player",
+          "entity",
+          "location",
+          "entitytype",
+          "pluralentitytype",
+          "inventory",
+          "inventoryholder",
+          "countedentitytype",
+          "livingentity",
+          "block",
+          "display",
+          "metadataholder"
+        ],
+        "plurals": [],
+        "defaults": [
+          "audience",
+          "commandsender",
+          "offlineplayer",
+          "player",
+          "entity",
+          "location",
+          "inventory",
+          "inventoryholder",
+          "livingentity",
+          "block",
+          "display"
+        ]
+      },
+      {
+        "values": [
+          "object",
           "commandsender",
           "offlineplayer",
           "player",
@@ -24969,7 +25750,7 @@
         "defaults": []
       }
     ],
-    "commandScope": 178,
-    "functionScope": 179
+    "commandScope": 180,
+    "functionScope": 181
   }
 }

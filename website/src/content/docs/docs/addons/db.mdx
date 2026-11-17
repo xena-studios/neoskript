@@ -1,0 +1,192 @@
+---
+title: NeoSkript DB
+description: "SQL from scripts with skript-db's syntax: MySQL, MariaDB, PostgreSQL and SQLite, values sent as parameters, transactions, and queries that never hold up the server."
+sidebar:
+  label: NeoSkript DB
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+NeoSkript DB (`NeoSkriptDb`) runs SQL from scripts. It takes [skript-db](https://hangar.papermc.io/4w3/skript-db)'s syntax, so scripts written for skript-db run unchanged, and it's tested against skript-db 2.0.0 on Skript 2.17.0. It works with MySQL, MariaDB, PostgreSQL and SQLite.
+
+A query never holds up the server: the trigger pauses at the line, as it does at `wait`, while the query runs on NeoSkript DB's own threads, then carries on with the result.
+
+```skript nocheck
+options:
+	db: the database "mysql://localhost:3306/server?user=minecraft&password=secret"
+
+on join:
+	execute "SELECT coins FROM players WHERE uuid = %player's uuid%" in {@db} and store the result in {_row::*}
+	if {_row::coins::1} is set:
+		send "You have %{_row::coins::1}% coins." to player
+	else:
+		execute "INSERT INTO players (uuid, coins) VALUES (%player's uuid%, 0)" in {@db}
+```
+
+## Installing
+
+1. Put `NeoSkriptDb-<version>.jar` in `plugins/`, next to NeoSkript, at the same version.
+2. Remove skript-db's jar if it's there. It needs Skript, so it can't load next to NeoSkript anyway, and NeoSkript DB says so in the console when it finds it.
+3. Restart the server. `plugins/NeoSkriptDb/config.yml` is made on the first start.
+
+It needs nothing else: the drivers for MySQL and SQLite come with Paper and Folia, and NeoSkript DB brings MariaDB's and PostgreSQL's.
+
+## Databases
+
+`the database "..."` is a database from its JDBC URL, with or without `jdbc:` in front. The same URL is the same database, wherever a script names it, so a script can write it in `options:` or set a variable to it.
+
+| Database | URL |
+|---|---|
+| MySQL | `mysql://localhost:3306/server?user=minecraft&password=secret` |
+| MariaDB | `mariadb://localhost:3306/server?user=minecraft&password=secret` |
+| PostgreSQL | `postgresql://localhost:5432/server?user=minecraft&password=secret` |
+| SQLite | `sqlite:plugins/MyScripts/data.db` (relative to the server's folder) |
+
+```
+[the] data(base|[ ]source) [(of|at)] %text% [with [a] [max[imum]] [connection] life[ ]time of %timespan%] [[(using|with)] [a] driver %text%]
+```
+
+Naming a database connects to nothing: the first query opens a pool of connections, at most `pool-size` of them. A database no query has used for `idle-close` (10 minutes) closes its connections, and opens them again when it's next used.
+
+The lifetime is how long a connection is kept before it's replaced; keep it under the database's own limit (MySQL's `wait_timeout`). The driver is a JDBC driver's class, for a URL whose driver isn't picked by itself. Both are taken the first time a URL is named, before its pool opens.
+
+When a script shows a database (`send "%{@db}%"`), passwords in its URL are `***`. A database can be stored in a variable, and is saved with its URL, as skript-db saves it.
+
+## Running SQL
+
+```
+[quickly|synchronously] execute %text% (in|on) %datasource% [with [batch] arg[ument][s] %objects%] [and store [the] [generated keys] [(output|result)[s]] (to|in) [the] [var[iable]] %objects%]
+```
+
+### Values are parameters
+
+Each expression in the query's text is sent to the database as a parameter, not put into the SQL, so a value can never change what the query does: a player named `'; DROP TABLE players; --` is just a name. Don't put quotes around them; the console warns if you do.
+
+```skript nocheck
+execute "SELECT * FROM homes WHERE owner = %player's uuid% AND name = %{_home}%" in {@db} and store the result in {_homes::*}
+```
+
+A list is a parameter for each value, for `IN`: `WHERE name IN (%{_names::*}%)` sends `WHERE name IN (?, ?, ?)`. An expression with no value is `NULL`.
+
+The query has to be written as text in quotes. For what can't be a parameter, like a table's name, `unsafe` puts the text in as it is. Never use it for anything a player typed.
+
+```skript nocheck
+execute "SELECT COUNT(*) AS total FROM %unsafe {_table}%" in {@db} and store the result in {_count::*}
+execute unsafe {_query} in {@db}
+```
+
+With `with arguments`, the values go to the query's question marks, in order, and expressions in the text are put in as text:
+
+```skript nocheck
+execute "INSERT INTO scores (name, score) VALUES (?, ?)" in {@db} with arguments "Steve" and 100
+```
+
+With `with batch arguments` and a list of lists, the query runs once for each list, in one round trip and one transaction:
+
+```skript nocheck
+set {_rows::1::*} to "Steve" and 100
+set {_rows::2::*} to "Alex" and 250
+execute "INSERT INTO scores (name, score) VALUES (?, ?)" in {@db} with batch arguments {_rows::*} and store the result in {_added}
+```
+
+### Results
+
+In a list variable, the rows are stored by column and row: each column's name at `{_rows::<column>}`, and its value in each row at `{_rows::<column>::<row>}`, from 1. Column names are lower case; the value at `{_rows::<column>}` is the name as the database gave it.
+
+```skript nocheck
+execute "SELECT name, score FROM scores ORDER BY score DESC LIMIT 3" in {@db} and store the result in {_top::*}
+loop {_top::name::*}:
+	send "%loop-index%. %loop-value%: %{_top::score::%loop-index%}%" to player
+```
+
+The list is emptied first. A query with no rows leaves only the columns' names. A `NULL` isn't set. Numbers are numbers, dates are dates, and text, times of day and anything else are text.
+
+In a single variable, a query stores how many rows it found, and a change (`INSERT`, `UPDATE`, `DELETE`) how many rows it changed. With `generated keys`, an insert stores the key the database made:
+
+```skript nocheck
+execute "INSERT INTO homes (owner) VALUES (%player's uuid%)" in {@db} and store the generated keys in {_id}
+```
+
+A list gets at most `max-cells` values, rows times columns (1,000,000): a result with more fails, with `the last sql error` saying so, rather than running the server out of memory. Ask for fewer with `LIMIT`. A count keeps no rows in memory, though the database still sends them.
+
+### Errors
+
+A statement that fails doesn't stop the trigger, and its variable keeps its value. `the last sql error` says what went wrong, or is nothing if the last statement worked:
+
+```
+[the] [last] (sql|db|data(base|[ ]source)) error
+```
+
+```skript nocheck
+execute "INSERT INTO players (uuid) VALUES (%player's uuid%)" in {@db}
+if the last sql error is set:
+	send "Couldn't save you: %the last sql error%" to console
+```
+
+It's the error of this run's own last statement (each trigger and function call is its own run); one that hasn't run a statement sees the last error of any. A database that's down, a URL that's wrong and a query that takes too long are errors too. Passwords are never in them.
+
+A database that isn't set (`execute "..." in {nothing}`) is a runtime error on the line, as in skript-db.
+
+## Transactions
+
+```
+[(sql|database)] transaction (on|in) %datasource%:
+```
+
+Every statement in the section on that database runs in one transaction, committed at the end of the section. If one fails, the whole transaction is rolled back, the rest of the section is skipped, and `the last sql error` says why. `exit section` ends it as its end does, committing, as in skript-db.
+
+```skript nocheck
+transaction on {@db}:
+	execute "UPDATE accounts SET balance = balance - %{_amount}% WHERE id = %{_from}%" in {@db}
+	execute "UPDATE accounts SET balance = balance + %{_amount}% WHERE id = %{_to}%" in {@db}
+if the last sql error is set:
+	send "The transfer failed: %the last sql error%" to player
+```
+
+Leaving the section another way (`stop`, `return`, `exit` or `continue` past it, an error) rolls the transaction back at once, and gives its connection back. A trigger that waits inside the section (`wait 1 minute`) keeps the transaction open until it carries on; if it stays open longer than `transaction-timeout` (30 seconds), the console says so, once.
+
+## Threads and waiting
+
+A statement runs on one of NeoSkript DB's threads, and the trigger waits for it as it waits at `wait`. Then it carries on on its own thread: the main thread on Paper; on Folia, the thread of what started the trigger, so a player's trigger carries on on the player's region and can touch the player. Local variables and loops are kept. The line is a delay for Skript's rules, so after it the event has passed, as after `wait`.
+
+- **`quickly`** and **`synchronously`** are accepted, so scripts written for any version of skript-db load. They change nothing: the trigger always carries on on its own thread, as soon as the result is there.
+- **In an async event**, such as `on connect`, the statement runs where the trigger is and the trigger waits for it, as in skript-db, so the event's outcome (kicking the player, say) can depend on it.
+- **How long:** a statement may run for `query-timeout` (30 seconds) before it's stopped, and may wait `connection-timeout` (30 seconds) for a connection. A trigger waits at most that long plus 5 seconds; with no query timeout, 10 minutes.
+- **Reloading:** a trigger whose script is reloaded while it waits carries on with its old code, as after `wait`.
+- **Stopping the server, `/reload`, a plugin manager:** NeoSkript DB disables before NeoSkript, so it keeps its connections until NeoSkript has run its `on unload` triggers: their statements still run, and get a few seconds to finish. Then statements still running are cancelled, open transactions are rolled back and the connections close, without holding up the server however a statement behaves. Disabled on its own, with NeoSkript still running, it closes its connections 30 seconds later.
+
+## config.yml
+
+skript-db's settings, with the same names, and a few of NeoSkript DB's own. A value that isn't valid falls back to its default on its own, and the console names it. Changes take effect after a restart.
+
+| Setting | Default | |
+|---|---|---|
+| `pool-size` | 10 | The most connections each database keeps open |
+| `thread-pool-size` | 0 | Threads that run statements; 0 is the number of processors plus 2 |
+| `max-connection-lifetime` | 1800000 | How long a connection is kept, in milliseconds |
+| `connection-timeout` | 30000 | How long a statement waits for a connection, in milliseconds |
+| `query-timeout` | 30 | How long a statement may run, in seconds; 0 for no limit (skript-db's default) |
+| `transaction-timeout` | 30 | Seconds a transaction may stay open before the console says so (skript-db rolls back an idle one) |
+| `sql-driver-class-name` | `default` | A JDBC driver for every database, or `default` to pick it from the URL |
+| `max-cells` | 1000000 | NeoSkript DB's own: the most values a list gets, rows times columns; 0 for no limit |
+| `idle-close` | 600 | NeoSkript DB's own: seconds a database may go unused before its connections close; 0 for never |
+
+## Differences from skript-db
+
+NeoSkript DB is tested against skript-db 2.0.0, the version that runs on Paper 26.x: the test harness runs the same script on Skript 2.17.0 with skript-db and on NeoSkript with NeoSkript DB, against an SQLite file, and compares what they print, their warnings and errors as the script loads, and the tables after. They match. Where they differ on purpose:
+
+- **Threads:** with `quickly`, skript-db carries on on its own thread, off the server's, where touching the world isn't safe; on Folia, it carries every trigger on on the global thread, even a player's. NeoSkript DB always carries on on the trigger's own thread.
+- **Time limits:** skript-db's statements have no time limit by default, and SQLite's driver ignores one anyway. NeoSkript DB stops any statement at `query-timeout`, 30 seconds unless set.
+- **Large results:** skript-db reads every row into memory. NeoSkript DB stores at most `max-cells` values in a list, skips the rows where nothing stores them, and keeps none for a count (which still steps through them).
+- **Whose transaction:** skript-db keeps a transaction and `the last sql error` by event, and every trigger of an event shares it: a second script's statements join the first's open transaction, are rolled back with its failure while that script's `last sql error` stays empty, or a second transaction on the same database is refused as "already open". NeoSkript DB keeps them by run: each trigger's run, and each function call, has its own.
+- **Transactions:** skript-db rolls back a transaction idle for `transaction-timeout`, even under a trigger still in its section, after which the trigger's remaining statements commit one by one with no error. NeoSkript DB keeps a transaction open while its trigger waits inside it, and rolls one back the moment its trigger leaves the section another way. One rolled back from outside (as NeoSkript DB stops) fails the trigger's later statements, with `the last sql error` saying so.
+- **Connections:** skript-db keeps each pool, with up to `pool-size` idle connections, open until the server stops. NeoSkript DB keeps no idle connections for long, and closes a database's pool once nothing has used it for `idle-close`, so a URL a script stops using (after a reload, say) holds nothing.
+- **Passwords:** skript-db hides them where it shows a URL. NeoSkript DB also takes them out of errors, and gives them to the pool apart from the URL, so the pool's debug logging, which prints the URL, never shows one.
+- **config.yml:** skript-db replaces the whole file's settings with the defaults if one value is wrong. NeoSkript DB replaces only that value.
+- **Too few or many arguments:** for `with arguments` with a different number of values than question marks, skript-db gives a runtime warning on the line; NeoSkript DB says the same in the console, without the line.
+- **Older forks:** `synchronously`, from skript-db before 2.0, is accepted. The Limework fork's `on complete of sql query` event and `sql query` expression aren't there, as they're not in 2.0.
+- **Saved databases:** a database in a saved variable is saved with skript-db's type and fields. Loading a `variables.csv` that skript-db wrote isn't tested yet.
+
+<Aside type="note">
+The harness compares NeoSkript DB with skript-db on SQLite. MySQL and MariaDB are covered by the drivers' own use and by the unit tests' handling of a database that's down, not yet by a comparison against a running server.
+</Aside>

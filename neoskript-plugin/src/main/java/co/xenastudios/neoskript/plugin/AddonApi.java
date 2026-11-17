@@ -87,6 +87,44 @@ final class AddonApi implements NeoSkript {
         task.run();
     }
 
+    /** What runs once NeoSkript has stopped running scripts, and whether it has. */
+    private final List<Runnable> stopping = new ArrayList<>();
+    private boolean stopped;
+
+    @Override
+    public Runnable whenStopped(Runnable task) {
+        java.util.Objects.requireNonNull(task, "task");
+        synchronized (this) {
+            if (!stopped) {
+                stopping.add(task);
+                return () -> {
+                    synchronized (this) {
+                        stopping.remove(task);
+                    }
+                };
+            }
+        }
+        task.run();
+        return () -> {};
+    }
+
+    /** Marks NeoSkript stopped, after its unload triggers and their pauses, and runs what waited for that. */
+    void stopped() {
+        List<Runnable> tasks;
+        synchronized (this) {
+            stopped = true;
+            tasks = List.copyOf(stopping);
+            stopping.clear();
+        }
+        for (Runnable task : tasks) {
+            try {
+                task.run();
+            } catch (RuntimeException | LinkageError e) {
+                logger.error("A task waiting for NeoSkript to stop failed", e);
+            }
+        }
+    }
+
     /** Marks NeoSkript ready, once scripts have loaded, and runs what waited for it. */
     void ready() {
         List<Runnable> tasks;

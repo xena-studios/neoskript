@@ -283,6 +283,29 @@ public final class Values {
         return values.toArray();
     }
 
+    /**
+     * A text's template ({@link co.xenastudios.neoskript.api.element.TextTemplate}) with its holes' values: those
+     * the trigger worked out, in order, for a {@link co.xenastudios.neoskript.api.element.TemplateAware} element.
+     */
+    public static co.xenastudios.neoskript.api.element.TextTemplate template(
+            co.xenastudios.neoskript.api.element.TextTemplate shape, Object[] values) {
+        List<co.xenastudios.neoskript.api.element.TextTemplate.Hole> holes = new java.util.ArrayList<>(values.length);
+        for (int i = 0; i < values.length; i++) {
+            co.xenastudios.neoskript.api.element.TextTemplate.Hole hole = shape.holes().get(i);
+            List<Object> each = new java.util.ArrayList<>();
+            List<String> texts = new java.util.ArrayList<>();
+            for (Object value : array(values[i])) {
+                if (value != null) {
+                    each.add(value);
+                    texts.add(text(value));
+                }
+            }
+            holes.add(new co.xenastudios.neoskript.api.element.TextTemplate.Hole(hole.element(), hole.written(), each,
+                    texts));
+        }
+        return new co.xenastudios.neoskript.api.element.TextTemplate(shape.pieces(), holes);
+    }
+
     /** How a value reads in text, as when embedded in a string with {@code %...%}. */
     public static String text(Object value) {
         if (value == null || (value instanceof Object[] empty && empty.length == 0)) {

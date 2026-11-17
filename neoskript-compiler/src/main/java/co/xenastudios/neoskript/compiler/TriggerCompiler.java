@@ -164,7 +164,9 @@ final class TriggerCompiler {
         SECTION,
         /** Code whose {@code return} gives values to the section, not the function: Skript's returnable sections. */
         RETURNABLE,
-        RETURNABLE_PLURAL
+        RETURNABLE_PLURAL,
+        /** A pausing section's code, run once ({@code transaction on {db}:}): left by {@code exit section}. */
+        PAUSING
     }
 
     /**
@@ -711,6 +713,13 @@ final class TriggerCompiler {
             method.visitTypeInsn(CHECKCAST, OBJECTS);
             method.visitVarInsn(ASTORE, ARGUMENTS_SLOT);
         }
+        // A run of its own: every trigger run and function call has its own context, the same object across its
+        // waits and pauses, even where the caller shares one (an event's triggers, functions called from nowhere).
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        // A function's has no event, only its caller's owner.
+        method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(co.xenastudios.neoskript.runtime.SimpleTriggerContext.class),
+                trigger ? "run" : "call", "(" + CONTEXT + ")" + CONTEXT, false);
+        method.visitVarInsn(ASTORE, CONTEXT_SLOT);
         method.visitTypeInsn(NEW, STORE);
         method.visitInsn(DUP);
         method.visitMethodInsn(INVOKESPECIAL, STORE, "<init>", "()V", false);
@@ -765,6 +774,11 @@ final class TriggerCompiler {
         // Errors from a function called here already say where they happened, so they pass through as is.
         method.visitLabel(handler);
         method.visitVarInsn(ASTORE, EXCEPTION_SLOT);
+        if (usesPausingSections) {
+            // The trigger stopped with an error inside them: the pausing sections it was in are told.
+            method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+            method.visitMethodInsn(INVOKESTATIC, PAUSING_SECTIONS, "abandonAll", "(" + CONTEXT + ")V", false);
+        }
         String exception = Type.getInternalName(ScriptRuntimeException.class);
         method.visitVarInsn(ALOAD, EXCEPTION_SLOT);
         method.visitLdcInsn(scriptName);
@@ -1046,7 +1060,7 @@ final class TriggerCompiler {
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "ticks", "(" + OBJECT_DESC + ")J", false);
         method.visitMethodInsn(INVOKESTATIC, Type.getInternalName(Waits.class), "schedule",
                 "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + "J)V", false);
-        exitTrigger();
+        suspendTrigger();
         method.visitLabel(wait.resume());
     }
 
@@ -1071,7 +1085,8 @@ final class TriggerCompiler {
         method.visitJumpInsn(GOTO, after);
         method.visitLabel(start.resume());
         statements(section.body());
-        exitTrigger();
+        // The delayed code's own end: the code after the section, which already ran, goes on with any section.
+        suspendTrigger();
         method.visitLabel(after);
     }
 
@@ -1086,8 +1101,20 @@ final class TriggerCompiler {
         }
     }
 
-    /** Ends the trigger or function: {@code return} (a function returns nothing). */
+    /**
+     * Ends the trigger or function for good: {@code return} (a function returns nothing). The pausing sections it's
+     * inside are told they were left ({@link co.xenastudios.neoskript.runtime.PausingSections}).
+     */
     private void exitTrigger() {
+        abandonPausingSections(null);
+        suspendTrigger();
+    }
+
+    /**
+     * Returns from the trigger's method because it waits: it carries on later from where it stopped, so nothing it's
+     * inside has been left.
+     */
+    private void suspendTrigger() {
         if (function != null) {
             method.visitInsn(ACONST_NULL);
             method.visitInsn(ARETURN);
@@ -1510,6 +1537,19 @@ final class TriggerCompiler {
         if (!(library.binding(syntax.syntax()) instanceof ElementFactory<?> factory)) {
             throw unsupported(syntax.syntax().id());
         }
+        Object element = factory.create(info(syntax));
+        if (!type.isInstance(element)) {
+            throw unsupported(syntax.syntax().id());
+        }
+        return pause(syntax, type, element, true);
+    }
+
+    /**
+     * {@link #pause(ParsedSyntax, Class)} for {@code element}, made for {@code syntax}; without {@code withArguments},
+     * it's started with none.
+     */
+    private int pause(ParsedSyntax syntax, Class<?> type, Object element, boolean withArguments)
+            throws CompileException {
         // It carries on on the trigger's own thread, so it doesn't start on the global one.
         leaveGlobal();
         int frameSlot = nextSlot++;
@@ -1518,15 +1558,25 @@ final class TriggerCompiler {
         WaitPoint wait = saveFrame();
         method.visitInsn(DUP);
         method.visitVarInsn(ASTORE, frameSlot);
-        Object element = factory.create(info(syntax));
-        if (!type.isInstance(element)) {
-            throw unsupported(syntax.syntax().id());
-        }
         co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site = site(syntax, element.getClass());
         // Its start throwing is a failed stage, as a stage completing exceptionally is.
         constant(co.xenastudios.neoskript.runtime.Pauses.guard(regional(element, type, syntax, site), type), type);
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
-        arguments(syntax);
+        if (withArguments && element instanceof KeyAware aware) {
+            // List variables with their indices, or every value under them.
+            boolean outerRecursive = recursiveListArguments;
+            recursiveListArguments = aware.recursiveKeys();
+            try {
+                arguments(syntax, true, aware.implicitKeys() || aware.recursiveKeys());
+            } finally {
+                recursiveListArguments = outerRecursive;
+            }
+        } else if (withArguments) {
+            arguments(syntax);
+        } else {
+            pushInt(0);
+            method.visitTypeInsn(ANEWARRAY, OBJECT);
+        }
         method.visitMethodInsn(INVOKEINTERFACE, Type.getInternalName(type), "start",
                 "(" + CONTEXT + OBJECTS + ")Ljava/util/concurrent/CompletionStage;", true);
         constant(new co.xenastudios.neoskript.runtime.Pauses.Point(site, library.timeoutMillis(baseId(syntax))),
@@ -1536,7 +1586,7 @@ final class TriggerCompiler {
                 + Type.getDescriptor(co.xenastudios.neoskript.runtime.Pauses.Point.class) + ")Z", false);
         Label now = new Label();
         method.visitJumpInsn(IFEQ, now);
-        exitTrigger();
+        suspendTrigger();
         method.visitLabel(wait.resume());
         method.visitVarInsn(ALOAD, ARGUMENTS_SLOT);
         method.visitTypeInsn(CHECKCAST, Type.getInternalName(Frame.class));
@@ -1574,6 +1624,7 @@ final class TriggerCompiler {
         }
         int frame = pause(effect, PausingEffect.class);
         if (stored == null) {
+            leaveIfAsked(frame);
             return;
         }
         Label skip = new Label();
@@ -1594,6 +1645,108 @@ final class TriggerCompiler {
             });
         }
         method.visitLabel(skip);
+        leaveIfAsked(frame);
+    }
+
+    /** A pausing section whose code is being compiled, and its element. */
+    private record OpenSection(Block block, co.xenastudios.neoskript.api.element.PausingSection element) {}
+
+    /** The pausing sections whose code is being compiled, innermost first. */
+    private final java.util.Deque<OpenSection> pausingSections = new java.util.ArrayDeque<>();
+
+    /** Whether the trigger or function has a pausing section, so its error handler tells them. */
+    private boolean usesPausingSections;
+
+    private static final String PAUSING_SECTIONS =
+            Type.getInternalName(co.xenastudios.neoskript.runtime.PausingSections.class);
+
+    /**
+     * Before a jump to {@code target} (or out of the trigger, with {@code null}): tells the pausing sections it
+     * leaves without reaching their end, innermost first.
+     */
+    private void abandonPausingSections(Block target) {
+        if (pausingSections.isEmpty()) {
+            return;
+        }
+        for (Block block : blocks) { // innermost first
+            if (block == target) {
+                return;
+            }
+            for (OpenSection open : pausingSections) {
+                if (open.block() == block) {
+                    constant(open.element(), co.xenastudios.neoskript.api.element.PausingSection.class);
+                    method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+                    method.visitMethodInsn(INVOKESTATIC, PAUSING_SECTIONS, "abandon", "("
+                            + Type.getDescriptor(co.xenastudios.neoskript.api.element.PausingSection.class) + CONTEXT
+                            + ")V", false);
+                }
+            }
+        }
+    }
+
+    /**
+     * After a pausing effect in a pausing section: leaves the section if its stage said to
+     * ({@link co.xenastudios.neoskript.api.element.PausingSection#LEAVE}), unless that would leave a {@code run on}
+     * section.
+     */
+    private void leaveIfAsked(int frame) {
+        Block section = pausingSections.isEmpty() ? null : pausingSections.peek().block();
+        if (section == null) {
+            return;
+        }
+        // A 'run on' inside the section (innermost first) would be left without going back to the trigger's thread.
+        for (RunOn runOn : runOns) {
+            if (!runOn.outside().contains(section)) {
+                break;
+            }
+            return;
+        }
+        Label stay = new Label();
+        method.visitVarInsn(ALOAD, frame);
+        method.visitMethodInsn(INVOKESTATIC, PAUSES, "leaves", "(" + FRAME_DESC + ")Z", false);
+        method.visitJumpInsn(IFEQ, stay);
+        method.visitJumpInsn(GOTO, section.end());
+        method.visitLabel(stay);
+    }
+
+    /**
+     * A pausing section ({@code transaction on {db}:}): waits for its start, runs its code once unless that failed
+     * or gave {@code false}, then waits for its end.
+     */
+    private void pausingSection(Statement.Section section) throws CompileException {
+        ParsedSyntax header = section.header();
+        if (!(library.binding(header.syntax()) instanceof ElementFactory<?> factory)
+                || !(factory.create(info(header)) instanceof co.xenastudios.neoskript.api.element.PausingSection element)) {
+            throw unsupported(header.syntax().id());
+        }
+        // Each pause is a pausing effect's, so it's guarded, timed and checked for regions as one.
+        PausingEffect start = element::start;
+        int frame = pause(header, PausingEffect.class, start, true);
+        Label end = new Label();
+        method.visitVarInsn(ALOAD, frame);
+        method.visitMethodInsn(INVOKESTATIC, PAUSES, "proceeds", "(" + FRAME_DESC + ")Z", false);
+        method.visitJumpInsn(IFEQ, end);
+        usesPausingSections = true;
+        String sectionType = Type.getDescriptor(co.xenastudios.neoskript.api.element.PausingSection.class);
+        // Inside it now: a way out other than its end tells it.
+        constant(element, co.xenastudios.neoskript.api.element.PausingSection.class);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        method.visitMethodInsn(INVOKESTATIC, PAUSING_SECTIONS, "enter", "(" + sectionType + CONTEXT + ")V", false);
+        Block code = new Block(BlockKind.PAUSING, end, null, -1, -1, -1);
+        blocks.push(code);
+        pausingSections.push(new OpenSection(code, element));
+        try {
+            statements(section.body());
+        } finally {
+            pausingSections.pop();
+            blocks.pop();
+        }
+        method.visitLabel(end);
+        constant(element, co.xenastudios.neoskript.api.element.PausingSection.class);
+        method.visitVarInsn(ALOAD, CONTEXT_SLOT);
+        method.visitMethodInsn(INVOKESTATIC, PAUSING_SECTIONS, "leave", "(" + sectionType + CONTEXT + ")V", false);
+        PausingEffect finish = (context, arguments) -> element.end(context);
+        pause(header, PausingEffect.class, finish, false);
     }
 
     private void statementHere(Statement statement) throws CompileException {
@@ -1655,6 +1808,8 @@ final class TriggerCompiler {
                 block(BlockKind.CONDITIONAL, end, section.body());
                 method.visitLabel(end);
             }
+            case Statement.Section section when section.header() != null
+                    && library.isPausingSection(section.header().syntax().id()) -> pausingSection(section);
             case Statement.Section section when library.sectionType(section.header() == null ? null
                     : section.header().syntax().id()) != null -> librarySection(section);
             case Statement.Section section when sectionExpression(section) != null -> expressionSection(section);
@@ -2224,7 +2379,8 @@ final class TriggerCompiler {
         method.visitJumpInsn(GOTO, after);
         method.visitLabel(start.resume());
         statements(section.body());
-        exitTrigger();
+        // The delayed code's own end: the code after the section, which already ran, goes on with any section.
+        suspendTrigger();
         method.visitLabel(after);
         lineOf(section, section.line().key());
         precomputed.put(made, valuesSlot);
@@ -2287,6 +2443,7 @@ final class TriggerCompiler {
         }
         convert(plural);
         method.visitMethodInsn(INVOKESTATIC, VALUES, "returned", "(" + OBJECT_DESC + ")V", false);
+        abandonPausingSections(handler);
         method.visitJumpInsn(GOTO, handler.end());
     }
 
@@ -2610,6 +2767,7 @@ final class TriggerCompiler {
                 } finally {
                     literalTypes = outerLiteralTypes;
                 }
+                abandonPausingSections(null);
                 method.visitInsn(ARETURN);
             }
             case CoreSyntax.CHANGE -> change(effect);
@@ -2797,6 +2955,7 @@ final class TriggerCompiler {
      * first.
      */
     private void leaving(Block target) throws CompileException {
+        abandonPausingSections(target);
         boolean left = false;
         int thread = -1;
         for (RunOn runOn : runOns) {
@@ -2871,7 +3030,7 @@ final class TriggerCompiler {
                 "(" + Type.getDescriptor(Resumable.class) + CONTEXT + FRAME_DESC + OBJECT_DESC + ")Z", false);
         // Not scheduled: this thread owns it already, so the trigger carries straight on.
         method.visitJumpInsn(IFEQ, wait.resume());
-        exitTrigger();
+        suspendTrigger();
         method.visitLabel(wait.resume());
     }
 
@@ -2881,7 +3040,7 @@ final class TriggerCompiler {
 
     private Block innermostLoop() throws CompileException {
         for (Block block : blocks) {
-            if (block.kind() != BlockKind.CONDITIONAL) {
+            if (block.kind() != BlockKind.CONDITIONAL && block.kind() != BlockKind.PAUSING) {
                 return block;
             }
         }
@@ -2901,7 +3060,7 @@ final class TriggerCompiler {
     private List<Block> loops() {
         List<Block> loops = new ArrayList<>();
         blocks.descendingIterator().forEachRemaining(block -> {
-            if (block.kind() != BlockKind.CONDITIONAL) {
+            if (block.kind() != BlockKind.CONDITIONAL && block.kind() != BlockKind.PAUSING) {
                 loops.add(block);
             }
         });
@@ -4200,10 +4359,73 @@ final class TriggerCompiler {
                 break;
             }
         }
+        List<co.xenastudios.neoskript.api.element.TextTemplate> texts = new ArrayList<>(values.size());
+        List<String> elements = new ArrayList<>(values.size());
+        for (Object value : values) {
+            texts.add(value instanceof Expr.Text text ? templateShape(text) : null);
+            elements.add(value instanceof Expr.Syntax inner ? baseId(inner.syntax()) : null);
+        }
         return new ElementInfo(syntax.pattern(), syntax.match().mark(), syntax.match().tags(), or, lists, types,
                 argumentTypes, single, literals, eventLabel != null ? eventLabel : "function",
                 eventClasses == null ? List.of() : eventClasses,
-                sectionType, defaults, syntax == timedSyntax ? timedTime : 0, textOf(syntax));
+                sectionType, defaults, syntax == timedSyntax ? timedTime : 0, textOf(syntax), texts, elements);
+    }
+
+    /**
+     * A text in quotes as a template: the text around its expressions, and each expression's element and how it's
+     * written, without values. {@code null} if the text isn't on this line's source (a default).
+     */
+    private co.xenastudios.neoskript.api.element.TextTemplate templateShape(Expr.Text text) {
+        if (text.end() > source.length() || text.start() < 0) {
+            return null;
+        }
+        List<String> pieces = new ArrayList<>();
+        List<co.xenastudios.neoskript.api.element.TextTemplate.Hole> holes = new ArrayList<>();
+        int pos = text.start() + 1;
+        for (Expr part : text.embedded()) {
+            pieces.add(unescape(source.substring(pos, part.start() - 1)));
+            holes.add(new co.xenastudios.neoskript.api.element.TextTemplate.Hole(
+                    part instanceof Expr.Syntax inner ? baseId(inner.syntax()) : null,
+                    source.substring(part.start(), part.end()).strip(), List.of(), List.of()));
+            pos = part.end() + 1;
+        }
+        pieces.add(unescape(source.substring(pos, text.end() - 1)));
+        return new co.xenastudios.neoskript.api.element.TextTemplate(pieces, holes);
+    }
+
+    /**
+     * Whether argument {@code index} of {@code syntax} goes to its element as a template
+     * ({@link co.xenastudios.neoskript.api.element.TemplateAware}).
+     */
+    private boolean templateArgument(ParsedSyntax syntax, int index) {
+        return !(library.binding(syntax.syntax()) instanceof Library.Core)
+                && library.binding(syntax.syntax()) instanceof ElementFactory<?> factory
+                && factory.create(info(syntax)) instanceof co.xenastudios.neoskript.api.element.TemplateAware aware
+                && aware.template(index);
+    }
+
+    /** Pushes text {@code text} as a template, with its expressions' values ({@link Values#template}). */
+    private void template(Expr.Text text) throws CompileException {
+        co.xenastudios.neoskript.api.element.TextTemplate shape = templateShape(text);
+        constant(shape, co.xenastudios.neoskript.api.element.TextTemplate.class);
+        pushInt(text.embedded().size());
+        method.visitTypeInsn(ANEWARRAY, OBJECT);
+        for (int i = 0; i < text.embedded().size(); i++) {
+            Expr part = text.embedded().get(i);
+            method.visitInsn(DUP);
+            pushInt(i);
+            String outerTextPart = textPart;
+            textPart = source.substring(part.start(), part.end());
+            try {
+                expression(part);
+            } finally {
+                textPart = outerTextPart;
+            }
+            method.visitInsn(AASTORE);
+        }
+        method.visitMethodInsn(INVOKESTATIC, VALUES, "template", "("
+                + Type.getDescriptor(co.xenastudios.neoskript.api.element.TextTemplate.class) + "[" + OBJECT_DESC + ")"
+                + Type.getDescriptor(co.xenastudios.neoskript.api.element.TextTemplate.class), false);
     }
 
     /** What a change's errors quote instead of its target: the time state around it ({@code past level of player}). */
@@ -4557,6 +4779,12 @@ final class TriggerCompiler {
             }
             if (keyed && isKeyed(expr, implicit)) {
                 keyed(expr, implicit);
+                method.visitInsn(AASTORE);
+                continue;
+            }
+            if (expr instanceof Expr.Text text && templateShape(text) != null && templateArgument(syntax, i)) {
+                // The element wants the text's expressions apart: skript-db binds each as a query parameter.
+                template(text);
                 method.visitInsn(AASTORE);
                 continue;
             }

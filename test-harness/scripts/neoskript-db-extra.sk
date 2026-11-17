@@ -1,0 +1,31 @@
+# Harness check: NeoSkriptDb only. The older forks' 'synchronously', a console command's trigger (on Folia, the
+# global thread's), and a slow statement whose script is reloaded while it runs. Each line prints "[dbextra] ...".
+options:
+	db: the database "sqlite:plugins/dbtest/test.db"
+
+command /dbextra <text>:
+	trigger:
+		if arg-1 is "sync":
+			synchronously execute "SELECT COUNT(*) AS n FROM players" in {@db} and store the result in {_r::*}
+			send "[dbextra] sync %{_r::n::1}%" to console
+		else if arg-1 is "slow":
+			send "[dbextra] slow start" to console
+			execute "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 3000000) SELECT COUNT(*) AS n FROM c" in {@db} and store the result in {_r::*}
+			send "[dbextra] slow done %{_r::n::1}%" to console
+		else if arg-1 is "tx":
+			# Run by a player: on Folia, on the player's region thread.
+			transaction on {@db}:
+				execute "INSERT INTO log (what) VALUES (%player's name%)" in {@db}
+			send "[dbextra] tx by %player% %last sql error%" to console
+		else if arg-1 is "shown":
+			set {_db} to the database "mysql://localhost:1/x?user=admin&password=hunter22"
+			send "[dbextra] shown %{_db}%" to console
+
+# Two scripts on one event, each with a transaction (the other is neoskript-db-pair.sk): this one fails, which must
+# roll back only its own, and say so only to itself.
+on command "dbpair":
+	transaction on {@db}:
+		execute "INSERT INTO log (what) VALUES ('pair a')" in {@db}
+		execute "NOT SQL" in {@db}
+	if last sql error is set:
+		send "[dbextra] pair a failed" to console

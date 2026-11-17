@@ -32,7 +32,8 @@ final class Addons {
 
     /** The registrar methods whose first argument is the id of an element they register. */
     private static final Set<String> REGISTERS_ELEMENT = Set.of("effect", "condition", "section", "expression",
-            "typedExpression", "property", "propertyCondition", "event", "pausingEffect", "pausingExpression");
+            "typedExpression", "property", "propertyCondition", "event", "pausingEffect", "pausingExpression",
+            "pausingSection");
 
     private final Logger logger;
     private final List<Addon> addons = new ArrayList<>();

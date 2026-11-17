@@ -118,6 +118,22 @@ public interface NeoSkript {
     void whenReady(Runnable task);
 
     /**
+     * Runs {@code task} once NeoSkript has stopped running scripts as it disables: after its {@code on unload}
+     * triggers ran and what they paused for finished or was given up on, before it saves variables. On the thread
+     * disabling it; now, on this thread, if it has stopped already. An addon disables before NeoSkript (it depends on
+     * it), so what scripts may still use until then, like a database's connections, is closed here rather than in
+     * the addon's own {@code onDisable}. A task that throws is logged in the console, and the others still run.
+     *
+     * <p>A task holds on to what it uses (and so to the addon's classes) until it runs: an addon disabled while
+     * NeoSkript keeps running (by a plugin manager) cancels it with the returned handle once it has closed things
+     * itself.
+     *
+     * @param task what to run
+     * @return runs to cancel the task, if it hasn't run yet; does nothing after
+     */
+    Runnable whenStopped(Runnable task);
+
+    /**
      * The script files and their functions. Their methods throw {@link IllegalStateException} until NeoSkript is
      * ready ({@link #whenReady}).
      *

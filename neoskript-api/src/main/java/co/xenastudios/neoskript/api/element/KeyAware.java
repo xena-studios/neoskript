@@ -15,7 +15,7 @@ import co.xenastudios.neoskript.api.annotation.Experimental;
  * <p>It may also return a {@link java.util.Map}: each key is an index, and a value that's a map, a collection or an
  * array makes a list under its index, as a pausing effect's stored result does ({@link PausingEffect}).
  * {@code {"home": {"x": 10}}} is the value 10 at {@code home::x}, so setting {@code {_data::*}} to it sets
- * {@code {_data::home::x}}.
+ * {@code {_data::home::x}}. A pausing effect may be key-aware too, for its arguments.
  */
 @Experimental
 public interface KeyAware {

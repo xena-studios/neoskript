@@ -818,6 +818,13 @@ final class StatementParser {
         if (header.syntax().id().equals(FILTER)) {
             return filter(section, header);
         }
+        if (context.registry().delays(header.syntax())) {
+            // A pausing section (a database transaction): it waits before its code, which runs once, and after.
+            delay = DelayState.DELAYED;
+            List<Statement> body = sectionCode(header, () -> statements(section.children()));
+            delay = DelayState.DELAYED;
+            return new Statement.Section(line, header, body);
+        }
         return new Statement.Section(line, header, sectionCode(header, () -> repeatable(section.children(),
                 header.syntax().id().equals("SecFor") ? header : null)));
     }
