@@ -113,3 +113,13 @@ Each addon gets its own Modrinth project, which only the owner can create. For e
 - **Project:** name `NeoSkript Web`, slug `neoskript-web`, summary "HTTP requests, webhooks and JSON for NeoSkript scripts. Runs scripts written for Reqn and skJson unchanged." The description says it replaces Reqn and skJson's requests and JSON (with what of skJson isn't in it yet, from the docs page), that requests never block the server, and that it needs NeoSkript at the same version. Categories: utility, library. Licence GPL-3.0-only, source `https://github.com/xena-studios/neoskript/tree/main/addons/web`, Paper and Folia, NeoSkript's Minecraft versions.
 - **Dependencies:** NeoSkript (`FuVeJ2X5`) required. Neither Reqn nor skJson is on Modrinth (checked 2026-11-17), so there's no incompatible project to mark; add skJson's if it ever appears.
 - **Release:** the jar from `./gradlew :addons:web:build` (`addons/web/build/libs/NeoSkriptWeb-<version>.jar`), with NeoSkript's version and changelog.
+
+### NeoSkript Proxy (`addons/proxy`)
+
+- name `NeoSkript Proxy`, slug `neoskript-proxy`;
+- summary: "Messages and proxy actions across a BungeeCord or Velocity network from NeoSkript scripts, over plugin messaging or Redis, with SkProxy's, Skelocity's and SkRedis's syntax.";
+- description: NeoSkript's own network addon (issue #19): messages between servers, server lists, player counts, where a player is; it also runs scripts written for SkProxy 2.4, Skelocity 1.1 and SkRedis 2.3.5's messaging, and talks to servers still on SkRedis; goes on each backend server, not the proxy; needs NeoSkript at the same version; Paper and Folia; links to [the docs](https://neoskript.dev/docs/addons/proxy/), which list the differences;
+- categories: utility, social; licence GPL-3.0-only; source this repository's `addons/proxy`; loaders Paper and Folia, NeoSkript's Minecraft versions; environment server only;
+- dependencies: **required** NeoSkript (`FuVeJ2X5`); **incompatible** SkProxy (`HaSv4ey2`), Skelocity (`URMrn6g1`) and SkRedis (`3R33dfbs`), all on Modrinth, since NeoSkriptProxy replaces them and they need Skript;
+- the jar is `addons/proxy/build/libs/NeoSkriptProxy-<version>.jar` (no libraries shaded: its Redis client is its own), and the project id goes into the release steps next to NeoSkript's.
+
