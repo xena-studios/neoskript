@@ -1,0 +1,23 @@
+# Probe: loops over what's only ever one value are refused, as Skript's (issue #37), and while loops whose condition
+# isn't one.
+
+function probe_single_loops():
+	set {_l::*} to "a", "b" and "c"
+	loop join {_l::*} with ",":
+		send "join with: %loop-value%" to console
+	loop join {_l::*}:
+		send "join: %loop-value%" to console
+	loop "x" except "y":
+		send "except one: %loop-value%" to console
+	loop {_l::*} joined by "-":
+		send "joined by: %loop-value%" to console
+	loop split "a,b" at ",":
+		send "split: %loop-value%" to console
+	set {_n} to 0
+	while true:
+		add 1 to {_n}
+		if {_n} > 3:
+			stop loop
+	while false:
+		send "no" to console
+	send "n: %{_n}%" to console

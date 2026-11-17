@@ -1,0 +1,47 @@
+# Checks: the order of a script's problems (issue #37). Skript reads every structure's header first (options,
+# variables, using, headers it can't understand), then function headers, then functions, events and commands, as it
+# loads them by priority, and a command entry by entry.
+
+options:
+	good: 1
+	bad option line
+
+on load:
+	frob one
+
+on frobnicate the wibble:
+	broadcast "x"
+
+function message_order_a(n: number) :: number:
+	frob two
+	return 1
+
+command /messageorderc:
+	permission message: hi
+	cooldown: frob seconds
+	cooldown message: "%frob nonsense%"
+	cooldown bypass: x.y
+	trigger:
+		frob three
+	usage: "%frob usage%"
+
+variables:
+	{message_order::a} = frob value
+	this is not a variable line
+
+function message_order_b(n: numberz):
+	broadcast "x"
+
+using frobfeature
+
+every frob seconds:
+	broadcast "x"
+
+on chat:
+	frob four
+	if 1 is 1:
+		broadcast "x"
+
+function message_order_c() :: number:
+	frob five
+	return 1

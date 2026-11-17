@@ -304,14 +304,14 @@ final class ScriptManager {
             }
             diagnostics.add(diagnostic);
         }
-        // Each script's problems in the order of their lines, as Skript gives them while it goes through the
-        // script, though NeoSkript finds some while parsing and others while compiling. Problems with the file's
-        // layout come first, in the order Skript finds them reading the file.
-        Map<String, Integer> fileOrder = new HashMap<>();
-        diagnostics.forEach(d -> fileOrder.putIfAbsent(d.file(), fileOrder.size()));
-        diagnostics.sort(java.util.Comparator.comparingInt((Diagnostic d) -> fileOrder.get(d.file()))
-                .thenComparing(d -> !layoutProblem(d.message()))
-                .thenComparingInt(d -> layoutProblem(d.message()) ? 0 : d.line()));
+        // Each script's problems in the order Skript gives them while it loads the script, though NeoSkript finds some
+        // while parsing and others while compiling: see MessageOrder. Problems with the file's layout come first.
+        Map<String, List<Diagnostic>> byFile = new LinkedHashMap<>();
+        diagnostics.forEach(d -> byFile.computeIfAbsent(d.file(), f -> new ArrayList<>()).add(d));
+        diagnostics.clear();
+        byFile.forEach((name, found) -> diagnostics.addAll(byName.get(name) == null ? found
+                : co.xenastudios.neoskript.frontend.source.MessageOrder.sort(found, byName.get(name),
+                        d -> layoutProblem(d.message()))));
         Set<String> failed = new HashSet<>();
         int errors = 0;
         for (Diagnostic diagnostic : diagnostics) {

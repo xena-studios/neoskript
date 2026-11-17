@@ -4,3 +4,6 @@
 folia: probes/world # The console runs on Folia's global thread, which can't read the world's regions.
 
 # Not matched yet: still to do, not impossible.
+# (Not a unit.) Load messages are in Skript's order within each script, but Skript orders them across every script
+# it loads at once (on startup and '/sk reload scripts'), by priority, so a file's messages come interleaved with the
+# others'. The differential compares one script at a time, so it doesn't see this. Issue #69.

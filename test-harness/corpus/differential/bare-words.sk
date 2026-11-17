@@ -1,0 +1,27 @@
+# Probe: words for an event value or an expression that isn't there in this event (issue #37). Where words are taken
+# as they are (a variable, a function's 'objects' parameter), Skript's unparsed literal reads them as
+# the type they name; in a text's %...% or where only what changes goes, the error stands.
+
+function bare_words_show(label: text, v: objects):
+	send "%{_label}%: %{_v::*}% (set: %whether {_v::*} is set%)" to console
+
+function probe_bare_words():
+	set {_a} to world
+	set {_b} to block
+	set {_c} to executor
+	set {_d} to damage cause
+	bare_words_show("set", ({_a}, {_b}, {_c}, {_d}))
+	bare_words_show("executor", executor)
+	bare_words_show("damage cause", damage cause)
+	send "%block%" to console
+	send "%executor%" to console
+	if executor is set:
+		send "executor is set" to console
+	broadcast damage cause
+	# Words inside a text's code are taken as they are, as anywhere else: only what the %...% is keeps the error.
+	set {_v} to "a"
+	send "%{_v} ? block%" to console
+	send "%block ? {_v}%" to console
+	send "%whether {_v} is damage cause%" to console
+	send "%{_v} ? executor%" to console
+	send "end" to console
