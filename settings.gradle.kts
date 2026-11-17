@@ -48,3 +48,8 @@ include(
 
 // An example addon, built in CI against the API and run by the harness, never shipped.
 project(":example-addon").projectDir = file("examples/example-addon")
+
+// The official addons, one folder each in addons/ (see addons/README.md), and what they share.
+file("addons").listFiles { dir -> dir.resolve("build.gradle.kts").isFile }?.sortedBy { it.name }?.forEach {
+    include(":addons:${it.name}")
+}

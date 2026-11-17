@@ -21,7 +21,9 @@ import java.util.regex.Pattern;
  * The data for neoskript.dev's syntax reference (website/scripts/syntax.mjs reads it). Boots NeoSkript with
  * {@code -Dneoskript.syntaxExport}, so it writes its registry, and the reference Skript, whose {@code sk gen-docs}
  * writes its documentation as JSON: names, descriptions, examples and since for each element. Both files go into
- * the reports folder as {@code syntax-export.json} and {@code skript-docs.json}. Run by name; no group selects it.
+ * the reports folder as {@code syntax-export.json} and {@code skript-docs.json}. The official addons in
+ * {@code addons/} whose builds don't leave them out are installed, so their syntax is in the export, each element
+ * with its addon's name. Run by name; no group selects it.
  */
 public final class SyntaxExportScenario implements Scenario {
 
@@ -49,6 +51,12 @@ public final class SyntaxExportScenario implements Scenario {
 
         Path neoskriptRun = runs.resolve("neoskript");
         var neoskript = context.server(neoskriptRun).plugin(context.neoskriptJar());
+        // The official addons' syntax is in the export too, named by addon, for neoskript.dev and the editors.
+        for (Path addon : context.officialAddonJars()) {
+            if (Boolean.parseBoolean(NeoSkriptOfficialAddonsScenario.properties(addon).getProperty("syntaxExport"))) {
+                neoskript.plugin(addon);
+            }
+        }
         Path exportFile = neoskriptRun.resolve("syntax-export.json");
         neoskript.jvmArg("-Dneoskript.syntaxExport=" + exportFile.toAbsolutePath());
         try (ServerProcess server = neoskript.start()) {

@@ -7,7 +7,7 @@ An addon is a Paper plugin that adds syntax to NeoSkript: its own types, events,
 
 This is NeoSkript's own API. Skript addons, built against Skript's `ch.njol.skript` classes, don't load on NeoSkript yet. A compatibility layer for them is planned, SkBee first.
 
-The [example addon](https://github.com/xena-studios/neoskript/tree/main/examples/example-addon) in the repository uses every part of this page. The harness runs it on Paper and Folia with every change to NeoSkript.
+The [example addon](https://github.com/xena-studios/neoskript/tree/main/examples/example-addon) in the repository uses every part of this page. The harness runs it on Paper and Folia with every change to NeoSkript. NeoSkript's own addons, which replace community Skript addons, live in the repository's [`addons/`](https://github.com/xena-studios/neoskript/tree/main/addons) folder, with how they're built and released.
 
 ## Getting started
 

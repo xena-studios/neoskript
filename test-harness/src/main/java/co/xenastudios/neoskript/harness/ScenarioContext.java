@@ -61,6 +61,13 @@ public final class ScenarioContext {
         return config.botJar();
     }
 
+    /** The official addons' jars ({@code addons/}), each with its libraries shaded in. */
+    public java.util.List<Path> officialAddonJars() {
+        String jars = System.getProperty("harness.officialAddonJars", "");
+        return java.util.Arrays.stream(jars.split(java.util.regex.Pattern.quote(java.io.File.pathSeparator)))
+                .filter(jar -> !jar.isBlank()).map(Path::of).toList();
+    }
+
     /** The example addon ({@code examples/example-addon}), which registers syntax through NeoSkript's API. */
     public Path exampleAddonJar() {
         return config.exampleAddonJar();

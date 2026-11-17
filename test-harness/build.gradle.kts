@@ -19,6 +19,10 @@ val exampleAddon = configurations.create("exampleAddon") {
     isCanBeConsumed = false
     isTransitive = false
 }
+val officialAddons = configurations.create("officialAddons") {
+    isCanBeConsumed = false
+    isTransitive = false
+}
 
 dependencies {
     implementation(libs.gson)
@@ -28,6 +32,10 @@ dependencies {
     neoskriptCli(project(path = ":neoskript-cli", configuration = "shadowRuntimeElements"))
     // The example addon, for the neoskript-addon scenario.
     exampleAddon(project(":example-addon"))
+    // The official addons in addons/, each its shaded jar, for the official-addons and syntax-export scenarios.
+    rootProject.subprojects.filter { it.path.startsWith(":addons:") && it.name != "support" }.forEach {
+        officialAddons(project(path = it.path, configuration = "shadowRuntimeElements"))
+    }
 }
 
 // The harness bot: a plugin the harness installs next to NeoSkript or Skript, whose console commands
@@ -131,6 +139,8 @@ tasks.register<JavaExec>("harness") {
     inputs.files(cliJar)
     val addonJar: FileCollection = exampleAddon
     inputs.files(addonJar)
+    val officialAddonJars: FileCollection = officialAddons
+    inputs.files(officialAddonJars)
     val botJarFile = botJar.flatMap { it.archiveFile }
     inputs.file(botJarFile)
     // Servers on 1.21.x run on Java 21, and 26.x needs Java 25.
@@ -151,6 +161,7 @@ tasks.register<JavaExec>("harness") {
             "-Dharness.neoskriptJar=" + pluginJar.singleFile.absolutePath,
             "-Dharness.cliJar=" + cliJar.singleFile.absolutePath,
             "-Dharness.exampleAddonJar=" + addonJar.singleFile.absolutePath,
+            "-Dharness.officialAddonJars=" + officialAddonJars.files.joinToString(File.pathSeparator) { it.absolutePath },
             "-Dharness.botJar=" + botJarFile.get().asFile.absolutePath,
             "-Dharness.environments=" + projectDir.dir("environments").asFile.absolutePath,
             "-Dharness.scripts=" + projectDir.dir("scripts").asFile.absolutePath,

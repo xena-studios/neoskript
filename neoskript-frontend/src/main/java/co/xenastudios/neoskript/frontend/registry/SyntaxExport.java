@@ -47,13 +47,20 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
      * @param eventName for events, what Skript calls the event ({@code Break / Mine}), or {@code null} if it has
      *     no counterpart in Skript or isn't an event
      * @param eventValues for server events, the values code under the event can use; empty otherwise
+     * @param addon the addon that registered it, or {@code null} for NeoSkript's own
      */
     public record Element(String kind, String id, List<String> patterns, String returnType, String eventName,
-            List<EventValue> eventValues, ElementParser parser) {
+            List<EventValue> eventValues, ElementParser parser, String addon) {
 
         public Element {
             patterns = List.copyOf(patterns);
             eventValues = List.copyOf(eventValues);
+        }
+
+        /** One of NeoSkript's own elements. */
+        public Element(String kind, String id, List<String> patterns, String returnType, String eventName,
+                List<EventValue> eventValues, ElementParser parser) {
+            this(kind, id, patterns, returnType, eventName, eventValues, parser, null);
         }
     }
 
@@ -110,11 +117,18 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
      * A type.
      *
      * @param literals the values written as words, for a closed set like game modes; empty otherwise
+     * @param addon the addon that registered it, or {@code null} for NeoSkript's own
      */
-    public record Type(String id, String name, String plural, List<String> literals, TypeParser parser) {
+    public record Type(String id, String name, String plural, List<String> literals, TypeParser parser,
+            String addon) {
 
         public Type {
             literals = List.copyOf(literals);
+        }
+
+        /** One of NeoSkript's own types. */
+        public Type(String id, String name, String plural, List<String> literals, TypeParser parser) {
+            this(id, name, plural, literals, parser, null);
         }
     }
 
@@ -149,12 +163,21 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
         }
     }
 
-    /** A built-in function. {@code returnType} is {@code null} if it returns nothing. */
+    /**
+     * A built-in function. {@code returnType} is {@code null} if it returns nothing; {@code addon} is the addon
+     * that registered it, or {@code null} for NeoSkript's own.
+     */
     public record Function(String name, List<FunctionInfo.Parameter> parameters, String returnType,
-            boolean returnsPlural) {
+            boolean returnsPlural, String addon) {
 
         public Function {
             parameters = List.copyOf(parameters);
+        }
+
+        /** One of NeoSkript's own functions. */
+        public Function(String name, List<FunctionInfo.Parameter> parameters, String returnType,
+                boolean returnsPlural) {
+            this(name, parameters, returnType, returnsPlural, null);
         }
     }
 
@@ -239,6 +262,9 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
             if (!parser.isEmpty()) {
                 map.put("parser", parser);
             }
+            if (element.addon() != null) {
+                map.put("addon", element.addon());
+            }
             elementList.add(map);
         }
         root.put("elements", elementList);
@@ -253,6 +279,9 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
             }
             if (type.parser() != null) {
                 map.put("parser", typeParser(type.parser()));
+            }
+            if (type.addon() != null) {
+                map.put("addon", type.addon());
             }
             typeList.add(map);
         }
@@ -274,6 +303,9 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
             if (function.returnType() != null) {
                 map.put("returnType", function.returnType());
                 map.put("returnsPlural", function.returnsPlural());
+            }
+            if (function.addon() != null) {
+                map.put("addon", function.addon());
             }
             functionList.add(map);
         }
@@ -392,14 +424,14 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
             }
             elements.add(new Element((String) map.get("kind"), (String) map.get("id"),
                     strings(map.get("patterns")), (String) map.get("returnType"), (String) map.get("eventName"),
-                    values, readElementParser((Map<String, Object>) map.get("parser"))));
+                    values, readElementParser((Map<String, Object>) map.get("parser")), (String) map.get("addon")));
         }
         List<Type> types = new ArrayList<>();
         for (Object o : (List<Object>) root.get("types")) {
             Map<String, Object> map = (Map<String, Object>) o;
             types.add(new Type((String) map.get("id"), (String) map.get("name"), (String) map.get("plural"),
                     strings(map.getOrDefault("literals", List.of())),
-                    readTypeParser((Map<String, Object>) map.get("parser"))));
+                    readTypeParser((Map<String, Object>) map.get("parser")), (String) map.get("addon")));
         }
         List<Function> functions = new ArrayList<>();
         for (Object o : (List<Object>) root.get("functions")) {
@@ -412,7 +444,7 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
                         (Boolean) parameter.get("optional")));
             }
             functions.add(new Function((String) map.get("name"), parameters, (String) map.get("returnType"),
-                    Boolean.TRUE.equals(map.get("returnsPlural"))));
+                    Boolean.TRUE.equals(map.get("returnsPlural")), (String) map.get("addon")));
         }
         return new SyntaxExport(format, (String) root.get("neoskript"), (String) root.get("server"), elements,
                 types, functions, readParser((Map<String, Object>) root.get("parser")));

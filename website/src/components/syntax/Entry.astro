@@ -51,6 +51,7 @@ const cancellable = props.kind === "element" && props.item.kind === "event" ? pr
     <h2>{item.name}</h2>
     <ul class="badges" aria-label="About">
       <li>{props.category}</li>
+      {item.addon && <li class="flag">{item.addon} addon</li>}
       {added && <li>Skript {added}</li>}
       {deprecated && <li class="flag">Deprecated</li>}
     </ul>
@@ -64,7 +65,7 @@ const cancellable = props.kind === "element" && props.item.kind === "event" ? pr
     {item.description.length > 0 ? (
       <div class="description">{item.description.map((p) => (p.startsWith("<ul>") ? <Fragment set:html={p} /> : <p set:html={p} />))}</div>
     ) : (
-      <p class="undocumented">No matching entry in Skript's documentation.</p>
+      <p class="undocumented">{item.addon ? `No documentation in ${item.addon} yet.` : "No matching entry in Skript's documentation."}</p>
     )}
 
     <dl class="meta">
