@@ -403,8 +403,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     /** Sets variables.recover back to false in config.yml, once a recovery has run. */
     private void turnOffRecover() {
         try {
-            ConfigLoader.Change change = ConfigLoader.set(NeoSkriptConfig.SPEC, configFile(),
-                    java.util.Map.of("variables.recover", false));
+            ConfigLoader.Change change = NeoSkriptConfig.turnOffRecover(configFile());
             change.warnings().forEach(warning -> getSLF4JLogger().warn("config.yml: {}", warning));
             if (change.written()) {
                 getSLF4JLogger().info("Turned variables.recover off again in config.yml");

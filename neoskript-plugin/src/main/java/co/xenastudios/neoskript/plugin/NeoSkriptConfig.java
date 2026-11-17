@@ -6,6 +6,7 @@ package co.xenastudios.neoskript.plugin;
 
 import co.xenastudios.neoskript.plugin.config.Codec;
 import co.xenastudios.neoskript.plugin.config.Comment;
+import co.xenastudios.neoskript.plugin.config.ConfigLoader;
 import co.xenastudios.neoskript.plugin.config.ConfigSpec;
 import co.xenastudios.neoskript.plugin.config.Range;
 import co.xenastudios.neoskript.plugin.text.TextStyle;
@@ -196,6 +197,15 @@ public record NeoSkriptConfig(
         public String toString() {
             return text;
         }
+    }
+
+    /**
+     * Sets {@code variables.recover} back to false once a recovery has run: through the loader, so the file keeps its
+     * comments and other keys, and a file from a newer NeoSkript is left as it is.
+     */
+    static ConfigLoader.Change turnOffRecover(java.nio.file.Path file)
+            throws co.xenastudios.neoskript.plugin.config.ConfigException {
+        return ConfigLoader.set(SPEC, file, java.util.Map.of("variables.recover", false));
     }
 
     /**

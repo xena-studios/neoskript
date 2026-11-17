@@ -532,6 +532,27 @@ class NeoSkriptConfigTest {
     }
 
     @Test
+    void recoverTurnsItselfOffKeepingTheFileAndLeavesANewerFileAlone() throws Exception {
+        String text = ConfigLoader.defaultText(NeoSkriptConfig.SPEC)
+                .replace("  recover: false\n", "  # Mine: turned on after the disk failed.\n  recover: true\n")
+                .replace("metrics: true", "metrics: false");
+        Files.writeString(file(), text);
+        assertTrue(load().config().variables().recover());
+        ConfigLoader.Change change = NeoSkriptConfig.turnOffRecover(file());
+        assertTrue(change.written());
+        String after = Files.readString(file());
+        assertTrue(after.contains("  # Mine: turned on after the disk failed.\n  recover: false\n"), after);
+        NeoSkriptConfig config = load().config();
+        assertFalse(config.variables().recover());
+        assertFalse(config.metrics(), "the other settings are kept");
+
+        String newer = "config-version: 3\nvariables:\n  recover: true\n";
+        Files.writeString(file(), newer);
+        assertFalse(NeoSkriptConfig.turnOffRecover(file()).written());
+        assertEquals(newer, Files.readString(file()));
+    }
+
+    @Test
     void theDocsShowTheDefaultConfig() throws IOException {
         Path page = Path.of("../website/src/content/docs/docs/server/configuration.mdx");
         String docs = Files.readString(page);

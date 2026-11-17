@@ -80,7 +80,7 @@ See [updates and bStats](/docs/server/updates-and-metrics/) for who hears about 
 |---|---|---|
 | `variables.file` | `variables.csv` | Where global variables are saved, relative to `plugins/NeoSkript`. The file is in Skript's format. Applies on restart. |
 | `variables.storage` | `csv` | `csv` saves to `variables.file` in Skript's format. `native` saves to NeoSkript's own `variables.nsv` beside it: faster to load, saves only what changed, crash-safe. Switching moves the variables over at the next start, after a backup. See [native storage](/docs/server/variables/#native-storage). Applies on restart. |
-| `variables.recover` | `false` | Native storage only: a one-shot recovery of a damaged `variables.nsv` that no snapshot can repair. Loads everything up to the last good save, backs the damaged file up, lists what's lost, and turns itself off. Applies on restart. |
+| `variables.recover` | `false` | Native storage only: a one-shot recovery of a damaged `variables.nsv` that no snapshot can repair. Loads everything up to the last good save, backs the damaged file up, lists what's lost, and turns itself off, keeping the file's comments (a config.yml from a newer NeoSkript is left alone, and the console says to set it back by hand). Applies on restart, and only does anything when the file is damaged. |
 | `variables.save-interval` | `5 minutes` | How often changed variables are saved, at least every 10 seconds. They're also saved when the server stops. |
 | `variables.player-uuids-in-names` | `true` | Whether a player in a variable's name, as in `{money::%player%}`, is their UUID (`true`) or their name. Skript's `use player UUIDs in variable names`. |
 
