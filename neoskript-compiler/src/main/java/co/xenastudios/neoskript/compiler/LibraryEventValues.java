@@ -174,6 +174,22 @@ final class LibraryEventValues implements EventValues {
         }
 
         @Override
+        public boolean allowsSyntax(SyntaxInfo syntax, int pattern) {
+            List<Class<?>> only = library.eventOnly(syntax.id(), pattern);
+            if (only == null) {
+                return true;
+            }
+            for (Class<?> current : classes) {
+                for (Class<?> wanted : only) {
+                    if (wanted.isAssignableFrom(current)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        @Override
         public boolean allows(SyntaxInfo syntax, TypeRef type, String words) {
             if (!isEventValue(syntax)) {
                 return true;

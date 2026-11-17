@@ -190,4 +190,65 @@ class EventsTest {
     void expressionsThatCantBeChangedThatWayAreAnError() {
         assertEquals("name of person can't be deleted", error("on greet:\n\tdelete name of person\n"));
     }
+
+    /** A filter that remembers what was written in the event's line. */
+    record Topic(String topic) implements co.xenastudios.neoskript.api.element.Condition {
+        @Override
+        public boolean check(TriggerContext context, Object[] arguments) {
+            return true;
+        }
+    }
+
+    @Test
+    void aServerEventsTriggerHasItsEventsIdAndTheFilterMadeForIt() {
+        library.event("Ask", List.of(Greeting.class), info -> new Topic(info.argumentLiteral(0)), "ask about %*string%");
+        CompiledScripts compiled = compile("ask about \"cake\":\n\tsay \"yes\"\n");
+        assertEquals(List.of(), compiled.diagnostics());
+        CompiledScripts.CompiledTrigger trigger = compiled.triggers().getFirst();
+        assertEquals("Ask", trigger.eventId());
+        assertEquals(new Topic("cake"), trigger.filter());
+    }
+
+    @Test
+    void aSyntaxErrorFromAnEventsFilterIsTheLinesError() {
+        library.event("Strict", List.of(Greeting.class), info -> {
+            throw new co.xenastudios.neoskript.api.element.SyntaxError("Strictly no " + info.argumentLiteral(0));
+        }, "strict %*string%");
+        assertEquals("Strictly no x", error("strict \"x\":\n\tsay \"hi\"\n"));
+    }
+
+    @Test
+    void addonsCanBeToldWhichTriggersOfTheirEventsAreLoaded() {
+        java.util.function.Consumer<List<co.xenastudios.neoskript.api.registration.LoadedTrigger>> watcher = triggers -> {};
+        library.eventTriggers("Greet", watcher);
+        assertEquals(List.of(watcher), library.triggerWatchers().get("Greet"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> library.eventTriggers("ScriptLoad", watcher));
+    }
+
+    @Test
+    void syntaxForOtherEventsIsTriedAfterSyntaxThatWorksHere() {
+        // Registered first, so without its events it would be read first everywhere, as 'the result' was.
+        library.expression("FarewellMood", "string", info -> {
+            if (!info.isEvent(Farewell.class)) {
+                throw new co.xenastudios.neoskript.api.element.SyntaxError("'the mood' is only for farewells");
+            }
+            return (context, args) -> "sad";
+        }, "[the] mood");
+        library.onlyInEvents("FarewellMood", -1, Farewell.class);
+        library.expression("AnyMood", "string", info -> (context, args) -> "fine", "[the] mood");
+        library.expression("FarewellTone", "string", info -> {
+            if (!info.isEvent(Farewell.class)) {
+                throw new co.xenastudios.neoskript.api.element.SyntaxError("'the tone' is only for farewells");
+            }
+            return (context, args) -> "low";
+        }, "[the] tone");
+        library.onlyInEvents("FarewellTone", -1, Farewell.class);
+
+        fire("on farewell:\n\tsay the mood\n\tsay the tone\n", new Farewell(new Person("Ann", false)));
+        fire("on greeting:\n\tsay the mood\n", new Greeting(new Person("Ann", false)));
+        assertEquals(List.of("[sad]", "[low]", "[fine]"), said);
+        // With nothing else to read it, it's still read, and its error is the line's.
+        assertEquals("'the tone' is only for farewells", error("on greeting:\n\tsay the tone\n"));
+    }
 }

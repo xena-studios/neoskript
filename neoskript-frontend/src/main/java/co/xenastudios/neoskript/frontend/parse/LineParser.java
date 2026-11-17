@@ -51,6 +51,8 @@ final class LineParser {
     private final String input;
     private final String lowerInput;
     private final Map<Key, Object> memo = new HashMap<>();
+    /** Whether syntax that only works in other events is taken too, once nothing else reads the text. */
+    private boolean anyEvent;
     /** What was parsed while code had to stand without unresolved words, kept apart from the rest. */
     private final Map<Key, Object> strictMemo = new HashMap<>();
     /** Whether an outer parse is in its first, strict pass: nested ones then stay strict too. */
@@ -201,6 +203,8 @@ final class LineParser {
         // A type property turned down for its values' type, written in full: then a reading leaning on unresolved
         // words isn't taken instead, as Skript's error for the property is the line's.
         boolean propertyRefused = false;
+        // Whether syntax that only works in other events matched, and was passed over.
+        boolean otherEvents = false;
         List<PatternIndex.Entry<SyntaxRegistry.Candidate>> indexed = new ArrayList<>();
         for (PatternIndex.Entry<SyntaxRegistry.Candidate> entry : index.indexed(text)) {
             if (isViable(kind, entry)) {
@@ -235,6 +239,12 @@ final class LineParser {
                 continue;
             }
             ParsedSyntax parsed = new ParsedSyntax(syntax, candidate.pattern(), match);
+            // Syntax that only works in other events is tried last, as Skript's fails to set up there and Skript
+            // tries the next: 'the result' in a placeholder isn't the smelted item.
+            if (eventScope != null && !anyEvent && !eventScope.allowsSyntax(syntax, candidate.pattern())) {
+                otherEvents = true;
+                continue;
+            }
             // An event value the code can't have isn't one, so another reading is tried, as Skript's fails to
             // initialize: 'amount of slots of {_inv}' in 'on load' is the inventory's number of slots.
             if (eventScope != null && hasTypeRole(syntax) && !eventValueAllowed(parsed, text)) {
@@ -427,7 +437,22 @@ final class LineParser {
                 fallbackUnresolved = unresolved;
             }
         }
-        return propertyRefused && fallbackUnresolved > 0 ? null : fallback;
+        Object found = propertyRefused && fallbackUnresolved > 0 ? null : fallback;
+        if (otherEvents) {
+            // Nothing else reads it without leaning on unresolved words: the syntax for other events does, and gives
+            // its error when it's set up, as Skript keeps that error over words that aren't anything.
+            boolean before = anyEvent;
+            anyEvent = true;
+            try {
+                Object other = matchSyntax(kind, start, end, literalOnly, expected, splitTokens, strictCode);
+                if (other != null) {
+                    found = other;
+                }
+            } finally {
+                anyEvent = before;
+            }
+        }
+        return found;
     }
 
     /** Whether {@code expr} might have a past or future state: an event value, or syntax that may have one. */

@@ -122,7 +122,8 @@ public final class ScriptCompiler {
                                         serverEvent);
                                 // The filter may have narrowed the classes listened to.
                                 triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), null,
-                                        compiler.eventClasses(), null, null, trigger));
+                                        compiler.eventClasses(), null, null, trigger, null,
+                                        event.event().syntax().id(), compiler.eventFilter()));
                             } else if (binding instanceof Library.Core core && core.id().equals(CoreSyntax.PERIODICAL)) {
                                 triggers.add(new CompiledScripts.CompiledTrigger(name, header.number(), null, null,
                                         period(header.number(), event), null, compiler(functions, script).compilePeriodical(name, event.body()),

@@ -122,6 +122,11 @@ final class AddonApi implements NeoSkript {
         return threads;
     }
 
+    @Override
+    public String text(Object value) {
+        return co.xenastudios.neoskript.runtime.Values.text(value);
+    }
+
     /**
      * The plugin of the first class loader in {@code frames} that isn't {@code self} (NeoSkript's) and that
      * {@code pluginOf} knows, or {@code null}: frames from the JDK and other loaders are passed over.

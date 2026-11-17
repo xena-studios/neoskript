@@ -631,6 +631,7 @@ final class ScriptManager {
         } catch (RuntimeException e) {
             logger.error("Couldn't register the scripts' commands", e);
         }
+        tellWatchers();
     }
 
     /**
@@ -663,6 +664,61 @@ final class ScriptManager {
         for (CompiledScripts.CompiledTrigger trigger : triggers) {
             if (trigger.event() == ScriptEvent.UNLOAD) {
                 run(trigger);
+            }
+        }
+    }
+
+    /**
+     * Tells the addons that run their events themselves ({@code Registrar.eventTriggers}) which of those events'
+     * triggers are loaded now.
+     */
+    private void tellWatchers() {
+        var watchers = library.triggerWatchers();
+        if (watchers.isEmpty()) {
+            return;
+        }
+        List<CompiledScripts.CompiledTrigger> all = loaded.values().stream().flatMap(List::stream).toList();
+        for (var entry : watchers.entrySet()) {
+            List<co.xenastudios.neoskript.api.registration.LoadedTrigger> triggers = all.stream()
+                    .filter(trigger -> entry.getKey().equals(trigger.eventId()))
+                    .map(trigger -> (co.xenastudios.neoskript.api.registration.LoadedTrigger) new Loaded(trigger, logger))
+                    .toList();
+            for (var watcher : entry.getValue()) {
+                try {
+                    watcher.accept(triggers);
+                } catch (RuntimeException | LinkageError e) {
+                    logger.error("An addon failed when told which triggers of its event {} are loaded", entry.getKey(), e);
+                }
+            }
+        }
+    }
+
+    /** A loaded trigger of an event an addon runs itself. */
+    private record Loaded(CompiledScripts.CompiledTrigger compiled, Logger logger)
+            implements co.xenastudios.neoskript.api.registration.LoadedTrigger {
+
+        @Override
+        public String script() {
+            return compiled.script();
+        }
+
+        @Override
+        public int line() {
+            return compiled.line();
+        }
+
+        @Override
+        public co.xenastudios.neoskript.api.element.Condition filter() {
+            return compiled.filter();
+        }
+
+        @Override
+        public void run(Object event, Object owner) {
+            try {
+                compiled.trigger().execute(new SimpleTriggerContext(event, owner));
+            } catch (Throwable e) {
+                // As any trigger's: never to the addon that ran it.
+                TriggerErrors.report(logger, e);
             }
         }
     }

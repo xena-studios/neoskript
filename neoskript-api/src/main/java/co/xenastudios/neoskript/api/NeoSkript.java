@@ -139,4 +139,15 @@ public interface NeoSkript {
      * @return the threads
      */
     Threads threads();
+
+    /**
+     * A value as it reads in text, as when a script puts it in a text with {@code %...%}: {@code 5} for the number
+     * 5, a player's name for a player, {@code <none>} for nothing.
+     *
+     * @param value the value, as scripts have it, or an {@code Object[]} of several
+     * @return the text
+     */
+    default String text(Object value) {
+        return String.valueOf(value);
+    }
 }

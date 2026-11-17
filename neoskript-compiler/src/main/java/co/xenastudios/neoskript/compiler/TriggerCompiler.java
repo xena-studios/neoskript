@@ -260,6 +260,14 @@ final class TriggerCompiler {
         return eventClasses;
     }
 
+    /** The filter the last server event trigger compiled was made with, or {@code null}. */
+    private Condition eventFilter;
+
+    /** The filter the last server event trigger compiled was made with, or {@code null} if its event has none. */
+    Condition eventFilter() {
+        return eventFilter;
+    }
+
     /**
      * An inline function's loop over a list ({@code where [...]}): the slots of the current value, its
      * position, the list's indices (or -1), and the reduced value so far (or -1).
@@ -413,6 +421,7 @@ final class TriggerCompiler {
     Trigger compileTrigger(String scriptName, ParsedStructure.Event event, Library.ServerEvent binding)
             throws CompileException {
         eventClasses = binding.classes();
+        eventFilter = null;
         headerLine = event.structure().node().line();
         String key = event.structure().node().line().key();
         // Skript's name for the event, as its errors call it: 'on death' for 'on death of a zombie'.
@@ -424,7 +433,14 @@ final class TriggerCompiler {
                 line = event.structure().node().line().number();
                 source = key;
                 ParsedSyntax syntax = event.event();
-                Condition filter = binding.filter().create(info(syntax));
+                Condition filter;
+                try {
+                    filter = binding.filter().create(info(syntax));
+                } catch (co.xenastudios.neoskript.api.element.SyntaxError error) {
+                    // The event matched but can't be used as written: the line's error, as Skript's structures give.
+                    throw new CompileException(line, error.getMessage());
+                }
+                eventFilter = filter;
                 if (filter instanceof co.xenastudios.neoskript.api.element.EventFilter narrowing) {
                     // 'on player move' listens to player moves only; its code is checked against those.
                     eventClasses = List.copyOf(narrowing.eventClasses());
