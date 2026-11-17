@@ -1557,12 +1557,12 @@ final class TriggerCompiler {
         method.visitVarInsn(ALOAD, CONTEXT_SLOT);
         if (withArguments && element instanceof KeyAware aware) {
             // List variables with their indices, or every value under them.
-            boolean outerRecursive = recursiveKeys;
-            recursiveKeys = aware.recursiveKeys();
+            boolean outerRecursive = recursiveListArguments;
+            recursiveListArguments = aware.recursiveKeys();
             try {
                 arguments(syntax, true, aware.implicitKeys() || aware.recursiveKeys());
             } finally {
-                recursiveKeys = outerRecursive;
+                recursiveListArguments = outerRecursive;
             }
         } else if (withArguments) {
             arguments(syntax);
@@ -4675,9 +4675,6 @@ final class TriggerCompiler {
         argumentsIn(syntax, keyed, implicit);
     }
 
-    /** Whether list variables in the arguments being compiled are passed with every value under them. */
-    private boolean recursiveKeys;
-
     /** Whether arguments are being tried in the order Skript parses them, last first, without writing anything. */
     private boolean skriptOrder;
 
@@ -6956,7 +6953,7 @@ final class TriggerCompiler {
             case Expr.Variable variable when variable.list() -> {
                 variableStore(variable);
                 variableName(variable);
-                method.visitMethodInsn(INVOKEVIRTUAL, STORE, recursiveKeys ? "recursiveKeyedList" : "keyedList",
+                method.visitMethodInsn(INVOKEVIRTUAL, STORE, "keyedList",
                         "(" + STRING_DESC + ")" + Type.getDescriptor(KeyedValues.class), false);
             }
             case Expr.FunctionCall call -> call(call, true);
