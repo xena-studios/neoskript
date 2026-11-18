@@ -129,7 +129,8 @@ final class LibraryEventValues implements EventValues {
     @Override
     public Scope later(SyntaxInfo header) {
         Library.Later later = library.later(header.id());
-        return later == null ? null
+        // Code that runs later in its own trigger is checked where it's written, with that trigger's event.
+        return later == null || later.sameTrigger() ? null
                 : named.computeIfAbsent(later.eventClasses() + "/" + later.eventName(),
                         k -> new EventScope(later.eventClasses(), later.eventName()));
     }
@@ -147,6 +148,9 @@ final class LibraryEventValues implements EventValues {
 
     @Override
     public boolean keepsEventValues(SyntaxInfo header) {
+        if (library.later(header.id()) instanceof Library.Later later && later.sameTrigger()) {
+            return true;
+        }
         return library.binding(header) instanceof Library.Core core && KEEPING.contains(core.id());
     }
 

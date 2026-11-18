@@ -135,6 +135,26 @@ public interface Registrar {
             ElementFactory<co.xenastudios.neoskript.api.element.LaterSection> factory, String... patterns);
 
     /**
+     * A section whose code runs later, in the same trigger: as SkRedis's {@code run async:} runs its code on another
+     * thread while the trigger carries on. The code is checked where it's written, in the trigger's event, with its
+     * event values and the loops around it ({@code loop-value}), and runs with the trigger's local variables as they
+     * were when the line ran: one copy, which every run shares. It can't leave the loops or sections around it
+     * ({@code exit loop}, {@code continue} or {@code return} out of it are errors), and it ends at its own end, or at
+     * {@code stop}, without touching the trigger. The element gets the code when its line runs and runs it with
+     * {@link co.xenastudios.neoskript.api.element.SectionCode#run}, giving the trigger's event. Written without code,
+     * it's an effect, and gets {@code null}.
+     *
+     * @param id the section's id
+     * @param factory makes the section for each place it's used
+     * @param patterns its patterns
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void laterSection(String id, ElementFactory<co.xenastudios.neoskript.api.element.LaterSection> factory,
+            String... patterns) {
+        throw new UnsupportedOperationException("This version of NeoSkript can't register " + id);
+    }
+
+    /**
      * Tells the addon which scripts' code stopped, each time scripts reload or unload: those reloaded, unloaded
      * or removed. Code it still holds, as {@link co.xenastudios.neoskript.api.element.SectionCode}, says itself
      * whether it's the loaded version ({@link co.xenastudios.neoskript.api.element.SectionCode#loaded}). It's called on the thread that loaded them, the global thread on Folia; an exception from it

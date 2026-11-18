@@ -257,6 +257,11 @@ final class TriggerCompiler {
      * used in it, nor a returnable section's from around it.
      */
     private int detachedAt = -1;
+    /**
+     * The blocks around the code of a section that runs later in this trigger ({@link #laterSection}), which that
+     * code sees but can't jump out to; or {@code null}.
+     */
+    private java.util.Set<Block> fence;
     /** The slots keeping the trigger's context while a section's code runs in an event of its own. */
     private final Deque<Integer> outerContexts = new ArrayDeque<>();
     /** As {@link #detachedAt}, but counting the section block the code is of, whose values it has; or -1. */
@@ -2003,7 +2008,8 @@ final class TriggerCompiler {
             return;
         }
         for (Block block : blocks) { // innermost first
-            if (block == target) {
+            if (block == target || (fence != null && fence.contains(block))) {
+                // Past the code that runs later on its own: the trigger's own sections aren't its to leave.
                 return;
             }
             for (OpenSection open : pausingSections) {
@@ -2822,9 +2828,19 @@ final class TriggerCompiler {
         String outerLabel = eventLabel;
         List<Block> outerBlocks = new ArrayList<>(blocks);
         List<RunOn> outerRunOns = new ArrayList<>(runOns);
-        // The code is apart from the loops and 'run on' sections around it: its frame doesn't keep their values (the
-        // players a loop went through), for as long as the code is kept.
-        blocks.clear();
+        java.util.Set<Block> outerFence = fence;
+        boolean sameTrigger = later.sameTrigger();
+        if (sameTrigger) {
+            // Code that runs later in this trigger (SkRedis's 'run async:'): the loops around it stay, for their
+            // values (loop-value as it was when the line ran), but it can't jump out to them; nor can it leave a
+            // 'run on' section it's in, which it isn't on the thread of.
+            fence = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+            fence.addAll(blocks);
+        } else {
+            // The code is apart from the loops and 'run on' sections around it: its frame doesn't keep their values
+            // (the players a loop went through), for as long as the code is kept.
+            blocks.clear();
+        }
         runOns.clear();
         try {
             method.visitVarInsn(ALOAD, 0);
@@ -2841,14 +2857,17 @@ final class TriggerCompiler {
             method.visitVarInsn(ASTORE, codeSlot);
             method.visitJumpInsn(GOTO, after);
             method.visitLabel(start.resume());
-            eventClasses = later.eventClasses();
-            eventLabel = later.eventName();
+            if (!sameTrigger) {
+                eventClasses = later.eventClasses();
+                eventLabel = later.eventName();
+            }
             statements(section.body());
             // The code's own end: nothing around it was entered, so nothing is left.
             suspendTrigger();
         } finally {
             eventClasses = outerClasses;
             eventLabel = outerLabel;
+            fence = outerFence;
             blocks.clear();
             runOns.clear();
             blocks.addAll(outerBlocks);
@@ -3251,6 +3270,10 @@ final class TriggerCompiler {
             }
             case CoreSyntax.RETURN -> {
                 Block handler = returnable();
+                if (fence != null && (handler == null || fence.contains(handler))) {
+                    throw new CompileException(line, "Can't return from code that runs on its own, after the trigger"
+                            + " has gone on. Use 'stop' to end it.");
+                }
                 if (handler != null) {
                     returnFromSection(handler, (Expr) effect.match().values().getFirst());
                     return;
@@ -3476,6 +3499,10 @@ final class TriggerCompiler {
      * first.
      */
     private void leaving(Block target) throws CompileException {
+        if (fence != null && fence.contains(target)) {
+            throw new CompileException(line, "Can't leave '" + source.strip() + "''s section this way: its code runs on"
+                    + " its own, after the trigger has gone on. Use 'stop' to end it.");
+        }
         abandonPausingSections(target);
         boolean left = false;
         int thread = -1;

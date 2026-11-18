@@ -582,7 +582,17 @@ public final class Library implements Registrar {
     }
 
     /** A section whose code runs later, for events of its own: what they're called and their classes. */
-    public record Later(String eventName, List<Class<?>> eventClasses) {}
+    /**
+     * @param eventClasses the events the code runs for; empty for code that runs later in the trigger it's written in
+     *     ({@link #laterSection(String, ElementFactory, String...)})
+     */
+    public record Later(String eventName, List<Class<?>> eventClasses) {
+
+        /** Whether the code runs in the trigger it's written in, not for an event of the addon's own. */
+        public boolean sameTrigger() {
+            return eventClasses.isEmpty();
+        }
+    }
 
     private final Map<String, Later> laterSections = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -595,6 +605,18 @@ public final class Library implements Registrar {
         }
         java.util.Objects.requireNonNull(eventName, "eventName");
         laterSections.put(id, new Later(eventName, List.copyOf(eventClasses)));
+        add(SyntaxKind.SECTION, id, null, factory, patterns);
+        add(SyntaxKind.EFFECT, id, null, (ElementFactory<Effect>) info -> {
+            co.xenastudios.neoskript.api.element.LaterSection section = factory.create(info);
+            return (context, arguments) -> section.run(context, arguments, null);
+        }, patterns);
+    }
+
+    @Override
+    public void laterSection(String id, ElementFactory<co.xenastudios.neoskript.api.element.LaterSection> factory,
+            String... patterns) {
+        checkOpen();
+        laterSections.put(id, new Later(null, List.of()));
         add(SyntaxKind.SECTION, id, null, factory, patterns);
         add(SyntaxKind.EFFECT, id, null, (ElementFactory<Effect>) info -> {
             co.xenastudios.neoskript.api.element.LaterSection section = factory.create(info);
