@@ -68,4 +68,48 @@ public final class CompatBridge {
     public static Class<?> enchantmentTypeClass() {
         return Enchantments.Levelled.class;
     }
+
+    /** NeoSkript's named colour with this enum name ({@code LIGHT_GREY}) or script name ({@code silver}), or null. */
+    public static Object namedColour(String name) {
+        for (Colors.Named colour : Colors.Named.values()) {
+            if (colour.name().equals(name)) {
+                return colour;
+            }
+            for (String written : colour.names) {
+                if (written.equalsIgnoreCase(name)) {
+                    return colour;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** The enum name of a named colour ({@code LIGHT_GREY}), or null for another colour. */
+    public static String colourName(Object colour) {
+        return colour instanceof Colors.Named named ? named.name() : null;
+    }
+
+    /** A colour's red, green, blue and alpha. */
+    public static int[] colourRgba(Object colour) {
+        Colors.Colour c = (Colors.Colour) colour;
+        return new int[] {c.red(), c.green(), c.blue(), c.alpha()};
+    }
+
+    /** NeoSkript's colour of this red, green, blue and alpha, not a named one. */
+    public static Object rgbColour(int red, int green, int blue, int alpha) {
+        return new Colors.Rgb(red, green, blue, alpha);
+    }
+
+    /** The class of NeoSkript's colours, of its named colours and of its others. */
+    public static Class<?> colourClass() {
+        return Colors.Colour.class;
+    }
+
+    public static Class<?> namedColourClass() {
+        return Colors.Named.class;
+    }
+
+    public static Class<?> rgbColourClass() {
+        return Colors.Rgb.class;
+    }
 }

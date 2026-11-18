@@ -31,6 +31,13 @@ final class CompatAdapters {
             new Adapter(ch.njol.skript.util.Timespan.class, co.xenastudios.neoskript.runtime.Timespan.class,
                     ch.njol.skript.util.Timespan::of,
                     value -> ((ch.njol.skript.util.Timespan) value).neoskript()),
+            // A named colour is Skript's SkriptColor, any other a ColorRGB; Color is for the type as a whole.
+            new Adapter(ch.njol.skript.util.SkriptColor.class, co.xenastudios.neoskript.paper.CompatBridge.namedColourClass(),
+                    ch.njol.skript.util.Color::of, value -> ch.njol.skript.util.Color.neoskript((ch.njol.skript.util.Color) value)),
+            new Adapter(ch.njol.skript.util.ColorRGB.class, co.xenastudios.neoskript.paper.CompatBridge.rgbColourClass(),
+                    ch.njol.skript.util.Color::of, value -> ch.njol.skript.util.Color.neoskript((ch.njol.skript.util.Color) value)),
+            new Adapter(ch.njol.skript.util.Color.class, co.xenastudios.neoskript.paper.CompatBridge.colourClass(),
+                    ch.njol.skript.util.Color::of, value -> ch.njol.skript.util.Color.neoskript((ch.njol.skript.util.Color) value)),
             new Adapter(ch.njol.skript.util.slot.Slot.class, co.xenastudios.neoskript.paper.CompatBridge.slotClass(),
                     ch.njol.skript.util.slot.Slot::of,
                     // A slot an addon made itself stays the addon's.

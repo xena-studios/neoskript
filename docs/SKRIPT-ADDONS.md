@@ -265,7 +265,7 @@ the addon's name and the element's class (`SkBee:ExprWorldHeight`).
 - **Runtime errors** name the addon: what an element throws while it runs becomes "SkBee's ExprStoredEnchant threw in
   SkBee's code: ..." ("in SkBee's code" when the addon's own code threw, not NeoSkriptCompat's), and the trigger goes
   on as with NeoSkript's other runtime errors.
-- **Value adapters** (D24) so far: `ItemType`, `EntityData`, `EnchantmentType`, `Timespan`, and `Slot` (an inventory's as `InventorySlot`).
+- **Value adapters** (D24) so far: `ItemType`, `EntityData`, `EnchantmentType`, `Timespan`, `Color` (`SkriptColor`, `ColorRGB`), and `Slot` (an inventory's as `InventorySlot`).
 - **Conversions and comparisons** go to NeoSkript where they involve a class NeoSkript has no type for, so they
   don't change how NeoSkript's own types behave. **Event values** go where NeoSkript has no value of that type for
   the event (or a superclass of it): an addon's events get theirs, and NeoSkript's own event values stay as they
