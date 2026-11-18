@@ -4640,6 +4640,10 @@ final class TriggerCompiler {
 
     private void condition(ParsedSyntax condition) throws CompileException {
         List<Object> values = condition.match().values();
+        if (condition.syntax().id().equals("CondCompare")) {
+            entityWordsWithoutEntity(values);
+            uncomparable(values);
+        }
         if (condition.syntax().id().equals("CondCompare") && values.stream().anyMatch(v -> v instanceof Expr.Unresolved)) {
             try {
                 conditionChecked(condition, values);
@@ -4690,6 +4694,170 @@ final class TriggerCompiler {
             return;
         }
         conditionChecked(condition, values);
+    }
+
+    /**
+     * Skript's error for a comparison of two values whose types it has no comparator for ({@code CondCompare.init}):
+     * {@code 1 is "a"} compares an integer with a text. Words are the type Skript's comparison reads them as. In an
+     * 'if' or 'while' header with a value of a type on the right, Skript has first read the whole line as a
+     * comparison, of the words {@code if 1}, and that error is the one kept.
+     */
+    private void uncomparable(List<Object> values) throws CompileException {
+        if (values.size() != 2) {
+            return;
+        }
+        String[] words = new String[2];
+        String[] types = new String[2];
+        for (int i = 0; i < 2; i++) {
+            Object side = values.get(i);
+            words[i] = comparisonWords(side);
+            if (words[i] != null && eventClasses != null && !eventClasses.isEmpty()
+                    && (side instanceof Expr.Syntax || entityWords(words[i]))) {
+                // An event value, or the event's entity of a kind ('player'), this event may yet have, as Skript
+                // reads it: left to the comparison. In a function there's none, and words are only words.
+                return;
+            }
+            if (words[i] == null && side instanceof Expr expr && !(expr instanceof Expr.Variable)) {
+                String type = valueType(expr);
+                TypeRef ref = type == null || type.equals(SyntaxRegistry.OBJECT) ? null : registry.resolveType(type);
+                types[i] = ref == null ? null : ref.type().id();
+            }
+        }
+        // Words are read against the other side, the first side's first (CondCompare.attemptReconstruction).
+        if (words[0] != null) {
+            types[0] = wordTypeAgainst(words[0], types[1]);
+        }
+        if (words[1] != null) {
+            types[1] = wordTypeAgainst(words[1], types[0]);
+        }
+        // Only where a side is written out (a literal, a text or words): two other values' types are left to the
+        // comparison, which knows comparators this check doesn't.
+        boolean written = false;
+        for (int i = 0; i < 2; i++) {
+            written |= words[i] != null || values.get(i) instanceof Expr.Literal || values.get(i) instanceof Expr.Text;
+        }
+        if (!written || types[0] == null || types[1] == null
+                || comparableThrough(types[0], types[1], words[0] == null, words[1] == null)) {
+            return;
+        }
+        String second = typeWithArticle(types[1]);
+        java.util.regex.Matcher conditional = java.util.regex.Pattern
+                .compile("(?i)^((?:else )?if |(?:do )?while )").matcher(source.strip());
+        if (words[1] == null && inSectionHeader() && conditional.lookingAt() && values.get(0) instanceof Expr first
+                && !writtenText(first).contains("\"")) {
+            // Skript has read the whole line as a comparison first: its words, 'if 1', compared with the value.
+            throw new CompileException(line, "Can't compare '" + conditional.group(1) + writtenText(first) + "' with "
+                    + second);
+        }
+        throw new CompileException(line, "Can't compare " + typeWithArticle(types[0]) + " with " + second);
+    }
+
+    /**
+     * The type Skript's comparison reads {@code words} as, against a value of type {@code other} ({@code null} if
+     * unknown): the first of its types, in its order, that reads them and can be compared with the other, else the
+     * other's type if that reads them, else the first type that reads them.
+     */
+    private String wordTypeAgainst(String words, String other) {
+        List<String> order = skriptTypeOrder();
+        if (other != null) {
+            for (String type : order) {
+                if (comparable(other, type) && wordsAs(words, List.of(type)) != null) {
+                    return type;
+                }
+            }
+            if (wordsAs(words, List.of(other)) != null) {
+                return other;
+            }
+        }
+        return wordsType(words, order);
+    }
+
+    /** Whether Skript's {@code ExprEntity} reads {@code words} as the event's entity: a kind of entity, no item. */
+    private boolean entityWords(String words) {
+        if (wordsAs(words, List.of("itemtype")) != null) {
+            return false;
+        }
+        TypeRef named = registry.resolveType(words.strip().toLowerCase(Locale.ROOT));
+        if (named != null) {
+            return registry.isSubtype(named.type().id(), "entity");
+        }
+        TypeRef entity = registry.resolveType("entity");
+        return entity != null && library.request(entity, words).valueClass() != library.javaClass("entity");
+    }
+
+    /**
+     * Whether Skript has a comparator for the types, directly or through a conversion of either side, as its
+     * {@code Comparators.getComparator} finds one: a world is compared with a text, which converts to a world.
+     * Words are only converted where Skript read them as a value ({@code convertA}, {@code convertB}).
+     */
+    private boolean comparableThrough(String a, String b, boolean convertA, boolean convertB) {
+        if (comparesWith(a, b)) {
+            return true;
+        }
+        for (String via : skriptTypeOrder()) {
+            if (!via.equals(SyntaxRegistry.OBJECT)
+                    && (convertA && !via.equals(a) && registry.isAssignable(a, via) && comparesWith(via, b)
+                    || convertB && !via.equals(b) && registry.isAssignable(b, via) && comparesWith(a, via))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean comparesWith(String a, String b) {
+        return comparable(a, b) || related(a, b) || numeric(a) && numeric(b);
+    }
+
+    /** Whether one type's values are the other's: a player is an entity, compared by Skript as objects are. */
+    private boolean related(String a, String b) {
+        Class<?> x = library.javaClass(a);
+        Class<?> y = library.javaClass(b);
+        return x != null && y != null && (x.isAssignableFrom(y) || y.isAssignableFrom(x));
+    }
+
+    private boolean numeric(String type) {
+        Class<?> c = library.javaClass(type);
+        return c != null && Number.class.isAssignableFrom(c);
+    }
+
+    /**
+     * Skript's error for a type property of a kind of entity written alone, compared where the event has no such
+     * entity ({@code if name of zombie is "x"} in a function): Skript first reads the words as the event's entity
+     * ({@code ExprEntity}), and its comparison keeps that error over the property's.
+     */
+    private void entityWordsWithoutEntity(List<Object> values) throws CompileException {
+        for (Object side : values) {
+            if (!(side instanceof Expr.Syntax syntax)) {
+                continue;
+            }
+            SyntaxRegistry.PropertySyntax property = registry.propertySyntax(syntax.syntax().syntax());
+            List<Object> arguments = syntax.syntax().match().values();
+            if (property == null || property.argument() >= arguments.size()
+                    || !(arguments.get(property.argument()) instanceof Expr.Unresolved words)
+                    || wordsAs(words.text(), List.of("itemtype")) != null) {
+                continue;
+            }
+            TypeRef entity = registry.resolveType("entity");
+            if (entity == null) {
+                return;
+            }
+            Library.EventValueRequest request = library.request(entity, words.text());
+            if (request.valueClass() == library.javaClass("entity")) {
+                continue;
+            }
+            Library.EventValueLookup lookup = library.eventValue(eventClasses == null ? List.of() : eventClasses,
+                    request.valueClass(), request.type(), 0, eventDescription());
+            if (lookup.getter() == null && lookup.error() != null) {
+                throw new CompileException(line, lookup.error());
+            }
+        }
+    }
+
+    /** A type by Skript's name for it, with its article: 'an integer'. */
+    private String typeWithArticle(String type) {
+        TypeRef ref = registry.resolveType(type);
+        String name = ref == null ? type : ref.type().name();
+        return article(name) + " " + name;
     }
 
     /** Words that are a function's argument themselves, being compiled. */
