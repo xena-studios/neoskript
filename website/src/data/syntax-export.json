@@ -15,6 +15,14 @@
       }
     },
     {
+      "kind": "structure",
+      "id": "NeoSkriptReflectStructImport",
+      "patterns": [
+        "import"
+      ],
+      "addon": "NeoSkriptReflect"
+    },
+    {
       "kind": "event",
       "id": "EvtPeriodical",
       "patterns": [
@@ -5503,6 +5511,17 @@
     },
     {
       "kind": "event",
+      "id": "NeoSkriptReflectEvtByReflection",
+      "patterns": [
+        "%javatypes%"
+      ],
+      "parser": {
+        "scope": 178
+      },
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "event",
       "id": "NeoSkriptWebEvtSkJsonResponse",
       "patterns": [
         "received [http] response",
@@ -5515,7 +5534,7 @@
         }
       ],
       "parser": {
-        "scope": 178
+        "scope": 179
       },
       "addon": "NeoSkriptWeb"
     },
@@ -5526,7 +5545,7 @@
         "network message [(on|in|from) [the] channel[s] %-strings%]"
       ],
       "parser": {
-        "scope": 179
+        "scope": 180
       },
       "addon": "NeoSkriptProxy"
     },
@@ -5537,7 +5556,7 @@
         "redis message"
       ],
       "parser": {
-        "scope": 179
+        "scope": 180
       },
       "addon": "NeoSkriptProxy"
     },
@@ -5548,7 +5567,7 @@
         "custom redis message"
       ],
       "parser": {
-        "scope": 179
+        "scope": 180
       },
       "addon": "NeoSkriptProxy"
     },
@@ -5572,7 +5591,7 @@
         }
       ],
       "parser": {
-        "scope": 180
+        "scope": 181
       },
       "addon": "NeoSkriptPlaceholders"
     },
@@ -7199,6 +7218,18 @@
       ]
     },
     {
+      "kind": "effect",
+      "id": "NeoSkriptReflectEffJavaCall",
+      "patterns": [
+        "[try:try] %object%..%string%",
+        "[try:try] %object%..%string%\\([%-objects%]\\)",
+        "[try:try] %object%.<(?:\\[[\\w.$]*])?(?!class(?![^. \\[\\]()\"{}%,]))[^0-9. \\[\\]()\"{}%,][^. \\[\\]()\"{}%,]*(?:\\[[\\w.$, \\[\\]]*])?>",
+        "[try:try] %object%.<(?:\\[[\\w.$]*])?(?!class(?![^. \\[\\]()\"{}%,]))[^0-9. \\[\\]()\"{}%,][^. \\[\\]()\"{}%,]*(?:\\[[\\w.$, \\[\\]]*])?>\\([%-objects%]\\)",
+        "[try:try] [a] new %javatype%\\([%-objects%]\\)"
+      ],
+      "addon": "NeoSkriptReflect"
+    },
+    {
       "kind": "condition",
       "id": "CondBrewingConsume",
       "patterns": [
@@ -8558,6 +8589,24 @@
     },
     {
       "kind": "condition",
+      "id": "NeoSkriptReflectCondIsInstanceOf",
+      "patterns": [
+        "%objects% (is|are) [a[n]] instance[s] of %javatypes%",
+        "%objects% (is not|isn't|are not|aren't) [a[n]] instance[s] of %javatypes%"
+      ],
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptProxyCondNetworkVariables",
+      "patterns": [
+        "[the] network variables are available",
+        "[the] network variables (aren't|are not) available"
+      ],
+      "addon": "NeoSkriptProxy"
+    },
+    {
+      "kind": "condition",
       "id": "NeoSkriptYamlCondHasList",
       "patterns": [
         "[skript-]y[a]ml [(node|path)[s]] %string% (of|in|from) %string% has [a] list",
@@ -8752,6 +8801,18 @@
         "%objects@1% (will be|not:will (not|neither) be|not:won't be) (ge:(greater|more|higher|bigger|larger|above) [than] or (equal to|the same as)|gt:(greater|more|higher|bigger|larger) than|gt:above|le:(less|smaller|lower|below) [than] or (equal to|the same as)|lt:(less|smaller|lower) than|lt:below|eq:[equal to|the same as]) %objects%",
         "%objects@1% ((is|are)|not:(isn't|aren't|is not|are not)) (turning|changing) [in]to %objects%"
       ]
+    },
+    {
+      "kind": "condition",
+      "id": "NeoSkriptReflectCondJavaCall",
+      "patterns": [
+        "[try:try] %object%..%string%",
+        "[try:try] %object%..%string%\\([%-objects%]\\)",
+        "[try:try] %object%.<(?:\\[[\\w.$]*])?(?!class(?![^. \\[\\]()\"{}%,]))[^0-9. \\[\\]()\"{}%,][^. \\[\\]()\"{}%,]*(?:\\[[\\w.$, \\[\\]]*])?>",
+        "[try:try] %object%.<(?:\\[[\\w.$]*])?(?!class(?![^. \\[\\]()\"{}%,]))[^0-9. \\[\\]()\"{}%,][^. \\[\\]()\"{}%,]*(?:\\[[\\w.$, \\[\\]]*])?>\\([%-objects%]\\)",
+        "[try:try] [a] new %javatype%\\([%-objects%]\\)"
+      ],
+      "addon": "NeoSkriptReflect"
     },
     {
       "kind": "expression",
@@ -13305,6 +13366,129 @@
     },
     {
       "kind": "expression",
+      "id": "NeoSkriptReflectExprNull",
+      "patterns": [
+        "null"
+      ],
+      "returnType": "null",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprJavaType",
+      "patterns": [
+        "[the] [java] class %string%"
+      ],
+      "returnType": "javatype",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprJavaTypeOf",
+      "patterns": [
+        "[the] [java] class[es] of %objects%",
+        "%objects%'[s] [java] class[es]"
+      ],
+      "returnType": "javatype",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprClassReference",
+      "patterns": [
+        "<(boolean|byte|char|double|float|int|long|short)>.class",
+        "%javatype%.class"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprNewArray",
+      "patterns": [
+        "new <(boolean|byte|char|double|float|int|long|short)>\\[%number%\\]",
+        "new %javatype%\\[%number%\\]"
+      ],
+      "returnType": "javaobject",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprArrayAccess",
+      "patterns": [
+        "%javaobject%\\[%number%\\]"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprCollect",
+      "patterns": [
+        "\\[%objects%[ as %-javatype%[ ]]\\]"
+      ],
+      "returnType": "javaobject",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprSpread",
+      "patterns": [
+        "...%object%",
+        "…%object%"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprMembers",
+      "patterns": [
+        "[the] (fields:fields|methods:methods|constructors:constructors) of %objects%",
+        "%objects%'[s] (fields:fields|methods:methods|constructors:constructors)"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprMemberNames",
+      "patterns": [
+        "[the] (field:field|method:method) names of %objects%",
+        "%objects%'[s] (field:field|method:method) names"
+      ],
+      "returnType": "string",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprPlugin",
+      "patterns": [
+        "[(an|the)] instance of [the] plugin %javatype/string%"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprEvent",
+      "patterns": [
+        "[the] event"
+      ],
+      "returnType": "event",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprJavaError",
+      "patterns": [
+        "[the] [last] [java] (throwable|exception|error)"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "kind": "expression",
       "id": "NeoSkriptDbExprDatabase",
       "patterns": [
         "[the] data(base|[ ]source) [(of|at)] %string% [with [a] [max[imum]] [connection] life[ ]time of %-timespan%] [[(using|with)] [a] driver %-string%]"
@@ -14280,6 +14464,19 @@
         "[a] loot context %direction% %location%"
       ],
       "returnType": "lootcontext"
+    },
+    {
+      "kind": "expression",
+      "id": "NeoSkriptReflectExprJavaCall",
+      "patterns": [
+        "[try:try] %object%..%string%",
+        "[try:try] %object%..%string%\\([%-objects%]\\)",
+        "[try:try] %object%.<(?:\\[[\\w.$]*])?(?!class(?![^. \\[\\]()\"{}%,]))[^0-9. \\[\\]()\"{}%,][^. \\[\\]()\"{}%,]*(?:\\[[\\w.$, \\[\\]]*])?>",
+        "[try:try] %object%.<(?:\\[[\\w.$]*])?(?!class(?![^. \\[\\]()\"{}%,]))[^0-9. \\[\\]()\"{}%,][^. \\[\\]()\"{}%,]*(?:\\[[\\w.$, \\[\\]]*])?>\\([%-objects%]\\)",
+        "[try:try] [a] new %javatype%\\([%-objects%]\\)"
+      ],
+      "returnType": "object",
+      "addon": "NeoSkriptReflect"
     },
     {
       "kind": "expression",
@@ -18434,6 +18631,68 @@
           "queues"
         ]
       }
+    },
+    {
+      "id": "javatype",
+      "name": "java type",
+      "plural": "java types",
+      "parser": {
+        "names": [
+          "java type",
+          "javatype"
+        ],
+        "pluralNames": [
+          "java types",
+          "javatypes"
+        ],
+        "strict": true,
+        "openLiterals": true
+      },
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "id": "null",
+      "name": "null",
+      "plural": "nulls",
+      "parser": {
+        "names": [
+          "null"
+        ],
+        "pluralNames": [
+          "nulls"
+        ]
+      },
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "id": "event",
+      "name": "event",
+      "plural": "events",
+      "parser": {
+        "names": [
+          "event"
+        ],
+        "pluralNames": [
+          "events"
+        ]
+      },
+      "addon": "NeoSkriptReflect"
+    },
+    {
+      "id": "javaobject",
+      "name": "java object",
+      "plural": "java objects",
+      "parser": {
+        "names": [
+          "java object",
+          "javaobject"
+        ],
+        "pluralNames": [
+          "java objects",
+          "javaobjects"
+        ]
+      },
+      "addon": "NeoSkriptReflect"
     },
     {
       "id": "httpresponse",
@@ -25889,6 +26148,77 @@
       },
       {
         "values": [
+          "integer",
+          "offlineplayer",
+          "gamemode",
+          "textcomponent",
+          "entitytype",
+          "pluralentitytype",
+          "itemcomponent",
+          "equippablecomponent",
+          "countedentitytype",
+          "vehicle",
+          "worldborder",
+          "skriptpotioneffect",
+          "hiddenpotioneffect",
+          "villagerprofession",
+          "display",
+          "blockdata",
+          "loottable",
+          "lootcontext",
+          "healreason",
+          "teleportcause",
+          "spawnreason",
+          "respawnreason",
+          "transformreason",
+          "unleashreason",
+          "inventoryaction",
+          "inventoryclosereason",
+          "quitreason",
+          "fishingstate",
+          "potioncause",
+          "potionaction",
+          "experiencecooldownchangereason",
+          "villagercareerchangereason",
+          "fireworkeffect",
+          "response"
+        ],
+        "plurals": [
+          "offlineplayer",
+          "player",
+          "world",
+          "textcomponent",
+          "color",
+          "location",
+          "entitytype",
+          "pluralentitytype",
+          "itemtype",
+          "inventory",
+          "inventoryholder",
+          "slot",
+          "itemcomponent",
+          "equippablecomponent",
+          "countedentitytype",
+          "enchantmenttype",
+          "livingentity",
+          "projectile",
+          "vehicle",
+          "itementity",
+          "display",
+          "inputkey"
+        ],
+        "defaults": [
+          "offlineplayer",
+          "equippablecomponent",
+          "worldborder",
+          "skriptpotioneffect",
+          "display",
+          "lootcontext",
+          "fireworkeffect"
+        ]
+      },
+      {
+        "values": [
           "object",
           "response"
         ],
@@ -25990,7 +26320,7 @@
         "defaults": []
       }
     ],
-    "commandScope": 181,
-    "functionScope": 182
+    "commandScope": 182,
+    "functionScope": 183
   }
 }
