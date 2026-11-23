@@ -2,11 +2,11 @@
 
 **Keep your scripts. Lose the lag.**
 
-<!-- Badges: Devin's Badges, and ours from xena-studios/brand (docs/badges.md there says which go where). -->
-<a href="https://modrinth.com/plugin/neoskript"><img alt="Available on Modrinth" height="32" src="https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/compact/available/modrinth_vector.svg"></a>
-<img alt="Available for Paper" height="32" src="https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/compact/supported/paper_vector.svg">
-<img alt="Available for Folia" height="32" src="https://raw.githubusercontent.com/xena-studios/brand/main/badges/compact/supported/folia.svg">
-<a href="https://neoskript.dev/docs/"><img alt="Read the Docs" height="32" src="https://raw.githubusercontent.com/xena-studios/brand/main/badges/compact/documentation/docs.svg"></a>
+<!-- Badges: Xena's, from xena-studios/brand (docs/badges.md there says which go where). -->
+<a href="https://modrinth.com/plugin/neoskript"><img alt="Available on Modrinth" height="32" src="https://raw.githubusercontent.com/xena-studios/brand/main/badges/neoskript/compact/modrinth.svg"></a>
+<img alt="Runs on Paper" height="32" src="https://raw.githubusercontent.com/xena-studios/brand/main/badges/neoskript/compact/paper.svg">
+<img alt="Runs on Folia" height="32" src="https://raw.githubusercontent.com/xena-studios/brand/main/badges/neoskript/compact/folia.svg">
+<a href="https://neoskript.dev/docs/"><img alt="Read the Docs" height="32" src="https://raw.githubusercontent.com/xena-studios/brand/main/badges/neoskript/compact/docs.svg"></a>
 
 NeoSkript is a fast, modern drop-in replacement for [Skript](https://github.com/SkriptLang/Skript). Your `.sk` scripts run unchanged, only faster, on Paper and Folia.
 
