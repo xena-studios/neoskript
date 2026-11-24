@@ -2,6 +2,12 @@
 
 **Keep your scripts. Lose the lag.**
 
+<!-- Badges: Xena's, from xena-studios/brand (docs/badges.md there says which go where). -->
+<a href="https://modrinth.com/plugin/neoskript"><img alt="Available on Modrinth" height="32" src="https://cdn.jsdelivr.net/gh/xena-studios/brand@1/badges/neoskript/compact/modrinth.svg"></a>
+<img alt="Runs on Paper" height="32" src="https://cdn.jsdelivr.net/gh/xena-studios/brand@1/badges/neoskript/compact/paper.svg">
+<img alt="Runs on Folia" height="32" src="https://cdn.jsdelivr.net/gh/xena-studios/brand@1/badges/neoskript/compact/folia.svg">
+<a href="https://neoskript.dev/docs/"><img alt="Read the Docs" height="32" src="https://cdn.jsdelivr.net/gh/xena-studios/brand@1/badges/neoskript/compact/docs.svg"></a>
+
 NeoSkript is a fast, modern drop-in replacement for [Skript](https://github.com/SkriptLang/Skript). Your `.sk` scripts run unchanged, only faster, on Paper and Folia.
 
 **Status:** public beta, [0.1.0-beta.1](https://github.com/xena-studios/neoskript/releases/tag/v0.1.0-beta.1). Skript's whole test suite passes on NeoSkript. See [progress](docs/PROGRESS.md).
