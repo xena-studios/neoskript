@@ -50,4 +50,16 @@ public interface Variables {
      * @param name the list's name without {@code ::*}
      */
     void deleteList(String name);
+
+    /**
+     * The databases variables are saved in, from the top of config.yml's {@code databases} section, the disabled ones
+     * left out. Unlike the other methods, this works before NeoSkript is ready: the databases are opened by then, if
+     * not yet loaded.
+     *
+     * @return the databases, or an empty list if they couldn't be opened
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default java.util.List<VariableDatabase> databases() {
+        return java.util.List.of();
+    }
 }

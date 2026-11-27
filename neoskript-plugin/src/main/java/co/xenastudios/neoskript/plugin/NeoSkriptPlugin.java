@@ -225,7 +225,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (!deferSyntax) {
             loadVariables();
         }
-        AddonApi api = new AddonApi(this, addons, scripts.globals(), library, getSLF4JLogger());
+        AddonApi api = new AddonApi(this, addons, scripts.globals(), library, getSLF4JLogger(), this::databases);
         addonApi = api;
         co.xenastudios.neoskript.api.Installed.install(api);
         // An addon disables before NeoSkript when the server stops, and its classes go with it. Its values in
@@ -670,6 +670,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                                         database.name(), database.host(), database.port(), database.database(),
                                         database.user(), database.password(), database.table(),
                                         database.monitorChanges(), database.monitorInterval().millis());
+                sql = sql.withMerge(database.mergeChanges());
                 // Kept per database, by a hash of its type, where it is and its table.
                 return new co.xenastudios.neoskript.runtime.variables.storage.SqlVariableStorage(globals, codecs, sql,
                         routing, data.resolve("pending"), console);
