@@ -4173,7 +4173,7 @@ final class TriggerCompiler {
             if (!lax || !Values.hasChanger(changeMode)) {
                 return false;
             }
-            changeValues(effect, mode, target);
+            changeValues(effect, mode, target, null);
             return true;
         }
         if (typed.accepted() == null) {
@@ -4183,7 +4183,7 @@ final class TriggerCompiler {
         if (mode.value >= 0) {
             checkChanger((Expr) effect.match().values().get(mode.value), typed.accepted(), changeMode, typed.what());
         }
-        changeValues(effect, mode, target);
+        changeValues(effect, mode, target, typed.accepted());
         return true;
     }
 
@@ -4191,10 +4191,21 @@ final class TriggerCompiler {
      * {@code give a diamond to player}: changes the target's values themselves, with the changers
      * registered for their classes.
      */
-    private void changeValues(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr target) throws CompileException {
+    private void changeValues(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr target, Class<?>[] accepted)
+            throws CompileException {
         expression(target);
         if (mode.value >= 0) {
-            expression((Expr) effect.match().values().get(mode.value));
+            // Words are first tried as what the values take, as Skript's change effect reads them: 'set block at X
+            // to cactus' is the item, though where any value goes 'cactus' is the damage type.
+            List<String> outerLiteralTypes = literalTypes;
+            if (accepted != null) {
+                literalTypes = library.typesOf(accepted);
+            }
+            try {
+                expression((Expr) effect.match().values().get(mode.value));
+            } finally {
+                literalTypes = outerLiteralTypes;
+            }
         } else {
             method.visitInsn(ACONST_NULL);
         }
@@ -4639,6 +4650,12 @@ final class TriggerCompiler {
     // ---------------------------------------------------------------- elements
 
     private void condition(ParsedSyntax condition) throws CompileException {
+        if (isCore(condition, CoreSyntax.DELAY_CHECK)) {
+            // Known while compiling, as Skript's CondHasDelayBefore decides it while parsing.
+            method.visitInsn(CoreSyntax.delayCheckHolds(condition.match(), script.delayBefore(currentLine))
+                    ? ICONST_1 : ICONST_0);
+            return;
+        }
         List<Object> values = condition.match().values();
         if (condition.syntax().id().equals("CondCompare") && values.stream().anyMatch(v -> v instanceof Expr.Unresolved)) {
             try {
