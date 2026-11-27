@@ -4736,15 +4736,15 @@ final class TriggerCompiler {
         for (int i = 0; i < 2; i++) {
             written |= words[i] != null || values.get(i) instanceof Expr.Literal || values.get(i) instanceof Expr.Text;
         }
-        if (!written || types[0] == null || types[1] == null
-                || comparableThrough(types[0], types[1], words[0] == null, words[1] == null)) {
+        if (!written || types[0] == null || types[1] == null || !skriptType(types[0]) || !skriptType(types[1])
+                || skriptComparable(types[0], types[1])) {
             return;
         }
         String second = typeWithArticle(types[1]);
         java.util.regex.Matcher conditional = java.util.regex.Pattern
                 .compile("(?i)^((?:else )?if |(?:do )?while )").matcher(source.strip());
-        if (words[1] == null && inSectionHeader() && conditional.lookingAt() && values.get(0) instanceof Expr first
-                && !writtenText(first).contains("\"")) {
+        if (words[1] == null && !literals(values.get(1)) && inSectionHeader() && conditional.lookingAt()
+                && values.get(0) instanceof Expr first && !writtenText(first).contains("\"")) {
             // Skript has read the whole line as a comparison first: its words, 'if 1', compared with the value.
             throw new CompileException(line, "Can't compare '" + conditional.group(1) + writtenText(first) + "' with "
                     + second);
@@ -4761,7 +4761,7 @@ final class TriggerCompiler {
         List<String> order = skriptTypeOrder();
         if (other != null) {
             for (String type : order) {
-                if (comparable(other, type) && wordsAs(words, List.of(type)) != null) {
+                if (skriptComparable(other, type) && wordsAs(words, List.of(type)) != null) {
                     return type;
                 }
             }
@@ -4770,6 +4770,19 @@ final class TriggerCompiler {
             }
         }
         return wordsType(words, order);
+    }
+
+    /** Whether Skript's {@code ExprEntity} reads {@code words} as the event's entity: a kind of entity, no item. */
+    private boolean entityWords(String words) {
+        if (wordsAs(words, List.of("itemtype")) != null) {
+            return false;
+        }
+        TypeRef named = registry.resolveType(words.strip().toLowerCase(Locale.ROOT));
+        if (named != null) {
+            return registry.isSubtype(named.type().id(), "entity");
+        }
+        TypeRef entity = registry.resolveType("entity");
+        return entity != null && library.request(entity, words).valueClass() != library.javaClass("entity");
     }
 
     /** Whether Skript's {@code ExprEntity} reads {@code words} as the event's entity: a kind of entity, no item. */
@@ -4808,16 +4821,51 @@ final class TriggerCompiler {
         return comparable(a, b) || related(a, b) || numeric(a) && numeric(b);
     }
 
-    /** Whether one type's values are the other's: a player is an entity, compared by Skript as objects are. */
-    private boolean related(String a, String b) {
-        Class<?> x = library.javaClass(a);
-        Class<?> y = library.javaClass(b);
-        return x != null && y != null && (x.isAssignableFrom(y) || y.isAssignableFrom(x));
+    /**
+     * Whether a side is literals only: a number, a boolean, a timespan ({@code 1 or 2}). Skript reads them as
+     * unparsed literals of no type, so reading the whole 'if' line as a comparison gives no error of its own.
+     */
+    private static boolean literals(Object side) {
+        return side instanceof Expr.Literal
+                || side instanceof Expr.ListOf list && list.items().stream().allMatch(TriggerCompiler::literals);
     }
 
-    private boolean numeric(String type) {
-        Class<?> c = library.javaClass(type);
-        return c != null && Number.class.isAssignableFrom(c);
+    /** Whether {@code type} is one of Skript's own types, whose comparisons {@code skript-comparators.txt} lists. */
+    private static boolean skriptType(String type) {
+        return SKRIPT_TYPES.contains(type);
+    }
+
+    /** Whether Skript 2.17 can compare values of the two types, from {@code skript-comparators.txt}. */
+    static boolean skriptComparable(String a, String b) {
+        return SKRIPT_COMPARATORS.contains(a + "\t" + b) || SKRIPT_COMPARATORS.contains(b + "\t" + a);
+    }
+
+    /** Skript's comparable pairs of types, by NeoSkript's ids, as {@code a\tb}. */
+    private static final java.util.Set<String> SKRIPT_COMPARATORS;
+    /** Skript's types, by NeoSkript's ids. */
+    private static final java.util.Set<String> SKRIPT_TYPES;
+
+    static {
+        java.util.Set<String> pairs = new java.util.HashSet<>();
+        java.util.Set<String> types = new java.util.HashSet<>();
+        for (String line : loadLines("skript-comparators.txt")) {
+            String[] columns = line.split("\t");
+            pairs.add(skriptId(columns[0]) + "\t" + skriptId(columns[1]));
+            types.add(skriptId(columns[0]));
+            types.add(skriptId(columns[1]));
+        }
+        SKRIPT_COMPARATORS = java.util.Set.copyOf(pairs);
+        // Every type of Skript's is in a pair: anything compares with a type of types.
+        SKRIPT_TYPES = java.util.Set.copyOf(types);
+    }
+
+    /** NeoSkript's id for a Skript code name: Skript's 'entitydata' is 'entitytype', its 'entitytype' 'countedentitytype'. */
+    private static String skriptId(String code) {
+        return switch (code) {
+            case "entitydata" -> "entitytype";
+            case "entitytype" -> "countedentitytype";
+            default -> code;
+        };
     }
 
     /**
@@ -4853,10 +4901,9 @@ final class TriggerCompiler {
         }
     }
 
-    /** A type by Skript's name for it, with its article: 'an integer'. */
+    /** A type by Skript's name for it, with its article: 'an integer', 'a boolean (yes/no)'. */
     private String typeWithArticle(String type) {
-        TypeRef ref = registry.resolveType(type);
-        String name = ref == null ? type : ref.type().name();
+        String name = skriptTypeName(type);
         return article(name) + " " + name;
     }
 

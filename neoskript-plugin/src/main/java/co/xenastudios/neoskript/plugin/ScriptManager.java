@@ -176,9 +176,12 @@ final class ScriptManager {
         }
     }
 
-    /** Loads every script when the server starts. */
+    /**
+     * Loads every script when the server starts, on its first tick, as Skript does. Load events run straight away,
+     * before the scripts are said to be loaded and before anything else that tick (a console command) runs.
+     */
     synchronized void loadAll() throws IOException {
-        Outcome outcome = load(null, problem -> {}, false, ScriptManager::toConsole);
+        Outcome outcome = load(null, problem -> {}, true, ScriptManager::toConsole);
         int triggers = loaded.values().stream().mapToInt(List::size).sum();
         // Skript doesn't say at config.yml's 'verbosity: low'.
         if (!Logging.logs(NeoSkriptConfig.Verbosity.NORMAL)) {
@@ -282,7 +285,7 @@ final class ScriptManager {
         return load(scope, problems, false);
     }
 
-    /** With {@code now}, load events run straight away rather than on the next tick: for loads a script asks for. */
+    /** With {@code now}, load events run straight away rather than on the next tick: for loads on the global thread. */
     private Outcome load(Predicate<String> scope, Consumer<String> problems, boolean now) throws IOException {
         return load(scope, problems, now, null);
     }
