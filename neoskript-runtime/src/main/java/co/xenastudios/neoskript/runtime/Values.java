@@ -89,24 +89,33 @@ public final class Values {
             return null;
         }
         lastParseError = null;
-        parserError = null;
-        Object parsed = ((Function<String, ?>) parser).apply(string.strip());
-        if (parsed == null) {
-            lastParseError = parserError != null ? parserError : string + " could not be parsed as " + what;
+        parserError.remove();
+        Object parsed;
+        String said;
+        try {
+            parsed = ((Function<String, ?>) parser).apply(string.strip());
+        } finally {
+            said = parserError.get();
+            parserError.remove();
         }
-        parserError = null;
+        if (parsed == null) {
+            lastParseError = said != null ? said : string + " could not be parsed as " + what;
+        }
         return parsed;
     }
 
-    /** What the running parser said was wrong, for {@link #parseError}; or {@code null}. */
-    private static volatile String parserError;
+    /**
+     * What the parser running on this thread said was wrong, for {@link #parseError}; or {@code null}. Per
+     * thread, as Folia's regions parse at once: one region's parser mustn't word another's error.
+     */
+    private static final ThreadLocal<String> parserError = new ThreadLocal<>();
 
     /**
      * Says why the parser running for {@code parsed as} turns its text down, as Skript's parsers log an error
      * ({@code 'any sword' represents multiple materials}): that's then the last parse error.
      */
     public static void parseError(String message) {
-        parserError = message;
+        parserError.set(message);
     }
 
     /** Skript's {@code the last parse error}: why the last {@code parsed as} failed, or {@code null}. */
