@@ -1,0 +1,39 @@
+# Checks: event values an event doesn't have, loaded to compare the messages.
+
+on join:
+	set {_a} to event-block
+	set {_b} to attacker
+	set {_c} to victim
+	send "%event-block%" to player
+	set {_d} to event-entity
+	set {_e} to event-blocks
+	set {_f} to event-item
+	set {_g} to event-zombie
+	set {_h} to the player
+	set {_i} to event-world
+	set {_j} to event-location
+
+on damage:
+	set {_a} to event-block
+	set {_d} to attacker
+	set {_e} to event-player
+
+on break:
+	set {_a} to event-entity
+	set {_b} to event-block
+	set {_c} to event-blocks
+	set {_d} to event-player
+
+on explode:
+	set {_a} to event-block
+	set {_b} to event-blocks
+
+command /evtest:
+	trigger:
+		set {_a} to event-block
+		set {_b} to event-player
+		set {_c} to event-world
+
+function evtest():
+	set {_a} to event-block
+	set {_b} to event-player

@@ -1,0 +1,20 @@
+# Lines on which NeoSkript's server and the reference Skript still disagree, so they aren't in the differential's
+# checks. The parser-parity scenario checks the browser says what NeoSkript's server says.
+
+on join:
+	# Skript: '1 stone brick' can't be added to a player because the former is neither an item type, ...
+	give player 1 stone brick
+	# Skript: {_a} can only be set to one class java.lang.Object, not more
+	set {_a} to stone sword, stone pickaxe, 16 bread and leather chestplate
+	# Skript: Can't understand this condition/effect: spawn a farmer villager at player
+	spawn a farmer villager at player
+
+on damage:
+	set {_a} to event-block
+	# Skript: no error on these two, where 'player' is the entity type.
+	set {_b} to player
+	set {_c} to player
+
+function gaps():
+	# Skript: no error.
+	set {_c} to player

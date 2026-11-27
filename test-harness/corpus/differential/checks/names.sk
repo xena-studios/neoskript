@@ -1,0 +1,46 @@
+# Checks: item and entity names, known and unknown, loaded to compare the messages.
+
+on join:
+	give player 5 of nonexistant_item
+	give player a stne
+	give player 2 diamond swrds
+	give player a diamond sword of sharpnes 2
+	give player a diamond sword of sharpness 2
+	give player 5 of stone
+	give player 2 oak planks
+	give player 3 stone bricks
+	give player a dirt block
+	give player speed potion
+	give player potion of swiftness
+	give player splash potion of zzz
+	give player minecraft:stone
+	give player oak_stairs
+	give player plain stone
+	give player all diamond swords
+	give player an enchanted golden apple
+	give player 3 of any boots
+	set {_b} to stone sword, stne pickaxe and bread
+	set block at player to water
+	set block at player to watr
+	if player's tool is stne:
+		stop
+	if player's tool is a diamond pickaxe:
+		stop
+	spawn a zombi at player
+	spawn a zombie at player
+	spawn 3 baby zombies at player
+	spawn 3 baby zombis at player
+	spawn a red sheep at player
+	spawn a rde sheep at player
+	spawn a lucy axolotl at player
+	spawn a primed tnt at player
+	spawn an armor stand at player
+	spawn a dropped stone at player
+	spawn a dropped stne at player
+	spawn a falling sand at player
+	spawn an angry bee with nectar at player
+	spawn a stone block display at player
+	spawn a tamed wolf at player
+	kill all zombies
+	kill all zombis
+	kill all creepers in world "world"
