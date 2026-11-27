@@ -272,6 +272,23 @@ final class Items {
                 .filter(each -> each.material().isItem()).toArray());
         registrar.cloner(ItemStack.class, ItemStack::clone);
         registrar.parser("itemtype", ItemType::parse);
+        // 'X parsed as item stack', as Skript's item stack parser: an item that's one material, and an item, not a
+        // block with none (fire).
+        registrar.parser("itemstack", text -> {
+            ItemType item = ItemType.parse(text);
+            if (item == null) {
+                return null;
+            }
+            if (item.alternatives().size() != 1) {
+                co.xenastudios.neoskript.runtime.Values.parseError("'" + text + "' represents multiple materials");
+                return null;
+            }
+            if (!item.material().isItem()) {
+                co.xenastudios.neoskript.runtime.Values.parseError("'" + text + "' cannot represent an item");
+                return null;
+            }
+            return item.stack();
+        });
         // 'X is stone' holds for any stone, named or not; 'X is stone named "a"' only for one with that name.
         // An entity is the item it comes from: a boat is a boat item, a dropped item the item it is.
         registrar.comparison(org.bukkit.entity.Entity.class, ItemType.class, (entity, item) -> {
