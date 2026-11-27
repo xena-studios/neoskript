@@ -51,6 +51,7 @@ These are the differences the test harness knows about, from `known-differences.
 - **Skript's suite on Folia: 860 of 862.** The two left read a chest at the spawn of a random world from the test's region. Folia only allows that from the chest's own region.
 - **`permission message:`** is deprecated in Skript 2.17, and gives the same warning on NeoSkript.
 - **The `prefix:` command entry** is read, but commands are always registered under the `skript:` namespace.
+- **`on load` at startup runs on the first tick.** Skript runs it while it loads the scripts. In a script with an `on load`, the triggers below it (and in scripts after it) start listening when it runs, so an event in the moment between the scripts loading and the first tick doesn't reach them; on Skript they weren't registered yet then either. `/sk reload` and `auto reload` run `on load` straight away, as Skript does.
 
 <Aside type="note">
 Found a difference that isn't here? [Open an issue](https://github.com/xena-studios/neoskript/issues/new/choose) with the script, and what Skript and NeoSkript each did.

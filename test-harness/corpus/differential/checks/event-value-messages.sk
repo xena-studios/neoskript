@@ -1,0 +1,36 @@
+# Checks: event values and their words where the event hasn't them, as Skript 2.17.0 gives their problems
+# (issues #64 and #70).
+
+# 'event-' and words that name no type: a value named so, which no event has.
+on chat:
+	delete event-message
+on chat:
+	set {_x} to event-message
+on chat:
+	reset event-message
+on join:
+	broadcast event-frobnitz
+
+# What can't be reset but can be deleted says so.
+on break:
+	reset event-block
+
+# Damage and death events have an attacker and a victim, not an entity.
+on damage:
+	delete event-entity
+on damage:
+	reset event-entity
+on death:
+	delete event-entity
+
+# Words for a damage cause where there's none are the type, compared with the damage type 'fall'.
+on load:
+	if damage cause is fall:
+		broadcast "x"
+	if inventory action is pickup all:
+		broadcast "y"
+	set {_w} to world
+	if {_w} is world:
+		broadcast "z"
+	loop world and "z":
+		broadcast "%loop-value%"

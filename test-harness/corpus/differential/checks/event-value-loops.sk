@@ -1,0 +1,27 @@
+# Checks: event values a loop or a value can't have, as Skript 2.17.0 gives their problems (issue #70). Only words
+# are read as the type they name; 'the block' and 'event-block' are the event's, which a function hasn't.
+
+function event_value_loops():
+	loop the block:
+		send "1" to console
+	loop event-block:
+		send "2" to console
+	loop the block and "z":
+		send "3 %loop-value%" to console
+	loop the player:
+		send "4" to console
+	loop event-player:
+		send "5" to console
+	loop the world:
+		send "6" to console
+	# 'the world' is the world of the event's location.
+	send "%the world%" to console
+	set {_w} to the world
+	broadcast the world
+	send "%event-world%" to console
+
+on load:
+	loop the block:
+		send "7" to console
+	loop event-block and "z":
+		send "8 %loop-value%" to console

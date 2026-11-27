@@ -211,8 +211,11 @@ about.
   damage type, so `is magic` reads `magic` as one).
 - **Arguments are worked out before the element runs.** NeoSkript evaluates each argument as it does for its own
   syntax and the element's argument expressions give it those values (as the classes the addon asks for). An addon
-  that evaluates an argument twice gets the same values; one that changes an argument (`set`, `add` on it) isn't
-  supported. An element that keeps an argument and reads it later, outside its own `get`, `check`, `execute` or
+  that evaluates an argument twice gets the same values. An effect can set or delete an argument that's a variable
+  (SkBee's `component replace ... in {_text}`): what it sets is recorded (`ArgumentChanges`) and the compiled code
+  writes it to the variable once the effect has run (`Library.writesBackArguments`, for NeoSkriptCompat's effects
+  only). Changing any other argument, adding to or removing from one, or an expression or condition changing its
+  argument, isn't supported. An element that keeps an argument and reads it later, outside its own `get`, `check`, `execute` or
   `change` (from a task it schedules, say), gets whatever element is running on that thread then, or an error: the
   values are only there while NeoSkript is running the element.
 - **An argument is a `Literal` only when it's one written value** (`5`, `"text"`, `zombie`), read when the line is
@@ -262,7 +265,7 @@ the addon's name and the element's class (`SkBee:ExprWorldHeight`).
 - **Runtime errors** name the addon: what an element throws while it runs becomes "SkBee's ExprStoredEnchant threw in
   SkBee's code: ..." ("in SkBee's code" when the addon's own code threw, not NeoSkriptCompat's), and the trigger goes
   on as with NeoSkript's other runtime errors.
-- **Value adapters** (D24) so far: `ItemType`, `EntityData`, `EnchantmentType`, and `Slot` (an inventory's as `InventorySlot`).
+- **Value adapters** (D24) so far: `ItemType`, `EntityData`, `EnchantmentType`, `Timespan`, and `Slot` (an inventory's as `InventorySlot`).
 - **Conversions and comparisons** go to NeoSkript where they involve a class NeoSkript has no type for, so they
   don't change how NeoSkript's own types behave. **Event values** go where NeoSkript has no value of that type for
   the event (or a superclass of it): an addon's events get theirs, and NeoSkript's own event values stay as they

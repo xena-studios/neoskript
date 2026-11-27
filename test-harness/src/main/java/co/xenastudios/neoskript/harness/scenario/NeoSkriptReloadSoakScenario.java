@@ -24,7 +24,8 @@ import java.util.regex.Pattern;
  * Reloads a varied set of scripts a few hundred times and checks nothing from the old versions stays: events,
  * commands with aliases and a GUI, functions and a function reference, list variables, {@code every} timers, a
  * timer whose trigger is still waiting when the reload comes, a command waiting across reloads, {@code auto
- * reload}, a script disabled and enabled again, and one broken on every other reload, which loads without the broken line. After warming up, the harness bot forces a full GC and samples
+ * reload}, a script disabled and enabled again, syntax declared in a script (NeoSkript Reflect's custom effects and
+ * expressions, one renamed on every reload), and one broken on every other reload, which loads without the broken line. After warming up, the harness bot forces a full GC and samples
  * the loaded class count, the heap, and NeoSkript's listeners, commands (in Brigadier's tree too) and scheduled
  * tasks every 50 reloads. They must plateau, not grow. Then every script is disabled, and the classes and heap
  * must fall back, and the listeners, commands and tasks be what they were before any script loaded.
@@ -33,12 +34,14 @@ public final class NeoSkriptReloadSoakScenario implements Scenario {
 
     private static final Duration WAIT = Duration.ofMinutes(2);
     private static final String[] SCRIPTS = {"soak-events.sk", "soak-functions.sk", "soak-commands.sk", "soak-extras.sk",
-        "soak-flaky.sk"};
+        "soak-flaky.sk", "soak-reflect.sk"};
     private static final int WARM_UP = 50;
     private static final int SAMPLE_EVERY = 50;
     private static final Pattern STATS = Pattern.compile("\\[bot] stats (\\S+) (.*)$");
-    private static final Pattern RELOADED = Pattern.compile("\\[NeoSkript] Reloaded 5 scripts in \\d+ ms\\.$");
-    private static final Pattern FAILED_RELOAD = Pattern.compile("\\[NeoSkript] Reloaded 5 scripts with 1 error in \\d+ ms");
+    private static final Pattern RELOADED = Pattern.compile("\\[NeoSkript] Reloaded " + SCRIPTS.length
+            + " scripts in \\d+ ms\\.$");
+    private static final Pattern FAILED_RELOAD = Pattern.compile("\\[NeoSkript] Reloaded " + SCRIPTS.length
+            + " scripts with 1 error in \\d+ ms");
 
     /** How much the loaded classes may grow over the measured reloads: some of the JDK's and the server's are lazy. */
     private static final long CLASS_SLACK = 400;
@@ -82,7 +85,9 @@ public final class NeoSkriptReloadSoakScenario implements Scenario {
             sources.put(script, context.script("reload-soak/" + script));
         }
         // Soft references are cleared by every GC, so what's alive after one is held for good.
+        // With NeoSkript Reflect, for syntax declared in a script (soak-reflect.sk).
         ServerBuilder builder = context.server().plugin(context.neoskriptJar()).plugin(context.botJar())
+                .plugin(NeoSkriptReflectScenario.addonJar(context))
                 .jvmArg("-XX:SoftRefLRUPolicyMSPerMB=0");
         // Disabled at first, to sample NeoSkript without scripts.
         sources.forEach((script, source) -> builder.file("plugins/NeoSkript/scripts/-" + script, version(source, 0)));
@@ -126,7 +131,7 @@ public final class NeoSkriptReloadSoakScenario implements Scenario {
             Map<String, Long> loaded = samples.getLast();
             mark = server.mark();
             server.command("sk disable all");
-            server.await(line("[NeoSkript] Disabled 5 scripts."), mark, WAIT);
+            server.await(line("[NeoSkript] Disabled " + SCRIPTS.length + " scripts."), mark, WAIT);
             // The waits in flight finish first.
             Thread.sleep(5_000);
             Map<String, Long> disabled = sample(server, "disabled");
@@ -154,7 +159,7 @@ public final class NeoSkriptReloadSoakScenario implements Scenario {
                 // Folia has no /reload: the scripts are just enabled again for the stop.
                 int enabling = server.mark();
                 server.command("sk enable all");
-                server.await(Pattern.compile("\\[NeoSkript] Enabled 5 scripts in \\d+ ms\\.$"), enabling, WAIT);
+                server.await(Pattern.compile("\\[NeoSkript] Enabled " + SCRIPTS.length + " scripts in \\d+ ms\\.$"), enabling, WAIT);
             }
             shutdown(server, builder.runDir());
         }
@@ -168,7 +173,7 @@ public final class NeoSkriptReloadSoakScenario implements Scenario {
     private static void pluginReloads(ScenarioContext context, ServerProcess server) throws Exception {
         int mark = server.mark();
         server.command("sk enable all");
-        server.await(Pattern.compile("\\[NeoSkript] Enabled 5 scripts in \\d+ ms\\.$"), mark, WAIT);
+        server.await(Pattern.compile("\\[NeoSkript] Enabled " + SCRIPTS.length + " scripts in \\d+ ms\\.$"), mark, WAIT);
         List<Long> loaders = new ArrayList<>();
         for (int i = 1; i <= PLUGIN_RELOADS; i++) {
             mark = server.mark();

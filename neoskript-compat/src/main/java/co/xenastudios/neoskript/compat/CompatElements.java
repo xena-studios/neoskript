@@ -82,9 +82,11 @@ final class CompatElements {
         String id = id(addon, info);
         registrar.effect(id, element -> {
             ch.njol.skript.lang.Effect effect = setup(compat, addon, info, placeholders, element, "effect");
-            return (Effect) (context, arguments) -> run(addon, effect, arguments,
-                    () -> effect.run(CompatEvent.of(context.event())));
+            // What it sets its variable arguments to is written back to them once it's run (ArgumentChanges).
+            return (Effect) (context, arguments) ->
+                    run(addon, effect, arguments, () -> effect.run(CompatEvent.of(context.event())));
         }, patterns(info));
+        compat.library().writesBackArguments(id);
         priority(registrar, id, info);
     }
 
@@ -242,6 +244,10 @@ final class CompatElements {
         }
     }
 
+    private static long[] i64(long[] masks, int count) {
+        return count > 64 ? new long[2] : masks;
+    }
+
     /** An effect NeoSkriptCompat leaves out: one that runs the rest of the trigger itself. */
     static final class UnsupportedEffect extends RuntimeException {
         UnsupportedEffect() {
@@ -317,6 +323,8 @@ final class CompatElements {
                 : List.of();
         int count = Math.max(pattern.size(), element.argumentTypes().size());
         ch.njol.skript.lang.Expression<?>[] arguments = new ch.njol.skript.lang.Expression<?>[count];
+        // An effect's variable arguments, which it can set or delete (written back to the variable after it runs).
+        long[] variables = i64(compat.library().variableArguments(), count);
         for (int i = 0; i < count; i++) {
             if (i >= element.argumentTypes().size() || omitted(element, i)) {
                 continue;
@@ -330,6 +338,9 @@ final class CompatElements {
             }
             // An event's arguments are all literals, as Skript gives them.
             arguments[i] = argument(i, type, element, instance instanceof ch.njol.skript.lang.SkriptEvent);
+            if (instance instanceof ch.njol.skript.lang.Effect && (variables[0] & (1L << i)) != 0) {
+                ((CompatArgument<?>) arguments[i]).variable((variables[1] & (1L << i)) != 0);
+            }
         }
         ParseResult result = new ParseResult(text, arguments);
         result.mark = mark(element);

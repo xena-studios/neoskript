@@ -290,6 +290,18 @@
       "since": [
         "1.0.0"
       ]
+    },
+    "NeoSkriptProxyCondNetworkVariables": {
+      "name": "Network Variables Are Available",
+      "description": [
+        "Whether {network::...} variables are shared and their database answers now. While it's down, scripts still read and change their copy, and the changes are written, and merged with other servers', once it's back; check this before something that shouldn't happen twice, like a reward."
+      ],
+      "examples": [
+        "if network variables aren't available:\n\tsend \"Rewards are paused for a moment, try again soon.\"\n\tstop"
+      ],
+      "since": [
+        "1.0.0"
+      ]
     }
   },
   "types": {},

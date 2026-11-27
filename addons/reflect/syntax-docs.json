@@ -239,6 +239,90 @@
       "since": [
         "0.1.0"
       ]
+    },
+    "NeoSkriptReflectStructCustomEffect": {
+      "name": "Custom Effect (skript-reflect)",
+      "description": [
+        "An effect declared in a script, usable in every script (only its own, with <code>local</code>). <code>trigger:</code> runs where it's used, with the values it was given as <code>expression-1</code>, <code>expression-2</code>..."
+      ],
+      "examples": [
+        "effect shout %string%:\n\ttrigger:\n\t\tbroadcast \"%expression-1%!\""
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectStructCustomCondition": {
+      "name": "Custom Condition (skript-reflect)",
+      "description": [
+        "A condition declared in a script: it passes if <code>check:</code> reaches <code>continue</code>. The property form, <code>&lt;types&gt; property condition &lt;name&gt;</code>, gives <code>%types% is &lt;name&gt;</code> and <code>is not</code>."
+      ],
+      "examples": [
+        "condition %number% is big:\n\tcheck:\n\t\tif expression-1 > 10:\n\t\t\tcontinue"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectStructCustomExpression": {
+      "name": "Custom Expression (skript-reflect)",
+      "description": [
+        "An expression declared in a script: what <code>get:</code> returns. <code>return type:</code> names its type, and <code>plural</code> or <code>non-single</code> says it can be several values. The property form, <code>&lt;types&gt; property &lt;name&gt;</code>, gives <code>the &lt;name&gt; of %types%</code> and <code>%types%'s &lt;name&gt;</code>, its code run once for each value."
+      ],
+      "examples": [
+        "expression doubled %number%:\n\tget:\n\t\treturn expression-1 * 2"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprExpression": {
+      "name": "Expression (skript-reflect)",
+      "description": [
+        "In custom syntax's code, a value the use was given, by placeholder, from 1."
+      ],
+      "examples": [
+        "say expression-1"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprMatchedPattern": {
+      "name": "Matched Pattern (skript-reflect)",
+      "description": [
+        "In custom syntax's code, which of its patterns the use matched, from 1."
+      ],
+      "examples": [
+        "if matched pattern is 2:"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprParseMark": {
+      "name": "Parser Mark (skript-reflect)",
+      "description": [
+        "In custom syntax's code, the use's parse mark."
+      ],
+      "examples": [
+        "set {_mark} to parser mark"
+      ],
+      "since": [
+        "0.1.0"
+      ]
+    },
+    "NeoSkriptReflectExprParseTags": {
+      "name": "Parse Tags (skript-reflect)",
+      "description": [
+        "In custom syntax's code, the use's parse tags."
+      ],
+      "examples": [
+        "if parse tags contain \"all\":"
+      ],
+      "since": [
+        "0.1.0"
+      ]
     }
   },
   "types": {

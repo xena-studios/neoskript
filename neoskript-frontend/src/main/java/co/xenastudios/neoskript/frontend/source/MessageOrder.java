@@ -52,6 +52,58 @@ public final class MessageOrder {
         return keyed.stream().map(Keyed::diagnostic).toList();
     }
 
+    /**
+     * {@code diagnostics} grouped by script, the scripts in the order of {@code scripts} (their load order) and
+     * others last, each script's problems kept in the order given: as a report that lists each script's
+     * problems together shows them.
+     */
+    public static List<Diagnostic> byScript(List<Diagnostic> diagnostics, List<SourceFile> scripts) {
+        java.util.Map<String, Integer> order = new java.util.HashMap<>();
+        for (SourceFile script : scripts) {
+            order.putIfAbsent(script.name(), order.size());
+        }
+        List<Diagnostic> grouped = new ArrayList<>(diagnostics);
+        grouped.sort(java.util.Comparator.comparingInt(d -> order.getOrDefault(d.file(), Integer.MAX_VALUE)));
+        return grouped;
+    }
+
+    /**
+     * Sorts the problems of scripts loaded together as Skript gives them: Skript reads every script's file first (their
+     * layout problems, in the scripts' order), then every script's structure headers, then sorts all their structures
+     * together by priority and runs each stage across all of them, so one script's problems come between another's
+     * ({@code ScriptLoader.loadScripts}). {@code scripts} are the scripts in the order Skript loads them, by name;
+     * problems of files not among them come last, as they were.
+     */
+    public static List<Diagnostic> sortAll(List<Diagnostic> diagnostics, List<SourceFile> scripts,
+            Predicate<Diagnostic> layout) {
+        java.util.Map<String, Integer> order = new java.util.HashMap<>();
+        java.util.Map<String, Structures> structures = new java.util.HashMap<>();
+        for (SourceFile script : scripts) {
+            order.putIfAbsent(script.name(), order.size());
+            structures.computeIfAbsent(script.name(), name -> new Structures(script));
+        }
+        record Keyed(Diagnostic diagnostic, int index, long[] key) {}
+        List<Keyed> keyed = new ArrayList<>();
+        for (int i = 0; i < diagnostics.size(); i++) {
+            Diagnostic diagnostic = diagnostics.get(i);
+            Integer file = order.get(diagnostic.file());
+            long[] key;
+            if (file == null) {
+                key = new long[] {2, 0, 0, 0, 0, 0, 0};
+            } else if (layout.test(diagnostic)) {
+                key = new long[] {0, 0, 0, file, 0, 0, 0};
+            } else {
+                // Stage and priority first, then the script, then where in it.
+                long[] own = structures.get(diagnostic.file()).key(diagnostic);
+                key = new long[] {own[0], own[1], own[2], file, own[3], own[4], own[5]};
+            }
+            keyed.add(new Keyed(diagnostic, i, key));
+        }
+        keyed.sort(Comparator.<Keyed, long[]>comparing(Keyed::key, java.util.Arrays::compare)
+                .thenComparingInt(Keyed::index));
+        return keyed.stream().map(Keyed::diagnostic).toList();
+    }
+
     /** The script's top-level structures, by the lines they span. */
     private static final class Structures {
         private final List<String> lines;

@@ -48,6 +48,8 @@ final class LineParser {
     private final co.xenastudios.neoskript.frontend.registry.EventValues.Scope eventScope;
     private boolean refusedEventValues;
     private boolean refusedSkriptValues;
+    /** Whether an event value refused was written as words a value can be read from: not 'the' or 'event-' ones. */
+    private boolean refusedWords;
     private final String input;
     private final String lowerInput;
     private final Map<Key, Object> memo = new HashMap<>();
@@ -259,6 +261,8 @@ final class LineParser {
                 }
                 refusedEventValues = true;
                 refusedSkriptValues |= skriptEventValue(parsed, text);
+                String written = Text.lower(text.strip());
+                refusedWords |= !written.startsWith("the ") && !written.startsWith("event-");
                 continue;
             }
             if (eventScope != null && !leftOutAllowed(syntax, pattern, match)) {
@@ -312,11 +316,17 @@ final class LineParser {
                     && !mayHaveTimeState(timed)) {
                 // Skript's init first refuses any time state after a wait; else it names the expression as it writes it.
                 boolean future = candidate.pattern() >= 2;
-                problem(() -> context.delay() == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED
-                        ? "Cannot use time states after the event has already passed"
-                        : (timed instanceof Expr.Syntax inner ? described(inner.syntax(),
-                                input.substring(timed.start(), timed.end())) : input.substring(timed.start(), timed.end()).strip())
-                                + " does not have a " + (future ? "future" : "past") + " state", SEMANTIC_ERROR);
+                problem(() -> {
+                    if (context.delay() == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED) {
+                        return "Cannot use time states after the event has already passed";
+                    }
+                    String message = (timed instanceof Expr.Syntax inner ? described(inner.syntax(),
+                            input.substring(timed.start(), timed.end())) : input.substring(timed.start(), timed.end()).strip())
+                            + " does not have a " + (future ? "future" : "past") + " state";
+                    // Skript sets the expression up first: if it can't be used here, that's the error.
+                    causes.put(message, timed);
+                    return message;
+                }, SEMANTIC_ERROR);
                 continue;
             }
             // A direction after a direction word is another one written out, as Skript's init refuses anything else:
@@ -338,6 +348,11 @@ final class LineParser {
             // the player's inventory' are the items.
             if (syntax.id().equals("ExprInventory") && parsed.match().values().getFirst() instanceof Expr.Syntax holders
                     && holders.syntax().syntax().id().equals("ExprItemsIn")) {
+                continue;
+            }
+            // 'transformed' only of what may be several values, as Skript's init refuses one, with no error of its own.
+            if (syntax.id().equals("ExprTransform") && parsed.match().values().getFirst() instanceof Expr source
+                    && !(source instanceof Expr.ListOf) && Plurality.single(source, registry)) {
                 continue;
             }
             // 'recursive X' only for what can give nested lists, as Skript's init refuses the rest: 'recursive size of
@@ -914,6 +929,11 @@ final class LineParser {
         return refusedSkriptValues;
     }
 
+    /** Whether an event value the code can't have was turned down, written as words a value can be read from. */
+    boolean refusedWords() {
+        return refusedWords;
+    }
+
     private boolean skriptEventValue(ParsedSyntax parsed, String text) {
         if (text.strip().regionMatches(true, 0, "event-", 0, 6)) {
             return true;
@@ -1171,7 +1191,19 @@ final class LineParser {
                         yield effect != null ? strict(effect, strictCode) : call(start, end);
                     }
                     case EXPRESSION -> expression(start, end, Expected.OBJECTS);
-                    case TYPE -> typeName(start, end);
+                    case TYPE -> {
+                        TypeRef ref = typeName(start, end);
+                        if (ref == null && eventScope != null && start >= 6
+                                && input.regionMatches(true, start - 6, "event-", 0, 6)) {
+                            // Skript's 'event-<words>' asks for a value named so when they name no type, which
+                            // no event has: its error, if nothing else reads the line.
+                            String unnamed = eventScope.unnamed(input.substring(start, end).strip());
+                            if (unnamed != null) {
+                                problem(unnamed);
+                            }
+                        }
+                        yield ref;
+                    }
                     case TYPE_OR_ENTITY -> {
                         TypeRef ref = typeName(start, end);
                         TypeInfo entity = registry.type("entity");
@@ -1251,7 +1283,7 @@ final class LineParser {
             return null;
         }
         Object value = parsed.match().values().isEmpty() ? null : parsed.match().values().getFirst();
-        if (value instanceof Expr argument && listVariable(argument)) {
+        if (value instanceof Expr argument && (indices ? keyedSource(argument) : listVariable(argument))) {
             return null;
         }
         // A recursive size of several list variables is all of theirs, as in Skript.
@@ -1278,6 +1310,32 @@ final class LineParser {
             }
         }
         return null;
+    }
+
+    /**
+     * Whether {@code expr} gives its values' indices, as Skript's {@code KeyProviderExpression.canReturnKeys}: a list
+     * variable, {@code keyed} anything, a function call, or {@code recursive}, {@code filtered}, an element of, a
+     * value within or (with one value for each) {@code transformed} something that does.
+     */
+    private boolean keyedSource(Expr expr) {
+        return switch (expr) {
+            case Expr.Variable variable -> variable.list();
+            case Expr.FunctionCall call -> true;
+            case Expr.Syntax syntax -> {
+                List<Object> values = syntax.syntax().match().values();
+                Expr inner = values.isEmpty() || !(values.getFirst() instanceof Expr first) ? null : first;
+                yield switch (syntax.syntax().syntax().id()) {
+                    case "ExprKeyed" -> true;
+                    case "ExprRecursive", "ExprFilter", "ExprCast" -> inner != null && keyedSource(inner);
+                    case "ExprElement" -> values.getLast() instanceof Expr last && keyedSource(last);
+                    case "ExprTransform" -> inner != null && keyedSource(inner)
+                            && syntax.syntax().match().regexValues().getFirst() instanceof Expr mapping
+                            && Plurality.single(mapping, registry);
+                    default -> false;
+                };
+            }
+            default -> false;
+        };
     }
 
     /** Whether {@code expr} is a list variable, or {@code keyed} of one. */
@@ -1307,7 +1365,7 @@ final class LineParser {
         // expression gave an error: Skript keeps that error ('player' where there's no player in the event).
         if (expr instanceof Expr.Unresolved words && (!words.verified() || anyValueOnly(words, expected))
                 && frame[0] != null && expected.anything()) {
-            return new Expr.Unresolved(words.start(), words.end(), words.text(), false, frame[0]);
+            return new Expr.Unresolved(words.start(), words.end(), words.text(), false, frame[0], causes.get(frame[0]));
         }
         return expr;
     }
@@ -1458,8 +1516,9 @@ final class LineParser {
             // As Skript's parseExpressionList reads what's in brackets again on its own and returns without printing
             // its log, the errors of what's in brackets are dropped when it isn't of a type wanted: '(the equippable
             // component of {_item})' says nothing where an item component goes. Where any value goes, it's an
-            // unparsed literal that keeps them.
-            Problems before = expected.anything() ? null : problems();
+            // unparsed literal that keeps them, unless no words may go there ('%~objects%'): then there's no unparsed
+            // literal, and 'indices of (recursive {_t})' says nothing either (issue #79).
+            Problems before = expected.anything() && !expected.changeable() ? null : problems();
             Expr inner = expression(start + 1, end - 1, expected);
             if (inner instanceof Expr.ListOf list) {
                 // A copy, so only this reading of the list is the bracketed one: see bracketedLists.
@@ -1593,8 +1652,24 @@ final class LineParser {
         return specifiedLiteral(start, end, text, expected);
     }
 
+    /**
+     * Skript's pattern for a literal with its type given ({@code SkriptParser.LITERAL_SPECIFICATION_PATTERN}): when the
+     * type isn't one, that's its error.
+     */
+    private static final java.util.regex.Pattern SKRIPT_SPECIFIED =
+            java.util.regex.Pattern.compile("[^,():/\"\\[\\]}{]+ \\(([\\w\\p{L} ]+)\\)");
+
     /** A literal with its type given in parentheses, like {@code black (wolf variant)}. */
     private Expr specifiedLiteral(int start, int end, String text, Expected expected) {
+        java.util.regex.Matcher skript = SKRIPT_SPECIFIED.matcher(text);
+        if (skript.matches()) {
+            // As Skript's parseSpecifiedLiteral: 'indices of (5)' is the words 'indices of' of a type '5'.
+            String named = skript.group(1).replaceFirst("(?i)^the ", "");
+            if (registry.resolveType(Literals.normalize(named)) == null) {
+                problem("A " + named + " is not a valid type.");
+                return null;
+            }
+        }
         java.util.regex.Matcher matcher = Literals.SPECIFIED.matcher(text);
         if (!matcher.matches()) {
             return null;
@@ -2245,6 +2320,9 @@ final class LineParser {
 
     /** The quality of {@link #problem}. */
     private int problemQuality;
+
+    /** The expressions problems are about, by problem: see {@link Expr.Unresolved#cause}. */
+    private final java.util.Map<String, Expr> causes = new java.util.HashMap<>();
 
     /** {@link #problem(String, int)}, worked out only if it's kept. */
     private void problem(java.util.function.Supplier<String> found, int quality) {

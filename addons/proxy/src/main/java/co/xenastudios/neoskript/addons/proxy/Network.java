@@ -40,6 +40,8 @@ final class Network {
     private final String instance;
     private volatile PluginMessaging plugin;
     private volatile RedisLink redis;
+    /** Gets the messages on {@link NetworkVariables#CHANNEL}, which never reach scripts. */
+    private volatile Consumer<String> notices = message -> {};
     private volatile String serverName;
     private final AtomicInteger pending = new AtomicInteger();
     private final java.util.concurrent.atomic.AtomicLong pendingBytes = new java.util.concurrent.atomic.AtomicLong();
@@ -67,6 +69,43 @@ final class Network {
     void use(PluginMessaging plugin, RedisLink redis) {
         this.plugin = plugin;
         this.redis = redis;
+    }
+
+    /** Where messages on {@link NetworkVariables#CHANNEL} go, on the thread they arrive on: never to scripts. */
+    void notices(Consumer<String> notices) {
+        this.notices = notices;
+    }
+
+    /** Whether a notice can reach the other servers now: Redis is up, or plugin messaging is on with a secret. */
+    boolean canNotify() {
+        RedisLink link = redis;
+        return link != null || (plugin != null && envelope.usable());
+    }
+
+    /**
+     * Tells every other server something on {@link NetworkVariables#CHANNEL}, now or not at all: over Redis if it's
+     * up, or else through a player if plugin messaging is on and one is online. Never queued: a notice that's late is
+     * useless.
+     *
+     * @return whether it was sent
+     */
+    boolean notice(String message) {
+        RedisLink link = redis;
+        if (link != null && link.up()) {
+            JsonObject json = new JsonObject();
+            json.addProperty("action", "neoskript-message");
+            json.addProperty("message", message);
+            json.addProperty("date", System.currentTimeMillis());
+            json.addProperty("origin", serverName);
+            json.addProperty("instance", instance);
+            return link.publish(redisChannel(NetworkVariables.CHANNEL), json.toString());
+        }
+        PluginMessaging messaging = plugin;
+        if (messaging == null || !envelope.usable()) {
+            return false;
+        }
+        return messaging.sendNow(PluginMessaging.forward("ALL",
+                envelope.seal(serverName, instance, "ALL", NetworkVariables.CHANNEL, message)));
     }
 
     /** This server's name on the proxy, or empty if it isn't known yet. */
@@ -196,6 +235,17 @@ final class Network {
             return;
         }
         JsonElement action = json.get("action");
+        if (channel.equals(NetworkVariables.CHANNEL)) {
+            // NeoSkriptProxy's own: never to scripts.
+            if (action != null && action.isJsonPrimitive() && action.getAsString().equals("neoskript-message")
+                    && !instance.equals(string(json, "instance"))) {
+                String message = string(json, "message");
+                if (message != null) {
+                    notices.accept(message);
+                }
+            }
+            return;
+        }
         if (action == null) {
             deliver(new NetworkMessageEvent(NetworkMessageEvent.Kind.CUSTOM, channel, text, null,
                     System.currentTimeMillis()));
@@ -279,6 +329,10 @@ final class Network {
         }
         if (opened.instance().equals(instance)) {
             return; // This server's own, back from the proxy.
+        }
+        if (opened.channel().equals(NetworkVariables.CHANNEL)) {
+            notices.accept(opened.message());
+            return;
         }
         if (!opened.target().equals("ALL") && !serverName.isEmpty() && !opened.target().equalsIgnoreCase(serverName)) {
             warn("A network message for " + opened.target() + " came to this server (" + serverName + "): dropped.");

@@ -1,0 +1,22 @@
+# Checks: a command's arguments and loops can't be used in a spawn section, or a delayed section's, as Skript loads
+# them apart; the spawned entity is the sender there.
+
+command /sectioneventprobe [<text>]:
+	trigger:
+		spawn a pig at player:
+			set {_1} to player
+			set {_2} to arg-1
+			send "x" to player
+			send "x"
+			set {_3} to sender
+			set {_4} to command sender
+			set {_6} to event-player
+		loop 2 times:
+			spawn a pig at player:
+				set {_7} to loop-number
+				set {_8} to loop-iteration
+		loop all players:
+			spawn a pig at loop-player:
+				set {_9} to loop-player
+		wait 1 tick:
+			set {_10} to arg-1
