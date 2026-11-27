@@ -319,6 +319,71 @@ command /skbeetest-timespans:
 		set block at {_l} to air
 		send "[skbee] end timespans" to console
 
+command /skbeetest-scoreboards:
+	trigger:
+		set {_sb} to a new scoreboard
+		set {_o} to objective with id "kills" with criteria "dummy" named "Kills" for {_sb}
+		skbee("objective id", objective id of {_o})
+		skbee("objective display name", objective display name of {_o})
+		set objective display name of {_o} to "Total kills"
+		skbee("objective display name set", objective display name of {_o})
+		set score of "Alice" for {_o} to 5
+		add 3 to score of "Alice" for {_o}
+		skbee("score", score of "Alice" for {_o})
+		remove 1 from score of "Alice" for {_o}
+		skbee("score after remove", score of "Alice" for {_o})
+		set {_g} to objective with id "kills" from {_sb}
+		skbee("objective from id", objective id of {_g})
+		skbee("missing objective", objective with id "deaths" from {_sb})
+		set objective display slot of {_o} to sidebar
+		skbee("display slot", objective display slot of {_o})
+		set {_s::*} to objectives by display slot sidebar of {_sb}
+		skbee("objectives in sidebar", size of {_s::*})
+		set {_byc::*} to objectives by criteria criteria with id "dummy" of {_sb}
+		skbee("objectives by criteria", size of {_byc::*})
+		set {_c} to criteria with id "health"
+		skbee("criteria", {_c})
+		skbee("health modifiable", whether scores of {_c} are modifiable)
+		skbee("dummy modifiable", whether scores of {_o} are modifiable)
+		set {_t} to team named "red" from {_sb}
+		skbee("team name", team name of {_t})
+		set team display name of {_t} to "Red Team"
+		skbee("team display name", team display name of {_t})
+		set team prefix of {_t} to "[R] "
+		skbee("team prefix", team prefix of {_t})
+		set team suffix of {_t} to " (red)"
+		skbee("team suffix", team suffix of {_t})
+		add "Alice" and "Bob" to team entries of {_t}
+		skbee("team entries", team entries of {_t} as strings)
+		remove "Bob" from team entries of {_t}
+		skbee("team entries after remove", team entries of {_t} as strings)
+		skbee("team registered", whether team named "red" of {_sb} is registered)
+		skbee("other team registered", whether team named "blue" of {_sb} is registered)
+		skbee("all teams", size of all teams of {_sb})
+		set team color of {_t} to red
+		skbee("team color", team color of {_t})
+		set {_colour} to team color of {_t}
+		skbee("team color is red", whether {_colour} is red)
+		set team color of {_t} to light green
+		skbee("team color changed", team color of {_t})
+		skbee("team color hex", hex code of team color of {_t})
+		set team option collision rule of {_t} to never
+		skbee("team collision rule", team option collision rule of {_t})
+		spawn a zombie at location(36.5, 100, 36.5, world "world")
+		set {_z} to last spawned entity
+		add {_z} to team entries of {_t}
+		skbee("entity team", team name of team of {_z} from {_sb})
+		skbee("entity team entries", size of entity team entries of {_t})
+		delete entity within {_z}
+		set {_main} to the main scoreboard
+		set {_mo} to objective with id "skbeetest" with criteria "dummy" named "Test" for {_main}
+		skbee("main scoreboard objective", objective id of objective with id "skbeetest" from {_main})
+		set score of "Carol" for {_mo} to 4
+		skbee("main scoreboard score", score of "Carol" for {_mo})
+		set number format of {_mo} to "points"
+		skbee("number format", number format of {_mo})
+		send "[skbee] end scoreboards" to console
+
 command /skbeetest-after-restart-text:
 	trigger:
 		set {_j} to serialized json string of {skbee::saved-text}

@@ -143,9 +143,16 @@ public final class Compat {
         }
     }
 
-    /** A warning from an addon: logged. Warnings while a line is set up are dropped, as NeoSkript gives its own. */
+    /**
+     * A warning from an addon: for the line being loaded, as Skript gives an element's warnings from {@code init} or
+     * {@code acceptChange} (once for the line, however often it's set up); else logged.
+     */
     public void warning(String message) {
-        if (SETUP_ERRORS.get() == null) {
+        co.xenastudios.neoskript.api.element.Warnings.Sink sink = co.xenastudios.neoskript.api.element.Warnings.install(null);
+        co.xenastudios.neoskript.api.element.Warnings.install(sink);
+        if (sink != null) {
+            co.xenastudios.neoskript.api.element.Warnings.warn(message);
+        } else if (SETUP_ERRORS.get() == null) {
             logger.warning(message);
         }
     }
