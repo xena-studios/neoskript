@@ -144,7 +144,7 @@ components:
 
 **Creative North Star: "The server log"**
 
-neoskript.dev reads like a Paper server's console where that is the honest form: two servers' logs side by side, elapsed-time stamps, level tags, a title strip naming what runs in each pane. It is not a terminal costume. Words are set in Geist and read like a good product site and good docs; mono appears only where the text is code, a log line or a measurement; magenta marks NeoSkript and the action. The world sits in the Xena family (xenastudios.co, docs.xenastudios.co): hairline rows, 44px pills, a frosted sticky header, JetBrains Mono uppercase labels for metadata, the XENA footer, and the planet horizon once, at the close.
+neoskript.dev reads like a Paper server's console where that is the honest form: two servers' logs side by side, elapsed-time stamps, level tags, a title strip naming what runs in each pane. It is not a terminal costume. Words are set in Geist and read like a good product site and good docs; mono appears only where the text is code, a log line or a measurement; magenta marks NeoSkript and the action. The world sits in the Xena family (xenastudios.co, plugins.xenastudios.co): hairline rows, 44px pills, a frosted sticky header, JetBrains Mono uppercase labels for metadata, the XENA footer, and the planet horizon once, at the close.
 
 The landing page proves the claim in its first viewport. Two console panes, one per server, replay the benchmark's startup and `/sk reload` at the speed each server took (`src/scripts/replay.ts`, from `src/data/benchmark.json`), each pane's clock stopping at its own time, NeoSkript's ratios as magenta marks. Below it: the comparison table, the numbers on one left-to-right axis per labelled group, the output check (the script's lines against what each server printed, a row lighting across both servers on hover), the switch, questions and the close. The tools (parser, syntax reference) are panes too. The guides are Starlight, themed into the same world, with asides as INFO / TIP / WARN / ERROR notes.
 
@@ -214,7 +214,7 @@ A wide container (`max`, 90rem) with a fluid gutter. Landing sections stack full
 
 ## Elevation & Depth
 
-Flat. No shadows anywhere (Starlight's `--sl-shadow-*` are `none`). Depth is ground versus raised, and hairlines. The sticky header is the ground at 88% under a 12px blur, as on docs.xenastudios.co. The only atmosphere is the Xena horizon at the foot of the landing page; in the light theme its planet is drawn in paper tones with the magenta rim.
+Flat. No shadows anywhere (Starlight's `--sl-shadow-*` are `none`). Depth is ground versus raised, and hairlines. The sticky header is the ground at 88% under a 12px blur, as on plugins.xenastudios.co. The only atmosphere is the Xena horizon at the foot of the landing page; in the light theme its planet is drawn in paper tones with the magenta rim.
 
 ## Shapes
 

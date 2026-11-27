@@ -1,10 +1,16 @@
-![NeoSkript by Xena Studios. The .sk icon and the NeoSkript wordmark over a magenta planet horizon, with the headline "Keep your scripts. Lose the lag." and a Skript script that runs unchanged.](.github/assets/banner.png)
+![NeoSkript by Xena Studios. The .sk icon and the NeoSkript wordmark over a magenta planet horizon, with the headline "Keep your scripts. Lose the lag." and a Skript script that runs unchanged.](https://cdn.jsdelivr.net/gh/xena-studios/brand@1/neoskript/banner.png)
 
 **Keep your scripts. Lose the lag.**
 
-NeoSkript is a fast, modern drop-in replacement for [Skript](https://github.com/SkriptLang/Skript). Your `.sk` scripts run unchanged, only faster, on Paper and Folia.
+<!-- Badges: Xena's, from xena-studios/brand (docs/badges.md there says which go where). -->
+<a href="https://modrinth.com/plugin/neoskript"><img alt="Available on Modrinth" height="32" src="https://cdn.jsdelivr.net/gh/xena-studios/brand@1/badges/neoskript/compact/modrinth.svg"></a>
+<img alt="Runs on Paper" height="32" src="https://cdn.jsdelivr.net/gh/xena-studios/brand@1/badges/neoskript/compact/paper.svg">
+<img alt="Runs on Folia" height="32" src="https://cdn.jsdelivr.net/gh/xena-studios/brand@1/badges/neoskript/compact/folia.svg">
+<a href="https://neoskript.dev/docs/"><img alt="Read the Docs" height="32" src="https://cdn.jsdelivr.net/gh/xena-studios/brand@1/badges/neoskript/compact/docs.svg"></a>
 
-**Status:** public beta, [0.1.0-beta.1](https://github.com/xena-studios/neoskript/releases/tag/v0.1.0-beta.1). Skript's whole test suite passes on NeoSkript. See [progress](docs/PROGRESS.md).
+NeoSkript is a fast, modern drop-in replacement for [Skript](https://github.com/SkriptLang/Skript), by [Xena Studios](https://xenastudios.co). Your `.sk` scripts run unchanged, only faster, on Paper and Folia.
+
+> **Status:** public beta, [0.1.0-beta.1](https://github.com/xena-studios/neoskript/releases/tag/v0.1.0-beta.1). Skript's whole test suite passes on NeoSkript. See [progress](docs/PROGRESS.md).
 
 **Website:** [neoskript.dev](https://neoskript.dev), with the docs, the syntax reference and an in-browser script checker.
 
@@ -15,18 +21,6 @@ NeoSkript is a fast, modern drop-in replacement for [Skript](https://github.com/
 3. Start the server. Your scripts, variables and alias files are copied from `plugins/Skript`, which is never changed.
 
 Paper or Folia, Minecraft 1.21.4 to 26.3, Java 21 or newer. It's a beta: try it on a test server first. [Moving from Skript](https://neoskript.dev/docs/moving-from-skript/) has the details.
-
-## Building
-
-Needs JDK 21, plus JDK 25 for the test harness's 26.x servers.
-
-```sh
-./gradlew build        # compile, unit tests, licence header check
-./gradlew runServer    # Paper 1.21.4 dev server with NeoSkript
-./gradlew runFolia     # Folia 1.21.4 dev server with NeoSkript
-```
-
-The plugin jar ends up in `neoskript-plugin/build/libs/`. The real-server tests are in the [test harness](test-harness/README.md).
 
 ## Checking your scripts
 
@@ -79,6 +73,18 @@ The `skript` skill teaches coding agents to write Skript that loads on Skript an
 ```
 
 For Codex and other agents, see [Writing scripts with AI](https://neoskript.dev/docs/ai/).
+
+## Building
+
+Needs JDK 21, plus JDK 25 for the test harness's 26.x servers.
+
+```sh
+./gradlew build        # compile, unit tests, licence header check
+./gradlew runServer    # Paper 1.21.4 dev server with NeoSkript
+./gradlew runFolia     # Folia 1.21.4 dev server with NeoSkript
+```
+
+The plugin jar ends up in `neoskript-plugin/build/libs/`. The real-server tests are in the [test harness](test-harness/README.md).
 
 ## Contributing
 

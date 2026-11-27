@@ -133,6 +133,18 @@ final class BlockSyntax {
         }, "[the] type of %entitytypes/itemtypes/inventories/skriptpotioneffects/blockdatas/entities/blocks%",
                 "%entitytypes/itemtypes/inventories/skriptpotioneffects/blockdatas/entities/blocks%'[s] type");
 
+        // As Skript's: the type of items is an item type, of entity types an entity type, so 'type of fire is fire'
+        // reads 'fire' as an item.
+        registrar.returnType("ExprTypeOf", info -> {
+            String type = info.argumentType(0);
+            String words = info.argumentLiteral(0);
+            if (type == null && words != null) {
+                // Words, read as this placeholder's types in order: an entity type, then an item.
+                type = EntityKind.parse(words) != null ? "entitytype" : ItemType.parse(words) != null ? "itemtype" : null;
+            }
+            return "itemtype".equals(type) || "entitytype".equals(type) ? type : null;
+        });
+
         registrar.expression("ExprVersion", "string", info -> {
             boolean skript = info.hasTag("skript");
             boolean minecraft = info.hasTag("minecraft");
@@ -161,6 +173,10 @@ final class BlockSyntax {
      * its instrument ('type of potion of fire resistance' isn't a water bottle).
      */
     private static ItemType baseType(ItemType item) {
+        if (!item.material().isItem()) {
+            // A block with no item, like fire: its kind is that block, as Skript's item type keeps it.
+            return ItemType.ofMaterial(item.material());
+        }
         org.bukkit.inventory.ItemStack stack = item.alternatives().getFirst().stack();
         org.bukkit.inventory.ItemStack base = new org.bukkit.inventory.ItemStack(item.material());
         if (stack.getItemMeta() instanceof org.bukkit.inventory.meta.PotionMeta potion

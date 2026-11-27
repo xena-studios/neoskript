@@ -51,7 +51,7 @@ NeoSkript is a clean-room, drop-in replacement for Skript: existing `.sk` script
 
 ## Evidence on Hand
 
-- The README banner and headline (`.github/assets/banner.png`), and brand files in xena-studios/brand.
+- The README banner and headline (`neoskript/banner.png` in xena-studios/brand, linked from its v1 release), and the other brand files there.
 - Progress per milestone in `docs/PROGRESS.md`; the plan in `docs/PLAN.md`.
 - Skript's test suite passing on NeoSkript; the differential test harness (`test-harness/`) and its known-differences list.
 - The reference Skript docs export (`neoskript-frontend/src/testFixtures/resources/skript-syntax/2.17.0.json`).

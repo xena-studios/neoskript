@@ -153,6 +153,45 @@ public final class Library implements Registrar {
         wordsAsLiterals.add(id);
     }
 
+    private final Set<String> writesBackArguments = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Writes what effect {@code id} sets its variable arguments to back to them once it's run
+     * ({@link co.xenastudios.neoskript.runtime.ArgumentChanges}), as a Skript addon changes its arguments: for
+     * NeoSkriptCompat. NeoSkript's own syntax doesn't.
+     */
+    public void writesBackArguments(String id) {
+        writesBackArguments.add(id);
+    }
+
+    boolean hasWriteBack(String id) {
+        return writesBackArguments.contains(id);
+    }
+
+    /**
+     * Which of the arguments of the element being set up on this thread are a variable and which a list variable,
+     * for syntax that writes back: set for each element as it's set up, and cleared once it's made.
+     */
+    private final ThreadLocal<long[]> variableArguments = new ThreadLocal<>();
+
+    /** The element about to be set up has these variable arguments, or none of either when {@code null}. */
+    void settingUpVariables(long[] masks) {
+        if (masks == null) {
+            variableArguments.remove();
+        } else {
+            variableArguments.set(masks);
+        }
+    }
+
+    /**
+     * Which of the arguments of the element being set up on this thread are a variable ({@code [0]}) and which a list
+     * variable ({@code [1]}), by bit, for syntax that {@link #writesBackArguments writes back}: for NeoSkriptCompat.
+     */
+    public long[] variableArguments() {
+        long[] masks = variableArguments.get();
+        return masks == null ? new long[2] : masks.clone();
+    }
+
     boolean hasWordsAsLiterals(String id) {
         return wordsAsLiterals.contains(id);
     }
@@ -350,9 +389,27 @@ public final class Library implements Registrar {
         sectionEvents.put(expressionId, eventName);
     }
 
+    /** A library section's own event: its class, and how it's made of each value the section gives. */
+    record SectionEventClass(Class<?> eventClass, java.util.function.Function<Object, ?> event) {}
+
+    private final Map<String, SectionEventClass> sectionEventClasses = new HashMap<>();
+
+    @Override
+    public <E> void sectionEvent(String sectionId, String eventName, Class<E> eventClass,
+            java.util.function.Function<Object, ? extends E> event) {
+        checkOpen();
+        sectionEvents.put(sectionId, eventName);
+        sectionEventClasses.put(sectionId, new SectionEventClass(eventClass, event));
+    }
+
     /** What the event of expression {@code id}'s section is called, or {@code null} if it has none of its own. */
     String sectionEvent(String id) {
         return sectionEvents.get(id);
+    }
+
+    /** Library section {@code id}'s own event, or {@code null} if its code is in the trigger's event. */
+    SectionEventClass sectionEventClass(String id) {
+        return sectionEventClasses.get(id);
     }
 
     @Override
@@ -496,6 +553,13 @@ public final class Library implements Registrar {
             String... patterns) {
         add(SyntaxKind.STRUCTURE, id, null, handler, patterns);
         builder.structureHandler(id, handler);
+    }
+
+    @Override
+    public void scriptSyntax(String id, co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler handler,
+            String... patterns) {
+        add(SyntaxKind.STRUCTURE, id, null, handler, patterns);
+        builder.scriptSyntaxHandler(id, handler);
     }
 
     @Override
@@ -1952,8 +2016,16 @@ public final class Library implements Registrar {
      * {@link ServerEvent}.
      */
     Object binding(SyntaxInfo syntax) {
+        if (syntax.script() != null) {
+            // Syntax a script declared: what it's bound to is only known while its load compiles.
+            java.util.function.Function<SyntaxInfo, Object> declared = SCRIPT_SYNTAX.get();
+            return declared == null ? null : declared.apply(syntax);
+        }
         return bindings.get(new Key(syntax.kind(), syntax.id()));
     }
+
+    /** What syntax scripts declared is bound to, while a load compiles on this thread: see {@link ScriptCompiler}. */
+    static final ThreadLocal<java.util.function.Function<SyntaxInfo, Object>> SCRIPT_SYNTAX = new ThreadLocal<>();
 
     /**
      * Whether an element of any kind is registered as {@code id}, or as a variant of it ({@code id-2}): what an

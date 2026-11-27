@@ -225,7 +225,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         if (!deferSyntax) {
             loadVariables();
         }
-        AddonApi api = new AddonApi(this, addons, scripts.globals(), library, getSLF4JLogger());
+        AddonApi api = new AddonApi(this, addons, scripts.globals(), library, getSLF4JLogger(), this::databases);
         addonApi = api;
         co.xenastudios.neoskript.api.Installed.install(api);
         // An addon disables before NeoSkript when the server stops, and its classes go with it. Its values in
@@ -364,9 +364,18 @@ public final class NeoSkriptPlugin extends JavaPlugin {
      * Reads config.yml at startup, writing the defaults if there's none and carrying an old one forward. A file
      * that isn't valid YAML is left as it is, and NeoSkript runs on the defaults until it's fixed.
      */
+    /** Set when the server stops, so a backup being compressed is cut off rather than waited for. */
+    private volatile boolean stopping;
+
+    /** Whether config.yml was carried forward at this start from a version without databases, so without backups. */
+    private boolean carriedToDatabases;
+
     private void loadSettings() {
         try {
-            accept(ConfigLoader.load(NeoSkriptConfig.SPEC, configFile()));
+            ConfigLoader.Result<NeoSkriptConfig> loaded = ConfigLoader.load(NeoSkriptConfig.SPEC, configFile());
+            // Carried from a config.yml without databases, as 0.1.0-beta.1's, which made no backups.
+            carriedToDatabases = loaded.carriedFrom() > 0 && loaded.carriedFrom() < 3;
+            accept(loaded);
         } catch (ConfigException e) {
             getSLF4JLogger().error("{} Running on the default settings until it's fixed and reloaded with /sk reload config.",
                     e.getMessage());
@@ -657,6 +666,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                                         database.name(), database.host(), database.port(), database.database(),
                                         database.user(), database.password(), database.table(),
                                         database.monitorChanges(), database.monitorInterval().millis());
+                sql = sql.withMerge(database.mergeChanges());
                 // Kept per database, by a hash of its type, where it is and its table.
                 return new co.xenastudios.neoskript.runtime.variables.storage.SqlVariableStorage(globals, codecs, sql,
                         routing, data.resolve("pending"), console);
@@ -788,6 +798,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
         scheduleSaves();
         scheduleBackups();
+        if (carriedToDatabases) {
+            backupsNotice();
+        }
     }
 
     /**
@@ -819,7 +832,22 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             long period = plan.periodMillis();
             getServer().getAsyncScheduler().runAtFixedRate(this, task -> {
                 try {
+                    // Compressing reads only the copy, so it never holds up a save, and stopping the server cuts it off.
                     java.nio.file.Path backup = backend.backupNow();
+                    if (backup != null && this.settings.variables().compressBackups()) {
+                        try {
+                            VariableStorage.Compressed compressed = VariableStorage.compress(backup, () -> stopping);
+                            if (compressed.copyLeft() != null) {
+                                getSLF4JLogger().warn("Compressed the backup as {}, but couldn't remove the copy {}: {}",
+                                        compressed.file().getFileName(), backup.getFileName(),
+                                        compressed.copyLeft().getMessage());
+                            }
+                            backup = compressed.file();
+                        } catch (IOException | RuntimeException e) {
+                            getSLF4JLogger().error("Couldn't compress the backup {}, so it's kept as it is: {}",
+                                    backup.getFileName(), e.getMessage());
+                        }
+                    }
                     if (backup != null) {
                         getSLF4JLogger().info("Backed up {} as {}", backend.describe(),
                                 getDataPath().toAbsolutePath().relativize(backup.toAbsolutePath()));
@@ -851,6 +879,24 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             // Skript's task runs every so many ticks: under one, it doesn't start. Otherwise exactly as written.
             long ticks = interval.millis() / 50;
             return new BackupPlan(false, ticks * 50);
+        }
+    }
+
+    /**
+     * Once, when config.yml was just carried forward from before it had databases: says that variables are now backed
+     * up as Skript backs them up by default, which 0.1.0-beta.1 didn't do, and how to change it.
+     */
+    private void backupsNotice() {
+        for (DatabaseSettings.Database database : settings.databases().enabled()) {
+            if (database.type().file() && database.backupInterval() != null && database.backupsToKeep() != 0) {
+                getSLF4JLogger().info("Variables in the {} database are now backed up every {} into backups/ beside its"
+                        + " file{}, keeping {}, as Skript does. Set databases.{}.backup-interval to 0 to stop, or"
+                        + " backups-to-keep to keep fewer. See https://neoskript.dev/docs/server/variables/#backups",
+                        database.name(), database.backupInterval(), database.type().name().equals("NATIVE")
+                                ? " (copies of the native .nsv file)" : "",
+                        database.backupsToKeep() < 0 ? "them all" : "the newest " + database.backupsToKeep(),
+                        database.name());
+            }
         }
     }
 
@@ -906,6 +952,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        stopping = true;
         co.xenastudios.neoskript.api.Installed.install(null);
         if (metrics != null) {
             // bStats' thread would otherwise outlive the plugin, and keep it in memory, through /reload.

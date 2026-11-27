@@ -71,21 +71,53 @@ final class ScriptHarness {
         Syntax.elements(library, imports);
     }
 
+    private final java.util.Map<co.xenastudios.neoskript.frontend.registry.FunctionInfo,
+            co.xenastudios.neoskript.runtime.FunctionHandle> handles = new java.util.concurrent.ConcurrentHashMap<>();
+    private final ScriptCompiler compiler = new ScriptCompiler(library, globals, handles);
+
+    /**
+     * The scripts the next load switches to their new code, as a reload of one script does; {@code null} for all.
+     * Every script is still parsed and compiled, as the plugin does.
+     */
+    java.util.Set<String> switching;
+
+    private co.xenastudios.neoskript.frontend.registry.SyntaxRegistry declared;
+
+    /** Runs {@code line} as an effect command does, with the syntax the loaded scripts declared; its errors. */
+    List<String> effectCommand(String line) {
+        ScriptCompiler.CompiledLine compiled = compiler.compileLine("effect command", line, Object.class,
+                "effect command", declared);
+        if (compiled.trigger() != null) {
+            compiled.trigger().execute(new SimpleTriggerContext(null, null));
+        }
+        return compiled.errors();
+    }
+
+    /** What the last load said about syntax that went while loaded scripts used it. */
+    List<String> switchWarnings = List.of();
+
     /** Parses and compiles {@code scripts} (name, text, name, text...), and returns the problems. */
     List<String> load(String... scripts) {
         List<SourceFile> files = new ArrayList<>();
         for (int i = 0; i < scripts.length; i += 2) {
             files.add(new SourceFile(scripts[i], scripts[i + 1]));
         }
-        List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(files);
+        ScriptLoader loader = new ScriptLoader(library.registry());
+        List<ParsedScript> parsed = loader.load(files);
+        declared = loader.declaredRegistry();
         List<String> problems = new ArrayList<>();
         for (ParsedScript script : parsed) {
             for (Diagnostic d : script.diagnostics()) {
                 problems.add(d.severity() + " " + d.line() + ": " + d.message());
             }
         }
-        compiled = new ScriptCompiler(library, globals).compile(parsed);
-        compiled.linkFunctions();
+        // One compiler, and one set of function handles, across loads, as the plugin keeps them.
+        compiled = compiler.compile(parsed);
+        java.util.Set<String> names = new java.util.HashSet<>();
+        files.forEach(file -> names.add(file.name()));
+        java.util.Set<String> switching = this.switching == null ? names : this.switching;
+        compiled.linkFunctions(switching);
+        switchWarnings = compiled.switchSyntax(switching, handles, names);
         for (Diagnostic d : compiled.diagnostics()) {
             problems.add(d.severity() + " " + d.line() + ": " + d.message());
         }
@@ -263,6 +295,11 @@ final class ScriptHarness {
         public Runnable whenStopped(Runnable task) {
             // The tests never stop NeoSkript: nothing to run, nothing to cancel.
             return () -> {};
+        }
+
+        @Override
+        public boolean inDeclaredSyntaxCode() {
+            return ScriptCompiler.compilingDeclaredSyntax();
         }
 
         @Override

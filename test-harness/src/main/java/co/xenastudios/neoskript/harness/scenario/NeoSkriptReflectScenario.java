@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 
 /**
  * NeoSkriptReflect against skript-reflect 2.6.3 (pinned by SHA-256) on Skript 2.17.0: the same script
- * ({@code scripts/reflect-check.sk}) on both, with imports, static and instance calls, overloads, varargs, fields,
+ * ({@code scripts/reflect-check.sk}, and {@code scripts/reflect-custom.sk} for custom syntax) on both, with imports, static and instance calls, overloads, varargs, fields,
  * nested classes, arrays, {@code null}, classes, a Java event and the last error, each line it prints compared. A call
  * to a method that doesn't exist must warn on both. Each also times a method call, net of the loop around it. Where
  * the reference Skript doesn't run (Folia, 1.21.4), NeoSkript's lines are checked against what Skript printed.
@@ -44,6 +44,9 @@ public final class NeoSkriptReflectScenario implements Scenario {
             "contains size: true", "plus call: 3", "equals call: false", "is call: true", "letter 5: false",
             "letter ab: <none>",
             "error: java.lang.IndexOutOfBoundsException: Index 9 out of bounds for length 2", "system: yes", "loaded",
+            "custom shout: hi", "custom big: yes", "custom doubled: 8", "custom pattern 1: a", "custom pattern 2: b",
+            "custom twice: 6", "custom twices: 2 and 4", "custom even: yes", "custom not even: yes", "custom java: 1",
+            "custom whisper: psst", "custom done",
             "event: reflect-event", "missing done");
 
     /**
@@ -78,7 +81,8 @@ public final class NeoSkriptReflectScenario implements Scenario {
             ServerBuilder skript = context.server(runs.resolve("skript"))
                     .plugin(context.skriptJar())
                     .plugin(context.download(REFLECT_URL, REFLECT_SHA256, "skript-reflect-2.6.3.jar"))
-                    .file("plugins/Skript/scripts/reflect-check.sk", context.script("reflect-check.sk"));
+                    .file("plugins/Skript/scripts/reflect-check.sk", context.script("reflect-check.sk"))
+                    .file("plugins/Skript/scripts/reflect-custom.sk", context.script("reflect-custom.sk"));
             Result result = run(skript, false);
             expected = result.lines;
             skriptBench = result.bench;
@@ -93,7 +97,8 @@ public final class NeoSkriptReflectScenario implements Scenario {
                 .plugin(context.neoskriptJar())
                 .plugin(addonJar(context))
                 .plugin(context.download(REFLECT_URL, REFLECT_SHA256, "skript-reflect-2.6.3.jar"))
-                .file("plugins/NeoSkript/scripts/reflect-check.sk", context.script("reflect-check.sk"));
+                .file("plugins/NeoSkript/scripts/reflect-check.sk", context.script("reflect-check.sk"))
+                .file("plugins/NeoSkript/scripts/reflect-custom.sk", context.script("reflect-custom.sk"));
         Result result = run(neoskript, true);
         context.summary("lines", result.lines.size());
         context.summary("neoskript ns per call", result.bench);
@@ -141,6 +146,7 @@ public final class NeoSkriptReflectScenario implements Scenario {
                 }
             }
             server.await(Pattern.compile(Pattern.quote("[reflect] loaded")), WAIT);
+            server.await(Pattern.compile(Pattern.quote("[reflect] custom done")), WAIT);
             server.await(ServerProcess.DONE, WAIT);
             int mark = server.mark();
             server.command("reflect-event");
@@ -181,7 +187,7 @@ public final class NeoSkriptReflectScenario implements Scenario {
         }
     }
 
-    private static Path addonJar(ScenarioContext context) throws IOException {
+    static Path addonJar(ScenarioContext context) throws IOException {
         for (Path jar : context.officialAddonJars()) {
             if ("NeoSkriptReflect".equals(NeoSkriptOfficialAddonsScenario.properties(jar).getProperty("name"))) {
                 return jar;

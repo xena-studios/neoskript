@@ -118,10 +118,12 @@ final class ServerEvents {
      * 2.17, they're text components, which become text where text is wanted.
      */
     static void registerMessages(Registrar registrar) {
-        registrar.expression("ExprChatMessage", "textcomponent", info -> new EventMessage<>(AsyncChatEvent.class,
-                AsyncChatEvent::message, (event, text) -> event.message(Messages.component(text)),
-                changedAfter("the chat message")),
-                "[the] [chat( |-)]message");
+        registrar.expression("ExprChatMessage", "textcomponent", info -> {
+            // Skript's chat message only works in a chat event: elsewhere it fails to set up, with its error.
+            SkriptEventNames.restrict(info, "message", AsyncChatEvent.class);
+            return new EventMessage<>(AsyncChatEvent.class, AsyncChatEvent::message,
+                    (event, text) -> event.message(Messages.component(text)), changedAfter("the chat message"));
+        }, "[the] [chat( |-)]message");
         registrar.expression("ExprChatFormat", "string", info -> new EventMessage<>(AsyncChatEvent.class,
                 event -> "<[player]> [message]", (event, text) -> {
                     String format = Values.text(text);
@@ -221,6 +223,9 @@ final class ServerEvents {
             case EffectCommandEvent command -> command.getSender();
             case co.xenastudios.neoskript.runtime.command.CommandEvent command -> (CommandSender) command.sender();
             case PlayerEvent player -> player.getPlayer();
+            // In a spawn or shoot section, the entity, as Skript's command sender event value is of it.
+            case WorldSyntax.SpawnSectionEvent spawn -> spawn.entity();
+            case WorldSyntax.ShootSectionEvent shoot -> shoot.entity();
             case null, default -> null;
         };
     }

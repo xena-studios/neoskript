@@ -110,6 +110,9 @@ final class WorldProperties {
             PlayerSyntax.names(weathers, weather, weather.names);
         }
         registrar.namedType("weathertype", "weather type", Weather.class, weathers);
+        // Skript's other names for the type: 'weather' alone is the type where nothing else reads it.
+        registrar.alias("weathertype", "weather", "weathers");
+        registrar.alias("weathertype", "weather condition", "weather conditions");
         registrar.text(Weather.class, weather -> weather.names[0]);
 
         Map<String, io.papermc.paper.world.MoonPhase> phases = new LinkedHashMap<>();

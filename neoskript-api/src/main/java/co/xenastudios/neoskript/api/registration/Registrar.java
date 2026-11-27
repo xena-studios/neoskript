@@ -294,6 +294,22 @@ public interface Registrar {
             ElementFactory<co.xenastudios.neoskript.api.element.LoopValue> factory);
 
     /**
+     * The code in library section {@code sectionId}'s section is in an event of its own, of {@code eventClass} and
+     * called {@code eventName} in errors, as Skript loads a spawn section's code: it runs once for each value the
+     * section gives, in the event {@code event} makes of that value, and only that event's values can be used there
+     * ({@code There's no world in a spawn event.}), as {@link #eventValue} gives them for {@code eventClass}.
+     *
+     * @param <E> the event's class
+     * @param sectionId the section's id
+     * @param eventName the event's name in errors
+     * @param eventClass the event's class, whose event values the code can use
+     * @param event the event for one of the values the section gives
+     */
+    @Experimental
+    default <E> void sectionEvent(String sectionId, String eventName, Class<E> eventClass,
+            java.util.function.Function<Object, ? extends E> event) {}
+
+    /**
      * Marks expression {@code expressionId} as an event value, as Skript's {@code EventValueExpression}s are
      * ({@code the created damage source}): as an argument, it counts as a default one
      * ({@link co.xenastudios.neoskript.api.element.ElementInfo#isDefault(int)}).
@@ -948,4 +964,20 @@ public interface Registrar {
      */
     @co.xenastudios.neoskript.api.annotation.Experimental
     default void strictType(String typeId) {}
+
+    /**
+     * A structure scripts declare syntax with, as skript-reflect's {@code effect <pattern>:}: {@code handler} reads
+     * each use before any script's code is parsed, and the syntax it declares is added to what every script (or, for
+     * local syntax, the declaring script) is parsed with, for that load. The code in the structure's body section is
+     * compiled as what runs where the syntax is used; it's given the use's arguments through
+     * {@link co.xenastudios.neoskript.api.element.TriggerContext#scriptSyntaxCall()}. Each load starts from nothing, so a
+     * script's syntax goes when it changes or unloads. Scripts on a server where no script declares syntax are parsed
+     * exactly as without this.
+     *
+     * @param id the structure's id: one this addon registers, without {@code -}
+     * @param handler reads what each use declares
+     * @param patterns the structure's header patterns
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void scriptSyntax(String id, ScriptSyntaxHandler handler, String... patterns) {}
 }

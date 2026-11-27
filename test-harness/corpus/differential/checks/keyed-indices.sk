@@ -1,0 +1,12 @@
+# Checks: 'indices of' refuses what has no indices, as Skript (issue #61).
+
+function keyed_indices_refused():
+	set {_t} to "x"
+	set {_i::*} to indices of {_t}
+	set {_i::*} to indices of (1, 2)
+	set {_i::*} to indices of ({_t})
+	set {_i::*} to indices of recursive {_t}
+	set {_i::*} to {_t}'s indices
+	set {_i::*} to ({_t})'s indices
+	set {_i::*} to indices of ({_t} where [input is set])
+	set {_i::*} to indices of 5

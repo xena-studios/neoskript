@@ -1,0 +1,43 @@
+# Probe: the indices of keyed expressions besides list variables (issue #61), as Skript's
+# KeyProviderExpression gives them.
+
+function keyed_indices_list() :: objects:
+	set {_r::a} to 1
+	set {_r::b} to 2
+	return {_r::*}
+
+function probe_keyed_indices():
+	set {_a::x::y} to 1
+	set {_a::x::z} to 2
+	set {_a::w} to 3
+	set {_s::c} to 30
+	set {_s::a} to 10
+	set {_s::b} to 20
+	show("of a list", indices of {_a::*})
+	show("of recursive", indices of (recursive {_a::*}))
+	show("of keyed", indices of keyed {_s::*})
+	show("of keyed recursive", indices of keyed (recursive {_a::*}))
+	show("of a function", indices of keyed_indices_list())
+	show("of filtered", indices of ({_s::*} where [input > 10]))
+	show("of transformed", indices of ({_s::*} transformed using [input * 2]))
+	show("of first elements", indices of (first 2 elements of {_s::*}))
+	show("sorted of recursive", sorted indices of (recursive {_a::*}) in descending order)
+	show("sorted of a function", sorted indices of keyed_indices_list() in descending order)
+	show("possessive of recursive", (recursive {_a::*})'s indices)
+	# Nested filters and transforms, elements of a filter, values within, single elements (review of #80).
+	show("of filtered twice", indices of (({_s::*} where [input > 10]) where [input > 20]))
+	show("of transformed twice", indices of (({_s::*} transformed using [input * 2]) transformed using [input + 1]))
+	show("of elements of filtered", indices of (first 2 elements of ({_s::*} where [input > 10])))
+	show("of values within", indices of (values within {_s::*}))
+	show("of values within recursive", indices of (values within recursive {_a::*}))
+	show("of last element", indices of (last element of {_s::*}))
+	show("of first element", indices of (first element of {_s::*}))
+	show("of 2nd element", indices of (2nd element of {_s::*}))
+	show("first element", first element of {_s::*})
+	show("last element", last element of {_s::*})
+	set {_f::*} to {_s::*} where [input > 10]
+	show("filtered renumbered", indices of {_f::*})
+	set {_g::*} to keyed ({_s::*} where [input > 10])
+	show("keyed filtered kept", indices of {_g::*})
+	set {_e} to first element of {_s::*}
+	show("element value", {_e})

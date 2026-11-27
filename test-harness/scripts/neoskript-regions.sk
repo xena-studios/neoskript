@@ -41,8 +41,11 @@ command /regiontest <text>:
 			# Back on the trigger's own thread: the far pig is another region's again, an error on Folia.
 			set {_far} to health of {regiontest::far}
 			send "[regiontest] after section %{_far}%" to console
+			# As in Skript, a spawn section's code can't see the loop around it: the value goes in a variable, and the
+			# loop is left after the section, back from its region.
 			loop 3 times:
+				set {_n} to loop-value
 				spawn a chicken at location(4100, 80, 4100, world "world"):
-					send "[regiontest] loop section %loop-value%" to console
-					exit loop
+					send "[regiontest] loop section %{_n}%" to console
+				exit loop
 			send "[regiontest] after exit loop" to console
