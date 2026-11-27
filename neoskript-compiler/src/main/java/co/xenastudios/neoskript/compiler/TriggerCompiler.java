@@ -4785,42 +4785,6 @@ final class TriggerCompiler {
         return entity != null && library.request(entity, words).valueClass() != library.javaClass("entity");
     }
 
-    /** Whether Skript's {@code ExprEntity} reads {@code words} as the event's entity: a kind of entity, no item. */
-    private boolean entityWords(String words) {
-        if (wordsAs(words, List.of("itemtype")) != null) {
-            return false;
-        }
-        TypeRef named = registry.resolveType(words.strip().toLowerCase(Locale.ROOT));
-        if (named != null) {
-            return registry.isSubtype(named.type().id(), "entity");
-        }
-        TypeRef entity = registry.resolveType("entity");
-        return entity != null && library.request(entity, words).valueClass() != library.javaClass("entity");
-    }
-
-    /**
-     * Whether Skript has a comparator for the types, directly or through a conversion of either side, as its
-     * {@code Comparators.getComparator} finds one: a world is compared with a text, which converts to a world.
-     * Words are only converted where Skript read them as a value ({@code convertA}, {@code convertB}).
-     */
-    private boolean comparableThrough(String a, String b, boolean convertA, boolean convertB) {
-        if (comparesWith(a, b)) {
-            return true;
-        }
-        for (String via : skriptTypeOrder()) {
-            if (!via.equals(SyntaxRegistry.OBJECT)
-                    && (convertA && !via.equals(a) && registry.isAssignable(a, via) && comparesWith(via, b)
-                    || convertB && !via.equals(b) && registry.isAssignable(b, via) && comparesWith(a, via))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean comparesWith(String a, String b) {
-        return comparable(a, b) || related(a, b) || numeric(a) && numeric(b);
-    }
-
     /**
      * Whether a side is literals only: a number, a boolean, a timespan ({@code 1 or 2}). Skript reads them as
      * unparsed literals of no type, so reading the whole 'if' line as a comparison gives no error of its own.
