@@ -24,4 +24,39 @@ function probe_bare_words():
 	send "%block ? {_v}%" to console
 	send "%whether {_v} is damage cause%" to console
 	send "%{_v} ? executor%" to console
+	# Lists and loops of such words, and values for any object: each is the type it names (issue #70).
+	set {_l::*} to block, executor and "z"
+	send "list: %{_l::*}%" to console
+	loop block and executor:
+		send "loop: %loop-value%" to console
+	loop (block and "z"):
+		send "brackets: %loop-value%" to console
+	set {_n::*} to (block and executor)
+	send "count: %size of {_n::*}%" to console
+	set {_q} to {_v} ? block
+	send "ternary: %{_q}%" to console
+	set {_t} to "x" ? damage cause
+	send "ternary words: %{_t}%" to console
+	set {_m::*} to damage cause and inventory action
+	send "elements: %{_m::*}%" to console
+	# Compared with the type its words name.
+	if {_a} is world:
+		send "is world" to console
+	if world is {_a}:
+		send "world is" to console
+	if {_a} is block:
+		send "is block" to console
+	if {_a} is chunk:
+		send "is chunk" to console
+	send "whether: %whether {_a} is world%" to console
+	if block is air:
+		send "block is air" to console
+	# Can't be: a single value, a type's property, or an event value's property in a comparison.
+	loop block:
+		send "single: %loop-value%" to console
+	loop damage cause:
+		send "single: %loop-value%" to console
+	broadcast name of block
+	if name of block is "x":
+		send "named" to console
 	send "end" to console

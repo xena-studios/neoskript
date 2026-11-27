@@ -45,7 +45,7 @@ Script problems at startup and runtime errors keep Skript's look, since tools an
 - the theme;
 - `update-checker`;
 - `language`, `text`, `syntax` (but for `syntax.type-properties`), `verbosity` and `warnings`;
-- `variables.player-uuids-in-names`, `variables.player-variable-fix` and `variables.save-interval`;
+- `variables.player-uuids-in-names`, `variables.player-variable-fix`, `variables.compress-backups` and `variables.save-interval`;
 - the `runtime-errors` limits;
 - `effect-commands`.
 
@@ -168,6 +168,7 @@ The plugins NeoSkript hooks into for their syntax, when they're installed. Each 
 | `variables.save-interval` | `5 minutes` | How often changed variables are saved to `csv` and `native` databases, at least every 10 seconds. They're also saved when the server stops. SQL databases write changes within a second or so. |
 | `variables.player-uuids-in-names` | `true` | Whether a player in a variable's name, as in `{money::%player%}`, is their UUID (`true`) or their name. Skript's `use player UUIDs in variable names`. |
 | `variables.player-variable-fix` | `true` | A player kept in a variable who leaves and joins again is a new player to the server. On, reading the variable gives the player now online, and stores them. Off, it gives the old player, whom messages and changes no longer reach. Skript's `player variable fix`. |
+| `variables.compress-backups` | `true` | Whether the backups each database makes every `backup-interval` are gzipped (`variables_<time>_scheduled.csv.gz`), at Skript's best compression. Compressing reads only the finished copy, so saves never wait for it. Skript's `compress backups`. |
 
 Moving over from Skript copies Skript's `use player UUIDs in variable names` setting into `player-uuids-in-names`, so the variables Skript saved are found. See [variables and storage](/docs/server/variables/).
 
@@ -194,6 +195,7 @@ databases:
 | `backups-to-keep` | `12` | How many of the file's backups to keep, the oldest removed first. `12` (a day's worth) in a new config and one carried forward from before the `databases` section; a server that moved from Skript has its `config.sk` value. Left out of a database, `-1`. `-1` keeps them all; `0` makes none and removes the file's old ones when the server starts, as in Skript, unless `backup-interval` is `0`. |
 | `monitor-changes` | `false` | `sqlite` and `mysql`: read other servers' changes from the database every `monitor-interval`, for servers that share it. |
 | `monitor-interval` | `20 seconds` | How often, at least every second. |
+| `merge-changes` | `true` | With `monitor-changes`: two servers' changes to one variable are merged where they can be, so additions on both count ([sharing variables](/docs/server/variables/#sharing-variables-between-servers)). `false` keeps Skript's rule exactly: the last write wins. |
 | `host`, `port`, `user`, `password`, `database` | | `mysql`: where the database is. The password is never shown in the console or `/sk info`. |
 | `table` | `variables21` | `sqlite` and `mysql`: the table, Skript's by default. |
 
@@ -266,6 +268,7 @@ The first start copies these settings from Skript's `config.sk`, read as Skript 
 | `long parse time warning threshold` | `warnings.long-parse-time` |
 | `disable hooks` (`vault`, `regions.worldguard`, `regions.grief prevention`) | `hooks`, turned round |
 | `runtime errors` | `runtime-errors` |
+| `compress backups` | `variables.compress-backups` |
 | `databases`, with the files it names | `databases` |
 | `enable effect commands`, `effect command token`, `allow ops to use effect commands`, `log effect commands` | `effect-commands` |
 
@@ -284,7 +287,13 @@ A setting `config.sk` doesn't have keeps NeoSkript's default, which is the value
 | `script loader thread size` | NeoSkript loads scripts its own way: each file is parsed in parallel, and nothing waits on the main thread. There's nothing to size. |
 | `version` | Skript's own record of its config's version. NeoSkript's is `config-version`. |
 | `case-insensitive variables` | Not here: NeoSkript's variable names always ignore case, as Skript's do by default. If `config.sk` turned it off, moving over says so, and names, as errors, the saved variables that differ only by case (`{coins::Bob}` and `{coins::bob}`), as NeoSkript keeps only one of each. Skript's `variables.csv` is left as it was. |
-| `compress backups`, `variable changes until save` | Not here yet: NeoSkript behaves as Skript's default `config.sk` for them. |
+| `variable changes until save` | Skript writes each change to `variables.csv` as it happens, and rewrites the whole file once this many changes pile up. NeoSkript writes the changed variables every `variables.save-interval` instead (native storage appends only what changed), so there are no piled-up changes to count. Moving over says so when it isn't Skript's 1000. |
+| `execute functions with missing parameters` | Not here: NeoSkript always runs a function whose argument has no value, as Skript does by default (`true`). With it off, Skript skips such a call and gives nothing. Moving over says so when `config.sk` turned it off. |
+| `simplify syntax on parse` | Not here: NeoSkript always works out what it can while a script loads (`1 + 1` is `2`), as Skript does by default (`true`); Skript's own config doesn't list it. Moving over says so when `config.sk` turned it off. |
+| `keep configs loaded` | It keeps each script's parsed file in memory for Skript addons that read it; NeoSkript doesn't load Skript addons. |
+| `allow unsafe platforms` | It lets Skript start on a server platform it doesn't support. NeoSkript is built on Paper's API, for Paper and Folia only; there's no other platform to allow. |
+| `updater download tries` | For Skript's own updater; NeoSkript's `update-checker` doesn't download. |
+| `allow function calls before definations`, `enable script caching`, `addon safety checks`, `case-insensitive commands`, `keep command last usage dates` | They do nothing in Skript 2.17: deprecated or no longer read. |
 
 ## Updating NeoSkript
 
@@ -392,6 +401,9 @@ variables:
   # Skript's 'player variable fix': a player in a variable who leaves and joins again is read as the
   # player now online. Off, it stays the old player, whom messages and changes no longer reach.
   player-variable-fix: true
+  # Skript's 'compress backups': whether the backups each database makes every backup-interval are gzipped
+  # (variables_<time>_scheduled.csv.gz), at Skript's best compression.
+  compress-backups: true
 
 # Where global variables are saved, as the databases: section of Skript's config.sk. Each variable is saved
 # in the first database, from the top, whose pattern (a regular expression) matches its whole name, and in no

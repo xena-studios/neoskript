@@ -13,6 +13,10 @@ package co.xenastudios.neoskript.runtime;
 public record TypeValue(String name, Class<?> type) {
 
     static {
+        // As Skript's comparator for a type: a value of it is it, and so is the type or one under it ('integer is
+        // number', not 'number is integer').
+        Comparison.registerEquality(TypeValue.class, TypeValue.class, (value, type) -> type.type().isAssignableFrom(
+                value.type()));
         Comparison.registerEquality(TypeValue.class, Object.class, (type, value) -> type.type().isInstance(value));
     }
 

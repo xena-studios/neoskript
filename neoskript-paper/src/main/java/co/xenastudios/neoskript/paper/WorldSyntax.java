@@ -340,6 +340,10 @@ final class WorldSyntax {
                 "(spawn|summon) %number% of %entitytypes/entitysnapshots% [%directions% %locations%]",
                 "(spawn|summon) %*number% %*entitytypes% [%directions% %locations%]",
                 "(spawn|summon) %experience% [%directions% %locations%]");
+        // Its code is in an event of its own, as Skript loads it: the entity is all there is, and what it gives
+        // ('event-location', the player it is). The trigger's own event values aren't there.
+        registrar.sectionEvent("EffSecSpawn", "spawn", SpawnSectionEvent.class, value -> new SpawnSectionEvent((Entity) value));
+        registrar.eventValue(SpawnSectionEvent.class, "entity", SpawnSectionEvent::entity);
         // 'shoot an arrow from the player', 'make {_loc} shoot a pig at speed 2': its code runs for each one shot.
         registrar.section("EffSecShoot", "entity", info -> {
             int typesAt = info.pattern() == 0 ? 0 : 1;
@@ -369,6 +373,11 @@ final class WorldSyntax {
             };
         }, "shoot %entitytypes% [from %livingentities/locations%] [(at|with) (speed|velocity) %-number%] [%-direction%]",
                 "(make|let) %livingentities/locations% shoot %entitytypes% [(at|with) (speed|velocity) %-number%] [%-direction%]");
+        // As a spawn section's: what was shot, and as a projectile if it's one.
+        registrar.sectionEvent("EffSecShoot", "shoot", ShootSectionEvent.class, value -> new ShootSectionEvent((Entity) value));
+        registrar.eventValue(ShootSectionEvent.class, "entity", ShootSectionEvent::entity);
+        registrar.eventValue(ShootSectionEvent.class, "projectile",
+                event -> event.entity() instanceof org.bukkit.entity.Projectile projectile ? projectile : null);
         // The shooter of a projectile, or in 'shoot a pig:', of what was shot.
         registrar.expression("ExprShooter", "livingentity", info -> new SettableProperty<>(Entity.class,
                 org.bukkit.entity.LivingEntity.class, entity -> entity instanceof org.bukkit.entity.Projectile projectile
@@ -1465,4 +1474,10 @@ final class WorldSyntax {
         }
         container.update();
     }
+
+    /** Skript's EffSecSpawn.SpawnEvent: the event a spawn section's code is in, for the entity spawned. */
+    record SpawnSectionEvent(Entity entity) {}
+
+    /** Skript's EffSecShoot.ShootEvent: the event a shoot section's code is in, for what was shot. */
+    record ShootSectionEvent(Entity entity) {}
 }

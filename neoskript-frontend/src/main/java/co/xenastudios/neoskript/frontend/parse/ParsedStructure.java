@@ -75,14 +75,21 @@ public sealed interface ParsedStructure {
      *
      * @param defaults each parameter's default value, by parameter; {@code null} where there's none. Their
      *     positions are in the default value's own text, {@code defaultTexts}.
+     * @param declaredSyntax whether it's the code of syntax a script declared (skript-reflect's {@code effect:}),
+     *     where {@code continue} outside a loop proceeds
      */
     record Function(Structure structure, FunctionInfo signature, boolean local, List<Expr> defaults,
-            List<String> defaultTexts, List<Statement> body) implements ParsedStructure {
+            List<String> defaultTexts, List<Statement> body, boolean declaredSyntax) implements ParsedStructure {
 
         public Function {
             defaults = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(defaults));
             defaultTexts = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(defaultTexts));
             body = List.copyOf(body);
+        }
+
+        public Function(Structure structure, FunctionInfo signature, boolean local, List<Expr> defaults,
+                List<String> defaultTexts, List<Statement> body) {
+            this(structure, signature, local, defaults, defaultTexts, body, false);
         }
     }
 

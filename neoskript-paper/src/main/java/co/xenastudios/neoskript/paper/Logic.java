@@ -658,7 +658,7 @@ final class Logic {
                     if (queue != null) {
                         return last ? queue.pollLast() : queue.pollFirst();
                     }
-                    return last ? values[count - 1] : values[0];
+                    return at(keyed, values, last ? count - 1 : 0);
                 }
                 case 1 -> {
                     int n = Math.min(count, Math.max(0, number(args[0])));
@@ -674,7 +674,7 @@ final class Logic {
                     return last ? range(keyed, values, count - n, count) : range(keyed, values, 0, n);
                 }
                 case 2 -> {
-                    return count == 0 ? null : values[random.nextInt(count)];
+                    return count == 0 ? null : at(keyed, values, random.nextInt(count));
                 }
                 case 3 -> {
                     int n = Math.max(0, number(args[0]));
@@ -684,10 +684,13 @@ final class Logic {
                     if (!distinct) {
                         // Any element each time, so the same one can come up more than once.
                         Object[] picked = new Object[n];
+                        String[] keys = new String[n];
                         for (int i = 0; i < n; i++) {
-                            picked[i] = values[random.nextInt(count)];
+                            int chosen = random.nextInt(count);
+                            picked[i] = values[chosen];
+                            keys[i] = keyed == null ? null : keyed.keys()[chosen];
                         }
-                        return picked;
+                        return keyed == null ? picked : new KeyedValues(picked, keys);
                     }
                     List<Integer> order = new java.util.ArrayList<>(count);
                     for (int i = 0; i < count; i++) {
@@ -706,7 +709,7 @@ final class Logic {
                 case 4 -> {
                     int n = number(args[0]);
                     int index = toLast ? count - n : n - 1;
-                    return index >= 0 && index < count ? values[index] : null;
+                    return index >= 0 && index < count ? at(keyed, values, index) : null;
                 }
                 default -> {
                     // 'elements from 2 to 1' are those from 1 to 2.
@@ -717,6 +720,12 @@ final class Logic {
                     return from > to ? new Object[0] : range(keyed, values, from - 1, to);
                 }
             }
+        }
+
+        /** The value at {@code index}, with its index if the values have them, as Skript's keyed element. */
+        private static Object at(KeyedValues keyed, Object[] values, int index) {
+            return keyed == null ? values[index]
+                    : new KeyedValues(new Object[] {values[index]}, new String[] {keyed.keys()[index]});
         }
 
         private static Object range(KeyedValues keyed, Object[] values, int from, int to) {

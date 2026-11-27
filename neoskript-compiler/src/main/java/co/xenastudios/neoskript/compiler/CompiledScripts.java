@@ -5,6 +5,7 @@
 package co.xenastudios.neoskript.compiler;
 
 import co.xenastudios.neoskript.api.registration.ScriptEvent;
+import co.xenastudios.neoskript.frontend.registry.FunctionInfo;
 import co.xenastudios.neoskript.frontend.source.Diagnostic;
 import co.xenastudios.neoskript.runtime.CompiledFunction;
 import co.xenastudios.neoskript.runtime.FunctionHandle;
@@ -25,7 +26,67 @@ import java.util.List;
  */
 public record CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunctionBody> functions,
         List<Diagnostic> diagnostics, java.util.Map<String, String> unrunnableTests, List<CompiledCommand> commands,
-        java.util.Set<String> unparsedLines, java.util.Set<String> crashed, java.util.Set<String> unreachableAfterFailure) {
+        java.util.Set<String> unparsedLines, java.util.Set<String> crashed, java.util.Set<String> unreachableAfterFailure,
+        java.util.Set<FunctionInfo> declaredSyntax,
+        java.util.Map<co.xenastudios.neoskript.runtime.FunctionHandle, java.util.Set<String>> syntaxUses) {
+
+    public CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunctionBody> functions,
+            List<Diagnostic> diagnostics, java.util.Map<String, String> unrunnableTests, List<CompiledCommand> commands,
+            java.util.Set<String> unparsedLines, java.util.Set<String> crashed,
+            java.util.Set<String> unreachableAfterFailure) {
+        this(triggers, functions, diagnostics, unrunnableTests, commands, unparsedLines, crashed,
+                unreachableAfterFailure, java.util.Set.of(), java.util.Map.of());
+    }
+
+    /** These, with the syntax scripts declared and which scripts use it: see {@link #switchSyntax}. */
+    CompiledScripts withDeclaredSyntax(java.util.Set<FunctionInfo> declared,
+            java.util.Map<co.xenastudios.neoskript.runtime.FunctionHandle, java.util.Set<String>> uses) {
+        return new CompiledScripts(triggers, functions, diagnostics, unrunnableTests, commands, unparsedLines, crashed,
+                unreachableAfterFailure, declared, uses);
+    }
+
+    /**
+     * Once {@code switching} have switched to their new code ({@link #linkFunctions}): the code of syntax they declared
+     * before but don't any more is let go of. Its handle is dropped from {@code handles} and cleared, so code still
+     * using it (a script that wasn't reloaded) gets an error rather than running the old code, which can be freed. A
+     * script that's {@code present} but not switching keeps its syntax. Returns a warning for each piece of syntax
+     * that goes while loaded scripts still use it, naming them.
+     */
+    public List<String> switchSyntax(java.util.Set<String> switching,
+            java.util.Map<FunctionInfo, co.xenastudios.neoskript.runtime.FunctionHandle> handles,
+            java.util.Set<String> present) {
+        for (java.util.Map.Entry<FunctionInfo, co.xenastudios.neoskript.runtime.FunctionHandle> entry : handles.entrySet()) {
+            if (entry.getKey().name().startsWith(
+                    co.xenastudios.neoskript.frontend.registry.ScriptSyntaxDecl.FUNCTION_PREFIX)) {
+                entry.getValue().users().removeAll(switching);
+            }
+        }
+        syntaxUses.forEach((handle, users) -> users.stream().filter(switching::contains).forEach(handle.users()::add));
+        List<String> warnings = new java.util.ArrayList<>();
+        handles.entrySet().removeIf(entry -> {
+            FunctionInfo info = entry.getKey();
+            co.xenastudios.neoskript.runtime.FunctionHandle handle = entry.getValue();
+            if (!info.name().startsWith(co.xenastudios.neoskript.frontend.registry.ScriptSyntaxDecl.FUNCTION_PREFIX)
+                    || declaredSyntax.contains(info)) {
+                return false;
+            }
+            String owner = handle.script();
+            if (owner != null && present.contains(owner) && !switching.contains(owner)) {
+                return false;
+            }
+            handle.target(null);
+            if (!handle.users().isEmpty()) {
+                String header = info.name().substring(
+                        co.xenastudios.neoskript.frontend.registry.ScriptSyntaxDecl.FUNCTION_PREFIX.length());
+                warnings.add(String.join(", ", new java.util.TreeSet<>(handle.users())) + " still use"
+                        + (handle.users().size() == 1 ? "s" : "") + " the custom syntax '" + header + "', which "
+                        + (owner == null ? "a script" : owner) + " no longer declares: reload "
+                        + (handle.users().size() == 1 ? "it" : "them"));
+            }
+            return true;
+        });
+        return warnings;
+    }
 
     public CompiledScripts(List<CompiledTrigger> triggers, List<CompiledFunctionBody> functions,
             List<Diagnostic> diagnostics, java.util.Map<String, String> unrunnableTests, List<CompiledCommand> commands) {

@@ -150,14 +150,36 @@ class CompatArgument<T> implements Expression<T> {
         return this;
     }
 
+    /** Whether the argument is a variable an effect can set or delete, and a list one: see {@link #variable}. */
+    private boolean variable;
+    private boolean listVariable;
+
+    /** The argument is a variable, which an effect can set or delete, as on Skript: NeoSkript writes it back. */
+    CompatArgument<T> variable(boolean list) {
+        this.variable = true;
+        this.listVariable = list;
+        return this;
+    }
+
     @Override
     public Class<?>[] acceptChange(ChangeMode mode) {
+        if (variable && (mode == ChangeMode.SET || mode == ChangeMode.DELETE)) {
+            return new Class<?>[] {listVariable ? Object[].class : Object.class};
+        }
         return null;
     }
 
     @Override
     public void change(Event event, Object[] delta, ChangeMode mode) {
-        throw new UnsupportedOperationException("NeoSkriptCompat can't change an addon's argument");
+        if (!variable || mode != ChangeMode.SET && mode != ChangeMode.DELETE) {
+            throw new UnsupportedOperationException("NeoSkriptCompat can only set or delete an addon's argument that's"
+                    + " a variable");
+        }
+        Object value = null;
+        if (mode == ChangeMode.SET && delta != null && delta.length > 0) {
+            value = listVariable ? CompatValuesBridge.result(delta) : CompatValuesBridge.result(delta[0]);
+        }
+        co.xenastudios.neoskript.runtime.ArgumentChanges.put(index, value);
     }
 
     @Override

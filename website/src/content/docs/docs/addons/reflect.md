@@ -77,6 +77,56 @@ The [syntax reference](/syntax/) has every pattern, with a badge saying it's fro
 | `[the] event` | The Bukkit event the trigger is running for. |
 | `on <imported event class>:` | A trigger for any Bukkit event. Several with `or`. |
 
+## Custom syntax
+
+Scripts can declare their own effects, conditions and expressions, as with skript-reflect, and every script can use them, whatever order the scripts load in. A `local` one is only for the script that declares it.
+
+```skript nocheck
+effect shout %string%:
+	trigger:
+		broadcast "%expression-1%!"
+
+condition %number% is big:
+	check:
+		if expression-1 > 10:
+			continue
+
+expression doubled %number%:
+	get:
+		return expression-1 * 2
+
+effect:
+	patterns:
+		greet %player%
+		wave at %player%
+	trigger:
+		send "Pattern %matched pattern%" to expression-1
+
+players property rank:
+	get:
+		return {rank::%expression-1's uuid%}
+
+players property condition staff:
+	check:
+		if {staff::%expression-1's uuid%} is true:
+			continue
+```
+
+| Syntax | What it does |
+|---|---|
+| `[local] effect <pattern>:` or `effect:` with `patterns:` | An effect: `trigger:` runs where it's used. |
+| `[local] condition <pattern>:` or `condition:` with `patterns:` | A condition: it passes if `check:` reaches `continue`. |
+| `[local] [plural\|non-single] expression <pattern>:` or `expression:` with `patterns:` | An expression: what `get:` returns. `return type:` names its type. |
+| `[local] <types> property <name>:` | A property expression: `the <name> of %types%` and `%types%'s <name>`. `get:` runs once for each value, given as `expression-1`. |
+| `[local] <types> property condition <name>:` | A property condition: `%types% is <name>` and `%types% is not <name>`. |
+| `expression-1`, `expr-2`... | The values the use was given, by placeholder. |
+| `[the] [matched] pattern` | Which of the patterns the use matched, from 1. |
+| `[the] [parse[r]] mark`, `[the] parse[r] tags` | The use's parse mark and tags. |
+| `continue` | In `check:`, the condition passes, and the code stops. In a loop, it's Skript's `continue`. |
+| `return %objects%` | In `get:`, the expression's value. |
+
+The code runs as part of the trigger that used the syntax: on its thread (its region on Folia), with its event (`event` is that event), but, as in a function, without its event values: write `event-player` as `event.getPlayer()`, or pass the player in. Each load reads the declarations again, so changing or removing a script changes or removes its syntax.
+
 ## How calls run
 
 skript-reflect looks a method up each time a line runs, matching the arguments against every overload again, and calls it with `invokeWithArguments`, which the JVM can't turn into a direct call. NeoSkript Reflect keeps what it found, in two places:
@@ -129,10 +179,11 @@ The values scripts get are NeoSkript's own: an item type, a timespan or a date i
 
 ## Not yet
 
-This is the first part of the addon. These parts of skript-reflect aren't in it yet, so lines using them don't load. They're tracked in [issue #13](https://github.com/xena-studios/neoskript/issues/13).
+These parts of skript-reflect aren't in NeoSkript Reflect yet, so lines using them don't load, or, for a custom syntax's sections, are left out with a warning. They're tracked in [issue #13](https://github.com/xena-studios/neoskript/issues/13).
 
-- Custom syntax: `effect`, `expression`, `condition`, `event` and `property` structures, with `parse`, `get`, `patterns`, `usable in`, `continue` and `expression-N`.
-- Computed options (`option` with `get`), sections and `run section`, proxies (`proxy instance of`), function references (`function "name"`), `local` and `bits of`.
+- In custom syntax: `parse:`, `usable in:` (and so event values in its code), the changer sections of expressions (`set:`, `add:`, `remove:`, `remove all:`, `delete:`, `reset:`, with `change value`), `delay the effect`, `loop of`, `event-classes` and `raw` expressions.
+- Custom events (`event` structures, `call event`).
+- Computed options (`option` with `get`), sections and `run section`, proxies (`proxy instance of`), function references (`function "name"`) and `bits of`.
 - The `import` effect for effect commands, and loading classes from jars in `plugins/skript-reflect/` (external libraries).
 - `with priority` and `all` on Java events (`on ServerCommandEvent with priority highest:`).
 - `raw %objects%`, and parsing deferred to run time (`$`).

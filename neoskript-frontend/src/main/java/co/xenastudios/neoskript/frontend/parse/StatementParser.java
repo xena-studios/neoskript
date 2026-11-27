@@ -328,7 +328,9 @@ final class StatementParser {
         if (context.eventScope() == null || header != null && values != null && values.keepsEventValues(header.syntax())) {
             return body.get();
         }
-        EventValues.Scope scope = context.eventScope(null);
+        // A section whose code is in an event of its own (a spawn section's) can use that event's values only.
+        EventValues.Scope own = header != null && values != null ? values.section(header.syntax()) : null;
+        EventValues.Scope scope = context.eventScope(own);
         try {
             return body.get();
         } finally {
@@ -919,7 +921,14 @@ final class StatementParser {
         LineParser strict = new LineParser(context, key);
         ParsedSyntax parsed = strict.section(0, key.length());
         EventValues.Scope scope = context.eventScope();
-        if (scope != null && strict.refusedSkriptValues() && (parsed == null || unresolved(parsed) > 0)) {
+        // Words for an event value that isn't there are read as a value where any object goes, as Skript's unparsed
+        // literal reads them: a loop's values ('loop block and executor:' in a function) and a condition's
+        // ('if {_a} is world:'). The compiler sees to it, and to a loop's other event values' errors ('loop the
+        // block:'). In a condition, words with 'the' are no value.
+        boolean words = key.regionMatches(true, 0, "loop ", 0, 5) ? strict.refusedEventValues()
+                : IF_HEADER.matcher(key).matches() && strict.refusedWords();
+        if (scope != null && (words || strict.refusedSkriptValues())
+                && (parsed == null || unresolved(parsed) > 0)) {
             // As for other lines: with the event values the code can't have, for the compiler to say which.
             context.eventScope(null);
             try {

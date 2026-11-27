@@ -64,8 +64,18 @@ public record SimpleTriggerContext(Object event, Object owner, TriggerContext ca
      * @return a context of its own
      */
     public static TriggerContext call(TriggerContext caller) {
+        if (caller instanceof ScriptSyntaxContext use) {
+            // Code of syntax a script declared: it runs with the event, and as part of the run, of where it's used.
+            return new SimpleTriggerContext(use.event(), use.owner(), use);
+        }
         return new SimpleTriggerContext(null, caller instanceof SimpleTriggerContext simple ? simple.owner() : null,
                 caller == NOWHERE ? null : caller);
+    }
+
+    /** The use of declared syntax this is the code of, if it is: only directly, not in a function the code calls. */
+    @Override
+    public co.xenastudios.neoskript.api.element.ScriptSyntaxCall scriptSyntaxCall() {
+        return caller instanceof ScriptSyntaxContext use ? use : null;
     }
 
     // A run's context is itself, not its contents: two runs of the same event are two runs.

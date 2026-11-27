@@ -148,6 +148,7 @@ final class CompatRegistration {
         String id = info.getCodeName();
         Class<T> type = info.getC();
         registrar.type(id, id, type);
+        compat.types().registeredWithNeoSkript(type);
         @SuppressWarnings("unchecked")
         Parser<T> parser = (Parser<T>) info.getParser();
         if (parser != null) {
@@ -194,7 +195,9 @@ final class CompatRegistration {
 
     /** Whether NeoSkript has no type for exactly this class: conversions and comparisons go only for those. */
     private boolean addonOnly(Class<?> type) {
-        return compat.library().exactTypeOf(type) == null;
+        // An addon's own type counts as the addon's, though NeoSkript knows it once registered: SkBee's text
+        // component to text conversion goes to NeoSkript, so a component in a list of texts becomes its text.
+        return compat.library().exactTypeOf(type) == null || compat.types().isAddons(type);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

@@ -22,6 +22,15 @@ public interface ScriptStructure {
     String script();
 
     /**
+     * The line the structure's header is on.
+     *
+     * @return its number, from 1
+     */
+    default int line() {
+        return 0;
+    }
+
+    /**
      * The structure's header, without its {@code :}.
      *
      * @return the header as written
@@ -41,6 +50,18 @@ public interface ScriptStructure {
      * @return the lines
      */
     List<Entry> entries();
+
+    /**
+     * The lines under one of the structure's sections ({@code patterns:} in skript-reflect's {@code effect:}), as
+     * written, nested sections' lines included, with their indentation left out; {@code null} if there's no section of
+     * that name directly under the header.
+     *
+     * @param name the section's name, without its {@code :}, in any case
+     * @return its lines, or {@code null}
+     */
+    default List<Entry> section(String name) {
+        return null;
+    }
 
     /**
      * Reports an error on a line of the structure, as the script's other load errors are; the rest of the script still

@@ -107,4 +107,55 @@ class MessageOrderTest {
                 error(6, "Minecraft id notarealitemzzz is not valid"), error(8, "frob c2")), file, d -> false);
         assertEquals(List.of(5, 6, 2, 8), sorted.stream().map(Diagnostic::line).toList());
     }
+
+    @Test
+    void scriptsLoadedTogetherAreInterleavedByStage() {
+        // Three scripts loaded together on Skript 2.17.0: the alias problems (headers) first, then every script's
+        // functions, then every script's events, then every script's commands (issue #69).
+        SourceFile a = new SourceFile("order-a.sk", "on load:\n\tfrob a1\nfunction order_a():\n\tfrob a2\n"
+                + "command /ordera:\n\ttrigger:\n\t\tfrob a3\n");
+        SourceFile b = new SourceFile("order-b.sk", "command /orderb:\n\ttrigger:\n\t\tfrob b3\non load:\n\tfrob b1\n"
+                + "function order_b():\n\tfrob b2\n");
+        SourceFile c = new SourceFile("order-c.sk", "on load:\n\tfrob c1\naliases:\n\tprobe thing = stone\n"
+                + "\tthis line is bad\n\tprobe other = notarealitemzzz\non chat:\n\tfrob c2\n");
+        List<Diagnostic> found = List.of(
+                new Diagnostic(Severity.ERROR, "order-a.sk", 2, 0, 0, "frob a1"),
+                new Diagnostic(Severity.ERROR, "order-a.sk", 4, 0, 0, "frob a2"),
+                new Diagnostic(Severity.ERROR, "order-a.sk", 7, 0, 0, "frob a3"),
+                new Diagnostic(Severity.ERROR, "order-b.sk", 3, 0, 0, "frob b3"),
+                new Diagnostic(Severity.ERROR, "order-b.sk", 5, 0, 0, "frob b1"),
+                new Diagnostic(Severity.ERROR, "order-b.sk", 7, 0, 0, "frob b2"),
+                new Diagnostic(Severity.ERROR, "order-c.sk", 2, 0, 0, "frob c1"),
+                new Diagnostic(Severity.ERROR, "order-c.sk", 5, 0, 0, "'this line is bad' is not an entry (like 'name = value')"),
+                new Diagnostic(Severity.ERROR, "order-c.sk", 6, 0, 0, "Minecraft id notarealitemzzz is not valid"),
+                new Diagnostic(Severity.ERROR, "order-c.sk", 8, 0, 0, "frob c2"));
+        assertEquals(List.of("order-c.sk:5", "order-c.sk:6", "order-a.sk:4", "order-b.sk:7", "order-a.sk:2",
+                "order-b.sk:5", "order-c.sk:2", "order-c.sk:8", "order-a.sk:7", "order-b.sk:3"),
+                MessageOrder.sortAll(found, List.of(a, b, c), d -> false).stream()
+                        .map(d -> d.file() + ":" + d.line()).toList());
+    }
+
+    @Test
+    void layoutProblemsOfEveryScriptComeFirst() {
+        SourceFile a = new SourceFile("a.sk", "on load:\n\tfrob\n");
+        SourceFile b = new SourceFile("b.sk", "on load:\n\tfrob\nif x:\n");
+        List<Diagnostic> found = List.of(new Diagnostic(Severity.ERROR, "a.sk", 2, 0, 0, "frob"),
+                new Diagnostic(Severity.WARNING, "b.sk", 3, 0, 0, "Empty configuration section!"));
+        assertEquals(List.of("b.sk:3", "a.sk:2"), MessageOrder.sortAll(found, List.of(a, b),
+                d -> d.message().startsWith("Empty")).stream().map(d -> d.file() + ":" + d.line()).toList());
+    }
+
+    @Test
+    void aReportGroupsTheScriptsInTheirLoadOrder() {
+        // '/sk reload' lists each script's problems together: by load order, not by which has the first problem.
+        SourceFile a = new SourceFile("a.sk", "on load:\n\tfrob\n");
+        SourceFile b = new SourceFile("b.sk", "on load:\n\tfrob\n");
+        List<Diagnostic> found = List.of(new Diagnostic(Severity.ERROR, "b.sk", 2, 0, 0, "b1"),
+                new Diagnostic(Severity.ERROR, "a.sk", 2, 0, 0, "a1"),
+                new Diagnostic(Severity.ERROR, "b.sk", 3, 0, 0, "b2"),
+                new Diagnostic(Severity.ERROR, "c.sk", 1, 0, 0, "c1"),
+                new Diagnostic(Severity.ERROR, "a.sk", 1, 0, 0, "a2"));
+        assertEquals(List.of("a1", "a2", "b1", "b2", "c1"), MessageOrder.byScript(found, List.of(a, b)).stream()
+                .map(Diagnostic::message).toList());
+    }
 }

@@ -50,3 +50,13 @@ redis:
 
 # The longest network message, in bytes of UTF-8. Plugin messages can't be longer than about 32 KB.
 max-message-bytes: 16384
+
+network-variables:
+  # {network::...} variables, the same on every server. They're kept in a database of NeoSkript's config.yml (its
+  # databases section): MySQL, with pattern "network::.*", monitor-changes: true, and the same settings on every
+  # server. That database keeps them and merges two servers' changes (an add on each counts both). The name of that
+  # database:
+  database: "network"
+  # Each time this server writes them, tell the other servers over Redis or plugin messaging (with a secret), so they
+  # read the change at once rather than at their next monitor-interval. Only the database's id is sent, never a value.
+  notify: true

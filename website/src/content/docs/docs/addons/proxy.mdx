@@ -1,13 +1,13 @@
 ---
 title: NeoSkript Proxy
-description: "Messages and proxy actions across a BungeeCord or Velocity network: server lists, player counts, where a player is, and messages between servers over plugin messaging or Redis."
+description: "Messages, variables and proxy actions across a BungeeCord or Velocity network: server lists, player counts, where a player is, {network::...} variables, and messages between servers over plugin messaging or Redis."
 sidebar:
   label: Proxy
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
-NeoSkript Proxy (`NeoSkriptProxy`) lets scripts on a network of servers, behind BungeeCord or Velocity, talk to each other and to the proxy: send messages between servers, list the servers and their players, find which server a player is on, broadcast and kick across the network.
+NeoSkript Proxy (`NeoSkriptProxy`) lets scripts on a network of servers, behind BungeeCord or Velocity, talk to each other and to the proxy: send messages between servers, share `{network::...}` variables, list the servers and their players, find which server a player is on, broadcast and kick across the network.
 
 It's NeoSkript's own addon, with its own syntax, and it also takes the syntax of the Skript addons networks use, so their scripts load unchanged: [SkProxy](https://modrinth.com/plugin/skproxy) 2.4, [Skelocity](https://modrinth.com/plugin/skelocity) 1.1 and [SkRedis](https://modrinth.com/plugin/skredis) 2.3.5's messaging. NeoSkript's test harness runs a network with a real Velocity proxy, one server with Skript and those three addons, and two with NeoSkript and this addon, and checks that they print the same and hear each other.
 
@@ -73,6 +73,78 @@ The proxy only answers about a server it knows, or a player who's online; otherw
 
 Sending a player to another server is Skript's own `connect %players% to [proxy|bungeecord] server %text%`.
 
+## Network variables
+
+Variables named `{network::...}` are the same on every server: set one in the lobby and survival sees it a second or two later.
+
+```skript nocheck
+on join:
+	add 1 to {network::joins}
+	send "Welcome! %{network::joins}% joins across the network so far."
+```
+
+They live in a MySQL or MariaDB database every server can reach, set up in NeoSkript's own [databases section](/docs/server/variables/#databases), which keeps them, saves them and merges two servers' changes. On each server, put this at the top of `databases` in `plugins/NeoSkript/config.yml`, with the same values everywhere, and restart:
+
+```yaml
+databases:
+  network:
+    type: "mysql"
+    pattern: "network::.*"
+    monitor-changes: true
+    monitor-interval: "30 seconds"
+    host: "db.example.net"
+    port: 3306
+    user: "minecraft"
+    password: "..."
+    database: "skript"
+    table: "variables21"
+  default:
+    type: "csv"
+    pattern: ".*"
+    file: "variables.csv"
+```
+
+The database's name, `network`, is what NeoSkript Proxy looks for (`network-variables.database`). If it isn't there, or isn't MySQL with `monitor-changes: true`, the console says what to add, and `{network::...}` variables are saved like any other, on that server only.
+
+- **Reading never waits.** Each server keeps the variables in memory, as it does every variable, and writes its changes within a second or so on the database's own thread, never the server's.
+- **Changes show at once.** Each time a server writes, NeoSkript Proxy tells the others, over Redis, or over plugin messaging when Redis is off or down, and they read the change straight away. The test harness, with `monitor-interval` at five minutes, sees a change on the other server within a few seconds. A server that can't be told (no Redis, no `secret`, nobody online to carry a plugin message) reads it at its next `monitor-interval`. Only the database's id is sent, never a value: a lost, late or forged notice costs one extra read at most.
+
+### Two servers at once
+
+The database holds the value every server agrees on. A change a server hasn't written yet is never replaced by another server's: it's written over theirs. When two servers change one variable at once, the second write finds the first's and:
+
+- **Numbers added to or taken from** (`add`, `remove`, with numbers) **all count.** `add 1 to {network::joins}` on two servers at once adds 2, and a balance that loses 100 on one server while it gains 50 on another ends up 50 down. This holds through an outage too: additions on every server while the database was down all count once it's back.
+- **Values added to a list are all kept.** Two servers that add to `{network::queue::*}` at once both pick the same next index; the first write keeps it, and the other value moves to the next free one.
+- **Anything else is the last write's**, on every server, as in Skript: a `set` or a `delete` (even of a number, and even with additions on another server), or a value one server sets while another adds to it. A deletion racing an addition on another server ends deleted, or at just the addition, whichever is written last. When one server should decide a value, set it only there, or give each server a name of its own, as `{network::online::%this server's network name%}`.
+
+Which list index a value lands at, and so a list's order, isn't guaranteed across servers. Merging applies to every database with `monitor-changes`, not only `network`; `merge-changes: false` on a database keeps Skript's last-write-wins exactly ([variables](/docs/server/variables/#sharing-variables-between-servers)).
+
+### When the database is down
+
+Scripts keep running, and read what each server last had. Changes wait and are written when the database is back, merged as above; nothing is queued for each change, so a long outage costs no memory. Other servers don't see them until then. If the server stops before it's back, the changes are kept in `plugins/NeoSkript/pending/` and written at the next start (only where the database's row hasn't changed since). The console says when the database goes and comes back, `/sk info` shows its state and how many writes were merged, and a script can check it before something that shouldn't happen twice, like a reward:
+
+```
+[the] network variables are available
+[the] network variables (aren't|are not) available
+```
+
+```skript nocheck
+command /claim:
+	trigger:
+		if network variables aren't available:
+			send "Rewards are paused for a moment, try again soon."
+			stop
+		if {network::claimed::%player's uuid%} is set:
+			send "You've already claimed it."
+			stop
+		set {network::claimed::%player's uuid%} to now
+		give player a diamond
+```
+
+That check can't stop two servers claiming at the same moment, in the second before either has written: for that, keep each player's claim on the server they're on, or use [NeoSkript DB](/docs/addons/db/) with a transaction.
+
+Network variables hold what any database can: not entities, and names up to 380 characters. Servers still on Skript can share the same database and see the variables, but read them only every `monitor-interval`, and their writes are the last write's against NeoSkript's.
+
 ## SkProxy, Skelocity and SkRedis
 
 | Original | Syntax |
@@ -116,7 +188,5 @@ Redis messages use SkRedis's format, so a server on NeoSkript and one still on S
 | `redis.max-queued`, `queued-for` | 1000, 60 | The most messages waiting for Redis, and for how many seconds |
 | `redis.channel-prefix` | blank | Put in front of every Redis channel, to keep networks sharing a Redis apart |
 | `max-message-bytes` | 16384 | The longest network message |
-
-<Aside type="note">
-Network-wide variables (`{network::...}`, kept the same on every server) are planned, built on Redis, once NeoSkript's variable storage can hand a prefix of variables to an addon. They're not in this version. Until then, Skript's own `databases:` section with MySQL storage shares variables between servers.
-</Aside>
+| `network-variables.database` | network | The database in NeoSkript's config.yml that keeps `{network::...}` variables |
+| `network-variables.notify` | true | Tell the other servers each time this one writes them, so they read the change at once |

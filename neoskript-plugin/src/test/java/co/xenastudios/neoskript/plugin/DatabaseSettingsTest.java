@@ -45,6 +45,8 @@ class DatabaseSettingsTest {
                     type: sqlite
                     pattern: db_.*
                     file: data/variables
+                    monitor-changes: true
+                    merge changes: false
                   off:
                     type: disabled
                   default:
@@ -66,6 +68,10 @@ class DatabaseSettingsTest {
         assertNull(synced.problem());
         assertFalse(synced.toString().contains("secret"), "the password never shows");
         assertEquals("data/variables.db", all.get(1).file(), "SQLite files end in .db, as in Skript");
+        assertTrue(synced.mergeChanges(), "merging is on unless turned off");
+        assertFalse(all.get(1).mergeChanges());
+        assertEquals(false, DatabaseSettings.settings(all.get(1)).get("merge-changes"));
+        assertFalse(DatabaseSettings.settings(synced).containsKey("merge-changes"), "written only when off");
         assertNull(all.get(2).backupInterval());
         assertEquals(3, all.get(2).backupsToKeep());
     }

@@ -80,7 +80,7 @@ public record NeoSkriptConfig(
             "english",
             new Text(DatePattern.DEFAULT, 2, false, true,
                     co.xenastudios.neoskript.paper.TextComponentParser.DEFAULT_SAFE_TAGS, LinkParsing.DISABLED),
-            new Variables(false, Interval.parse("5 minutes"), true, true),
+            new Variables(false, Interval.parse("5 minutes"), true, true, true),
             DatabaseSettings.DEFAULTS,
             new Syntax(100, NamePattern.DEFAULT, true, true),
             Verbosity.NORMAL,
@@ -266,7 +266,11 @@ public record NeoSkriptConfig(
             @Comment({
                 "Skript's 'player variable fix': a player in a variable who leaves and joins again is read as the",
                 "player now online. Off, it stays the old player, whom messages and changes no longer reach."})
-            boolean playerVariableFix) {}
+            boolean playerVariableFix,
+            @Comment({
+                "Skript's 'compress backups': whether the backups each database makes every backup-interval are gzipped",
+                "(variables_<time>_scheduled.csv.gz), at Skript's best compression."})
+            boolean compressBackups) {}
 
     public record Events(
             @Comment({

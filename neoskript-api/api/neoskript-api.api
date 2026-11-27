@@ -2,6 +2,7 @@ public interface co.xenastudios.neoskript.api.NeoSkript
   public abstract void addon(java.lang.String, java.lang.String, java.util.function.Consumer) signature (Ljava/lang/String;Ljava/lang/String;Ljava/util/function/Consumer<-Lco/xenastudios/neoskript/api/registration/Registrar;>;)V
   public abstract java.util.List addons() signature ()Ljava/util/List<Ljava/lang/String;>;
   public static co.xenastudios.neoskript.api.NeoSkript get()
+  public boolean inDeclaredSyntaxCode() @Experimental
   public static boolean isEnabled()
   public abstract boolean isReady()
   public void runtimeError(java.lang.String) @Experimental
@@ -51,7 +52,18 @@ public final record co.xenastudios.neoskript.api.Values$Saved
   public java.lang.String toString()
   public java.lang.String type()
 
+public interface co.xenastudios.neoskript.api.VariableDatabase @Experimental
+  public abstract boolean available()
+  public abstract void checkForChanges()
+  public abstract java.lang.String id()
+  public abstract java.lang.String name()
+  public abstract java.lang.String pattern()
+  public abstract boolean shared()
+  public abstract java.lang.String state()
+  public abstract java.lang.Runnable whenWritten(java.lang.Runnable)
+
 public interface co.xenastudios.neoskript.api.Variables
+  public java.util.List databases() signature ()Ljava/util/List<Lco/xenastudios/neoskript/api/VariableDatabase;>; @Experimental
   public abstract void deleteList(java.lang.String)
   public abstract java.lang.Object get(java.lang.String)
   public abstract java.util.Map list(java.lang.String) signature (Ljava/lang/String;)Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;
@@ -170,6 +182,14 @@ public interface co.xenastudios.neoskript.api.element.PausingSection @Experiment
   public java.util.concurrent.CompletionStage end(co.xenastudios.neoskript.api.element.TriggerContext) signature (Lco/xenastudios/neoskript/api/element/TriggerContext;)Ljava/util/concurrent/CompletionStage<*>;
   public abstract java.util.concurrent.CompletionStage start(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[]) signature (Lco/xenastudios/neoskript/api/element/TriggerContext;[Ljava/lang/Object;)Ljava/util/concurrent/CompletionStage<*>;
 
+public interface co.xenastudios.neoskript.api.element.ScriptSyntaxCall @Experimental
+  public abstract java.lang.Object[] arguments()
+  public abstract int mark()
+  public abstract int pattern()
+  public abstract void proceed()
+  public abstract boolean proceeded()
+  public abstract java.util.Set tags() signature ()Ljava/util/Set<Ljava/lang/String;>;
+
 public interface co.xenastudios.neoskript.api.element.Section
   public abstract java.lang.Object run(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[])
 
@@ -208,6 +228,7 @@ public final record co.xenastudios.neoskript.api.element.TextTemplate$Hole
 public interface co.xenastudios.neoskript.api.element.TriggerContext
   public abstract java.lang.Object event()
   public co.xenastudios.neoskript.api.element.TriggerContext outermostRun() @Experimental
+  public co.xenastudios.neoskript.api.element.ScriptSyntaxCall scriptSyntaxCall() @Experimental
 
 public interface co.xenastudios.neoskript.api.element.Update extends co.xenastudios.neoskript.api.element.Effect
   public void execute(co.xenastudios.neoskript.api.element.TriggerContext, java.lang.Object[])
@@ -307,9 +328,11 @@ public interface co.xenastudios.neoskript.api.registration.Registrar
   public void propertyCondition(java.lang.String, java.lang.String, java.lang.String, java.lang.Class, java.util.function.Predicate) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TT;>;Ljava/util/function/Predicate<-TT;>;)V
   public void propertySyntax(java.lang.String, int, java.util.function.Function, boolean) signature (Ljava/lang/String;ILjava/util/function/Function<Ljava/util/Set<Ljava/lang/String;>;Ljava/lang/String;>;Z)V @Experimental
   public void returnType(java.lang.String, java.util.function.Function) signature (Ljava/lang/String;Ljava/util/function/Function<Lco/xenastudios/neoskript/api/element/ElementInfo;Ljava/lang/String;>;)V @Experimental
+  public void scriptSyntax(java.lang.String, co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler, java.lang.String[]) @Experimental
   public void scriptsUnloaded(java.util.function.Consumer) signature (Ljava/util/function/Consumer<-Ljava/util/Set<Ljava/lang/String;>;>;)V
   public abstract void section(java.lang.String, java.lang.String, co.xenastudios.neoskript.api.element.ElementFactory, java.lang.String[]) signature (Ljava/lang/String;Ljava/lang/String;Lco/xenastudios/neoskript/api/element/ElementFactory<Lco/xenastudios/neoskript/api/element/Section;>;[Ljava/lang/String;)V
   public void sectionEvent(java.lang.String, java.lang.String) @Experimental
+  public void sectionEvent(java.lang.String, java.lang.String, java.lang.Class, java.util.function.Function) signature <E:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Class<TE;>;Ljava/util/function/Function<Ljava/lang/Object;+TE;>;)V @Experimental
   public abstract void sectionExpression(java.lang.String, java.lang.String)
   public abstract void storage(java.lang.String, java.lang.Class, co.xenastudios.neoskript.api.storage.VariableCodec) signature <T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/Class<TT;>;Lco/xenastudios/neoskript/api/storage/VariableCodec<TT;>;)V
   public void strictType(java.lang.String) @Experimental
@@ -339,8 +362,10 @@ public interface co.xenastudios.neoskript.api.registration.ScriptStructure @Expe
   public abstract java.util.List entries() signature ()Ljava/util/List<Lco/xenastudios/neoskript/api/registration/ScriptStructure$Entry;>;
   public abstract void error(int, java.lang.String)
   public abstract java.lang.String header()
+  public int line()
   public abstract int pattern()
   public abstract java.lang.String script()
+  public java.util.List section(java.lang.String) signature (Ljava/lang/String;)Ljava/util/List<Lco/xenastudios/neoskript/api/registration/ScriptStructure$Entry;>;
   public abstract void warning(int, java.lang.String)
 
 public final record co.xenastudios.neoskript.api.registration.ScriptStructure$Entry
@@ -350,6 +375,37 @@ public final record co.xenastudios.neoskript.api.registration.ScriptStructure$En
   public int line()
   public java.lang.String text()
   public final java.lang.String toString()
+
+public final record co.xenastudios.neoskript.api.registration.ScriptSyntax @Experimental
+  public ScriptSyntax(co.xenastudios.neoskript.api.registration.ScriptSyntax$Kind, java.util.List, java.lang.String, co.xenastudios.neoskript.api.registration.ScriptSyntax$Plurality, boolean, java.lang.String) signature (Lco/xenastudios/neoskript/api/registration/ScriptSyntax$Kind;Ljava/util/List<Ljava/lang/String;>;Ljava/lang/String;Lco/xenastudios/neoskript/api/registration/ScriptSyntax$Plurality;ZLjava/lang/String;)V
+  public ScriptSyntax(co.xenastudios.neoskript.api.registration.ScriptSyntax$Kind, java.util.List, java.lang.String, co.xenastudios.neoskript.api.registration.ScriptSyntax$Plurality, boolean, java.lang.String, boolean) signature (Lco/xenastudios/neoskript/api/registration/ScriptSyntax$Kind;Ljava/util/List<Ljava/lang/String;>;Ljava/lang/String;Lco/xenastudios/neoskript/api/registration/ScriptSyntax$Plurality;ZLjava/lang/String;Z)V
+  public java.lang.String body()
+  public final boolean equals(java.lang.Object)
+  public final int hashCode()
+  public co.xenastudios.neoskript.api.registration.ScriptSyntax$Kind kind()
+  public boolean local()
+  public java.util.List patterns() signature ()Ljava/util/List<Ljava/lang/String;>;
+  public co.xenastudios.neoskript.api.registration.ScriptSyntax$Plurality plurality()
+  public boolean property()
+  public java.lang.String returnType()
+  public final java.lang.String toString()
+
+public enum co.xenastudios.neoskript.api.registration.ScriptSyntax$Kind signature Ljava/lang/Enum<Lco/xenastudios/neoskript/api/registration/ScriptSyntax$Kind;>;
+  public static final co.xenastudios.neoskript.api.registration.ScriptSyntax$Kind CONDITION
+  public static final co.xenastudios.neoskript.api.registration.ScriptSyntax$Kind EFFECT
+  public static final co.xenastudios.neoskript.api.registration.ScriptSyntax$Kind EXPRESSION
+  public static co.xenastudios.neoskript.api.registration.ScriptSyntax$Kind valueOf(java.lang.String)
+  public static co.xenastudios.neoskript.api.registration.ScriptSyntax$Kind[] values()
+
+public enum co.xenastudios.neoskript.api.registration.ScriptSyntax$Plurality signature Ljava/lang/Enum<Lco/xenastudios/neoskript/api/registration/ScriptSyntax$Plurality;>;
+  public static final co.xenastudios.neoskript.api.registration.ScriptSyntax$Plurality AS_ARGUMENTS
+  public static final co.xenastudios.neoskript.api.registration.ScriptSyntax$Plurality PLURAL
+  public static final co.xenastudios.neoskript.api.registration.ScriptSyntax$Plurality SINGLE
+  public static co.xenastudios.neoskript.api.registration.ScriptSyntax$Plurality valueOf(java.lang.String)
+  public static co.xenastudios.neoskript.api.registration.ScriptSyntax$Plurality[] values()
+
+public interface co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler @Experimental
+  public abstract co.xenastudios.neoskript.api.registration.ScriptSyntax declare(co.xenastudios.neoskript.api.registration.ScriptStructure)
 
 public interface co.xenastudios.neoskript.api.registration.StructureHandler @Experimental
   public abstract void load(co.xenastudios.neoskript.api.registration.ScriptStructure)

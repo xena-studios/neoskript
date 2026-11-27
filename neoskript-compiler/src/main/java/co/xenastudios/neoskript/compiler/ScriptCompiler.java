@@ -56,7 +56,51 @@ public final class ScriptCompiler {
         this.handles = handles;
     }
 
+    /** Whether the code being compiled on this thread is the code of syntax a script declared. */
+    public static boolean compilingDeclaredSyntax() {
+        return TriggerCompiler.compilingDeclaredSyntax();
+    }
+
     public CompiledScripts compile(List<ParsedScript> scripts) {
+        // Syntax scripts declared is bound, for this load, to its declaring structure's code.
+        java.util.function.Function<co.xenastudios.neoskript.frontend.registry.SyntaxInfo, Object> before =
+                Library.SCRIPT_SYNTAX.get();
+        Map<FunctionHandle, Set<String>> uses = new java.util.concurrent.ConcurrentHashMap<>();
+        Library.SCRIPT_SYNTAX.set(syntax -> {
+            // Which scripts use which declared syntax, so a script whose syntax goes can name the ones still using it.
+            FunctionHandle code = handles.get(syntax.script().body());
+            String user = co.xenastudios.neoskript.runtime.ScriptFeatures.compilingScript();
+            if (code != null && user != null) {
+                uses.computeIfAbsent(code, k -> java.util.concurrent.ConcurrentHashMap.newKeySet()).add(user);
+            }
+            return ScriptSyntaxBindings.factory(syntax, handles);
+        });
+        try {
+            CompiledScripts compiled = compileScripts(scripts);
+            return compiled.withDeclaredSyntax(declaredSyntax(scripts), Map.copyOf(uses));
+        } finally {
+            if (before == null) {
+                Library.SCRIPT_SYNTAX.remove();
+            } else {
+                Library.SCRIPT_SYNTAX.set(before);
+            }
+        }
+    }
+
+    /** The declared syntax's code that {@code scripts} declare. */
+    private static Set<FunctionInfo> declaredSyntax(List<ParsedScript> scripts) {
+        Set<FunctionInfo> declared = new java.util.HashSet<>();
+        for (ParsedScript script : scripts) {
+            for (ParsedStructure structure : script.structures()) {
+                if (structure instanceof ParsedStructure.Function function && function.declaredSyntax()) {
+                    declared.add(function.signature());
+                }
+            }
+        }
+        return Set.copyOf(declared);
+    }
+
+    private CompiledScripts compileScripts(List<ParsedScript> scripts) {
         // Used by compiled functions when the stack runs out, when there's no stack left to load it with.
         co.xenastudios.neoskript.runtime.Overflows.ready();
         List<CompiledScripts.CompiledTrigger> triggers = new ArrayList<>();
@@ -241,6 +285,16 @@ public final class ScriptCompiler {
      * Skript has no specific information.
      */
     public CompiledLine compileLine(String name, String text, Class<?> eventClass, String eventName) {
+        return compileLine(name, text, eventClass, eventName, library.registry());
+    }
+
+    /**
+     * {@link #compileLine(String, String, Class, String)}, parsed with {@code syntax}: the registry with the syntax the
+     * loaded scripts declared ({@code ScriptLoader.declaredRegistry()}), as skript-reflect's custom syntax works in
+     * effect commands.
+     */
+    public CompiledLine compileLine(String name, String text, Class<?> eventClass, String eventName,
+            co.xenastudios.neoskript.frontend.registry.SyntaxRegistry syntax) {
         Map<String, List<FunctionInfo>> callable = new HashMap<>();
         handles.forEach((info, handle) -> {
             if (info.localTo() == null && handle.loaded()) {
@@ -249,7 +303,7 @@ public final class ScriptCompiler {
         });
         LibraryEventValues values = library.registry().eventValues() instanceof LibraryEventValues v ? v : null;
         co.xenastudios.neoskript.frontend.parse.ScriptLoader.ParsedLine parsed =
-                new co.xenastudios.neoskript.frontend.parse.ScriptLoader(library.registry()).parseLine(name, text,
+                new co.xenastudios.neoskript.frontend.parse.ScriptLoader(syntax).parseLine(name, text,
                         callable, values == null ? null : values.scope(List.of(eventClass)));
         List<String> errors = new ArrayList<>();
         for (Diagnostic diagnostic : parsed.script().diagnostics()) {
@@ -262,6 +316,9 @@ public final class ScriptCompiler {
         if (!effect || !errors.isEmpty()) {
             return new CompiledLine(null, errors);
         }
+        java.util.function.Function<co.xenastudios.neoskript.frontend.registry.SyntaxInfo, Object> before =
+                Library.SCRIPT_SYNTAX.get();
+        Library.SCRIPT_SYNTAX.set(declared -> ScriptSyntaxBindings.factory(declared, handles));
         try {
             return new CompiledLine(new TriggerCompiler(library, handles, globals, parsed.script())
                     .compileLine(name, parsed.statement(), List.of(eventClass), eventName), List.of());
@@ -272,6 +329,12 @@ public final class ScriptCompiler {
         } catch (RuntimeException | LinkageError e) {
             return new CompiledLine(null, List.of(tooBig(e) ? TOO_BIG
                     : "NeoSkript couldn't compile this (" + e + "). Please report it."));
+        } finally {
+            if (before == null) {
+                Library.SCRIPT_SYNTAX.remove();
+            } else {
+                Library.SCRIPT_SYNTAX.set(before);
+            }
         }
     }
 

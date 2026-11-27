@@ -108,7 +108,8 @@ final class SkriptSettings {
             shown("disable hooks.vault", "hooks.vault"),
             shown("disable hooks.regions.worldguard", "hooks.worldguard"),
             shown("disable hooks.regions.grief prevention", "hooks.grief-prevention"),
-            bool("enable legacy tab completion event compatibility", "syntax.legacy-tab-completion", true));
+            bool("enable legacy tab completion event compatibility", "syntax.legacy-tab-completion", true),
+            bool("compress backups", "variables.compress-backups", false));
 
     /**
      * Options that change nothing on NeoSkript when set away from Skript's default config, and why, for the log:
@@ -124,7 +125,11 @@ final class SkriptSettings {
                     + " types. NeoSkript names every Minecraft item after its id whatever the alias files have, and"
                     + " doesn't load Skript addons"},
             new String[] {"disable hooks.regions.precious stones", "true", "NeoSkript doesn't hook into PreciousStones"},
-            new String[] {"disable hooks.regions.residence", "true", "NeoSkript doesn't hook into Residence"});
+            new String[] {"disable hooks.regions.residence", "true", "NeoSkript doesn't hook into Residence"},
+            new String[] {"execute functions with missing parameters", "false", "NeoSkript always runs a function whose"
+                    + " argument has no value, as Skript does by default"},
+            new String[] {"simplify syntax on parse", "false", "NeoSkript always works out what it can while a script"
+                    + " loads, as Skript does by default"});
 
     private SkriptSettings() {}
 
@@ -183,6 +188,12 @@ final class SkriptSettings {
         }
         Map<String, String> entries = SkriptConfigFile.read(SkriptConfigFile.text(config));
         List<String> notes = new java.util.ArrayList<>();
+        String changes = entries.get("variable changes until save");
+        if (changes != null && !changes.strip().equals("1000")) {
+            notes.add("Skript's 'variable changes until save: " + changes + "' isn't copied: Skript writes each change to"
+                    + " variables.csv as it happens and rewrites the whole file once that many pile up, where NeoSkript"
+                    + " writes the changed variables every variables.save-interval, so there's nothing to count.");
+        }
         for (String[] option : NOT_COPIED) {
             String value = entries.get(option[0]);
             Boolean set = value == null ? null : SkriptConfigFile.bool(value);

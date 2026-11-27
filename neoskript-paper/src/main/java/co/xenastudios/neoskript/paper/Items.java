@@ -267,6 +267,9 @@ final class Items {
             return item == null || item.alternatives().size() != 1 ? null : item.stack();
         });
         registrar.cloner(ItemType.class, ItemType::copy);
+        // Looped as Skript's item type container: the items it stands for, so 'loop fire:' (no item) runs no times.
+        co.xenastudios.neoskript.runtime.Values.registerContainer(ItemType.class, item -> item.alternatives().stream()
+                .filter(each -> each.material().isItem()).toArray());
         registrar.cloner(ItemStack.class, ItemStack::clone);
         registrar.parser("itemtype", ItemType::parse);
         // 'X is stone' holds for any stone, named or not; 'X is stone named "a"' only for one with that name.

@@ -15,6 +15,7 @@ import co.xenastudios.neoskript.harness.scenario.YamlDifferentialScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptCliScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptDbScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptProxyScenario;
+import co.xenastudios.neoskript.harness.scenario.NetworkVariablesScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptEventsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptLanguageScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptLoadBenchmark;
@@ -33,6 +34,7 @@ import co.xenastudios.neoskript.harness.scenario.NeoSkriptGuiScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptPlaceholdersScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptWebScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptRegionsScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptLoadOrderScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptReloadScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptReloadSoakScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptAutoReloadScenario;
@@ -74,6 +76,7 @@ public final class HarnessMain {
             new NeoSkriptLanguageScenario(),
             new NeoSkriptSkriptTestsScenario(),
             new NeoSkriptReloadScenario(),
+            new NeoSkriptLoadOrderScenario(),
             new NeoSkriptReloadSoakScenario(),
             new NeoSkriptAutoReloadScenario(),
             new NeoSkriptRuntimeErrorsScenario(),
@@ -116,7 +119,8 @@ public final class HarnessMain {
             new NeoSkriptReflectScenario(),
             new SkBeeDifferentialScenario(),
             new NeoSkriptSkriptSuiteScenario(true),
-            new NeoSkriptGuiScenario());
+            new NeoSkriptGuiScenario(),
+            new NetworkVariablesScenario());
 
     record Result(String environment, String scenario, boolean passed, Duration duration, String message,
             Map<String, Object> summary) {}
