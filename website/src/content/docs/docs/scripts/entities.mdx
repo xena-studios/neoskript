@@ -35,6 +35,8 @@ command /guards:
 		set name of last spawned entity to "Bob"
 ```
 
+As in Skript, that code runs in an event of its own, apart from the trigger: `entity`, and what it gives (its `location`, `player` if it's a player), is all there is. The trigger's own values, such as `attacker`, a command's `arg-1` or the `loop-value` of a loop around it, aren't there; set a variable to them first. It can't wait either. `shoot` sections work the same way, with `projectile` too.
+
 Entity types are written by name: `zombie`, `pig`, `baby cow`, `powered creeper`, `red sheep`. Categories work too: `monster`, `animal`, `projectile`.
 
 ## Health, damage and effects

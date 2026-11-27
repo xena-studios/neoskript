@@ -127,6 +127,25 @@ final class LibraryEventValues implements EventValues {
     }
 
     @Override
+    public Scope later(SyntaxInfo header) {
+        Library.Later later = library.later(header.id());
+        return later == null ? null
+                : named.computeIfAbsent(later.eventClasses() + "/" + later.eventName(),
+                        k -> new EventScope(later.eventClasses(), later.eventName()));
+    }
+
+    @Override
+    public Scope section(SyntaxInfo header) {
+        Library.SectionEventClass own = library.sectionEventClass(header.id());
+        if (own == null) {
+            return null;
+        }
+        String name = library.sectionEvent(header.id());
+        return named.computeIfAbsent(own.eventClass().getName() + "/" + name,
+                k -> new EventScope(List.of(own.eventClass()), name));
+    }
+
+    @Override
     public boolean keepsEventValues(SyntaxInfo header) {
         return library.binding(header) instanceof Library.Core core && KEEPING.contains(core.id());
     }
@@ -137,6 +156,26 @@ final class LibraryEventValues implements EventValues {
     }
 
     /** The event values of events of some classes (none outside events). */
+    @Override
+    public long usedUp() {
+        return library.usedUp();
+    }
+
+    @Override
+    public long usedUpHere() {
+        return library.usedUpHere();
+    }
+
+    @Override
+    public Object save() {
+        return library.saveUsedUp();
+    }
+
+    @Override
+    public void restore(Object saved) {
+        library.restoreUsedUp(saved);
+    }
+
     private final class EventScope implements Scope {
 
         private final List<Class<?>> classes;
@@ -157,6 +196,8 @@ final class LibraryEventValues implements EventValues {
             }
             // As the compiler says it, without using up a value's own error ('Use 'attacker' and/or 'victim'...').
             Library.EventValueRequest request = library.request(type, words);
+            // Which script asks first for a value whose error Skript gives once depends on the order: noted.
+            library.askedExcluded(classes, request.valueClass(), request.type());
             Library.EventValueLookup lookup = library.eventValue(classes, request.valueClass(), request.type(), 0, null);
             if (lookup.getter() != null || "multiple".equals(lookup.error())) {
                 return null;
@@ -171,6 +212,12 @@ final class LibraryEventValues implements EventValues {
             String description = TriggerCompiler.article(name) + " " + name + " event";
             return request.words() != null ? "There's no " + request.words() + " in " + description + "."
                     : library.eventValue(classes, request.valueClass(), request.type(), 0, description).error();
+        }
+
+        @Override
+        public String unnamed(String words) {
+            return name == null ? null : "There's no " + words + " in " + TriggerCompiler.article(name) + " " + name
+                    + " event.";
         }
 
         @Override

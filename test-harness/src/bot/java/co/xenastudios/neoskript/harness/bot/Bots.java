@@ -172,12 +172,19 @@ final class Bots implements Listener {
                 case "quit" -> bot.quit();
                 case "chat" -> bot.chat(rest);
                 case "command" -> bot.command(rest);
+                case "tab" -> bot.tabComplete(rest);
                 case "respawn" -> bot.respawn();
                 case "swap" -> bot.swapHands();
                 case "drop" -> bot.drop(rest.equalsIgnoreCase("all"));
                 case "use" -> bot.use();
                 case "punch" -> bot.punch();
                 case "slot" -> bot.selectSlot(Integer.parseInt(rest));
+                case "click" -> {
+                    String[] click = rest.split(" ");
+                    bot.click(Integer.parseInt(click[0]), click.length > 1 ? click[1].toLowerCase(Locale.ROOT) : "left");
+                }
+                case "drag" -> bot.drag(Arrays.stream(rest.split(" ")).mapToInt(Integer::parseInt).toArray());
+                case "closescreen" -> bot.closeScreen();
                 case "op" -> Bukkit.getGlobalRegionScheduler().execute(plugin, () -> Bukkit.getOfflinePlayer(Bot.offlineUuid(name)).setOp(true));
                 case "deop" -> Bukkit.getGlobalRegionScheduler().execute(plugin, () -> Bukkit.getOfflinePlayer(Bot.offlineUuid(name)).setOp(false));
                 case "teleport" -> {

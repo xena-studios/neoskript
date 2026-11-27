@@ -1,0 +1,327 @@
+# The same script on Skript 2.17 with SkBee 3.26.0 and on NeoSkript with NeoSkriptCompat and SkBee: the
+# skbee-differential scenario compares each "[skbee] label: value" line. It runs each /skbeetest-<part> command from the
+# console, and /skbeeping after each, so a part that fails on one of them doesn't stop the others. Each part ends with
+# "[skbee] end <part>". The parts use SkBee's syntax that NeoSkriptCompat supports: see docs/SKRIPT-ADDONS.md.
+
+function skbee(label: text, value: objects):
+	send "[skbee] %{_label}%: %{_value::*}%" to console
+
+command /skbeeping <text>:
+	trigger:
+		send "[skbee] ping %arg-1%" to console
+
+command /skbeetest-worlds:
+	trigger:
+		set {_w} to world "world"
+		skbee("max height", max height of {_w})
+		skbee("min height", min height of {_w})
+		skbee("heights of all worlds", max height of all worlds)
+		skbee("min heights of all worlds", min height of all worlds)
+		set {_h} to {_w}'s max height
+		skbee("possessive height", {_h})
+		skbee("autosave", world autosave of {_w})
+		set world autosave of {_w} to false
+		skbee("autosave off", world autosave of {_w})
+		set world autosave of {_w} to true
+		skbee("autosave on", world autosave of {_w})
+		skbee("game ticks set", whether game ticks of {_w} is set)
+		send "[skbee] end worlds" to console
+
+command /skbeetest-chunks:
+	trigger:
+		set {_w} to world "world"
+		set {_c} to chunk at location(40, 64, -40, {_w})
+		skbee("chunk x", chunk x of {_c})
+		skbee("chunk z", chunk z of {_c})
+		skbee("chunk key", chunk key of {_c})
+		skbee("chunk key at location", chunk key at location(-300, 64, 500, {_w}))
+		set {_k} to chunk key at 7, -9
+		skbee("chunk key at numbers", {_k})
+		set {_n} to chunk x of {_c}
+		add 1 to {_n}
+		skbee("chunk x plus one", {_n})
+		send "[skbee] end chunks" to console
+
+command /skbeetest-keys:
+	trigger:
+		set {_k} to minecraft key of stone
+		skbee("key of stone", {_k})
+		set {_k} to namespaced key of diamond sword
+		skbee("key of sword", {_k})
+		set {_k} to mc key from "my_server:custom_log"
+		skbee("key from text", {_k})
+		set {_k} to namespaced key from "le_test"
+		skbee("key from text without namespace", {_k})
+		set {_k} to resource location of world "world"
+		skbee("key of world", {_k})
+		set {_k::*} to minecraft keys of stone, dirt and world "world"
+		skbee("keys of a list", {_k::*})
+		set {_t} to translation key of stone
+		skbee("translation of stone", {_t})
+		set {_t} to translation key of diamond sword
+		skbee("translation of sword", {_t})
+		set {_t::*} to translation keys of stone and dirt
+		skbee("translations of a list", {_t::*})
+		send "[skbee] end keys" to console
+
+command /skbeetest-conditions:
+	trigger:
+		if server is paused:
+			skbee("paused", "yes")
+		else:
+			skbee("paused", "no")
+		if server is not paused:
+			skbee("not paused", "yes")
+		send "[skbee] end conditions" to console
+
+# ---- SkBee's events. Each prints only while its part has set {-skbee::watch}.
+
+on entity removed from world:
+	{-skbee::watch} is set
+	event-entity is a zombie
+	skbee("removed from world", type of event-entity)
+
+on server tick start:
+	{-skbee::ticks} is set
+	add 1 to {-skbee::ticks}
+	if {-skbee::ticks} is 3:
+		skbee("server tick start", "counted 3")
+
+on async chat:
+	{-skbee::watch} is set
+	skbee("async chat", "%player%: %async chat message%")
+
+on unknown command:
+	{-skbee::watch} is set
+	skbee("unknown command", event-string)
+
+on player chunk send:
+	{-skbee::watch} is set
+	{-skbee::chunk} is not set
+	set {-skbee::chunk} to true
+	skbee("player chunk send", player)
+
+# 'on player track entity' isn't here: a zombie spawned next to the bot isn't tracked by it, on Skript or NeoSkript
+# (the bot's client doesn't report its view distance), so the event never fires on either.
+
+# 'on entities load' (event-entities) isn't here: its entities come with a chunk's, which only SkBee's 'load chunk'
+# loads at once, and that effect waits for the load, which NeoSkriptCompat doesn't run yet.
+
+on damage of zombie by cactus or magma block:
+	{-skbee::watch} is set
+	{-skbee::cactus} is not set
+	set {-skbee::cactus} to true
+	skbee("block damage", "%type of victim%")
+
+on tab complete of "/bot" and "/skript":
+	{-skbee::watch} is set
+	skbee("tab complete", "%player% %event-string%")
+
+
+command /skbeetest-events:
+	trigger:
+		set {-skbee::watch} to true
+		spawn a zombie at location(10.5, 100, 10.5, world "world")
+		set {_z} to last spawned entity
+		delete entity within {_z}
+		set {-skbee::ticks} to 0
+		wait 10 ticks
+		clear {-skbee::ticks}
+		# A zombie in a chunk far away, then its chunk unloaded: it's removed from the world.
+		spawn a zombie at location(2408.5, 100, 2408.5, world "world")
+		wait 2 seconds
+		unload chunk at 150, 150 in world world "world"
+		wait 10 ticks
+		clear {-skbee::watch}
+		send "[skbee] end events" to console
+
+command /skbeetest-player-events:
+	trigger:
+		set {-skbee::watch} to true
+		execute console command "bot join Alice"
+		wait 3 seconds
+		execute console command "bot chat Alice hello there"
+		wait 1 second
+		execute console command "bot command Alice nosuchcommand abc"
+		wait 1 second
+		# Bukkit's tab complete event is for plugins' commands (not Brigadier's, as /plugins is): the bot's own.
+		execute console command "bot op Alice"
+		wait 10 ticks
+		execute console command "bot tab Alice /bot a"
+		wait 1 second
+		execute console command "bot tab Alice /help a"
+		wait 1 second
+		# A list in an event's header: SkBee's event copies its values when it's set up.
+		set {_alice} to "Alice" parsed as player
+		set {_at} to location of {_alice}
+		set component tab list name of {_alice} to mini message from "<yellow>Alice!"
+		set {_tab} to component tab list name of {_alice}
+		set {_j} to serialized json string of {_tab}
+		skbee("tab list name json", {_j})
+		set block at {_at} ~ vector(3, 0, 0) to cactus
+		spawn a zombie at {_at} ~ vector(3, 0, 0)
+		set {_z} to last spawned entity
+		wait 1 second
+		delete entity within {_z}
+		set block at {_at} ~ vector(3, 0, 0) to air
+		execute console command "bot quit Alice"
+		wait 1 second
+		clear {-skbee::watch}
+		clear {-skbee::chunk}
+		clear {-skbee::cactus}
+		send "[skbee] end player-events" to console
+
+command /skbeetest-nbt:
+	trigger:
+		set {_n} to nbt compound from "{a:1,b:""x"",c:[1,2,3],nested:{deep:2.5d}}"
+		skbee("compound", {_n})
+		set {_a} to int tag "a" of {_n}
+		skbee("int tag", {_a})
+		set {_b} to string tag "b" of {_n}
+		skbee("string tag", {_b})
+		set {_c::*} to int list tag "c" of {_n}
+		skbee("int list tag", {_c::*})
+		set {_d} to double tag "nested;deep" of {_n}
+		skbee("nested tag", {_d})
+		set int tag "d" of {_n} to 42
+		set string tag "e" of {_n} to "hello"
+		skbee("after set", {_n})
+		delete tag "a" of {_n}
+		skbee("after delete", {_n})
+		if {_n} has tag "b":
+			skbee("has tag b", "yes")
+		if {_n} doesn't have tag "a":
+			skbee("has no tag a", "yes")
+		set {_type} to tag type of tag "c" of {_n}
+		skbee("tag type", {_type})
+		set {_i} to diamond sword
+		set int tag "custom" of custom nbt of {_i} to 7
+		set {_v} to int tag "custom" of custom nbt of {_i}
+		skbee("item custom tag", {_v})
+		set {_i2} to stone with custom nbt from "{x:5}"
+		set {_v} to int tag "x" of custom nbt of {_i2}
+		skbee("item with custom nbt", {_v})
+		set {_e} to nbt compound from "{}"
+		if {_e} is an empty nbt compound:
+			skbee("empty compound", "yes")
+		# 'has tag' on an item's custom nbt doesn't give the item custom data, as on Skript (SkBee reads Skript's
+		# parsing stack for that).
+		set {_plain} to stone
+		if custom nbt of {_plain} has tag "x":
+			skbee("plain item has x", "yes")
+		else:
+			skbee("plain item has x", "no")
+		set {_full} to full nbt of {_plain}
+		skbee("plain item after has tag", {_full})
+		set {skbee::saved-key} to minecraft key of stone
+		set {skbee::saved-nbt} to {_n}
+		skbee("saved", {skbee::saved-nbt})
+		send "[skbee] end nbt" to console
+
+command /skbeetest-after-restart-nbt:
+	trigger:
+		skbee("loaded", {skbee::saved-nbt})
+		skbee("loaded key", {skbee::saved-key})
+		delete {skbee::saved-nbt}
+		delete {skbee::saved-key}
+		send "[skbee] end after-restart-nbt" to console
+command /skbeetest-text:
+	trigger:
+		set {_t} to text component from "Hello &aworld"
+		skbee("text component", {_t})
+		set {_j} to serialized json string of {_t}
+		skbee("text component json", {_j})
+		set {_m} to mini message from "<red>Red <bold>bold</bold></red>"
+		skbee("mini message", {_m})
+		set {_j} to serialized json string of {_m}
+		skbee("mini message json", {_j})
+		set {_merged} to merge components {_t} and {_m} joined with ", "
+		set {_j} to serialized json string of {_merged}
+		skbee("merged json", {_j})
+		set {_c::*} to component children of {_merged}
+		skbee("children", size of {_c::*})
+		set hover event of {_t} to hover event showing "a tip"
+		set click event of {_t} to click event to run command "/help"
+		set {_j} to serialized json string of {_t}
+		skbee("with events json", {_j})
+		set bold format of {_t} to true
+		set {_b} to bold format of {_t}
+		skbee("bold format", {_b})
+		set {_i} to diamond sword
+		set component item name of {_i} to mini message from "<gold>Blade"
+		set {_n} to component item name of {_i}
+		set {_j} to serialized json string of {_n}
+		skbee("item name json", {_j})
+		set component item lore of {_i} to text component from "line one" and text component from "line two"
+		set {_l::*} to component item lore of {_i}
+		skbee("item lore", {_l::*})
+		set {_r} to text component from "the cat sat on the mat"
+		component replace "at" with "og" in {_r}
+		skbee("component replace", {_r})
+		set {_r2} to text component from "aaa bbb"
+		component replace first "a" with "x" in {_r2}
+		skbee("component replace first", {_r2})
+		set {_sent} to merge components text component from "[skbee] sent component: " and {_m}
+		send component {_sent} to console
+		set {_inv} to chest inventory with component name mini message from "<blue>Chest" with 2 rows
+		set {_title} to component inventory name of {_inv}
+		set {_j} to serialized json string of {_title}
+		skbee("inventory title json", {_j})
+		spawn a pig at location(12.5, 100, 12.5, world "world")
+		set {_pig} to last spawned entity
+		set component entity custom name of {_pig} to mini message from "<green>Porky"
+		set {_pn} to component entity custom name of {_pig}
+		set {_j} to serialized json string of {_pn}
+		skbee("entity name json", {_j})
+		delete entity within {_pig}
+		set {skbee::saved-text} to {_m}
+		send "[skbee] end text" to console
+
+# A trigger that runs a NeoSkriptCompat effect while another one runs, as releasing a bee fires its spawn: the outer
+# effect still sets its variable argument.
+on spawn of bee:
+	{skbee::releasing} is true
+	set {_c} to text component from "[skbee] release spawn: bee"
+	send component {_c} to console
+
+command /skbeetest-storage:
+	trigger:
+		set {_l} to location(20, 100, 20, world "world")
+		set block at {_l} to bee nest
+		spawn a bee at location(20.5, 102, 20.5, world "world")
+		set {_bee} to last spawned entity
+		add {_bee} to storage of block at {_l}
+		skbee("stored bee valid", whether {_bee} is valid)
+		set time in world "world" to 12:00
+		set weather in world "world" to clear
+		set {skbee::releasing} to true
+		release all entities from storage of block at {_l} for 1 minute into {_bees::*}
+		delete {skbee::releasing}
+		skbee("released bees", size of {_bees::*})
+		kill {_bees::*}
+		set block at {_l} to air
+		send "[skbee] end storage" to console
+
+command /skbeetest-timespans:
+	trigger:
+		set {_l} to location(28, 100, 28, world "world")
+		set inhabited time of chunk at {_l} to 1 day
+		skbee("inhabited time", inhabited time of chunk at {_l})
+		add 10 minutes to inhabited time of chunk at {_l}
+		remove 3 minutes from inhabited time of chunk at {_l}
+		skbee("inhabited time changed", inhabited time of chunk at {_l})
+		skbee("inhabited over an hour", whether inhabited time of chunk at {_l} > 1 hour)
+		set {_t} to inhabited time of chunk at {_l}
+		skbee("inhabited time plus", {_t} + 2 seconds)
+		set block at {_l} to spawner
+		set spawner spawn delay of block at {_l} to 3 seconds
+		skbee("spawn delay", spawner spawn delay of block at {_l})
+		set block at {_l} to air
+		send "[skbee] end timespans" to console
+
+command /skbeetest-after-restart-text:
+	trigger:
+		set {_j} to serialized json string of {skbee::saved-text}
+		skbee("loaded text json", {_j})
+		delete {skbee::saved-text}
+		send "[skbee] end after-restart-text" to console

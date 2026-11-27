@@ -116,7 +116,7 @@ final class Workstations {
                     }
                     default -> {}
                 }
-            });
+            }).passed("The 'brewing results' cannot be changed after the 'brewing complete' event has passed.");
         }, "[the] brewing results");
         registrar.expression("ExprBrewingTime", "timespan", info -> new BrewingTime(isIn(info, BrewingStartEvent.class)),
                 Property.defaultPatterns("[current|remaining] brewing time", "blocks"));

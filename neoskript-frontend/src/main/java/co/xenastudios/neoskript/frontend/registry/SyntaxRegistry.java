@@ -41,6 +41,8 @@ public final class SyntaxRegistry {
     private final Map<String, List<FunctionInfo>> functions;
     private final Map<String, Set<String>> supertypes;
     private final Set<String> strictTypes;
+    /** Addon types made strict, whose words count where any value goes: see {@link Builder#addonStrict}. */
+    private final List<TypeInfo> addonStrictTypes;
     /** Types whose values can all be listed, though they aren't a closed set of words: {@code all biomes}. */
     private final Set<String> enumerableTypes;
     private final Map<String, java.util.function.Predicate<String>> literalChecks;
@@ -57,6 +59,15 @@ public final class SyntaxRegistry {
     /** The names of addons' {@code loop-<name>} values, as {@code node}. */
     private final Set<String> loopValueNames;
     private final Map<String, ParseCheck> checks;
+    /** Syntax whose arguments' lists aren't warned about, as Skript's function calls. */
+    private final java.util.Set<String> quietLists;
+    private final boolean missingAndOrOff;
+    /** Addons' structures ({@code import:}), by syntax id: what to do with each use while a script is parsed. */
+    private final Map<String, co.xenastudios.neoskript.api.registration.StructureHandler> structureHandlers;
+    /** Addons' structures scripts declare syntax with, by syntax id: see {@link Builder#scriptSyntaxHandler}. */
+    private final Map<String, co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler> scriptSyntaxHandlers;
+    /** For syntax scripts declared, whether each expression is one value ({@code S}), several ({@code P}) or as its arguments ({@code A}). */
+    private final Map<String, Character> scriptPlurality;
     /** The experiments syntax elements need, by element id. */
     private final Map<String, Experimental> experimental;
     /** The experiment a script's {@code using X} turns on, by its code name. */
@@ -71,7 +82,7 @@ public final class SyntaxRegistry {
     private final EventValues eventValues;
 
     private SyntaxRegistry(Builder builder) {
-        this.typesById = Collections.unmodifiableMap(new LinkedHashMap<>(builder.typesById));
+        this.typesById = Collections.unmodifiableMap(builder.typesInOrder());
         Map<String, Integer> orders = new java.util.HashMap<>();
         for (String id : typesById.keySet()) {
             orders.put(id, orders.size());
@@ -98,12 +109,15 @@ public final class SyntaxRegistry {
         this.functions = Frozen.map(functions);
         this.supertypes = closure(builder.supertypes);
         this.strictTypes = Frozen.set(builder.strictTypes);
+        this.addonStrictTypes = builder.addonStrictTypes.stream().map(id -> builder.typesById.get(Text.lower(id)))
+                .filter(java.util.Objects::nonNull).toList();
         this.skriptTypes = Frozen.set(builder.skriptTypes);
         Map<String, Set<String>> skriptConversions = new HashMap<>();
         builder.skriptConversions.forEach((from, to) -> skriptConversions.put(from, Frozen.set(to)));
         this.skriptConversions = Frozen.map(skriptConversions);
         this.timed = Frozen.set(builder.timed);
         this.anyTyped = Frozen.set(builder.anyTyped);
+        this.pluralAsArguments = Frozen.set(builder.pluralAsArguments);
         this.describer = builder.describer;
         this.typer = builder.typer;
         this.enumerableTypes = Frozen.set(builder.enumerableTypes);
@@ -121,6 +135,11 @@ public final class SyntaxRegistry {
         this.sectionOnly = Frozen.set(builder.sectionOnly);
         this.loopValueNames = Frozen.set(builder.loopValueNames);
         this.checks = Frozen.map(builder.checks);
+        this.structureHandlers = Frozen.map(builder.structureHandlers);
+        this.scriptSyntaxHandlers = Frozen.map(builder.scriptSyntaxHandlers);
+        this.scriptPlurality = Map.of();
+        this.quietLists = java.util.Set.copyOf(builder.quietLists);
+        this.missingAndOrOff = builder.missingAndOrOff;
         this.experimental = Frozen.map(builder.experimental);
         this.experimentNames = builder.experimentNames;
         Map<String, Set<String>> propertyTypes = new HashMap<>();
@@ -129,6 +148,106 @@ public final class SyntaxRegistry {
         this.propertySyntaxes = Frozen.map(builder.propertySyntaxes);
         this.placeholderConversions = Frozen.set(builder.placeholderConversions);
         this.eventValues = builder.eventValues;
+    }
+
+    /**
+     * This registry with syntax scripts declared added ({@link ScriptSyntaxDecl}), for one load: everything else is
+     * this one's. Each declared syntax is tried after the registered syntax of its kind.
+     */
+    private SyntaxRegistry(SyntaxRegistry base, List<SyntaxInfo> added) {
+        this.pluralAsArguments = base.pluralAsArguments;
+        this.typesById = base.typesById;
+        this.typeOrders = base.typeOrders;
+        this.typeNames = base.typeNames;
+        this.functions = base.functions;
+        this.supertypes = base.supertypes;
+        this.strictTypes = base.strictTypes;
+        this.addonStrictTypes = base.addonStrictTypes;
+        this.enumerableTypes = base.enumerableTypes;
+        this.literalChecks = base.literalChecks;
+        this.parseChecks = base.parseChecks;
+        this.conversions = base.conversions;
+        this.entityNames = base.entityNames;
+        this.delaying = base.delaying;
+        this.delayingExpressions = base.delayingExpressions;
+        this.stopping = base.stopping;
+        this.ending = base.ending;
+        this.suppressing = base.suppressing;
+        this.sectionOnly = base.sectionOnly;
+        this.loopValueNames = base.loopValueNames;
+        this.checks = base.checks;
+        this.quietLists = base.quietLists;
+        this.missingAndOrOff = base.missingAndOrOff;
+        this.structureHandlers = base.structureHandlers;
+        this.scriptSyntaxHandlers = base.scriptSyntaxHandlers;
+        this.experimental = base.experimental;
+        this.experimentNames = base.experimentNames;
+        this.propertyTypes = base.propertyTypes;
+        this.propertySyntaxes = base.propertySyntaxes;
+        this.placeholderConversions = base.placeholderConversions;
+        this.eventValues = base.eventValues;
+        this.timed = base.timed;
+        this.anyTyped = base.anyTyped;
+        this.describer = base.describer;
+        this.typer = base.typer;
+        this.skriptTypes = base.skriptTypes;
+        this.skriptConversions = base.skriptConversions;
+        Map<SyntaxKind, List<SyntaxInfo>> syntaxes = new EnumMap<>(SyntaxKind.class);
+        Map<SyntaxKind, PatternIndex<Candidate>> indexes = new EnumMap<>(SyntaxKind.class);
+        Map<String, Character> plurality = new HashMap<>(base.scriptPlurality);
+        for (SyntaxKind kind : SyntaxKind.values()) {
+            List<SyntaxInfo> extra = added.stream().filter(syntax -> syntax.kind() == kind).toList();
+            if (extra.isEmpty()) {
+                syntaxes.put(kind, base.syntaxes.get(kind));
+                indexes.put(kind, base.indexes.get(kind));
+                continue;
+            }
+            List<SyntaxInfo> list = new ArrayList<>(base.syntaxes.get(kind));
+            list.addAll(extra);
+            syntaxes.put(kind, List.copyOf(list));
+            PatternIndex<Candidate> index = new PatternIndex<>();
+            for (SyntaxInfo syntax : list) {
+                for (int i = 0; i < syntax.patterns().size(); i++) {
+                    index.add(syntax.patterns().get(i), new Candidate(syntax, i));
+                }
+            }
+            indexes.put(kind, index);
+        }
+        for (SyntaxInfo syntax : added) {
+            if (syntax.script() != null && syntax.kind() == SyntaxKind.EXPRESSION) {
+                plurality.put(syntax.id(), switch (syntax.script().declared().plurality()) {
+                    case SINGLE -> 'S';
+                    case PLURAL -> 'P';
+                    case AS_ARGUMENTS -> 'A';
+                });
+            }
+        }
+        this.syntaxes = Collections.unmodifiableMap(syntaxes);
+        this.indexes = Collections.unmodifiableMap(indexes);
+        this.scriptPlurality = Frozen.map(plurality);
+    }
+
+    /**
+     * This registry with {@code added}, syntax scripts declared, for one load; this one itself if there's none, so
+     * scripts are parsed exactly as without the feature where no script declares syntax.
+     */
+    public SyntaxRegistry withScriptSyntax(List<SyntaxInfo> added) {
+        return added.isEmpty() ? this : new SyntaxRegistry(this, added);
+    }
+
+    /** For an expression a script declared, {@code S}, {@code P} or {@code A} (as Plurality's table); else {@code null}. */
+    public Character scriptPlurality(String id) {
+        return scriptPlurality.get(id);
+    }
+
+    /** The addon structure that declares syntax, by syntax id, or {@code null}. */
+    public co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler scriptSyntaxHandler(String id) {
+        return scriptSyntaxHandlers.get(id);
+    }
+
+    /** Whether any addon has a structure that declares syntax. */
+    public boolean hasScriptSyntax() {
+        return !scriptSyntaxHandlers.isEmpty();
     }
 
     /** Which event values code can use, or {@code null} if this registry can't tell. */
@@ -174,6 +293,7 @@ public final class SyntaxRegistry {
 
     private final Set<String> timed;
     private final Set<String> anyTyped;
+    private final Set<String> pluralAsArguments;
     private final Describer describer;
     private final Typer typer;
 
@@ -211,7 +331,8 @@ public final class SyntaxRegistry {
         }
         try {
             return describer.describe(syntax, pattern, match, arguments);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
+            // A describer that needs what isn't there (a server's registries, in a test) describes nothing.
             return null;
         }
     }
@@ -219,6 +340,14 @@ public final class SyntaxRegistry {
     /** Whether Skript registers expression {@code id} as returning any type ({@link Builder#anyType}). */
     public boolean isAnyTyped(String id) {
         return anyTyped.contains(id);
+    }
+
+    /**
+     * Whether expression {@code id} is several values when a plural argument of it is, as Skript's property
+     * expressions are ({@link Builder#pluralAsArguments}).
+     */
+    public boolean isPluralAsArguments(String id) {
+        return pluralAsArguments.contains(id);
     }
     /** Skript's types, by NeoSkript's ids, between which {@link #skriptConversions} says what's taken as what. */
     private final Set<String> skriptTypes;
@@ -233,6 +362,26 @@ public final class SyntaxRegistry {
     }
 
     /** The check the syntax element makes while it's parsed, or {@code null} if it makes none. */
+    /** Whether syntax {@code id}'s arguments are parsed as a function's, with no warnings about their lists. */
+    public boolean quietLists(String id) {
+        return quietLists.contains(id);
+    }
+
+    /** Whether Skript's "List is missing 'and' or 'or'" warning is off: see {@link Builder#missingAndOrOff}. */
+    public boolean missingAndOrOff() {
+        return missingAndOrOff;
+    }
+
+    /** The addon's handler for structure {@code id}, or {@code null} if it isn't an addon's. */
+    public co.xenastudios.neoskript.api.registration.StructureHandler structureHandler(String id) {
+        return structureHandlers.get(id);
+    }
+
+    /** Every addon structure's handler. */
+    public java.util.Collection<co.xenastudios.neoskript.api.registration.StructureHandler> structureHandlers() {
+        return structureHandlers.values();
+    }
+
     public ParseCheck check(SyntaxInfo syntax) {
         return checks.get(syntax.kind() + ":" + syntax.id());
     }
@@ -356,6 +505,19 @@ public final class SyntaxRegistry {
     /** Whether type {@code id} only takes itself, its subtypes and conversions: see {@link Builder#strict}. */
     public boolean isStrict(String id) {
         return strictTypes.contains(id);
+    }
+
+    /**
+     * Whether an addon's strict type certainly takes {@code words} as a literal, so they're known words where any
+     * value goes: {@code ArrayList} imported in skript-reflect's syntax.
+     */
+    public boolean isAddonStrictLiteral(String words) {
+        for (TypeInfo type : addonStrictTypes) {
+            if (isLiteral(type, words)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Every direct conversion, as {@code from -> {to...}}: see {@link Builder#convertible}. */
@@ -603,9 +765,21 @@ public final class SyntaxRegistry {
         private final Set<String> sectionOnly = new HashSet<>();
         private final Set<String> loopValueNames = new HashSet<>();
         private final Map<String, ParseCheck> checks = new HashMap<>();
+        private final Map<String, co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler> scriptSyntaxHandlers =
+                new HashMap<>();
+
+        /** The structure with syntax id {@code id} declares syntax: see {@code Registrar.scriptSyntax}. */
+        public Builder scriptSyntaxHandler(String id, co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler handler) {
+            scriptSyntaxHandlers.put(id, handler);
+            return this;
+        }
+
+        private final Map<String, co.xenastudios.neoskript.api.registration.StructureHandler> structureHandlers =
+                new java.util.LinkedHashMap<>();
+        private final java.util.Set<String> quietLists = new java.util.HashSet<>();
         private final Map<String, Experimental> experimental = new HashMap<>();
         private java.util.function.UnaryOperator<String> experimentNames =
-                name -> Text.lower(name.strip());
+                name -> Text.lower(name.strip()).replaceAll("\\s+", " ");
         private EventValues eventValues;
 
         /** Makes the syntax elements with this id need an experiment. */
@@ -738,6 +912,29 @@ public final class SyntaxRegistry {
             return this;
         }
 
+        /** Says syntax {@code id}'s arguments are parsed as a function's: their lists aren't warned about. */
+        /**
+         * Turns Skript's "List is missing 'and' or 'or'" warning off for every script, as Skript's
+         * {@code disable variable missing and/or warnings} does, and as skript-reflect sets it when installed.
+         */
+        public Builder missingAndOrOff() {
+            missingAndOrOff = true;
+            return this;
+        }
+
+        private boolean missingAndOrOff;
+
+        public Builder quietLists(String id) {
+            quietLists.add(id);
+            return this;
+        }
+
+        /** Makes structure {@code id} an addon's, given each use while a script is parsed. */
+        public Builder structureHandler(String id, co.xenastudios.neoskript.api.registration.StructureHandler handler) {
+            structureHandlers.put(id, handler);
+            return this;
+        }
+
         /** Adds a check the syntax element makes when a section is written under its line. */
         public Builder sectionCheck(SyntaxKind kind, String id, ParseCheck check) {
             checks.put("section:" + kind + ":" + id, check);
@@ -777,6 +974,9 @@ public final class SyntaxRegistry {
          */
         public Builder type(TypeInfo type, String... aliases) {
             String id = Text.lower(type.id());
+            if (inserting && !typesById.containsKey(id)) {
+                insertedTypes.add(id);
+            }
             typesById.put(id, type);
             nameType(id, type);
             nameType(normalize(type.name()), type);
@@ -823,8 +1023,59 @@ public final class SyntaxRegistry {
         }
 
         public Builder syntax(SyntaxInfo syntax) {
-            syntaxes.computeIfAbsent(syntax.kind(), k -> new ArrayList<>()).add(syntax);
+            List<SyntaxInfo> list = syntaxes.computeIfAbsent(syntax.kind(), k -> new ArrayList<>());
+            if (inserting) {
+                // At the addons' place, after what was inserted there already.
+                int at = marks.getOrDefault(syntax.kind(), 0) + inserted.merge(syntax.kind(), 1, Integer::sum) - 1;
+                list.add(Math.min(at, list.size()), syntax);
+            } else {
+                list.add(syntax);
+            }
             return this;
+        }
+
+        /** Where each kind's syntax and the types stood when {@link #mark} was called. */
+        private final Map<SyntaxKind, Integer> marks = new EnumMap<>(SyntaxKind.class);
+        private final Map<SyntaxKind, Integer> inserted = new EnumMap<>(SyntaxKind.class);
+        private int typeMark = -1;
+        private final List<String> insertedTypes = new ArrayList<>();
+        private boolean inserting;
+
+        /**
+         * Marks the place addons' syntax and types go, as the standard library registers: what's added later while
+         * {@link #inserting(boolean)} goes there, in the order it's added, as if it had been registered at this point.
+         */
+        public Builder mark() {
+            for (SyntaxKind kind : SyntaxKind.values()) {
+                marks.put(kind, syntaxes.getOrDefault(kind, List.of()).size());
+            }
+            typeMark = typesById.size();
+            return this;
+        }
+
+        /** Whether what's added now goes at the {@link #mark}, rather than after everything. */
+        public Builder inserting(boolean inserting) {
+            this.inserting = inserting && typeMark >= 0;
+            return this;
+        }
+
+        /** The types in the order they're tried: those added while inserting at the mark. */
+        private Map<String, TypeInfo> typesInOrder() {
+            if (insertedTypes.isEmpty()) {
+                return new LinkedHashMap<>(typesById);
+            }
+            Map<String, TypeInfo> ordered = new LinkedHashMap<>();
+            int index = 0;
+            for (Map.Entry<String, TypeInfo> entry : typesById.entrySet()) {
+                if (index++ == typeMark) {
+                    insertedTypes.forEach(id -> ordered.put(id, typesById.get(id)));
+                }
+                if (!insertedTypes.contains(entry.getKey())) {
+                    ordered.put(entry.getKey(), entry.getValue());
+                }
+            }
+            insertedTypes.forEach(id -> ordered.putIfAbsent(id, typesById.get(id)));
+            return ordered;
         }
 
         /** Adds a built-in function, or another overload of one. */
@@ -878,6 +1129,17 @@ public final class SyntaxRegistry {
         private final Set<String> anyTyped = new HashSet<>();
 
         /**
+         * Marks expression {@code id} as several values when a plural argument of it is several values, as Skript's
+         * property expressions ({@code names of {_players::*}}); without it, syntax Skript doesn't have is one value.
+         */
+        public Builder pluralAsArguments(String id) {
+            pluralAsArguments.add(id);
+            return this;
+        }
+
+        private final Set<String> pluralAsArguments = new HashSet<>();
+
+        /**
          * How syntax writes itself in errors, as Skript's {@code toString}: given a syntax element, how it was
          * matched and its arguments as written so, it returns its text, or {@code null} for the text as written.
          */
@@ -928,6 +1190,18 @@ public final class SyntaxRegistry {
             strictTypes.addAll(List.of(types));
             return this;
         }
+
+        /**
+         * An addon's type made strict ({@code Registrar.strictType}): as {@link #strict}, and words its literal check
+         * certainly takes are known words where any value goes, as they're no other type's.
+         */
+        public Builder addonStrict(String type) {
+            strictTypes.add(type);
+            addonStrictTypes.add(type);
+            return this;
+        }
+
+        private final List<String> addonStrictTypes = new ArrayList<>();
 
         /** Names of kinds of entity, singular and plural, e.g. {@code zombie} and {@code zombies}. */
         public Builder entityNames(Iterable<String> names) {

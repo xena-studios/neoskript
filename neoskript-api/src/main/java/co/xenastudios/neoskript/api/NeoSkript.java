@@ -162,4 +162,44 @@ public interface NeoSkript {
      * @return the threads
      */
     Threads threads();
+
+    /**
+     * The script being parsed or set up on this thread, while scripts load: so an addon's literal parsers, structure
+     * handlers and element factories can tell scripts apart, as skript-reflect's imports are each script's own.
+     *
+     * @return the script's name, as {@code quests/main.sk}, or {@code null} outside of loading scripts
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default String scriptBeingLoaded() {
+        return null;
+    }
+
+    /**
+     * Reports a runtime warning, as Skript's syntax does when something goes wrong while a trigger runs: printed with
+     * the script, line and element, within Skript's limits per frame, and the trigger carries on.
+     *
+     * @param message the warning
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void runtimeWarning(String message) {}
+
+    /**
+     * Reports a runtime error, as {@link #runtimeWarning}: printed, and the trigger carries on.
+     *
+     * @param message the error
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void runtimeError(String message) {}
+
+    /**
+     * While an element is set up (its factory runs): whether it's in the code of syntax a script declared
+     * ({@link co.xenastudios.neoskript.api.registration.Registrar#scriptSyntax}), for syntax only that code can use,
+     * as skript-reflect's {@code expression-1}.
+     *
+     * @return whether it is
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default boolean inDeclaredSyntaxCode() {
+        return false;
+    }
 }

@@ -159,6 +159,19 @@ public final class Regions {
         return (kind == RegionAccess.Kind.ENTITY || kind == RegionAccess.Kind.BLOCK) && !access.owns(value);
     }
 
+    /**
+     * On Folia, whether {@code value} is an entity or block another thread owns, which is then reported as a read of it
+     * would be: an event can't be given one. Always {@code false} without region checks.
+     */
+    public static boolean refuseForeign(ErrorSites.Site site, Object value) {
+        RegionAccess access = enabled() ? access() : null;
+        if (access == null || !foreign(access, value)) {
+            return false;
+        }
+        readError(access, site, value);
+        return true;
+    }
+
     /** Reports that {@code value}, which another thread owns, can't be read here. */
     static void readError(RegionAccess access, ErrorSites.Site site, Object value) {
         report(site, capitalize(access.describe(value)) + " is in another region, which only that region's thread"

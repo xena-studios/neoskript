@@ -28,6 +28,12 @@ On main, in the [development build](https://github.com/xena-studios/neoskript/re
 
 - **Damaged variable files:** a `variables.csv` whose last line was cut short by a crash could be wiped. Now lines that can't be read are skipped and the file is backed up first, nothing is saved until variables have loaded, and the file copied from Skript is backed up before its first load. See [variables and storage](/docs/server/variables/#backups).
 
+- **Skript's `config.sk` settings in `config.yml`:** the language, date format, number accuracy, case sensitivity, text formatting, target distance, player name pattern and the player variable fix, copied from `config.sk` when moving over. See [configuration](/docs/server/configuration/).
+
+- **Variable backups, upgrading from 0.1.0-beta.1:** 0.1.0-beta.1 made no scheduled backups. Now each database's file is copied into `backups/` every `backup-interval`, gzipped, as Skript does. A `config.yml` from 0.1.0-beta.1 is carried forward with every 2 hours, keeping the newest 12, for `variables.csv` or, with native storage, `variables.nsv`, and the console says so once. Set the database's `backup-interval` to `0` to stop, or `backups-to-keep` to keep more or fewer. See [variables and storage](/docs/server/variables/#backups).
+
+- **Decimals in variable names, upgrading from 0.1.0-beta.1:** a decimal in a variable's name now keeps up to 8 decimal places, as in Skript, where 0.1.0-beta.1 kept 2. A variable saved under a decimal with more than 2 places, such as `{price::%1.234%}`, was saved as `price::1.23` and isn't found as `price::1.234` now. It can't be renamed for you: the file only has the rounded number. Whole numbers and decimals with up to 2 places, the usual indices, aren't affected. Variables Skript saved were always right.
+
 - **The family look for `/sk` and `config.yml`:** `/ns` as another name for `/sk`, clickable help, reload reports per script, a `theme` section and `config-version` in `config.yml`, and more settings applied by `/sk reload config`. A 0.1.0-beta.1 `config.yml` is carried forward, with a backup as `config.yml.bak-v1`. See [commands](/docs/server/commands/) and [configuration](/docs/server/configuration/#updating-neoskript).
 
 ## neoskript-cli 0.1.0

@@ -182,18 +182,114 @@ NeoSkriptCompat.
 ## Plan
 
 1. **This PR:** the design, and the scanner.
-2. **The core and the first slice:** NeoSkriptCompat with SkBee's start-up (its version checks, its registration
-   path, `SkriptAddon`, `AddonModule`), the D10 check by name, parse-time `init`, arguments as expressions, the
-   element bases, `ClassInfo`, and **SkBee's bossbars** (`elements/bossbar`: a type with a parser and serializer,
-   expressions with changers, ids). SkBee's own `config.yml` turns its other element modules off, so the slice only
-   needs what bossbars use. A harness scenario runs a script using them on Skript 2.17.0 + SkBee 3.26.0 and on
-   NeoSkript + NeoSkriptCompat + SkBee 3.26.0 (both pinned by SHA-256), comparing the output.
+2. **The core and the first slice** (done): NeoSkriptCompat with SkBee's start-up (its version checks, its
+   registration path, `SkriptAddon`, `AddonModule`), the D10 check by name, the element bases, `ClassInfo`, and the
+   first slice. Bossbars were planned as the first slice, but Skript 2.17 has bossbars of its own, and so does
+   NeoSkript, so SkBee turns its bossbar module off on both. The first slice is instead SkBee's "other" module,
+   which SkBee always loads (its config can't turn it off), so all of it has to register for SkBee to enable at all.
+   The `skbee-differential` scenario compares a script using its world, chunk, key and server syntax on Skript
+   2.17.0 + SkBee 3.26.0 and on NeoSkript + NeoSkriptCompat + SkBee 3.26.0 (SkBee pinned by SHA-256), on Paper 26.3
+   (SkBee 3.26.0 needs Minecraft 26.1 and Skript 2.15).
 3. **Slice by slice:** text components, NBT, scoreboards, item components, recipes, bounds, structures and the rest,
    most used first, each compared with Skript + SkBee, until SkBee's commonly used syntax works. Then skript-yaml's
-   addons that aren't replaced by an official addon: SkQuery, then skript-reflect (which reaches deepest into Skript
-   and may never work fully).
+   addons that aren't replaced by an official addon: SkQuery first. skript-reflect, which reaches deepest into Skript
+   and may never work fully, is replaced by NeoSkriptReflect (issue #13) instead.
 
 The docs for server owners say what works, by addon and by slice, and nothing more.
+
+## What's built so far
+
+The first step takes a simpler route than the design above in two places, so the compiler isn't changed for it.
+Both are to be replaced by the design's way in a later slice, and until then they're limits server owners are told
+about.
+
+- **`init` runs when the line is compiled, not while it's parsed.** NeoSkript picks the syntax with its own parser,
+  then sets the addon's element up. An element whose `init` returns `false` makes that line an error (with the
+  addon's `Skript.error`, if it gave one), where Skript would go on to try other syntax. The element's return type is
+  the one it registered, except for an expression registered as giving anything: that one is also
+  set up while the line is parsed, quietly, and gives the type its `getReturnType` says (`damage type of x` gives a
+  damage type, so `is magic` reads `magic` as one).
+- **Arguments are worked out before the element runs.** NeoSkript evaluates each argument as it does for its own
+  syntax and the element's argument expressions give it those values (as the classes the addon asks for). An addon
+  that evaluates an argument twice gets the same values. An effect can set or delete an argument that's a variable
+  (SkBee's `component replace ... in {_text}`): what it sets is recorded (`ArgumentChanges`) and the compiled code
+  writes it to the variable once the effect has run (`Library.writesBackArguments`, for NeoSkriptCompat's effects
+  only). Changing any other argument, adding to or removing from one, or an expression or condition changing its
+  argument, isn't supported. An element that keeps an argument and reads it later, outside its own `get`, `check`, `execute` or
+  `change` (from a task it schedules, say), gets whatever element is running on that thread then, or an error: the
+  values are only there while NeoSkript is running the element.
+- **An argument is a `Literal` only when it's one written value** (`5`, `"text"`, `zombie`), read when the line is
+  set up. A list of written values (`zombies and skeletons`) isn't one, so an element that needs a literal there
+  (SkBee's `entities in range of beacon`, which takes a list of entity types) fails to set up and the line is an
+  error.
+
+The rest is as designed: what an addon registers goes to NeoSkript through one `Registrar` per addon. Element ids are
+the addon's name and the element's class (`SkBee:ExprWorldHeight`).
+
+- **Order:** each element is given its priority level as Skript has it (`SyntaxInfo.priority()`, or, as on Skript,
+  the level its patterns give when the addon gave none: simple, combined, or matching almost anything), and NeoSkript
+  tries it after its own syntax of that level (`Registrar.priority`), as Skript tries an addon's after its own. So a
+  line reads as it does on Skript with the same addon installed. That isn't always as Skript alone reads it: SkBee
+  gives none of its syntax a priority, so Skript gives it the level of its patterns, and some of it (`item model of
+  %itemstacks/itemtypes/slots%`, combined) comes before Skript's own (a property). `neoskript-skript-suite-skbee`
+  runs Skript's whole suite with NeoSkriptCompat and SkBee installed, and Skript's own runner on Skript 2.17 with the
+  same SkBee (at least 800 tests must pass there, with SkBee enabled): every test that passes there must pass on
+  NeoSkript, unless SkBee's own code threw the same exception on both, or it's a test NeoSkript's runner doesn't run
+  in the plain suite either (`health utils update`, which uses the runner's `on test` event). 857 of 862 pass; the other 5 don't pass on Skript
+  with SkBee either (SkBee's damage source, item model and book pages syntax takes those lines there too), one of
+  them because SkBee's own code throws on both (`add fire aspect 0 to stored enchantments`). Addons' syntax and types
+  are inserted at the place the standard library marks for them, as before; their literal parsers, named types,
+  event values and event names now go after the standard library's, where before they went at that place too.
+
+- **Skript's API** is in NeoSkriptCompat's jar: the classes addons use are written by hand where they need to work,
+  and the rest of Skript 2.17.0's API that SkBee and skript-yaml reach (`src/stubs/skript-2.17.0.api`, a listing of
+  names and signatures only, no code) is generated, so an addon's classes link and reflect as on Skript. A generated
+  method throws, saying NeoSkriptCompat doesn't have it yet.
+- **Types** an addon registers become NeoSkript's types, with their parser, text and values. One NeoSkript has
+  already (by code name or class) stays NeoSkript's: SkBee checks first and leaves those alone.
+- **Saving** an addon's types in variables uses the addon's own serializer, in Skript's format (its `Fields` by
+  name, as Skript's `variables.csv` has them): fields of text, numbers, booleans and nothing, which is all SkBee's
+  serializers write. Field names are lowercased and written in a hash map's order, as Skript's `Fields` are, so
+  what either saved reads and writes back byte for byte (a unit test checks bytes Skript 2.17 + SkBee 3.26 wrote).
+  A value the serializer refuses isn't saved, as on Skript. Enums aren't saved yet. Paper closes an addon's class
+  loader when it's disabled, before NeoSkriptCompat, so NeoSkript turns values into their saved bytes as the plugin
+  whose code their codec runs is disabled (the addon's serializer's class loader, `CodecLoader`), not only when the
+  codec's plugin is.
+- **Literals:** words a type's literal parser reads (SkBee's `int list tag`) are literals for an addon, as Skript
+  gives them (`Library.wordsAsLiterals`, for NeoSkriptCompat's syntax only). Numbers an addon's changer takes are
+  any number to NeoSkript, made the class it asks for (`Integer`) when the change runs.
+- **Parsing stack:** `ParserInstance.getParsingStack()` has the syntax around the element being set up, from what
+  NeoSkript's compiler is compiling around it (`Library.enclosingSyntax`): an addon's syntax with its info, and
+  NeoSkript's own as an element of no addon's, so the top is the element's parent, as on Skript. SkBee reads it to
+  tell `nbt compound` inside its `has nbt tag` condition, where it doesn't create the item's custom data.
+- **Runtime errors** name the addon: what an element throws while it runs becomes "SkBee's ExprStoredEnchant threw in
+  SkBee's code: ..." ("in SkBee's code" when the addon's own code threw, not NeoSkriptCompat's), and the trigger goes
+  on as with NeoSkript's other runtime errors.
+- **Value adapters** (D24) so far: `ItemType`, `EntityData`, `EnchantmentType`, `Timespan`, and `Slot` (an inventory's as `InventorySlot`).
+- **Conversions and comparisons** go to NeoSkript where they involve a class NeoSkript has no type for, so they
+  don't change how NeoSkript's own types behave. **Event values** go where NeoSkript has no value of that type for
+  the event (or a superclass of it): an addon's events get theirs, and NeoSkript's own event values stay as they
+  are; only NeoSkript's own values count, compared by exact value class, so an addon's list value
+  (`event-entities`, `Entity[]`) goes in next to NeoSkript's single one. **Functions** an addon writes in Java become
+  NeoSkript's.
+- **Events:** NeoSkript listens to an addon event's classes, and runs the event's `check` as the trigger's filter,
+  with the literals written in its header (`on zombie knockback by skeleton`). An event's arguments are all
+  literals, as on Skript. It's set up when the script loads (so a header it won't take is an error then), and again
+  the first time its trigger's filter runs, with the header's values, which are constants: a list (`on tab complete
+  of "/a" and "/b"`) has its values then, for an event that copies them in `init`. An event whose check throws is
+  logged at most once a minute per trigger.
+- **Effects that run the rest of the trigger themselves** (overriding `walk`, as SkBee's `load chunk`, which waits
+  for the load) aren't registered yet: running only their `execute` would do nothing. The console counts them.
+  Skript's code names for types that NeoSkript has under another id are mapped (`entitydata` is NeoSkript's
+  `entitytype`).
+- **Not yet:** sections and structures an addon registers (SkBee's 60 sections and 2 structures are left out, and
+  the console says so), event values of types NeoSkript has none of, type properties, saving addon types that are
+  enums, and reading an addon's language files.
+
+SkBee 3.26.0 enables with all its modules, and NeoSkriptCompat registers its 78 types, 258 expressions, 77 effects,
+31 conditions, 69 events, 162 event values and 17 functions on NeoSkript. Not every one of those works yet: an element that reaches a part of
+Skript's API NeoSkriptCompat doesn't have fails when a script uses it, with an error naming what's missing. What's
+compared with Skript + SkBee is tracked in issue #45.
 
 ## The scanner
 

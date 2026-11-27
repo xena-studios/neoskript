@@ -1,0 +1,189 @@
+---
+title: NeoSkript Reflect
+description: "Java from scripts: imports, methods, fields, constructors and any Bukkit event. Scripts written for skript-reflect run unchanged, and calls are compiled rather than looked up each time."
+sidebar:
+  label: NeoSkript Reflect
+---
+
+NeoSkript Reflect lets scripts use Java directly: import a class, call its methods, read and set its fields, make new objects, and listen to any Bukkit event, including other plugins' events that have no Skript syntax. It's an official addon, released with NeoSkript at the same version.
+
+It takes the syntax of **[skript-reflect](https://github.com/SkriptLang/skript-reflect) 2.6.3**, its latest release, which was called **skript-mirror** before. Scripts written for either run unchanged, as far as this first part covers ([below](#not-yet)).
+
+:::caution[Scripts get full Java access]
+Like skript-reflect, this addon gives scripts everything Java can do: read and change any plugin's data, run commands, read files, open network connections, and stop the server. That's the point of it, and NeoSkript can't limit it. Only install it if you trust everyone who can write or upload scripts, as you would with a plugin's jar.
+:::
+
+## Installing
+
+1. Put `NeoSkriptReflect-<version>.jar` in `plugins/`, next to NeoSkript, using the same version as NeoSkript.
+2. Remove skript-reflect's (or skript-mirror's) jar if it's there. It needs Skript, so it can't load with NeoSkript anyway, and NeoSkript Reflect says so in the console when it starts.
+3. Restart the server. `/sk info` lists NeoSkriptReflect.
+
+## Examples
+
+Static methods and fields of an imported class, and an object's own:
+
+```skript nocheck
+import:
+	java.lang.Math
+	java.util.ArrayList
+	org.bukkit.Bukkit
+
+on load:
+	send "%Math.max(3, 7)%" to console
+	set {_list} to new ArrayList()
+	{_list}.add("a")
+	send "%{_list}.size()% item, on %Bukkit.getName()%" to console
+```
+
+Any Bukkit event, by its class:
+
+```skript nocheck
+import:
+	org.bukkit.event.server.ServerCommandEvent
+
+on ServerCommandEvent:
+	send "The console ran %event.getCommand()%" to console
+```
+
+A call that fails gives no value and a warning naming the line, and the trigger carries on. With `try` in front, there's no warning, and the error is kept:
+
+```skript nocheck
+try {_list}.get(9)
+if last java error is set:
+	send "No 10th item: %last java error%" to console
+```
+
+## Syntax
+
+The [syntax reference](/syntax/) has every pattern, with a badge saying it's from NeoSkriptReflect. In short:
+
+| Syntax | What it does |
+|---|---|
+| `import:` with full class names, one a line, each optionally `as` another name | Makes classes known to this script by their simple names. Each script has its own imports. |
+| `%object%.method(...)`, `%object%.field`, `new Class(...)` | Calls a method, reads a field, or makes an object. On an imported class, the static ones. A field can be set: `set {_point}.x to 5`. |
+| `%object%.[Class]method[int, int](...)` | A method from a given class, or with given parameter types, as skript-reflect writes it. |
+| `%object%..%text%(...)` | A method or field named by text worked out when the line runs. |
+| `try %java call%` | The call without its warning. |
+| `[the] [last] java error` | What the last call on this thread threw, or none. |
+| `null` | Java's `null`, to pass or set: unlike `none`, a value. |
+| `class "java.lang.Thread"`, `%objects%'s class`, `ArrayList.class`, `int.class` | Classes by name, a value's class, and the `Class` object to pass to a method. |
+| `new int[3]`, `new String[10]`, `{_array}[1]` | Arrays, and their elements, which can be set. |
+| `[1, 2, 3]`, `[... as Class]` | Values as one Java array. |
+| `...{_list}` | The elements of an array, collection, iterator or stream as separate values. |
+| `%objects% is an instance of %java types%` | Java's `instanceof`. |
+| `fields`, `methods`, `constructors`, `field names`, `method names` `of %objects%` | What a class has, as text. |
+| `instance of plugin %java type/text%` | A plugin's running instance. |
+| `[the] event` | The Bukkit event the trigger is running for. |
+| `on <imported event class>:` | A trigger for any Bukkit event. Several with `or`. |
+
+## Custom syntax
+
+Scripts can declare their own effects, conditions and expressions, as with skript-reflect, and every script can use them, whatever order the scripts load in. A `local` one is only for the script that declares it.
+
+```skript nocheck
+effect shout %string%:
+	trigger:
+		broadcast "%expression-1%!"
+
+condition %number% is big:
+	check:
+		if expression-1 > 10:
+			continue
+
+expression doubled %number%:
+	get:
+		return expression-1 * 2
+
+effect:
+	patterns:
+		greet %player%
+		wave at %player%
+	trigger:
+		send "Pattern %matched pattern%" to expression-1
+
+players property rank:
+	get:
+		return {rank::%expression-1's uuid%}
+
+players property condition staff:
+	check:
+		if {staff::%expression-1's uuid%} is true:
+			continue
+```
+
+| Syntax | What it does |
+|---|---|
+| `[local] effect <pattern>:` or `effect:` with `patterns:` | An effect: `trigger:` runs where it's used. |
+| `[local] condition <pattern>:` or `condition:` with `patterns:` | A condition: it passes if `check:` reaches `continue`. |
+| `[local] [plural\|non-single] expression <pattern>:` or `expression:` with `patterns:` | An expression: what `get:` returns. `return type:` names its type. |
+| `[local] <types> property <name>:` | A property expression: `the <name> of %types%` and `%types%'s <name>`. `get:` runs once for each value, given as `expression-1`. |
+| `[local] <types> property condition <name>:` | A property condition: `%types% is <name>` and `%types% is not <name>`. |
+| `expression-1`, `expr-2`... | The values the use was given, by placeholder. |
+| `[the] [matched] pattern` | Which of the patterns the use matched, from 1. |
+| `[the] [parse[r]] mark`, `[the] parse[r] tags` | The use's parse mark and tags. |
+| `continue` | In `check:`, the condition passes, and the code stops. In a loop, it's Skript's `continue`. |
+| `return %objects%` | In `get:`, the expression's value. |
+
+The code runs as part of the trigger that used the syntax: on its thread (its region on Folia), with its event (`event` is that event), but, as in a function, without its event values: write `event-player` as `event.getPlayer()`, or pass the player in. Each load reads the declarations again, so changing or removing a script changes or removes its syntax.
+
+## How calls run
+
+skript-reflect looks a method up each time a line runs, matching the arguments against every overload again, and calls it with `invokeWithArguments`, which the JVM can't turn into a direct call. NeoSkript Reflect keeps what it found, in two places:
+
+- **Each class's members** are looked up once, the first time any line calls one of them, and kept with the class (and let go of with it, if a plugin's classes are unloaded).
+- **Each line** keeps the member it chose for the last four combinations of the target's class and the arguments' classes, and checks it still takes the values it's given (a text is a `char` only if it's one letter).
+
+It then calls the member through a method handle, which the JVM compiles like a direct call.
+
+NeoSkript's test harness times `set {_size} to {_list}.size()` in a loop, on the same server, on Paper 26.3, against skript-reflect 2.6.3 on Skript 2.17.0:
+
+| | NeoSkript Reflect | skript-reflect |
+|---|---|---|
+| One class (the same list every time) | 33 to 120 ns a call | 270 to 1,000 ns |
+| Six classes in turn (`loop-value.size()` over six kinds of collection, as `loop-entity.getHandle()` over many kinds of entity) | about 60 ns | about 200 ns |
+
+The times vary from run to run and depend on the machine; what holds in every run is that the calls are several times faster.
+
+A call that can't be made never stops the trigger: a missing method, arguments no overload takes, a method that throws, and a class whose members can't be looked at (a plugin's class whose methods name a class from a plugin that isn't installed) each give no value and a warning for the line.
+
+Java calls are read after all of Skript's own syntax, as skript-reflect's are: `{_n} + {_list}.size()` is `{_n}` plus the list's size, and `{_n} = {_list}.size()` compares the two. Put brackets round what a call is made on when it's more than one value: `({_n} + 1).toString()`.
+
+As with skript-reflect installed, Skript's "List is missing 'and' or 'or'" warning is off for every script.
+
+## Threads and Folia
+
+A Java call runs on the thread running the trigger: the main thread on Paper, and on Folia the thread of the region (or the global thread) the trigger runs on. `last java error` is each run of a trigger's own, functions it calls included (an error in a function is its caller's, as on skript-reflect), so a region never sees another region's error, and a trigger that waits and carries on on another thread still sees its own. It's let go of when the trigger ends.
+
+:::caution[Folia's rules]
+On Folia, NeoSkript checks that a script's own syntax only touches what the current region owns, and stops a line that doesn't with a runtime error. It can't check Java code. A Java call that reads or changes an entity, block or chunk another region owns (`Bukkit.getWorlds().get(0).getEntities()` from a player's region, say) breaks Folia's rules: it can corrupt the world or throw from deep inside the server. Keep Java calls to what the trigger's own region owns, or to things that aren't in a world, and use Folia's schedulers (through Java) for the rest.
+:::
+
+## Reloads
+
+Imports are read again with every script on each load, and a script's calls keep what they found only as long as the script's code is loaded. Nothing loads classes of its own, so `/sk reload` leaves nothing behind: classes come from the server and its plugins, through NeoSkript Reflect's own plugin class loader, as skript-reflect's came through Skript's.
+
+## Where it differs from skript-reflect
+
+NeoSkript's test harness runs the same script on Skript 2.17.0 with skript-reflect 2.6.3 and on NeoSkript with NeoSkript Reflect, and compares every line it prints (the `neoskript-reflect` scenario). Where they differ, it's on purpose:
+
+- **Overloads:** where several overloads of a method take the arguments, skript-reflect took whichever Java happened to list first, which can change between Java versions: `Math.max(3, 7)` could be the `double` one and give `7.0`. NeoSkript Reflect takes the closest: a parameter of the argument's own class, then of a superclass, then a number of the same kind, so it's the `long` one.
+- **Nested classes:** `EnderDragon.Phase.LEAVE_PORTAL` gave no value on skript-reflect, which read `Phase` as a field. It's the nested class here, as in Java. Importing `org.bukkit.entity.EnderDragon$Phase` works on both.
+- **NeoSkript's values as Java's:** where nothing else fits a parameter, a timespan is passed as a `java.time.Duration`, a date as an `Instant`, an item type as an `ItemStack` and a slot as its item, through NeoSkript's own conversions. skript-reflect had none, and said no method matched.
+- **`last java error`** is each run of a trigger's own (skript-reflect's was shared by the whole server).
+- **Java events** are listened to only for the classes named. A trigger for an event class that has no handler list of its own (an abstract one, like `PlayerEvent`) is an error saying so, rather than a trigger that never runs.
+
+Numbers keep their Java type, as on skript-reflect: `{_list}.size()` is an `Integer`, so it's found in a set of integers, and it works in arithmetic, comparisons and texts as any number does. Saved in a variable, it's saved as Skript saves an `Integer`.
+
+The values scripts get are NeoSkript's own: an item type, a timespan or a date is NeoSkript's class, not Skript's (`ch.njol.skript...`), so calls to Skript's own Java classes' methods don't work. Calls on Bukkit's and Java's classes, which is nearly all of them, are the same.
+
+## Not yet
+
+These parts of skript-reflect aren't in NeoSkript Reflect yet, so lines using them don't load, or, for a custom syntax's sections, are left out with a warning. They're tracked in [issue #13](https://github.com/xena-studios/neoskript/issues/13).
+
+- In custom syntax: `parse:`, `usable in:` (and so event values in its code), the changer sections of expressions (`set:`, `add:`, `remove:`, `remove all:`, `delete:`, `reset:`, with `change value`), `delay the effect`, `loop of`, `event-classes` and `raw` expressions.
+- Custom events (`event` structures, `call event`).
+- Computed options (`option` with `get`), sections and `run section`, proxies (`proxy instance of`), function references (`function "name"`) and `bits of`.
+- The `import` effect for effect commands, and loading classes from jars in `plugins/skript-reflect/` (external libraries).
+- `with priority` and `all` on Java events (`on ServerCommandEvent with priority highest:`).
+- `raw %objects%`, and parsing deferred to run time (`$`).

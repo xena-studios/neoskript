@@ -107,7 +107,10 @@ public final class Databases implements VariableBackend {
             }
             if (backend instanceof SqlVariableStorage sql) {
                 SqlVariableStorage.Status status = sql.status();
-                String monitor = sql.settings().monitor() ? ", watching for changes" : "";
+                long[] conflicts = sql.conflicts();
+                String monitor = !sql.settings().monitor() ? ""
+                        : ", watching for changes" + (conflicts[0] == 0 ? "" : ", " + conflicts[0] + " written at once "
+                                + "with another server's (" + conflicts[1] + " merged)");
                 String since = java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(
                         status.since().atZone(java.time.ZoneId.systemDefault()));
                 return switch (status.state()) {

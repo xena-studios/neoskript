@@ -1,0 +1,7 @@
+# Checks: a return in a spawn section that may wait is the error Skript keeps.
+
+function waiting_section_return(l: location) :: number:
+	spawn a pig at {_l}:
+		return 1
+		wait 1 tick
+	return 2

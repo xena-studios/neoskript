@@ -63,10 +63,13 @@ public final class DatabaseSettings {
      * @param file the file, relative to plugins/NeoSkript, for CSV, native and SQLite
      * @param backupInterval how often the file is backed up, or {@code null} for never
      * @param backupsToKeep how many of its backups to keep, or -1 for all
+     * @param mergeChanges with monitor changes, whether two servers' changes to one variable are merged where they can
+     *     be (on by default), or the last write wins, exactly as in Skript
      * @param problem why it can't be used, or {@code null}
      */
     public record Database(String name, Type type, String typeText, String pattern, String file,
-            boolean monitorChanges, NeoSkriptConfig.Interval monitorInterval, NeoSkriptConfig.Interval backupInterval,
+            boolean monitorChanges, NeoSkriptConfig.Interval monitorInterval, boolean mergeChanges,
+            NeoSkriptConfig.Interval backupInterval,
             int backupsToKeep, String host, int port, String user, String password, String database, String table,
             String problem) {
 
@@ -83,7 +86,8 @@ public final class DatabaseSettings {
     }
 
     /** Every key a database may have, in config.yml's case. */
-    static final Set<String> KEYS = Set.of("type", "pattern", "monitor-changes", "monitor-interval", "file",
+    static final Set<String> KEYS = Set.of("type", "pattern", "monitor-changes", "monitor-interval", "merge-changes",
+            "file",
             "backup-interval", "backups-to-keep", "host", "port", "user", "password", "database", "table");
 
     private final List<Database> databases;
@@ -103,7 +107,7 @@ public final class DatabaseSettings {
 
     /** The default: everything in variables.csv, as Skript's default config. */
     static final DatabaseSettings DEFAULTS = new DatabaseSettings(List.of(new Database("default", Type.CSV, "csv", ".*",
-            "variables.csv", false, NeoSkriptConfig.Interval.parse("20 seconds"),
+            "variables.csv", false, NeoSkriptConfig.Interval.parse("20 seconds"), true,
             NeoSkriptConfig.Interval.parse("2 hours"), 12, null, 3306, null, null, null,
             SqlVariableStorage.DEFAULT_TABLE, null)));
 
@@ -192,6 +196,9 @@ public final class DatabaseSettings {
         if (database.type().sql()) {
             map.put("monitor-changes", database.monitorChanges());
             map.put("monitor-interval", database.monitorInterval().toString());
+            if (!database.mergeChanges()) {
+                map.put("merge-changes", false);
+            }
         }
         if (database.type() == Type.MYSQL) {
             map.put("host", database.host());
@@ -238,14 +245,15 @@ public final class DatabaseSettings {
                 // Kept, owning its pattern, with only this to say: its other settings depend on the type.
                 String pattern = text(values.get("pattern"));
                 return new Database(name, Type.CSV, typeText, pattern == null || !compiles(pattern) ? "(?!)" : pattern,
-                        null, false, NeoSkriptConfig.Interval.parse("20 seconds"), null, -1, null, 3306, null, null,
+                        null, false, NeoSkriptConfig.Interval.parse("20 seconds"), true, null, -1, null, 3306, null,
+                        null,
                         null, SqlVariableStorage.DEFAULT_TABLE, "Invalid database type '" + typeText + "'");
             }
         }
         if (type == Type.DISABLED) {
             return new Database(name, type, typeText, Objects.requireNonNullElse(text(values.get("pattern")), ".*"),
-                    null, false, NeoSkriptConfig.Interval.parse("20 seconds"), null, -1, null, 3306, null, null, null,
-                    SqlVariableStorage.DEFAULT_TABLE, null);
+                    null, false, NeoSkriptConfig.Interval.parse("20 seconds"), true, null, -1, null, 3306, null, null,
+                    null, SqlVariableStorage.DEFAULT_TABLE, null);
         }
         String pattern = text(values.get("pattern"));
         if (pattern == null) {
@@ -267,6 +275,16 @@ public final class DatabaseSettings {
                 case "false", "no", "off" -> monitor = false;
                 default -> warnings.add(at + ".monitor-changes (\"" + monitorRaw + "\") should be true or false; using "
                         + "false.");
+            }
+        }
+        boolean merge = true;
+        Object mergeRaw = values.get("merge-changes");
+        if (mergeRaw != null) {
+            switch (String.valueOf(mergeRaw).strip().toLowerCase(Locale.ROOT)) {
+                case "true", "yes", "on" -> merge = true;
+                case "false", "no", "off" -> merge = false;
+                default -> warnings.add(at + ".merge-changes (\"" + mergeRaw + "\") should be true or false; using "
+                        + "true.");
             }
         }
         NeoSkriptConfig.Interval monitorInterval = interval(values.get("monitor-interval"), "20 seconds",
@@ -332,7 +350,7 @@ public final class DatabaseSettings {
                 }
             }
         }
-        return new Database(name, type, typeText, pattern, file, monitor, monitorInterval, backupInterval,
+        return new Database(name, type, typeText, pattern, file, monitor, monitorInterval, merge, backupInterval,
                 backupsToKeep, host, port, user, password, databaseName, table,
                 problems.isEmpty() ? null : String.join("; ", problems));
     }
@@ -348,7 +366,7 @@ public final class DatabaseSettings {
 
     private static Database withProblem(Database d, String problem) {
         return new Database(d.name(), d.type(), d.typeText(), d.pattern(), d.file(), d.monitorChanges(),
-                d.monitorInterval(), d.backupInterval(), d.backupsToKeep(), d.host(), d.port(), d.user(), d.password(),
+                d.monitorInterval(), d.mergeChanges(), d.backupInterval(), d.backupsToKeep(), d.host(), d.port(), d.user(), d.password(),
                 d.database(), d.table(), problem);
     }
 

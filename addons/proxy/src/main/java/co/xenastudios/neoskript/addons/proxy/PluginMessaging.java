@@ -372,6 +372,23 @@ final class PluginMessaging {
         }
     }
 
+    /**
+     * Sends a plugin message now, through a player, or not at all: for what's useless late, like telling the other
+     * servers about a write.
+     *
+     * @return whether it was sent
+     */
+    boolean sendNow(byte[] payload) {
+        if (closed || !settings.pluginMessaging()) {
+            return false;
+        }
+        try {
+            return carrier.send(payload);
+        } catch (RuntimeException | LinkageError e) {
+            return false;
+        }
+    }
+
     /** A player who can carry plugin messages is online: what waited for one is sent. */
     void carrierAvailable() {
         List<Queued> due = new ArrayList<>();

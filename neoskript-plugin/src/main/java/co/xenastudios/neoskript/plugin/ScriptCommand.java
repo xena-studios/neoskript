@@ -45,8 +45,6 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
 
     private static final String DEFAULT_PERMISSION_MESSAGE =
             "You don't have the required permission to use this command";
-    private static final String DEFAULT_COOLDOWN_MESSAGE =
-            "You are using this command too often, please try again later";
 
     private final Plugin plugin;
     private final Logger logger;
@@ -142,7 +140,8 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
             if (previous != null && now - previous < command.cooldown().millis()) {
                 event.cooldown(command.cooldown(), new Timespan(now - previous), command.cooldownBypass());
                 String message = message(command.cooldownMessage(), event);
-                send(sender, message == null ? DEFAULT_COOLDOWN_MESSAGE : message);
+                send(sender, message == null
+                        ? co.xenastudios.neoskript.runtime.Language.get("commands.cooldown message") : message);
                 return;
             }
             event.cooldown(command.cooldown(), previous == null ? null : new Timespan(now - previous),
@@ -270,8 +269,71 @@ final class ScriptCommand extends Command implements PluginIdentifiableCommand, 
     private static final Map<UUID, Map<String, net.kyori.adventure.text.Component>> TOOLTIPS =
             new java.util.concurrent.ConcurrentHashMap<>();
 
+    /** Skript's {@code enable legacy tab completion event compatibility}: on unless config.yml turns it off. */
+    private static volatile boolean legacyTabCompletion = true;
+    /**
+     * The completions a script command just gave, on the thread asking, for {@link #keepOwnCompletions}: Bukkit
+     * fires its TabCompleteEvent on that thread with them, after asking the command. Only JDK values, as
+     * {@code [sender, what was typed, when, completions]}, so a value left behind (another plugin asking the command
+     * map without an event) never holds NeoSkript's classes or a player after a reload, and it's only used for the same
+     * sender and words within a second.
+     */
+    private static final ThreadLocal<Object[]> GIVEN = new ThreadLocal<>();
+
+    /** How long the completions a command gave count for the event that follows. */
+    private static final long GIVEN_FOR = 1_000_000_000L;
+
+    static void legacyTabCompletion(boolean on) {
+        legacyTabCompletion = on;
+    }
+
+    /**
+     * With Skript's legacy tab completion compatibility off, other plugins' changes to a script command's
+     * completions through Bukkit's TabCompleteEvent don't count, as in Skript, where script commands are Brigadier
+     * commands that fire it only with the compatibility on. Runs after them, at the highest priority.
+     */
+    static void keepOwnCompletions(org.bukkit.event.server.TabCompleteEvent event) {
+        Object[] given = GIVEN.get();
+        GIVEN.remove();
+        if (given == null || legacyTabCompletion || System.nanoTime() - (long) given[2] > GIVEN_FOR
+                || !given[0].equals(senderKey(event.getSender()))) {
+            return;
+        }
+        // Only for what the command was asked about: Bukkit may ask a command without firing the event.
+        String buffer = event.getBuffer().startsWith("/") ? event.getBuffer().substring(1) : event.getBuffer();
+        if (!buffer.equalsIgnoreCase((String) given[1])) {
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        List<String> completions = (List<String>) given[3];
+        event.setCancelled(false);
+        event.setCompletions(new ArrayList<>(completions));
+    }
+
     @Override
     public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
+        List<String> texts = completions(sender, alias, args);
+        given(sender, alias, args, texts);
+        return texts;
+    }
+
+    /** Notes the completions a script command gave on this thread, for {@link #keepOwnCompletions}. */
+    static void given(CommandSender sender, String alias, String[] args, List<String> completions) {
+        GIVEN.set(new Object[] {senderKey(sender), alias + " " + String.join(" ", args), System.nanoTime(),
+                List.copyOf(completions)});
+    }
+
+    /** A sender, as text, so no sender is held: a player's UUID, else its name. */
+    private static String senderKey(CommandSender sender) {
+        return sender instanceof org.bukkit.entity.Entity entity ? entity.getUniqueId().toString() : sender.getName();
+    }
+
+    /** Whether completions are noted on this thread: for tests. */
+    static boolean holdsCompletions() {
+        return GIVEN.get() != null;
+    }
+
+    private List<String> completions(CommandSender sender, String alias, String[] args) {
         String label = alias.substring(alias.indexOf(':') + 1);
         List<CommandSuggestionEvent.Suggestion> suggestions;
         try {

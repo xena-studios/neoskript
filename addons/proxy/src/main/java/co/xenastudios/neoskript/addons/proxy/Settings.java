@@ -32,13 +32,15 @@ import java.util.function.Function;
  * @param redisQueuedForMillis how long one waits
  * @param redisChannelPrefix put in front of every Redis channel, to keep networks sharing a Redis apart
  * @param maxMessageBytes the longest network message, in bytes of UTF-8
+ * @param networkDatabase the database in NeoSkript's config.yml that keeps {@code {network::...}} variables
+ * @param networkNotify whether to tell the other servers each time this one writes network variables
  */
 public record Settings(String serverName, String secret, boolean pluginMessaging, long proxyTimeoutMillis,
         long refreshMillis,
         boolean queueWithoutPlayers, int maxQueued, long queuedForMillis, boolean redis, String redisHost,
         int redisPort, String redisUser, String redisPassword, int redisDatabase, boolean redisSsl,
         long redisTimeoutMillis, boolean redisQueueOnOutage, int redisMaxQueued, long redisQueuedForMillis,
-        String redisChannelPrefix, int maxMessageBytes) {
+        String redisChannelPrefix, int maxMessageBytes, String networkDatabase, boolean networkNotify) {
 
     /** The defaults. */
     public static final Settings DEFAULTS = read(key -> null, new ArrayList<>());
@@ -65,7 +67,8 @@ public record Settings(String serverName, String secret, boolean pluginMessaging
                 r.choice("redis.on-outage", "queue", "queue", "drop").equals("queue"),
                 (int) r.number("redis.max-queued", 1_000, 0, 1_000_000),
                 r.number("redis.queued-for", 60, 1, 86_400) * 1000, r.text("redis.channel-prefix", ""),
-                (int) r.number("max-message-bytes", 16_384, 1, Envelope.MAX_MESSAGE_BYTES));
+                (int) r.number("max-message-bytes", 16_384, 1, Envelope.MAX_MESSAGE_BYTES),
+                r.text("network-variables.database", "network"), r.flag("network-variables.notify", true));
     }
 
     private record Reader(Function<String, Object> values, List<String> warnings) {

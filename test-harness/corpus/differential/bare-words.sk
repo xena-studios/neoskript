@@ -1,0 +1,62 @@
+# Probe: words for an event value or an expression that isn't there in this event (issue #37). Where words are taken
+# as they are (a variable, a function's 'objects' parameter), Skript's unparsed literal reads them as
+# the type they name; in a text's %...% or where only what changes goes, the error stands.
+
+function bare_words_show(label: text, v: objects):
+	send "%{_label}%: %{_v::*}% (set: %whether {_v::*} is set%)" to console
+
+function probe_bare_words():
+	set {_a} to world
+	set {_b} to block
+	set {_c} to executor
+	set {_d} to damage cause
+	bare_words_show("set", ({_a}, {_b}, {_c}, {_d}))
+	bare_words_show("executor", executor)
+	bare_words_show("damage cause", damage cause)
+	send "%block%" to console
+	send "%executor%" to console
+	if executor is set:
+		send "executor is set" to console
+	broadcast damage cause
+	# Words inside a text's code are taken as they are, as anywhere else: only what the %...% is keeps the error.
+	set {_v} to "a"
+	send "%{_v} ? block%" to console
+	send "%block ? {_v}%" to console
+	send "%whether {_v} is damage cause%" to console
+	send "%{_v} ? executor%" to console
+	# Lists and loops of such words, and values for any object: each is the type it names (issue #70).
+	set {_l::*} to block, executor and "z"
+	send "list: %{_l::*}%" to console
+	loop block and executor:
+		send "loop: %loop-value%" to console
+	loop (block and "z"):
+		send "brackets: %loop-value%" to console
+	set {_n::*} to (block and executor)
+	send "count: %size of {_n::*}%" to console
+	set {_q} to {_v} ? block
+	send "ternary: %{_q}%" to console
+	set {_t} to "x" ? damage cause
+	send "ternary words: %{_t}%" to console
+	set {_m::*} to damage cause and inventory action
+	send "elements: %{_m::*}%" to console
+	# Compared with the type its words name.
+	if {_a} is world:
+		send "is world" to console
+	if world is {_a}:
+		send "world is" to console
+	if {_a} is block:
+		send "is block" to console
+	if {_a} is chunk:
+		send "is chunk" to console
+	send "whether: %whether {_a} is world%" to console
+	if block is air:
+		send "block is air" to console
+	# Can't be: a single value, a type's property, or an event value's property in a comparison.
+	loop block:
+		send "single: %loop-value%" to console
+	loop damage cause:
+		send "single: %loop-value%" to console
+	broadcast name of block
+	if name of block is "x":
+		send "named" to console
+	send "end" to console

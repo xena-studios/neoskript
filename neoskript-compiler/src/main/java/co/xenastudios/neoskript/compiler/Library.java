@@ -62,8 +62,18 @@ public final class Library implements Registrar {
      * {@code valueClass} makes it the value of only a narrower kind, like the projectile of a damage event, which
      * {@code event-projectile} gets; plain {@code event-entity} doesn't.
      */
+    /** An event value, and the addon that registered it, or {@code null} for NeoSkript's own. */
     private record EventValue(Class<?> eventClass, String type, int time, Class<?> valueClass,
-            java.util.function.Function<Object, ?> getter, String excluded) {}
+            java.util.function.Function<Object, ?> getter, String excluded, String addon) {
+
+        EventValue(Class<?> eventClass, String type, int time, Class<?> valueClass,
+                java.util.function.Function<Object, ?> getter, String excluded) {
+            this(eventClass, type, time, valueClass, getter, excluded, Library.currentAddon.get());
+        }
+    }
+
+    /** The addon registering now, as {@link #registeringAddon} says: what its event values are credited to. */
+    private static final ThreadLocal<String> currentAddon = new ThreadLocal<>();
 
     private final SyntaxRegistry.Builder builder = SyntaxRegistry.builder()
             .experimentNames(co.xenastudios.neoskript.runtime.ScriptFeatures::codeName);
@@ -76,6 +86,119 @@ public final class Library implements Registrar {
     public String typeOf(Class<?> javaClass) {
         String type = superType(javaClass);
         return SyntaxRegistry.OBJECT.equals(type) ? null : type;
+    }
+
+    /** The id of the type whose values are exactly {@code javaClass}, or {@code null}: for NeoSkriptCompat. */
+    public String exactTypeOf(Class<?> javaClass) {
+        return exactType(javaClass);
+    }
+
+    /**
+     * Whether events of {@code eventClass} already have one of NeoSkript's own values of type {@code typeId}, of
+     * exactly {@code valueClass} (an array class for a list), at {@code time}, registered for that class or a
+     * superclass of it: for NeoSkriptCompat, which adds an addon's event values only where NeoSkript has none. An
+     * addon's earlier values don't count, as on Skript, where each is kept and the closest event class used.
+     */
+    public synchronized boolean hasEventValue(Class<?> eventClass, String typeId, Class<?> valueClass, int time) {
+        for (EventValue value : eventValues) {
+            Class<?> given = value.valueClass() != null ? value.valueClass() : javaClasses.get(value.type());
+            if (value.addon() == null && value.excluded() == null && value.time() == time
+                    && value.type().equals(typeId) && valueClass.equals(given)
+                    && value.eventClass().isAssignableFrom(eventClass)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The syntax whose arguments are being compiled on this thread, innermost last. */
+    private static final ThreadLocal<java.util.ArrayDeque<String>> enclosing = new ThreadLocal<>();
+
+    void enterSyntax(String id) {
+        java.util.ArrayDeque<String> stack = enclosing.get();
+        if (stack == null) {
+            stack = new java.util.ArrayDeque<>();
+            enclosing.set(stack);
+        }
+        stack.addLast(id);
+    }
+
+    void leaveSyntax() {
+        java.util.ArrayDeque<String> stack = enclosing.get();
+        if (stack != null) {
+            stack.pollLast();
+            if (stack.isEmpty()) {
+                enclosing.remove();
+            }
+        }
+    }
+
+    /**
+     * The ids of the syntax around the element being set up on this thread, outermost first: for NeoSkriptCompat,
+     * which gives an addon Skript's parsing stack.
+     */
+    public List<String> enclosingSyntax() {
+        java.util.ArrayDeque<String> stack = enclosing.get();
+        return stack == null ? List.of() : List.copyOf(stack);
+    }
+
+    private final Set<String> wordsAsLiterals = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Gives syntax {@code id}'s arguments that are words a type's literal parser read ({@code int list tag}) as
+     * literals ({@code ElementInfo.argumentLiteral}), as Skript gives an addon them: for NeoSkriptCompat. NeoSkript's
+     * own syntax doesn't get them.
+     */
+    public void wordsAsLiterals(String id) {
+        wordsAsLiterals.add(id);
+    }
+
+    private final Set<String> writesBackArguments = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Writes what effect {@code id} sets its variable arguments to back to them once it's run
+     * ({@link co.xenastudios.neoskript.runtime.ArgumentChanges}), as a Skript addon changes its arguments: for
+     * NeoSkriptCompat. NeoSkript's own syntax doesn't.
+     */
+    public void writesBackArguments(String id) {
+        writesBackArguments.add(id);
+    }
+
+    boolean hasWriteBack(String id) {
+        return writesBackArguments.contains(id);
+    }
+
+    /**
+     * Which of the arguments of the element being set up on this thread are a variable and which a list variable,
+     * for syntax that writes back: set for each element as it's set up, and cleared once it's made.
+     */
+    private final ThreadLocal<long[]> variableArguments = new ThreadLocal<>();
+
+    /** The element about to be set up has these variable arguments, or none of either when {@code null}. */
+    void settingUpVariables(long[] masks) {
+        if (masks == null) {
+            variableArguments.remove();
+        } else {
+            variableArguments.set(masks);
+        }
+    }
+
+    /**
+     * Which of the arguments of the element being set up on this thread are a variable ({@code [0]}) and which a list
+     * variable ({@code [1]}), by bit, for syntax that {@link #writesBackArguments writes back}: for NeoSkriptCompat.
+     */
+    public long[] variableArguments() {
+        long[] masks = variableArguments.get();
+        return masks == null ? new long[2] : masks.clone();
+    }
+
+    boolean hasWordsAsLiterals(String id) {
+        return wordsAsLiterals.contains(id);
+    }
+
+    /** Whether a type has this id: for NeoSkriptCompat. */
+    public boolean hasType(String id) {
+        return javaClasses.containsKey(id);
     }
 
     /** Text as a value of type {@code typeId}, as a command argument, or {@code null}: for addons. */
@@ -146,7 +269,43 @@ public final class Library implements Registrar {
 
     private void putJavaClass(String id, Class<?> javaClass) {
         if (javaClasses.put(id, javaClass) == null) {
-            javaClassOrder.add(id);
+            if (inserting) {
+                javaClassOrder.add(javaClassMark + insertedClasses++, id);
+            } else {
+                javaClassOrder.add(id);
+            }
+        }
+    }
+
+    private int javaClassMark = -1;
+    private int insertedClasses;
+    private boolean inserting;
+
+    /**
+     * Marks the place addons' syntax and types go, as the standard library registers (where it calls its hooks):
+     * {@link #insertingAtMark} registers there later, as if then.
+     */
+    public void markAddonPoint() {
+        checkOpen();
+        builder.mark();
+        javaClassMark = javaClassOrder.size();
+    }
+
+    /**
+     * Runs {@code registration} with what it registers going at the {@link #markAddonPoint mark}: addons' syntax
+     * registered after the standard library, in the place it would have had if registered with it, so it's tried in
+     * the same order. Without a mark, it goes after everything.
+     */
+    public void insertingAtMark(Runnable registration) {
+        checkOpen();
+        boolean marked = javaClassMark >= 0;
+        inserting = marked;
+        builder.inserting(marked);
+        try {
+            registration.run();
+        } finally {
+            inserting = false;
+            builder.inserting(false);
         }
     }
 
@@ -230,9 +389,27 @@ public final class Library implements Registrar {
         sectionEvents.put(expressionId, eventName);
     }
 
+    /** A library section's own event: its class, and how it's made of each value the section gives. */
+    record SectionEventClass(Class<?> eventClass, java.util.function.Function<Object, ?> event) {}
+
+    private final Map<String, SectionEventClass> sectionEventClasses = new HashMap<>();
+
+    @Override
+    public <E> void sectionEvent(String sectionId, String eventName, Class<E> eventClass,
+            java.util.function.Function<Object, ? extends E> event) {
+        checkOpen();
+        sectionEvents.put(sectionId, eventName);
+        sectionEventClasses.put(sectionId, new SectionEventClass(eventClass, event));
+    }
+
     /** What the event of expression {@code id}'s section is called, or {@code null} if it has none of its own. */
     String sectionEvent(String id) {
         return sectionEvents.get(id);
+    }
+
+    /** Library section {@code id}'s own event, or {@code null} if its code is in the trigger's event. */
+    SectionEventClass sectionEventClass(String id) {
+        return sectionEventClasses.get(id);
     }
 
     @Override
@@ -259,6 +436,12 @@ public final class Library implements Registrar {
     public void priority(String id, co.xenastudios.neoskript.api.registration.SyntaxPriority priority) {
         checkOpen();
         priorities.put(id, priority.ordinal());
+    }
+
+    @Override
+    public void pluralAsArguments(String id) {
+        checkOpen();
+        builder.pluralAsArguments(id);
     }
 
     @Override
@@ -345,6 +528,41 @@ public final class Library implements Registrar {
     }
 
     @Override
+    public void strictType(String typeId) {
+        checkOpen();
+        if (!javaClasses.containsKey(typeId)) {
+            throw new IllegalArgumentException("Unknown type '" + typeId + "'");
+        }
+        builder.addonStrict(typeId);
+    }
+
+    @Override
+    public void noMissingAndOrWarnings() {
+        checkOpen();
+        builder.missingAndOrOff();
+    }
+
+    @Override
+    public void argumentsLikeFunctions(String id) {
+        checkOpen();
+        builder.quietLists(id);
+    }
+
+    @Override
+    public void structure(String id, co.xenastudios.neoskript.api.registration.StructureHandler handler,
+            String... patterns) {
+        add(SyntaxKind.STRUCTURE, id, null, handler, patterns);
+        builder.structureHandler(id, handler);
+    }
+
+    @Override
+    public void scriptSyntax(String id, co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler handler,
+            String... patterns) {
+        add(SyntaxKind.STRUCTURE, id, null, handler, patterns);
+        builder.scriptSyntaxHandler(id, handler);
+    }
+
+    @Override
     public void condition(String id, ElementFactory<Condition> factory, String... patterns) {
         add(SyntaxKind.CONDITION, id, null, factory, patterns);
     }
@@ -361,6 +579,47 @@ public final class Library implements Registrar {
             co.xenastudios.neoskript.api.element.Section section = factory.create(info);
             return (context, arguments) -> section.run(context, arguments);
         }, patterns);
+    }
+
+    /** A section whose code runs later, for events of its own: what they're called and their classes. */
+    public record Later(String eventName, List<Class<?>> eventClasses) {}
+
+    private final Map<String, Later> laterSections = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    public void laterSection(String id, String eventName, List<Class<?>> eventClasses,
+            ElementFactory<co.xenastudios.neoskript.api.element.LaterSection> factory, String... patterns) {
+        checkOpen();
+        if (eventClasses.isEmpty()) {
+            throw new IllegalArgumentException("Section " + id + " has no event classes");
+        }
+        java.util.Objects.requireNonNull(eventName, "eventName");
+        laterSections.put(id, new Later(eventName, List.copyOf(eventClasses)));
+        add(SyntaxKind.SECTION, id, null, factory, patterns);
+        add(SyntaxKind.EFFECT, id, null, (ElementFactory<Effect>) info -> {
+            co.xenastudios.neoskript.api.element.LaterSection section = factory.create(info);
+            return (context, arguments) -> section.run(context, arguments, null);
+        }, patterns);
+    }
+
+    /** The events the code under section {@code id} runs for later, or {@code null} if it isn't such a section. */
+    public Later later(String id) {
+        return id == null ? null : laterSections.get(id);
+    }
+
+    /** What's told which scripts' code stopped ({@link #scriptsUnloaded}). */
+    private final List<java.util.function.Consumer<? super java.util.Set<String>>> unloadWatchers =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    @Override
+    public void scriptsUnloaded(java.util.function.Consumer<? super java.util.Set<String>> scripts) {
+        checkOpen();
+        unloadWatchers.add(java.util.Objects.requireNonNull(scripts, "scripts"));
+    }
+
+    /** What's told which scripts' code stopped. */
+    public List<java.util.function.Consumer<? super java.util.Set<String>>> unloadWatchers() {
+        return java.util.Collections.unmodifiableList(unloadWatchers);
     }
 
     /** The type of the values a library section's code runs for, or {@code null} if {@code id} isn't one. */
@@ -601,6 +860,48 @@ public final class Library implements Registrar {
     @SuppressWarnings("unchecked")
     public <E> void eventValue(Class<E> eventClass, String typeId, java.util.function.Function<? super E, ?> getter) {
         eventValue(eventClass, typeId, 0, getter);
+    }
+
+    /** An event value {@code set} can change: see {@link #eventValueChanger}. */
+    private record EventValueChanger(Class<?> eventClass, String typeId, int time,
+            java.util.function.BiConsumer<Object, Object> setter) {}
+
+    private final List<EventValueChanger> eventValueChangers = new ArrayList<>();
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <E> void eventValueChanger(Class<E> eventClass, String typeId, int time,
+            java.util.function.BiConsumer<? super E, Object> setter) {
+        checkOpen();
+        eventValueChangers.add(new EventValueChanger(eventClass, typeId, time,
+                (java.util.function.BiConsumer<Object, Object>) setter));
+    }
+
+    /**
+     * What sets the event value of type {@code typeId} at {@code time} in events of {@code eventClasses}, for
+     * whichever of them the code runs for; {@code null} if none of them has one, as Skript's
+     * {@code EventValueExpression.acceptChange}.
+     */
+    java.util.function.BiConsumer<Object, Object> eventValueChanger(List<Class<?>> eventClasses, String typeId, int time) {
+        List<EventValueChanger> found = new ArrayList<>();
+        for (EventValueChanger changer : eventValueChangers) {
+            if (changer.typeId().equals(typeId) && changer.time() == time
+                    && eventClasses.stream().anyMatch(changer.eventClass()::isAssignableFrom)) {
+                found.add(changer);
+            }
+        }
+        if (found.isEmpty()) {
+            return null;
+        }
+        List<EventValueChanger> changers = List.copyOf(found);
+        return (event, value) -> {
+            for (EventValueChanger changer : changers) {
+                if (changer.eventClass().isInstance(event)) {
+                    changer.setter().accept(event, value);
+                    return;
+                }
+            }
+        };
     }
 
     @Override
@@ -923,6 +1224,49 @@ public final class Library implements Registrar {
      */
     void parserAsked(List<Class<?>> eventClasses, Class<?> valueClass, String type, String error) {
         parserAsked.put(eventClasses + "/" + valueClass.getName() + "/" + type, error);
+        usedUp.incrementAndGet();
+    }
+
+    /** How many times the parser has used up an excluded value's error: see {@link EventValues#usedUp}. */
+    private final java.util.concurrent.atomic.AtomicLong usedUp = new java.util.concurrent.atomic.AtomicLong();
+
+    long usedUp() {
+        return usedUp.get();
+    }
+
+    /** {@link #usedUp} on this thread. */
+    private final ThreadLocal<long[]> usedUpHere = ThreadLocal.withInitial(() -> new long[1]);
+
+    long usedUpHere() {
+        return usedUpHere.get()[0];
+    }
+
+    /**
+     * Notes on this thread that the parser asked for an excluded event value of {@code valueClass} in events of
+     * {@code eventClasses}, whether its once-only error was still there to use up or not: see {@link #usedUpHere}.
+     */
+    void askedExcluded(List<Class<?>> eventClasses, Class<?> valueClass, String type) {
+        EventValueResolver resolver = resolver();
+        for (Class<?> eventClass : eventClasses) {
+            if (resolver.peek(eventClass, valueClass, type, 0, EventValueResolver.DEFAULT & ~EventValueResolver.CONVERSION)
+                    .errored() || resolver.peek(eventClass, valueClass, type, 0, EventValueResolver.DEFAULT).errored()) {
+                usedUpHere.get()[0]++;
+                return;
+            }
+        }
+    }
+
+    /** The excluded values whose errors are used up so far, and those the parser kept for the compiler. */
+    Object saveUsedUp() {
+        return List.of(resolver().save(), Map.copyOf(parserAsked));
+    }
+
+    @SuppressWarnings("unchecked")
+    void restoreUsedUp(Object saved) {
+        List<Object> both = (List<Object>) saved;
+        resolver().restore(both.get(0));
+        parserAsked.clear();
+        parserAsked.putAll((Map<String, String>) both.get(1));
     }
 
     /** The error {@link #parserAsked} kept for this value, now taken, or {@code null}. */
@@ -1083,6 +1427,14 @@ public final class Library implements Registrar {
     @Override
     public <T> void storage(String name, Class<T> type, VariableCodec<T> codec) {
         codecs.register(name, type, codec);
+    }
+
+    /**
+     * Whether a codec, or a class one saves, is {@code loader}'s: a plugin that isn't an addon but whose classes an
+     * addon's codec saves (a Skript addon's types, through NeoSkriptCompat).
+     */
+    public boolean hasCodecsFrom(ClassLoader loader) {
+        return codecs.owns(loader);
     }
 
     /** Whether values of exactly {@code type} already have a codec. */
@@ -1298,6 +1650,11 @@ public final class Library implements Registrar {
      */
     public void registeringAddon(String name) {
         registering = name;
+        if (name == null) {
+            currentAddon.remove();
+        } else {
+            currentAddon.set(name);
+        }
     }
 
     /**
@@ -1659,8 +2016,16 @@ public final class Library implements Registrar {
      * {@link ServerEvent}.
      */
     Object binding(SyntaxInfo syntax) {
+        if (syntax.script() != null) {
+            // Syntax a script declared: what it's bound to is only known while its load compiles.
+            java.util.function.Function<SyntaxInfo, Object> declared = SCRIPT_SYNTAX.get();
+            return declared == null ? null : declared.apply(syntax);
+        }
         return bindings.get(new Key(syntax.kind(), syntax.id()));
     }
+
+    /** What syntax scripts declared is bound to, while a load compiles on this thread: see {@link ScriptCompiler}. */
+    static final ThreadLocal<java.util.function.Function<SyntaxInfo, Object>> SCRIPT_SYNTAX = new ThreadLocal<>();
 
     /**
      * Whether an element of any kind is registered as {@code id}, or as a variant of it ({@code id-2}): what an

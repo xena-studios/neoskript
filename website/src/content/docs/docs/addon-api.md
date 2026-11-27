@@ -211,6 +211,20 @@ registrar.eventTriggers("MyAddonEvtQuestion", triggers -> {
 
 Each list replaces the one before: drop the old triggers when it arrives. A trigger whose script has unloaded or reloaded since runs nothing. Each `LoadedTrigger` can `run(event, owner)` right away, from any thread, on that thread: its filter, then its code, until it ends or waits. A runtime error in it is logged as any trigger's, and doesn't reach your code. `owner` is the entity, block or location whose thread it carries on on after a `wait`, or `null` for the global thread. The list is given on the thread that loaded the scripts, the global thread on Folia, with an empty list once none are left, so what you register for them can follow scripts as they reload, with nothing left behind. On Folia, NeoSkript's region rules apply to what the code reads, as for any trigger. A trigger's code may run another (a placeholder asking for one); limit how deep and how much yourself. NeoSkript's own [placeholders addon](/docs/addons/placeholders/) is built this way.
 
+### Sections whose code runs later
+
+Some sections keep their code for later, for an event the addon fires itself, as skript-gui's `make gui slot 0 with dirt:` keeps its code for when the slot is clicked:
+
+```java
+registrar.laterSection("MyAddonSecOnRing", "doorbell ring", List.of(RingEvent.class), info -> (context, args, code) -> {
+    if (code != null) {
+        doorbell((String) args[0]).onRing(code);   // kept for later
+    }
+}, "when doorbell %text% rings");
+```
+
+The code is checked as code in that event, with its event values and syntax, and starts with no delay. The element gets it as a `SectionCode` when its line runs (or `null`, written without `:`), and runs it with `code.run(event, owner)` whenever the event happens, from any thread, on that thread. It keeps the trigger's local variables as they were at the section: one copy, which every run shares, as Skript's own sections that run later do. `code.script()` names its script: `registrar.scriptsUnloaded(names -> ...)` says when scripts reload or unload, after which code from them is the old version. NeoSkript's own [GUI addon](/docs/addons/gui/) closes GUIs with such code.
+
 ### Syntax for some events only
 
 This is experimental: it may change in a minor release.
@@ -222,6 +236,41 @@ registrar.onlyInEvents("MyAddonExprQuestion", -1, QuestionEvent.class);  // -1: 
 ```
 
 Elsewhere, other syntax that reads the text is tried first. Only if none does is your element used, and its factory throws the `SyntaxError` the script's author sees.
+
+## Structures, and what skript-reflect needed
+
+These are experimental: they may change in a minor release. NeoSkript's own [reflect addon](/docs/addons/reflect/) uses them.
+
+A **structure** is a top-level block with lines under it, like skript-reflect's `import:`. NeoSkript reads its header and lines and hands them to your handler as each script loads, before the script's triggers are parsed, so what it sets up (names for classes, say) is there when they are:
+
+```java
+registrar.structure("MyAddonStructAliases", new StructureHandler() {
+    public void reset() { aliases.clear(); }               // every script is loaded again: start afresh
+    public void load(ScriptStructure structure) {          // one structure in one script
+        for (ScriptStructure.Entry entry : structure.entries()) {
+            if (!add(structure.script(), entry.text())) {
+                structure.error(entry.line(), entry.text() + " isn't an alias");
+            }
+        }
+    }
+}, "aliases");
+```
+
+`reset` is called once before each load of all scripts, and `load` for each structure, in any order and on any thread, so keep what it stores per script, in something safe to share between threads. `NeoSkript.get().scriptBeingLoaded()` is the script being parsed on the calling thread, while scripts load: a literal parser or an element's factory can use it to look up what that script's structure set up. It's `null` at any other time.
+
+Three more for syntax that reads like Java:
+
+- `argumentsLikeFunctions(id)`: the element's arguments are written as a function call's, `Math.max(3, 7)`, so a list joined by commas alone isn't warned about, as Skript doesn't for function calls.
+- `strictType(typeId)`: only values of your type itself, its subtypes and what converts to it are taken where it goes, as in Skript. Without it, a value of any other type is taken, and converted when the line runs: a `location` where a class goes would give none rather than the words being read as your type. Words your type's literal parser takes are also known words where any value goes, so they aren't read as something else.
+- `noMissingAndOrWarnings()`: Skript's "List is missing 'and' or 'or'" warning is off for every script, as when Skript's `disable variable missing and/or warnings` is on. skript-reflect turns it on when it's installed.
+- `TriggerContext.outermostRun()`: the run a context is part of: a trigger's own, and for a function the run that called it, however deep. Keep something for one run by its identity, and the functions the run calls share it.
+- `NeoSkript.get().runtimeWarning(message)` and `runtimeError(message)`: report something that went wrong while a trigger runs, as Skript's syntax does, with the script, line and element, and the trigger carries on.
+
+### Syntax scripts declare
+
+A structure can declare syntax for scripts to use, as skript-reflect's `effect <pattern>:` does: `Registrar.scriptSyntax(id, handler, patterns)`. Before any script's code is parsed, NeoSkript gives each use of the structure to the handler, which returns a `ScriptSyntax`: whether it's an effect, a condition or an expression, its patterns, for an expression its return type and whether it's one value or several, whether only its own script can use it, whether it's a property of its first argument, and which section holds its code. `ScriptStructure.section(name)` gives that section's lines, nested ones included, and `line()` the header's line.
+
+NeoSkript adds the syntax to what every script (or its own script) is parsed with, for that load only, and compiles the code in the named section as it compiles a function. Where the syntax is used, the code runs as part of that trigger's run, with its event, and finds what it was given through `context.scriptSyntaxCall()`: `arguments()`, `pattern()`, `mark()` and `tags()`. In that code, `continue` outside a loop calls `proceed()` and ends the code: a condition passes if its code proceeded. Every load reads the declarations again, so a script's syntax goes when it changes or unloads, with nothing to unregister; where no script declares syntax, scripts are parsed exactly as without it.
 
 ## Functions
 

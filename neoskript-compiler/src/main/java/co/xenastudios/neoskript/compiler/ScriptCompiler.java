@@ -56,7 +56,51 @@ public final class ScriptCompiler {
         this.handles = handles;
     }
 
+    /** Whether the code being compiled on this thread is the code of syntax a script declared. */
+    public static boolean compilingDeclaredSyntax() {
+        return TriggerCompiler.compilingDeclaredSyntax();
+    }
+
     public CompiledScripts compile(List<ParsedScript> scripts) {
+        // Syntax scripts declared is bound, for this load, to its declaring structure's code.
+        java.util.function.Function<co.xenastudios.neoskript.frontend.registry.SyntaxInfo, Object> before =
+                Library.SCRIPT_SYNTAX.get();
+        Map<FunctionHandle, Set<String>> uses = new java.util.concurrent.ConcurrentHashMap<>();
+        Library.SCRIPT_SYNTAX.set(syntax -> {
+            // Which scripts use which declared syntax, so a script whose syntax goes can name the ones still using it.
+            FunctionHandle code = handles.get(syntax.script().body());
+            String user = co.xenastudios.neoskript.runtime.ScriptFeatures.compilingScript();
+            if (code != null && user != null) {
+                uses.computeIfAbsent(code, k -> java.util.concurrent.ConcurrentHashMap.newKeySet()).add(user);
+            }
+            return ScriptSyntaxBindings.factory(syntax, handles);
+        });
+        try {
+            CompiledScripts compiled = compileScripts(scripts);
+            return compiled.withDeclaredSyntax(declaredSyntax(scripts), Map.copyOf(uses));
+        } finally {
+            if (before == null) {
+                Library.SCRIPT_SYNTAX.remove();
+            } else {
+                Library.SCRIPT_SYNTAX.set(before);
+            }
+        }
+    }
+
+    /** The declared syntax's code that {@code scripts} declare. */
+    private static Set<FunctionInfo> declaredSyntax(List<ParsedScript> scripts) {
+        Set<FunctionInfo> declared = new java.util.HashSet<>();
+        for (ParsedScript script : scripts) {
+            for (ParsedStructure structure : script.structures()) {
+                if (structure instanceof ParsedStructure.Function function && function.declaredSyntax()) {
+                    declared.add(function.signature());
+                }
+            }
+        }
+        return Set.copyOf(declared);
+    }
+
+    private CompiledScripts compileScripts(List<ParsedScript> scripts) {
         // Used by compiled functions when the stack runs out, when there's no stack left to load it with.
         co.xenastudios.neoskript.runtime.Overflows.ready();
         List<CompiledScripts.CompiledTrigger> triggers = new ArrayList<>();
@@ -107,9 +151,12 @@ public final class ScriptCompiler {
             co.xenastudios.neoskript.runtime.ScriptAliases.set(script.file().name(), aliases);
             co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(null);
         }
+        String loadingBefore = co.xenastudios.neoskript.frontend.parse.LoadingScript.current();
+        try {
         for (ParsedScript script : scripts) {
             String name = script.file().name();
             co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(name);
+            co.xenastudios.neoskript.frontend.parse.LoadingScript.set(name);
             Map<Integer, String> parseProblems = new HashMap<>();
             script.diagnostics().forEach(d -> parseProblems.putIfAbsent(d.line(), d.message()));
             for (ParsedStructure structure : script.structures()) {
@@ -177,10 +224,15 @@ public final class ScriptCompiler {
                         unrunnableTests.put(testName, "line " + header.number() + ": " + TOO_DEEP);
                     }
                 } catch (RuntimeException | LinkageError e) {
-                    // A bug in NeoSkript, not the script: this structure is left out and the rest still load.
-                    String message = "NeoSkript couldn't compile this (" + e + "). Please report it.";
+                    // Code too big for a method is the script's doing; anything else is a bug in NeoSkript, not
+                    // the script. Either way this structure is left out and the rest still load.
+                    boolean big = tooBig(e);
+                    String message = big ? TOO_BIG_TRIGGER
+                            : "NeoSkript couldn't compile this (" + e + "). Please report it.";
                     diagnostics.add(new Diagnostic(Severity.ERROR, name, header.number(), 0, 0, message));
-                    crashed.add(name);
+                    if (!big) {
+                        crashed.add(name);
+                    }
                     if (testName != null) {
                         unrunnableTests.put(testName, "line " + header.number() + ": " + message);
                     }
@@ -199,6 +251,9 @@ public final class ScriptCompiler {
                     }
                 }
             }
+        }
+        } finally {
+            co.xenastudios.neoskript.frontend.parse.LoadingScript.set(loadingBefore);
         }
         co.xenastudios.neoskript.runtime.ScriptFeatures.compiling(null);
         // An unreachable warning after a statement that failed to compile isn't one: that statement doesn't stop
@@ -232,6 +287,16 @@ public final class ScriptCompiler {
      * Skript has no specific information.
      */
     public CompiledLine compileLine(String name, String text, Class<?> eventClass, String eventName) {
+        return compileLine(name, text, eventClass, eventName, library.registry());
+    }
+
+    /**
+     * {@link #compileLine(String, String, Class, String)}, parsed with {@code syntax}: the registry with the syntax the
+     * loaded scripts declared ({@code ScriptLoader.declaredRegistry()}), as skript-reflect's custom syntax works in
+     * effect commands.
+     */
+    public CompiledLine compileLine(String name, String text, Class<?> eventClass, String eventName,
+            co.xenastudios.neoskript.frontend.registry.SyntaxRegistry syntax) {
         Map<String, List<FunctionInfo>> callable = new HashMap<>();
         handles.forEach((info, handle) -> {
             if (info.localTo() == null && handle.loaded()) {
@@ -240,7 +305,7 @@ public final class ScriptCompiler {
         });
         LibraryEventValues values = library.registry().eventValues() instanceof LibraryEventValues v ? v : null;
         co.xenastudios.neoskript.frontend.parse.ScriptLoader.ParsedLine parsed =
-                new co.xenastudios.neoskript.frontend.parse.ScriptLoader(library.registry()).parseLine(name, text,
+                new co.xenastudios.neoskript.frontend.parse.ScriptLoader(syntax).parseLine(name, text,
                         callable, values == null ? null : values.scope(List.of(eventClass)));
         List<String> errors = new ArrayList<>();
         for (Diagnostic diagnostic : parsed.script().diagnostics()) {
@@ -253,6 +318,9 @@ public final class ScriptCompiler {
         if (!effect || !errors.isEmpty()) {
             return new CompiledLine(null, errors);
         }
+        java.util.function.Function<co.xenastudios.neoskript.frontend.registry.SyntaxInfo, Object> before =
+                Library.SCRIPT_SYNTAX.get();
+        Library.SCRIPT_SYNTAX.set(declared -> ScriptSyntaxBindings.factory(declared, handles));
         try {
             return new CompiledLine(new TriggerCompiler(library, handles, globals, parsed.script())
                     .compileLine(name, parsed.statement(), List.of(eventClass), eventName), List.of());
@@ -261,12 +329,32 @@ public final class ScriptCompiler {
         } catch (StackOverflowError tooDeep) {
             return new CompiledLine(null, List.of(TOO_DEEP));
         } catch (RuntimeException | LinkageError e) {
-            return new CompiledLine(null, List.of("NeoSkript couldn't compile this (" + e + "). Please report it."));
+            return new CompiledLine(null, List.of(tooBig(e) ? TOO_BIG
+                    : "NeoSkript couldn't compile this (" + e + "). Please report it."));
+        } finally {
+            if (before == null) {
+                Library.SCRIPT_SYNTAX.remove();
+            } else {
+                Library.SCRIPT_SYNTAX.set(before);
+            }
         }
     }
 
     /** The error for code nested too deeply to compile. */
     static final String TOO_DEEP = "This code is nested too deeply to be compiled";
+
+    /** The error for a line whose expressions are nested too deeply to compile, or code too big for its method. */
+    static final String TOO_BIG = "This line is too complex to be compiled";
+
+    /** The error for a trigger whose code, line by line within the limits, is too big for one method. */
+    static final String TOO_BIG_TRIGGER = "This trigger is too big to be compiled";
+
+    /** Whether {@code e} is ASM saying the code is too big for a method or class: the script's doing, not a bug. */
+    static boolean tooBig(Throwable e) {
+        String type = e.getClass().getName();
+        return type.startsWith("org.objectweb.asm.") && (type.endsWith("TooLargeException")
+                || type.endsWith("LimitExceededException"));
+    }
 
     /** Compiles code with a {@link TriggerCompiler}: one of its {@code compile...} methods. */
     @FunctionalInterface
@@ -354,11 +442,23 @@ public final class ScriptCompiler {
     }
 
     /** A compiler for code in {@code script}, whose warnings are reported with the other problems. */
+    /** What each script's compile here is: its version, which becomes the loaded one if it loads. */
+    private final Map<String, Object> versions = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * The version of {@code script} this compiler made, for {@link co.xenastudios.neoskript.runtime.ScriptVersions}
+     * once it loads, or {@code null} if it compiled no code of that script.
+     */
+    public Object version(String script) {
+        return versions.get(script);
+    }
+
     private TriggerCompiler compiler(Map<FunctionInfo, FunctionHandle> functions, ParsedScript script) {
         String name = script.file().name();
+        Object version = versions.computeIfAbsent(name, k -> new Object());
         List<Diagnostic> into = warnings;
         java.util.Set<String> skipped = unparsedLines;
-        return new TriggerCompiler(library, functions, globals, script)
+        return new TriggerCompiler(library, functions, globals, script).version(version)
                 .warnings((at, message) -> into.add(new Diagnostic(Severity.WARNING, name, at, 0, 0, message)))
                 .unparsed(line -> skipped.add(name + ":" + line));
     }
@@ -425,6 +525,8 @@ public final class ScriptCompiler {
             String line = child.line().text().strip();
             int equals = line.indexOf('=');
             if (equals < 0) {
+                // As Skript, which reads the section's lines as entries first.
+                problems.add(new AliasProblem(child.line().number(), "'" + line + "' is not an entry (like 'name = value')"));
                 continue;
             }
             String names = line.substring(0, equals).strip().toLowerCase(java.util.Locale.ROOT);

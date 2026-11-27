@@ -99,6 +99,8 @@ on load:
 	send "The script loaded." to console
 ```
 
+Scripts load one after another, as in Skript: each folder's subfolders first, then its own files, and each script's triggers in the order of their lines. An `on load` runs when its turn comes, so an event it causes (spawning a mob, say) reaches only the triggers before it in that order: not those further down the same script, nor those of scripts that load after it. Reloading one script, the others' triggers are all listening, and its own run after theirs for the same event until every script is reloaded.
+
 `on skript start` runs once, when NeoSkript has started. `on server start` works too, with a warning that recommends `on skript start`.
 
 ## The thread an event runs on

@@ -148,6 +148,61 @@ final class Durable {
         return to;
     }
 
+    /**
+     * Gzips {@code from} to a new file {@code to}, at the best compression, as {@link #copy(FileChannel, byte[], long,
+     * Path, java.util.function.BooleanSupplier, java.nio.file.attribute.FileTime)} copies: to {@link #temporary},
+     * created new and never deleted when another has it, synced and renamed once whole, with its directory synced, and
+     * stopped once {@code cancelled} is true.
+     */
+    static Path gzip(Path from, Path to, java.util.function.BooleanSupplier cancelled) throws IOException {
+        if (Files.exists(to)) {
+            throw new FileAlreadyExistsException(to.toString());
+        }
+        Path parent = to.toAbsolutePath().getParent();
+        Path temp = temporary(to);
+        FileChannel created;
+        try {
+            created = FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW);
+        } catch (FileAlreadyExistsException busy) {
+            throw new FileAlreadyExistsException(to.toString());
+        }
+        try {
+            // The stream is closed whatever happens, so its native deflater is always freed, cut off or not; closing it
+            // closes the channel too.
+            try (FileChannel out = created; java.io.InputStream in = Files.newInputStream(from);
+                    java.util.zip.GZIPOutputStream gzip = new java.util.zip.GZIPOutputStream(
+                            java.nio.channels.Channels.newOutputStream(out), 1 << 16) {
+                        {
+                            def.setLevel(java.util.zip.Deflater.BEST_COMPRESSION);
+                        }
+                    }) {
+                byte[] buffer = new byte[1 << 16];
+                long since = 0;
+                for (int read; (read = in.read(buffer)) > 0; ) {
+                    gzip.write(buffer, 0, read);
+                    since += read;
+                    if (since >= CHUNK) {
+                        since = 0;
+                        if (cancelled.getAsBoolean()) {
+                            throw new IOException("Compressing " + to.getFileName() + " was cut off");
+                        }
+                    }
+                }
+                gzip.finish();
+                gzip.flush();
+                out.force(true);
+            }
+            Files.setLastModifiedTime(temp, Files.getLastModifiedTime(from));
+            // Not REPLACE_EXISTING: a backup is never written over.
+            Files.move(temp, to);
+        } catch (IOException | RuntimeException | Error e) {
+            deleteQuietly(temp, e);
+            throw e;
+        }
+        syncDirectory(parent);
+        return to;
+    }
+
     /** How much is copied between checks that the copy hasn't been cut off. */
     private static final long CHUNK = 8L << 20;
 

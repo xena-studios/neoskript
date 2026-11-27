@@ -4,14 +4,18 @@
  */
 package co.xenastudios.neoskript.harness;
 
+import co.xenastudios.neoskript.harness.scenario.ConfigSettingsScenario;
 import co.xenastudios.neoskript.harness.scenario.DifferentialScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptAliasesScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptBootScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptYamlScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptReflectScenario;
+import co.xenastudios.neoskript.harness.scenario.SkBeeDifferentialScenario;
 import co.xenastudios.neoskript.harness.scenario.YamlDifferentialScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptCliScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptDbScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptProxyScenario;
+import co.xenastudios.neoskript.harness.scenario.NetworkVariablesScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptEventsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptLanguageScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptLoadBenchmark;
@@ -26,9 +30,11 @@ import co.xenastudios.neoskript.harness.scenario.NeoSkriptSkriptSuiteScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptAddonScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptOfficialAddonsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptPausingScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptGuiScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptPlaceholdersScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptWebScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptRegionsScenario;
+import co.xenastudios.neoskript.harness.scenario.NeoSkriptLoadOrderScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptReloadScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptReloadSoakScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptAutoReloadScenario;
@@ -70,6 +76,7 @@ public final class HarnessMain {
             new NeoSkriptLanguageScenario(),
             new NeoSkriptSkriptTestsScenario(),
             new NeoSkriptReloadScenario(),
+            new NeoSkriptLoadOrderScenario(),
             new NeoSkriptReloadSoakScenario(),
             new NeoSkriptAutoReloadScenario(),
             new NeoSkriptRuntimeErrorsScenario(),
@@ -93,6 +100,7 @@ public final class HarnessMain {
             new NeoSkriptLoadBenchmark(),
             new SkillExamplesScenario(),
             new DifferentialScenario(),
+            new ConfigSettingsScenario(),
             new NeoSkriptCliScenario(),
             new SyntaxExportScenario(),
             new EventBenchmark(),
@@ -107,7 +115,12 @@ public final class HarnessMain {
             new YamlDifferentialScenario(),
             new NeoSkriptWebScenario(),
             new NeoSkriptDbScenario(),
-            new NeoSkriptProxyScenario());
+            new NeoSkriptProxyScenario(),
+            new NeoSkriptReflectScenario(),
+            new SkBeeDifferentialScenario(),
+            new NeoSkriptSkriptSuiteScenario(true),
+            new NeoSkriptGuiScenario(),
+            new NetworkVariablesScenario());
 
     record Result(String environment, String scenario, boolean passed, Duration duration, String message,
             Map<String, Object> summary) {}

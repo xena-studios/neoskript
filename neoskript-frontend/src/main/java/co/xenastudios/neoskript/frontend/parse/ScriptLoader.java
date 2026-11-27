@@ -94,6 +94,14 @@ public final class ScriptLoader {
     }
 
     public List<ParsedScript> load(List<SourceFile> files) {
+        // Addons' structures start afresh: every script is parsed again.
+        for (co.xenastudios.neoskript.api.registration.StructureHandler handler : registry.structureHandlers()) {
+            try {
+                handler.reset();
+            } catch (RuntimeException | LinkageError e) {
+                // An addon's failure is its own: the scripts still load.
+            }
+        }
         List<ScriptParser.Result> results = parallel(files).map(ScriptParser::parse).toList();
         Map<String, List<FunctionInfo>> functions = new HashMap<>();
         Map<String, Map<String, List<FunctionInfo>>> locals = new HashMap<>();
@@ -124,10 +132,54 @@ public final class ScriptLoader {
         this.duplicates = duplicates;
         this.registered = registered;
         this.functions = functions;
-        return parallel(results)
-                .map(result -> parse(result, new ParserContext(registry, functions,
-                        locals.getOrDefault(result.file().name(), Map.of()))))
-                .toList();
+        // Syntax scripts declare (skript-reflect's 'effect <pattern>:'), read from every script before any script's
+        // code, so all of them can use it, whatever order they load in: added to the syntax for this load only.
+        List<co.xenastudios.neoskript.frontend.registry.SyntaxInfo> declaredGlobally = new ArrayList<>();
+        Map<String, List<co.xenastudios.neoskript.frontend.registry.SyntaxInfo>> declaredLocally = new HashMap<>();
+        this.declared = registry.hasScriptSyntax() ? declare(results, declaredGlobally, declaredLocally) : Map.of();
+        SyntaxRegistry everyScript = registry.withScriptSyntax(declaredGlobally);
+        this.declaredRegistry = everyScript;
+        java.util.function.Function<String, SyntaxRegistry> syntaxOf = name -> {
+            List<co.xenastudios.neoskript.frontend.registry.SyntaxInfo> local = declaredLocally.get(name);
+            if (local == null) {
+                return everyScript;
+            }
+            List<co.xenastudios.neoskript.frontend.registry.SyntaxInfo> both = new ArrayList<>(local);
+            both.addAll(declaredGlobally);
+            // A script's own local syntax first, as skript-reflect parses local syntax first.
+            return registry.withScriptSyntax(both);
+        };
+        EventValues values = registry.eventValues();
+        Object saved = values == null ? null : values.save();
+        // Each script is parsed on one thread, so what it used up is counted on that thread.
+        boolean[] usedUp = new boolean[results.size()];
+        List<ParsedScript> parsed = new ArrayList<>(parallel(java.util.stream.IntStream.range(0, results.size()).boxed().toList())
+                .map(i -> {
+                    long before = values == null ? 0 : values.usedUpHere();
+                    String name = results.get(i).file().name();
+                    ParsedScript script = parse(results.get(i), new ParserContext(syntaxOf.apply(name), functions,
+                            locals.getOrDefault(name, Map.of())));
+                    usedUp[i] = values != null && values.usedUpHere() != before;
+                    return script;
+                })
+                .toList());
+        int asked = 0;
+        for (boolean used : usedUp) {
+            asked += used ? 1 : 0;
+        }
+        if (asked > 1) {
+            // An event value's error Skript gives only the first time was used up by whichever of them was parsed
+            // first: those scripts are parsed again one after another, so it's the first in order that gets it.
+            values.restore(saved);
+            for (int i = 0; i < results.size(); i++) {
+                if (usedUp[i]) {
+                    String name = results.get(i).file().name();
+                    parsed.set(i, parse(results.get(i), new ParserContext(syntaxOf.apply(name), functions,
+                            locals.getOrDefault(name, Map.of()))));
+                }
+            }
+        }
+        return parsed;
     }
 
     /**
@@ -139,6 +191,15 @@ public final class ScriptLoader {
     }
 
     private ParsedScript parse(ScriptParser.Result result, ParserContext context) {
+        String before = LoadingScript.set(result.file().name());
+        try {
+            return parseScript(result, context);
+        } finally {
+            LoadingScript.set(before);
+        }
+    }
+
+    private ParsedScript parseScript(ScriptParser.Result result, ParserContext context) {
         Diagnostics diagnostics = new Diagnostics(result.file());
         context.scriptLines(result.file().lines().size());
         for (Diagnostic diagnostic : result.diagnostics()) {
@@ -170,15 +231,20 @@ public final class ScriptLoader {
         context.hints().enable(experiments.contains("type hints")
                 || experiments.stream().anyMatch(name -> name.matches("(local variable )?type hints")));
         StatementParser statements = new StatementParser(context, diagnostics);
+        // Addons' structures first, wherever they are in the script, as Skript loads skript-reflect's 'import:' before
+        // the triggers that use what it imports.
+        java.util.Set<Structure> handled = addonStructures(result.structures(), context, diagnostics);
         List<ParsedStructure> parsed = new ArrayList<>();
         for (Structure structure : result.structures()) {
-            ParsedStructure p = structure(structure, context, statements, diagnostics);
+            ParsedStructure p = handled.contains(structure) ? new ParsedStructure.Data(structure)
+                    : structure(structure, context, statements, diagnostics);
             if (p != null) {
                 parsed.add(p);
             }
         }
         return new ParsedScript(result.file(), parsed, diagnostics.all(), statements.delays(), statements.suppressions(),
-                statements.statementErrors(), statements.unreachableAfter());
+                statements.statementErrors(), statements.unreachableAfter(), statements.waitingSections(),
+                statements.sectionStatements());
     }
 
     private ParsedStructure structure(Structure structure, ParserContext context, StatementParser statements,
@@ -281,6 +347,306 @@ public final class ScriptLoader {
         }
     }
 
+    /** Gives each of the script's addon structures to its handler, returning those it handled. */
+    private java.util.Set<Structure> addonStructures(List<Structure> structures, ParserContext context,
+            Diagnostics diagnostics) {
+        if (registry.structureHandlers().isEmpty()) {
+            return java.util.Set.of();
+        }
+        java.util.Set<Structure> handled = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (Structure structure : structures) {
+            if (structure.kind() != Structure.Kind.EVENT
+                    || structure.section().line().key().equalsIgnoreCase(PARSE_STRUCTURE)) {
+                continue;
+            }
+            String key = structure.section().line().key();
+            ParsedSyntax custom = new LineParser(context, key).structure(0, key.length());
+            co.xenastudios.neoskript.api.registration.StructureHandler handler = custom == null ? null
+                    : registry.structureHandler(custom.syntax().id());
+            if (handler != null) {
+                addonStructure(handler, custom, structure.section(), diagnostics);
+                handled.add(structure);
+            }
+        }
+        return handled;
+    }
+
+    private SyntaxRegistry declaredRegistry;
+
+    /**
+     * After {@link #load}: the registry with the syntax the scripts declared for all of them (not local syntax), for
+     * code parsed later against the loaded scripts, as an effect command's. The registry itself if none was.
+     */
+    public SyntaxRegistry declaredRegistry() {
+        return declaredRegistry == null ? registry : declaredRegistry;
+    }
+
+    /** What a script-syntax structure declared, found before any code was parsed, and its problems. */
+    private record Declared(co.xenastudios.neoskript.frontend.registry.ScriptSyntaxDecl decl, List<Pending> problems) {}
+
+    /** A problem found reading a structure before its script's own problems are being collected. */
+    private record Pending(int line, boolean error, String message) {}
+
+    /** The structures that declare syntax this load, by identity. */
+    private Map<Structure, Declared> declared = Map.of();
+
+    /**
+     * Reads every script's syntax-declaring structures, filling {@code global} and {@code local} (by script) with what
+     * they declare: each a hidden function, its body, and syntax that calls it.
+     */
+    private Map<Structure, Declared> declare(List<ScriptParser.Result> results,
+            List<co.xenastudios.neoskript.frontend.registry.SyntaxInfo> global,
+            Map<String, List<co.xenastudios.neoskript.frontend.registry.SyntaxInfo>> local) {
+        Map<Structure, Declared> found = new java.util.IdentityHashMap<>();
+        ParserContext headers = new ParserContext(registry, Map.of());
+        int count = 0;
+        Map<String, Integer> names = new HashMap<>();
+        for (ScriptParser.Result result : results) {
+            String script = result.file().name();
+            for (Structure structure : result.structures()) {
+                if (structure.kind() != Structure.Kind.EVENT
+                        || structure.section().line().key().equalsIgnoreCase(PARSE_STRUCTURE)) {
+                    continue;
+                }
+                Line header = structure.section().line();
+                String key = header.key();
+                ParsedSyntax custom;
+                try {
+                    custom = new LineParser(headers, key).structure(0, key.length());
+                } catch (StackOverflowError | LineParser.TooComplex e) {
+                    continue;
+                }
+                co.xenastudios.neoskript.api.registration.ScriptSyntaxHandler handler = custom == null ? null
+                        : registry.scriptSyntaxHandler(custom.syntax().id());
+                if (handler == null) {
+                    continue;
+                }
+                List<Pending> problems = new ArrayList<>();
+                co.xenastudios.neoskript.api.registration.ScriptStructure view = scriptStructure(custom,
+                        structure.section(), script, (line, message) -> problems.add(new Pending(line, true, message)),
+                        (line, message) -> problems.add(new Pending(line, false, message)));
+                co.xenastudios.neoskript.api.registration.ScriptSyntax syntax = null;
+                try {
+                    syntax = handler.declare(view);
+                } catch (RuntimeException | LinkageError e) {
+                    problems.add(new Pending(header.number(), true, "The addon handling '" + key + "' failed: " + e));
+                }
+                co.xenastudios.neoskript.frontend.registry.ScriptSyntaxDecl decl = null;
+                if (syntax != null && child(structure.section(), syntax.body()) == null) {
+                    // Skript's entry validator's message, as skript-reflect's structures give it: nothing is declared.
+                    problems.add(new Pending(header.number(), true, "Required entry '" + syntax.body()
+                            + "' is missing"));
+                    syntax = null;
+                }
+                if (syntax != null) {
+                    List<co.xenastudios.neoskript.frontend.pattern.CompiledPattern> patterns = new ArrayList<>();
+                    for (String written : syntax.patterns()) {
+                        String pattern = knownTypes(written, header.number(), problems);
+                        try {
+                            patterns.add(co.xenastudios.neoskript.frontend.pattern.PatternCompiler.compile(pattern));
+                        } catch (RuntimeException e) {
+                            problems.add(new Pending(header.number(), true, "Invalid pattern '" + pattern + "': "
+                                    + e.getMessage()));
+                        }
+                    }
+                    if (!patterns.isEmpty() && patterns.size() == syntax.patterns().size()) {
+                        boolean expression = syntax.kind()
+                                == co.xenastudios.neoskript.api.registration.ScriptSyntax.Kind.EXPRESSION;
+                        String returnType = !expression ? null
+                                : syntax.returnType() == null ? SyntaxRegistry.OBJECT : typeId(syntax.returnType());
+                        if (expression && returnType == null) {
+                            problems.add(new Pending(header.number(), true, "'" + syntax.returnType()
+                                    + "' is not a type"));
+                            found.put(structure, new Declared(null, problems));
+                            continue;
+                        }
+                        // Named for messages, and the same each load while the header is: see FUNCTION_PREFIX.
+                        String name = co.xenastudios.neoskript.frontend.registry.ScriptSyntaxDecl.FUNCTION_PREFIX
+                                + key.strip() + " (" + script + ")";
+                        int same = names.merge(name, 1, Integer::sum);
+                        FunctionInfo body = new FunctionInfo(same == 1 ? name : name + " #" + same, List.of(),
+                                returnType, expression && syntax.plurality()
+                                        != co.xenastudios.neoskript.api.registration.ScriptSyntax.Plurality.SINGLE,
+                                null);
+                        decl = new co.xenastudios.neoskript.frontend.registry.ScriptSyntaxDecl(syntax, body, script,
+                                header.number());
+                        co.xenastudios.neoskript.frontend.registry.SyntaxKind kind = switch (syntax.kind()) {
+                            case EFFECT -> co.xenastudios.neoskript.frontend.registry.SyntaxKind.EFFECT;
+                            case CONDITION -> co.xenastudios.neoskript.frontend.registry.SyntaxKind.CONDITION;
+                            case EXPRESSION -> co.xenastudios.neoskript.frontend.registry.SyntaxKind.EXPRESSION;
+                        };
+                        co.xenastudios.neoskript.frontend.registry.SyntaxInfo info =
+                                new co.xenastudios.neoskript.frontend.registry.SyntaxInfo(kind,
+                                        "ScriptSyntax:" + count++, patterns, returnType, List.of(), decl);
+                        (syntax.local() ? local.computeIfAbsent(script, k -> new ArrayList<>()) : global).add(info);
+                    }
+                }
+                found.put(structure, new Declared(decl, problems));
+            }
+        }
+        return found;
+    }
+
+    /**
+     * {@code pattern} with each placeholder type no type is called replaced by {@code object}, warned about as
+     * skript-reflect's custom syntax warns.
+     */
+    private String knownTypes(String pattern, int line, List<Pending> problems) {
+        Matcher placeholder = PLACEHOLDER.matcher(pattern);
+        // A loop of find() and append(), not appendReplacement(): TeaVM, which builds the browser parser, has no
+        // appendReplacement or appendTail.
+        StringBuilder known = new StringBuilder();
+        int copied = 0;
+        while (placeholder.find()) {
+            StringBuilder types = new StringBuilder();
+            for (String type : placeholder.group(2).split("/", -1)) {
+                if (!types.isEmpty()) {
+                    types.append('/');
+                }
+                if (registry.resolveType(type.strip()) == null) {
+                    problems.add(new Pending(line, false, "'" + type.strip()
+                            + "' is not a valid Skript type. Using 'object' instead."));
+                    types.append("object");
+                } else {
+                    types.append(type);
+                }
+            }
+            known.append(pattern, copied, placeholder.start()).append('%').append(placeholder.group(1)).append(types)
+                    .append('%');
+            copied = placeholder.end();
+        }
+        known.append(pattern, copied, pattern.length());
+        return known.toString();
+    }
+
+    /** A placeholder: its flags ({@code -*~}), then its types. */
+    private static final Pattern PLACEHOLDER = Pattern.compile("%([-*~]*)([^%]+)%");
+
+    /** The id of the type called {@code name}, singular or plural, or {@code null} if there's none. */
+    private String typeId(String name) {
+        co.xenastudios.neoskript.frontend.registry.TypeRef ref = registry.resolveType(name.strip());
+        return ref == null ? null : ref.type().id();
+    }
+
+    /** A structure that declares syntax: its problems, then its body as its hidden function. */
+    private ParsedStructure declaredSyntax(Structure structure, Declared declared, ParserContext context,
+            StatementParser statements, Diagnostics diagnostics) {
+        for (Pending problem : declared.problems()) {
+            if (problem.error()) {
+                diagnostics.error(problem.line(), 0, 0, problem.message());
+            } else {
+                diagnostics.warning(problem.line(), 0, 0, problem.message());
+            }
+        }
+        co.xenastudios.neoskript.frontend.registry.ScriptSyntaxDecl decl = declared.decl();
+        if (decl == null) {
+            return new ParsedStructure.Data(structure);
+        }
+        // There's one: a declaration without its body section declares nothing.
+        Node.Section body = child(structure.section(), decl.declared().body());
+        // Its code is a function's: no event values of its own, but it runs with the event of where it's used.
+        EventValues values = registry.eventValues();
+        context.eventScope(values == null ? null : values.function());
+        return new ParsedStructure.Function(structure, decl.body(), false, List.of(), List.of(),
+                statements.body(body.children()), true);
+    }
+
+    /** {@code section}'s child section called {@code name}, in any case, or {@code null}. */
+    private static Node.Section child(Node.Section section, String name) {
+        for (Node node : section.children()) {
+            if (node instanceof Node.Section child && child.line().key().strip().equalsIgnoreCase(name)) {
+                return child;
+            }
+        }
+        return null;
+    }
+
+    /** Every line under {@code nodes}, nested ones too, as entries. */
+    private static void lines(List<Node> nodes,
+            List<co.xenastudios.neoskript.api.registration.ScriptStructure.Entry> into) {
+        for (Node node : nodes) {
+            into.add(new co.xenastudios.neoskript.api.registration.ScriptStructure.Entry(node.line().number(),
+                    node.line().text()));
+            if (node instanceof Node.Section section) {
+                lines(section.children(), into);
+            }
+        }
+    }
+
+    /** A structure as an addon sees it, its errors and warnings going to {@code error} and {@code warning}. */
+    private static co.xenastudios.neoskript.api.registration.ScriptStructure scriptStructure(ParsedSyntax syntax,
+            Node.Section section, String script, java.util.function.BiConsumer<Integer, String> error,
+            java.util.function.BiConsumer<Integer, String> warning) {
+        Line header = section.line();
+        List<co.xenastudios.neoskript.api.registration.ScriptStructure.Entry> entries = new ArrayList<>();
+        for (Node child : section.children()) {
+            entries.add(new co.xenastudios.neoskript.api.registration.ScriptStructure.Entry(child.line().number(),
+                    child.line().text()));
+        }
+        return new co.xenastudios.neoskript.api.registration.ScriptStructure() {
+            @Override
+            public String script() {
+                return script;
+            }
+
+            @Override
+            public String header() {
+                return header.key();
+            }
+
+            @Override
+            public int line() {
+                return header.number();
+            }
+
+            @Override
+            public int pattern() {
+                return syntax.pattern();
+            }
+
+            @Override
+            public List<Entry> entries() {
+                return List.copyOf(entries);
+            }
+
+            @Override
+            public List<Entry> section(String name) {
+                Node.Section child = child(section, name);
+                if (child == null) {
+                    return null;
+                }
+                List<Entry> lines = new ArrayList<>();
+                lines(child.children(), lines);
+                return List.copyOf(lines);
+            }
+
+            @Override
+            public void error(int line, String message) {
+                error.accept(line, message);
+            }
+
+            @Override
+            public void warning(int line, String message) {
+                warning.accept(line, message);
+            }
+        };
+    }
+
+    /** Gives an addon's structure to its handler, with its lines as written. */
+    private static void addonStructure(co.xenastudios.neoskript.api.registration.StructureHandler handler,
+            ParsedSyntax syntax, Node.Section section, Diagnostics diagnostics) {
+        Line header = section.line();
+        co.xenastudios.neoskript.api.registration.ScriptStructure structure = scriptStructure(syntax, section,
+                diagnostics.file().name(), (line, message) -> diagnostics.error(line, 0, 0, message),
+                (line, message) -> diagnostics.warning(line, 0, 0, message));
+        try {
+            handler.load(structure);
+        } catch (RuntimeException | LinkageError e) {
+            diagnostics.error(header.number(), header.column(), header.key().length(),
+                    "The addon handling '" + header.key() + "' failed: " + e);
+        }
+    }
+
     /** Parses the structures in a top-level {@code parse:} block's {@code code:}, capturing their problems. */
     private ParsedStructure parseBlock(Structure structure, ParserContext context, StatementParser statements,
             Diagnostics diagnostics) {
@@ -304,38 +670,55 @@ public final class ScriptLoader {
 
     private ParsedStructure event(Structure structure, ParserContext context, StatementParser statements,
             Diagnostics diagnostics) {
+        Declared syntax = declared.get(structure);
+        if (syntax != null) {
+            return declaredSyntax(structure, syntax, context, statements, diagnostics);
+        }
         Node.Section section = structure.section();
         Line line = section.line();
         String key = line.key();
         LineParser parser = new LineParser(context, key);
         ParsedSyntax custom = parser.structure(0, key.length());
         EventValues values = registry.eventValues();
+        if (custom != null && registry.structureHandler(custom.syntax().id()) != null) {
+            // Inside a 'parse:' block: given to its handler with the rest.
+            addonStructure(registry.structureHandler(custom.syntax().id()), custom, section, diagnostics);
+            return new ParsedStructure.Data(structure);
+        }
         if (custom != null) {
             context.eventScope(values == null ? null : values.structure(custom.syntax()));
             return new ParsedStructure.Custom(structure, custom, statements.body(section.children()));
         }
-        ParsedSyntax event = eventHeader(context, key, ON_PREFIX);
+        java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
+        ParsedSyntax event = eventHeader(context, key, ON_PREFIX, warnings);
         if (event == null) {
-            event = eventHeader(context, key, EVENT_MODIFIERS);
+            event = eventHeader(context, key, EVENT_MODIFIERS, warnings);
         }
         if (event == null) {
             diagnostics.error(line.number(), line.column(), key.length(), "Can't understand this structure: " + key);
             return null;
         }
-        java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
-        LineParser.listWarnings(key, event, warnings);
         statements.warn(line, warnings);
         context.eventScope(values == null ? null : values.event(event.syntax()));
         return new ParsedStructure.Event(structure, event, statements.body(section.children()));
     }
 
-    private static ParsedSyntax eventHeader(ParserContext context, String key, Pattern modifiers) {
+    /**
+     * The event a structure's key names, with Skript's warnings about its lists added to {@code warnings}, by the
+     * parser that read them (a list that's all that's in a pair of brackets doesn't warn).
+     */
+    private static ParsedSyntax eventHeader(ParserContext context, String key, Pattern modifiers,
+            java.util.Set<String> warnings) {
         Matcher matcher = modifiers.matcher(key);
         if (!matcher.matches() || matcher.group(1).isBlank()) {
             return null;
         }
         LineParser parser = new LineParser(context, key);
-        return parser.event(matcher.start(1), matcher.end(1));
+        ParsedSyntax event = parser.event(matcher.start(1), matcher.end(1));
+        if (event != null) {
+            parser.listWarnings(event, warnings);
+        }
+        return event;
     }
 
     private ParsedStructure function(Structure structure, StatementParser statements, Diagnostics diagnostics,

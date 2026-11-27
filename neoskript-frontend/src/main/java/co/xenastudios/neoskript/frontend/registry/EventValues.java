@@ -31,6 +31,44 @@ public interface EventValues {
      */
     boolean keepsEventValues(SyntaxInfo header);
 
+    /**
+     * What code in a section with {@code header} can use, if the section's code is in an event of its own, as a spawn
+     * section's is in Skript; else {@code null}, and it may use anything, as the section may give values of its own.
+     */
+    default Scope section(SyntaxInfo header) {
+        return null;
+    }
+
+    /**
+     * How many times the parser has used up an event value's error so far ({@code Use 'attacker' and/or 'victim'...}),
+     * which Skript gives only the first time any script asks: which script that is depends on the order scripts are
+     * read in.
+     */
+    default long usedUp() {
+        return 0;
+    }
+
+    /** {@link #usedUp}, on this thread only: what the script being parsed here used up. */
+    default long usedUpHere() {
+        return 0;
+    }
+
+    /** What's been used up so far, to {@link #restore} it: see {@link #usedUp}. */
+    default Object save() {
+        return null;
+    }
+
+    /** Puts back what was used up when {@link #save} was called. */
+    default void restore(Object saved) {}
+
+    /**
+     * What the code of a section that runs later, for events of its own, can use, as an addon's {@code make gui
+     * slot 0 with dirt:}; or {@code null} if {@code header} isn't such a section. Its code also starts with no delay.
+     */
+    default Scope later(SyntaxInfo header) {
+        return null;
+    }
+
     /** The event values some code can use. */
     interface Scope {
 
@@ -62,6 +100,15 @@ public interface EventValues {
          * it ({@code There's no player in an on damage event.}), or {@code null} if it can't tell.
          */
         default String missing(SyntaxInfo syntax, TypeRef type, String words) {
+            return null;
+        }
+
+        /**
+         * Skript's error for {@code event-<words>} where the words name no type, as its event expression asks for a
+         * value named so, which the event hasn't ({@code There's no message in an on chat event.}), or {@code null}
+         * if it can't tell.
+         */
+        default String unnamed(String words) {
             return null;
         }
     }

@@ -19,6 +19,10 @@ val exampleAddon = configurations.create("exampleAddon") {
     isCanBeConsumed = false
     isTransitive = false
 }
+val neoskriptCompat = configurations.create("neoskriptCompat") {
+    isCanBeConsumed = false
+    isTransitive = false
+}
 val officialAddons = configurations.create("officialAddons") {
     isCanBeConsumed = false
     isTransitive = false
@@ -34,6 +38,8 @@ dependencies {
     implementation(testFixtures(project(":neoskript-frontend")))
     neoskriptPlugin(project(path = ":neoskript-plugin", configuration = "shadowRuntimeElements"))
     neoskriptCli(project(path = ":neoskript-cli", configuration = "shadowRuntimeElements"))
+    // NeoSkriptCompat, for the skbee-differential scenario.
+    neoskriptCompat(project(path = ":neoskript-compat", configuration = "shadowRuntimeElements"))
     // The example addon, for the neoskript-addon scenario.
     exampleAddon(project(":example-addon"))
     // The official addons in addons/, each its shaded jar, for the official-addons and syntax-export scenarios.
@@ -145,6 +151,8 @@ tasks.register<JavaExec>("harness") {
     inputs.files(addonJar)
     val officialAddonJars: FileCollection = officialAddons
     inputs.files(officialAddonJars)
+    val compatJar: FileCollection = neoskriptCompat
+    inputs.files(compatJar)
     val botJarFile = botJar.flatMap { it.archiveFile }
     inputs.file(botJarFile)
     // Servers on 1.21.x run on Java 21, and 26.x needs Java 25.
@@ -156,6 +164,9 @@ tasks.register<JavaExec>("harness") {
     val skriptRuns = providers.gradleProperty("harness.differential.skriptRuns").orElse("3")
     // -Pharness.soak.reloads=N sets how many reloads neoskript-reload-soak measures (300 by default).
     val soakReloads = providers.gradleProperty("harness.soak.reloads").orElse("300")
+    // -Pharness.differential.recordVariations=true adds the answers of units that vary in Skript to
+    // corpus/differential/skript-varies.json.
+    val recordVariations = providers.gradleProperty("harness.differential.recordVariations").orElse("false")
     val projectDir = layout.projectDirectory
     val buildDir = layout.buildDirectory
     val cacheDir = layout.settingsDirectory.dir(".harness-cache")
@@ -168,6 +179,7 @@ tasks.register<JavaExec>("harness") {
             "-Dharness.cliJar=" + cliJar.singleFile.absolutePath,
             "-Dharness.exampleAddonJar=" + addonJar.singleFile.absolutePath,
             "-Dharness.officialAddonJars=" + officialAddonJars.files.joinToString(File.pathSeparator) { it.absolutePath },
+            "-Dharness.compatJar=" + compatJar.singleFile.absolutePath,
             "-Dharness.botJar=" + botJarFile.get().asFile.absolutePath,
             "-Dharness.environments=" + projectDir.dir("environments").asFile.absolutePath,
             "-Dharness.scripts=" + projectDir.dir("scripts").asFile.absolutePath,
@@ -181,6 +193,7 @@ tasks.register<JavaExec>("harness") {
             "-Dharness.echo=" + echo.get(),
             "-Dharness.differential.skriptRuns=" + skriptRuns.get(),
             "-Dharness.soak.reloads=" + soakReloads.get(),
+            "-Dharness.differential.recordVariations=" + recordVariations.get(),
         )
     })
 

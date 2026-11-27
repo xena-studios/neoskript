@@ -64,20 +64,10 @@ class SkriptMigrationTest {
     }
 
     @Test
-    void readsSkriptsPlayerUuidSetting() throws Exception {
+    void readsSkriptsSettings() throws Exception {
         Path skript = skript();
-        assertEquals(null, SkriptMigration.migrate(skript, plugins.resolve("NeoSkript")).playerUuids());
-        Path config = skript.resolve("config.sk");
-        Files.writeString(config, "language: english\n\tuse player UUIDs in variable names: false # names\n");
-        assertEquals(Boolean.FALSE, SkriptMigration.playerUuids(config));
-        Files.writeString(config, "use player UUIDs in variable names: true\n");
-        assertEquals(Boolean.TRUE, SkriptMigration.playerUuids(config));
-    }
-
-    @Test
-    void readsSkriptsEffectCommandSettings() throws Exception {
-        Path skript = skript();
-        assertEquals(java.util.Map.of(), SkriptMigration.migrate(skript, plugins.resolve("NeoSkript")).settings());
+        assertEquals(java.util.Map.of("language", "english"),
+                SkriptMigration.migrate(skript, plugins.resolve("NeoSkript")).settings());
         Path config = skript.resolve("config.sk");
         Files.writeString(config, """
                 enable effect commands: true
@@ -85,9 +75,86 @@ class SkriptMigrationTest {
                 # If 'enable effect commands' is set to true, ...
                 allow ops to use effect commands: false
                 log effect commands: maybe
+                	use player UUIDs in variable names: false # names
                 """);
+        // 'maybe' isn't a yes or no, so Skript runs with its default, off.
         assertEquals(java.util.Map.of("effect-commands.enabled", true, "effect-commands.token", "#!",
-                "effect-commands.allow-ops", false), SkriptMigration.settings(config));
+                "effect-commands.allow-ops", false, "effect-commands.log", false,
+                "variables.player-uuids-in-names", false), SkriptSettings.read(config, null));
+    }
+
+    @Test
+    void aLatin1ConfigSkIsReadAsSkriptReadsIt() throws Exception {
+        Path skript = skript();
+        // Skript's reader turns bytes that aren't UTF-8 into U+FFFD rather than failing: here an é in a comment.
+        String latin1 = "# Paramètres\nnumber accuracy: 4\ndatabases:\n\tmine:\n\t\ttype: CSV\n"
+                + "\t\tfile: ./plugins/Skript/variables.csv\n";
+        Files.write(skript.resolve("config.sk"), latin1.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+        SkriptMigration.Result result = SkriptMigration.migrate(skript, plugins.resolve("NeoSkript"));
+        assertEquals(null, result.settingsProblem());
+        assertEquals(4, result.settings().get("text.number-accuracy"));
+        assertTrue(result.settings().containsKey("databases"), result.settings().toString());
+        // The databases section names the file, so variables.csv isn't copied on its own.
+        assertFalse(result.copied().contains("variables.csv"), result.copied().toString());
+    }
+
+    @Test
+    void aByteOrderMarkBeforeTheFirstOptionIsLeftOut() throws Exception {
+        Path skript = skript();
+        Files.write(skript.resolve("config.sk"), ("\uFEFFnumber accuracy: 3\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(3, SkriptMigration.migrate(skript, plugins.resolve("NeoSkript")).settings().get("text.number-accuracy"));
+        Files.write(skript.resolve("config.sk"), ("\uFEFFdatabases:\n\tmine:\n\t\ttype: csv\n").getBytes(
+                java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(1, SkriptMigration.databases(skript.resolve("config.sk")).size());
+    }
+
+    @Test
+    void aConfigSkThatCantBeReadCopiesNothingAndIsTriedAgain() throws Exception {
+        Path skript = skript();
+        Path config = skript.resolve("config.sk");
+        org.junit.jupiter.api.Assumptions.assumeTrue(config.getFileSystem().supportedFileAttributeViews().contains("posix"));
+        Files.setPosixFilePermissions(config, java.util.Set.of());
+        org.junit.jupiter.api.Assumptions.assumeFalse(Files.isReadable(config), "running as a user who reads anything");
+        Path neoskript = plugins.resolve("NeoSkript");
+        try {
+            org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
+                    () -> SkriptMigration.migrate(skript, neoskript));
+            assertFalse(Files.exists(neoskript.resolve("variables.csv")), "Skript's variables.csv isn't copied");
+            assertFalse(Files.exists(neoskript.resolve(SkriptMigration.MARKER)));
+        } finally {
+            Files.setPosixFilePermissions(config, java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+        }
+        // Readable again, the next start copies everything.
+        assertEquals(List.of("scripts", "variables.csv"), SkriptMigration.migrate(skript, neoskript).copied());
+    }
+
+    @Test
+    void findsVariablesSkriptKeptApartByCase() throws Exception {
+        Path skript = skript();
+        Files.writeString(skript.resolve("variables.csv"), "# Skript\ncoins::Bob, long, 0000000000000001\n"
+                + "coins::bob, long, 0000000000000002\ncoins::Ann, long, 0000000000000003\n");
+        assertEquals(null, SkriptMigration.migrate(skript, plugins.resolve("NeoSkript")).caseClashes(),
+                "Skript's default ignores case, as NeoSkript does");
+        Files.writeString(skript.resolve("config.sk"), "case-insensitive variables: false\n");
+        SkriptMigration.Result result = SkriptMigration.migrate(skript, plugins.resolve("Other"));
+        assertEquals(List.of(List.of("coins::Bob", "coins::bob")), result.caseClashes());
+        // Read as Skript reads the file: a variable deleted later isn't there.
+        Path file = plugins.resolve("variables.csv");
+        Files.writeString(file, "coins::Bob, long, 0000000000000001\ncoins::bob, long, 0000000000000002\n"
+                + "coins::Bob, , \nbad line\n");
+        assertEquals(List.of(), SkriptMigration.caseClashes(file));
+    }
+
+    @Test
+    void copiesSkriptsLanguageFiles() throws Exception {
+        Path skript = skript();
+        Files.createDirectories(skript.resolve("lang"));
+        Files.writeString(skript.resolve("lang/pirate.lang"), "none: <naught>\n");
+        Files.writeString(skript.resolve("config.sk"), "language: Pirate\n");
+        SkriptMigration.Result result = SkriptMigration.migrate(skript, plugins.resolve("NeoSkript"));
+        assertEquals(List.of("scripts", "variables.csv", "lang"), result.copied());
+        assertEquals("pirate", result.settings().get("language"));
+        assertTrue(Files.exists(plugins.resolve("NeoSkript/lang/pirate.lang")));
     }
 
     @Test

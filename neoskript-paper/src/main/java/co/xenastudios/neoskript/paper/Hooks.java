@@ -29,12 +29,26 @@ public final class Hooks {
     /** The plugins hooked into, in Skript's order, which NeoSkript's plugin.yml soft-depends on. */
     private static final List<String> PLUGINS = List.of("Vault", "WorldGuard", "GriefPrevention");
 
+    /** The plugins not to hook into: config.yml's {@code hooks} turned off, Skript's {@code disable hooks}. */
+    private static volatile java.util.Set<String> disabled = java.util.Set.of();
+    /** Whether hooking into a plugin is logged: config.yml's {@code verbosity}, from {@code high}, as in Skript. */
+    private static volatile boolean logHooked;
+
     private Hooks() {}
+
+    /**
+     * Before {@link #register}: the plugins, by name ({@code Vault}, {@code WorldGuard}, {@code GriefPrevention}),
+     * not to hook into, and whether to log each plugin hooked into.
+     */
+    public static void configure(java.util.Set<String> disabledPlugins, boolean logHooked) {
+        Hooks.disabled = java.util.Set.copyOf(disabledPlugins);
+        Hooks.logHooked = logHooked;
+    }
 
     /** Whether any plugin NeoSkript hooks into is installed, so hooking (and loading scripts) waits for the server. */
     public static boolean anyInstalled() {
         for (String name : PLUGINS) {
-            if (Bukkit.getPluginManager().getPlugin(name) != null) {
+            if (!disabled.contains(name) && Bukkit.getPluginManager().getPlugin(name) != null) {
                 return true;
             }
         }
@@ -53,6 +67,7 @@ public final class Hooks {
     public static void register(Registrar registrar, String version, Logger logger) {
         if (enabled("Vault") != null) {
             VaultHook.register(registrar);
+            hooked("Vault", logger);
         }
         boolean regions = false;
         Plugin worldGuard = enabled("WorldGuard");
@@ -76,7 +91,14 @@ public final class Hooks {
         }
         Regions.PLUGINS.add(hook);
         logger.warn(Regions.hookedWarning(hook.getName()));
+        hooked(plugin.getName(), logger);
         return true;
+    }
+
+    private static void hooked(String plugin, Logger logger) {
+        if (logHooked) {
+            logger.info("Successfully hooked into {}", plugin);
+        }
     }
 
     /**
@@ -99,6 +121,9 @@ public final class Hooks {
     }
 
     private static Plugin enabled(String name) {
+        if (disabled.contains(name)) {
+            return null;
+        }
         Plugin plugin = Bukkit.getPluginManager().getPlugin(name);
         return plugin == null || !plugin.isEnabled() ? null : plugin;
     }

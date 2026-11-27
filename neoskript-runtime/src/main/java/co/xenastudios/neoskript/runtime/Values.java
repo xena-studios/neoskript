@@ -34,6 +34,31 @@ public final class Values {
         return value;
     }
 
+    /**
+     * {@code set event-item to bread}: sets the event's value with {@code setter} to the value given, converted to its
+     * class as Skript's change effect converts it. If nothing given is one (none, or text where an item goes), nothing
+     * is set, as in Skript. On Folia, an entity another region owns is an error, as reading it would be.
+     */
+    public static void setEventValue(java.util.function.BiConsumer<Object, Object> setter,
+            co.xenastudios.neoskript.api.element.TriggerContext context, Object value, Class<?> valueClass,
+            co.xenastudios.neoskript.runtime.errors.ErrorSites.Site site) {
+        Object[] given = narrow(convert(value, valueClass), new Class<?>[] {valueClass});
+        if (given.length == 0 || co.xenastudios.neoskript.runtime.region.Regions.refuseForeign(site, given[0])) {
+            return;
+        }
+        setter.accept(context.event(), given[0]);
+    }
+
+    /**
+     * The context the code in a library section runs in for one of its values, as Skript runs a spawn section's code:
+     * in the section's own event, made of the value, on the same thread as {@code outer}.
+     */
+    public static co.xenastudios.neoskript.api.element.TriggerContext sectionContext(
+            co.xenastudios.neoskript.api.element.TriggerContext outer, java.util.function.Function<Object, ?> event,
+            Object value) {
+        return new SimpleTriggerContext(event.apply(value), outer instanceof SimpleTriggerContext simple ? simple.owner() : null);
+    }
+
     /** The values that are instances of one of {@code classes}: what a changed expression accepts. */
     public static Object[] narrow(Object value, Class<?>[] classes) {
         List<Object> values = new ArrayList<>();
@@ -141,6 +166,31 @@ public final class Values {
     public static Object timesElement(int index, int offset, int count) {
         long i = (long) index + offset;
         return i >= 0 && i < count ? Long.valueOf(i + 1) : null;
+    }
+
+    private record Container(Class<?> type, java.util.function.Function<Object, Object[]> contents) {}
+
+    private static final java.util.List<Container> CONTAINERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /**
+     * Registers what looping a value of {@code type} written as words goes through, as Skript's loop does for its
+     * containers: an item type's items.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> void registerContainer(Class<T> type, java.util.function.Function<? super T, Object[]> contents) {
+        CONTAINERS.add(new Container(type, (java.util.function.Function<Object, Object[]>) contents));
+    }
+
+    /** What a loop over {@code values}, written as words, goes through: a container's contents, else them. */
+    public static Object[] containerValues(Object[] values) {
+        if (values.length == 1 && values[0] != null) {
+            for (Container container : CONTAINERS) {
+                if (container.type().isInstance(values[0])) {
+                    return container.contents().apply(values[0]);
+                }
+            }
+        }
+        return values;
     }
 
     /** What a loop goes through: the values, or a queue's elements, which looping takes out of it. */
@@ -309,7 +359,7 @@ public final class Values {
     /** How a value reads in text, as when embedded in a string with {@code %...%}. */
     public static String text(Object value) {
         if (value == null || (value instanceof Object[] empty && empty.length == 0)) {
-            return "<none>";
+            return Language.none();
         }
         if (value instanceof Object[] array) {
             StringBuilder text = new StringBuilder();
@@ -334,11 +384,24 @@ public final class Values {
         return converter != null ? converter.apply(value) : value.toString();
     }
 
-    /** Decimals as Skript shows them: at most two decimal places, without trailing zeros. */
+    /**
+     * Decimals as Skript shows them: at most the {@linkplain Settings#numberAccuracy number accuracy} of decimal
+     * places (two by default), without trailing zeros.
+     */
     public static String decimal(double value) {
-        // Skript's StringUtils.toString with its number accuracy of 2: '%.2f' without trailing zeros, so -0.004
-        // is -0 and 1.005 is 1.01.
-        String text = String.format(java.util.Locale.ENGLISH, "%.2f", value);
+        return decimal(value, Settings.numberAccuracy());
+    }
+
+    /**
+     * Skript's {@code StringUtils.toString}: {@code value} with at most {@code accuracy} decimal places, without
+     * trailing zeros, so with two -0.004 is -0 and 1.005 is 1.01. An accuracy of 0 rounds to a whole number.
+     */
+    public static String decimal(double value, int accuracy) {
+        if (accuracy <= 0) {
+            return Long.toString(Math.round(value));
+        }
+        String text = String.format(java.util.Locale.ENGLISH,
+                accuracy < DECIMAL_FORMATS.length ? DECIMAL_FORMATS[accuracy] : "%." + accuracy + "f", value);
         int end = text.length() - 1;
         while (text.charAt(end) == '0') {
             end--;
@@ -348,6 +411,18 @@ public final class Values {
         }
         return text.substring(0, end + 1);
     }
+
+    /** {@code %.0f} to {@code %.16f}, built once: decimals are written in triggers' hot paths. */
+    private static final String[] DECIMAL_FORMATS = new String[17];
+
+    static {
+        for (int i = 0; i < DECIMAL_FORMATS.length; i++) {
+            DECIMAL_FORMATS[i] = "%." + i + "f";
+        }
+    }
+
+    /** As Skript writes decimals in variable names: up to 8 decimal places, whatever the number accuracy. */
+    private static final int NAME_ACCURACY = 8;
 
     private record Conversion(Class<?> from, Function<Object, Object> converter) {}
 
@@ -507,6 +582,9 @@ public final class Values {
             }
             return text.toString();
         }
+        if (value instanceof Double || value instanceof Float) {
+            return decimal(((Number) value).doubleValue(), NAME_ACCURACY);
+        }
         if (value != null && !NAME_CONVERTERS.isEmpty()) {
             for (Map.Entry<Class<?>, Function<Object, String>> named : NAME_CONVERTERS.entrySet()) {
                 if (named.getKey().isInstance(value)) {
@@ -560,6 +638,15 @@ public final class Values {
     /** A section that runs later, as a {@link Runnable}: it carries on from {@code frame} in {@code code}. */
     public static Object section(Resumable code, co.xenastudios.neoskript.api.element.TriggerContext context, Frame frame) {
         return (Runnable) () -> code.resume(context, frame);
+    }
+
+    /**
+     * The code under an addon's section that runs later, from {@code frame}: with a copy of the trigger's local
+     * variables as they are now, which every run shares, as Skript's {@code copyLocalVariables} once.
+     */
+    public static Object laterSection(Resumable code, Frame frame, String script, Object version) {
+        frame.locals = frame.locals == null ? null : frame.locals.copy();
+        return new LaterCode(code, frame, script, version);
     }
 
     /** Not a thread local: what's kept may be one of NeoSkript's values, which would keep the plugin after it's gone. */

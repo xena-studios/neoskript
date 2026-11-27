@@ -9,6 +9,7 @@ NeoSkript's own addons, built on [`neoskript-api`](../neoskript-api) and release
 | NeoSkript Placeholders | `placeholders/` | skript-placeholders 1.7.1 | [neoskript.dev/docs/addons/placeholders](https://neoskript.dev/docs/addons/placeholders/) |
 | NeoSkript YAML | `yaml/` | skript-yaml 1.7.2 | [neoskript.dev/docs/addons/yaml](https://neoskript.dev/docs/addons/yaml/) |
 | NeoSkriptWeb | `web/` | Reqn 1.2.3; skJson 6.0.0's requests and JSON | [neoskript.dev/docs/addons/web](https://neoskript.dev/docs/addons/web/) |
+| NeoSkript Reflect | `reflect/` | skript-reflect 2.6.3 (once skript-mirror) | [neoskript.dev/docs/addons/reflect](https://neoskript.dev/docs/addons/reflect/) |
 
 ## Layout
 
@@ -134,9 +135,26 @@ Each addon gets its own Modrinth project, which only the owner can create. For e
 ### NeoSkript Proxy (`addons/proxy`)
 
 - name `NeoSkript Proxy`, slug `neoskript-proxy`;
-- summary: "Messages and proxy actions across a BungeeCord or Velocity network from NeoSkript scripts, over plugin messaging or Redis, with SkProxy's, Skelocity's and SkRedis's syntax.";
-- description: NeoSkript's own network addon (issue #19): messages between servers, server lists, player counts, where a player is; it also runs scripts written for SkProxy 2.4, Skelocity 1.1 and SkRedis 2.3.5's messaging, and talks to servers still on SkRedis; goes on each backend server, not the proxy; needs NeoSkript at the same version; Paper and Folia; links to [the docs](https://neoskript.dev/docs/addons/proxy/), which list the differences;
+- summary: "Messages, {network::...} variables and proxy actions across a BungeeCord or Velocity network from NeoSkript scripts, over plugin messaging or Redis, with SkProxy's, Skelocity's and SkRedis's syntax.";
+- description: NeoSkript's own network addon (issue #19): messages between servers, `{network::...}` variables shared through a MySQL database (changes show on every server at once, and additions on two servers at once both count), server lists, player counts, where a player is; it also runs scripts written for SkProxy 2.4, Skelocity 1.1 and SkRedis 2.3.5's messaging, and talks to servers still on SkRedis; goes on each backend server, not the proxy; needs NeoSkript at the same version; Paper and Folia; links to [the docs](https://neoskript.dev/docs/addons/proxy/), which list the differences;
 - categories: utility, social; licence GPL-3.0-only; source this repository's `addons/proxy`; loaders Paper and Folia, NeoSkript's Minecraft versions; environment server only;
 - dependencies: **required** NeoSkript (`FuVeJ2X5`); **incompatible** SkProxy (`HaSv4ey2`), Skelocity (`URMrn6g1`) and SkRedis (`3R33dfbs`), all on Modrinth, since NeoSkriptProxy replaces them and they need Skript;
 - the jar is `addons/proxy/build/libs/NeoSkriptProxy-<version>.jar` (no libraries shaded: its Redis client is its own), and the project id goes into the release steps next to NeoSkript's.
+
+### NeoSkript Reflect (`addons/reflect`)
+
+- name `NeoSkript Reflect`, slug `neoskript-reflect`;
+- summary: "Java from scripts, with skript-reflect's syntax: imports, Java calls and Bukkit events from skript-reflect scripts work unchanged on NeoSkript.";
+- description: what it replaces (skript-reflect, once called skript-mirror), what works so far and that custom syntax comes next (with a link to [the docs](https://neoskript.dev/docs/addons/reflect/), which list what's not in yet and the differences), that calls are compiled to method handles rather than looked up each time, that it runs on Folia with a warning that Java calls can break region rules, and, plainly, that it gives scripts full Java access, so it's only for servers where everyone who writes scripts is trusted;
+- icon, licence GPL-3.0-only, source link to this repository (`addons/reflect`), loaders Paper and Folia, NeoSkript's Minecraft versions;
+- a required dependency on NeoSkript (`FuVeJ2X5`); skript-reflect isn't on Modrinth (it's on GitHub and SpigotMC), so there's no incompatible dependency to add;
+- the jar to upload is `addons/reflect/build/libs/NeoSkriptReflect-<version>.jar`, and the project id goes into the release steps next to NeoSkript's.
+
+### NeoSkript GUI (`addons/gui`)
+
+- Name **NeoSkript GUI**, slug `neoskript-gui`, licence GPL-3.0-only, source this repository, loaders Paper and Folia.
+- Summary: "Inventory menus from scripts, with skript-gui's syntax, for NeoSkript."
+- Description: it replaces skript-gui, scripts written for it load unchanged, it needs NeoSkript, and it links to [the docs](https://neoskript.dev/docs/addons/gui/), which list the differences.
+- Dependencies: **required** NeoSkript (`FuVeJ2X5`). skript-gui isn't on Modrinth (it's on GitHub and SpigotMC), so there's no incompatible one to add.
+- Once it exists, an entry in `website/src/data/addons.json` lists it on neoskript.dev/addons with its Modrinth link.
 

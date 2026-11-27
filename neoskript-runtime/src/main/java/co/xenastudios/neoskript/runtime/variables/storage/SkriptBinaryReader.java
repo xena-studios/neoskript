@@ -172,6 +172,31 @@ public final class SkriptBinaryReader implements BinaryReader {
         };
     }
 
+    /**
+     * The next field, whatever its name: its name and value, a primitive's or boxed one's, text, null, or an object's
+     * type ({@link ObjectType}). For NeoSkriptCompat, which reads an addon's fields by the names in the data, as
+     * Skript's {@code Fields} does.
+     */
+    public java.util.Map.Entry<String, Object> nextField() {
+        String name = rawName();
+        int tag = in.get() & 0xFF;
+        Object value = switch (tag) {
+            case Tags.NULL -> null;
+            case Tags.STRING -> rawString();
+            case Tags.OBJECT -> new ObjectType(rawName());
+            case Tags.BYTE, Tags.BOXED + Tags.BYTE -> in.get();
+            case Tags.SHORT, Tags.BOXED + Tags.SHORT -> in.getShort();
+            case Tags.INT, Tags.BOXED + Tags.INT -> in.getInt();
+            case Tags.LONG, Tags.BOXED + Tags.LONG -> in.getLong();
+            case Tags.FLOAT, Tags.BOXED + Tags.FLOAT -> in.getFloat();
+            case Tags.DOUBLE, Tags.BOXED + Tags.DOUBLE -> in.getDouble();
+            case Tags.CHAR, Tags.BOXED + Tags.CHAR -> in.getChar();
+            case Tags.BOOLEAN, Tags.BOXED + Tags.BOOLEAN -> in.get() != 0;
+            default -> throw new IllegalStateException("Unexpected tag " + tag + " in field " + name);
+        };
+        return new java.util.AbstractMap.SimpleImmutableEntry<>(name, value);
+    }
+
     @Override
     public int objectArrayField(String name, String componentType) {
         field(name, Tags.ARRAY);

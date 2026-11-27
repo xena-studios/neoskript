@@ -22,6 +22,17 @@
         "docs": "/docs/addons/web/",
         "source": "https://github.com/xena-studios/neoskript/tree/main/addons/web"
       }
+    },
+    {
+      "name": "NeoSkript Reflect",
+      "summary": "Java from scripts, with skript-reflect's syntax: its imports, Java calls and events work unchanged, with custom syntax to come.",
+      "adds": "Imports, Java methods, fields and constructors, arrays, and triggers for any Bukkit event. Calls are looked up once and compiled to method handles, on Paper and Folia.",
+      "example": "import:\n\tjava.lang.Math\n\non load:\n\tsend \"%Math.max(3, 7)%\" to console",
+      "status": "beta",
+      "links": {
+        "docs": "/docs/addons/reflect/",
+        "source": "https://github.com/xena-studios/neoskript/tree/main/addons/reflect"
+      }
     }
   ]
 }

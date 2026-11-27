@@ -1,0 +1,7 @@
+# Checks: a literal alone in a text's %...% isn't understood, as in Skript; one inside an expression is (issue #50).
+
+on join:
+	send "%stone%" to console
+	send "h: %name of stone%" to console
+	send "j: %stone's name%" to console
+	broadcast "%name of diamond sword%"

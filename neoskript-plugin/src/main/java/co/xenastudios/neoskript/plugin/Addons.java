@@ -33,7 +33,7 @@ final class Addons {
     /** The registrar methods whose first argument is the id of an element they register. */
     private static final Set<String> REGISTERS_ELEMENT = Set.of("effect", "condition", "section", "expression",
             "typedExpression", "property", "propertyCondition", "event", "pausingEffect", "pausingExpression",
-            "pausingSection");
+            "pausingSection", "laterSection");
 
     private final Logger logger;
     private final List<Addon> addons = new ArrayList<>();
@@ -148,6 +148,7 @@ final class Addons {
     private Registrar forAddon(Addon addon, Registrar registrar) {
         Set<String> own = new HashSet<>();
         Set<String> taken = new HashSet<>();
+        Set<String> ownTypes = new HashSet<>();
         return (Registrar) Proxy.newProxyInstance(Registrar.class.getClassLoader(), new Class<?>[] {Registrar.class},
                 (proxy, method, args) -> {
                     if (method.getDeclaringClass() == Object.class) {
@@ -157,11 +158,21 @@ final class Addons {
                             default -> proxy == args[0];
                         };
                     }
-                    if (method.getName().equals("affinity") && args.length == 2 && args[1] instanceof ThreadAffinity) {
+                    if ((method.getName().equals("type") || method.getName().equals("namedType")) && args.length > 0
+                            && args[0] instanceof String id) {
+                        ownTypes.add(id);
+                    } else if (method.getName().equals("strictType") && args.length == 1
+                            && !ownTypes.contains(args[0])) {
+                        // Making NeoSkript's or another addon's type strict would change how their scripts parse.
+                        throw new IllegalArgumentException(addon.name() + " hasn't registered a type called " + args[0]
+                                + ": only your own types can be made strict");
+                    } else if (method.getName().equals("affinity") && args.length == 2 && args[1] instanceof ThreadAffinity) {
                         checkAffinity(addon, (String) args[0], own, taken);
                     } else if (method.getName().equals("priority") && args.length == 2
                             && args[1] instanceof co.xenastudios.neoskript.api.registration.SyntaxPriority) {
                         checkOwn(addon, "priority", (String) args[0], own, taken);
+                    } else if (method.getName().equals("pluralAsArguments") && args.length == 1) {
+                        checkOwn(addon, "plurality", (String) args[0], own, taken);
                     } else if (method.getName().equals("timeout") && args.length == 2
                             && args[1] instanceof java.time.Duration) {
                         checkOwn(addon, "timeout", (String) args[0], own, taken);

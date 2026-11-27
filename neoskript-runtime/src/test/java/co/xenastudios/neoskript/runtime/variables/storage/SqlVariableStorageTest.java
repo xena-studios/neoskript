@@ -92,8 +92,25 @@ class SqlVariableStorageTest {
         return storage(store, monitor, "variables21");
     }
 
+    /** Codecs with Skript's {@code long}, as NeoSkript registers it, so numbers come back as numbers. */
+    private static VariableCodecs codecs() {
+        VariableCodecs codecs = new VariableCodecs();
+        codecs.register("long", Long.class, new co.xenastudios.neoskript.api.storage.VariableCodec<>() {
+            @Override
+            public void encode(Long value, co.xenastudios.neoskript.api.storage.BinaryWriter out) {
+                out.rawLong(value);
+            }
+
+            @Override
+            public Long decode(co.xenastudios.neoskript.api.storage.BinaryReader in) {
+                return in.rawLong();
+            }
+        });
+        return codecs;
+    }
+
     private SqlVariableStorage storage(VariableStore store, boolean monitor, String table) {
-        return new SqlVariableStorage(store, new VariableCodecs(),
+        return new SqlVariableStorage(store, codecs(),
                 SqlVariableStorage.Settings.sqlite("test", db(), table, monitor, 100), Routing.ALL,
                 dir.resolve("pending"), log);
     }
@@ -915,5 +932,604 @@ class SqlVariableStorageTest {
             again.load();
             assertEquals(text("2"), back.get("last"));
         }
+    }
+
+    private SqlVariableStorage watching(VariableStore store, long monitorMillis) {
+        return new SqlVariableStorage(store, codecs(),
+                SqlVariableStorage.Settings.sqlite("test", db(), "variables21", true, monitorMillis), Routing.ALL,
+                dir.resolve("pending"), log);
+    }
+
+    /** Two servers whose writes are held, so each changes {@code x} before seeing the other's change. */
+    private void bothChange(SqlVariableStorage a, SqlVariableStorage b, Runnable onA, Runnable onB)
+            throws Exception {
+        java.util.concurrent.atomic.AtomicInteger aWrites = new java.util.concurrent.atomic.AtomicInteger();
+        Runnable stop = a.whenWritten(aWrites::incrementAndGet);
+        a.writesHeld = true;
+        b.writesHeld = true;
+        onA.run();
+        onB.run();
+        a.writesHeld = false;
+        waitFor(() -> aWrites.get() > 0);
+        stop.run();
+        b.writesHeld = false;
+    }
+
+    @Test
+    void twoServersAddingToOneNumberAtOnceBothCount() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        try (SqlVariableStorage a = storage(one, true); SqlVariableStorage b = storage(two, true)) {
+            a.load();
+            b.load();
+            one.set("coins", 10L);
+            a.save();
+            waitFor(() -> Long.valueOf(10).equals(two.get("coins")));
+            bothChange(a, b, () -> one.add("coins", new Object[] {1L}),
+                    () -> two.subtract("coins", new Object[] {3L}));
+            // a wrote 11; b, from 10, took 3 away: 8, not b's 7 or a's 11.
+            waitFor(() -> Long.valueOf(8).equals(one.get("coins")) && Long.valueOf(8).equals(two.get("coins")));
+            assertEquals(1, b.conflicts()[1]);
+            // And a new number both add to at once: the two additions add up.
+            bothChange(a, b, () -> one.add("fresh", new Object[] {2L}), () -> two.add("fresh", new Object[] {5L}));
+            waitFor(() -> Long.valueOf(7).equals(one.get("fresh")) && Long.valueOf(7).equals(two.get("fresh")));
+        }
+    }
+
+    @Test
+    void additionsMadeWhileAMergedWriteRunsStayAdded() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        try (SqlVariableStorage a = storage(one, true); SqlVariableStorage b = storage(two, true)) {
+            a.load();
+            b.load();
+            one.set("n", 0L);
+            a.save();
+            waitFor(() -> Long.valueOf(0).equals(two.get("n")));
+            // Many additions on both servers while both write: none is lost.
+            Thread adder = new Thread(() -> {
+                for (int i = 0; i < 200; i++) {
+                    one.add("n", new Object[] {1L});
+                    two.add("n", new Object[] {1L});
+                    if (i % 20 == 0) {
+                        try {
+                            Thread.sleep(15);
+                        } catch (InterruptedException e) {
+                            return;
+                        }
+                    }
+                }
+            });
+            adder.start();
+            adder.join();
+            waitFor(() -> Long.valueOf(400).equals(one.get("n")) && Long.valueOf(400).equals(two.get("n")));
+        }
+    }
+
+    @Test
+    void settingAVariableOnTwoServersAtOnceKeepsTheLastWriteEverywhere() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        try (SqlVariableStorage a = storage(one, true); SqlVariableStorage b = storage(two, true)) {
+            a.load();
+            b.load();
+            one.set("coins", 10L);
+            a.save();
+            waitFor(() -> Long.valueOf(10).equals(two.get("coins")));
+            // A set isn't an addition, even of numbers: the last write wins, as in Skript.
+            bothChange(a, b, () -> one.add("coins", new Object[] {1L}), () -> two.set("coins", 50L));
+            waitFor(() -> Long.valueOf(50).equals(one.get("coins")) && Long.valueOf(50).equals(two.get("coins")));
+            bothChange(a, b, () -> one.set("motd", text("a")), () -> two.set("motd", text("b")));
+            waitFor(() -> text("b").equals(one.get("motd")) && text("b").equals(two.get("motd")));
+        }
+    }
+
+    @Test
+    void valuesAddedToAListAtTheSameIndexOnTwoServersAreBothKept() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        try (SqlVariableStorage a = storage(one, true); SqlVariableStorage b = storage(two, true)) {
+            a.load();
+            b.load();
+            bothChange(a, b, () -> one.addToList("queue", new Object[] {text("alice")}),
+                    () -> two.addToList("queue", new Object[] {text("bob"), text("carol")}));
+            // Both took index 1 (and b index 2 too): a's stays at 1, b's move up.
+            waitFor(() -> one.list("queue").length == 3 && two.list("queue").length == 3);
+            waitFor(() -> java.util.Arrays.equals(one.list("queue"), two.list("queue")));
+            assertEquals(text("alice"), one.get("queue::1"));
+            List<Object> all = List.of(one.list("queue"));
+            assertTrue(all.contains(text("bob")) && all.contains(text("carol")), all.toString());
+        }
+    }
+
+    @Test
+    void anotherServersWriteIsReadAtOnceWhenItSaysSo() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        // A minute between checks: only being told reads it sooner.
+        try (SqlVariableStorage a = watching(one, 60_000); SqlVariableStorage b = watching(two, 60_000)) {
+            a.load();
+            b.load();
+            Runnable stop = a.whenWritten(b::checkForChanges);
+            one.set("news", text("hello"));
+            waitFor(() -> text("hello").equals(two.get("news")));
+            stop.run();
+            assertEquals(a.id(), b.id());
+            // Many calls at once are one check; one after the database closed does nothing.
+            for (int i = 0; i < 100; i++) {
+                b.checkForChanges();
+            }
+        }
+        VariableStore three = new VariableStore();
+        SqlVariableStorage closed = watching(three, 60_000);
+        closed.load();
+        closed.close();
+        closed.checkForChanges();
+    }
+
+    @Test
+    void withoutMonitorChangesNothingWatchesTheStore() throws Exception {
+        VariableStore store = new VariableStore();
+        try (SqlVariableStorage storage = storage(store)) {
+            storage.load();
+            store.add("n", new Object[] {1L});
+            storage.save();
+            assertEquals(0, storage.conflicts()[0]);
+        }
+    }
+
+    /** Two servers watching one file, loaded, with {@code name} at {@code start} on both. */
+    private SqlVariableStorage[] pair(VariableStore one, VariableStore two, String name, Object start)
+            throws Exception {
+        SqlVariableStorage a = storage(one, true);
+        SqlVariableStorage b = storage(two, true);
+        a.load();
+        b.load();
+        one.set(name, start);
+        a.save();
+        waitFor(() -> start.equals(two.get(name)));
+        return new SqlVariableStorage[] {a, b};
+    }
+
+    /** The number the table holds for {@code name}, as Skript's long. */
+    private Long saved(String name) throws SQLException {
+        Object[] row = rows().get(name);
+        if (row == null || row[1] == null) {
+            return null;
+        }
+        return java.nio.ByteBuffer.wrap((byte[]) row[1]).getLong();
+    }
+
+    @Test
+    void aSetMadeWhileAMergedWriteCommitsIsntShiftedAndIsTheLastWrite() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 10L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            // b's merged write (11 + 2) commits; before memory catches up, a script sets coins to 0.
+            java.util.concurrent.atomic.AtomicBoolean once = new java.util.concurrent.atomic.AtomicBoolean();
+            b.afterCommit = () -> {
+                if (once.compareAndSet(false, true)) {
+                    two.set("coins", 0L);
+                }
+            };
+            bothChange(a, b, () -> one.add("coins", new Object[] {1L}), () -> two.add("coins", new Object[] {2L}));
+            // The set is newer than the merge: it stays as set, and is written over it.
+            waitFor(() -> Long.valueOf(0).equals(one.get("coins")) && Long.valueOf(0).equals(two.get("coins")));
+            Thread.sleep(300);
+            assertEquals(0L, two.get("coins"));
+            assertEquals(0L, saved("coins"));
+        }
+    }
+
+    @Test
+    void aMergedWriteInABatchWithARefusedRowCountsOnce() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 10L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            try (Connection c = open(); Statement s = c.createStatement()) {
+                s.executeUpdate("CREATE TRIGGER refuse BEFORE INSERT ON variables21 WHEN NEW.name = 'bad' "
+                        + "BEGIN SELECT RAISE(ABORT, 'refused'); END");
+            }
+            bothChange(a, b, () -> one.add("coins", new Object[] {1L}), () -> {
+                two.add("coins", new Object[] {2L});
+                two.set("bad", text("x"));
+            });
+            waitFor(() -> Long.valueOf(13).equals(one.get("coins")) && Long.valueOf(13).equals(two.get("coins")));
+            Thread.sleep(300);
+            assertEquals(13L, two.get("coins"));
+            assertEquals(13L, saved("coins"));
+            assertEquals(1, b.conflicts()[1]);
+        }
+    }
+
+    @Test
+    void aWriteWhoseAnswerWasLostIsntCountedTwice() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 10L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            // a's write commits, but the answer is lost: a reconnects and finds its own write in the row.
+            a.loseNextReply = true;
+            one.add("coins", new Object[] {50L});
+            one.addToList("queue", new Object[] {text("alice")});
+            waitFor(() -> !a.loseNextReply && a.status().state() == SqlVariableStorage.State.CONNECTED
+                    && Long.valueOf(60).equals(two.get("coins")));
+            Thread.sleep(500);
+            assertEquals(60L, one.get("coins"));
+            assertEquals(60L, saved("coins"));
+            assertEquals(1, one.list("queue").length);
+            assertEquals(1, two.list("queue").length);
+            // A merged write whose answer is lost: the merge counts once too.
+            a.loseNextReply = true;
+            bothChange(b, a, () -> two.add("coins", new Object[] {5L}), () -> one.add("coins", new Object[] {7L}));
+            waitFor(() -> Long.valueOf(72).equals(one.get("coins")) && Long.valueOf(72).equals(two.get("coins")));
+            Thread.sleep(500);
+            assertEquals(72L, one.get("coins"));
+            assertEquals(72L, saved("coins"));
+        }
+    }
+
+    @Test
+    void anAdditionMadeAsAnotherServersValueArrivesIsntLost() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 0L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            java.util.concurrent.atomic.AtomicBoolean once = new java.util.concurrent.atomic.AtomicBoolean();
+            b.beforeApplying = name -> {
+                if (name.equals("coins") && once.compareAndSet(false, true)) {
+                    two.add("coins", new Object[] {1L});
+                }
+            };
+            one.set("coins", 5L);
+            a.save();
+            // b's addition, made just as a's 5 arrives, is merged with it rather than overwritten.
+            waitFor(() -> Long.valueOf(6).equals(one.get("coins")) && Long.valueOf(6).equals(two.get("coins")));
+        }
+    }
+
+    @Test
+    void aSetToTheOldValueThenAnAdditionIsntMergedAsAnAddition() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "kills", 0L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            bothChange(a, b, () -> one.add("kills", new Object[] {7L}), () -> {
+                two.set("kills", 0L);
+                two.add("kills", new Object[] {1L});
+            });
+            // b set it, so b's write is the last write: 1, not a's 7 plus 1.
+            waitFor(() -> Long.valueOf(1).equals(one.get("kills")) && Long.valueOf(1).equals(two.get("kills")));
+            assertEquals(0, b.conflicts()[1]);
+        }
+    }
+
+    @Test
+    void aWholeListSetIsntMergedAsAnAppend() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        try (SqlVariableStorage a = storage(one, true); SqlVariableStorage b = storage(two, true)) {
+            a.load();
+            b.load();
+            bothChange(a, b, () -> one.addToList("queue", new Object[] {text("alice")}),
+                    () -> two.setList("queue", new Object[] {text("bob")}));
+            // b set the list: the last write, not an append moved along.
+            waitFor(() -> text("bob").equals(one.get("queue::1")) && text("bob").equals(two.get("queue::1")));
+            Thread.sleep(300);
+            assertEquals(1, one.list("queue").length);
+        }
+    }
+
+    @Test
+    void withMergeChangesOffTheLastWriteWinsAsInSkript() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage.Settings plain = SqlVariableStorage.Settings.sqlite("test", db(), "variables21", true, 100)
+                .withMerge(false);
+        try (SqlVariableStorage a = new SqlVariableStorage(one, codecs(), plain, Routing.ALL, dir.resolve("p1"), log);
+                SqlVariableStorage b = new SqlVariableStorage(two, codecs(), plain, Routing.ALL, dir.resolve("p2"),
+                        log)) {
+            a.load();
+            b.load();
+            one.set("coins", 10L);
+            a.save();
+            waitFor(() -> Long.valueOf(10).equals(two.get("coins")));
+            bothChange(a, b, () -> one.add("coins", new Object[] {1L}), () -> two.add("coins", new Object[] {2L}));
+            waitFor(() -> Long.valueOf(12).equals(one.get("coins")) && Long.valueOf(12).equals(two.get("coins")));
+            assertEquals(0, b.conflicts()[0]);
+        }
+    }
+
+    @Test
+    void aLostAnswerThenAnotherServersMergeIsCountedOnce() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 10L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            // a adds 50 and commits 60, but the answer is lost; before a is back, b adds 3 and merges to 63 under
+            // its own update_guid. a must find its 60 committed, not merge 63 + 50.
+            a.loseNextReply = true;
+            one.add("coins", new Object[] {50L});
+            waitFor(() -> !a.loseNextReply);
+            waitFor(() -> {
+                try {
+                    return Long.valueOf(60).equals(saved("coins"));
+                } catch (SQLException e) {
+                    return false;
+                }
+            });
+            two.add("coins", new Object[] {3L});
+            b.save();
+            assertEquals(63L, saved("coins"));
+            waitFor(() -> a.status().state() == SqlVariableStorage.State.CONNECTED);
+            waitFor(() -> Long.valueOf(63).equals(one.get("coins")) && Long.valueOf(63).equals(two.get("coins")));
+            Thread.sleep(500);
+            assertEquals(63L, one.get("coins"));
+            assertEquals(63L, saved("coins"));
+            // The same with a set: a's lost one doesn't overwrite b's later change.
+            a.loseNextReply = true;
+            one.set("motd", text("from a"));
+            waitFor(() -> !a.loseNextReply);
+            waitFor(() -> {
+                try {
+                    return rows().containsKey("motd");
+                } catch (SQLException e) {
+                    return false;
+                }
+            });
+            two.set("motd", text("from b"));
+            b.save();
+            waitFor(() -> a.status().state() == SqlVariableStorage.State.CONNECTED);
+            waitFor(() -> text("from b").equals(one.get("motd")));
+            Thread.sleep(500);
+            assertEquals(text("from b"), one.get("motd"));
+            assertEquals(text("from b"), two.get("motd"));
+        }
+        // The marker rows are no variables: a fresh load doesn't see one.
+        VariableStore three = new VariableStore();
+        try (SqlVariableStorage c = storage(three, true)) {
+            c.load();
+            List<String> names = new ArrayList<>();
+            three.forEach((name, value) -> names.add(name));
+            assertTrue(names.stream().noneMatch(name -> name.startsWith("-")), names.toString());
+            assertEquals(List.of("coins", "motd"), names.stream().sorted().toList());
+        }
+        assertTrue(rows().keySet().stream().noneMatch(name -> name.startsWith(SqlVariableStorage.MARKER)),
+                "each server's marker goes when it stops");
+    }
+
+    @Test
+    void aChangeMadeWhileALostAnswerIsSettledIsWrittenAndCountsAsChanged() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 10L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            a.loseNextReply = true;
+            one.add("coins", new Object[] {50L});
+            waitFor(() -> !a.loseNextReply);
+            // While a is down, add 5 more: memory 65, the row 60.
+            one.add("coins", new Object[] {5L});
+            waitFor(() -> {
+                try {
+                    return Long.valueOf(65).equals(saved("coins"));
+                } catch (SQLException e) {
+                    return false;
+                }
+            });
+            waitFor(() -> !a.changed());
+            assertEquals(65L, one.get("coins"));
+            waitFor(() -> Long.valueOf(65).equals(two.get("coins")));
+        }
+    }
+
+    @Test
+    void aVariableLeftForTheNextRoundKeepsTheStoreChanged() throws Exception {
+        VariableStore store = new VariableStore();
+        try (SqlVariableStorage storage = storage(store, true)) {
+            storage.load();
+            store.set("x", 1L);
+            storage.underWay("x", true);
+            storage.save();
+            // x was under way: not written, and still changed, so it's written once it's done.
+            assertTrue(storage.changed());
+            assertFalse(rows().containsKey("x"));
+            storage.underWay("x", false);
+            waitFor(() -> {
+                try {
+                    return rows().containsKey("x");
+                } catch (SQLException e) {
+                    return false;
+                }
+            });
+            waitFor(() -> !storage.changed());
+        }
+    }
+
+    @Test
+    void aListBeingSetIsntDeletedFromTheDatabaseMeanwhile() throws Exception {
+        VariableStore store = new VariableStore();
+        try (SqlVariableStorage storage = storage(store, true)) {
+            storage.load();
+            store.setList("top", new Object[] {text("a"), text("b")});
+            storage.save();
+            assertTrue(rows().containsKey("top::1") && rows().containsKey("top::2"));
+            // A set of the list, caught after its old values went and before the new ones are in.
+            storage.underWay("top::*", true);
+            store.deleteList("top");
+            storage.save();
+            assertTrue(rows().containsKey("top::1") && rows().get("top::1")[1] != null, "not deleted meanwhile");
+            assertTrue(storage.changed());
+            store.setList("top", new Object[] {text("c")});
+            storage.underWay("top::*", false);
+            waitFor(() -> {
+                try {
+                    Map<String, Object[]> rows = rows();
+                    return rows.get("top::2") != null && rows.get("top::2")[1] == null
+                            && rows.get("top::1") != null && rows.get("top::1")[1] != null;
+                } catch (SQLException e) {
+                    return false;
+                }
+            });
+        }
+    }
+
+    /**
+     * a's commit is slow rather than lost: left open on its own connection while a carries on as if its answer timed
+     * out. It's committed (or rolled back) from the test while a settles it; then, before a's next round, b adds 3 on
+     * top under its own update_guid. a must count its own 50 once either way: 63, not 113.
+     */
+    private void stalledCommit(boolean commits) throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 10L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            one.addToList("queue", new Object[] {text("x")});
+            a.save();
+            waitFor(() -> two.list("queue").length == 1);
+            java.util.concurrent.CountDownLatch settled = new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.CountDownLatch bWrote = new java.util.concurrent.CountDownLatch(1);
+            a.afterSettle = () -> {
+                a.afterSettle = null;
+                settled.countDown();
+                try {
+                    bWrote.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            };
+            java.util.concurrent.CountDownLatch settling = new java.util.concurrent.CountDownLatch(1);
+            a.beforeSettle = () -> {
+                a.beforeSettle = null;
+                settling.countDown();
+            };
+            a.stallNextCommit = true;
+            one.add("coins", new Object[] {50L});
+            one.addToList("queue", new Object[] {text("alice")});
+            waitFor(() -> a.stalled != null);
+            Connection stalled = a.stalled;
+            // a is back and settling, while the stalled transaction is still open: settling waits for it.
+            assertTrue(settling.await(10, java.util.concurrent.TimeUnit.SECONDS));
+            Thread.sleep(400);
+            assertEquals(1, settled.getCount(), "settled before the stalled commit landed");
+            if (commits) {
+                stalled.commit();
+            } else {
+                stalled.rollback();
+            }
+            stalled.close();
+            assertTrue(settled.await(10, java.util.concurrent.TimeUnit.SECONDS));
+            if (!commits) {
+                // Nothing landed: a writes its 50 and its append again, once, before b's 3.
+                bWrote.countDown();
+                waitFor(() -> Long.valueOf(60).equals(two.get("coins")) && two.list("queue").length == 2);
+            }
+            two.add("coins", new Object[] {3L});
+            b.save();
+            bWrote.countDown();
+            waitFor(() -> Long.valueOf(63).equals(one.get("coins")) && Long.valueOf(63).equals(two.get("coins")));
+            Thread.sleep(1_000);
+            assertEquals(63L, one.get("coins"));
+            assertEquals(63L, saved("coins"));
+            assertEquals(2, one.list("queue").length);
+            assertEquals(2, two.list("queue").length);
+        }
+    }
+
+    @Test
+    void aSlowCommitThatLandsWhileItsSettledIsCountedOnce() throws Exception {
+        stalledCommit(true);
+    }
+
+    @Test
+    void aSlowCommitThatNeverLandsIsWrittenAgainOnce() throws Exception {
+        stalledCommit(false);
+    }
+
+    @Test
+    void aServerCutOffWithACommitUnsettledFindsItsMarkerWhenBack() throws Exception {
+        VariableStore one = new VariableStore();
+        VariableStore two = new VariableStore();
+        SqlVariableStorage[] both = pair(one, two, "coins", 10L);
+        try (SqlVariableStorage a = both[0]; SqlVariableStorage b = both[1]) {
+            // b's commit (60, and an append) lands but the answer is lost, and b can't reach the database for a while.
+            b.loseNextReply = true;
+            two.add("coins", new Object[] {50L});
+            two.addToList("queue", new Object[] {text("alice")});
+            waitFor(() -> !b.loseNextReply);
+            b.unreachable = true;
+            waitFor(() -> Long.valueOf(60).equals(one.get("coins")));
+            // Meanwhile a adds 5 on top and keeps watching the table: b's marker is b's alone to remove.
+            one.add("coins", new Object[] {5L});
+            a.save();
+            Thread.sleep(1_000);
+            assertTrue(rows().containsKey(SqlVariableStorage.MARKER + guidOf(b)), "b's marker is still there");
+            b.unreachable = false;
+            waitFor(() -> b.status().state() == SqlVariableStorage.State.CONNECTED);
+            waitFor(() -> Long.valueOf(65).equals(two.get("coins")));
+            Thread.sleep(1_000);
+            assertEquals(65L, one.get("coins"));
+            assertEquals(65L, two.get("coins"));
+            assertEquals(65L, saved("coins"));
+            assertEquals(1, one.list("queue").length);
+            assertEquals(1, two.list("queue").length);
+        }
+    }
+
+    /** A storage's update_guid, as its run file keeps it. */
+    private String guidOf(SqlVariableStorage storage) throws SQLException {
+        String run;
+        try {
+            run = Files.readString(storage.runFile()).strip();
+        } catch (IOException e) {
+            throw new SQLException(e);
+        }
+        return run;
+    }
+
+    @Test
+    void aCrashedRunsMarkerIsRemovedWhenTheServerNextStarts() throws Exception {
+        VariableStore store = new VariableStore();
+        Path runFile;
+        try (SqlVariableStorage storage = storage(store, true)) {
+            storage.load();
+            runFile = storage.runFile();
+        }
+        // A run that crashed: its update_guid kept, its marker row left behind.
+        Files.writeString(runFile, "crashed-run");
+        try (Connection c = open(); PreparedStatement p = c.prepareStatement(
+                "INSERT INTO variables21 (name, type, value, update_guid) VALUES (?, '7', NULL, 'crashed-run')")) {
+            p.setString(1, SqlVariableStorage.MARKER + "crashed-run");
+            p.executeUpdate();
+        }
+        // Another server's marker is never touched.
+        try (Connection c = open(); PreparedStatement p = c.prepareStatement(
+                "INSERT INTO variables21 (name, type, value, update_guid) VALUES (?, '3', NULL, 'other')")) {
+            p.setString(1, SqlVariableStorage.MARKER + "other");
+            p.executeUpdate();
+        }
+        try (SqlVariableStorage storage = storage(new VariableStore(), true)) {
+            storage.load();
+            assertFalse(rows().containsKey(SqlVariableStorage.MARKER + "crashed-run"));
+            assertTrue(rows().containsKey(SqlVariableStorage.MARKER + "other"));
+            assertFalse(Files.readString(runFile).strip().equals("crashed-run"), "this run's own is kept now");
+        }
+    }
+
+    @Test
+    void aStalledCommitsConnectionIsKilledOnlyIfItsCertainlyThisRunsOwn() {
+        String run = "3f6c2a1e-0000-4000-8000-000000000001";
+        Map<String, String> ours = Map.of(SqlVariableStorage.RUN_ATTRIBUTE, run, SqlVariableStorage.SERIAL_ATTRIBUTE,
+                "4", "_client_name", "MySQL Connector/J");
+        assertTrue(SqlVariableStorage.mayKill(ours, run, 4));
+        // Another of this run's connections, another run's (another server, or this one before a restart), a client
+        // without the attributes, no such connection, or attributes that can't be read: never killed.
+        assertFalse(SqlVariableStorage.mayKill(ours, run, 3));
+        assertFalse(SqlVariableStorage.mayKill(Map.of(SqlVariableStorage.RUN_ATTRIBUTE, "another-run",
+                SqlVariableStorage.SERIAL_ATTRIBUTE, "4"), run, 4));
+        assertFalse(SqlVariableStorage.mayKill(Map.of("_client_name", "some app"), run, 4));
+        assertFalse(SqlVariableStorage.mayKill(Map.of(), run, 4));
+        assertFalse(SqlVariableStorage.mayKill(null, run, 4));
     }
 }

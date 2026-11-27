@@ -1,0 +1,11 @@
+# Probe: literals inside an expression inside a text's %...% (issue #50). A literal on its own there isn't
+# understood, but one in an expression is, as Skript reads it.
+
+function probe_embedded():
+	show("type of", "g: %type of stone%")
+	show("name of", "h: %name of stone%")
+	show("possessive name", "j: %stone's name%")
+	show("name of two words", "%name of diamond sword%")
+	show("amount of", "%amount of 3 stone%")
+	set {_t} to "k: %name of stone%"
+	show("set", {_t})

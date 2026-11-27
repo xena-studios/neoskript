@@ -48,6 +48,8 @@ final class LineParser {
     private final co.xenastudios.neoskript.frontend.registry.EventValues.Scope eventScope;
     private boolean refusedEventValues;
     private boolean refusedSkriptValues;
+    /** Whether an event value refused was written as words a value can be read from: not 'the' or 'event-' ones. */
+    private boolean refusedWords;
     private final String input;
     private final String lowerInput;
     private final Map<Key, Object> memo = new HashMap<>();
@@ -259,6 +261,8 @@ final class LineParser {
                 }
                 refusedEventValues = true;
                 refusedSkriptValues |= skriptEventValue(parsed, text);
+                String written = Text.lower(text.strip());
+                refusedWords |= !written.startsWith("the ") && !written.startsWith("event-");
                 continue;
             }
             if (eventScope != null && !leftOutAllowed(syntax, pattern, match)) {
@@ -310,8 +314,19 @@ final class LineParser {
             // level' is the difference of two levels. (Which event values have one is for the compiler to say.)
             if (syntax.id().equals("ExprTimeState") && parsed.match().values().getFirst() instanceof Expr timed
                     && !mayHaveTimeState(timed)) {
-                problem(input.substring(timed.start(), timed.end()).strip() + " does not have a "
-                        + (candidate.pattern() >= 2 ? "future" : "past") + " state");
+                // Skript's init first refuses any time state after a wait; else it names the expression as it writes it.
+                boolean future = candidate.pattern() >= 2;
+                problem(() -> {
+                    if (context.delay() == co.xenastudios.neoskript.frontend.registry.DelayState.DELAYED) {
+                        return "Cannot use time states after the event has already passed";
+                    }
+                    String message = (timed instanceof Expr.Syntax inner ? described(inner.syntax(),
+                            input.substring(timed.start(), timed.end())) : input.substring(timed.start(), timed.end()).strip())
+                            + " does not have a " + (future ? "future" : "past") + " state";
+                    // Skript sets the expression up first: if it can't be used here, that's the error.
+                    causes.put(message, timed);
+                    return message;
+                }, SEMANTIC_ERROR);
                 continue;
             }
             // A direction after a direction word is another one written out, as Skript's init refuses anything else:
@@ -335,11 +350,24 @@ final class LineParser {
                     && holders.syntax().syntax().id().equals("ExprItemsIn")) {
                 continue;
             }
+            // 'transformed' only of what may be several values, as Skript's init refuses one, with no error of its own.
+            if (syntax.id().equals("ExprTransform") && parsed.match().values().getFirst() instanceof Expr source
+                    && !(source instanceof Expr.ListOf) && Plurality.single(source, registry)) {
+                continue;
+            }
             // 'recursive X' only for what can give nested lists, as Skript's init refuses the rest: 'recursive size of
             // {_l::*}' is the list's recursive size.
             if (syntax.id().equals("ExprRecursive") && parsed.match().values().getFirst() instanceof Expr nested
                     && !nestable(nested)) {
                 problem(input.substring(nested.start(), nested.end()).strip() + " does not support nested structures.");
+                continue;
+            }
+            // Indices and a recursive size only of a list variable, as Skript's init refuses anything else, so the
+            // parser tries the next way to read the line: '(indices of {_n::*}, size of {_n::*})' is two values, the
+            // indices and the size, not the indices of a list of both (issue #33).
+            String listOnly = listOnlyProblem(syntax.id(), parsed);
+            if (listOnly != null) {
+                problem(listOnly);
                 continue;
             }
             // 'all colours' only for types whose values can be listed; 'all players' is something else's.
@@ -600,6 +628,51 @@ final class LineParser {
                 return false;
             }
         }
+        return wordsFitOperation(parsed);
+    }
+
+    /**
+     * Whether words against an operand of a known type can be read as a type an operation with it takes, as Skript's
+     * arithmetic converts its unparsed literal to those types and fails to set up when it can't: with SkBee, 'custom
+     * model data -1' isn't a data component type take away 1.
+     */
+    private boolean wordsFitOperation(ParsedSyntax parsed) {
+        List<Object> values = parsed.match().values();
+        if (parsed.pattern() >= SKRIPT_OPERATIONS.length || values.size() != 2) {
+            return true;
+        }
+        for (int side = 0; side < 2; side++) {
+            if (!(values.get(side) instanceof Expr.Unresolved words) || !words.verified()) {
+                continue;
+            }
+            Object other = values.get(1 - side);
+            String known = other instanceof Expr expr && !(expr instanceof Expr.Unresolved) && !(expr instanceof Expr.Variable)
+                    ? expr.type() : null;
+            if (known == null || known.equals(SyntaxRegistry.OBJECT) || registry.type(known) == null) {
+                continue;
+            }
+            List<String> wanted = new ArrayList<>();
+            for (String[] operation : SKRIPT_OPERATIONS[parsed.pattern()]) {
+                if (isOperand(known, operation[1 - side])) {
+                    wanted.add(operation[side]);
+                }
+            }
+            if (wanted.isEmpty()) {
+                continue;
+            }
+            String normalized = Literals.normalize(words.text());
+            boolean fits = false;
+            for (TypeInfo type : registry.types()) {
+                boolean reads = type.openLiterals() ? registry.isLiteral(type, words.text()) : type.literals().contains(normalized);
+                if (reads && wanted.stream().anyMatch(operand -> isOperand(type.id(), operand))) {
+                    fits = true;
+                    break;
+                }
+            }
+            if (!fits) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -692,34 +765,69 @@ final class LineParser {
 
     /** Skript's warnings about the lists in what was parsed of this line, added to the line's warnings. */
     void listWarnings(Object parsed) {
-        listWarnings(input, parsed, warnings);
+        listWarnings(input, parsed, warnings, registry, bracketedLists);
     }
+
+    /** Skript's warnings about the lists in what was parsed of this line, added to {@code into}. */
+    void listWarnings(Object parsed, java.util.Set<String> into) {
+        listWarnings(input, parsed, into, registry, bracketedLists);
+    }
+
+    static void listWarnings(String input, Object parsed, java.util.Set<String> into) {
+        listWarnings(input, parsed, into, null, java.util.Set.of());
+    }
+
+    /**
+     * Lists read as all that's in a pair of brackets ('(1, 2)'), by identity. Skript's parser reads those again on
+     * their own and throws that parse's warnings away, so they don't warn; a list that is the argument of syntax in
+     * brackets ('(size of {_a::*}, 2)'), or in a pattern's own brackets, still does.
+     */
+    private final java.util.Set<Expr.ListOf> bracketedLists =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 
     /**
      * Skript's warnings about the lists in {@code parsed}, whose positions are in {@code input}: a list of more
      * than one value joined only by commas, which is an 'and' list, and one with both 'and' and 'or'.
      */
-    static void listWarnings(String input, Object parsed, java.util.Set<String> into) {
+    static void listWarnings(String input, Object parsed, java.util.Set<String> into, SyntaxRegistry registry) {
+        listWarnings(input, parsed, into, registry, java.util.Set.of());
+    }
+
+    private static void listWarnings(String input, Object parsed, java.util.Set<String> into, SyntaxRegistry registry,
+            java.util.Set<Expr.ListOf> bracketed) {
         switch (parsed) {
             case ParsedSyntax syntax -> {
-                syntax.match().values().forEach(value -> listWarnings(input, value, into));
-                syntax.match().regexValues().forEach(value -> listWarnings(input, value, into));
+                // An addon's call whose arguments Skript parses as a function's (skript-reflect's Java calls): its
+                // own lists aren't warned about, but what's inside them is.
+                boolean quiet = registry != null && registry.quietLists(syntax.syntax().id());
+                for (Object value : syntax.match().values()) {
+                    if (quiet && value instanceof Expr.ListOf list) {
+                        list.items().forEach(item -> listWarnings(input, item, into, registry, bracketed));
+                    } else {
+                        listWarnings(input, value, into, registry, bracketed);
+                    }
+                }
+                syntax.match().regexValues().forEach(value -> listWarnings(input, value, into, registry, bracketed));
             }
-            case Expr.Syntax syntax -> listWarnings(input, syntax.syntax(), into);
+            case Expr.Syntax syntax -> listWarnings(input, syntax.syntax(), into, registry, bracketed);
             case Expr.ListOf list -> {
-                listWarning(input, list, into);
-                list.items().forEach(item -> listWarnings(input, item, into));
+                if (!bracketed.contains(list)) {
+                    listWarning(input, list, into, registry);
+                }
+                list.items().forEach(item -> listWarnings(input, item, into, registry, bracketed));
             }
             // Skript throws away the warnings parsing function arguments gives.
             case Expr.FunctionCall call -> {}
-            case Expr.Text text -> text.embedded().forEach(part -> listWarnings(input, part, into));
-            case Expr.Variable variable -> variable.embedded().forEach(part -> listWarnings(input, part, into));
+            case Expr.Text text -> text.embedded().forEach(part -> listWarnings(input, part, into, registry, bracketed));
+            case Expr.Variable variable ->
+                    variable.embedded().forEach(part -> listWarnings(input, part, into, registry, bracketed));
             case null, default -> {}
         }
     }
 
     /** Skript's {@code parseExpressionList} warnings for one list, from the words between its items. */
-    private static void listWarning(String input, Expr.ListOf list, java.util.Set<String> into) {
+    private static void listWarning(String input, Expr.ListOf list, java.util.Set<String> into,
+            SyntaxRegistry registry) {
         List<Expr> items = list.items();
         if (items.size() < 2 || list.end() > input.length()) {
             return;
@@ -746,7 +854,7 @@ final class LineParser {
                 and = true;
             }
         }
-        if (and == null) {
+        if (and == null && (registry == null || !registry.missingAndOrOff())) {
             into.add("conjunction:List is missing 'and' or 'or', defaulting to 'and': " + text);
         }
     }
@@ -819,6 +927,11 @@ final class LineParser {
      */
     boolean refusedSkriptValues() {
         return refusedSkriptValues;
+    }
+
+    /** Whether an event value the code can't have was turned down, written as words a value can be read from. */
+    boolean refusedWords() {
+        return refusedWords;
     }
 
     private boolean skriptEventValue(ParsedSyntax parsed, String text) {
@@ -1078,7 +1191,19 @@ final class LineParser {
                         yield effect != null ? strict(effect, strictCode) : call(start, end);
                     }
                     case EXPRESSION -> expression(start, end, Expected.OBJECTS);
-                    case TYPE -> typeName(start, end);
+                    case TYPE -> {
+                        TypeRef ref = typeName(start, end);
+                        if (ref == null && eventScope != null && start >= 6
+                                && input.regionMatches(true, start - 6, "event-", 0, 6)) {
+                            // Skript's 'event-<words>' asks for a value named so when they name no type, which
+                            // no event has: its error, if nothing else reads the line.
+                            String unnamed = eventScope.unnamed(input.substring(start, end).strip());
+                            if (unnamed != null) {
+                                problem(unnamed);
+                            }
+                        }
+                        yield ref;
+                    }
                     case TYPE_OR_ENTITY -> {
                         TypeRef ref = typeName(start, end);
                         TypeInfo entity = registry.type("entity");
@@ -1108,8 +1233,14 @@ final class LineParser {
         };
     }
 
-    /** Whether some type's parser takes {@code words}, as Skript's {@code Classes.parse(words, Object.class)}. */
+    /**
+     * Whether some type's parser takes {@code words}, as Skript's {@code Classes.parse(words, Object.class)}. Its
+     * parsers don't take 'the': 'the stone' and 'the player' are nothing there, though 'a stone' is an item.
+     */
     private boolean anyLiteral(String words) {
+        if (Text.lower(words.strip()).startsWith("the ")) {
+            return false;
+        }
         if (context.isItemAlias(words)) {
             return true;
         }
@@ -1142,6 +1273,81 @@ final class LineParser {
         return result instanceof Expr expr ? expr : null;
     }
 
+    /**
+     * Skript's error for indices or a recursive size of something that isn't a list variable, or {@code null} if it
+     * is one: NeoSkript's compiler only works on list variables there, and Skript's init refuses most else.
+     */
+    private String listOnlyProblem(String id, ParsedSyntax parsed) {
+        boolean indices = id.equals("ExprIndices");
+        if (!indices && !id.equals("ExprAmount-recursive")) {
+            return null;
+        }
+        Object value = parsed.match().values().isEmpty() ? null : parsed.match().values().getFirst();
+        if (value instanceof Expr argument && (indices ? keyedSource(argument) : listVariable(argument))) {
+            return null;
+        }
+        // A recursive size of several list variables is all of theirs, as in Skript.
+        if (!indices && value instanceof Expr.ListOf several && several.and()
+                && several.items().stream().allMatch(item -> item instanceof Expr.Variable variable && variable.list())) {
+            return null;
+        }
+        if (indices) {
+            return "The indices expression may only be used with keyed expressions";
+        }
+        if (!(value instanceof Expr argument)) {
+            return null;
+        }
+        String written = input.substring(argument.start(), argument.end()).strip();
+        if (Plurality.single(argument, registry)) {
+            return "'" + written + "' can only ever have one value at most, thus the 'recursive size of ...' expression"
+                    + " is useless. Use '... exists' instead to find out whether the expression has a value.";
+        }
+        List<Expr> items = argument instanceof Expr.ListOf list ? list.items() : List.of(argument);
+        for (Expr item : items) {
+            if (!(item instanceof Expr.Variable)) {
+                return "Getting the recursive size of a list only applies to variables, thus the '"
+                        + input.substring(item.start(), item.end()).strip() + "' expression is useless.";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether {@code expr} gives its values' indices, as Skript's {@code KeyProviderExpression.canReturnKeys}: a list
+     * variable, {@code keyed} anything, a function call, or {@code recursive}, {@code filtered}, an element of, a
+     * value within or (with one value for each) {@code transformed} something that does.
+     */
+    private boolean keyedSource(Expr expr) {
+        return switch (expr) {
+            case Expr.Variable variable -> variable.list();
+            case Expr.FunctionCall call -> true;
+            case Expr.Syntax syntax -> {
+                List<Object> values = syntax.syntax().match().values();
+                Expr inner = values.isEmpty() || !(values.getFirst() instanceof Expr first) ? null : first;
+                yield switch (syntax.syntax().syntax().id()) {
+                    case "ExprKeyed" -> true;
+                    case "ExprRecursive", "ExprFilter", "ExprCast" -> inner != null && keyedSource(inner);
+                    case "ExprElement" -> values.getLast() instanceof Expr last && keyedSource(last);
+                    case "ExprTransform" -> inner != null && keyedSource(inner)
+                            && syntax.syntax().match().regexValues().getFirst() instanceof Expr mapping
+                            && Plurality.single(mapping, registry);
+                    default -> false;
+                };
+            }
+            default -> false;
+        };
+    }
+
+    /** Whether {@code expr} is a list variable, or {@code keyed} of one. */
+    private static boolean listVariable(Expr expr) {
+        if (expr instanceof Expr.Syntax keyed && keyed.syntax().syntax().id().equals("ExprKeyed")
+                && !keyed.syntax().match().values().isEmpty()
+                && keyed.syntax().match().values().getFirst() instanceof Expr inner) {
+            expr = inner;
+        }
+        return expr instanceof Expr.Variable variable && variable.list();
+    }
+
     private Expr parseExpression(int start, int end, Expected expected) {
         if (start >= end) {
             return null;
@@ -1155,10 +1361,18 @@ final class LineParser {
         } finally {
             frames.pop();
         }
-        if (expr instanceof Expr.Unresolved words && !words.verified() && frame[0] != null && expected.anything()) {
-            return new Expr.Unresolved(words.start(), words.end(), words.text(), false, frame[0]);
+        // Words read as a value only because a type's parser takes them ('stone') aren't, where reading them as an
+        // expression gave an error: Skript keeps that error ('player' where there's no player in the event).
+        if (expr instanceof Expr.Unresolved words && (!words.verified() || anyValueOnly(words, expected))
+                && frame[0] != null && expected.anything()) {
+            return new Expr.Unresolved(words.start(), words.end(), words.text(), false, frame[0], causes.get(frame[0]));
         }
         return expr;
+    }
+
+    /** Whether words are verified only because some type's parser takes them where any value goes. */
+    private boolean anyValueOnly(Expr.Unresolved words, Expected expected) {
+        return words.verified() && expected.anything() && !context.isItemAlias(words.text());
     }
 
     /** The problems found so far, to drop those found after: see {@link #restore}. */
@@ -1302,9 +1516,16 @@ final class LineParser {
             // As Skript's parseExpressionList reads what's in brackets again on its own and returns without printing
             // its log, the errors of what's in brackets are dropped when it isn't of a type wanted: '(the equippable
             // component of {_item})' says nothing where an item component goes. Where any value goes, it's an
-            // unparsed literal that keeps them.
-            Problems before = expected.anything() ? null : problems();
+            // unparsed literal that keeps them, unless no words may go there ('%~objects%'): then there's no unparsed
+            // literal, and 'indices of (recursive {_t})' says nothing either (issue #79).
+            Problems before = expected.anything() && !expected.changeable() ? null : problems();
             Expr inner = expression(start + 1, end - 1, expected);
+            if (inner instanceof Expr.ListOf list) {
+                // A copy, so only this reading of the list is the bracketed one: see bracketedLists.
+                Expr.ListOf copy = new Expr.ListOf(list.start(), list.end(), list.items(), list.and(), list.type());
+                bracketedLists.add(copy);
+                return copy;
+            }
             if (inner != null) {
                 return inner;
             }
@@ -1431,8 +1652,24 @@ final class LineParser {
         return specifiedLiteral(start, end, text, expected);
     }
 
+    /**
+     * Skript's pattern for a literal with its type given ({@code SkriptParser.LITERAL_SPECIFICATION_PATTERN}): when the
+     * type isn't one, that's its error.
+     */
+    private static final java.util.regex.Pattern SKRIPT_SPECIFIED =
+            java.util.regex.Pattern.compile("[^,():/\"\\[\\]}{]+ \\(([\\w\\p{L} ]+)\\)");
+
     /** A literal with its type given in parentheses, like {@code black (wolf variant)}. */
     private Expr specifiedLiteral(int start, int end, String text, Expected expected) {
+        java.util.regex.Matcher skript = SKRIPT_SPECIFIED.matcher(text);
+        if (skript.matches()) {
+            // As Skript's parseSpecifiedLiteral: 'indices of (5)' is the words 'indices of' of a type '5'.
+            String named = skript.group(1).replaceFirst("(?i)^the ", "");
+            if (registry.resolveType(Literals.normalize(named)) == null) {
+                problem("A " + named + " is not a valid type.");
+                return null;
+            }
+        }
         java.util.regex.Matcher matcher = Literals.SPECIFIED.matcher(text);
         if (!matcher.matches()) {
             return null;
@@ -1851,6 +2088,8 @@ final class LineParser {
         if (mixesNamedAndUnnamed(pieces, parameters)) {
             return "Mixing named and unnamed arguments is not allowed";
         }
+        // A function whose one parameter is a list, as Skript sorts its 'list references' from its 'exact' ones.
+        boolean listFunction = parameters.size() == 1 && parameters.getFirst().plural();
         Expr[] byParameter = new Expr[parameters.size()];
         int next = 0;
         for (int p = 0; p < pieces.size(); p++) {
@@ -1890,8 +2129,9 @@ final class LineParser {
             if (argument == null) {
                 int[] value = trim(valueStart, piece[1]);
                 String written = input.substring(value[0], value[1]);
-                if (nestedList(value[0], value[1])) {
-                    // A list with a list in it: no function takes that, so there's no such function.
+                if (listFunction && nestedList(value[0], value[1])) {
+                    // A list with a list in it, for a function whose one parameter is a list: there's no such
+                    // function, as Skript's getListReferences has it.
                     return null;
                 }
                 if (embeddedError != null && written.startsWith("\"")) {
@@ -1913,8 +2153,10 @@ final class LineParser {
             if (argument instanceof Expr.ListOf list && !list.and()) {
                 return OR_IN_ARGUMENTS;
             }
-            if (argument instanceof Expr.ListOf list && list.items().stream().anyMatch(Expr.ListOf.class::isInstance)) {
-                // A list of lists isn't an argument: 'f(ns: (1, (2, 3)))'.
+            if (listFunction && argument instanceof Expr.ListOf list
+                    && list.items().stream().anyMatch(Expr.ListOf.class::isInstance)) {
+                // A list of lists isn't an argument of a function whose one parameter is a list: 'f(ns: (1, (2, 3)))'.
+                // Other functions take one, as Skript's exact references do: 'show("x", ((1, 2), 3))'.
                 return null;
             }
             if (!parameter.plural() && Plurality.plural(argument, registry) && ref != null) {
@@ -2078,6 +2320,20 @@ final class LineParser {
 
     /** The quality of {@link #problem}. */
     private int problemQuality;
+
+    /** The expressions problems are about, by problem: see {@link Expr.Unresolved#cause}. */
+    private final java.util.Map<String, Expr> causes = new java.util.HashMap<>();
+
+    /** {@link #problem(String, int)}, worked out only if it's kept. */
+    private void problem(java.util.function.Supplier<String> found, int quality) {
+        boolean kept = problem == null || quality > problemQuality;
+        for (String[] frame : frames) {
+            kept |= frame[0] == null || quality > Integer.parseInt(frame[1]);
+        }
+        if (kept) {
+            problem(found.get(), quality);
+        }
+    }
 
     /**
      * A problem found while parsing, of a quality, kept as Skript's parse log keeps its error: the first of the
@@ -2277,7 +2533,11 @@ final class LineParser {
         if (!open) {
             return null;
         }
-        boolean verified = expected.types().stream().anyMatch(type -> type.openLiterals() && registry.isLiteral(type, text));
+        // Where any value goes, Skript reads the words with every type's parser (Classes.parse(words, Object.class)),
+        // so words one of them takes, like 'stone', are a value, not words leaning on nothing: '"%name of stone%"'.
+        // Words only an addon's strict type takes (an imported class) are known there too.
+        boolean verified = expected.types().stream().anyMatch(type -> type.openLiterals() && registry.isLiteral(type, text))
+                || expected.anything() && (anyLiteral(text) || registry.isAddonStrictLiteral(text));
         return new Expr.Unresolved(start, end, text, verified);
     }
 

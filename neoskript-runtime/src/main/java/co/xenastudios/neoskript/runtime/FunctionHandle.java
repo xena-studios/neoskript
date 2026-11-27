@@ -12,11 +12,12 @@ import co.xenastudios.neoskript.api.element.TriggerContext;
  */
 public final class FunctionHandle {
 
-    private static final SimpleTriggerContext CONTEXT = new SimpleTriggerContext(null);
 
     private final String name;
     private volatile CompiledFunction target;
     private volatile String script;
+    /** For declared syntax's code: the scripts whose loaded code uses it, to name them if it goes. */
+    private final java.util.Set<String> users = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public FunctionHandle(String name) {
         this.name = name;
@@ -40,12 +41,17 @@ public final class FunctionHandle {
         return target != null;
     }
 
+    /** The scripts whose loaded code uses this handle's declared syntax. */
+    public java.util.Set<String> users() {
+        return users;
+    }
+
     public void target(CompiledFunction target) {
         this.target = target;
     }
 
     public Object call(Object[] arguments) {
-        return call(CONTEXT, arguments);
+        return call(SimpleTriggerContext.NOWHERE, arguments);
     }
 
     /**
@@ -65,6 +71,6 @@ public final class FunctionHandle {
             return null;
         }
         // Straight through: the function's prologue makes its one context from it (SimpleTriggerContext.call).
-        return function.call(caller == null ? CONTEXT : caller, arguments);
+        return function.call(caller == null ? SimpleTriggerContext.NOWHERE : caller, arguments);
     }
 }

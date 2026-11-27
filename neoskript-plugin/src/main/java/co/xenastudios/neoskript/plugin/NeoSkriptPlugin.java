@@ -55,8 +55,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         co.xenastudios.neoskript.runtime.PausingSections.install(message -> getSLF4JLogger().warn(message));
-        // D10: NeoSkript replaces Skript, so running both would fight over scripts and commands.
-        if (getServer().getPluginManager().getPlugin("Skript") != null) {
+        // D10: NeoSkript replaces Skript, so running both would fight over scripts and commands. By the plugin's own
+        // name: NeoSkriptCompat provides "Skript" for Skript addons (D22), and isn't Skript.
+        if (skriptRunning(getServer().getPluginManager().getPlugin("Skript"))) {
             getSLF4JLogger().error(
                     "Skript is installed. NeoSkript replaces Skript, so they can't run together. "
                             + "Remove Skript.jar from the plugins folder to use NeoSkript. NeoSkript is now disabled.");
@@ -117,10 +118,24 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
 
         Library library = new Library();
+        this.library = library;
         if (TestRunner.enabled()) {
             library.enableTesting();
         }
         // Syntax of the plugins NeoSkript hooks into, as Skript's hooks, only when they're installed.
+        // config.yml's hooks, which apply on restart, and verbosity, which logs each plugin hooked into from high.
+        java.util.Set<String> unhooked = new java.util.HashSet<>();
+        if (!settings.hooks().vault()) {
+            unhooked.add("Vault");
+        }
+        if (!settings.hooks().worldguard()) {
+            unhooked.add("WorldGuard");
+        }
+        if (!settings.hooks().griefPrevention()) {
+            unhooked.add("GriefPrevention");
+        }
+        co.xenastudios.neoskript.paper.Hooks.configure(unhooked,
+                settings.verbosity().compareTo(NeoSkriptConfig.Verbosity.HIGH) >= 0);
         boolean hooks = co.xenastudios.neoskript.paper.Hooks.anyInstalled();
         addons = new Addons(getSLF4JLogger());
         addons.frozenWhen(library::frozen);
@@ -130,20 +145,25 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         // With addons, which enable after NeoSkript, the syntax is registered on the first tick, theirs with it, and
         // variables load after that, so the addons' types load too. Without them, nothing waits.
         boolean deferSyntax = Addons.anyInstalled(this) && !co.xenastudios.neoskript.plugin.check.CheckMode.requested();
-        Runnable registerSyntax = () -> {
-            StandardLibrary.register(library, registrar -> {
-                if (hooks) {
-                    co.xenastudios.neoskript.paper.Hooks.register(registrar, getPluginMeta().getVersion(), getSLF4JLogger());
-                }
-                // Addons' syntax goes with the hooks': before comparisons and what matches almost anything.
+        // The standard library and the hooks register now, with or without addons, so addons enabling after
+        // NeoSkript (and Skript addons, through NeoSkriptCompat) can ask what types there are. Addons' syntax goes
+        // with the hooks': before comparisons and what matches almost anything. With addons, it's registered on the
+        // first tick, at that place.
+        StandardLibrary.register(library, registrar -> {
+            if (hooks) {
+                co.xenastudios.neoskript.paper.Hooks.register(registrar, getPluginMeta().getVersion(), getSLF4JLogger());
+            }
+            if (deferSyntax) {
+                library.markAddonPoint();
+            } else {
                 addons.registerAll(registrar);
-            });
-            StandardLibrary.usePlayerUuidsInVariableNames(settings.variables().playerUuidsInNames());
-        };
-        if (!deferSyntax) {
-            registerSyntax.run();
-        }
+            }
+        });
+        StandardLibrary.usePlayerUuidsInVariableNames(settings.variables().playerUuidsInNames());
+        Runnable registerSyntax = () -> library.insertingAtMark(() -> addons.registerAll(library));
         aliases = new AliasManager(getDataPath(), getSLF4JLogger());
+        // The settings scripts read, before any script loads.
+        applyScriptSettings(settings);
         if (co.xenastudios.neoskript.plugin.check.CheckMode.requested()) {
             // Started by NeoSkript's CLI to check scripts: check them, write the report, and stop.
             try {
@@ -196,11 +216,16 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         effectCommands = new EffectCommands(scripts, scheduler, getSLF4JLogger(), TestRunner.enabled(),
                 EffectCommands.Settings.of(settings.effectCommands()));
         getServer().getPluginManager().registerEvents(effectCommands, this);
+        // Skript's legacy tab completion compatibility, when config.yml turns it off.
+        getServer().getPluginManager().registerEvent(org.bukkit.event.server.TabCompleteEvent.class,
+                new org.bukkit.event.Listener() {}, org.bukkit.event.EventPriority.HIGHEST,
+                (listener, event) -> ScriptCommand.keepOwnCompletions((org.bukkit.event.server.TabCompleteEvent) event),
+                this, false);
         storage = openVariables(scripts.globals(), library.codecs());
         if (!deferSyntax) {
             loadVariables();
         }
-        AddonApi api = new AddonApi(this, addons, scripts.globals(), library, getSLF4JLogger());
+        AddonApi api = new AddonApi(this, addons, scripts.globals(), library, getSLF4JLogger(), this::databases);
         addonApi = api;
         co.xenastudios.neoskript.api.Installed.install(api);
         // An addon disables before NeoSkript when the server stops, and its classes go with it. Its values in
@@ -208,10 +233,14 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
             @org.bukkit.event.EventHandler
             public void onAddonDisable(org.bukkit.event.server.PluginDisableEvent event) {
-                if (!Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin())) {
+                boolean addon = Addons.isAddon(NeoSkriptPlugin.this, event.getPlugin());
+                if (!detachesOnDisable(event.getPlugin() == NeoSkriptPlugin.this, addon,
+                        () -> library.hasCodecsFrom(event.getPlugin().getClass().getClassLoader()))) {
                     return;
                 }
-                addons.remove(event.getPlugin().getName());
+                if (addon) {
+                    addons.remove(event.getPlugin().getName());
+                }
                 VariableBackend current = storage;
                 if (current != null && current.loaded()) {
                     VariableStorage.Detached detached = current.detach(event.getPlugin().getClass().getClassLoader());
@@ -270,6 +299,34 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         getCommand("skript").setExecutor(new SkriptCommand(this, scripts));
     }
 
+    private Library library;
+
+    /**
+     * The library scripts are compiled against: for NeoSkriptCompat, which registers Skript addons' syntax into it
+     * (D22). Not part of the addon API.
+     */
+    public Library library() {
+        return library;
+    }
+
+    /**
+     * Whether a plugin being disabled has its values in variables turned into their saved bytes, so later saves never
+     * need its code: an addon, or a plugin whose classes a codec saves (a Skript addon's types through NeoSkriptCompat:
+     * SkBee disables before NeoSkriptCompat, and its classes can't be loaded after). Never NeoSkript itself: its own
+     * codecs stay until its last save, which is after its unload triggers.
+     */
+    static boolean detachesOnDisable(boolean self, boolean addon, java.util.function.BooleanSupplier ownsCodecs) {
+        return !self && (addon || ownsCodecs.getAsBoolean());
+    }
+
+    /**
+     * Whether {@code plugin}, what the server has under the name "Skript", is Skript itself rather than a plugin that
+     * only provides that name, as NeoSkriptCompat does (D22).
+     */
+    static boolean skriptRunning(org.bukkit.plugin.Plugin plugin) {
+        return plugin != null && plugin.getName().equals("Skript");
+    }
+
     /** The addons registered through NeoSkript's API, as {@code name version}, for {@code /sk info}. */
     java.util.List<String> registeredAddons() {
         return addons == null ? java.util.List.of() : addons.names();
@@ -311,9 +368,18 @@ public final class NeoSkriptPlugin extends JavaPlugin {
      * Reads config.yml at startup, writing the defaults if there's none and carrying an old one forward. A file
      * that isn't valid YAML is left as it is, and NeoSkript runs on the defaults until it's fixed.
      */
+    /** Set when the server stops, so a backup being compressed is cut off rather than waited for. */
+    private volatile boolean stopping;
+
+    /** Whether config.yml was carried forward at this start from a version without databases, so without backups. */
+    private boolean carriedToDatabases;
+
     private void loadSettings() {
         try {
-            accept(ConfigLoader.load(NeoSkriptConfig.SPEC, configFile()));
+            ConfigLoader.Result<NeoSkriptConfig> loaded = ConfigLoader.load(NeoSkriptConfig.SPEC, configFile());
+            // Carried from a config.yml without databases, as 0.1.0-beta.1's, which made no backups.
+            carriedToDatabases = loaded.carriedFrom() > 0 && loaded.carriedFrom() < 3;
+            accept(loaded);
         } catch (ConfigException e) {
             getSLF4JLogger().error("{} Running on the default settings until it's fixed and reloaded with /sk reload config.",
                     e.getMessage());
@@ -342,11 +408,15 @@ public final class NeoSkriptPlugin extends JavaPlugin {
      */
     /** Whether config.yml has them now, or there were none to copy. */
     private boolean copySkriptSettings(SkriptMigration.Result migration) {
-        java.util.Map<String, Object> copied = new java.util.LinkedHashMap<>();
-        if (migration.playerUuids() != null) {
-            copied.put("variables.player-uuids-in-names", migration.playerUuids());
+        if (migration.caseClashes() != null) {
+            caseClashes(migration);
         }
-        copied.putAll(migration.settings());
+        migration.notCopied().forEach(note -> getSLF4JLogger().info(note));
+        if (migration.settingsProblem() != null) {
+            getSLF4JLogger().warn("Couldn't read Skript's config.sk ({}), so its settings weren't copied. NeoSkript runs"
+                    + " on its defaults, which are Skript's; set any you changed in config.yml.", migration.settingsProblem());
+        }
+        java.util.Map<String, Object> copied = new java.util.LinkedHashMap<>(migration.settings());
         org.bukkit.configuration.file.YamlConfiguration current =
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile().toFile());
         copied.entrySet().removeIf(setting -> setting.getValue().equals(current.get(setting.getKey())));
@@ -370,6 +440,8 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             getSLF4JLogger().error("Couldn't copy Skript's settings to config.yml", e);
             return false;
         }
+        getSLF4JLogger().info("Copied {} from Skript's config.sk to config.yml: {}", copied.size() == 1 ? "a setting"
+                : copied.size() + " settings", String.join(", ", copied.keySet()));
         if (copied.containsKey("variables.player-uuids-in-names")) {
             getSLF4JLogger().info("Players are their {} in variable names, as in Skript's config.sk.",
                     settings.variables().playerUuidsInNames() ? "UUIDs" : "names");
@@ -387,6 +459,50 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                             .collect(java.util.stream.Collectors.joining(", ")));
         }
         return true;
+    }
+
+    /**
+     * Skript's {@code case-insensitive variables} was off, which NeoSkript doesn't have: its variable names always
+     * ignore case. Says so, and names the variables that now read as one, loudly, as only one of each is kept.
+     */
+    private void caseClashes(SkriptMigration.Result migration) {
+        if (migration.caseClashes().isEmpty()) {
+            getSLF4JLogger().warn("Skript's config.sk has 'case-insensitive variables: false'. NeoSkript's variable names"
+                    + " always ignore case, as Skript's do by default: {coins::Bob} and {coins::bob} are the same"
+                    + " variable. No saved variables differ only by case, so none are affected.");
+            return;
+        }
+        int count = migration.caseClashes().size();
+        getSLF4JLogger().error("Skript's config.sk has 'case-insensitive variables: false', but NeoSkript's variable"
+                + " names always ignore case. {} {} of saved variables differ only by case, and NeoSkript keeps only one"
+                + " of each (the last in {}); the next save drops the others. Skript's own file is left as it was{}. Rename"
+                + " them in your scripts and variables before relying on them:", count, count == 1 ? "group" : "groups",
+                migration.caseClashFile() == null ? "the file" : shown(migration.caseClashFile()),
+                migration.variablesBackup() == null ? ""
+                        : ", and the copy NeoSkript read is backed up as " + shown(migration.variablesBackup()));
+        int shown = 0;
+        for (java.util.List<String> names : migration.caseClashes()) {
+            if (shown++ == 50) {
+                getSLF4JLogger().error("  ... and {} more", count - 50);
+                break;
+            }
+            getSLF4JLogger().error("  {}", names.stream().map(name -> "{" + name + "}")
+                    .collect(java.util.stream.Collectors.joining(", ")));
+        }
+    }
+
+    /** A path as the console shows it: relative to NeoSkript's folder when it's in it. */
+    private String shown(java.nio.file.Path path) {
+        java.nio.file.Path absolute = path.toAbsolutePath().normalize();
+        java.nio.file.Path folder = getDataPath().toAbsolutePath().normalize();
+        return absolute.startsWith(folder) ? "plugins/NeoSkript/" + folder.relativize(absolute).toString().replace('\\', '/')
+                : absolute.toString();
+    }
+
+    /** Applies the settings scripts read, logging what couldn't be used. */
+    private void applyScriptSettings(NeoSkriptConfig settings) {
+        ScriptSettings.apply(settings, getDataPath().resolve("lang"))
+                .forEach(warning -> getSLF4JLogger().warn("config.yml: {}", warning));
     }
 
     /** The settings from config.yml. */
@@ -442,6 +558,11 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             @Override
             public void playerUuids(boolean uuids) {
                 StandardLibrary.usePlayerUuidsInVariableNames(uuids);
+            }
+
+            @Override
+            public void scripts(NeoSkriptConfig settings) {
+                applyScriptSettings(settings);
             }
 
             @Override
@@ -549,6 +670,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                                         database.name(), database.host(), database.port(), database.database(),
                                         database.user(), database.password(), database.table(),
                                         database.monitorChanges(), database.monitorInterval().millis());
+                sql = sql.withMerge(database.mergeChanges());
                 // Kept per database, by a hash of its type, where it is and its table.
                 return new co.xenastudios.neoskript.runtime.variables.storage.SqlVariableStorage(globals, codecs, sql,
                         routing, data.resolve("pending"), console);
@@ -657,9 +779,12 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 }
             }
             storage.notes().forEach(line -> getSLF4JLogger().warn(line));
-            getSLF4JLogger().info("Loaded {} {} in {} ms{}", loaded.variables(), loaded.variables() == 1 ? "variable" : "variables",
-                    (System.nanoTime() - start) / 1_000_000,
-                    loaded.raw() == 0 ? "" : " (" + loaded.raw() + " kept as saved until NeoSkript supports their types)");
+            // Skript doesn't say at config.yml's 'verbosity: low'.
+            if (Logging.logs(NeoSkriptConfig.Verbosity.NORMAL)) {
+                getSLF4JLogger().info("Loaded {} {} in {} ms{}", loaded.variables(),
+                        loaded.variables() == 1 ? "variable" : "variables", (System.nanoTime() - start) / 1_000_000,
+                        loaded.raw() == 0 ? "" : " (" + loaded.raw() + " kept as saved until NeoSkript supports their types)");
+            }
         } catch (IOException | RuntimeException | LinkageError e) {
             // Don't run with an empty set of variables that would then overwrite the file. The storage never saves
             // until it has loaded, so nothing writes over the file, not even when the server stops.
@@ -677,6 +802,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }
         scheduleSaves();
         scheduleBackups();
+        if (carriedToDatabases) {
+            backupsNotice();
+        }
     }
 
     /**
@@ -708,7 +836,22 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             long period = plan.periodMillis();
             getServer().getAsyncScheduler().runAtFixedRate(this, task -> {
                 try {
+                    // Compressing reads only the copy, so it never holds up a save, and stopping the server cuts it off.
                     java.nio.file.Path backup = backend.backupNow();
+                    if (backup != null && this.settings.variables().compressBackups()) {
+                        try {
+                            VariableStorage.Compressed compressed = VariableStorage.compress(backup, () -> stopping);
+                            if (compressed.copyLeft() != null) {
+                                getSLF4JLogger().warn("Compressed the backup as {}, but couldn't remove the copy {}: {}",
+                                        compressed.file().getFileName(), backup.getFileName(),
+                                        compressed.copyLeft().getMessage());
+                            }
+                            backup = compressed.file();
+                        } catch (IOException | RuntimeException e) {
+                            getSLF4JLogger().error("Couldn't compress the backup {}, so it's kept as it is: {}",
+                                    backup.getFileName(), e.getMessage());
+                        }
+                    }
                     if (backup != null) {
                         getSLF4JLogger().info("Backed up {} as {}", backend.describe(),
                                 getDataPath().toAbsolutePath().relativize(backup.toAbsolutePath()));
@@ -740,6 +883,24 @@ public final class NeoSkriptPlugin extends JavaPlugin {
             // Skript's task runs every so many ticks: under one, it doesn't start. Otherwise exactly as written.
             long ticks = interval.millis() / 50;
             return new BackupPlan(false, ticks * 50);
+        }
+    }
+
+    /**
+     * Once, when config.yml was just carried forward from before it had databases: says that variables are now backed
+     * up as Skript backs them up by default, which 0.1.0-beta.1 didn't do, and how to change it.
+     */
+    private void backupsNotice() {
+        for (DatabaseSettings.Database database : settings.databases().enabled()) {
+            if (database.type().file() && database.backupInterval() != null && database.backupsToKeep() != 0) {
+                getSLF4JLogger().info("Variables in the {} database are now backed up every {} into backups/ beside its"
+                        + " file{}, keeping {}, as Skript does. Set databases.{}.backup-interval to 0 to stop, or"
+                        + " backups-to-keep to keep fewer. See https://neoskript.dev/docs/server/variables/#backups",
+                        database.name(), database.backupInterval(), database.type().name().equals("NATIVE")
+                                ? " (copies of the native .nsv file)" : "",
+                        database.backupsToKeep() < 0 ? "them all" : "the newest " + database.backupsToKeep(),
+                        database.name());
+            }
         }
     }
 
@@ -795,6 +956,7 @@ public final class NeoSkriptPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        stopping = true;
         co.xenastudios.neoskript.api.Installed.install(null);
         if (metrics != null) {
             // bStats' thread would otherwise outlive the plugin, and keep it in memory, through /reload.

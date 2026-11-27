@@ -1,0 +1,13 @@
+# Checks: Skript's errors for 'continue' where there's no loop to go on with.
+
+on load:
+	continue
+
+on load:
+	loop 2 times:
+		continue the 2nd loop
+
+on load:
+	loop 2 times:
+		loop 2 times:
+			continue the 3rd loop

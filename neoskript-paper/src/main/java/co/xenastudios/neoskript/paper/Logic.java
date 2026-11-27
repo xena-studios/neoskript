@@ -12,6 +12,7 @@ import co.xenastudios.neoskript.api.registration.Registrar;
 import org.bukkit.inventory.Inventory;
 import co.xenastudios.neoskript.runtime.Comparison;
 import co.xenastudios.neoskript.runtime.KeyedValues;
+import co.xenastudios.neoskript.runtime.Settings;
 import co.xenastudios.neoskript.runtime.Values;
 import java.util.ArrayList;
 import java.util.List;
@@ -357,7 +358,9 @@ final class Logic {
             return "block".equals(info.argumentType(0))
                     ? co.xenastudios.neoskript.api.element.Update.inPlace(0, toggle)
                     : co.xenastudios.neoskript.api.element.Update.of(0, toggle);
-        }, "(open:open|close:close|toggle) %~objects%");
+        // As Skript's patterns: only blocks open and close, so 'close the player's inventory' is the inventory effect.
+        }, "(open:open|open:turn on|open:activate) %~blocks%", "(close:close|close:turn off|close:de[-]activate) %~blocks%",
+                "(toggle|switch) [[the] state of] %~blocks/booleans%");
         registrar.expression("ExprInverse", "boolean", info -> (context, args) -> {
             Object[] values = Values.array(args[0]);
             Object[] inverse = new Object[values.length];
@@ -506,18 +509,22 @@ final class Logic {
             return Condition.check(containers, containersAnd, container -> Condition.check(values, valuesAnd, value -> {
                 String needle = value instanceof net.kyori.adventure.text.Component component ? parser.toString(component)
                         : value instanceof String text ? parser.toString(parser.parse(text)) : null;
-                return needle != null && parser.toString((net.kyori.adventure.text.Component) container)
-                        .toLowerCase(java.util.Locale.ROOT).contains(needle.toLowerCase(java.util.Locale.ROOT));
+                return needle != null && contains(parser.toString((net.kyori.adventure.text.Component) container), needle);
             }));
         }
         if (java.util.Arrays.stream(containers).allMatch(String.class::isInstance)
                 && Condition.check(containers, containersAnd, container -> Condition.check(values, valuesAnd,
-                        value -> value instanceof String text && ((String) container).toLowerCase(java.util.Locale.ROOT)
-                                .contains(text.toLowerCase(java.util.Locale.ROOT))))) {
+                        value -> value instanceof String text && contains((String) container, text)))) {
             return true;
         }
         // Not all of them hold things: whether the values are among them, unless only what's in them counts.
         return direct && among(containers, values, valuesAnd);
+    }
+
+    /** Skript's {@code StringUtils.contains}: with case only when config.yml's text.case-sensitive is on. */
+    static boolean contains(String haystack, String needle) {
+        return Settings.caseSensitive() ? haystack.contains(needle)
+                : haystack.toLowerCase(java.util.Locale.ROOT).contains(needle.toLowerCase(java.util.Locale.ROOT));
     }
 
     /** Whether the values (all, or any) are among {@code containers}, as Skript compares them. */
@@ -552,12 +559,12 @@ final class Logic {
 
     /**
      * {@code decimals from 3.94 to 4}: the numbers between, in steps of the first's decimal places, at most
-     * two as Skript's default number accuracy: 3.94, 3.95 ... 4.
+     * the number accuracy (two by default): 3.94, 3.95 ... 4.
      */
     private static Object[] decimals(Number first, double to) {
         double from = first.doubleValue();
         String[] split = first.toString().split("\\.");
-        double multiplier = Math.pow(10, Math.min(split.length > 1 ? split[1].length() : 0, 2));
+        double multiplier = Math.pow(10, Math.min(split.length > 1 ? split[1].length() : 0, Settings.writtenNumberAccuracy()));
         int low = (int) Math.ceil(Math.min(from, to) * multiplier);
         int high = (int) Math.floor(Math.max(from, to) * multiplier);
         List<Object> numbers = new ArrayList<>();
@@ -645,7 +652,7 @@ final class Logic {
                     if (queue != null) {
                         return last ? queue.pollLast() : queue.pollFirst();
                     }
-                    return last ? values[count - 1] : values[0];
+                    return at(keyed, values, last ? count - 1 : 0);
                 }
                 case 1 -> {
                     int n = Math.min(count, Math.max(0, number(args[0])));
@@ -661,7 +668,7 @@ final class Logic {
                     return last ? range(keyed, values, count - n, count) : range(keyed, values, 0, n);
                 }
                 case 2 -> {
-                    return count == 0 ? null : values[random.nextInt(count)];
+                    return count == 0 ? null : at(keyed, values, random.nextInt(count));
                 }
                 case 3 -> {
                     int n = Math.max(0, number(args[0]));
@@ -671,10 +678,13 @@ final class Logic {
                     if (!distinct) {
                         // Any element each time, so the same one can come up more than once.
                         Object[] picked = new Object[n];
+                        String[] keys = new String[n];
                         for (int i = 0; i < n; i++) {
-                            picked[i] = values[random.nextInt(count)];
+                            int chosen = random.nextInt(count);
+                            picked[i] = values[chosen];
+                            keys[i] = keyed == null ? null : keyed.keys()[chosen];
                         }
-                        return picked;
+                        return keyed == null ? picked : new KeyedValues(picked, keys);
                     }
                     List<Integer> order = new java.util.ArrayList<>(count);
                     for (int i = 0; i < count; i++) {
@@ -693,7 +703,7 @@ final class Logic {
                 case 4 -> {
                     int n = number(args[0]);
                     int index = toLast ? count - n : n - 1;
-                    return index >= 0 && index < count ? values[index] : null;
+                    return index >= 0 && index < count ? at(keyed, values, index) : null;
                 }
                 default -> {
                     // 'elements from 2 to 1' are those from 1 to 2.
@@ -704,6 +714,12 @@ final class Logic {
                     return from > to ? new Object[0] : range(keyed, values, from - 1, to);
                 }
             }
+        }
+
+        /** The value at {@code index}, with its index if the values have them, as Skript's keyed element. */
+        private static Object at(KeyedValues keyed, Object[] values, int index) {
+            return keyed == null ? values[index]
+                    : new KeyedValues(new Object[] {values[index]}, new String[] {keyed.keys()[index]});
         }
 
         private static Object range(KeyedValues keyed, Object[] values, int from, int to) {
@@ -817,9 +833,12 @@ final class Logic {
                     if (!(value instanceof String part) || part.isEmpty()) {
                         continue;
                     }
-                    // Without case, as Skript compares text by default.
+                    // Without case unless config.yml's text.case-sensitive is on. (Skript 2.17 has its option the
+                    // wrong way round here, finding text with case when it's off.)
+                    boolean ignoreCase = !Settings.caseSensitive();
                     List<Long> positions = new java.util.ArrayList<>();
-                    for (int at = indexOf(text, part, 0); at >= 0; at = indexOf(text, part, at + 1)) {
+                    for (int at = indexOf(text, part, 0, ignoreCase); at >= 0;
+                            at = indexOf(text, part, at + 1, ignoreCase)) {
                         positions.add((long) at + 1);
                     }
                     if (which == 2 && !positions.isEmpty()) {
@@ -844,10 +863,10 @@ final class Logic {
             return found.size() == 1 && which != 0 ? found.getFirst() : found.toArray();
         }
 
-        /** Where {@code part} is in {@code text} from {@code from} on, without case, or -1. */
-        private static int indexOf(String text, String part, int from) {
+        /** Where {@code part} is in {@code text} from {@code from} on, or -1. */
+        private static int indexOf(String text, String part, int from, boolean ignoreCase) {
             for (int i = from; i + part.length() <= text.length(); i++) {
-                if (text.regionMatches(true, i, part, 0, part.length())) {
+                if (text.regionMatches(ignoreCase, i, part, 0, part.length())) {
                     return i;
                 }
             }

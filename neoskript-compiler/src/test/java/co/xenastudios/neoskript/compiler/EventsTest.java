@@ -251,4 +251,37 @@ class EventsTest {
         // With nothing else to read it, it's still read, and its error is the line's.
         assertEquals("'the tone' is only for farewells", error("on greeting:\n\tsay the tone\n"));
     }
+
+    @Test
+    void aLaterSectionKeepsItsCodeForItsOwnEventWithOneCopyOfTheLocals() {
+        List<co.xenastudios.neoskript.api.element.SectionCode> kept = new ArrayList<>();
+        library.laterSection("KeepCode", "farewell", List.of(Farewell.class), info -> (context, args, code) -> {
+            if (code != null) {
+                kept.add(code);
+            }
+        }, "keep code");
+        fire("on greeting:\n\tset {_x} to 5\n\tkeep code:\n\t\tsay {_x} and name of person\n\t\tadd 1 to {_x}\n"
+                + "\tset {_x} to 100\n\tsay \"after\"\n\tkeep code\n", new Greeting(new Person("Ann", false)));
+        assertEquals(List.of("[after]"), said);
+        assertEquals(1, kept.size());
+        assertEquals("test.sk", kept.getFirst().script());
+        kept.getFirst().run(new Farewell(new Person("Bo", false)), null);
+        kept.getFirst().run(new Farewell(new Person("Cy", false)), null);
+        // The locals as they were at the section, shared by every run; the event is each run's.
+        assertEquals(List.of("[after]", "[5, Bo]", "[6, Cy]"), said);
+    }
+
+    @Test
+    void everyLineOfALaterSectionRuns() {
+        List<co.xenastudios.neoskript.api.element.SectionCode> kept = new ArrayList<>();
+        library.laterSection("KeepCode2", "farewell", List.of(Farewell.class), info -> (context, args, code) -> {
+            if (code != null) {
+                kept.add(code);
+            }
+        }, "keep code");
+        fire("on greeting:\n\tkeep code:\n\t\tsay \"one\"\n\t\twave at person\n\t\tsay \"end\"\n",
+                new Greeting(new Person("Ann", false)));
+        kept.getFirst().run(new Farewell(new Person("Bo", false)), null);
+        assertEquals(List.of("[one]", "wave at Bo", "[end]"), said);
+    }
 }

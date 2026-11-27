@@ -230,7 +230,8 @@ public final class ScriptCheck {
             case Expr.ListOf list -> list.items().stream().anyMatch(ScriptCheck::readsRegions);
             case Expr.FunctionCall call -> call.arguments().stream().anyMatch(ScriptCheck::readsRegions);
             case Expr.Text text -> text.embedded().stream().anyMatch(ScriptCheck::readsRegions);
-            default -> false;
+            // A function's argument left out for its default.
+            case null, default -> false;
         };
     }
 

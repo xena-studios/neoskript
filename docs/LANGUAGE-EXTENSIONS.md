@@ -1,8 +1,9 @@
 # Opt-in language extensions: design
 
-**Status: needs the owner's decision.** This proposes how a script opts into syntax Skript doesn't have, what that
-promises, and which extensions could come first. Only the opt-in mechanism exists; no extension does. Choosing
-which extensions to build, if any, is the owner's call.
+**Status: the opt-in is in; which extensions to build is decided later.** This sets out how a script opts into syntax
+Skript doesn't have, what that promises, and which extensions could come first. Only the opt-in mechanism exists; no
+extension does. The owner merged it as it is on 2026-11-27 (section 4); choosing which extensions to build, if any,
+is the owner's call, later.
 
 PLAN.md's non-goals say new language features that break Skript syntax are out of scope for 1.0, and that "any
 extensions are opt-in and come later" (the 1.x row). This is that later.
@@ -67,9 +68,9 @@ A script that uses an extension won't run on Skript, and every place that shows 
 ### `run on`
 
 `run on %entity/location%:` is NeoSkript's own syntax for Folia, and today it needs no opt-in. It can't break a
-Skript script: Skript has no such syntax, and Skript doesn't run on Folia, where it's needed. **For the owner:**
-leave it as it is (recommended, so Folia scripts keep working), or put it behind `using neoskript run on` for
-consistency. The CLI could also say a script uses it.
+Skript script: Skript has no such syntax, and Skript doesn't run on Folia, where it's needed. **Decided (2026-11-27):** it
+stays as it is, with no opt-in, so Folia scripts keep working. Putting it behind `using neoskript run on` for
+consistency was the other option. The CLI could also say a script uses it.
 
 ## 2. What's guaranteed
 
@@ -241,12 +242,15 @@ Built:
 - Tests: a made-up extension (`LanguageExtensionsTest`) shows a script without the opt-in is unaffected, a script with
   it gets the syntax, and Skript's own experiments are untouched.
 
-For the owner to decide:
+Decided by the owner (2026-11-27):
+1. The opt-in and this design are merged as they are, with no extension built.
+2. `run on` stays without an opt-in, as recommended above.
+
+Still open, decided later:
 1. Which extensions, if any, to build, and in what order. Ranked above: background sections, match sections,
    records, typed locals, unpacking.
 2. Whether to offer `language-extensions.allowed: false` in config.yml.
-3. Whether `run on` stays without an opt-in.
-4. The names. Each extension's name is the one scripts write, and it's permanent (guarantee 4).
+3. The names. Each extension's name is the one scripts write, and it's permanent (guarantee 4).
 
 Each extension, once chosen, ships in its own PR. It comes with its syntax, unit tests, a harness scenario, a
 docs page under "NeoSkript extensions" on neoskript.dev, and its elements marked in the syntax reference.

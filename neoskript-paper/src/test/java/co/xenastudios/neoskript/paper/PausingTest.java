@@ -378,6 +378,34 @@ class PausingTest {
     }
 
     @Test
+    void whatSkriptRefusesAfterAWaitIsRefusedOnALineThatPauses() {
+        // The line is surely after a delay from its start, so it follows Skript's rules after a wait.
+        CompiledScripts compiled = compile("""
+                on chat:
+                \tcancel event if fetched "x" is "y"
+
+                on join:
+                \tset join message to fetched "x"
+
+                on consume:
+                \tset event-item to fetched "x"
+                """);
+        assertEquals(List.of("An event cannot be cancelled after it has already passed",
+                "'the join message' can't be changed after the event has passed",
+                "Event values cannot be changed after the event has already passed."), errors(compiled.diagnostics()));
+    }
+
+    @Test
+    void theLineAfterOneThatPausesIsAfterAWaitToo() {
+        CompiledScripts compiled = compile("""
+                on chat:
+                \tset {_x} to fetched "x"
+                \tcancel event
+                """);
+        assertEquals(List.of("An event cannot be cancelled after it has already passed"), errors(compiled.diagnostics()));
+    }
+
+    @Test
     void anExpressionInAnElseIfHeaderGivesOneError() {
         CompiledScripts compiled = compile("""
                 on load:

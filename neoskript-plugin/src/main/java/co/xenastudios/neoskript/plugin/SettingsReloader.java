@@ -12,7 +12,8 @@ import java.util.List;
 /**
  * {@code /sk reload config}: reads config.yml again and applies what can change while the server runs: the
  * theme, the update checker, how players are named in variables, how often variables are saved, the runtime
- * error limits and effect commands. If the file can't be read, the running settings stay.
+ * error limits, effect commands, and the settings scripts read (text, syntax, the language). If the file can't be
+ * read, the running settings stay.
  *
  * <p>The settings that wait for a restart are compared with those the server started with, so a change stays
  * reported on every reload until the server restarts, and changing one back stops it being reported.
@@ -25,6 +26,9 @@ final class SettingsReloader {
         void accept(ConfigLoader.Result<NeoSkriptConfig> result);
 
         void playerUuids(boolean uuids);
+
+        /** The settings scripts read: {@code text}, {@code syntax}, {@code language}, the player variable fix. */
+        void scripts(NeoSkriptConfig settings);
 
         void effectCommands(EffectCommands.Settings settings);
 
@@ -99,6 +103,7 @@ final class SettingsReloader {
         NeoSkriptConfig to = result.config();
         effects.accept(result);
         effects.playerUuids(to.variables().playerUuidsInNames());
+        effects.scripts(to);
         effects.effectCommands(EffectCommands.Settings.of(to.effectCommands()));
         if (!to.runtimeErrors().equals(from.runtimeErrors())) {
             effects.runtimeErrors(to.runtimeErrors());

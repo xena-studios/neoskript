@@ -341,6 +341,16 @@ final class PlayerEvents {
         registrar.eventValue(PlayerTeleportEvent.class, "location", PlayerTeleportEvent::getTo);
         registrar.eventValue(EntityTeleportEvent.class, "location", -1, EntityTeleportEvent::getFrom);
         registrar.eventValue(EntityTeleportEvent.class, "location", EntityTeleportEvent::getTo);
+        // Where it goes, which 'set event-location to X' changes, and where it starts, 'set past event-location', as
+        // in Skript.
+        registrar.eventValueChanger(PlayerTeleportEvent.class, "location", 0,
+                (event, location) -> event.setTo(((org.bukkit.Location) location).clone()));
+        registrar.eventValueChanger(PlayerTeleportEvent.class, "location", -1,
+                (event, location) -> event.setFrom(((org.bukkit.Location) location).clone()));
+        registrar.eventValueChanger(EntityTeleportEvent.class, "location", 0,
+                (event, location) -> event.setTo(((org.bukkit.Location) location).clone()));
+        registrar.eventValueChanger(EntityTeleportEvent.class, "location", -1,
+                (event, location) -> event.setFrom(((org.bukkit.Location) location).clone()));
         registrar.eventValue(PlayerTeleportEvent.class, "teleportcause", PlayerTeleportEvent::getCause);
         // 'former world' and 'world will be': the worlds teleported from and to, as Skript's ExprWorld, which a
         // bare 'world' is there, has them.

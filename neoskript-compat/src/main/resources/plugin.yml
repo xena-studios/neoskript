@@ -1,0 +1,12 @@
+# NeoSkriptCompat (D22): Skript's classes for Skript addons, backed by NeoSkript. It stands in for Skript, so addons that
+# depend on Skript load, and it's opt-in: a server that installs it chooses NeoSkript over Skript.
+name: NeoSkriptCompat
+version: '${version}'
+main: ch.njol.skript.Skript
+api-version: '1.21.4'
+folia-supported: true
+provides: [Skript]
+depend: [NeoSkript]
+description: Lets Skript addons such as SkBee run on NeoSkript.
+website: https://neoskript.dev/docs/addons/skript-addons/
+authors: [Xena Studios]

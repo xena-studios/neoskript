@@ -45,9 +45,6 @@ import org.bukkit.util.Vector;
  */
 final class EntityProperties {
 
-    /** How far {@code the target of a player} looks, as Skript's default {@code maximum target block distance}. */
-    private static final int TARGET_DISTANCE = 100;
-
     private EntityProperties() {}
 
     static void register(Registrar registrar) {
@@ -868,9 +865,10 @@ final class EntityProperties {
                 && !(entity instanceof Player player && player.getGameMode() == GameMode.SPECTATOR);
         Location eyes = origin.getEyeLocation();
         Vector direction = origin.getLocation().getDirection();
-        double distance = TARGET_DISTANCE;
+        int maxDistance = co.xenastudios.neoskript.runtime.Settings.targetBlockDistance();
+        double distance = maxDistance;
         if (!ignoreBlocks) {
-            RayTraceResult block = origin.getWorld().rayTraceBlocks(eyes, direction, TARGET_DISTANCE);
+            RayTraceResult block = origin.getWorld().rayTraceBlocks(eyes, direction, maxDistance);
             if (block != null) {
                 distance = eyes.toVector().distance(block.getHitPosition());
             }

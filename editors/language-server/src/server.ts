@@ -141,18 +141,20 @@ function validate(document: TextDocument) {
       source: "NeoSkript",
     };
   });
-  // A script that asks for NeoSkript's language extensions won't run on Skript: said on its 'using' lines.
-  for (const extension of result.extensions ?? []) {
-    const index = lines.findIndex((line) => line.trim().toLowerCase().replace(/\s+/g, " ") === `using neoskript ${extension}`);
-    if (index < 0) continue;
-    const line = lines[index];
+  // A script that asks for NeoSkript's language extensions won't run on Skript: said on each of its 'using' lines,
+  // as the parser reads them (Skript's 'using [[the] experiment] <name>', any case and spacing).
+  const extensions = new Set(result.extensions ?? []);
+  lines.forEach((line, index) => {
+    const match = /^using\s+(?:(?:the\s+)?experiment\s+)?neoskript\s+(.+)$/i.exec(line.trim());
+    const extension = match?.[1].trim().toLowerCase().replace(/\s+/g, " ");
+    if (extension === undefined || !extensions.has(extension)) return;
     diagnostics.push({
       severity: DiagnosticSeverity.Information,
       range: { start: { line: index, character: line.length - line.trimStart().length }, end: { line: index, character: line.length } },
       message: `This uses NeoSkript's language extension '${extension}', so the script won't run on Skript.`,
       source: "NeoSkript",
     });
-  }
+  });
   connection.sendDiagnostics({ uri: document.uri, diagnostics });
 }
 

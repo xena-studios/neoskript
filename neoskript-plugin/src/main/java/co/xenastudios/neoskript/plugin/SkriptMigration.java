@@ -39,29 +39,28 @@ final class SkriptMigration {
      * What's copied from {@code plugins/Skript}: the scripts, the saved variables, and the alias files Skript loads
      * with its default aliases (its own copy of them, {@code aliases-english.zip}, if it has one).
      */
-    static final List<String> COPIED = List.of("scripts", "variables.csv", "aliases", "aliases-english.zip");
+    static final List<String> COPIED = List.of("scripts", "variables.csv", "lang", "aliases", "aliases-english.zip");
 
     /** What's copied when NeoSkript moved over before it read alias files: only those. */
     static final List<String> ALIASES = List.of("aliases", "aliases-english.zip");
 
     /**
-     * What was copied, relative to the folders, for the log (empty if nothing was), Skript's
-     * {@code use player UUIDs in variable names} from its config.sk, or {@code null} if it doesn't say, and its
-     * other settings NeoSkript has, by their path in NeoSkript's config.yml ({@link #SETTINGS}), and the backup of
-     * the variables copied, made before NeoSkript first loads them (or {@code null}), and what to tell the owner about
-     * alias files that weren't copied, and whether Skript's alias files were all dealt with ({@code false} if some
-     * couldn't be read or copied, so they're tried again on the next start).
+     * What was copied, relative to the folders, for the log (empty if nothing was), Skript's settings from its
+     * config.sk that NeoSkript has, by their path in NeoSkript's config.yml ({@link SkriptSettings}, and its
+     * {@code databases} section), the backup of the variables copied, made before NeoSkript first loads them (or
+     * {@code null}), what to tell the owner about alias files that weren't copied, and whether Skript's alias files
+     * were all dealt with ({@code false} if some couldn't be read or copied, so they're tried again on the next start).
+     * If config.sk's settings couldn't be read, {@code settingsProblem} says why. {@code caseClashes} are the groups of
+     * variables Skript kept apart that NeoSkript, whose variable names always ignore case, reads as one, when config.sk
+     * turned Skript's {@code case-insensitive variables} off ({@code null} if it didn't), found in NeoSkript's copy of
+     * the CSV file, {@code caseClashFile}.
      */
-    record Result(List<String> copied, int scriptCount, Boolean playerUuids, Map<String, Object> settings,
-            Path variablesBackup, List<String> notes, boolean aliasesDone) {
+    record Result(List<String> copied, int scriptCount, Map<String, Object> settings, Path variablesBackup,
+            String settingsProblem, List<List<String>> caseClashes, Path caseClashFile, List<String> notes,
+            boolean aliasesDone, List<String> notCopied) {
 
-        Result(List<String> copied, int scriptCount, Boolean playerUuids) {
-            this(copied, scriptCount, playerUuids, Map.of(), null, List.of(), true);
-        }
-
-        Result(List<String> copied, int scriptCount, Boolean playerUuids, Map<String, Object> settings,
-                Path variablesBackup, List<String> notes) {
-            this(copied, scriptCount, playerUuids, settings, variablesBackup, notes, true);
+        Result(List<String> copied, int scriptCount) {
+            this(copied, scriptCount, Map.of(), null, null, null, null, List.of(), true, List.of());
         }
     }
 
@@ -74,14 +73,6 @@ final class SkriptMigration {
     /** Skript's {@code databases:} section, read from config.sk: each database's options as Skript wrote them. */
     record SkriptDatabase(String name, Map<String, String> options) {}
 
-    /** Skript's config.sk options that NeoSkript's config.yml has too, by Skript's name, with NeoSkript's path. */
-    static final Map<String, String> SETTINGS = Map.of(
-            "load default aliases", "aliases.load-defaults",
-            "enable effect commands", "effect-commands.enabled",
-            "effect command token", "effect-commands.token",
-            "allow ops to use effect commands", "effect-commands.allow-ops",
-            "log effect commands", "effect-commands.log");
-
     private SkriptMigration() {}
 
     static Result migrate(Path skriptDir, Path neoskriptDir) throws IOException {
@@ -90,17 +81,28 @@ final class SkriptMigration {
         }
         boolean retry = Files.exists(neoskriptDir.resolve(STARTED));
         if (!Files.isDirectory(skriptDir) || (!retry && Files.exists(neoskriptDir.resolve("scripts")))) {
-            return new Result(List.of(), 0, null);
+            return new Result(List.of(), 0);
         }
         Files.createDirectories(neoskriptDir);
+        // Before anything is copied: config.sk's databases section says where Skript's variables are, so if it can't
+        // be read at all, copying variables.csv could bring over the wrong ones. Nothing is copied or marked done, and
+        // the next start tries again.
+        List<SkriptDatabase> databases;
+        try {
+            databases = databases(skriptDir.resolve("config.sk"));
+        } catch (IOException | RuntimeException | StackOverflowError e) {
+            throw new IOException("Couldn't read Skript's config.sk (" + (e.getMessage() == null ? e : e.getMessage())
+                    + "), so nothing was copied from plugins/Skript: its databases section says where Skript's"
+                    + " variables are. Fix it and restart, and NeoSkript copies everything then.", e);
+        }
         if (!retry) {
             Files.writeString(neoskriptDir.resolve(STARTED), "Copying from " + skriptDir.toAbsolutePath() + " since "
                     + Instant.now() + "\n");
         }
         List<String> copied = new ArrayList<>();
         int[] scripts = {0};
-        List<SkriptDatabase> databases = databases(skriptDir.resolve("config.sk"));
-        for (String name : List.of("scripts", "variables.csv")) {
+        String problem = null;
+        for (String name : List.of("scripts", "variables.csv", "lang")) {
             Path source = skriptDir.resolve(name);
             if (!Files.exists(source) || (name.equals("variables.csv") && !databases.isEmpty())
                     || (retry && Files.exists(neoskriptDir.resolve(name)))) {
@@ -109,7 +111,14 @@ final class SkriptMigration {
             copy(source, neoskriptDir.resolve(name), name.equals("scripts") ? scripts : new int[1]);
             copied.add(name);
         }
-        Map<String, Object> settings = settings(skriptDir.resolve("config.sk"));
+        Map<String, Object> settings = new java.util.LinkedHashMap<>();
+        try {
+            settings.putAll(SkriptSettings.read(skriptDir.resolve("config.sk"), neoskriptDir.resolve("lang")));
+        } catch (IOException | RuntimeException | StackOverflowError e) {
+            problem = String.valueOf(e.getMessage() == null ? e : e.getMessage());
+        }
+        // The CSV file whose variables NeoSkript reads, for Skript's case-insensitive variables.
+        Path csv = copied.contains("variables.csv") ? neoskriptDir.resolve("variables.csv") : null;
         Path backup = null;
         if (databases.isEmpty()) {
             // Before NeoSkript first loads or saves them, the variables Skript saved are backed up as they were.
@@ -125,6 +134,9 @@ final class SkriptMigration {
                     String type = String.valueOf(options.getOrDefault("type", "")).strip().toLowerCase(java.util.Locale.ROOT);
                     Moved moved = moveFile(skriptDir, neoskriptDir, String.valueOf(file), type, copied);
                     options.put("file", moved.file());
+                    if (csv == null && type.equals("csv")) {
+                        csv = neoskriptDir.resolve(moved.file());
+                    }
                     if (moved.backup() != null && backup == null) {
                         backup = moved.backup();
                     }
@@ -138,9 +150,31 @@ final class SkriptMigration {
         List<String> notes = new ArrayList<>();
         AliasCopy aliases = copyAliases(skriptDir, neoskriptDir, notes);
         copied.addAll(aliases.copied());
+        List<String> notCopied = List.of();
+        List<List<String>> clashes = null;
+        try {
+            notCopied = SkriptSettings.notCopied(skriptDir.resolve("config.sk"));
+            if (SkriptSettings.caseSensitiveVariables(skriptDir.resolve("config.sk"))) {
+                clashes = csv != null && Files.isRegularFile(csv) ? caseClashes(csv) : List.of();
+            }
+        } catch (IOException | RuntimeException | StackOverflowError e) {
+            problem = problem != null ? problem : String.valueOf(e.getMessage() == null ? e : e.getMessage());
+        }
         // The marker is written by finish(), once config.yml has the settings.
-        return new Result(copied, scripts[0], playerUuids(skriptDir.resolve("config.sk")), settings, backup,
-                List.copyOf(notes), aliases.complete());
+        return new Result(copied, scripts[0], settings, backup, problem, clashes, csv, List.copyOf(notes),
+                aliases.complete(), notCopied);
+    }
+
+    /**
+     * The variables in {@code file} whose names are the same but for case, grouped, as Skript lowers them. The file is
+     * read a line at a time, holding only the names.
+     */
+    static List<List<String>> caseClashes(Path file) throws IOException {
+        Map<String, List<String>> byName = new java.util.LinkedHashMap<>();
+        for (String name : co.xenastudios.neoskript.runtime.variables.storage.VariableFile.names(file)) {
+            byName.computeIfAbsent(name.toLowerCase(java.util.Locale.ENGLISH), k -> new ArrayList<>(1)).add(name);
+        }
+        return byName.values().stream().filter(names -> names.size() > 1).map(List::copyOf).toList();
     }
 
     /**
@@ -263,7 +297,7 @@ final class SkriptMigration {
         Path marker = neoskriptDir.resolve(MARKER);
         String recorded = Files.readString(marker);
         if (recorded.lines().anyMatch(ALIASES_DONE::equals)) {
-            return new Result(List.of(), 0, null);
+            return new Result(List.of(), 0);
         }
         List<String> notes = new ArrayList<>();
         AliasCopy aliases = copyAliases(skriptDir, neoskriptDir, notes);
@@ -271,11 +305,19 @@ final class SkriptMigration {
         Files.writeString(marker, recorded + (copied.isEmpty() ? "" : "Copied " + copied + " from "
                 + skriptDir.toAbsolutePath() + " at " + Instant.now() + "\n") + (aliases.complete() ? ALIASES_DONE + "\n" : ""));
         if (copied.isEmpty()) {
-            return new Result(List.of(), 0, null, Map.of(), null, List.copyOf(notes), aliases.complete());
+            return new Result(List.of(), 0, Map.of(), null, null, null, null, List.copyOf(notes), aliases.complete(),
+                    List.of());
         }
-        Map<String, Object> settings = new java.util.LinkedHashMap<>(settings(skriptDir.resolve("config.sk")));
+        Map<String, Object> settings = new java.util.LinkedHashMap<>();
+        String problem = null;
+        try {
+            settings.putAll(SkriptSettings.read(skriptDir.resolve("config.sk"), null));
+        } catch (IOException | RuntimeException | StackOverflowError e) {
+            problem = String.valueOf(e.getMessage() == null ? e : e.getMessage());
+        }
         settings.keySet().retainAll(List.of("aliases.load-defaults"));
-        return new Result(copied, 0, null, settings, null, List.copyOf(notes), aliases.complete());
+        return new Result(copied, 0, settings, null, problem, null, null, List.copyOf(notes), aliases.complete(),
+                List.of());
     }
 
     /** Where a database's file is for NeoSkript, and the backup of what was copied. */
@@ -382,7 +424,8 @@ final class SkriptMigration {
         String sectionIndent = null;
         String name = null;
         Map<String, String> options = null;
-        for (String line : Files.readAllLines(config)) {
+        // As Skript reads it: UTF-8 with bad bytes replaced, a byte order mark left out.
+        for (String line : SkriptConfigFile.text(config).split("\r\n|\r|\n", -1)) {
             String content = value(line);
             if (content.isEmpty()) {
                 continue;
@@ -416,40 +459,6 @@ final class SkriptMigration {
         return databases;
     }
 
-    /**
-     * The {@link #SETTINGS} Skript's config.sk has, by NeoSkript's path: booleans for its yes/no options, and the
-     * text of the others. Options it doesn't have, or whose value isn't valid, are left out.
-     */
-    static Map<String, Object> settings(Path config) throws IOException {
-        Map<String, Object> settings = new java.util.LinkedHashMap<>();
-        if (!Files.isRegularFile(config)) {
-            return settings;
-        }
-        for (String line : Files.readAllLines(config)) {
-            int colon = line.indexOf(':');
-            if (colon < 0) {
-                continue;
-            }
-            String path = SETTINGS.get(line.substring(0, colon).strip().toLowerCase(java.util.Locale.ROOT));
-            if (path == null || settings.containsKey(path)) {
-                continue;
-            }
-            String value = value(line.substring(colon + 1));
-            if (path.equals("effect-commands.token")) {
-                if (!value.isEmpty()) {
-                    settings.put(path, value);
-                }
-                continue;
-            }
-            switch (value.toLowerCase(java.util.Locale.ROOT)) {
-                case "true", "yes", "on" -> settings.put(path, Boolean.TRUE);
-                case "false", "no", "off" -> settings.put(path, Boolean.FALSE);
-                default -> {}
-            }
-        }
-        return settings;
-    }
-
     /** An option's value as Skript's config reads it: up to a {@code #} comment, where {@code ##} is a {@code #}. */
     private static String value(String text) {
         StringBuilder value = new StringBuilder();
@@ -466,27 +475,6 @@ final class SkriptMigration {
             value.append(c);
         }
         return value.toString().strip();
-    }
-
-    /** Skript's {@code use player UUIDs in variable names} option, if its config has it. */
-    static Boolean playerUuids(Path config) throws IOException {
-        if (!Files.isRegularFile(config)) {
-            return null;
-        }
-        for (String line : Files.readAllLines(config)) {
-            String option = line.strip();
-            if (option.startsWith("use player UUIDs in variable names:")) {
-                String value = option.substring(option.indexOf(':') + 1).strip().toLowerCase(java.util.Locale.ROOT);
-                int comment = value.indexOf('#');
-                value = (comment >= 0 ? value.substring(0, comment) : value).strip();
-                return switch (value) {
-                    case "true", "yes", "on" -> Boolean.TRUE;
-                    case "false", "no", "off" -> Boolean.FALSE;
-                    default -> null;
-                };
-            }
-        }
-        return null;
     }
 
     private static void copy(Path source, Path target, int[] scripts) throws IOException {

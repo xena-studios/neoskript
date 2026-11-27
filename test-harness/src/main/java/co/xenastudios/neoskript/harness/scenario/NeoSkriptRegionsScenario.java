@@ -111,7 +111,7 @@ public final class NeoSkriptRegionsScenario implements Scenario {
                 at = lineOf(server, expected, at) + 1;
             }
             if (!server.linesMatching(line("[regiontest] loop section 2")).isEmpty()) {
-                throw new HarnessFailure("'exit loop' in a section didn't leave the loop. See " + server.logFile());
+                throw new HarnessFailure("'exit loop' after a section in a loop didn't leave the loop. See " + server.logFile());
             }
             if (folia && server.linesMatching(IN_ANOTHER_REGION).size() != 3) {
                 throw new HarnessFailure("Reading a pig from another region's thread should have been 3 runtime errors,"

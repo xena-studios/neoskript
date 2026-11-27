@@ -83,6 +83,17 @@ class LanguageExtensionsTest {
     }
 
     @Test
+    void theOptInIsReadAsSkriptReadsUsing() {
+        ParsedScript script = parse("USING the experiment  NeoSkript   Test  Shouting\non load:\n\tshout \"b\"\n");
+        assertEquals(List.of(), problems(script.diagnostics()));
+        assertEquals(Set.of("test shouting"), script.extensions());
+        CompiledScripts compiled = compile(script);
+        assertEquals(List.of(), compiled.diagnostics());
+        compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
+        assertEquals(List.of("SHOUT [b]"), said);
+    }
+
+    @Test
     void anExtensionThatDoesntExistIsAnError() {
         ParsedScript script = parse("using neoskript  Nothing  Here\non load:\n\tsay \"a\"\n");
         assertEquals(List.of("1: NeoSkript has no language extension called 'nothing here'"),

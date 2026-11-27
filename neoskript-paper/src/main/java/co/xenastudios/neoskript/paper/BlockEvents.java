@@ -233,6 +233,8 @@ final class BlockEvents {
                 event -> event.getResonatedEntities().toArray(new org.bukkit.entity.LivingEntity[0]));
         registrar.eventValue(org.bukkit.event.block.VaultDisplayItemEvent.class, "itemstack",
                 org.bukkit.event.block.VaultDisplayItemEvent::getDisplayItem);
+        registrar.eventValueChanger(org.bukkit.event.block.VaultDisplayItemEvent.class, "itemstack", 0,
+                (event, item) -> event.setDisplayItem((org.bukkit.inventory.ItemStack) item));
         registrar.eventValue(SignChangeEvent.class, "player", SignChangeEvent::getPlayer);
         registrar.eventValue(SignChangeEvent.class, "string", String[].class, 0, event -> event.lines().stream()
                 .map(line -> line == null ? "" : Messages.LEGACY_SECTION.serialize(line)).toArray(String[]::new));

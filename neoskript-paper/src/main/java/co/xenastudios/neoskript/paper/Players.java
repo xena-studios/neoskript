@@ -34,6 +34,15 @@ final class Players {
 
     private Players() {}
 
+    /** For Skript's player variable fix: a player who left and joined again as the player now online. */
+    static Object current(Object value) {
+        if (value instanceof Player player && !player.isValid() && player.isOnline()) {
+            Player online = Bukkit.getPlayer(player.getUniqueId());
+            return online != null ? online : value;
+        }
+        return value;
+    }
+
     static void register(Registrar registrar) {
         // An offline player without a name is always its UUID, as in Skript.
         registrar.variableNameText(OfflinePlayer.class, player -> uuidsInVariableNames || player.getName() == null
@@ -75,6 +84,8 @@ final class Players {
                         ((org.bukkit.block.BlockState) nameable).update(true, false);
                     }
                 }
+                // Anything else with a name, an addon's GUI among them.
+                case Nameable nameable -> nameable.customName(component);
                 default -> {}
             }
         };

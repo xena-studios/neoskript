@@ -118,6 +118,33 @@ public interface Registrar {
             String... patterns);
 
     /**
+     * A section whose code runs later, for events the addon fires itself, as skript-gui's {@code make gui slot 0
+     * with dirt:} keeps its code for when the slot is clicked. The code is checked as code in an event of
+     * {@code eventClasses} called {@code eventName}, with that event's values and syntax ({@code player},
+     * {@code cancel event}), and starts with no delay. The element gets the code when its line runs, and runs it
+     * with {@link co.xenastudios.neoskript.api.element.SectionCode#run} whenever the event happens. Written without
+     * code, it's an effect, and gets {@code null}.
+     *
+     * @param id the section's id
+     * @param eventName what Skript calls the event in errors, as {@code inventory click}
+     * @param eventClasses the classes of the events the code runs for
+     * @param factory makes the section for each place it's used
+     * @param patterns its patterns
+     */
+    void laterSection(String id, String eventName, List<Class<?>> eventClasses,
+            ElementFactory<co.xenastudios.neoskript.api.element.LaterSection> factory, String... patterns);
+
+    /**
+     * Tells the addon which scripts' code stopped, each time scripts reload or unload: those reloaded, unloaded
+     * or removed. Code it still holds, as {@link co.xenastudios.neoskript.api.element.SectionCode}, says itself
+     * whether it's the loaded version ({@link co.xenastudios.neoskript.api.element.SectionCode#loaded}). It's called on the thread that loaded them, the global thread on Folia; an exception from it
+     * is logged.
+     *
+     * @param scripts what gets the scripts' names, as {@code menus/shop.sk}
+     */
+    default void scriptsUnloaded(java.util.function.Consumer<? super java.util.Set<String>> scripts) {}
+
+    /**
      * A property condition, {@code %owners% (is|are) <property>} and its negation (see
      * {@link Patterns#isProperty}). It's true when {@code test} holds for every owner, or for none when
      * negated.
@@ -267,6 +294,22 @@ public interface Registrar {
             ElementFactory<co.xenastudios.neoskript.api.element.LoopValue> factory);
 
     /**
+     * The code in library section {@code sectionId}'s section is in an event of its own, of {@code eventClass} and
+     * called {@code eventName} in errors, as Skript loads a spawn section's code: it runs once for each value the
+     * section gives, in the event {@code event} makes of that value, and only that event's values can be used there
+     * ({@code There's no world in a spawn event.}), as {@link #eventValue} gives them for {@code eventClass}.
+     *
+     * @param <E> the event's class
+     * @param sectionId the section's id
+     * @param eventName the event's name in errors
+     * @param eventClass the event's class, whose event values the code can use
+     * @param event the event for one of the values the section gives
+     */
+    @Experimental
+    default <E> void sectionEvent(String sectionId, String eventName, Class<E> eventClass,
+            java.util.function.Function<Object, ? extends E> event) {}
+
+    /**
      * Marks expression {@code expressionId} as an event value, as Skript's {@code EventValueExpression}s are
      * ({@code the created damage source}): as an argument, it counts as a default one
      * ({@link co.xenastudios.neoskript.api.element.ElementInfo#isDefault(int)}).
@@ -331,6 +374,21 @@ public interface Registrar {
      */
     @Experimental
     default void priority(String id, SyntaxPriority priority) {}
+
+    /**
+     * Says expression {@code id} is several values when a plural argument of it is several values, as Skript's
+     * property expressions are: {@code names of {_players::*}} is several names. Without it, syntax Skript doesn't
+     * have is taken as one value when the script loads, so where only one value goes, a list in its argument isn't
+     * refused. Skript's parser splits a list differently by this: {@code (status of {_r} and body of {_r})}, where
+     * {@code status of} takes one response, is two values, as {@code last response of {_r} and body of {_r}} is
+     * several. Use it on an addon's property expressions that are a Skript addon's.
+     *
+     * @param id the expression's id: one this addon registered, without {@code -}
+     * @throws IllegalArgumentException if the id isn't one of this addon's elements, or is also the id of one of
+     *     NeoSkript's elements or another addon's
+     */
+    @Experimental
+    default void pluralAsArguments(String id) {}
 
     /**
      * Has effect {@code effectId} tried before effect {@code otherId}, as Skript tries its effects in its own order:
@@ -475,6 +533,26 @@ public interface Registrar {
      * @param getter the value of an event, or {@code null} for none
      */
     <E> void eventValue(Class<E> eventClass, String typeId, int time, java.util.function.Function<? super E, ?> getter);
+
+    /**
+     * Lets {@code set event-<type>} change the event value of {@code typeId} at {@code time} in events of
+     * {@code eventClass}, as Skript's event values with a changer: {@code set event-item to bread} in a consume event,
+     * {@code set past event-location} where a teleport starts. It's for {@code set} only: other changes go through the
+     * type's changer, as in Skript. The value set is converted to the type's class first; if there's none, or it isn't
+     * one, nothing is set. Once the code has surely waited, setting it is Skript's error ({@code Event values cannot be
+     * changed after the event has already passed.}).
+     *
+     * @param <E> the event's class
+     * @param eventClass the event's class
+     * @param typeId the id of the value's type, as {@link #eventValue(Class, String, java.util.function.Function)}
+     *     registers it
+     * @param time -1 for the value before the event, 0 now, 1 after it, as
+     *     {@link #eventValue(Class, String, int, java.util.function.Function)}
+     * @param setter sets the value in an event, given the one value set, never {@code null}
+     */
+    @Experimental
+    default <E> void eventValueChanger(Class<E> eventClass, String typeId, int time,
+            java.util.function.BiConsumer<? super E, Object> setter) {}
 
     /**
      * Events of {@code eventClass} (and subclasses) don't have a value of {@code typeId}, though a superclass
@@ -843,4 +921,63 @@ public interface Registrar {
      *     the id of one of NeoSkript's elements or another addon's
      */
     default void affinity(String id, ThreadAffinity affinity) {}
+
+    /**
+     * A top-level structure of an addon's own, as Skript's {@code import:} in skript-reflect: a header matching one of
+     * {@code patterns}, and lines under it that aren't code. NeoSkript gives each use to {@code handler} while the
+     * script is parsed, before the structures after it in the same script, so what it declares can change how the
+     * rest of the script reads. What it gives can be found again while the script is set up through
+     * {@link co.xenastudios.neoskript.api.NeoSkript#scriptBeingLoaded()}.
+     *
+     * @param id the structure's id, as the other elements'
+     * @param handler what to do with each use
+     * @param patterns the header's patterns, without the {@code :}
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void structure(String id, StructureHandler handler, String... patterns) {}
+
+    /**
+     * Says that element {@code id}'s arguments are written as a function call's ({@code Math.max(3, 7)} in
+     * skript-reflect), so a list of them joined by commas alone isn't warned about, as Skript doesn't for function
+     * calls.
+     *
+     * @param id the element's id: one this addon registered
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void argumentsLikeFunctions(String id) {}
+
+    /**
+     * Turns Skript's "List is missing 'and' or 'or', defaulting to 'and'" warning off for every script, as Skript's
+     * {@code disable variable missing and/or warnings} option does. For an addon whose original turns that option on
+     * when it's installed, as skript-reflect does, so the same scripts load with the same warnings.
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void noMissingAndOrWarnings() {}
+
+    /**
+     * Says that only values of type {@code typeId} itself, its subtypes and what converts to it are taken where it's
+     * wanted, as in Skript. Without this, a value of an unrelated type is taken and converted when the script runs:
+     * a {@code location} where skript-reflect's {@code javatype} goes would give no class rather than the parser
+     * reading {@code Location} as the imported class.
+     *
+     * @param typeId a type this addon registered
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void strictType(String typeId) {}
+
+    /**
+     * A structure scripts declare syntax with, as skript-reflect's {@code effect <pattern>:}: {@code handler} reads
+     * each use before any script's code is parsed, and the syntax it declares is added to what every script (or, for
+     * local syntax, the declaring script) is parsed with, for that load. The code in the structure's body section is
+     * compiled as what runs where the syntax is used; it's given the use's arguments through
+     * {@link co.xenastudios.neoskript.api.element.TriggerContext#scriptSyntaxCall()}. Each load starts from nothing, so a
+     * script's syntax goes when it changes or unloads. Scripts on a server where no script declares syntax are parsed
+     * exactly as without this.
+     *
+     * @param id the structure's id: one this addon registers, without {@code -}
+     * @param handler reads what each use declares
+     * @param patterns the structure's header patterns
+     */
+    @co.xenastudios.neoskript.api.annotation.Experimental
+    default void scriptSyntax(String id, ScriptSyntaxHandler handler, String... patterns) {}
 }

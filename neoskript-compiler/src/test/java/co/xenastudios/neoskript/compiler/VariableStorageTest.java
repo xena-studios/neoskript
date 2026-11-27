@@ -54,6 +54,25 @@ class VariableStorageTest {
     }
 
     @Test
+    void javasOtherNumbersAreSavedAsSkriptSavesThem() {
+        // As Skript's variables.csv has them: its integer, short, byte and float types, the primitive's bytes.
+        VariableCodecs codecs = new Library().codecs();
+        Object[][] cases = {
+            {5, "integer", new byte[] {0, 0, 0, 5}},
+            {(short) -2, "short", new byte[] {(byte) 0xff, (byte) 0xfe}},
+            {(byte) 7, "byte", new byte[] {7}},
+            {1.5f, "float", new byte[] {0x3f, (byte) 0xc0, 0, 0}},
+        };
+        for (Object[] c : cases) {
+            VariableCodecs.Encoded encoded = codecs.encode(c[0]);
+            assertEquals(c[1], encoded.type(), String.valueOf(c[0]));
+            assertArrayEquals((byte[]) c[2], encoded.bytes(), String.valueOf(c[0]));
+            assertEquals(c[0], codecs.decode((String) c[1], (byte[]) c[2]));
+        }
+        assertInstanceOf(RawValue.class, codecs.decode("integer", new byte[] {1, 2}), "not an integer: kept as it was");
+    }
+
+    @Test
     void decodedValues() throws Exception {
         VariableStore store = new VariableStore();
         new VariableStorage(store, new Library().codecs(), skriptFile()).load();
