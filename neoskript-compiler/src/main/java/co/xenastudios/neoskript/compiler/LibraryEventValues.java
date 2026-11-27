@@ -83,6 +83,19 @@ final class LibraryEventValues implements EventValues {
         return List.of(CommandEvent.class);
     }
 
+    /**
+     * What Skript's errors call the event {@code event} ({@code an on join event}), or {@code null} if Skript has
+     * no name for it.
+     */
+    String description(SyntaxInfo event) {
+        String name = library.eventName(event.id());
+        return name == null || eventClasses(event) == null ? null : description(name);
+    }
+
+    private static String description(String name) {
+        return TriggerCompiler.article(name) + " " + name + " event";
+    }
+
     /** Whether {@code syntax} is the event's value of a type, which {@link Scope#allows} checks. */
     boolean isEventValue(SyntaxInfo syntax) {
         return EVENT_VALUES.contains(syntax.id()) && library.binding(syntax) instanceof Library.Core;
@@ -91,24 +104,55 @@ final class LibraryEventValues implements EventValues {
     /**
      * What code in events of {@code classes} can use, written down for the syntax export: for each type, whether
      * {@link Scope#allows} takes its value, single and plural (for a kind of entity it can't be written down), and
-     * whether {@link Scope#allowsLeftOut} finds the event's value of it.
+     * whether {@link Scope#allowsLeftOut} finds the event's value of it. For the values it doesn't take, the error
+     * {@link EventScope#missing} gives, where it isn't the usual one.
      */
     co.xenastudios.neoskript.frontend.registry.SyntaxExport.Scope export(List<Class<?>> classes) {
         List<String> values = new java.util.ArrayList<>();
         List<String> plurals = new java.util.ArrayList<>();
         List<String> defaults = new java.util.ArrayList<>();
+        List<Map<String, String>> errors = List.of(new java.util.TreeMap<>(), new java.util.TreeMap<>(),
+                new java.util.TreeMap<>(), new java.util.TreeMap<>());
         for (co.xenastudios.neoskript.frontend.registry.TypeInfo type : library.registry().types()) {
-            if (has(classes, new TypeRef(type, false))) {
-                values.add(type.id());
-            }
-            if (has(classes, new TypeRef(type, true))) {
-                plurals.add(type.id());
+            for (boolean plural : new boolean[] {false, true}) {
+                TypeRef ref = new TypeRef(type, plural);
+                if (has(classes, ref)) {
+                    (plural ? plurals : values).add(type.id());
+                } else if (!classes.isEmpty()) {
+                    missingError(classes, ref, errors.get(plural ? 1 : 0), errors.get(plural ? 3 : 2));
+                }
             }
             if (library.hasEventDefault(type.id()) && library.eventValue(classes, type.id()) != null) {
                 defaults.add(type.id());
             }
         }
-        return new co.xenastudios.neoskript.frontend.registry.SyntaxExport.Scope(values, plurals, defaults);
+        return new co.xenastudios.neoskript.frontend.registry.SyntaxExport.Scope(values, plurals, defaults,
+                errors.get(0), errors.get(1), errors.get(2), errors.get(3));
+    }
+
+    /**
+     * Writes down what {@link EventScope#missing} says for {@code type} in events of {@code classes}, without using
+     * up an excluded value's error: into {@code excluded} if it's one, else into {@code missing} if it isn't the
+     * usual error, with {@link co.xenastudios.neoskript.frontend.registry.SyntaxExport.Scope#EVENT} for the event.
+     */
+    private void missingError(List<Class<?>> classes, TypeRef type, Map<String, String> missing,
+            Map<String, String> excluded) {
+        String event = co.xenastudios.neoskript.frontend.registry.SyntaxExport.Scope.EVENT;
+        Library.EventValueRequest request = library.request(type, null);
+        Library.EventValueLookup lookup = library.eventValue(classes, request.valueClass(), request.type(), 0, null);
+        if ("multiple".equals(lookup.error())) {
+            missing.put(type.type().id(), "");
+            return;
+        }
+        if (!"none".equals(lookup.error())) {
+            excluded.put(type.type().id(), lookup.error());
+            return;
+        }
+        String error = library.eventValue(classes, request.valueClass(), request.type(), 0, event, false).error();
+        if (error != null && !error.equals(co.xenastudios.neoskript.frontend.registry.SyntaxExport.Scope
+                .missingError(type.type().name(), type.plural(), event))) {
+            missing.put(type.type().id(), error);
+        }
     }
 
     /** Whether events of {@code classes} have the value {@code type} asks for, as {@link EventScope#allows}. */
@@ -168,7 +212,7 @@ final class LibraryEventValues implements EventValues {
                 library.parserAsked(classes, request.valueClass(), request.type(), lookup.error());
                 return lookup.error();
             }
-            String description = TriggerCompiler.article(name) + " " + name + " event";
+            String description = description(name);
             return request.words() != null ? "There's no " + request.words() + " in " + description + "."
                     : library.eventValue(classes, request.valueClass(), request.type(), 0, description).error();
         }

@@ -5,6 +5,7 @@
 package co.xenastudios.neoskript.plugin;
 
 import co.xenastudios.neoskript.compiler.Library;
+import co.xenastudios.neoskript.paper.NameExport;
 import co.xenastudios.neoskript.paper.StandardLibrary;
 import co.xenastudios.neoskript.runtime.Waits;
 import co.xenastudios.neoskript.runtime.platform.Platform;
@@ -197,8 +198,18 @@ public final class NeoSkriptPlugin extends JavaPlugin {
                 java.nio.file.Files.createDirectories(path.getParent());
             }
             String server = Platform.detect().displayName() + " " + getServer().getMinecraftVersion();
-            java.nio.file.Files.writeString(path, library.export(getPluginMeta().getVersion(), server).toJson());
+            co.xenastudios.neoskript.frontend.registry.SyntaxExport.Names names = NameExport.names();
+            String json = library.export(getPluginMeta().getVersion(), server).withNames(names).toJson();
+            java.nio.file.Files.writeString(path, json);
             getSLF4JLogger().info("Wrote the syntax export to {}", path.toAbsolutePath());
+            // The browser reads item, block and entity names from the export: check it reads them as this server.
+            NameExport.Check check = NameExport.check(library.registry(),
+                    co.xenastudios.neoskript.frontend.registry.ExportedRegistry.build(
+                            co.xenastudios.neoskript.frontend.registry.SyntaxExport.fromJson(json)), names);
+            check.differences().stream().limit(500).forEach(difference ->
+                    getSLF4JLogger().warn("Name check: {}", difference));
+            getSLF4JLogger().info("Checked {} names against the syntax export: {} differ, {} it can't tell",
+                    check.checked(), check.differences().size(), check.unknown());
         } catch (IOException | RuntimeException e) {
             getSLF4JLogger().error("Couldn't write the syntax export", e);
         }

@@ -60,6 +60,12 @@ final class AliasFiles {
         return known.get(name);
     }
 
+    /** Every name the default aliases give, for the syntax export. */
+    static java.util.Set<String> names() {
+        get("");
+        return java.util.Collections.unmodifiableSet(aliases.keySet());
+    }
+
     private static final Pattern RELATED = Pattern.compile("minecraft:([a-z0-9_]+)\\[relatedEntity=([^\\]]+)\\]");
 
     private static volatile Map<String, String> related;

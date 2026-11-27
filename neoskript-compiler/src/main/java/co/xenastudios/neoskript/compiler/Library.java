@@ -767,9 +767,17 @@ public final class Library implements Registrar {
 
     EventValueLookup eventValue(List<Class<?>> eventClasses, Class<?> valueClass, String type, int time,
             String eventDescription) {
-        EventValueResolver resolver = resolver();
         // Without a description, it's the parser checking: an excluded value's error is left for the code asking.
-        boolean consume = eventDescription != null;
+        return eventValue(eventClasses, valueClass, type, time, eventDescription, eventDescription != null);
+    }
+
+    /**
+     * {@link #eventValue(List, Class, String, int, String)}, using up an excluded value's error only if
+     * {@code consume}: the syntax export asks what the error would be without changing what scripts get.
+     */
+    EventValueLookup eventValue(List<Class<?>> eventClasses, Class<?> valueClass, String type, int time,
+            String eventDescription, boolean consume) {
+        EventValueResolver resolver = resolver();
         String error = null;
         boolean hasValue = false;
         List<Map.Entry<Class<?>, java.util.function.Function<Object, Object>>> getters = new ArrayList<>();
@@ -1323,7 +1331,8 @@ public final class Library implements Registrar {
                 registry.delays(syntax), stops, registry.ends(syntax), registry.suppressesWarnings(syntax),
                 registry.sectionOnly(syntax), experimental == null ? null : experimental.experiment(),
                 experimental != null && experimental.silent(), exported,
-                binding(syntax) instanceof Core, events.isEventValue(syntax), events.keepsEventValues(syntax), scope);
+                binding(syntax) instanceof Core, events.isEventValue(syntax), events.keepsEventValues(syntax), scope,
+                syntax.kind() == SyntaxKind.EVENT ? events.description(syntax) : null);
     }
 
     /** The tags a pattern's alternatives are written with, in order. */

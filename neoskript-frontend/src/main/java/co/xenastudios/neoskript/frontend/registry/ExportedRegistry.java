@@ -47,6 +47,8 @@ public final class ExportedRegistry {
 
         Set<String> eventDefaults = new HashSet<>();
         Set<String> defaultValues = new HashSet<>();
+        Map<String, java.util.function.Predicate<String>> names = parser.names() == null ? Map.of()
+                : new ExportedNames(parser.names()).checks();
         for (SyntaxExport.Type type : export.types()) {
             SyntaxExport.TypeParser info = type.parser();
             builder.type(new TypeInfo(type.id(), type.name(), Set.copyOf(type.literals()),
@@ -84,7 +86,11 @@ public final class ExportedRegistry {
                 Set<String> words = Set.copyOf(info.parsedWords());
                 builder.parses(type.id(), text -> words.contains(SyntaxRegistry.normalize(text)));
             }
-            if (!info.literalWords().isEmpty()) {
+            java.util.function.Predicate<String> named = names.get(type.id());
+            if (named != null) {
+                // Read as the server reads them, from its names.
+                builder.openLiterals(type.id(), named);
+            } else if (!info.literalWords().isEmpty()) {
                 Set<String> words = Set.copyOf(info.literalWords());
                 builder.openLiterals(type.id(), text -> {
                     if (words.contains(SyntaxRegistry.normalize(text))) {
@@ -146,6 +152,7 @@ public final class ExportedRegistry {
             builder.function(new FunctionInfo(function.name(), function.parameters(), function.returnType(),
                     function.returnsPlural()));
         }
+        values.exactTypes = Set.copyOf(names.keySet());
         builder.eventValues(values);
         SyntaxRegistry registry = builder.build();
         values.registry = registry;
@@ -176,15 +183,17 @@ public final class ExportedRegistry {
     }
 
     /** The event values the export lists, as the server's registry tells the parser about them. */
-    private static final class Values implements EventValues {
+    static final class Values implements EventValues {
 
         private final List<ScopeData> scopes = new ArrayList<>();
         private final ScopeData command;
         private final ScopeData function;
         private final Set<String> eventDefaults;
         private final Set<String> defaultValues;
-        private final Map<String, ScopeData> events = new HashMap<>();
+        private final Map<String, Scope> events = new HashMap<>();
         private final Set<String> eventValues = new HashSet<>();
+        /** The types whose literals are read from the export's names, exactly as the server reads them. */
+        Set<String> exactTypes = Set.of();
         private final Set<String> keeping = new HashSet<>();
         /** Elements that are the compiler's own, or events: those don't fill left-out placeholders from events. */
         private final Set<String> notFactories = new HashSet<>();
@@ -209,7 +218,7 @@ public final class ExportedRegistry {
             if (kind == SyntaxKind.EVENT) {
                 ScopeData scope = scope(info.scope());
                 if (scope != null) {
-                    events.put(id, scope);
+                    events.put(id, info.eventDescription() == null ? scope : scope.named(info.eventDescription()));
                 }
             }
             if (info.eventValue()) {
@@ -248,17 +257,56 @@ public final class ExportedRegistry {
             return keeping.contains(header.kind() + ":" + header.id());
         }
 
+        /** {@code scope}, one of the export's, as the compiler names it in its errors, or {@code null}. */
+        NamedScope named(Scope scope, String description) {
+            return scope instanceof ScopeData data ? new NamedScope(data, description) : null;
+        }
+
+        /** Whether {@code syntax} is the event's value of a type ({@code event-block}, {@code the player}). */
+        boolean isEventValue(SyntaxInfo syntax) {
+            return eventValues.contains(syntax.kind() + ":" + syntax.id());
+        }
+
         /** What code in some events can use, as the server's scope for their classes answers. */
-        private final class ScopeData implements Scope {
+        final class ScopeData implements Scope {
 
             private final Set<String> values;
             private final Set<String> plurals;
             private final Set<String> defaults;
+            private final SyntaxExport.Scope errors;
 
             ScopeData(SyntaxExport.Scope scope) {
                 this.values = Set.copyOf(scope.values());
                 this.plurals = Set.copyOf(scope.plurals());
                 this.defaults = Set.copyOf(scope.defaults());
+                this.errors = scope;
+            }
+
+            /** This scope under an event Skript calls {@code description} in its errors ({@code an on join event}). */
+            Scope named(String description) {
+                return new NamedScope(this, description);
+            }
+
+            /**
+             * Skript's error for the event value of {@code type} under an event Skript calls {@code description},
+             * as the server gives it, or {@code null} for none. An excluded value's own error is only for the
+             * {@code first} time it's asked for.
+             */
+            String error(SyntaxInfo syntax, TypeRef type, String description, boolean first) {
+                if (!isEventValue(syntax)) {
+                    return null;
+                }
+                String id = type.type().id();
+                boolean plural = type.plural();
+                String excluded = (plural ? errors.excludedPlurals() : errors.excluded()).get(id);
+                if (excluded != null && first) {
+                    return excluded;
+                }
+                String error = (plural ? errors.missingPlurals() : errors.missing()).get(id);
+                if (error != null) {
+                    return error.isEmpty() ? null : error.replace(SyntaxExport.Scope.EVENT, description);
+                }
+                return SyntaxExport.Scope.missingError(type.type().name(), plural, description);
             }
 
             @Override
@@ -316,6 +364,38 @@ public final class ExportedRegistry {
                     }
                 }
                 return false;
+            }
+        }
+
+        /** The event values of an event Skript has a name for, which can say what Skript says when one isn't there. */
+        final class NamedScope implements Scope {
+
+            final ScopeData data;
+            final String description;
+
+            NamedScope(ScopeData data, String description) {
+                this.data = data;
+                this.description = description;
+            }
+
+            @Override
+            public boolean allows(SyntaxInfo syntax, TypeRef type, String words) {
+                return data.allows(syntax, type, words);
+            }
+
+            @Override
+            public boolean allowsLeftOut(SyntaxInfo syntax, PlaceholderSpec spec) {
+                return data.allowsLeftOut(syntax, spec);
+            }
+
+            @Override
+            public String missing(SyntaxInfo syntax, TypeRef type, String words) {
+                return data.error(syntax, type, description, true);
+            }
+
+            /** Which of the export's scopes this is, so values asked for in it can be told apart. */
+            int index() {
+                return scopes.indexOf(data);
             }
         }
     }

@@ -20,7 +20,8 @@ import java.util.Map;
  * load the same file.
  *
  * <p>What a registry can't write down is left out: the checks syntax makes while it's parsed, and the parsers
- * that tell whether words are a literal of an open type such as item types, which need a server.
+ * that tell whether words are a literal of an open type, which need a server. For items, blocks and entities, the
+ * names those parsers read are written down instead ({@link Names}), when the export is taken on a server.
  *
  * @param format the version of this format; readers should refuse one they don't know
  * @param neoskript the NeoSkript version that wrote it
@@ -73,18 +74,29 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
      * @param eventValue whether it's the event's value of a type ({@code event-player}, {@code the zombie})
      * @param keepsEventValues for a section, whether code in it has only the event values of the code around it
      * @param scope for an event, the index in {@link Parser#scopes()} of what code under it can use; -1 if unknown
+     * @param eventDescription for an event Skript has a name for, what its errors call it ({@code an on join
+     *     event}); {@code null} otherwise
      */
     public record ElementParser(List<String> regexRoles, boolean delays, List<Integer> stops, boolean ends,
             boolean suppressesWarnings, boolean sectionOnly, String experiment, boolean experimentSilent,
-            Property property, boolean core, boolean eventValue, boolean keepsEventValues, int scope) {
+            Property property, boolean core, boolean eventValue, boolean keepsEventValues, int scope,
+            String eventDescription) {
 
         /** An element the parser knows nothing more about. */
         public static final ElementParser NONE = new ElementParser(List.of(), false, List.of(), false, false, false,
-                null, false, null, false, false, false, -1);
+                null, false, null, false, false, false, -1, null);
 
         public ElementParser {
             regexRoles = List.copyOf(regexRoles);
             stops = List.copyOf(stops);
+        }
+
+        /** Without an event description. */
+        public ElementParser(List<String> regexRoles, boolean delays, List<Integer> stops, boolean ends,
+                boolean suppressesWarnings, boolean sectionOnly, String experiment, boolean experimentSilent,
+                Property property, boolean core, boolean eventValue, boolean keepsEventValues, int scope) {
+            this(regexRoles, delays, stops, ends, suppressesWarnings, sectionOnly, experiment, experimentSilent,
+                    property, core, eventValue, keepsEventValues, scope, null);
         }
     }
 
@@ -167,11 +179,18 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
      * @param scopes the event values code can use somewhere, which events, commands and functions point to
      * @param commandScope the index in {@code scopes} of what a command's code can use; -1 if unknown
      * @param functionScope the index in {@code scopes} of what a function's code can use; -1 if unknown
+     * @param names the names of items, blocks and entities the server reads, or {@code null} if not known
      */
     public record Parser(List<Conversion> conversions, Map<String, List<String>> typeProperties,
-            Map<String, String> experiments, List<Scope> scopes, int commandScope, int functionScope) {
+            Map<String, String> experiments, List<Scope> scopes, int commandScope, int functionScope, Names names) {
 
-        public static final Parser NONE = new Parser(List.of(), Map.of(), Map.of(), List.of(), -1, -1);
+        public static final Parser NONE = new Parser(List.of(), Map.of(), Map.of(), List.of(), -1, -1, null);
+
+        /** Without names. */
+        public Parser(List<Conversion> conversions, Map<String, List<String>> typeProperties,
+                Map<String, String> experiments, List<Scope> scopes, int commandScope, int functionScope) {
+            this(conversions, typeProperties, experiments, scopes, commandScope, functionScope, null);
+        }
 
         public Parser {
             conversions = List.copyOf(conversions);
@@ -192,14 +211,102 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
      * @param values the types whose single value code can get, as {@code event-player}
      * @param plurals the types whose values code can get as a list, as {@code event-players}
      * @param defaults the types whose value fills in a left-out placeholder of a type that takes the event's
+     * @param missing for types whose single value isn't there, Skript's error for asking for it where that isn't
+     *     {@link #missingError the usual one}, with {@link #EVENT} for the event's description; empty where
+     *     there's no error (the events have several, and code has to say which)
+     * @param missingPlurals the same for their values as a list
+     * @param excluded for types whose single value the events leave out on purpose, the error the first time
+     *     it's asked for ({@code Use 'attacker' and/or 'victim' in damage/death events}); after that, it's as
+     *     {@code missing} says
+     * @param excludedPlurals the same for their values as a list
      */
-    public record Scope(List<String> values, List<String> plurals, List<String> defaults) {
+    public record Scope(List<String> values, List<String> plurals, List<String> defaults,
+            Map<String, String> missing, Map<String, String> missingPlurals, Map<String, String> excluded,
+            Map<String, String> excludedPlurals) {
+
+        /** What stands for the event's description in {@link #missing}. */
+        public static final String EVENT = "%event%";
 
         public Scope {
             values = List.copyOf(values);
             plurals = List.copyOf(plurals);
             defaults = List.copyOf(defaults);
+            missing = Collections.unmodifiableMap(new LinkedHashMap<>(missing));
+            missingPlurals = Collections.unmodifiableMap(new LinkedHashMap<>(missingPlurals));
+            excluded = Collections.unmodifiableMap(new LinkedHashMap<>(excluded));
+            excludedPlurals = Collections.unmodifiableMap(new LinkedHashMap<>(excludedPlurals));
         }
+
+        /** Without errors. */
+        public Scope(List<String> values, List<String> plurals, List<String> defaults) {
+            this(values, plurals, defaults, Map.of(), Map.of(), Map.of(), Map.of());
+        }
+
+        /**
+         * Skript's usual error for a value that isn't there, as NeoSkript's compiler words it: {@code There's no
+         * block in an on join event.}, or {@code There are no blocks in ...}, for a type called {@code name}.
+         */
+        public static String missingError(String name, boolean plural, String event) {
+            return plural ? "There are no " + SyntaxRegistry.plural(name) + " in " + event + "."
+                    : "There's no " + name + " in " + event + ".";
+        }
+    }
+
+    /**
+     * The names of items, blocks and entities that a server's literal parsers read, which need the server to
+     * know: what the browser's registry reads them with ({@link Names}).
+     *
+     * @param materials every Minecraft material by its key, in the server's order, with what it is: {@code i} an
+     *     item, {@code b} a block, {@code a} air
+     * @param aliases the names in Skript's default alias files that the server reads as items, with what each
+     *     is: {@code g} several items, {@code b} a block, {@code p} a potion
+     * @param potions the keys of the potion types
+     * @param enchantments the keys of the enchantments
+     * @param dyes the dye colours, as their constants' names in lower case
+     * @param pandaGenes the panda genes, the same way
+     * @param entities every name of a kind of entity, with the index in {@code vocabularies} of the words that
+     *     can come before it
+     * @param entityPlurals the names that are plural ({@code zombies})
+     * @param sameEntityPlurals the names whose plural is the same ({@code sheep})
+     * @param vocabularies the words that can come before kinds of entity's names ({@code baby}, {@code red})
+     * @param thrownPotions whether the server has thrown potions
+     */
+    public record Names(Map<String, String> materials, Map<String, String> aliases, List<String> potions,
+            List<String> enchantments, List<String> dyes, List<String> pandaGenes, Map<String, Integer> entities,
+            List<String> entityPlurals, List<String> sameEntityPlurals, List<Vocabulary> vocabularies,
+            boolean thrownPotions) {
+
+        public Names {
+            materials = Collections.unmodifiableMap(new LinkedHashMap<>(materials));
+            aliases = Collections.unmodifiableMap(new LinkedHashMap<>(aliases));
+            potions = List.copyOf(potions);
+            enchantments = List.copyOf(enchantments);
+            dyes = List.copyOf(dyes);
+            pandaGenes = List.copyOf(pandaGenes);
+            entities = Collections.unmodifiableMap(new LinkedHashMap<>(entities));
+            entityPlurals = List.copyOf(entityPlurals);
+            sameEntityPlurals = List.copyOf(sameEntityPlurals);
+            vocabularies = List.copyOf(vocabularies);
+        }
+    }
+
+    /**
+     * The words that can come before some kinds of entity's names. {@code special} is {@code panda} where two genes
+     * can be written together ({@code lazy-aggressive panda}), {@code fish} where two dyes can ({@code red-blue
+     * kob}), or {@code null}.
+     */
+    public record Vocabulary(List<String> words, String special) {
+
+        public Vocabulary {
+            words = List.copyOf(words);
+        }
+    }
+
+    /** This export with {@code names} in its parser part. */
+    public SyntaxExport withNames(Names names) {
+        Parser p = parser;
+        return new SyntaxExport(format, neoskript, server, elements, types, functions, new Parser(p.conversions(),
+                p.typeProperties(), p.experiments(), p.scopes(), p.commandScope(), p.functionScope(), names));
     }
 
     /** The lower-case name of a kind, as the export writes it. */
@@ -316,6 +423,9 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
         if (parser.scope() >= 0) {
             map.put("scope", parser.scope());
         }
+        if (parser.eventDescription() != null) {
+            map.put("eventDescription", parser.eventDescription());
+        }
         return map;
     }
 
@@ -360,12 +470,47 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
             s.put("values", scope.values());
             s.put("plurals", scope.plurals());
             s.put("defaults", scope.defaults());
+            putIfAny(s, "missing", scope.missing());
+            putIfAny(s, "missingPlurals", scope.missingPlurals());
+            putIfAny(s, "excluded", scope.excluded());
+            putIfAny(s, "excludedPlurals", scope.excludedPlurals());
             scopes.add(s);
         }
         map.put("scopes", scopes);
         map.put("commandScope", parser.commandScope());
         map.put("functionScope", parser.functionScope());
+        if (parser.names() != null) {
+            Names names = parser.names();
+            Map<String, Object> n = new LinkedHashMap<>();
+            n.put("materials", new LinkedHashMap<>(names.materials()));
+            n.put("aliases", new LinkedHashMap<>(names.aliases()));
+            n.put("potions", names.potions());
+            n.put("enchantments", names.enchantments());
+            n.put("dyes", names.dyes());
+            n.put("pandaGenes", names.pandaGenes());
+            n.put("entities", new LinkedHashMap<>(names.entities()));
+            n.put("entityPlurals", names.entityPlurals());
+            n.put("sameEntityPlurals", names.sameEntityPlurals());
+            List<Object> vocabularies = new ArrayList<>();
+            for (Vocabulary vocabulary : names.vocabularies()) {
+                Map<String, Object> v = new LinkedHashMap<>();
+                v.put("words", vocabulary.words());
+                if (vocabulary.special() != null) {
+                    v.put("special", vocabulary.special());
+                }
+                vocabularies.add(v);
+            }
+            n.put("vocabularies", vocabularies);
+            n.put("thrownPotions", names.thrownPotions());
+            map.put("names", n);
+        }
         return map;
+    }
+
+    private static void putIfAny(Map<String, Object> map, String key, Map<String, String> values) {
+        if (!values.isEmpty()) {
+            map.put(key, new LinkedHashMap<>(values));
+        }
     }
 
     private static void flag(Map<String, Object> map, String key, boolean value) {
@@ -438,7 +583,7 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
                 flag(map, "ends"), flag(map, "suppressesWarnings"), flag(map, "sectionOnly"),
                 (String) map.get("experiment"), flag(map, "experimentSilent"), property, flag(map, "core"),
                 flag(map, "eventValue"), flag(map, "keepsEventValues"),
-                map.get("scope") instanceof Number n ? n.intValue() : -1);
+                map.get("scope") instanceof Number n ? n.intValue() : -1, (String) map.get("eventDescription"));
     }
 
     private static TypeParser readTypeParser(Map<String, Object> map) {
@@ -471,10 +616,36 @@ public record SyntaxExport(int format, String neoskript, String server, List<Ele
         List<Scope> scopes = new ArrayList<>();
         for (Object o : (List<Object>) map.getOrDefault("scopes", List.of())) {
             Map<String, Object> s = (Map<String, Object>) o;
-            scopes.add(new Scope(strings(s.get("values")), strings(s.get("plurals")), strings(s.get("defaults"))));
+            scopes.add(new Scope(strings(s.get("values")), strings(s.get("plurals")), strings(s.get("defaults")),
+                    texts(s.get("missing")), texts(s.get("missingPlurals")), texts(s.get("excluded")),
+                    texts(s.get("excludedPlurals"))));
         }
         return new Parser(conversions, properties, experiments, scopes, index(map.get("commandScope")),
-                index(map.get("functionScope")));
+                index(map.get("functionScope")), readNames((Map<String, Object>) map.get("names")));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Names readNames(Map<String, Object> map) {
+        if (map == null) {
+            return null;
+        }
+        Map<String, Integer> entities = new LinkedHashMap<>();
+        ((Map<String, Object>) map.get("entities")).forEach((name, index) -> entities.put(name,
+                ((Number) index).intValue()));
+        List<Vocabulary> vocabularies = new ArrayList<>();
+        for (Object o : (List<Object>) map.get("vocabularies")) {
+            Map<String, Object> v = (Map<String, Object>) o;
+            vocabularies.add(new Vocabulary(strings(v.get("words")), (String) v.get("special")));
+        }
+        return new Names(texts(map.get("materials")), texts(map.get("aliases")), strings(map.get("potions")),
+                strings(map.get("enchantments")), strings(map.get("dyes")), strings(map.get("pandaGenes")), entities,
+                strings(map.get("entityPlurals")), strings(map.get("sameEntityPlurals")), vocabularies,
+                flag(map, "thrownPotions"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> texts(Object map) {
+        return map == null ? Map.of() : (Map<String, String>) map;
     }
 
     private static int index(Object value) {

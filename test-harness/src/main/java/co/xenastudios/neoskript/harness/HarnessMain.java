@@ -25,6 +25,7 @@ import co.xenastudios.neoskript.harness.scenario.NeoSkriptRunScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptRuntimeErrorsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptSkriptTestsScenario;
 import co.xenastudios.neoskript.harness.scenario.NeoSkriptVariablesScenario;
+import co.xenastudios.neoskript.harness.scenario.ParserParityScenario;
 import co.xenastudios.neoskript.harness.scenario.SkillExamplesScenario;
 import co.xenastudios.neoskript.harness.scenario.SkriptConflictScenario;
 import co.xenastudios.neoskript.harness.scenario.SkriptCorpusScenario;
@@ -76,6 +77,7 @@ public final class HarnessMain {
             new DifferentialScenario(),
             new NeoSkriptCliScenario(),
             new SyntaxExportScenario(),
+            new ParserParityScenario(),
             new EventBenchmark(),
             new TickBenchmark(),
             new VariableBenchmark(),

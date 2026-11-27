@@ -1004,4 +1004,31 @@ public record EntityKind(String name, EntityType type, Class<? extends Entity> e
     static String name(EntityType type) {
         return type.getKey().getKey().replace('_', ' ');
     }
+
+    // ---------------------------------------------------------------- the syntax export
+
+    /**
+     * For the syntax export: every name a kind of entity has, with the index in {@code vocabularies} of the words
+     * that can come before it (one list for each class of entity); the plural names; and those whose plural is the
+     * same.
+     */
+    static void export(Map<String, Integer> names, List<co.xenastudios.neoskript.frontend.registry.SyntaxExport.Vocabulary> vocabularies,
+            java.util.Set<String> plurals, java.util.Set<String> samePlurals) {
+        Map<Class<?>, Integer> byClass = new HashMap<>();
+        Map<String, EntityKind> bases = new java.util.TreeMap<>(bases());
+        bases.forEach((name, base) -> names.put(name, byClass.computeIfAbsent(base.entityClass, c -> {
+            List<String> words = new ArrayList<>(VOCABULARIES.computeIfAbsent(c, k -> vocabulary(base)).keySet());
+            java.util.Collections.sort(words);
+            vocabularies.add(new co.xenastudios.neoskript.frontend.registry.SyntaxExport.Vocabulary(words,
+                    c == Panda.class ? "panda" : c == TropicalFish.class ? "fish" : null));
+            return vocabularies.size() - 1;
+        })));
+        plurals.addAll(PLURALS);
+        samePlurals.addAll(SAME_PLURALS);
+    }
+
+    /** Whether the server has thrown potions, which {@code thrown speed potion} names. */
+    static boolean hasThrownPotions() {
+        return thrownPotion() != null;
+    }
 }
