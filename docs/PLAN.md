@@ -9,7 +9,7 @@ A fast, modern, **clean-room** replacement for Skript. Existing `.sk` scripts ru
 ### Non-goals for 1.0
 - Loading Skript addons (planned for 1.x through the compat shim).
 - Versions before 1.21.4, Spigot/Bukkit, or Java < 21.
-- New language features that break Skript syntax. Any extensions are opt-in and come later.
+- New language features that break Skript syntax. Any extensions are opt-in and come later: [the design](LANGUAGE-EXTENSIONS.md).
 
 ## 2. Locked decisions
 
@@ -144,7 +144,7 @@ Milestones are ordered by dependency, not dated. A milestone is done when its ex
 | **M4** | Standard library | Types, converters, aliases, events, effects, expressions, conditions and commands, most-used first | ≥95% of the corpus behaves identically under differential testing, and all of Skript's own tests pass |
 | **M5** | Folia hardening and tooling | Region-ownership enforcement, the `run on` section, Folia differential tests, the migration CLI | The corpus runs on Folia without thread violations, and the CLI is released |
 | **M6** | Beta → 1.0 | Public beta on Modrinth and GitHub Releases, published benchmarks, a syntax-docs export for the docs site, bStats and the update checker (both can be turned off), bug burn-down | 1.0 is released |
-| **1.x** | After 1.0 | The Skript-addon shim (SkBee first), an optional native variable backend, opt-in language extensions. Done early, in M6: the LSP and editor extensions, and the addon API declared stable | |
+| **1.x** | After 1.0 | The Skript-addon shim (SkBee first), an optional native variable backend, opt-in language extensions ([design](LANGUAGE-EXTENSIONS.md): the opt-in, `using neoskript <name>`, is in; which extensions is decided later). Done early, in M6: the LSP and editor extensions, and the addon API declared stable | |
 
 ## 7. Top risks
 

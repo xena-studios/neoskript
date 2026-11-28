@@ -94,6 +94,24 @@ public record ParsedScript(SourceFile file, List<ParsedStructure> structures, Li
         this(file, structures, diagnostics, delays, Map.of());
     }
 
+    /**
+     * The NeoSkript language extensions the script asks for with {@code using neoskript <name>}, by name, in order:
+     * none for a script that runs as on Skript. Tools show them, as such a script won't run on Skript.
+     */
+    public java.util.SortedSet<String> extensions() {
+        java.util.SortedSet<String> names = new java.util.TreeSet<>();
+        for (ParsedStructure structure : structures) {
+            if (structure.structure().kind() == co.xenastudios.neoskript.frontend.structure.Structure.Kind.USING) {
+                String name = LanguageExtensions.extensionName(co.xenastudios.neoskript.frontend.structure.Structure
+                        .usingName(structure.structure().node().line()));
+                if (name != null) {
+                    names.add(name);
+                }
+            }
+        }
+        return names;
+    }
+
     /** Whether the trigger may have waited before the statement on {@code line}. */
     public DelayState delayBefore(Line line) {
         return delays.getOrDefault(line, DelayState.NOT_DELAYED);

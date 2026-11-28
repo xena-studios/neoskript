@@ -127,7 +127,9 @@ public final class ScriptCompiler {
                     Line using = structure.structure().node().line();
                     String feature = co.xenastudios.neoskript.frontend.structure.Structure.usingName(using);
                     features.add(feature.toLowerCase(java.util.Locale.ROOT));
-                    String warning = co.xenastudios.neoskript.runtime.ScriptFeatures.usingWarning(feature);
+                    // A language extension isn't one of Skript's experiments: the parser says if it doesn't exist.
+                    String warning = co.xenastudios.neoskript.frontend.parse.LanguageExtensions.extensionName(feature)
+                            != null ? null : co.xenastudios.neoskript.runtime.ScriptFeatures.usingWarning(feature);
                     if (warning != null) {
                         diagnostics.add(new Diagnostic(Severity.WARNING, script.file().name(), using.number(), 0, 0,
                                 warning));
