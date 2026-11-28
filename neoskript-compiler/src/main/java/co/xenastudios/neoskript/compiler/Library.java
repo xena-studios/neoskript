@@ -249,6 +249,11 @@ public final class Library implements Registrar {
         type("time", "time", co.xenastudios.neoskript.runtime.TimeOfDay.class);
         parser("time", co.xenastudios.neoskript.runtime.TimeOfDay::parse);
         literalParser("time", co.xenastudios.neoskript.runtime.TimeOfDay::parse);
+        // Skript's time period, which words where any value goes may be ('day'): read by its parser, not as a literal
+        // everywhere, as times already take the periods' names.
+        type("timeperiod", "time period", co.xenastudios.neoskript.runtime.TimePeriod.class);
+        parser("timeperiod", co.xenastudios.neoskript.runtime.TimePeriod::parse);
+        co.xenastudios.neoskript.runtime.TimePeriod.registerComparisons();
         type("script", "script", co.xenastudios.neoskript.runtime.ScriptRef.class);
         CoreSyntax.register(this);
         CoreCodecs.register(this);
