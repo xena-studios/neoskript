@@ -4734,6 +4734,12 @@ final class TriggerCompiler {
                 // reads it: left to the comparison. In a function there's none, and words are only words.
                 return;
             }
+            if (side instanceof Expr.Syntax element && library.binding(element.syntax().syntax())
+                    instanceof ElementFactory<?> factory && !setsUp(factory, element)) {
+                // Skript's comparison sets up its sides first, and a side that fails keeps its own error ('message'
+                // in a function: 'message' can only be used in the on chat event), as the comparison gives later.
+                return;
+            }
             if (words[i] == null && side instanceof Expr expr && !(expr instanceof Expr.Variable)) {
                 String type = valueType(expr);
                 TypeRef ref = type == null || type.equals(SyntaxRegistry.OBJECT) ? null : registry.resolveType(type);
@@ -4765,13 +4771,6 @@ final class TriggerCompiler {
             // Skript has read the whole line as a comparison first: its words, 'if 1', compared with the value.
             throw new CompileException(line, "Can't compare '" + conditional.group(1) + writtenText(first) + "' with "
                     + second);
-        }
-        for (int i = 0; i < 2; i++) {
-            if (words[i] != null && values.get(i) instanceof Expr.Syntax) {
-                // Words for an event value the event hasn't ('message' in a function): Skript reads them as that
-                // value first, and keeps its error ('message' can only be used in the on chat event).
-                return;
-            }
         }
         throw new CompileException(line, "Can't compare " + typeWithArticle(types[0]) + " with " + second);
     }
