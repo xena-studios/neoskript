@@ -4657,6 +4657,10 @@ final class TriggerCompiler {
             return;
         }
         List<Object> values = condition.match().values();
+        if (condition.syntax().id().equals("CondCompare")) {
+            entityWordsWithoutEntity(values);
+            uncomparable(values);
+        }
         if (condition.syntax().id().equals("CondCompare") && values.stream().anyMatch(v -> v instanceof Expr.Unresolved)) {
             try {
                 conditionChecked(condition, values);
@@ -4707,6 +4711,187 @@ final class TriggerCompiler {
             return;
         }
         conditionChecked(condition, values);
+    }
+
+    /**
+     * Skript's error for a comparison of two values whose types it has no comparator for ({@code CondCompare.init}):
+     * {@code 1 is "a"} compares an integer with a text. Words are the type Skript's comparison reads them as. In an
+     * 'if' or 'while' header with a value of a type on the right, Skript has first read the whole line as a
+     * comparison, of the words {@code if 1}, and that error is the one kept.
+     */
+    private void uncomparable(List<Object> values) throws CompileException {
+        if (values.size() != 2) {
+            return;
+        }
+        String[] words = new String[2];
+        String[] types = new String[2];
+        for (int i = 0; i < 2; i++) {
+            Object side = values.get(i);
+            words[i] = comparisonWords(side);
+            if (words[i] != null && eventClasses != null && !eventClasses.isEmpty()
+                    && (side instanceof Expr.Syntax || entityWords(words[i]))) {
+                // An event value, or the event's entity of a kind ('player'), this event may yet have, as Skript
+                // reads it: left to the comparison. In a function there's none, and words are only words.
+                return;
+            }
+            if (side instanceof Expr.Syntax element && library.binding(element.syntax().syntax())
+                    instanceof ElementFactory<?> factory && !setsUp(factory, element)) {
+                // Skript's comparison sets up its sides first, and a side that fails keeps its own error ('message'
+                // in a function: 'message' can only be used in the on chat event), as the comparison gives later.
+                return;
+            }
+            if (words[i] == null && side instanceof Expr expr && !(expr instanceof Expr.Variable)) {
+                String type = valueType(expr);
+                TypeRef ref = type == null || type.equals(SyntaxRegistry.OBJECT) ? null : registry.resolveType(type);
+                types[i] = ref == null ? null : ref.type().id();
+            }
+        }
+        // Words are read against the other side, the first side's first (CondCompare.attemptReconstruction).
+        if (words[0] != null) {
+            types[0] = wordTypeAgainst(words[0], types[1]);
+        }
+        if (words[1] != null) {
+            types[1] = wordTypeAgainst(words[1], types[0]);
+        }
+        // Only where a side is written out (a literal, a text or words): two other values' types are left to the
+        // comparison, which knows comparators this check doesn't.
+        boolean written = false;
+        for (int i = 0; i < 2; i++) {
+            written |= words[i] != null || values.get(i) instanceof Expr.Literal || values.get(i) instanceof Expr.Text;
+        }
+        if (!written || types[0] == null || types[1] == null || !skriptType(types[0]) || !skriptType(types[1])
+                || skriptComparable(types[0], types[1])) {
+            return;
+        }
+        String second = typeWithArticle(types[1]);
+        java.util.regex.Matcher conditional = java.util.regex.Pattern
+                .compile("(?i)^((?:else )?if |(?:do )?while )").matcher(source.strip());
+        if (words[1] == null && !literals(values.get(1)) && inSectionHeader() && conditional.lookingAt()
+                && values.get(0) instanceof Expr first && !writtenText(first).contains("\"")) {
+            // Skript has read the whole line as a comparison first: its words, 'if 1', compared with the value.
+            throw new CompileException(line, "Can't compare '" + conditional.group(1) + writtenText(first) + "' with "
+                    + second);
+        }
+        throw new CompileException(line, "Can't compare " + typeWithArticle(types[0]) + " with " + second);
+    }
+
+    /**
+     * The type Skript's comparison reads {@code words} as, against a value of type {@code other} ({@code null} if
+     * unknown): the first of its types, in its order, that reads them and can be compared with the other, else the
+     * other's type if that reads them, else the first type that reads them.
+     */
+    private String wordTypeAgainst(String words, String other) {
+        List<String> order = skriptTypeOrder();
+        if (other != null) {
+            for (String type : order) {
+                if (skriptComparable(other, type) && wordsAs(words, List.of(type)) != null) {
+                    return type;
+                }
+            }
+            if (wordsAs(words, List.of(other)) != null) {
+                return other;
+            }
+        }
+        return wordsType(words, order);
+    }
+
+    /** Whether Skript's {@code ExprEntity} reads {@code words} as the event's entity: a kind of entity, no item. */
+    private boolean entityWords(String words) {
+        if (wordsAs(words, List.of("itemtype")) != null) {
+            return false;
+        }
+        TypeRef named = registry.resolveType(words.strip().toLowerCase(Locale.ROOT));
+        if (named != null) {
+            return registry.isSubtype(named.type().id(), "entity");
+        }
+        TypeRef entity = registry.resolveType("entity");
+        return entity != null && library.request(entity, words).valueClass() != library.javaClass("entity");
+    }
+
+    /**
+     * Whether a side is literals only: a number, a boolean, a timespan ({@code 1 or 2}). Skript reads them as
+     * unparsed literals of no type, so reading the whole 'if' line as a comparison gives no error of its own.
+     */
+    private static boolean literals(Object side) {
+        return side instanceof Expr.Literal
+                || side instanceof Expr.ListOf list && list.items().stream().allMatch(TriggerCompiler::literals);
+    }
+
+    /** Whether {@code type} is one of Skript's own types, whose comparisons {@code skript-comparators.txt} lists. */
+    private static boolean skriptType(String type) {
+        return SKRIPT_TYPES.contains(type);
+    }
+
+    /** Whether Skript 2.17 can compare values of the two types, from {@code skript-comparators.txt}. */
+    static boolean skriptComparable(String a, String b) {
+        return SKRIPT_COMPARATORS.contains(a + "\t" + b) || SKRIPT_COMPARATORS.contains(b + "\t" + a);
+    }
+
+    /** Skript's comparable pairs of types, by NeoSkript's ids, as {@code a\tb}. */
+    private static final java.util.Set<String> SKRIPT_COMPARATORS;
+    /** Skript's types, by NeoSkript's ids. */
+    private static final java.util.Set<String> SKRIPT_TYPES;
+
+    static {
+        java.util.Set<String> pairs = new java.util.HashSet<>();
+        java.util.Set<String> types = new java.util.HashSet<>();
+        for (String line : loadLines("skript-comparators.txt")) {
+            String[] columns = line.split("\t");
+            pairs.add(skriptId(columns[0]) + "\t" + skriptId(columns[1]));
+            types.add(skriptId(columns[0]));
+            types.add(skriptId(columns[1]));
+        }
+        SKRIPT_COMPARATORS = java.util.Set.copyOf(pairs);
+        // Every type of Skript's is in a pair: anything compares with a type of types.
+        SKRIPT_TYPES = java.util.Set.copyOf(types);
+    }
+
+    /** NeoSkript's id for a Skript code name: Skript's 'entitydata' is 'entitytype', its 'entitytype' 'countedentitytype'. */
+    private static String skriptId(String code) {
+        return switch (code) {
+            case "entitydata" -> "entitytype";
+            case "entitytype" -> "countedentitytype";
+            default -> code;
+        };
+    }
+
+    /**
+     * Skript's error for a type property of a kind of entity written alone, compared where the event has no such
+     * entity ({@code if name of zombie is "x"} in a function): Skript first reads the words as the event's entity
+     * ({@code ExprEntity}), and its comparison keeps that error over the property's.
+     */
+    private void entityWordsWithoutEntity(List<Object> values) throws CompileException {
+        for (Object side : values) {
+            if (!(side instanceof Expr.Syntax syntax)) {
+                continue;
+            }
+            SyntaxRegistry.PropertySyntax property = registry.propertySyntax(syntax.syntax().syntax());
+            List<Object> arguments = syntax.syntax().match().values();
+            if (property == null || property.argument() >= arguments.size()
+                    || !(arguments.get(property.argument()) instanceof Expr.Unresolved words)
+                    || wordsAs(words.text(), List.of("itemtype")) != null) {
+                continue;
+            }
+            TypeRef entity = registry.resolveType("entity");
+            if (entity == null) {
+                return;
+            }
+            Library.EventValueRequest request = library.request(entity, words.text());
+            if (request.valueClass() == library.javaClass("entity")) {
+                continue;
+            }
+            Library.EventValueLookup lookup = library.eventValue(eventClasses == null ? List.of() : eventClasses,
+                    request.valueClass(), request.type(), 0, eventDescription());
+            if (lookup.getter() == null && lookup.error() != null) {
+                throw new CompileException(line, lookup.error());
+            }
+        }
+    }
+
+    /** A type by Skript's name for it, with its article: 'an integer', 'a boolean (yes/no)'. */
+    private String typeWithArticle(String type) {
+        String name = skriptTypeName(type);
+        return article(name) + " " + name;
     }
 
     /** Words that are a function's argument themselves, being compiled. */

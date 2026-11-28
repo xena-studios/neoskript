@@ -116,4 +116,22 @@ class LoadMessagesTest {
                 \tdelete event-world
                 """));
     }
+
+    @Test
+    void wordsForAnEventValueThatIsntThereKeepTheirErrorAgainstAValueOfAnotherType() {
+        // In a function, words for an event value no type compared with the other side reads are Skript's unparsed
+        // literal, which can't be made a value: its error is the one kept, not the comparison's (issue #92's review).
+        assertEquals(List.of("2: 'message' can only be used in the on chat event",
+                "4: 'victim' can only be used in the on vehicle destroy event, the on projectile hit event, the on"
+                        + " vehicle damage event, the on attempt attack event, the on death event or the on damage event",
+                "6: Can't compare 'if message' with a text"), errors("""
+                function f():
+                \tif message is 1:
+                \t\tbroadcast "a"
+                \tif victim is 1:
+                \t\tbroadcast "b"
+                \tif message is "a":
+                \t\tbroadcast "c"
+                """));
+    }
 }

@@ -176,9 +176,19 @@ final class ScriptManager {
         }
     }
 
-    /** Loads every script when the server starts. */
+    /**
+     * Loads every script when the server starts, on its first tick, as Skript does. Their load events wait for
+     * {@link #runStartupLoadEvents}, which runs them in the same tick, so they come before anything else that tick
+     * (a console command) runs, and after addons waiting for the scripts and saved variables carry on.
+     */
     synchronized void loadAll() throws IOException {
-        Outcome outcome = load(null, problem -> {}, false, ScriptManager::toConsole);
+        holdWalk = true;
+        Outcome outcome;
+        try {
+            outcome = load(null, problem -> {}, false, ScriptManager::toConsole);
+        } finally {
+            holdWalk = false;
+        }
         int triggers = loaded.values().stream().mapToInt(List::size).sum();
         // Skript doesn't say at config.yml's 'verbosity: low'.
         if (!Logging.logs(NeoSkriptConfig.Verbosity.NORMAL)) {
@@ -188,6 +198,23 @@ final class ScriptManager {
                 triggers, triggers == 1 ? "trigger" : "triggers", outcome.millis(),
                 outcome.errors() == 0 ? "" : " (" + outcome.errors() + (outcome.errors() == 1 ? " error" : " errors") + ")");
     }
+
+    /** Runs the load events {@link #loadAll} held, if it held any: on the global region's thread. */
+    void runStartupLoadEvents() {
+        Runnable walking;
+        synchronized (this) {
+            walking = heldWalk;
+            heldWalk = null;
+        }
+        if (walking != null) {
+            walking.run();
+        }
+    }
+
+    /** Whether the load running now is {@link #loadAll}'s, whose load events are held in {@link #heldWalk}. */
+    private boolean holdWalk;
+    /** The load events {@link #loadAll} held for {@link #runStartupLoadEvents}, or {@code null}. */
+    private Runnable heldWalk;
 
     /**
      * Reloads the scripts whose names {@code scope} accepts, or every script if it's {@code null}, for
@@ -496,6 +523,8 @@ final class ScriptManager {
             Runnable walking = () -> walk(order, loadWalk);
             if (now) {
                 walking.run();
+            } else if (holdWalk) {
+                heldWalk = walking;
             } else {
                 scheduler.runGlobal(walking);
             }
