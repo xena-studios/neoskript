@@ -248,6 +248,8 @@ final class CoreSyntax {
 
         // The script being compiled.
         library.core(SyntaxKind.EXPRESSION, CURRENT_SCRIPT, "script", List.of(), "[the] [current] script");
+        // As Skript writes it in errors, however it was written.
+        library.describe(CURRENT_SCRIPT, (info, arguments) -> "the current script");
 
         // Inline functions over a list's values: 'where [input is "a"]', 'transformed using [input + 1]',
         // 'reduced with [reduced value + input]'. 'input' is the value being looked at.

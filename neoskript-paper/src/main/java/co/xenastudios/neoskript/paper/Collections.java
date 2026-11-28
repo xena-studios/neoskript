@@ -66,31 +66,34 @@ final class Collections {
         registrar.changer(ScriptQueue.class, Changeable.Mode.RESET, (queue, values) -> queue.clear());
         registrar.changer(ScriptQueue.class, Changeable.Mode.RESET, (queue, values) -> queue.clear());
 
-        registrar.condition("CondIsEmpty", info -> {
-            boolean negated = info.pattern() == 1;
-            return (context, args) -> {
-                Object[] values = (Object[]) args[0];
-                if (values.length == 0) {
-                    // Nothing to check holds only when negated, as Skript's checks have it.
-                    return negated;
-                }
-                for (Object value : values) {
-                    boolean empty = switch (value) {
-                        case String text -> text.isEmpty();
-                        case java.util.Collection<?> collection -> collection.isEmpty();
-                        case Inventory inventory -> inventory.isEmpty();
-                        case Items.Slot slot -> slot.item() == null || slot.item().getType().isAir();
-                        // Anything with an amount is empty without any, as Skript's numbered things.
-                        case ItemType item -> item.amount() == 0;
-                        default -> false;
-                    };
-                    if (empty == negated) {
-                        return false;
+        if (TypeProperties.enabled()) {
+            // Skript's type property; without it, Skript's old 'is empty' (LegacyProperties).
+            registrar.condition("CondIsEmpty", info -> {
+                boolean negated = info.pattern() == 1;
+                return (context, args) -> {
+                    Object[] values = (Object[]) args[0];
+                    if (values.length == 0) {
+                        // Nothing to check holds only when negated, as Skript's checks have it.
+                        return negated;
                     }
-                }
-                return true;
-            };
-        }, "%objects% (is|are) empty", "%objects% (isn't|is not|aren't|are not) empty");
+                    for (Object value : values) {
+                        boolean empty = switch (value) {
+                            case String text -> text.isEmpty();
+                            case java.util.Collection<?> collection -> collection.isEmpty();
+                            case Inventory inventory -> inventory.isEmpty();
+                            case Items.Slot slot -> slot.item() == null || slot.item().getType().isAir();
+                            // Anything with an amount is empty without any, as Skript's numbered things.
+                            case ItemType item -> item.amount() == 0;
+                            default -> false;
+                        };
+                        if (empty == negated) {
+                            return false;
+                        }
+                    }
+                    return true;
+                };
+            }, "%objects% (is|are) empty", "%objects% (isn't|is not|aren't|are not) empty");
+        }
     }
 
     /** {@code the start of %queue%}: its first (or last) element, which stays; add to it to put values there. */

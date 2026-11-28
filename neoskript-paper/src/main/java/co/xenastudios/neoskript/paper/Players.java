@@ -43,6 +43,42 @@ final class Players {
         return value;
     }
 
+    /** Settable for entities and items: their custom name. Also Skript's old 'name of' ({@link LegacyProperties}). */
+    static final java.util.function.BiConsumer<Object, Object> RENAME = (owner, name) -> {
+        Component component = name == null ? null : Messages.component(name);
+        switch (owner) {
+            case org.bukkit.entity.Player player -> player.displayName(component);
+            // A boss bar's name is its title.
+            case org.bukkit.boss.BossBar bar -> bar.setTitle(component == null ? null : Messages.LEGACY_SECTION.serialize(component));
+            case Entity entity -> {
+                entity.customName(component);
+                // A named mob stays, as Skript has it.
+                if (entity instanceof org.bukkit.entity.LivingEntity living) {
+                    living.setRemoveWhenFarAway(component == null);
+                }
+            }
+            case ItemType item -> item.editMeta(meta -> meta.displayName(component));
+            case org.bukkit.inventory.ItemStack stack -> stack.editMeta(meta -> meta.displayName(component));
+            case Items.Slot slot -> {
+                org.bukkit.inventory.ItemStack stack = slot.item();
+                if (stack != null && !stack.getType().isAir()) {
+                    stack.editMeta(meta -> meta.displayName(component));
+                    slot.set(stack);
+                }
+            }
+            case org.bukkit.inventory.Inventory inventory -> retitle(inventory, component);
+            case org.bukkit.block.Block block -> {
+                if (block.getState() instanceof Nameable nameable) {
+                    nameable.customName(component);
+                    ((org.bukkit.block.BlockState) nameable).update(true, false);
+                }
+            }
+            // Anything else with a name, an addon's GUI among them.
+            case Nameable nameable -> nameable.customName(component);
+            default -> {}
+        }
+    };
+
     static void register(Registrar registrar) {
         // An offline player without a name is always its UUID, as in Skript.
         registrar.variableNameText(OfflinePlayer.class, player -> uuidsInVariableNames || player.getName() == null
@@ -54,63 +90,32 @@ final class Players {
                     case Entity entity -> entity.getUniqueId();
                     default -> null;
                 });
-        // Settable for entities and items: their custom name.
-        java.util.function.BiConsumer<Object, Object> rename = (owner, name) -> {
-            Component component = name == null ? null : Messages.component(name);
-            switch (owner) {
-                case org.bukkit.entity.Player player -> player.displayName(component);
-                // A boss bar's name is its title.
-                case org.bukkit.boss.BossBar bar -> bar.setTitle(component == null ? null : Messages.LEGACY_SECTION.serialize(component));
-                case Entity entity -> {
-                    entity.customName(component);
-                    // A named mob stays, as Skript has it.
-                    if (entity instanceof org.bukkit.entity.LivingEntity living) {
-                        living.setRemoveWhenFarAway(component == null);
+        java.util.function.BiConsumer<Object, Object> rename = RENAME;
+        if (TypeProperties.enabled()) {
+            // Skript's type properties; without them, Skript's old 'name of' (LegacyProperties).
+            // 'display name', 'nick name', 'chat name', 'custom name': a player's display name, or anything else's
+            // custom name. Giving an entity a display name shows it, as in Skript.
+            registrar.expression("PropExprName-display", "textcomponent", info -> {
+                java.util.function.BiConsumer<Object, Object> setter = (owner, name) -> {
+                    rename.accept(owner, name);
+                    if (owner instanceof Entity entity && !(owner instanceof org.bukkit.entity.Player)) {
+                        entity.setCustomNameVisible(name != null);
                     }
-                }
-                case ItemType item -> item.editMeta(meta -> meta.displayName(component));
-                case org.bukkit.inventory.ItemStack stack -> stack.editMeta(meta -> meta.displayName(component));
-                case Items.Slot slot -> {
-                    org.bukkit.inventory.ItemStack stack = slot.item();
-                    if (stack != null && !stack.getType().isAir()) {
-                        stack.editMeta(meta -> meta.displayName(component));
-                        slot.set(stack);
-                    }
-                }
-                case org.bukkit.inventory.Inventory inventory -> retitle(inventory, component);
-                case org.bukkit.block.Block block -> {
-                    if (block.getState() instanceof Nameable nameable) {
-                        nameable.customName(component);
-                        ((org.bukkit.block.BlockState) nameable).update(true, false);
-                    }
-                }
-                // Anything else with a name, an addon's GUI among them.
-                case Nameable nameable -> nameable.customName(component);
-                default -> {}
-            }
-        };
-        // 'display name', 'nick name', 'chat name', 'custom name': a player's display name, or anything else's
-        // custom name. Giving an entity a display name shows it, as in Skript.
-        registrar.expression("PropExprName-display", "textcomponent", info -> {
-            java.util.function.BiConsumer<Object, Object> setter = (owner, name) -> {
-                rename.accept(owner, name);
-                if (owner instanceof Entity entity && !(owner instanceof org.bukkit.entity.Player)) {
-                    entity.setCustomNameVisible(name != null);
-                }
-            };
-            // An entity's is its custom name, if it has one.
-            return new SettableProperty<>(Object.class, Object.class, owner -> switch (owner) {
-                case org.bukkit.entity.Player player -> player.displayName();
-                case Entity entity -> entity.customName();
-                default -> name(owner);
-            }, setter)
-                    .resettingTo((java.util.function.Consumer<Object>) owner -> setter.accept(owner, null))
-                    .deleting(owner -> setter.accept(owner, null));
-        }, Patterns.property("(display|nick|chat|custom)[ ]name[s]", "objects"));
-        // Resetting or deleting a name takes the custom name away.
-        registrar.expression("PropExprName", "textcomponent", info -> new SettableProperty<>(Object.class, Object.class,
-                Players::name, rename).resettingTo((java.util.function.Consumer<Object>) owner -> rename.accept(owner, null))
-                .deleting(owner -> rename.accept(owner, null)), Patterns.property("name[s]", "objects"));
+                };
+                // An entity's is its custom name, if it has one.
+                return new SettableProperty<>(Object.class, Object.class, owner -> switch (owner) {
+                    case org.bukkit.entity.Player player -> player.displayName();
+                    case Entity entity -> entity.customName();
+                    default -> name(owner);
+                }, setter)
+                        .resettingTo((java.util.function.Consumer<Object>) owner -> setter.accept(owner, null))
+                        .deleting(owner -> setter.accept(owner, null));
+            }, Patterns.property("(display|nick|chat|custom)[ ]name[s]", "objects"));
+            // Resetting or deleting a name takes the custom name away.
+            registrar.expression("PropExprName", "textcomponent", info -> new SettableProperty<>(Object.class, Object.class,
+                    Players::name, rename).resettingTo((java.util.function.Consumer<Object>) owner -> rename.accept(owner, null))
+                    .deleting(owner -> rename.accept(owner, null)), Patterns.property("name[s]", "objects"));
+        }
 
         // How long a player has played; players who aren't online count as none, as in Skript.
         registrar.expression("ExprTimePlayed", "timespan", info -> new SettableProperty<>(OfflinePlayer.class, Timespan.class,
@@ -392,7 +397,7 @@ final class Players {
      * Gives an inventory a new title, as Skript does: its viewers are shown a copy with the same contents.
      * Without a title, its kind's default one.
      */
-    private static void retitle(org.bukkit.inventory.Inventory inventory, Component title) {
+    static void retitle(org.bukkit.inventory.Inventory inventory, Component title) {
         if (inventory.getViewers().isEmpty() || !inventory.getType().isCreatable()) {
             return;
         }

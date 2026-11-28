@@ -82,7 +82,7 @@ public record NeoSkriptConfig(
                     co.xenastudios.neoskript.paper.TextComponentParser.DEFAULT_SAFE_TAGS, LinkParsing.DISABLED),
             new Variables(false, Interval.parse("5 minutes"), true, true, true),
             DatabaseSettings.DEFAULTS,
-            new Syntax(100, NamePattern.DEFAULT, true),
+            new Syntax(100, NamePattern.DEFAULT, true, true),
             Verbosity.NORMAL,
             new Warnings(true, true, true, true, true, Interval.parse("2 seconds")),
             new Hooks(true, true, true),
@@ -162,7 +162,7 @@ public record NeoSkriptConfig(
                 "strict (only http:// and https:// links) or lenient (anything with a dot, like example.com)."})
             LinkParsing parseLinks) {}
 
-    /** Settings for particular syntax, as Skript's options of the same names. All apply on /sk reload config. */
+    /** Settings for particular syntax, as Skript's options of the same names. */
     public record Syntax(
             @Comment({
                 "Skript's 'maximum target block distance': how many blocks away 'targeted block', 'target' and",
@@ -175,7 +175,13 @@ public record NeoSkriptConfig(
             @Comment({
                 "Skript's 'enable legacy tab completion event compatibility': other plugins can add tab completions to",
                 "script commands (through Bukkit's TabCompleteEvent). Off, a script command's completions are its own."})
-            boolean legacyTabCompletion) {}
+            boolean legacyTabCompletion,
+            @Comment({
+                "Skript's 'use type properties': true for Skript 2.13's type properties ('name of', 'amount of',",
+                "'is empty', 'contains', 'value of', 'x of' and the like), for anything that has them. false for the",
+                "syntax from before 2.13: for fewer types, with its errors, and no 'title', 'progress', 'style' or",
+                "'viewers' of anything. Applies on restart."})
+            boolean typeProperties) {}
 
     /**
      * Warnings when scripts load, as Skript's {@code disable ... warnings} options turned round: {@code false} turns
@@ -569,6 +575,9 @@ public record NeoSkriptConfig(
         }
         if (!hooks.equals(before.hooks)) {
             changed.add("hooks");
+        }
+        if (syntax.typeProperties != before.syntax.typeProperties) {
+            changed.add("syntax.type-properties");
         }
         return changed;
     }
