@@ -568,6 +568,31 @@ class LanguageTest {
         assertEquals(List.of("false", "unknown", "true", "<none>", "true"), said);
     }
 
+    @Test
+    void delayStateComparesWithItsWords() {
+        Library library = new Library();
+        library.enableTesting();
+        StandardLibrary.register(library);
+        library.effect("TestSay", info -> (context, args) -> said.add(Values.text(args[0])), "say %objects%");
+        List<ParsedScript> parsed = new ScriptLoader(library.registry()).load(List.of(new SourceFile("test.sk", """
+                test "delays":
+                \tif has delay before is false:
+                \t\tsay "not delayed"
+                \tif {_never} is set:
+                \t\twait 1 second
+                \tif has delay before is unknown:
+                \t\tsay "maybe delayed"
+                \tif has delay before is not false:
+                \t\tsay "not surely undelayed"
+                """)));
+        assertEquals(List.of(), parsed.getFirst().diagnostics());
+        CompiledScripts compiled = new ScriptCompiler(library, globals).compile(parsed);
+        assertEquals(List.of(), compiled.diagnostics());
+        compiled.linkFunctions();
+        compiled.triggers().getFirst().trigger().execute(new SimpleTriggerContext(null));
+        assertEquals(List.of("not delayed", "maybe delayed", "not surely undelayed"), said);
+    }
+
     /** Each error compiling {@code script}, as {@code <line>: <message>}. */
     private List<String> lineErrors(String script) {
         Library library = new Library();

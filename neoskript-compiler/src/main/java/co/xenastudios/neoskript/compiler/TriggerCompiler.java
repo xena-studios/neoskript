@@ -2428,7 +2428,7 @@ final class TriggerCompiler {
         if (!(looped instanceof Expr.Variable) && !"queue".equals(looped.type())
                 && (surelySingle(looped) || looped instanceof Expr.Unresolved words
                         && !words.text().strip().toLowerCase(Locale.ROOT).startsWith("the ")
-                        && unparsedValue(words.text()) != null && !itemWords(words.text()))) {
+                        && anyWords(words.text()) != null && !itemWords(words.text()))) {
             // A list is in brackets, as Skript's ExpressionList writes itself: '("a" or "b")'.
             String written = looped instanceof Expr.ListOf ? "(" + skriptText(looped) + ")" : skriptText(looped);
             throw new CompileException(line, "Can't loop '" + written + "' because it's only a single value");
@@ -4173,7 +4173,7 @@ final class TriggerCompiler {
             if (!lax || !Values.hasChanger(changeMode)) {
                 return false;
             }
-            changeValues(effect, mode, target);
+            changeValues(effect, mode, target, null);
             return true;
         }
         if (typed.accepted() == null) {
@@ -4183,7 +4183,7 @@ final class TriggerCompiler {
         if (mode.value >= 0) {
             checkChanger((Expr) effect.match().values().get(mode.value), typed.accepted(), changeMode, typed.what());
         }
-        changeValues(effect, mode, target);
+        changeValues(effect, mode, target, typed.accepted());
         return true;
     }
 
@@ -4191,10 +4191,21 @@ final class TriggerCompiler {
      * {@code give a diamond to player}: changes the target's values themselves, with the changers
      * registered for their classes.
      */
-    private void changeValues(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr target) throws CompileException {
+    private void changeValues(ParsedSyntax effect, CoreSyntax.ChangeMode mode, Expr target, Class<?>[] accepted)
+            throws CompileException {
         expression(target);
         if (mode.value >= 0) {
-            expression((Expr) effect.match().values().get(mode.value));
+            // Words are first tried as what the values take, as Skript's change effect reads them: 'set block at X
+            // to cactus' is the item, though where any value goes 'cactus' is the damage type.
+            List<String> outerLiteralTypes = literalTypes;
+            if (accepted != null) {
+                literalTypes = library.typesOf(accepted);
+            }
+            try {
+                expression((Expr) effect.match().values().get(mode.value));
+            } finally {
+                literalTypes = outerLiteralTypes;
+            }
         } else {
             method.visitInsn(ACONST_NULL);
         }
@@ -4639,6 +4650,12 @@ final class TriggerCompiler {
     // ---------------------------------------------------------------- elements
 
     private void condition(ParsedSyntax condition) throws CompileException {
+        if (isCore(condition, CoreSyntax.DELAY_CHECK)) {
+            // Known while compiling, as Skript's CondHasDelayBefore decides it while parsing.
+            method.visitInsn(CoreSyntax.delayCheckHolds(condition.match(), script.delayBefore(currentLine))
+                    ? ICONST_1 : ICONST_0);
+            return;
+        }
         List<Object> values = condition.match().values();
         if (condition.syntax().id().equals("CondCompare")) {
             entityWordsWithoutEntity(values);
@@ -5070,8 +5087,14 @@ final class TriggerCompiler {
         co.xenastudios.neoskript.api.registration.Registrar.Describer describer = library.describer(condition.syntax().id());
         if (describer != null) {
             List<String> arguments = new ArrayList<>();
-            for (Object argument : condition.match().values()) {
-                arguments.add(skriptText(argument));
+            List<Object> values = condition.match().values();
+            // A comparison's words are written as what it reads them as ('7:00 is equal to 6:00-18:00').
+            String[] read = condition.syntax().id().equals("CondCompare") ? comparedWordTypes(values) : null;
+            for (int i = 0; i < values.size(); i++) {
+                Object argument = values.get(i);
+                Object value = read != null && i < read.length && read[i] != null
+                        && argument instanceof Expr.Unresolved words ? wordsAs(words.text(), List.of(read[i])) : null;
+                arguments.add(value != null ? Values.text(value) : skriptText(argument));
             }
             ParsedSyntax outerSettingUp = settingUp;
             String outerSource = settingUpSource;
@@ -5467,7 +5490,7 @@ final class TriggerCompiler {
                 for (String type : skriptTypeOrder()) {
                     Class<?> c = library.javaClass(type);
                     if (c != null && co.xenastudios.neoskript.runtime.Comparison.hasEquality(otherClass, c)
-                            && wordsAs(words, List.of(type)) != null) {
+                            && wordsAs(words, List.of(type)) != null && !periodAsTime(type, words)) {
                         return type;
                     }
                 }
@@ -6244,14 +6267,12 @@ final class TriggerCompiler {
             // in a function is the type, as there's no world.
             return null;
         }
-        // An event value's words may be another value ('entity' is the entity type); an element's only its type.
-        Object value = null;
-        if (isCore(syntax.syntax(), CoreSyntax.EVENT_VALUE)) {
-            // As the types its words are first tried as, where there are any: in a comparison, what Skript reads.
-            value = literalTypes == null ? null : wordsAs(words, literalTypes);
-            if (value == null) {
-                value = anyWords(words);
-            }
+        // The words are what Skript's unparsed literal reads them as: first as the types they're tried as, where
+        // there are any (in a comparison, what Skript reads), then in Skript's order ('entity' is the entity type,
+        // 'egg' outside an egg throw the spawn reason).
+        Object value = literalTypes == null ? null : withoutServer(() -> wordsAs(words, literalTypes));
+        if (value == null) {
+            value = anyWords(words);
         }
         if (value != null) {
             return value;
@@ -6272,23 +6293,13 @@ final class TriggerCompiler {
     }
 
     /**
-     * Words nothing else reads, where any object goes: a type's name that some type reads ('player', 'zombie') as
-     * Skript's unparsed literal reads it ({@link #anyWords}), other words as the value they name ('creative' is
-     * the game mode).
-     */
-    private Object unparsedValue(String words) {
-        Object value = library.literal(words);
-        // Only words some type reads: others may be what an addon reads, such as a class skript-reflect imported.
-        return value != null && registry.resolveType(words.strip()) != null ? anyWords(words) : value;
-    }
-
-    /**
      * {@code words} where any object goes, as Skript's unparsed literal reads them: the first of Skript's types, in
      * its order, whose parser reads them. Its type of types comes among them, which reads a type's name as the type:
-     * 'player' is the inventory close reason, 'zombie' the entity type, 'time' the type. {@code null} if none does.
+     * 'player' is the inventory close reason, 'zombie' the entity type, 'time' the type, 'fall' the damage type and
+     * 'potion' the heal reason. What an addon reads them as comes first. {@code null} if nothing reads them.
      */
     private Object anyWords(String words) {
-        Object own = library.literal(words);
+        Object own = withoutServer(() -> library.literal(words));
         if (own != null && !skriptsValue(own)) {
             // What an addon reads them as, such as a class skript-reflect imported ('Integer'), comes first.
             return own;
@@ -6301,13 +6312,7 @@ final class TriggerCompiler {
                     return new co.xenastudios.neoskript.runtime.TypeValue(type.type().name(), javaClass);
                 }
             } else if (registry.type(id) != null) {
-                Object value;
-                try {
-                    value = wordsAs(words, List.of(id));
-                } catch (RuntimeException | LinkageError needsServer) {
-                    // A parser that needs a running server isn't asked.
-                    value = null;
-                }
+                Object value = withoutServer(() -> skriptParse(id, words));
                 if (value != null) {
                     return value;
                 }
@@ -6315,6 +6320,37 @@ final class TriggerCompiler {
         }
         // Types Skript doesn't have, in NeoSkript's order.
         return own;
+    }
+
+    /**
+     * {@code words} as type {@code id}'s parser reads them, as Skript's: a named type by all its names (a heal reason
+     * is 'potion', though NeoSkript's literals leave that word to the item), others by their literal parser. A time
+     * isn't a time period's name ('day'), which Skript reads as the period.
+     */
+    private Object skriptParse(String id, String words) {
+        if (periodAsTime(id, words)) {
+            return null;
+        }
+        java.util.function.Function<String, ?> parser = library.namedValues(id) != null || id.equals("timeperiod")
+                ? library.parser(id) : library.literalParser(id);
+        return parser == null ? null : parser.apply(words.strip());
+    }
+
+    /**
+     * Whether {@code words} are a time period's name ('day') read as a time: Skript's time doesn't read them, its
+     * time period does ('7:00 is day' is whether it's day). Where a time is wanted, NeoSkript's time takes them.
+     */
+    private static boolean periodAsTime(String type, String words) {
+        return type.equals("time") && TIME_PERIODS.containsKey(words.strip().toLowerCase(Locale.ROOT));
+    }
+
+    /** What {@code read} gives, or {@code null} if it needs a running server it hasn't (as in unit tests). */
+    private static Object withoutServer(java.util.function.Supplier<?> read) {
+        try {
+            return read.get();
+        } catch (RuntimeException | LinkageError needsServer) {
+            return null;
+        }
     }
 
     /** Whether {@code value} is of one of Skript's own types, not an addon's. */
@@ -7282,7 +7318,7 @@ final class TriggerCompiler {
                 Object value = wordsAs(unresolved.text(), literalTypes);
                 // Where any value goes, Skript's parsers don't take 'the': 'the stone' is nothing there.
                 if (value == null && !unresolved.text().strip().toLowerCase(Locale.ROOT).startsWith("the ")) {
-                    value = unparsedValue(unresolved.text());
+                    value = anyWords(unresolved.text());
                     if (value != null) {
                         if (inList == 0 && callArguments == 0) {
                             multipleTypesWarning(unresolved.text().strip());
@@ -7310,7 +7346,8 @@ final class TriggerCompiler {
         for (String name : types) {
             TypeRef ref = registry.resolveType(name);
             java.util.function.Function<String, ?> parser = ref == null ? null : library.literalParser(ref.type().id());
-            if (parser == null && ref != null && library.namedValues(ref.type().id()) != null) {
+            if (parser == null && ref != null && (library.namedValues(ref.type().id()) != null
+                    || ref.type().id().equals("timeperiod"))) {
                 // A named type's words: 'normal' is the environment where an environment is compared.
                 parser = library.parser(ref.type().id());
             }

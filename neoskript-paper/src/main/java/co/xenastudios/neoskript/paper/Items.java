@@ -272,6 +272,23 @@ final class Items {
                 .filter(each -> each.material().isItem()).toArray());
         registrar.cloner(ItemStack.class, ItemStack::clone);
         registrar.parser("itemtype", ItemType::parse);
+        // 'X parsed as item stack', as Skript's item stack parser: an item that's one material, and an item, not a
+        // block with none (fire).
+        registrar.parser("itemstack", text -> {
+            ItemType item = ItemType.parse(text);
+            if (item == null) {
+                return null;
+            }
+            if (item.alternatives().size() != 1) {
+                co.xenastudios.neoskript.runtime.Values.parseError("'" + text + "' represents multiple materials");
+                return null;
+            }
+            if (!item.material().isItem()) {
+                co.xenastudios.neoskript.runtime.Values.parseError("'" + text + "' cannot represent an item");
+                return null;
+            }
+            return item.stack();
+        });
         // 'X is stone' holds for any stone, named or not; 'X is stone named "a"' only for one with that name.
         // An entity is the item it comes from: a boat is a boat item, a dropped item the item it is.
         registrar.comparison(org.bukkit.entity.Entity.class, ItemType.class, (entity, item) -> {
@@ -631,29 +648,32 @@ final class Items {
         }, "%itemtypes/itemstacks/entities% (is|are) of type[s] %itemtypes/entitytypes%",
                 "%itemtypes/itemstacks/entities% (isn't|is not|aren't|are not) of type[s] %itemtypes/entitytypes%");
 
-        // 'player has 5 diamonds': an inventory holds the items.
-        registrar.condition("CondHasItems", info -> {
-            boolean negated = info.pattern() == 1;
-            return (context, args) -> {
-                Object[] inventories = (Object[]) args[0];
-                for (Object value : inventories) {
-                    Inventory inventory = value instanceof Inventory i ? i
-                            : value instanceof InventoryHolder holder ? holder.getInventory() : null;
-                    if (inventory == null) {
-                        return false;
+        // Skript's type properties; without them, the old CondContains has 'has' (LegacyProperties).
+        if (TypeProperties.enabled()) {
+            // 'player has 5 diamonds': an inventory holds the items.
+            registrar.condition("CondHasItems", info -> {
+                boolean negated = info.pattern() == 1;
+                return (context, args) -> {
+                    Object[] inventories = (Object[]) args[0];
+                    for (Object value : inventories) {
+                        Inventory inventory = value instanceof Inventory i ? i
+                                : value instanceof InventoryHolder holder ? holder.getInventory() : null;
+                        if (inventory == null) {
+                            return false;
+                        }
+                        boolean has = true;
+                        for (ItemStack stack : stacks((Object[]) args[1])) {
+                            has &= inventory.containsAtLeast(stack, stack.getAmount());
+                        }
+                        if (has == negated) {
+                            return false;
+                        }
                     }
-                    boolean has = true;
-                    for (ItemStack stack : stacks((Object[]) args[1])) {
-                        has &= inventory.containsAtLeast(stack, stack.getAmount());
-                    }
-                    if (has == negated) {
-                        return false;
-                    }
-                }
-                return inventories.length > 0;
-            };
-        }, "%inventoryholders/inventories% (has|have) %itemtypes% [in [(the[ir]|his|her|its)] inventory]",
-                "%inventoryholders/inventories% (doesn't|does not|do not|don't) have %itemtypes% [in [(the[ir]|his|her|its)] inventory]");
+                    return inventories.length > 0;
+                };
+            }, "%inventoryholders/inventories% (has|have) %itemtypes% [in [(the[ir]|his|her|its)] inventory]",
+                    "%inventoryholders/inventories% (doesn't|does not|do not|don't) have %itemtypes% [in [(the[ir]|his|her|its)] inventory]");
+        }
     }
 
     /**

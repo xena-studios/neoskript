@@ -83,16 +83,39 @@ public final class Values {
     @SuppressWarnings("unchecked")
     public static Object parse(Function<?, ?> parser, Object text, String what) {
         Object value = single(text);
-        if (value == null) {
+        // Only text is parsed, as Skript's '%string% parsed as': what a converter turns into text (a UUID, a
+        // component) is that text, and anything else, like an item, gives nothing.
+        if (!(convertOne(value, String.class) instanceof String string)) {
             return null;
         }
-        String string = text(value);
         lastParseError = null;
-        Object parsed = ((Function<String, ?>) parser).apply(string.strip());
+        parserError.remove();
+        Object parsed;
+        String said;
+        try {
+            parsed = ((Function<String, ?>) parser).apply(string.strip());
+        } finally {
+            said = parserError.get();
+            parserError.remove();
+        }
         if (parsed == null) {
-            lastParseError = string + " could not be parsed as " + what;
+            lastParseError = said != null ? said : string + " could not be parsed as " + what;
         }
         return parsed;
+    }
+
+    /**
+     * What the parser running on this thread said was wrong, for {@link #parseError}; or {@code null}. Per
+     * thread, as Folia's regions parse at once: one region's parser mustn't word another's error.
+     */
+    private static final ThreadLocal<String> parserError = new ThreadLocal<>();
+
+    /**
+     * Says why the parser running for {@code parsed as} turns its text down, as Skript's parsers log an error
+     * ({@code 'any sword' represents multiple materials}): that's then the last parse error.
+     */
+    public static void parseError(String message) {
+        parserError.set(message);
     }
 
     /** Skript's {@code the last parse error}: why the last {@code parsed as} failed, or {@code null}. */

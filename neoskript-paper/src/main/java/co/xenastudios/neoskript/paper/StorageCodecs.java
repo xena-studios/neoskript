@@ -105,6 +105,22 @@ final class StorageCodecs {
                 return new co.xenastudios.neoskript.runtime.TimeOfDay(in.intField("time"));
             }
         });
+        // A time period is where it starts and ends, as Skript's Timeperiod saves its two fields.
+        registrar.storage("timeperiod", co.xenastudios.neoskript.runtime.TimePeriod.class, new VariableCodec<>() {
+            @Override
+            public void encode(co.xenastudios.neoskript.runtime.TimePeriod period, BinaryWriter out) {
+                out.beginObject(2);
+                out.intField("start", period.start());
+                out.intField("end", period.end());
+            }
+
+            @Override
+            public co.xenastudios.neoskript.runtime.TimePeriod decode(BinaryReader in) {
+                in.beginObject();
+                int start = in.intField("start");
+                return new co.xenastudios.neoskript.runtime.TimePeriod(start, in.intField("end"));
+            }
+        });
         // A block is its world and coordinates.
         registrar.storage("block", org.bukkit.block.Block.class, new VariableCodec<>() {
             @Override

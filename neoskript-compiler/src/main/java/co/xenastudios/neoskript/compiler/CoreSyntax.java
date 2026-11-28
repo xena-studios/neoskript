@@ -170,13 +170,28 @@ final class CoreSyntax {
         // Whether the trigger may have waited at this point: true, false or unknown.
         library.literalType("kleenean", "kleenean", java.util.Set.of("unknown"), word -> word);
         library.core(SyntaxKind.EXPRESSION, HAS_DELAY, "kleenean", List.of(), "[the] has delay before");
+        // Skript's CondHasDelayBefore: whether it's so is known while parsing, and with 'failing if wrong' it's an
+        // error if it isn't. Its own condition, so 'has delay before is unknown' is never a comparison.
         library.core(SyntaxKind.CONDITION, DELAY_CHECK, null, List.of(),
-                "has delay before is (true:true|false:false|unknown:unknown) failing if wrong");
+                "has delay before is[(not:n't|not: not)] (true:true|false:false|unknown:unknown) [init:failing if wrong]");
         library.check(SyntaxKind.CONDITION, DELAY_CHECK, (match, delay) -> {
-            String expected = match.hasTag("true") ? "true" : match.hasTag("false") ? "false" : "unknown";
-            String actual = kleenean(delay);
-            return expected.equals(actual) ? null : "has delay before is " + actual + ", not " + expected;
+            if (!match.hasTag("init") || delayCheckHolds(match, delay)) {
+                return null;
+            }
+            String expected = (match.hasTag("not") ? "not " : "") + expectedDelay(match);
+            return "has delay before is " + kleenean(delay) + ", not " + expected;
         });
+    }
+
+    /** The delay state {@code has delay before is X} names: true, false or unknown. */
+    private static String expectedDelay(co.xenastudios.neoskript.frontend.pattern.MatchResult match) {
+        return match.hasTag("true") ? "true" : match.hasTag("false") ? "false" : "unknown";
+    }
+
+    /** Whether {@code has delay before is [not] X} holds where the trigger's delay state is {@code delay}. */
+    static boolean delayCheckHolds(co.xenastudios.neoskript.frontend.pattern.MatchResult match,
+            co.xenastudios.neoskript.frontend.registry.DelayState delay) {
+        return expectedDelay(match).equals(kleenean(delay)) != match.hasTag("not");
     }
 
     static void register(Library library) {
@@ -248,6 +263,8 @@ final class CoreSyntax {
 
         // The script being compiled.
         library.core(SyntaxKind.EXPRESSION, CURRENT_SCRIPT, "script", List.of(), "[the] [current] script");
+        // As Skript writes it in errors, however it was written.
+        library.describe(CURRENT_SCRIPT, (info, arguments) -> "the current script");
 
         // Inline functions over a list's values: 'where [input is "a"]', 'transformed using [input + 1]',
         // 'reduced with [reduced value + input]'. 'input' is the value being looked at.

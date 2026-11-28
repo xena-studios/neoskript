@@ -20,7 +20,8 @@ import java.util.Locale;
  *
  * <pre>{@code
  * {"diagnostics": [{"severity": "error", "line": 3, "column": 4, "length": 5, "message": "..."}],
- *  "outline": [{"kind": "event", "line": 1, "text": "on join"}]}
+ *  "outline": [{"kind": "event", "line": 1, "text": "on join"}],
+ *  "extensions": ["name"]}
  * }</pre>
  *
  * Lines are 1-based, columns 0-based; a length of 0 means the whole line.
@@ -78,6 +79,13 @@ public final class WebParser {
                 out.append(",\"name\":").append(Json.quote(command.name()));
             }
             out.append('}');
+        }
+        // The language extensions it asks for: a script with any won't run on Skript.
+        out.append("],\"extensions\":[");
+        first = true;
+        for (String extension : script.extensions()) {
+            out.append(first ? "" : ",").append(Json.quote(extension));
+            first = false;
         }
         out.append("],\"elements\":").append(Elements.of(script));
         return out.append("}").toString();

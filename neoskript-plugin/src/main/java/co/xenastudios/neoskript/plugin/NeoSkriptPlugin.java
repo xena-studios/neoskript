@@ -149,6 +149,9 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         // NeoSkript (and Skript addons, through NeoSkriptCompat) can ask what types there are. Addons' syntax goes
         // with the hooks': before comparisons and what matches almost anything. With addons, it's registered on the
         // first tick, at that place.
+        // Which of Skript's property syntax there is ('use type properties'): fixed until a restart, as the registry is
+        // built once.
+        co.xenastudios.neoskript.paper.TypeProperties.enabled(settings.syntax().typeProperties());
         StandardLibrary.register(library, registrar -> {
             if (hooks) {
                 co.xenastudios.neoskript.paper.Hooks.register(registrar, getPluginMeta().getVersion(), getSLF4JLogger());
