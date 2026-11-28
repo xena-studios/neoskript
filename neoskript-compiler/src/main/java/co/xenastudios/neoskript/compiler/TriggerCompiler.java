@@ -4766,6 +4766,13 @@ final class TriggerCompiler {
             throw new CompileException(line, "Can't compare '" + conditional.group(1) + writtenText(first) + "' with "
                     + second);
         }
+        for (int i = 0; i < 2; i++) {
+            if (words[i] != null && values.get(i) instanceof Expr.Syntax) {
+                // Words for an event value the event hasn't ('message' in a function): Skript reads them as that
+                // value first, and keeps its error ('message' can only be used in the on chat event).
+                return;
+            }
+        }
         throw new CompileException(line, "Can't compare " + typeWithArticle(types[0]) + " with " + second);
     }
 

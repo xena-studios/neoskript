@@ -285,8 +285,16 @@ public final class NeoSkriptPlugin extends JavaPlugin {
         }, api::ready, getSLF4JLogger());
         // As Skript: taking Vault's services and loading scripts wait for the server to start, when every plugin has
         // enabled and registered its services, and the worlds have had their first save, which no 'on world save'
-        // sees. With addons, so does registering the syntax, for theirs.
-        getServer().getGlobalRegionScheduler().run(this, task -> start.run());
+        // sees. With addons, so does registering the syntax, for theirs. The scripts' load events run in that tick,
+        // as Skript runs them as it loads, before any console command: after addons waiting for NeoSkript carry on,
+        // so they see the variables as they were saved.
+        getServer().getGlobalRegionScheduler().run(this, task -> {
+            try {
+                start.run();
+            } finally {
+                scripts.runStartupLoadEvents();
+            }
+        });
         // D15: tell admins about newer versions on Modrinth, opt-out with `update-checker: false`. Test servers
         // never check.
         if (!TestRunner.enabled()) {
